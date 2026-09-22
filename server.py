@@ -22,7 +22,8 @@ def index():
 def static_files(path):
     return send_from_directory(".", path)
 
-# Oyunun skorları çektiği adres (/scores)
+# --- 1. SKOR TABLOSU ENDPOINT'LERİ (Liderlik Tablosu) ---
+
 @app.route("/scores", methods=["GET"])
 def get_scores():
     if not supabase:
@@ -33,7 +34,6 @@ def get_scores():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Oyunun skoru kaydettiği adres (/submit)
 @app.route("/submit", methods=["POST"])
 def add_score():
     if not supabase:
@@ -60,6 +60,69 @@ def add_score():
         return jsonify({"success": True, "data": response.data})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# --- 2. STEAM OYUNCU & İLERLEME ENDPOINT'LERİ (Gems, Skinler vb.) ---
+
+@app.route("/get_player", methods=["POST"])
+def get_player():
+    if not supabase:
+        return jsonify({"error": "Supabase bağlantısı yok!"}), 500
+    try:
+        data = request.json
+        steam_id = data.get("steam_id")
+        name = data.get("name", "Steam Oyuncusu")
+        
+        if not steam_id:
+            return jsonify({"error": "steam_id gereklidir!"}), 400
+
+        # Oyuncuyu benzersiz steam_id'si ile veritabanında arıyoruz
+        response = supabase.table("players").select("*").eq("steam_id", steam_id).execute()
+        
+        if response.data and len(response.data) > 0:
+            return jsonify({"success": True, "data": response.data[0]})
+        else:
+            # Oyuncu ilk defa giriyorsa sıfır elmas ve default skinle kayıt açıyoruz
+            new_player = {
+                "steam_id": steam_id,
+                "name": name,
+                "gems": 0,
+                "skins": "default",
+                "selected_skin": "default"
+            }
+            ins_res = supabase.table("players").insert(new_player).execute()
+            return jsonify({"success": True, "data": ins_res.data[0]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/update_player", methods=["POST"])
+def update_player():
+    if not supabase:
+        return jsonify({"error": "Supabase bağlantısı yok!"}), 500
+    try:
+        data = request.json
+        steam_id = data.get("steam_id")
+        gems = data.get("gems")
+        selected_skin = data.get("selected_skin")
+        skins = data.get("skins")
+        
+        if not steam_id:
+            return jsonify({"error": "steam_id gereklidir!"}), 400
+
+        payload = {}
+        if gems is not None:
+            payload["gems"] = int(gems)
+        if selected_skin is not None:
+            payload["selected_skin"] = selected_skin
+        if skins is not None:
+            payload["skins"] = skins
+
+        # Steam ID'ye göre oyuncunun verilerini güvenle güncelliyoruz
+        response = supabase.table("players").update(payload).eq("steam_id", steam_id).execute()
+        return jsonify({"success": True, "data": response.data})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
