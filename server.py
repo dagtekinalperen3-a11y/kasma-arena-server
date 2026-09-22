@@ -1,8 +1,10 @@
 import os
 from flask import Flask, jsonify, request, send_from_directory
+from flask_cors import CORS
 from supabase import create_client, Client
 
 app = Flask(__name__, static_folder=".")
+CORS(app)  # CORS sorunlarını önlemek için
 
 # Supabase bağlantı bilgileri (Render Environment değişkenlerinden alınır)
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
@@ -20,7 +22,8 @@ def index():
 def static_files(path):
     return send_from_directory(".", path)
 
-@app.route("/api/scores", methods=["GET"])
+# Oyunun skorları çektiği adres (/scores)
+@app.route("/scores", methods=["GET"])
 def get_scores():
     if not supabase:
         return jsonify({"error": "Supabase bağlantısı yapılandırılmamış!"}), 500
@@ -30,7 +33,8 @@ def get_scores():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/api/scores", methods=["POST"])
+# Oyunun skoru kaydettiği adres (/submit)
+@app.route("/submit", methods=["POST"])
 def add_score():
     if not supabase:
         return jsonify({"error": "Supabase bağlantısı yapılandırılmamış!"}), 500
