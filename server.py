@@ -110,6 +110,7 @@ def update_player():
         gems = data.get("gems")
         selected_skin = data.get("selected_skin")
         skins = data.get("skins")
+        name = data.get("name")
         
         if not steam_id:
             return jsonify({"error": "steam_id gereklidir!"}), 400
@@ -121,6 +122,8 @@ def update_player():
             payload["selected_skin"] = selected_skin
         if skins is not None:
             payload["skins"] = skins
+        if name is not None:
+            payload["name"] = name
 
         # Steam ID'ye göre oyuncunun verilerini güvenle güncelliyoruz[cite: 1]
         response = supabase.table("players").update(payload).eq("steam_id", steam_id).execute()
