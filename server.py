@@ -1,106 +1,129 @@
 import os
-import requests
-from flask import Flask, jsonify, request
-from supabase import Client, create_client
+from flask import Flask, jsonify, request, send_from_directory
+from flask_cors import CORS
+from supabase import create_client, Client
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder=".")
+CORS(app)  # CORS sorunlarını önlemek için
 
-# Supabase Bilgilerin (Kendi bilgilerini buraya koyarsın)
-SUPABASE_URL = "SENIN_SUPABASE_URL"
-SUPABASE_KEY = "SENIN_SUPABASE_KEY"
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Supabase bağlantı bilgileri (Render Environment değişkenlerinden alınır)
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
-# ==========================================
-# AYARLAR (Yayın günü sadece burayı değiştireceksin)
-# ==========================================
-DEV_MODE = True  # Şu an test için True. Yayın günü False yapacaksın!
-STEAM_API_KEY = "BURAYA_VALVE_API_KEY_GELECEK"
-STEAM_APP_ID = "480"  # Test için 480, kendi oyunun çıkınca gerçek App ID
+supabase: Client = None
+if SUPABASE_URL and SUPABASE_KEY:
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+@app.route("/")
+def index():
+    return send_from_directory(".", "index.html")
+
+@app.route("/<path:path>")
+def static_files(path):
+    return send_from_directory(".", path)
+
+# --- 1. SKOR TABLOSU ENDPOINT'LERİ (Liderlik Tablosu) ---
+
+@app.route("/scores", methods=["GET"])
+def get_scores():
+    if not supabase:
+        return jsonify({"error": "Supabase bağlantısı yapılandırılmamış!"}), 500
+    try:
+        response = supabase.table("scores").select("*").order("score", desc=True).limit(10).execute()
+        return jsonify(response.data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/submit", methods=["POST"])
+def add_score():
+    if not supabase:
+        return jsonify({"error": "Supabase bağlantısı yapılandırılmamış!"}), 500
+    try:
+        data = request.json
+        name = data.get("name", "Anonim")
+        score = int(data.get("score", 0))
+        kills = int(data.get("kills", 0))
+        wave = int(data.get("wave", 0))
+        run_time = float(data.get("run_time", 0))
+        created_at = float(data.get("created_at", 0))
+
+        payload = {
+            "name": name,
+            "score": score,
+            "kills": kills,
+            "wave": wave,
+            "run_time": run_time,
+            "created_at": created_at
+        }
+        
+        response = supabase.table("scores").insert(payload).execute()
+        return jsonify({"success": True, "data": response.data})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
-def steam_biletini_dogrula(steam_id, ticket):
-  """Valve Web API kullanarak biletin gerçek olup olmadığını doğrular."""
-  if DEV_MODE:
-    return True  # Test modundaysak Valve'a sormadan direkt onay ver
-
-  url = "https://partner.steam-api.com/ISteamUserAuth/AuthenticateUserTicket/v1/"
-  params = {
-      "key": STEAM_API_KEY,
-      "appid": STEAM_APP_ID,
-      "ticket": ticket,
-  }
-
-  try:
-    response = requests.get(url, params=params)
-    data = response.json()
-    # Valve'dan gelen yanıtta kullanıcı ID'si eşleşiyor mu kontrol et
-    if "response" in data and "params" in data["response"]:
-      gercek_id = data["response"]["params"].get("steamid")
-      if str(gercek_id) == str(steam_id):
-        return True
-  except Exception as e:
-    print(f"Steam API Bağlantı Hatası: {e}")
-
-  return False
-
+# --- 2. STEAM OYUNCU & İLERLEME ENDPOINT'LERİ (Gems, Skinler vb.) ---
 
 @app.route("/get_player", methods=["POST"])
 def get_player():
-  data = request.json
-  steam_id = data.get("steam_id")
-  ticket = data.get("ticket", "")
+    if not supabase:
+        return jsonify({"error": "Supabase bağlantısı yok!"}), 500
+    try:
+        data = request.json
+        steam_id = data.get("steam_id")
+        name = data.get("name", "Steam Oyuncusu")
+        
+        if not steam_id:
+            return jsonify({"error": "steam_id gereklidir!"}), 400
 
-  if not steam_id:
-    return jsonify({"error": "Steam ID bulunamadı!"}), 400
-
-  # Güvenlik Kontrolü (DEV_MODE kapalıysa bilet kontrolü yapılır)
-  if not DEV_MODE:
-    if not steam_biletini_dogrula(steam_id, ticket):
-      return jsonify({"error": "Steam kimlik doğrulaması başarısız! Hile engellendi."}), 403
-
-  # Supabase'den oyuncuyu sorgula
-  response = supabase.table("players").select("*").eq("steam_id", steam_id).execute()
-
-  if response.data and len(response.data) > 0:
-    # Oyuncu zaten var, verilerini döndür
-    return jsonify(response.data[0]), 200
-  else:
-    # Oyuncu ilk defa giriyor, yeni kayıt aç (100 Elmas + Default Skin)
-    yeni_oyuncu = {
-        "steam_id": steam_id,
-        "gems": 100,
-        "selected_skin": "default",
-        "skins": ["default"],
-    }
-    insert_res = supabase.table("players").insert(yeni_oyuncu).execute()
-    return jsonify(insert_res.data[0]), 200
-
+        # Oyuncuyu benzersiz steam_id'si ile veritabanında arıyoruz
+        response = supabase.table("players").select("*").eq("steam_id", steam_id).execute()
+        
+        if response.data and len(response.data) > 0:
+            return jsonify({"success": True, "data": response.data[0]})
+        else:
+            # Oyuncu ilk defa giriyorsa sıfır elmas ve default skinle kayıt açıyoruz
+            new_player = {
+                "steam_id": steam_id,
+                "name": name,
+                "gems": 0,
+                "skins": "default",
+                "selected_skin": "default"
+            }
+            ins_res = supabase.table("players").insert(new_player).execute()
+            return jsonify({"success": True, "data": ins_res.data[0]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/update_player", methods=["POST"])
 def update_player():
-  data = request.json
-  steam_id = data.get("steam_id")
-  gems = data.get("gems")
-  selected_skin = data.get("selected_skin")
-  skins = data.get("skins")
+    if not supabase:
+        return jsonify({"error": "Supabase bağlantısı yok!"}), 500
+    try:
+        data = request.json
+        steam_id = data.get("steam_id")
+        gems = data.get("gems")
+        selected_skin = data.get("selected_skin")
+        skins = data.get("skins")
+        
+        if not steam_id:
+            return jsonify({"error": "steam_id gereklidir!"}), 400
 
-  if not steam_id:
-    return jsonify({"error": "Steam ID eksik!"}), 400
+        payload = {}
+        if gems is not None:
+            payload["gems"] = int(gems)
+        if selected_skin is not None:
+            payload["selected_skin"] = selected_skin
+        if skins is not None:
+            payload["skins"] = skins
 
-  # Güncellenecek veriler
-  guncelleme = {}
-  if gems is not None:
-    guncelleme["gems"] = gems
-  if selected_skin is not None:
-    guncelleme["selected_skin"] = selected_skin
-  if skins is not None:
-    guncelleme["skins"] = skins
-
-  # Supabase'de güncelle
-  supabase.table("players").update(guncelleme).eq("steam_id", steam_id).execute()
-
-  return jsonify({"status": "success", "message": "Veriler güncellendi!"}), 200
+        # Steam ID'ye göre oyuncunun verilerini güvenle güncelliyoruz
+        response = supabase.table("players").update(payload).eq("steam_id", steam_id).execute()
+        return jsonify({"success": True, "data": response.data})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
-  app.run(port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
