@@ -64,14 +64,19 @@ def add_score():
 
 # --- 2. STEAM OYUNCU & İLERLEME ENDPOINT'LERİ (Gems, Skinler vb.) ---
 
-@app.route("/get_player", methods=["POST"])
+@app.route("/get_player", methods=["GET", "POST"])
 def get_player():
     if not supabase:
         return jsonify({"error": "Supabase bağlantısı yok!"}), 500
     try:
-        data = request.json
-        steam_id = data.get("steam_id")
-        name = data.get("name", "Steam Oyuncusu")
+        # İster GET parametresiyle ister POST json ile gelsin, steam_id ve name'i alalım
+        if request.method == "GET":
+            steam_id = request.args.get("steam_id")
+            name = request.args.get("name", "Steam Oyuncusu")
+        else:
+            data = request.json or {}
+            steam_id = data.get("steam_id")
+            name = data.get("name", "Steam Oyuncusu")
         
         if not steam_id:
             return jsonify({"error": "steam_id gereklidir!"}), 400
@@ -82,11 +87,11 @@ def get_player():
         if response.data and len(response.data) > 0:
             return jsonify({"success": True, "data": response.data[0]})
         else:
-            # Oyuncu ilk defa giriyorsa sıfır elmas ve default skinle kayıt açıyoruz
+            # Yeni gelen oyuncu (veya test oyuncusu) veritabanında yoksa 100 puan/elmas ile kaydediyoruz[cite: 1]
             new_player = {
                 "steam_id": steam_id,
                 "name": name,
-                "gems": 0,
+                "gems": 100,
                 "skins": "default",
                 "selected_skin": "default"
             }
@@ -117,7 +122,7 @@ def update_player():
         if skins is not None:
             payload["skins"] = skins
 
-        # Steam ID'ye göre oyuncunun verilerini güvenle güncelliyoruz
+        # Steam ID'ye göre oyuncunun verilerini güvenle güncelliyoruz[cite: 1]
         response = supabase.table("players").update(payload).eq("steam_id", steam_id).execute()
         return jsonify({"success": True, "data": response.data})
     except Exception as e:
