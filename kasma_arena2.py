@@ -101,7 +101,10 @@ GEM_COLOR   = (120, 210, 255)
 OUTLINE     = (10, 10, 16)
 
 # Çalışma zamanı ayarları (SaveManager'dan güncellenir)
-CFG = {"shake": True, "dmg": True, "fps": False}
+# plain_skin: "SADE GÖRÜNÜM". Açıkken oyuncu; kanat, şapka, gözlük, pelerin
+# ve tüm skin efektleri olmadan yalnızca skininin renginde sade bir top olarak
+# çizilir. Skin'in verdiği bonuslar aynen devam eder — yalnızca görünüm kapanır.
+CFG = {"shake": True, "dmg": True, "fps": False, "plain_skin": False}
 
 random.seed()
 
@@ -622,7 +625,7 @@ class SaveManager:
         "achievements": {},
         "settings": {"fullscreen": False, "player_name": "", "music_vol": 0.5, "sfx_vol": 0.7,
                      "shake": True, "dmg": True, "fps": False, "difficulty": "normal",
-                     "skill_scale": 0.85},
+                     "skill_scale": 0.85, "plain_skin": False},
         "stats": {"runs": 0, "best_score": 0, "total_kills": 0, "total_time": 0.0,
                   "bosses": 0, "best_wave": 0},
         "daily": {"date": "", "claimed_free": False, "ad_watches": 0,
@@ -687,6 +690,7 @@ class SaveManager:
         CFG["dmg"] = bool(st.get("dmg", True))
         CFG["fps"] = bool(st.get("fps", False))
         CFG["skill_scale"] = float(st.get("skill_scale", 0.85))
+        CFG["plain_skin"] = bool(st.get("plain_skin", False))
 
     # ---- elmas ----
     def add_gems(self, amount):
@@ -724,6 +728,13 @@ class SaveManager:
     def _daily(self):
         d = self.data.setdefault("daily", dict(self._DAILY_DEFAULT))
         today = time.strftime("%Y-%m-%d")
+        # DÜZELTME: giriş serisi alanı eklenmeden önceki kayıtlarda (ya da gün
+        # dönüşü tam o anda yakalanamadıysa) seri 0'da kalıyor, ekranda "1. gün"
+        # yazmasına rağmen haftalık sandık asla açılmıyordu.
+        if d.get("date") == today and int(self.data.get("login_streak", 0) or 0) <= 0:
+            self.data["login_streak"] = 1
+            self.data["last_login_date"] = today
+            self.save()
         if d.get("date") != today:
             yesterday = time.strftime("%Y-%m-%d", time.localtime(time.time() - 86400))
             last_login = self.data.get("last_login_date", "")
@@ -766,6 +777,9 @@ class SaveManager:
         d = self._daily()
         if wave > d["wave_reached"]:
             d["wave_reached"] = wave
+            # DÜZELTME: eskiden diske yazılmıyordu; oyuncu hedefi tutturup
+            # ödülü almadan oyunu kapatınca günlük ilerleme sıfırlanıyordu.
+            self.save()
 
     def wave_reward_available(self):
         d = self._daily()
@@ -802,7 +816,9 @@ class SaveManager:
     # -- skor kırıcı --
     def register_score_beaten(self):
         d = self._daily()
-        d["score_beaten"] = True
+        if not d["score_beaten"]:
+            d["score_beaten"] = True
+            self.save()   # DÜZELTME: ilerleme anında kalıcı olsun
 
     def score_reward_available(self):
         d = self._daily()
@@ -822,6 +838,7 @@ class SaveManager:
         d = self._daily()
         if kills > d["killstreak"]:
             d["killstreak"] = kills
+            self.save()   # DÜZELTME: ilerleme anında kalıcı olsun
 
     def killstreak_reward_available(self):
         d = self._daily()
@@ -915,9 +932,21 @@ class SaveManager:
         return (self.daily_free_available() or self.daily_ad_available()
                 or self.daily_match_reward_available())
 
-    # Günlük market kartında gösterilen görev listesi:
-    # (anahtar, ikon, renk-adı)  -> renkler UI tarafında çözülür
+    # Günlük market kartında gösterilen görev sayısı.
+    # Haftalık sandık yalnızca 7 günlük serinin tamamlandığı günlerde
+    # talep edilebilir; o yüzden bugünün görev sayısına ancak o gün dahil olur.
     DAILY_TASK_COUNT = 10
+    DAILY_TASK_BASE = 9
+
+    def daily_task_total(self):
+        """Bugün tamamlanabilecek görev sayısı (9 ya da sandık günlerinde 10).
+
+        DÜZELTME: sabit 10 kullanılıyordu; haftalık sandık gününde olmayan
+        oyuncu bütün görevleri bitirse bile ilerleme 9/10'da kalıyor, günü
+        "tamamlandı" saymıyordu.
+        """
+        return self.DAILY_TASK_BASE + (1 if (self.weekly_chest_available()
+                                             or self._weekly_chest_claimed()) else 0)
 
     def _weekly_chest_claimed(self):
         streak = self.data.get("login_streak", 0)
@@ -958,6 +987,27 @@ class SaveManager:
         if d.get("wheel_claimed"):                                n += 1
         if self._weekly_chest_claimed():                          n += 1
         return n
+
+    def claim_all_ready(self):
+        """Talep edilebilir bütün günlük ödülleri tek seferde toplar.
+
+        Reklam ödülü dışarıda bırakılır — onun için reklamın izlenmesi gerekir.
+        Kazanılan toplam elmas ve toplanan ödül sayısını döndürür.
+        """
+        before = self.get_gems()
+        n = 0
+        for fn in (self.claim_daily_free, self.claim_match_reward, self.claim_streak_reward,
+                   self.claim_wave_reward, self.claim_boss_reward, self.claim_score_reward,
+                   self.claim_killstreak_reward, self.claim_weekly_chest):
+            try:
+                if fn():
+                    n += 1
+            except Exception:
+                pass
+        if self.wheel_reward_available() and self.claim_wheel_reward() > 0:
+            n += 1
+        self.save()
+        return self.get_gems() - before, n
 
     def daily_gems_available_now(self):
         """Şu anda tek tuşla toplanabilecek toplam elmas (kartta gösterilir)."""
@@ -2815,11 +2865,19 @@ def draw_cosmetic_eyewear(surf, p, px, py, t):
             line((EF + r * 0.04, -ES * 0.42), (EF + r * 0.04, ES * 0.42), bridge_col, 2)
 
 
-AURA_INTERVAL = {"motes": .1, "wings": .08, "bubbles": .065, "stars": .11, "arcs": .4,
-                 "shadow": .04, "flames": .022, "halo": .07, "prism": .04}
+AURA_INTERVAL = {"motes": .045, "wings": .08, "bubbles": .055, "stars": .09, "arcs": .07,
+                 "shadow": .04, "flames": .022, "halo": .05, "prism": .04}
 
 
 def skin_update_fx(p, dt, fx):
+    """Skin'e özel parçacık imzası.
+
+    Eskiden "motes" ve "bubbles" aileleri yalnızca birkaç soluk toz zerresi
+    üretiyor, o skinler ekranda renkli bir toptan ibaret kalıyordu. Artık her
+    aile kendi karakterini taşıyan yoğun bir parçacık imzasına sahip.
+    """
+    if CFG.get("plain_skin"):
+        return
     sk = p.skin
     a = sk["aura"]
     iv = AURA_INTERVAL.get(a, .2)
@@ -2834,16 +2892,32 @@ def skin_update_fx(p, dt, fx):
     col, acc = sk["color"], sk["accent"]
     for _ in range(n):
         if a == "motes":
-            fx.spark(x + random.uniform(-r, r), y + random.uniform(-r * .6, r), acc, 0, -18, .8, 2.2)
+            # Çekirdekten kopan enerji zerreleri: içeri doğru çekilen kıvılcımlar
+            ang = random.uniform(0, math.tau)
+            rad = r * random.uniform(1.4, 2.2)
+            fx.spark(x + math.cos(ang) * rad, y + math.sin(ang) * rad, acc,
+                     -math.cos(ang) * 46, -math.sin(ang) * 46 - 10, .55, 2.4)
+            if random.random() < .45:
+                fx.spark(x + random.uniform(-r, r), y + random.uniform(-r * .6, r),
+                         col, random.uniform(-14, 14), -34, .7, 2.0)
         elif a == "wings":
             fx.spark(x + random.uniform(-r * 1.6, r * 1.6), y + random.uniform(-6, 10),
                      random.choice(((235, 85, 95), (255, 170, 140), (150, 40, 60))),
                      random.uniform(-22, 22), 22, 1.1, 3.0, add=False, gravity=12, drag=0.8)
+            if random.random() < .35:
+                fx.spark(x + random.uniform(-r * 2.0, r * 2.0), y - r * 0.4, acc,
+                         random.uniform(-8, 8), 34, .9, 1.8, gravity=40, drag=0.6)
         elif a == "bubbles":
-            fx.spark(x + random.uniform(-r * .8, r * .8), y + random.uniform(-r * .2, r * .8),
-                     (150, 255, 120), random.uniform(-8, 8), -34, .9, 2.6, gravity=-10, drag=.5)
-            if random.random() < .4:
-                fx.spark(x + random.uniform(-6, 6), y + r * .8, (90, 200, 70), 0, 40, .6, 2.4, gravity=220, drag=.1)
+            # Kaynayan iksir: yükselen kabarcıklar + aşağı damlayan asit
+            fx.spark(x + random.uniform(-r * .9, r * .9), y + random.uniform(-r * .2, r * .8),
+                     lighten(col, 0.35), random.uniform(-10, 10), -40, 1.0, 3.0,
+                     gravity=-16, drag=.45)
+            if random.random() < .55:
+                fx.spark(x + random.uniform(-r, r), y + r * .8, scale_col(col, 0.8),
+                         random.uniform(-6, 6), 40, .7, 2.6, gravity=240, drag=.1)
+            if random.random() < .30:
+                fx.spark(x + random.uniform(-r * 1.4, r * 1.4), y + random.uniform(-r, r),
+                         acc, random.uniform(-18, 18), -18, .5, 1.6)
         elif a == "stars":
             fx.spark(x + random.uniform(-r * 1.6, r * 1.6), y + random.uniform(-r * 1.6, r * 1.6),
                      random.choice((acc, col)), 0, -12, .7, 2.2)
@@ -2860,24 +2934,42 @@ def skin_update_fx(p, dt, fx):
         elif a == "halo":
             fx.spark(x + random.uniform(-r * 1.4, r * 1.4), y + random.uniform(-r * 1.4, r * 1.2),
                      acc, random.uniform(-10, 10), 20, .9, 2.4, gravity=20)
+            if random.random() < .35:
+                fx.spark(x + random.uniform(-r * .6, r * .6), y - r - 12, (255, 240, 180),
+                         random.uniform(-6, 6), -14, .8, 1.8)
+        elif a == "arcs":
+            fx.spark(x + random.uniform(-r * 1.3, r * 1.3), y + random.uniform(-r * 1.3, r * 1.3),
+                     acc, random.uniform(-30, 30), random.uniform(-30, 30), .35, 2.0)
         elif a == "prism":
             fx.spark(x + random.uniform(-r * 1.2, r * 1.2), y + random.uniform(-r * 1.2, r * 1.2),
                      hue_col(random.random()), random.uniform(-12, 12), -14, .7, 2.4)
 
 
 def skin_draw_back(surf, p, px, py, t):
-    sk = p.skin
-    a = sk["aura"]
+    """Oyuncunun ARKASINA çizilen skin efektleri (gövdenin altında kalır).
+
+    Her aura ailesinin kendine ait bir arka imzası vardır; böylece hiçbir
+    skin yalnızca renkli bir daire olarak kalmaz.
+    """
     r = p.radius
     col = p.body_color(t)
-    acc = sk["accent"]
+    # Dash hayaletleri sade görünümde de kalır — oynanış bilgisi taşır.
     for g in p.ghosts:
         k = clamp(g[2] / 0.35, 0.0, 1.0)
         blit_disc(surf, g[0], g[1], r * (0.65 + 0.35 * k), g[3], 130 * k)
+    if CFG.get("plain_skin"):
+        # SADE GÖRÜNÜM: yalnızca hafif bir renk parıltısı kalır.
+        add_glow(surf, px, py, r * 2.1, col, 0.26)
+        return
+
+    sk = p.skin
+    a = sk["aura"]
+    acc = sk["accent"]
     pulse = 0.5 + 0.5 * math.sin(t * 3)
     base_k = {"flames": .5, "halo": .5, "shadow": .4}.get(a, .32)
     gcol = acc if a == "shadow" else col
     add_glow(surf, px, py, r * (2.5 + 0.25 * pulse), gcol, base_k * (0.85 + 0.15 * pulse))
+
     if a == "wings":
         flap = math.sin(t * (9 if p.speed_now > 30 else 3.5)) * 0.32
         aim_ang = math.atan2(p.aim_dir[1], p.aim_dir[0])
@@ -2893,13 +2985,115 @@ def skin_draw_back(surf, p, px, py, t):
                 pygame.draw.polygon(surf, scale_col(col, 0.58 + 0.13 * i), pts)
                 pygame.draw.line(surf, acc, (sx, sy), (tx, ty), 1)
 
+    elif a == "motes":
+        # ENERJİ ÇEKİRDEĞİ: ters yönde dönen iki altıgen enerji halkası
+        for k, (spd, rad_k, wid) in enumerate(((1.1, 1.9, 2), (-0.8, 2.35, 1))):
+            ang0 = t * spd + k * 0.5
+            rad = r * rad_k * (1.0 + 0.04 * math.sin(t * 2.6 + k))
+            pts = [(px + math.cos(ang0 + i * math.tau / 6) * rad,
+                    py + math.sin(ang0 + i * math.tau / 6) * rad * 0.82) for i in range(6)]
+            pygame.draw.polygon(surf, scale_col(acc, 0.55 + 0.2 * k), pts, wid)
+        # halkalar üzerinde koşan enerji düğümleri
+        for i in range(3):
+            a2 = t * 1.1 + i * math.tau / 3
+            nx = px + math.cos(a2) * r * 1.9
+            ny = py + math.sin(a2) * r * 1.9 * 0.82
+            add_glow(surf, nx, ny, 11, acc, .55)
+
+    elif a == "bubbles":
+        # KAYNAYAN İKSİR: arkada yükselen büyük kabarcık kümesi
+        for i in range(6):
+            ph = (t * 0.5 + i * 0.167) % 1.0
+            bx = px + math.sin(t * 1.5 + i * 2.1) * r * 1.6
+            by = py + r * 1.0 - ph * r * 3.4
+            br = (3.4 + i * 1.0) * (1.0 - ph * 0.40)
+            if br < 1.5:
+                continue
+            alpha = int(190 * (1.0 - ph * 0.8))
+            blit_disc(surf, bx, by, br * 1.6, col, alpha // 3)
+            pygame.draw.circle(surf, lighten(col, 0.5), (int(bx), int(by)), int(br), 2)
+            pygame.draw.circle(surf, (255, 255, 255),
+                               (int(bx - br * 0.32), int(by - br * 0.32)), max(1, int(br * 0.22)))
+        # tabanda kaynayan sıvı yüzeyi: dolu leke yerine iç içe ince halkalar
+        for k in range(3):
+            rw = r * (1.15 + k * 0.42) * (1.0 + 0.05 * math.sin(t * 5 + k * 1.4))
+            ring = pygame.Rect(0, 0, int(rw * 2), int(max(4, rw * 0.52)))
+            ring.center = (int(px), int(py + r * 0.82))
+            pygame.draw.ellipse(surf, scale_col(lighten(col, 0.2), 0.9 - k * 0.2), ring, 1)
+        add_glow(surf, px, py + r * 0.7, r * 1.5, lighten(col, 0.15),
+                 .22 + .10 * math.sin(t * 6))
+
+    elif a == "stars":
+        # TAKIMYILDIZ: gövdeyi saran ince yıldız halkası
+        ring = pygame.Rect(0, 0, int(r * 5.0), int(r * 3.4))
+        ring.center = (int(px), int(py))
+        pygame.draw.ellipse(surf, scale_col(acc, 0.5), ring, 1)
+        for i in range(6):
+            a2 = -t * 0.9 + i * math.tau / 6
+            sx = px + math.cos(a2) * r * 2.5
+            sy = py + math.sin(a2) * r * 1.7
+            pygame.draw.circle(surf, acc, (int(sx), int(sy)), 2)
+
+    elif a == "arcs":
+        # TESLA BOBİNİ: gövdeyi çevreleyen iki bakır bobin halkası
+        for k, rk in enumerate((1.7, 2.3)):
+            ring = pygame.Rect(0, 0, int(r * rk * 2), int(r * rk * 1.15))
+            ring.center = (int(px), int(py + r * (0.25 + k * 0.35)))
+            pygame.draw.ellipse(surf, scale_col(acc, 0.45 + 0.15 * k), ring, 2)
+        add_glow(surf, px, py, r * 2.0, acc, 0.22 + 0.16 * abs(math.sin(t * 7)))
+
+    elif a == "shadow":
+        # GÖLGE PELERİNİ: arkada dalgalanan karanlık şeritler
+        for i in range(5):
+            base_a = math.pi / 2 + (i - 2) * 0.34
+            wob = math.sin(t * 2.4 + i * 1.3) * 0.22
+            ang = base_a + wob
+            L = r * (2.2 + 0.4 * math.sin(t * 1.7 + i))
+            tipx, tipy = px + math.cos(ang) * L, py + math.sin(ang) * L
+            midx = px + math.cos(ang + 0.25) * L * 0.55
+            midy = py + math.sin(ang + 0.25) * L * 0.55
+            pygame.draw.polygon(surf, (28, 20, 44),
+                                [(px, py), (midx, midy), (tipx, tipy)])
+
+    elif a == "flames":
+        # KOR HALKASI: ayakların çevresinde yanan kor
+        for i in range(8):
+            a2 = t * 1.6 + i * math.tau / 8
+            ex = px + math.cos(a2) * r * 1.9
+            ey = py + math.sin(a2) * r * 0.95 + r * 0.4
+            k = 0.5 + 0.5 * math.sin(t * 8 + i)
+            add_glow(surf, ex, ey, 9 + 5 * k, (255, 120 + int(70 * k), 40), .5)
+
+    elif a == "halo":
+        # MELEK HALKALARI: eğik dönen iki altın halka
+        for k, (rk, tilt) in enumerate(((2.4, 0.32), (2.0, 0.58))):
+            w_ = r * rk * 2
+            h_ = w_ * (tilt + 0.14 * math.sin(t * 1.3 + k * 2))
+            ring = pygame.Rect(0, 0, int(w_), int(max(4, h_)))
+            ring.center = (int(px), int(py + r * 0.15))
+            pygame.draw.ellipse(surf, (255, 228, 150) if k == 0 else (232, 196, 110), ring, 2)
+
+    elif a == "prism":
+        # PRİZMA HALKASI: gökkuşağı renklerinde dönen altıgen
+        ang0 = t * 0.9
+        for i in range(6):
+            a1 = ang0 + i * math.tau / 6
+            a2 = ang0 + (i + 1) * math.tau / 6
+            p1 = (px + math.cos(a1) * r * 2.1, py + math.sin(a1) * r * 2.1 * 0.85)
+            p2 = (px + math.cos(a2) * r * 2.1, py + math.sin(a2) * r * 2.1 * 0.85)
+            pygame.draw.line(surf, hue_col(t * 0.4 + i / 6.0), p1, p2, 2)
+
 
 def skin_draw_front(surf, p, px, py, t):
+    """Oyuncunun ÖNÜNE çizilen skin efektleri (gövdenin üstünde kalır)."""
+    if CFG.get("plain_skin"):
+        return
     sk = p.skin
     a = sk["aura"]
     r = p.radius
     acc = sk["accent"]
     col = sk["color"]
+
     if a == "stars":
         for i in range(3):
             ang = t * 2.2 + i * math.tau / 3
@@ -2914,6 +3108,7 @@ def skin_draw_front(surf, p, px, py, t):
         pygame.draw.polygon(surf, (235, 190, 80), pts)
         pygame.draw.polygon(surf, (255, 240, 170), pts, 1)
         pygame.draw.circle(surf, (255, 90, 140), (int(px), int(cy - 4)), 2)
+
     elif a == "arcs":
         for k in range(3):
             rnd = random.Random(int(t * 16) * 7 + k * 131)
@@ -2925,15 +3120,32 @@ def skin_draw_front(surf, p, px, py, t):
             pts = [(int(x), int(y)) for x, y in zigzag(x0, y0, x1, y1, 4, 4, rnd)]
             pygame.draw.lines(surf, acc, False, pts, 2)
             add_glow(surf, x1, y1, 10, col, .6)
+        # tepede çatallanan bobin ucu
+        tipy = py - r - 9
+        pygame.draw.line(surf, acc, (px, py - r + 2), (px, tipy), 2)
+        pygame.draw.circle(surf, (235, 255, 255), (int(px), int(tipy)), 3)
+        add_glow(surf, px, tipy, 13, acc, .5 + .3 * abs(math.sin(t * 9)))
+
     elif a == "halo":
         hy = py - r - 12
         add_glow(surf, px, hy, 22, acc, .35)
         pygame.draw.ellipse(surf, (255, 235, 150), pygame.Rect(int(px - 15), int(hy - 4), 30, 9), 3)
+        # halenin çevresinde dolanan altın zerreler
+        for i in range(3):
+            ang = t * 2.0 + i * math.tau / 3
+            gx = px + math.cos(ang) * 17
+            gy = hy + math.sin(ang) * 5
+            pygame.draw.circle(surf, (255, 246, 200), (int(gx), int(gy)), 2)
+
     elif a == "shadow":
         for s in (-1, 1):
             pts = [(px + s * 10, py - r + 3), (px + s * 15, py - r - 10), (px + s * 4, py - r + 1)]
             pygame.draw.polygon(surf, (36, 26, 56), pts)
             pygame.draw.polygon(surf, acc, pts, 1)
+        # boynuzlar arasında süzülen mor kıvılcım
+        sx = px + math.sin(t * 3.1) * 6
+        add_glow(surf, sx, py - r - 14, 9, acc, .45 + .25 * math.sin(t * 5))
+
     elif a == "flames":
         for i, ox in enumerate((-7, 0, 7)):
             h = 11 + 5 * math.sin(t * 14 + i * 2)
@@ -2941,6 +3153,7 @@ def skin_draw_front(surf, p, px, py, t):
             pygame.draw.polygon(surf, (255, 140, 40), pts)
             pts2 = [(px + ox - 2.5, py - r + 2), (px + ox, py - r - h * 0.6), (px + ox + 2.5, py - r + 2)]
             pygame.draw.polygon(surf, (255, 225, 120), pts2)
+
     elif a == "prism":
         for i in range(3):
             ang = t * 1.6 + i * math.tau / 3
@@ -2948,6 +3161,115 @@ def skin_draw_front(surf, p, px, py, t):
             hc = hue_col(t * .5 + i * .33)
             add_glow(surf, sx, sy, 13, hc, .7)
             pygame.draw.polygon(surf, hc, [(sx, sy - 5), (sx + 3.5, sy), (sx, sy + 5), (sx - 3.5, sy)])
+
+    elif a == "motes":
+        # ENERJİ ÇEKİRDEĞİ: yörüngede koşan üç zerre + tepede enerji kıvılcımı
+        for i in range(3):
+            ang = t * 2.6 + i * math.tau / 3
+            ox = px + math.cos(ang) * (r + 13)
+            oy = py + math.sin(ang) * (r + 13) * 0.85
+            add_glow(surf, ox, oy, 11, acc, .55)
+            pygame.draw.circle(surf, acc, (int(ox), int(oy)), 3)
+            # kısa kuyruk
+            tang = ang - 0.35
+            tx = px + math.cos(tang) * (r + 13)
+            ty = py + math.sin(tang) * (r + 13) * 0.85
+            pygame.draw.line(surf, scale_col(acc, 0.7), (tx, ty), (ox, oy), 2)
+        # tepede duran enerji kıvılcımı
+        sy = py - r - 8 + math.sin(t * 4) * 1.5
+        add_glow(surf, px, sy, 12, col, .5)
+        pygame.draw.circle(surf, (250, 252, 255), (int(px), int(sy)), 2)
+        for k in range(4):
+            ka = t * 3 + k * math.tau / 4
+            pygame.draw.line(surf, acc, (px + math.cos(ka) * 3, sy + math.sin(ka) * 3),
+                             (px + math.cos(ka) * 7, sy + math.sin(ka) * 7), 1)
+
+    elif a == "bubbles":
+        # İKSİR KABARCIKLARI: gövdenin önünde yükselen parlak kabarcıklar
+        for i in range(4):
+            ph = (t * 0.8 + i * 0.25) % 1.0
+            bx = px + math.sin(t * 2.2 + i * 1.9) * (r * 0.9)
+            by = py + r * 0.5 - ph * (r * 2.6)
+            br = (4.2 - i * 0.5) * (1.0 - ph * 0.35)
+            if br < 1.2:
+                continue
+            pygame.draw.circle(surf, lighten(col, 0.25), (int(bx), int(by)), int(br), 1)
+            pygame.draw.circle(surf, (255, 255, 255),
+                               (int(bx - br * 0.35), int(by - br * 0.35)), max(1, int(br * 0.3)))
+        # omuz hizasında iki asit damlası
+        for s in (-1, 1):
+            dy = (t * 60 * (1 + 0.3 * s)) % 26
+            dx = px + s * (r + 6)
+            pygame.draw.circle(surf, acc, (int(dx), int(py - 6 + dy)), 2)
+        add_glow(surf, px, py - r * 0.2, r * 1.2, lighten(col, 0.2), .28 + .12 * math.sin(t * 5))
+
+    elif a == "wings":
+        # TÜY TACI: başın üstünde titreşen üç tüy
+        for i, ox in enumerate((-8, 0, 8)):
+            h = 10 + 3 * math.sin(t * 6 + i * 1.7)
+            tip = (px + ox * 1.25, py - r - h)
+            pygame.draw.line(surf, scale_col(col, 0.85), (px + ox, py - r + 2), tip, 3)
+            pygame.draw.line(surf, acc, (px + ox, py - r + 2), tip, 1)
+        add_glow(surf, px, py - r - 6, 14, acc, .30)
+
+class _SkinPreviewActor:
+    """skin_draw_back / skin_draw_front için hafif bir sahte oyuncu.
+
+    Skin market kartlarında ve detay ekranında skinin GERÇEK görünümünü
+    (kanat, hale, yıldırım, kabarcık, enerji halkası...) canlandırmak için
+    kullanılır.
+    """
+    __slots__ = ("skin", "radius", "ghosts", "speed_now", "aim_dir", "recoil", "flash_t")
+
+    def __init__(self, sk, radius, aim_dir):
+        self.skin = sk
+        self.radius = radius
+        self.ghosts = []
+        self.speed_now = 0.0
+        self.aim_dir = aim_dir
+        self.recoil = 0.0
+        self.flash_t = 0.0
+
+    def body_color(self, t):
+        if self.skin["id"] == "prism":
+            return hue_col(t * 0.35)
+        return self.skin["color"]
+
+
+def draw_skin_preview(surf, sk, cx, cy, t, r=22, weapon=True):
+    """Bir skini TÜM efektleriyle birlikte önizler.
+
+    DÜZELTME: skin market'teki kartlar ve detay ekranı eskiden yalnızca düz
+    renkli bir daire + silah çiziyordu. Bu yüzden kanatlı, haleli, yıldırımlı
+    bütün skinler markette birbirinin aynı "renkli top" gibi görünüyor,
+    oyuncu aldığı skinin neye benzediğini ancak oyuna girince görebiliyordu.
+    """
+    actor = _SkinPreviewActor(sk, r, (math.cos(t * 0.6), math.sin(t * 0.6) * 0.3))
+    prev_plain = CFG.get("plain_skin")
+    CFG["plain_skin"] = False          # markette skin her zaman tam hâliyle görünür
+    try:
+        skin_draw_back(surf, actor, cx, cy, t)
+        body = actor.body_color(t)
+        acc = sk["accent"]
+        ix, iy = int(cx), int(cy)
+        pygame.draw.circle(surf, OUTLINE, (ix, iy), int(r + 2))
+        pygame.draw.circle(surf, scale_col(body, 0.6), (ix, iy), int(r))
+        pygame.draw.circle(surf, body, (int(cx - r * 0.10), int(cy - r * 0.14)), int(r * 0.86))
+        pygame.draw.circle(surf, lighten(body, 0.5),
+                           (int(cx - r * 0.36), int(cy - r * 0.42)), max(2, int(r * 0.22)))
+        pygame.draw.circle(surf, acc, (ix, iy), int(r), 2)
+        ax, ay = actor.aim_dir
+        for s in (-1, 1):
+            ex = cx + ax * r * 0.42 + (-ay) * s * r * 0.34
+            ey = cy + ay * r * 0.42 + ax * s * r * 0.34
+            pygame.draw.circle(surf, (250, 250, 255), (int(ex), int(ey)), max(2, int(r * 0.24)))
+            pygame.draw.circle(surf, (20, 24, 40),
+                               (int(ex + ax * 1.8), int(ey + ay * 1.8)), max(1, int(r * 0.12)))
+        if weapon:
+            draw_weapon(surf, actor, cx, cy, t)
+        skin_draw_front(surf, actor, cx, cy, t)
+    finally:
+        CFG["plain_skin"] = prev_plain
 
 
 def draw_weapon(surf, p, px, py, t):
@@ -3290,60 +3612,190 @@ RUN_UPGRADES = BOOKS
 
 
 def draw_book(surf, cx, cy, h, book, t=0.0, locked=False, glow=True):
-    """Bir kitabı kapağı, sırtı, sayfaları ve amblemiyle çizer.
+    """Kapalı bir kitabı çizer.
+
+    Kitap artık düz bir dikdörtgen değil: arka kapak (kalınlık hissi), tek
+    tek görünen sayfa kenarları, yaldızlı kesim, kabartmalı deri kapak,
+    madalyon içine oturtulmuş amblem, cilt bantları ve aşağı sarkan bir
+    ayraç kurdelesi var.
 
     h = kitabın yüksekliği (piksel). Genişlik orantılı hesaplanır, böylece
     aynı fonksiyon hem küçük kartlarda hem de büyük önizlemede kullanılabilir.
     """
-    col = (95, 100, 120) if locked else book["color"]
+    base = book["color"]
+    col = mix_col(base, (88, 92, 110), 0.74) if locked else base
     w = h * 0.74
     x0, y0 = cx - w / 2, cy - h / 2
-    sway = 0 if locked else math.sin(t * 1.8 + cx * 0.01) * (h * 0.018)
+    # Kilitli kitap sallanmaz — raftaki ölü ağırlık gibi durur.
+    sway = 0.0 if locked else math.sin(t * 1.8 + cx * 0.01) * (h * 0.018)
     y0 += sway
+    ccy = y0 + h / 2
+
+    rare = bool(book.get("rare")) and not locked
+    gild = (245, 210, 122) if rare else ((200, 194, 172) if not locked else (120, 122, 134))
+    spine_w = max(3.0, w * 0.17)
 
     if glow and not locked:
-        add_glow(surf, cx, cy, h * 0.72, col, .34 + .10 * math.sin(t * 3 + cx * 0.02))
+        k = .30 + .12 * math.sin(t * 3 + cx * 0.02)
+        add_glow(surf, cx, ccy, h * 0.74, col, k)
+        if rare:
+            add_glow(surf, cx, ccy, h * 0.52, (255, 226, 150), .18 + .10 * math.sin(t * 4.4 + cx * 0.02))
 
-    spine_w = max(3.0, w * 0.17)
-    # sayfalar (sağ kenar)
+    # ---- arka kapak: kitaba kalınlık kazandırır ----
+    back = pygame.Rect(int(x0 + w * 0.06), int(y0 + h * 0.026), int(w * 0.92), int(h))
+    pygame.draw.rect(surf, OUTLINE, back.inflate(4, 4), border_radius=5)
+    pygame.draw.rect(surf, scale_col(col, 0.42), back, border_radius=5)
+
+    # ---- sayfa bloğu ----
     pages = pygame.Rect(int(x0 + spine_w), int(y0 + h * 0.035), int(w - spine_w * 0.4), int(h * 0.93))
     pygame.draw.rect(surf, OUTLINE, pages.inflate(4, 4), border_radius=3)
-    pygame.draw.rect(surf, (226, 222, 205) if not locked else (120, 122, 134), pages, border_radius=3)
-    for i in range(3):
-        ly = int(pages.y + pages.h * (0.25 + i * 0.25))
-        pygame.draw.line(surf, (188, 183, 165), (pages.right - int(w * 0.10), ly),
-                         (pages.right - 2, ly), 1)
-    # kapak
+    pygame.draw.rect(surf, (240, 235, 216) if not locked else (128, 130, 142), pages, border_radius=3)
+    # yaldızlı kesim (nadir kitapta altın, normalde kirli beyaz)
+    gw = max(2, int(w * 0.055))
+    pygame.draw.rect(surf, gild, (pages.right - gw, pages.y + 1, gw, pages.h - 2), border_radius=2)
+    # tek tek sayfa kenarları
+    n_lines = int(clamp(h * 0.10, 3, 14))
+    for i in range(n_lines):
+        ly = int(pages.y + 4 + (pages.h - 8) * i / max(1, n_lines - 1))
+        pygame.draw.line(surf, (198, 192, 172) if not locked else (106, 108, 120),
+                         (pages.right - int(w * 0.13), ly), (pages.right - gw - 1, ly), 1)
+
+    # ---- ön kapak ----
     cover = pygame.Rect(int(x0), int(y0), int(w * 0.92), int(h))
-    pygame.draw.rect(surf, OUTLINE, cover.inflate(4, 4), border_radius=4)
-    pygame.draw.rect(surf, col, cover, border_radius=4)
-    pygame.draw.rect(surf, lighten(col, 0.34), (cover.x + 2, cover.y + 2, cover.w - 4, max(2, int(h * 0.06))),
-                     border_radius=2)
-    # sırt
+    pygame.draw.rect(surf, OUTLINE, cover.inflate(4, 4), border_radius=5)
+    pygame.draw.rect(surf, col, cover, border_radius=5)
+    # deri dokusu: üstte açık, altta koyu iki bant
+    pygame.draw.rect(surf, lighten(col, 0.30),
+                     (cover.x + 2, cover.y + 2, cover.w - 4, max(2, int(h * 0.10))), border_radius=3)
+    pygame.draw.rect(surf, scale_col(col, 0.74),
+                     (cover.x + 2, cover.bottom - max(2, int(h * 0.09)) - 2,
+                      cover.w - 4, max(2, int(h * 0.09))), border_radius=3)
+
+    # ---- cilt (sırt) + kabartma bantlar ----
     spine = pygame.Rect(int(x0), int(y0), int(spine_w), int(h))
-    pygame.draw.rect(surf, scale_col(col, 0.58), spine, border_radius=3)
-    pygame.draw.line(surf, scale_col(col, 0.4), (spine.right, spine.y + 2), (spine.right, spine.bottom - 2), 1)
-    # kapak çerçevesi
-    inner = cover.inflate(int(-w * 0.20), int(-h * 0.14))
+    pygame.draw.rect(surf, scale_col(col, 0.55), spine, border_radius=4)
+    for fy in (0.22, 0.52, 0.80):
+        by = int(y0 + h * fy)
+        pygame.draw.line(surf, lighten(col, 0.22), (spine.x + 1, by), (spine.right - 1, by), max(1, int(h * 0.016)))
+    pygame.draw.line(surf, scale_col(col, 0.36), (spine.right, spine.y + 2), (spine.right, spine.bottom - 2), 1)
+
+    # ---- kapak çerçevesi + köşe perçinleri ----
+    inner = cover.inflate(int(-w * 0.22), int(-h * 0.16))
     inner.x += int(spine_w * 0.45)
-    pygame.draw.rect(surf, scale_col(col, 0.45) if locked else lighten(col, 0.18), inner, width=1, border_radius=3)
-    # amblem
-    em_col = (150, 154, 170) if locked else lighten(col, 0.55)
-    draw_icon(surf, inner.centerx, inner.centery, book.get("icon", "star"), em_col, max(5, h * 0.20))
+    frame_col = scale_col(col, 0.48) if locked else gild
+    pygame.draw.rect(surf, frame_col, inner, width=max(1, int(h * 0.012)), border_radius=3)
+    stud_r = max(1, int(h * 0.022))
+    if stud_r >= 2:
+        for sx, sy in ((inner.x, inner.y), (inner.right, inner.y),
+                       (inner.x, inner.bottom), (inner.right, inner.bottom)):
+            pygame.draw.circle(surf, frame_col, (int(sx), int(sy)), stud_r)
+
+    # ---- madalyon + amblem ----
+    med_r = max(4, int(h * 0.15))
+    mx, my = inner.centerx, inner.centery
+    pygame.draw.circle(surf, scale_col(col, 0.62), (int(mx), int(my)), med_r)
+    pygame.draw.circle(surf, frame_col, (int(mx), int(my)), med_r, 1)
+    em_col = (158, 162, 178) if locked else lighten(col, 0.62)
+    draw_icon(surf, mx, my, book.get("icon", "star"), em_col, max(4, h * 0.155))
+
+    # ---- ayraç kurdelesi ----
+    # Sayfaların arasına konmuş bir ayraç gibi kitabın ÜSTÜNDEN çıkar.
+    # (Aşağı sarktığında kartlarda ve okuma ekranında kitabın hemen altındaki
+    #  başlık yazısının üstüne biniyordu.)
+    rb_w = max(2, int(w * 0.09))
+    rb_x = int(cover.right - w * 0.30)
+    rb_len = h * (0.13 + 0.02 * math.sin(t * 2.2 + cx * 0.02))
+    rb_col = (226, 78, 92) if not locked else (96, 88, 100)
+    rb_top = cover.y - rb_len
+    pygame.draw.rect(surf, scale_col(rb_col, 0.7), (rb_x, int(rb_top), rb_w, int(rb_len + h * 0.05)))
+    pygame.draw.polygon(surf, rb_col, [
+        (rb_x, rb_top), (rb_x + rb_w, rb_top), (rb_x + rb_w / 2, rb_top + rb_w * 0.8)])
+
     if locked:
-        # asma kilit
-        lx, ly = cx + w * 0.30, cy + h * 0.30
-        pygame.draw.arc(surf, (225, 228, 240),
-                        pygame.Rect(int(lx - h * 0.09), int(ly - h * 0.16), int(h * 0.18), int(h * 0.18)),
-                        0.2, math.pi - 0.2, 2)
-        body = pygame.Rect(int(lx - h * 0.10), int(ly - h * 0.06), int(h * 0.20), int(h * 0.15))
-        pygame.draw.rect(surf, OUTLINE, body.inflate(2, 2), border_radius=2)
-        pygame.draw.rect(surf, (225, 228, 240), body, border_radius=2)
-    elif book.get("rare"):
-        # nadir kitaplarda kapakta parıldayan bir yıldız
-        sp = 0.5 + 0.5 * math.sin(t * 4 + cx * 0.03)
-        pygame.draw.circle(surf, (255, 240, 190), (int(cover.right - w * 0.16), int(cover.y + h * 0.16)),
-                           max(1, int(1 + sp * 2)))
+        # ---- zincir + asma kilit ----
+        cyy = int(y0 + h * 0.62)
+        pygame.draw.rect(surf, (52, 55, 70), (int(x0 - 2), cyy - max(2, int(h * 0.035)),
+                                              int(w + 4), max(4, int(h * 0.07))), border_radius=3)
+        pygame.draw.rect(surf, (96, 102, 124), (int(x0 - 2), cyy - max(2, int(h * 0.035)),
+                                                int(w + 4), max(4, int(h * 0.07))), width=1, border_radius=3)
+        lx, ly = cx + w * 0.02, cyy + h * 0.02
+        arc_r = pygame.Rect(int(lx - h * 0.095), int(ly - h * 0.175), int(h * 0.19), int(h * 0.19))
+        pygame.draw.arc(surf, (214, 220, 236), arc_r, 0.2, math.pi - 0.2, max(2, int(h * 0.022)))
+        body = pygame.Rect(int(lx - h * 0.105), int(ly - h * 0.065), int(h * 0.21), int(h * 0.16))
+        pygame.draw.rect(surf, OUTLINE, body.inflate(2, 2), border_radius=3)
+        pygame.draw.rect(surf, (222, 226, 240), body, border_radius=3)
+        pygame.draw.circle(surf, (70, 74, 92), body.center, max(1, int(h * 0.024)))
+    elif rare:
+        # ---- nadir kitap: kapakta dönen parıltılar ----
+        for i in range(3):
+            a = t * 1.8 + i * math.tau / 3
+            sx = cover.centerx + math.cos(a) * w * 0.32
+            sy = cover.centery + math.sin(a) * h * 0.34
+            sp = 0.5 + 0.5 * math.sin(t * 5 + i * 2.1)
+            sz = max(1, int(1 + sp * 2.2))
+            pygame.draw.circle(surf, (255, 242, 196), (int(sx), int(sy)), sz)
+            if sz >= 2:
+                pygame.draw.line(surf, (255, 248, 220), (sx - sz * 2, sy), (sx + sz * 2, sy), 1)
+                pygame.draw.line(surf, (255, 248, 220), (sx, sy - sz * 2), (sx, sy + sz * 2), 1)
+
+
+def draw_book_open(surf, rect, book, t=0.0, locked=False):
+    """Açık kitabı (iki sayfalık yayılım) çizer ve metin yazılabilecek
+    SOL ve SAĞ sayfa dikdörtgenlerini döndürür.
+
+    Kitaplık'ta bir kitaba tıklandığında kitap gerçekten "açılır"; okuma
+    penceresi bu fonksiyonun döndürdüğü sayfalara yazılır.
+    """
+    base = book["color"]
+    col = mix_col(base, (88, 92, 110), 0.74) if locked else base
+    rare = bool(book.get("rare")) and not locked
+    gild = (245, 210, 122) if rare else (206, 200, 178)
+    paper = (243, 238, 220) if not locked else (228, 226, 226)
+    ink_line = (214, 206, 184) if not locked else (200, 198, 200)
+
+    # ---- kapak tabakası (sayfaların altından taşar) ----
+    pygame.draw.rect(surf, OUTLINE, rect.inflate(8, 8), border_radius=12)
+    pygame.draw.rect(surf, scale_col(col, 0.58), rect, border_radius=11)
+    pygame.draw.rect(surf, col, rect.inflate(-4, -4), border_radius=10)
+    pygame.draw.rect(surf, gild, rect.inflate(-10, -10), width=1, border_radius=9)
+
+    # ---- ayraç kurdelesi: sayfaların ALTINA çizilir, sadece ucu görünür ----
+    if not locked:
+        rb_w = max(3, int(rect.w * 0.014))
+        rb_x = int(rect.right - rect.w * 0.26)
+        pygame.draw.rect(surf, (168, 52, 64), (rb_x, rect.y - 16, rb_w, 40))
+        pygame.draw.polygon(surf, (226, 78, 92), [
+            (rb_x, rect.y - 16), (rb_x + rb_w, rect.y - 16), (rb_x + rb_w / 2, rect.y - 16 + rb_w * 1.6)])
+
+    # ---- iki sayfa ----
+    pad = max(8, int(rect.h * 0.035))
+    gutter = max(10, int(rect.w * 0.022))
+    page_w = (rect.w - pad * 2 - gutter) / 2
+    left = pygame.Rect(int(rect.x + pad), int(rect.y + pad), int(page_w), int(rect.h - pad * 2))
+    right = pygame.Rect(int(left.right + gutter), left.y, int(page_w), left.h)
+    for pg in (left, right):
+        pygame.draw.rect(surf, (188, 182, 160), pg.inflate(3, 3), border_radius=4)
+        pygame.draw.rect(surf, paper, pg, border_radius=4)
+
+    # ---- cilt (orta) gölgesi: sayfaların içe kıvrıldığı his ----
+    sh = pygame.Surface((gutter + 34, left.h), pygame.SRCALPHA)
+    for i in range(sh.get_width()):
+        k = abs(i - sh.get_width() / 2) / (sh.get_width() / 2)
+        a = int(96 * (1.0 - k) ** 1.6)
+        if a > 0:
+            pygame.draw.line(sh, (40, 32, 22, a), (i, 0), (i, left.h))
+    surf.blit(sh, (int(left.right - 17), left.y))
+    pygame.draw.line(surf, scale_col(col, 0.45),
+                     (int(left.right + gutter / 2), left.y), (int(left.right + gutter / 2), left.bottom), 2)
+
+    # ---- satır çizgileri (kağıt hissi) ----
+    for pg in (left, right):
+        yy = pg.y + int(pg.h * 0.30)
+        while yy < pg.bottom - 14:
+            pygame.draw.line(surf, ink_line, (pg.x + 16, yy), (pg.right - 16, yy), 1)
+            yy += 22
+
+    return left, right
 
 
 # =====================================================================
@@ -3799,8 +4251,10 @@ class Player:
         flash = self.hit_flash > 0 and int(self.hit_flash * 40) % 2 == 0
         body = self.body_color(t)
         acc = self.skin["accent"]
+        plain = bool(CFG.get("plain_skin"))
         surf.blit(shadow_sprite(r * 2 + 10), (int(px - r - 5), int(self.y + r * 0.55)))
-        draw_cosmetic_cape(surf, self, px, py, t)
+        if not plain:
+            draw_cosmetic_cape(surf, self, px, py, t)
         skin_draw_back(surf, self, px, py, t)
         if self.frenzy_stacks > 0:
             add_glow(surf, px, py, r * 3, (255, 200, 80), 0.25 + 0.08 * self.frenzy_stacks)
@@ -3817,16 +4271,23 @@ class Player:
         for s in (-1, 1):
             ex = px + ax * r * 0.42 + (-ay) * s * r * 0.34
             ey = py + ay * r * 0.42 + ax * s * r * 0.34
-            if self.skin["id"] == "shadow":
+            if self.skin["id"] == "shadow" and not plain:
                 add_glow(surf, ex, ey, 10, acc, 0.85)
                 pygame.draw.circle(surf, (235, 200, 255), (int(ex), int(ey)), 3)
             else:
                 pygame.draw.circle(surf, (250, 250, 255), (int(ex), int(ey)), 4)
                 pygame.draw.circle(surf, (20, 24, 40), (int(ex + ax * 1.6), int(ey + ay * 1.6)), 2)
-        draw_cosmetic_eyewear(surf, self, px, py, t)
-        draw_weapon(surf, self, px, py, t)
-        skin_draw_front(surf, self, px, py, t)
-        draw_cosmetic_hat(surf, self, px, py, t)
+        if plain:
+            # SADE GÖRÜNÜM: süslü silah yerine nişan yönünü gösteren kısa bir namlu.
+            bx0, by0 = px + ax * r * 0.7, py + ay * r * 0.7
+            bx1, by1 = px + ax * (r + 11), py + ay * (r + 11)
+            pygame.draw.line(surf, OUTLINE, (bx0, by0), (bx1, by1), 7)
+            pygame.draw.line(surf, scale_col(body, 0.55), (bx0, by0), (bx1, by1), 5)
+        else:
+            draw_cosmetic_eyewear(surf, self, px, py, t)
+            draw_weapon(surf, self, px, py, t)
+            skin_draw_front(surf, self, px, py, t)
+            draw_cosmetic_hat(surf, self, px, py, t)
 
         if self.shield_charges > 0:
             add_glow(surf, px, py, r * 2.4, (120, 170, 255), 0.3)
@@ -3846,7 +4307,8 @@ class Player:
 # =====================================================================
 
 class EnemyProjectile:
-    def __init__(self, x, y, vx, vy, dmg, color=(235, 210, 70), r=6, life=4.0):
+    def __init__(self, x, y, vx, vy, dmg, color=(235, 210, 70), r=6, life=4.0,
+                 target=None, turn=0.0, accel=0.0):
         self.x, self.y = x, y
         self.vx, self.vy = vx, vy
         self.dmg = dmg
@@ -3854,8 +4316,25 @@ class EnemyProjectile:
         self.r = r
         self.life = life
         self.alive = True
+        # Yönelmeli mermiler: patronların "lanet mermisi" / "spor oku" gibi
+        # saldırıları oyuncuyu bir süre takip eder. turn = saniyedeki dönüş
+        # hızı (radyan); 0 ise mermi düz gider.
+        self.target = target
+        self.turn = turn
+        self.accel = accel
 
     def update(self, dt):
+        if self.target is not None and self.turn > 0 and getattr(self.target, "alive", False):
+            sp = math.hypot(self.vx, self.vy)
+            if sp > 1:
+                cur = math.atan2(self.vy, self.vx)
+                want = math.atan2(self.target.y - self.y, self.target.x - self.x)
+                diff = (want - cur + math.pi) % math.tau - math.pi
+                cur += clamp(diff, -self.turn * dt, self.turn * dt)
+                sp += self.accel * dt
+                self.vx, self.vy = math.cos(cur) * sp, math.sin(cur) * sp
+            # yönelme sonsuza kadar sürmez, yoksa kaçmak imkânsız olur
+            self.turn = max(0.0, self.turn - dt * 1.45)
         self.x += self.vx * dt
         self.y += self.vy * dt
         self.life -= dt
@@ -4738,6 +5217,12 @@ BOSS_WAVE_STEP = 5
 #   EXTRA  -> her saldırının hazırlık (telegraph) süresine eklenen ek bekleme.
 #             Patron eskiden nişan alır almaz ateşliyordu ve oyuncu kaçamadan
 #             kilitleniyordu; bu ek süre kaçmak için gerçek bir pencere açar.
+# GÖLGE CADISI'nın "lanet çemberi" tuzakları. Tuzak merkezleri arasındaki
+# uzaklık, oyuncunun (yarıçap 16) iki tuzağın arasından geçebilmesi için
+# 2*(46+16) = 124 pikselden büyük olmalıdır; aşağıdaki değer pay bırakır.
+BOSS_RING_HAZARD_R = 46
+BOSS_RING_GAP_MIN = 126
+
 BOSS_HP_NERF = 0.85
 BOSS_DMG_NERF = 0.85
 BOSS_TELEGRAPH_EXTRA = 0.40
@@ -4759,8 +5244,11 @@ def boss_power(wave):
     birkaç saniyede eriyip gitmez.
     """
     idx = boss_index_for_wave(wave)
-    hp = 1.12 + (idx - 1) * 0.52 + ((idx - 1) ** 1.6) * 0.045
-    dmg = 1.0 + (idx - 1) * 0.16
+    hp = 1.12 + (idx - 1) * 0.62 + ((idx - 1) ** 1.6) * 0.055
+    # DENGE: hasar artışı çok zayıftı (patron başına yalnızca +%16). Oyuncu
+    # 10. dalgadan 20. dalgaya kadar kat kat güçlenirken patronlar yerinde
+    # sayıyor, 15. ve 20. dalga patronları 10. dalgadakinden kolay geliyordu.
+    dmg = 1.0 + (idx - 1) * 0.26 + ((idx - 1) ** 1.5) * 0.02
     armor = clamp(0.12 + (idx - 1) * 0.035, 0.0, 0.45)
     return hp, dmg, armor
 
@@ -4768,11 +5256,14 @@ def boss_power(wave):
 def boss_hp_share(n_boss):
     """Birden fazla patron varken her birinin can payı.
 
-    Toplam can, tek patronlu bir dalganın yalnızca 1.35 katı olur: yani iki
-    patron, tek patronun iki katı kadar dayanıklı DEĞİLDİR. Amaç dövüşü
-    uzatmak değil, aynı anda iki ayrı tehdidi yönetmeyi zorunlu kılmak.
+    Toplam can, tek patronlu bir dalganın 1.7 katı olur: yani iki patron,
+    tek patronun iki katı kadar dayanıklı DEĞİLDİR. Amaç dövüşü uzatmak
+    değil, aynı anda iki ayrı tehdidi yönetmeyi zorunlu kılmak.
+
+    DENGE: pay eskiden 1.35 idi; 20. dalgadaki iki patron tek tek çok çabuk
+    eriyor, dalga tek patronlu 15. dalgadan bile kolay geçiyordu.
     """
-    return 1.0 if n_boss <= 1 else 1.35 / n_boss
+    return 1.0 if n_boss <= 1 else 1.7 / n_boss
 
 
 def boss_count_for_wave(wave):
@@ -4825,6 +5316,18 @@ class Boss:
         self.flee_timer = 0.0
         self.summoned_enemies = []
         self.teleport_cd = random.uniform(4.0, 6.0)   # yalnızca "reaper" kullanır
+        # --- YAYLIM ATEŞ -------------------------------------------------
+        # Eskiden yalnızca SAVAŞ LORDU ve ORAK mermi atıyordu; GÖLGE CADISI,
+        # KOLOS ve KOVAN ANA'nın tek saldırısı yere telgraflanan alan hasarıydı
+        # ve kaçan bir oyuncuya asla dokunamıyorlardı. Artık HER patronun
+        # düzenli bir menzilli tehdidi var.
+        self.volley_cd = random.uniform(2.2, 3.4)
+        # --- HÜCUM (yalnızca KOLOS) --------------------------------------
+        self.charge_t = 0.0
+        self.charge_dir = (0.0, 0.0)
+        # Her patron farklı mesafede savaşır: KOLOS üstüne gelir, CADI uzak durur.
+        self.want_dist = {"warlord": 190, "witch": 215, "colossus": 110,
+                          "reaper": 160, "hive": 205}.get(kind, 190)
         # Zehir patronlarda da işler (süresi yoktur, ölene kadar sürer).
         self.poison_dps = 0.0
         self.poison_tick_acc = 0.0
@@ -4911,13 +5414,29 @@ class Boss:
 
         d = dist(self.x, self.y, player.x, player.y)
         dx, dy = norm_dir(self.x, self.y, player.x, player.y)
-        if self.flee_timer > 0:
+        if self.charge_t > 0:
+            # KOLOS HÜCUMU: telgraflanan yönde hızla ilerler, yolundakini ezer.
+            self.charge_t -= dt
+            cs = self.speed * 5.4
+            self.x += self.charge_dir[0] * cs * dt
+            self.y += self.charge_dir[1] * cs * dt
+            fx.spark(self.x + random.uniform(-self.radius, self.radius),
+                     self.y + random.uniform(-self.radius, self.radius),
+                     self.color, random.uniform(-40, 40), random.uniform(-40, 40), .35, 5)
+            if (self.x <= ARENA_RECT.left + self.radius or self.x >= ARENA_RECT.right - self.radius
+                    or self.y <= ARENA_RECT.top + self.radius or self.y >= ARENA_RECT.bottom - self.radius):
+                # duvara toslar: sersemler ve yer sarsılır
+                self.charge_t = 0.0
+                fx.shockwave(self.x, self.y, 190, self.color, 0.5, 7)
+                fx.shake(12, 0.35)
+                sfx("bonk", 0.8, 0.0)
+        elif self.flee_timer > 0:
             self.flee_timer -= dt
             flee_k = 1.9 if self.desperate else 1.5
             self.x -= dx * self.speed * flee_k * dt * scale_in
             self.y -= dy * self.speed * flee_k * dt * scale_in
         else:
-            want_d = 190
+            want_d = self.want_dist
             speed_k = 1.7 if self.enraged else 1.2
             if d > want_d + 20:
                 self.x += dx * self.speed * speed_k * dt * scale_in
@@ -4930,6 +5449,13 @@ class Boss:
 
         if self.hit_flash > 0:
             self.hit_flash -= dt
+
+        # --- YAYLIM ATEŞ: her patronun düzenli menzilli tehdidi ---
+        if self.spawn_t > 1.5 and self.charge_t <= 0:
+            self.volley_cd -= dt
+            if self.volley_cd <= 0:
+                self.volley_cd = self._volley_interval()
+                self._fire_volley(player, fx, projectiles)
 
         if self.telegraph:
             kind, tx, ty, r, timer, total = self.telegraph
@@ -4945,14 +5471,16 @@ class Boss:
                 # Saldırı temposu hem faza hem de kaçıncı patron olduğuna bağlı:
                 # geç dalgalardaki patronlar gözle görülür biçimde daha sık vurur.
                 cadence = 0.32 if self.desperate else (0.46 if self.enraged else 0.85)
-                cadence *= max(0.55, 1.0 - (self.boss_index - 1) * 0.07)
+                cadence *= max(0.45, 1.0 - (self.boss_index - 1) * 0.11)
                 self.atk_timer = random.uniform(0.9, 1.45) * cadence
                 self._start_attack(player, fx)
 
         if player.alive and self.touch_cd <= 0:
             if dist(self.x, self.y, player.x, player.y) < self.hit_r + player.radius - 3:
                 self.touch_cd = 0.42
-                player.take_damage(self.dmg, fx, self.x, self.y, self.name)
+                # Hücum eden KOLOS'a çarpmak sıradan temastan çok daha acıtır.
+                player.take_damage(self.dmg * (1.7 if self.charge_t > 0 else 1.0),
+                                   fx, self.x, self.y, self.name)
 
     def _summon_minions(self, fx):
         """Boss'un yanına yeni, daha küçük yaratıklar doğurur ve oyuncudan
@@ -4987,21 +5515,154 @@ class Boss:
         total = dur + BOSS_TELEGRAPH_EXTRA
         self.telegraph = (kind, a, b, c, total, total)
 
+    def _lead_point(self, player, lead=0.34):
+        """Oyuncunun BULUNDUĞU yere değil, GİDECEĞİ yere nişan alır.
+
+        Alan saldırıları eskiden oyuncunun o anki konumuna telgraflanıyordu;
+        oyuncu bir saniyelik hazırlık süresi boyunca yürüyüp gittiği için
+        KOLOS ve KOVAN ANA gibi yalnızca alan saldırısı olan patronlar hiçbir
+        zaman isabet ettiremiyordu.
+        """
+        lx = player.x + getattr(player, "vx", 0.0) * lead
+        ly = player.y + getattr(player, "vy", 0.0) * lead
+        return (clamp(lx, ARENA_RECT.left + 20, ARENA_RECT.right - 20),
+                clamp(ly, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20))
+
+    def _ring_count(self):
+        """Lanet çemberindeki tuzak sayısı.
+
+        Tuzaklar arasında MUTLAKA geçilebilir boşluk kalmalı; aksi hâlde
+        oyuncu çemberin içine kapanır ve saldırıdan kaçmanın yolu kalmaz.
+        Sayı bu yüzden sınırlı tutulur, halkanın yarıçapı ise patron
+        seviyesiyle büyür.
+        """
+        want = 7 + min(3, self.boss_index - 1) + (1 if self.enraged else 0)
+        # Halkanın çevresi, istenen tuzak sayısını geçilebilir aralıklarla
+        # taşıyamıyorsa tuzak sayısı kırpılır — çember asla tamamen kapanmaz.
+        max_n = int((math.tau * self._ring_radius()) // BOSS_RING_GAP_MIN)
+        return max(5, min(want, max_n))
+
+    def _ring_radius(self):
+        # Yarıçap tuzak sayısından daha hızlı büyür; böylece tuzak merkezleri
+        # arasındaki uzaklık her zaman 2*(tuzak_yarıçapı + oyuncu_yarıçapı)
+        # değerinin üstünde kalır ve aradan geçilebilir.
+        return 160 + self.boss_index * 12
+
+    def _volley_interval(self):
+        """İki yaylım ateş arasındaki süre — geç patronlarda belirgin kısalır."""
+        base = max(1.5, 5.0 - (self.boss_index - 1) * 0.80)
+        if self.desperate:
+            base *= 0.55
+        elif self.enraged:
+            base *= 0.72
+        return base * random.uniform(0.85, 1.15)
+
+    def _ranged_dmg_k(self):
+        """Menzilli saldırıların hasar katsayısı.
+
+        Vuruş başına hasar zaten dalgayla üssel büyüdüğü için, geç
+        patronlarda mermi hasarı biraz kısılır; aksi hâlde tek bir yaylım
+        ateş oyuncuyu bir anda siliyor ve dövüş adaletsiz hâle geliyor.
+        """
+        return max(0.45, 1.0 - (self.boss_index - 1) * 0.09)
+
+    def _shoot(self, projectiles, ang, speed, dmg_k, r=8, color=None,
+               target=None, turn=0.0, accel=0.0):
+        projectiles.append(EnemyProjectile(
+            self.x, self.y, math.cos(ang) * speed, math.sin(ang) * speed,
+            self.dmg * dmg_k * self._ranged_dmg_k(), color=color or self.color, r=r,
+            target=target, turn=turn, accel=accel))
+
+    def _fire_volley(self, player, fx, projectiles):
+        """Her patronun kendine özgü MENZİLLİ saldırısı.
+
+        Bu, patronların "kaçan oyuncuya dokunamama" sorununu çözen ana
+        eklemedir: artık GÖLGE CADISI lanet mermileri, KOLOS yerden yayılan
+        şok dalgası, KOVAN ANA takip eden spor okları atar.
+        """
+        bi = self.boss_index
+        px, py = self._lead_point(player, 0.20)
+        base = math.atan2(py - self.y, px - self.x)
+        eng = self.enraged or self.desperate
+
+        if self.kind == "warlord":
+            # Üç mermilik kısa seri — SAVAŞ LORDU zaten ışın yağdırıyor.
+            n = 3 + min(3, (bi - 1) // 2)
+            for i in range(n):
+                self._shoot(projectiles, base + (i - (n - 1) / 2) * 0.16,
+                            420 + bi * 14, 0.50, r=7)
+            sfx("shoot_c", 0.5, 0.0)
+
+        elif self.kind == "witch":
+            # LANET MERMİLERİ: yay biçiminde çıkar, bir süre oyuncuyu takip eder.
+            n = 4 + min(3, bi) + (2 if eng else 0)
+            spread = 1.05
+            for i in range(n):
+                ang = base + (i - (n - 1) / 2) * (spread / max(1, n - 1))
+                self._shoot(projectiles, ang, 290 + bi * 14, 0.46, r=8,
+                            color=(175, 110, 235), target=player,
+                            turn=1.9 + 0.12 * bi, accel=40)
+            fx.ring(self.x, self.y, (175, 110, 235), n=14, speed=150, life=0.35, r=3)
+            sfx("shoot_c", 0.55, 0.0)
+
+        elif self.kind == "colossus":
+            # ŞOK DALGASI: yerden her yöne yayılan ağır taş parçaları.
+            n = 10 + bi * 2 + (4 if eng else 0)
+            off = random.uniform(0, math.tau)
+            for i in range(n):
+                self._shoot(projectiles, off + i * math.tau / n, 205 + bi * 8, 0.42,
+                            r=11, color=(150, 165, 195))
+            fx.shockwave(self.x, self.y, 150, self.color, 0.4, 6)
+            fx.shake(7, 0.22)
+            sfx("explosion", 0.5, 0.0)
+
+        elif self.kind == "reaper":
+            # ÇAPRAZ KESİK: iki hızlı, dar mermi dalgası.
+            for wave_i in range(2):
+                for o in (-0.22, 0.0, 0.22):
+                    self._shoot(projectiles, base + o + wave_i * 0.11,
+                                470 + bi * 16, 0.40, r=6, color=(120, 240, 210))
+            sfx("shoot_c", 0.5, 0.0)
+
+        else:  # hive
+            # SPOR OKLARI: yavaş ama ısrarla takip eden mermiler.
+            n = 5 + min(3, bi) + (3 if eng else 0)
+            for i in range(n):
+                ang = base + random.uniform(-0.9, 0.9)
+                self._shoot(projectiles, ang, 225 + bi * 12, 0.40, r=9,
+                            color=(230, 190, 70), target=player,
+                            turn=1.5 + 0.10 * bi, accel=55)
+            fx.ring(self.x, self.y, (230, 190, 70), n=12, speed=130, life=0.35, r=3)
+            sfx("shoot_c", 0.5, 0.0)
+
     def _start_attack(self, player, fx):
+        bi = self.boss_index
         if self.kind == "warlord":
             n = 9 if self.enraged else 5
+            n += min(4, bi - 1)          # geç patron daha geniş yelpaze açar
             spread = 0.30 if self.enraged else 0.38
-            base = math.atan2(player.y - self.y, player.x - self.x)
+            px, py = self._lead_point(player, 0.22)
+            base = math.atan2(py - self.y, px - self.x)
             angs = [base + (i - (n - 1) / 2) * spread for i in range(n)]
             self._telegraph_beams(angs)
         elif self.kind == "witch":
-            r = 250 if self.enraged else 220
-            self._set_telegraph("hazard_ring", self.x, self.y, r, 0.62 if self.enraged else 0.78)
-            fx.ring(self.x, self.y, self.color, n=24 if self.enraged else 20, speed=150, life=0.5, r=3)
+            # LANET ÇEMBERİ: halka artık patronun değil OYUNCUNUN çevresine kurulur.
+            # Eskiden patron ~190 px uzakta durup kendi çevresine 150 px yarıçaplı
+            # halka açıyordu; halka oyuncuya hiç ulaşmıyor, saldırı boşa gidiyordu.
+            # CADI artık iki saldırı arasında geçiş yapar: lanet çemberi ve
+            # telgraflanan lanet yağmuru. Tek saldırılı patron tahmin
+            # edilebilir ve sıkıcı oluyordu.
+            if random.random() < (0.50 if bi >= 2 else 0.30):
+                px, py = self._lead_point(player, 0.25)
+                ang = math.atan2(py - self.y, px - self.x)
+                self._set_telegraph("barrage", ang, 0, 0, 0.45)
+            else:
+                px, py = self._lead_point(player, 0.25)
+                r = self._ring_radius()
+                self._set_telegraph("ring_player", px, py, r, 0.62 if self.enraged else 0.80)
+                fx.ring(px, py, self.color, n=24 if self.enraged else 20, speed=150, life=0.5, r=3)
         elif self.kind == "reaper":
-            # Oyuncunun BULUNDUĞU yere değil, GİDECEĞİ yere nişan alır.
-            px = player.x + getattr(player, "vx", 0.0) * 0.35
-            py = player.y + getattr(player, "vy", 0.0) * 0.35
+            px, py = self._lead_point(player, 0.35)
             if random.random() < 0.5:
                 # biçme darbesi: hedefin üstüne inen geniş alan
                 self._set_telegraph("scythe", px, py, 120 if self.enraged else 100,
@@ -5012,13 +5673,25 @@ class Boss:
                 offs = (-0.26, 0.0, 0.26) if self.enraged else (-0.2, 0.2)
                 self._telegraph_beams([ang + o for o in offs])
         elif self.kind == "hive":
-            # Etrafına dağılan, birbirini takip eden çoklu zehir havuzları.
-            self._set_telegraph("spore", player.x, player.y, 90, 0.7 if self.enraged else 0.85)
-            fx.ring(self.x, self.y, self.color, n=16, speed=140, life=0.45, r=3)
+            px, py = self._lead_point(player, 0.35)
+            if bi >= 2 and random.random() < 0.40:
+                # SPOR YAĞMURU: telgraflanan, hızlı ve yoğun bir mermi yelpazesi.
+                ang = math.atan2(py - self.y, px - self.x)
+                self._set_telegraph("barrage", ang, 0, 0, 0.50)
+            else:
+                # Etrafına dağılan, birbirini takip eden çoklu zehir havuzları.
+                self._set_telegraph("spore", px, py, 90, 0.7 if self.enraged else 0.85)
+                fx.ring(self.x, self.y, self.color, n=16, speed=140, life=0.45, r=3)
         else:  # colossus
-            r = 165 if self.enraged else 140
-            self._set_telegraph("slam", player.x, player.y, r, 0.52 if self.enraged else 0.68)
-            fx.popup(player.x, player.y - 40, "!", (255, 90, 70), 30, life=0.7)
+            px, py = self._lead_point(player, 0.45)
+            if bi >= 2 and random.random() < 0.45:
+                # HÜCUM: yavaş olan KOLOS artık aradaki mesafeyi kapatabiliyor.
+                self._set_telegraph("charge", px, py, 0, 0.62)
+                fx.popup(self.x, self.y - self.radius - 26, "HÜCUM!", (255, 150, 60), 22, life=0.8)
+            else:
+                r = 165 if self.enraged else 140
+                self._set_telegraph("slam", px, py, r, 0.52 if self.enraged else 0.68)
+                fx.popup(px, py - 40, "!", (255, 90, 70), 30, life=0.7)
         sfx("warn", 0.7, 0.0)
 
     def _telegraph_beams(self, angles):
@@ -5050,6 +5723,37 @@ class Boss:
                 hx = clamp(hx, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
                 hy = clamp(hy, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
                 hazards.append(Hazard(hx, hy, 56, 0.9, self.dmg * 1.0))
+        elif kind == "ring_player":
+            # LANET ÇEMBERİ: oyuncunun çevresine kapanan halka. Oyuncu ya
+            # ortada kalır ya da halkadaki boşluktan kaçar — ama artık
+            # saldırıyı görmezden gelip ateş etmeye devam edemez.
+            n = self._ring_count()
+            for i in range(n):
+                ang = i * math.tau / n + random.uniform(-0.05, 0.05)
+                hx = clamp(a + math.cos(ang) * c, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
+                hy = clamp(b + math.sin(ang) * c, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
+                hazards.append(Hazard(hx, hy, BOSS_RING_HAZARD_R, 0.45, self.dmg * 0.80))
+            fx.shockwave(a, b, c, self.color, 0.45, 6)
+        elif kind == "barrage":
+            # YAĞMUR: telgraflanan yöne doğru sıkı ve hızlı bir mermi yelpazesi.
+            # (CADI'nın lanet yağmuru / KOVAN ANA'nın spor yağmuru.)
+            n = 7 + self.boss_index * 2 + (3 if self.enraged else 0)
+            spread = 0.62
+            speed = 330 + self.boss_index * 20
+            col = (210, 120, 250) if self.kind == "witch" else (245, 205, 90)
+            for i in range(n):
+                ang = a + (i - (n - 1) / 2) * (spread / max(1, n - 1))
+                self._shoot(projectiles, ang, speed, 0.48, r=7, color=col)
+            fx.bolt([(self.x, self.y),
+                     (self.x + math.cos(a) * 90, self.y + math.sin(a) * 90)], col, 0.22)
+            sfx("shoot_c", 0.7, 0.0)
+        elif kind == "charge":
+            # KOLOS HÜCUMU: telgraflanan yöne doğru fırlar.
+            self.charge_dir = norm_dir(self.x, self.y, a, b)
+            self.charge_t = 0.62
+            fx.shockwave(self.x, self.y, 140, self.color, 0.35, 5)
+            fx.shake(9, 0.25)
+            sfx("bonk", 0.6, 0.0)
         elif kind == "scythe":
             # ORAK: hedefin üstüne geniş, hızlı inen bir biçme darbesi.
             hazards.append(Hazard(a, b, c, 0.04, self.dmg * 1.25))
@@ -5178,6 +5882,42 @@ class Boss:
                     hx = clamp(a + math.cos(ang) * 90, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
                     hy = clamp(b + math.sin(ang) * 90, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
                     blit_disc(surf, hx, hy, 28 * k, (230, 190, 70), 85)
+            elif kind == "barrage":
+                # YAĞMUR: mermilerin çıkacağı yelpaze koridoru önceden gösterilir
+                n = 7 + self.boss_index * 2 + (3 if self.enraged else 0)
+                col = (210, 120, 250) if self.kind == "witch" else (245, 205, 90)
+                s = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+                for i in range(n):
+                    ang = a + (i - (n - 1) / 2) * (0.62 / max(1, n - 1))
+                    ex, ey = x + math.cos(ang) * 900, y + math.sin(ang) * 900
+                    pygame.draw.line(s, (*col, int(45 + 95 * k)), (x, y), (ex, ey), 3)
+                surf.blit(s, (0, 0))
+                add_glow(surf, x, y, 40 + 34 * k, col, 0.35 + 0.35 * k)
+            elif kind == "ring_player":
+                # oyuncunun çevresine kapanan lanet çemberi
+                n = self._ring_count()
+                pygame.draw.circle(surf, (210, 120, 250), (int(a), int(b)), int(c), 2)
+                for i in range(n):
+                    ang = i * math.tau / n
+                    hx = clamp(a + math.cos(ang) * c, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
+                    hy = clamp(b + math.sin(ang) * c, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
+                    blit_disc(surf, hx, hy, BOSS_RING_HAZARD_R * 0.56 * k, (230, 90, 220), 92)
+                pygame.draw.circle(surf, (255, 170, 255), (int(a), int(b)), max(2, int(6 * k)))
+            elif kind == "charge":
+                # hücum hattı: patrondan hedefe uzanan geniş kırmızı koridor
+                ang = math.atan2(b - y, a - x)
+                ex, ey = x + math.cos(ang) * 900, y + math.sin(ang) * 900
+                nx, ny = -math.sin(ang), math.cos(ang)
+                w2 = self.radius * 1.05
+                s = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+                pygame.draw.polygon(s, (255, 90, 60, int(60 + 70 * k)), [
+                    (x + nx * w2, y + ny * w2), (ex + nx * w2, ey + ny * w2),
+                    (ex - nx * w2, ey - ny * w2), (x - nx * w2, y - ny * w2)])
+                surf.blit(s, (0, 0))
+                for i in range(3):
+                    fx_ = x + math.cos(ang) * (60 + i * 46) * (0.5 + k)
+                    fy_ = y + math.sin(ang) * (60 + i * 46) * (0.5 + k)
+                    pygame.draw.circle(surf, (255, 150, 90), (int(fx_), int(fy_)), max(2, int(5 * k)), 2)
 
         # HP bar (üst, isim + zırh bilgisi ile)
         w = 340
@@ -6654,7 +7394,8 @@ class App:
         self.cosmetic_tab = "hat"
         self.book_scroll = 0.0
         self.book_filter = "all"      # all | owned | locked
-        self.book_detail = None       # tıklanan kitabın anahtarı (detay penceresi)
+        self.book_detail = None       # tıklanan kitabın anahtarı (okuma penceresi)
+        self.book_detail_t = 0.0      # okuma penceresi açılma animasyonu (0..1)
         self.ad_watch_active = False
         self.ad_watch_timer = 0.0
         self.ad_watch_duration = 3.0
@@ -6662,6 +7403,7 @@ class App:
         self.wheel_popup_amount = 0
         self.market_anim = 0.0        # GÜNLÜK MARKET kartı hover animasyonu
         self.market_was_hover = False
+        self.claim_all_count = 0      # "tümünü topla" bildirimi için sayaç
         self.menu_buttons = []
         self.build_menu_buttons()
         audio.set_music("menu")
@@ -6923,13 +7665,13 @@ class App:
                   (VIRTUAL_W / 2, 250), 16, TEXT_DIM, center=True)
 
         cx = VIRTUAL_W / 2
-        w, h, gap = 300, 50, 12
-        y0 = 292
+        w, h, gap = 300, 46, 10
+        y0 = 286
         buttons = [
             Button((cx - w / 2, y0, w, h), "DEVAM ET", lambda: self.set_state(STATE_PLAY), color=(60, 130, 90), hover_color=(80, 170, 115)),
             Button((cx - w / 2, y0 + (h + gap), w, h), "TAM EKRAN AÇ/KAPA", self.display.toggle_fullscreen),
-            Button((cx - w / 2, y0 + 3 * (h + gap), w, h), "BAŞTAN BAŞLA", self.start_run, color=(130, 90, 60), hover_color=(170, 115, 80)),
-            Button((cx - w / 2, y0 + 4 * (h + gap), w, h), "ANA MENÜ", lambda: self.set_state(STATE_MENU)),
+            Button((cx - w / 2, y0 + 4 * (h + gap), w, h), "BAŞTAN BAŞLA", self.start_run, color=(130, 90, 60), hover_color=(170, 115, 80)),
+            Button((cx - w / 2, y0 + 5 * (h + gap), w, h), "ANA MENÜ", lambda: self.set_state(STATE_MENU)),
         ]
         for b in buttons:
             b.update(mouse_pos, dt)
@@ -6937,13 +7679,19 @@ class App:
             if clicked:
                 b.click(mouse_pos)
 
+        # --- SKİN GÖRÜNÜMÜ (oyun içinden açılıp kapatılabilir) ---
+        # Kapatıldığında oyuncu; kanat, şapka, gözlük, pelerin ve skin efektleri
+        # olmadan yalnızca skininin renginde sade bir top olarak çizilir.
+        self._plain_skin_row(canvas, pygame.Rect(cx - w / 2, y0 + 3 * (h + gap), w, h),
+                             mouse_pos, clicked)
+
         # --- yetenek çubuğu boyutu (oyuncu buradan küçültüp büyütebilir) ---
         sr = pygame.Rect(cx - w / 2, y0 + 2 * (h + gap), w, h)
         hov = sr.collidepoint(mouse_pos)
         panel(canvas, sr, bg=(36, 34, 56) if hov else (26, 26, 42),
               edge=CYAN if hov else PANEL_EDGE, alpha=240, radius=10, edge_w=2)
-        draw_text(canvas, "YETENEK ÇUBUĞU", (sr.x + 16, sr.y + 9), 12, TEXT_DIM, shadow=False)
-        draw_text(canvas, f"{skill_scale_label()}  »", (sr.x + 16, sr.y + 25), 17,
+        draw_text(canvas, "YETENEK ÇUBUĞU", (sr.x + 16, sr.y + 7), 12, TEXT_DIM, shadow=False)
+        draw_text(canvas, f"{skill_scale_label()}  »", (sr.x + 16, sr.y + 23), 17,
                   CYAN if hov else TEXT, bold=True, shadow=False)
         # sağda canlı küçük önizleme
         k = clamp(float(CFG.get("skill_scale", 0.85)), 0.5, 1.4)
@@ -6957,6 +7705,53 @@ class App:
             self.save.data.setdefault("settings", {})["skill_scale"] = CFG["skill_scale"]
             self.save.save()
             sfx("click", 0.6, 0.0)
+
+    def _plain_skin_row(self, canvas, rect, mouse_pos, clicked, compact=False):
+        """"SKİN GÖRÜNÜMÜ" anahtarı: sağında canlı bir önizleme topu taşır.
+
+        Kapalıyken oyuncu yalnızca skininin renginde sade bir yuvarlak olur;
+        skinin verdiği bonuslar etkilenmez, sadece görünüm sadeleşir.
+        """
+        on = not CFG.get("plain_skin")
+        hov = rect.collidepoint(mouse_pos)
+        panel(canvas, rect, bg=(30, 50, 34) if on else (44, 34, 28),
+              edge=(GREEN if on else ORANGE) if not hov else lighten(GREEN if on else ORANGE, .3),
+              alpha=240, radius=10, edge_w=2)
+        if compact:
+            draw_text(canvas, f"Skin Görünümü: {'AÇIK' if on else 'KAPALI'}",
+                      (rect.centerx - 16, rect.centery - 7), 12, TEXT, bold=True,
+                      center=True, shadow=False)
+        else:
+            draw_text(canvas, "SKİN GÖRÜNÜMÜ", (rect.x + 16, rect.y + 7), 12, TEXT_DIM, shadow=False)
+            draw_text(canvas, f"{'AÇIK' if on else 'KAPALI — sade top'}  »",
+                      (rect.x + 16, rect.y + 23), 17, (GREEN if on else ORANGE), bold=True,
+                      shadow=False)
+
+        # --- canlı önizleme: seçili skinin rengiyle küçük bir karakter ---
+        sk = get_skin(self.save.equipped_skin_id())
+        pr_ = 9 if compact else 12
+        pcx, pcy = rect.right - pr_ - 10, rect.centery
+        pygame.draw.circle(canvas, OUTLINE, (int(pcx), int(pcy)), pr_ + 2)
+        pygame.draw.circle(canvas, scale_col(sk["color"], 0.6), (int(pcx), int(pcy)), pr_)
+        pygame.draw.circle(canvas, sk["color"], (int(pcx - 1), int(pcy - 1)), pr_ - 1)
+        if on:
+            # görünüm açıkken önizlemede de küçük bir kanat/parıltı görünsün
+            add_glow(canvas, pcx, pcy, pr_ * 1.8, sk["accent"], .45)
+            for s in (-1, 1):
+                pygame.draw.polygon(canvas, sk["accent"],
+                                    [(pcx + s * pr_ * 0.75, pcy - 2),
+                                     (pcx + s * pr_ * 1.45, pcy - pr_ * 0.65),
+                                     (pcx + s * pr_ * 0.85, pcy + pr_ * 0.35)])
+        pygame.draw.circle(canvas, (250, 250, 255), (int(pcx - 3), int(pcy - 2)), 2)
+        pygame.draw.circle(canvas, (250, 250, 255), (int(pcx + 3), int(pcy - 2)), 2)
+
+        if clicked and hov:
+            CFG["plain_skin"] = on          # "on" açık demekti -> kapat
+            self.save.data.setdefault("settings", {})["plain_skin"] = CFG["plain_skin"]
+            self.save.save()
+            sfx("click", 0.6, 0.0)
+            return True
+        return False
 
     def set_state(self, s):
         if s == STATE_MENU:
@@ -7181,23 +7976,91 @@ class App:
         self.draw_daily_market_card(canvas, dt, mouse_pos, clicked)
 
     # ---------------- GÜNLÜK MARKET KARTI (ana menü, sağ alt) ----------------
+    def _draw_streak_strip(self, canvas, rect, mouse_pos=None, big=False):
+        """7 GÜNLÜK GİRİŞ SERİSİ şeridi.
+
+        Oyuncunun serinin kaçıncı gününde olduğunu tek bakışta gösterir:
+        geçmiş günler yeşil onaylı, BUGÜN altın renkli ve nabız gibi atan,
+        gelecek günler soluk. Eskiden bu bilgi hiçbir yerde görünmüyordu;
+        "bugün 3. gün" olduğu hâlde oyuncu bunu göremiyordu.
+        """
+        day = self.save.login_streak_day()          # 1, 2, 3, ...
+        pos = ((day - 1) % 7) + 1                   # hafta içindeki yeri (1..7)
+        claimed_today = self.save.data.get("daily", {}).get("streak_claimed", False)
+        tbl = SaveManager.STREAK_TABLE
+
+        n = 7
+        gap = 5 if not big else 8
+        cw = (rect.w - gap * (n - 1)) / n
+        for i in range(n):
+            d_i = i + 1
+            r = pygame.Rect(int(rect.x + i * (cw + gap)), rect.y, int(cw), rect.h)
+            done = d_i < pos or (d_i == pos and claimed_today)
+            today = d_i == pos
+            if today:
+                pulse = 0.5 + 0.5 * math.sin(self.t * 4)
+                bg = (72, 56, 22) if not claimed_today else (26, 52, 34)
+                ec = GOLD if not claimed_today else GREEN
+                add_glow(canvas, r.centerx, r.centery, r.w * 1.1, ec, 0.16 + pulse * 0.16)
+            elif done:
+                bg, ec = (24, 46, 32), (72, 148, 100)
+            else:
+                bg, ec = (20, 21, 32), (54, 58, 78)
+            pygame.draw.rect(canvas, bg, r, border_radius=6)
+            pygame.draw.rect(canvas, ec, r, width=2 if today else 1, border_radius=6)
+
+            amt = tbl[(d_i - 1) % len(tbl)]
+            if not big:
+                # KOMPAKT (ana menü kartı): yalnızca rakam ya da onay yıldızı
+                if done:
+                    draw_icon(canvas, r.centerx, r.centery, "star",
+                              GREEN if today else (110, 200, 145), 5)
+                else:
+                    draw_text(canvas, str(d_i), (r.centerx, r.y + 4), 13,
+                              GOLD if today else TEXT_DIM, bold=True, center=True, shadow=False)
+            elif done and not today:
+                # GEÇMİŞ GÜN: onay yıldızı + o gün kazanılan elmas
+                draw_icon(canvas, r.centerx, r.y + 15, "star", (110, 200, 145), 7)
+                draw_text(canvas, f"+{amt}", (r.centerx, r.y + 30), 11, (92, 168, 122),
+                          bold=True, center=True, shadow=False)
+            elif today:
+                # BUGÜN: büyük rakam + "BUGÜN" etiketi + ödül/alındı bilgisi
+                col = GREEN if claimed_today else GOLD
+                draw_text(canvas, str(d_i), (r.centerx, r.y + 2), 18, col,
+                          bold=True, center=True, shadow=False)
+                draw_text(canvas, "BUGÜN", (r.centerx, r.y + 24), 10, col,
+                          bold=True, center=True, shadow=False)
+                draw_text(canvas, "ALINDI" if claimed_today else f"+{amt}",
+                          (r.centerx, r.y + 37), 11,
+                          GREEN if claimed_today else GEM_COLOR,
+                          bold=True, center=True, shadow=False)
+            else:
+                # GELECEK GÜN
+                draw_text(canvas, str(d_i), (r.centerx, r.y + 6), 17, TEXT_DIM,
+                          bold=True, center=True, shadow=False)
+                draw_text(canvas, f"+{amt}", (r.centerx, r.y + 30), 11, TEXT_DIM,
+                          bold=True, center=True, shadow=False)
+        return day, pos
+
     def draw_daily_market_card(self, canvas, dt, mouse_pos, clicked):
         """
-        Ana menünün sağ alt köşesindeki market kutusu.
+        Ana menünün sağ alt köşesindeki GÜNLÜK MARKET kutusu.
 
-        Tasarım: tek sütunlu, hizalı, üç bölgeli bir kart.
-          1) Başlık şeridi : elmas rozeti + başlık + gece yarısı geri sayımı
-          2) İlerleme      : bugün toplanan ödül sayısı + çubuk
-          3) Eylem         : hazır ödüllerin mini ikonları + tek bir CTA düğmesi
+        Dört bölgeli bir kart:
+          1) Başlık şeridi     : market rozeti + başlık + gece yarısı geri sayımı
+          2) Giriş serisi      : 7 günlük şerit — bugünün kaçıncı gün olduğu
+          3) Günlük ilerleme   : bugün toplanan ödül sayısı + çubuk
+          4) Eylem             : hazır ödül ikonları + tek bir CTA düğmesi
         """
-        CARD_W, CARD_H, MARGIN = 336, 172, 18
+        CARD_W, CARD_H, MARGIN = 400, 172, 18
         rect = pygame.Rect(VIRTUAL_W - CARD_W - MARGIN, VIRTUAL_H - CARD_H - MARGIN, CARD_W, CARD_H)
 
         ready_icons = self.save.daily_ready_icons()
         ready_n = len(ready_icons)
         has_reward = ready_n > 0
         claimed_n = self.save.daily_claimed_count()
-        total_n = SaveManager.DAILY_TASK_COUNT
+        total_n = self.save.daily_task_total()
+        all_done = claimed_n >= total_n
         gems_now = self.save.daily_gems_available_now()
 
         # ---- hover animasyonu (kart yukarı doğru hafifçe kalkar) ----
@@ -7209,7 +8072,7 @@ class App:
         lift = self.market_anim * 4
         rect = rect.move(0, -lift)
 
-        accent = GOLD if has_reward else (86, 92, 122)
+        accent = GOLD if has_reward else (GREEN if all_done else (86, 92, 122))
         pulse = (math.sin(self.t * 3.2) * 0.5 + 0.5) if has_reward else 0.0
 
         # ---- gölge + dış parlama ----
@@ -7218,97 +8081,91 @@ class App:
         pygame.draw.rect(shadow, (0, 0, 0, 90), shadow.get_rect(), border_radius=22)
         canvas.blit(shadow, (rect.x - 10, rect.y - 2))
         if has_reward:
-            add_glow(canvas, rect.centerx, rect.centery, 110, GOLD, 0.10 + pulse * 0.07 + self.market_anim * 0.06)
+            add_glow(canvas, rect.centerx, rect.centery, 130, GOLD,
+                     0.09 + pulse * 0.06 + self.market_anim * 0.06)
 
         # ---- gövde ----
         body_bg = (34, 30, 22) if (has_reward and hover) else ((26, 24, 20) if has_reward else (20, 21, 32))
         panel(canvas, rect, bg=body_bg, edge=accent, alpha=250, radius=18, edge_w=2)
 
-        # üstte ince bir vurgu şeridi — kartı "kutu" değil "panel" gibi gösterir
         strip = pygame.Surface((rect.w - 26, 3), pygame.SRCALPHA)
         pygame.draw.rect(strip, (*accent, 120 + int(pulse * 80)), strip.get_rect(), border_radius=2)
         canvas.blit(strip, (rect.x + 13, rect.y + 6))
 
-        pl, pr_ = rect.x + 20, rect.right - 20
+        pl, pr_ = rect.x + 18, rect.right - 18
 
         # =============== 1) BAŞLIK ŞERİDİ ===============
-        bx, by, badge_r = rect.x + 42, rect.y + 44, 21
-        add_glow(canvas, bx, by, 32, GEM_COLOR, 0.28 + pulse * 0.30)
+        bx, by, badge_r = rect.x + 40, rect.y + 38, 20
+        add_glow(canvas, bx, by, 30, GEM_COLOR, 0.26 + pulse * 0.28)
         pygame.draw.circle(canvas, (13, 14, 22), (int(bx), int(by)), badge_r)
         pygame.draw.circle(canvas, accent, (int(bx), int(by)), badge_r, 2)
-        draw_icon(canvas, bx, by, "gem", GEM_COLOR, 13)
+        draw_icon(canvas, bx, by, "gem", GEM_COLOR, 12)
 
-        tx = rect.x + 74
-        draw_text(canvas, "GÜNLÜK MARKET", (tx, rect.y + 29), 17,
-                  accent if has_reward else TEXT, bold=True, shadow=False)
-
-        # geri sayım — market'in ne zaman yenileneceği
+        tx = rect.x + 70
+        draw_text(canvas, "GÜNLÜK MARKET", (tx, rect.y + 24), 17,
+                  accent if (has_reward or all_done) else TEXT, bold=True, shadow=False)
         draw_text(canvas, f"Yenilenmesine {fmt_hms(seconds_to_midnight())}",
-                  (tx, rect.y + 51), 11, TEXT_DIM, shadow=False)
+                  (tx, rect.y + 46), 11, TEXT_DIM, shadow=False)
 
         # sağ üst: hazır ödül sayacı rozeti
         if has_reward:
             bw = max(30, text_width(str(ready_n), 13, True) + 20)
-            br = pygame.Rect(rect.right - bw - 16, rect.y + 20, bw, 22)
+            br = pygame.Rect(rect.right - bw - 16, rect.y + 18, bw, 22)
             bs = pygame.Surface(br.size, pygame.SRCALPHA)
             pygame.draw.rect(bs, (*RED, 235), bs.get_rect(), border_radius=11)
             canvas.blit(bs, br.topleft)
             draw_text(canvas, str(ready_n), br.center, 13, WHITE, bold=True, center=True, shadow=False)
         else:
-            draw_icon(canvas, rect.right - 30, rect.y + 31, "star", GREEN, 9)
+            draw_icon(canvas, rect.right - 30, rect.y + 29, "star", GREEN, 9)
 
-        # =============== 2) İLERLEME ===============
-        draw_text(canvas, "BUGÜNKÜ İLERLEME", (pl, rect.y + 80), 10, TEXT_DIM, bold=True, shadow=False)
-        draw_text(canvas, f"{claimed_n}/{total_n}", (pr_, rect.y + 79), 12,
-                  GREEN if claimed_n >= total_n else TEXT, bold=True, shadow=False, right=True)
+        # =============== 2) GİRİŞ SERİSİ ŞERİDİ ===============
+        day, pos = self._draw_streak_strip(
+            canvas, pygame.Rect(pl + 76, rect.y + 64, pr_ - pl - 76, 24))
+        draw_text(canvas, "SERİ", (pl, rect.y + 64), 10, TEXT_DIM, bold=True, shadow=False)
+        draw_text(canvas, f"{day}. GÜN", (pl, rect.y + 76), 13, GOLD, bold=True, shadow=False)
 
-        bar = pygame.Rect(pl, rect.y + 96, pr_ - pl, 7)
+        # =============== 3) GÜNLÜK İLERLEME ===============
+        draw_text(canvas, "BUGÜNKÜ İLERLEME", (pl, rect.y + 98), 10, TEXT_DIM, bold=True, shadow=False)
+        draw_text(canvas, f"{claimed_n}/{total_n}", (pr_, rect.y + 97), 12,
+                  GREEN if all_done else TEXT, bold=True, shadow=False, right=True)
+        bar = pygame.Rect(pl, rect.y + 112, pr_ - pl, 7)
         draw_bar(canvas, bar, claimed_n / max(1, total_n),
-                 GREEN if claimed_n >= total_n else accent,
+                 GREEN if all_done else accent,
                  bg=(13, 14, 22), border=(48, 52, 74), radius=4)
 
-        # =============== 3) EYLEM ===============
-        row_cy = rect.y + 120
-        cta = pygame.Rect(pl, rect.y + 134, pr_ - pl, 28)
+        # =============== 4) EYLEM ===============
+        cta = pygame.Rect(pl, rect.y + 128, pr_ - pl, 28)
 
         if has_reward:
-            # hazır ödüllerin mini ikonları (en fazla 4 tane + "+N")
-            icon_x = pl + 10
-            for ic in ready_icons[:4]:
-                pygame.draw.circle(canvas, (13, 14, 22), (int(icon_x), int(row_cy)), 10)
-                pygame.draw.circle(canvas, (78, 72, 50), (int(icon_x), int(row_cy)), 10, 1)
-                draw_icon(canvas, icon_x, row_cy, ic, accent, 7)
-                icon_x += 23
-            if ready_n > 4:
-                draw_text(canvas, f"+{ready_n - 4}", (icon_x - 7, row_cy - 8), 11,
-                          TEXT_DIM, bold=True, shadow=False)
-
-            # tek tuşla toplanabilecek yaklaşık elmas
-            gem_txt = f"≈{fmt_num(gems_now)}"
-            gw = text_width(gem_txt, 13, True)
-            draw_icon(canvas, pr_ - gw - 12, row_cy, "gem", GEM_COLOR, 7)
-            draw_text(canvas, gem_txt, (pr_, row_cy - 9), 13, GEM_COLOR,
-                      bold=True, shadow=False, right=True)
-
-            # CTA düğmesi
+            # hazır ödüllerin mini ikonları, CTA'nın solunda tek satırda
+            icon_x = pl + 9
+            for ic in ready_icons[:5]:
+                pygame.draw.circle(canvas, (13, 14, 22), (int(icon_x), int(cta.centery)), 10)
+                pygame.draw.circle(canvas, (78, 72, 50), (int(icon_x), int(cta.centery)), 10, 1)
+                draw_icon(canvas, icon_x, cta.centery, ic, accent, 7)
+                icon_x += 22
             glow_k = 0.5 + pulse * 0.3 + self.market_anim * 0.2
-            cs = pygame.Surface(cta.size, pygame.SRCALPHA)
+            btn = pygame.Rect(icon_x + 4, cta.y, cta.right - icon_x - 4, cta.h)
+            cs = pygame.Surface(btn.size, pygame.SRCALPHA)
             base = (196, 156, 58) if hover else (150, 118, 40)
             pygame.draw.rect(cs, (*base, 250), cs.get_rect(), border_radius=14)
             pygame.draw.rect(cs, (255, 255, 255, 55 + int(glow_k * 95)), cs.get_rect(),
                              width=2, border_radius=14)
-            canvas.blit(cs, cta.topleft)
-            draw_text(canvas, f"{ready_n} ÖDÜLÜ TOPLA  »", cta.center, 13,
+            canvas.blit(cs, btn.topleft)
+            gem_txt = f"{ready_n} ÖDÜL  ·  ≈{fmt_num(gems_now)}"
+            draw_icon(canvas, btn.x + 14, btn.centery, "gem", (255, 250, 236), 6)
+            draw_text(canvas, gem_txt, (btn.centerx + 8, btn.centery - 7), 12,
                       (255, 250, 236), bold=True, center=True, shadow=False)
         else:
-            draw_text(canvas, "Bugünün tüm ödülleri toplandı.", (rect.centerx, row_cy - 7), 12,
-                      TEXT_DIM, center=True, shadow=False)
             cs = pygame.Surface(cta.size, pygame.SRCALPHA)
-            pygame.draw.rect(cs, (30, 33, 48, 235), cs.get_rect(), border_radius=14)
+            pygame.draw.rect(cs, (26, 44, 32, 235) if all_done else (30, 33, 48, 235),
+                             cs.get_rect(), border_radius=14)
             pygame.draw.rect(cs, (255, 255, 255, 40 + int(self.market_anim * 60)), cs.get_rect(),
                              width=2, border_radius=14)
             canvas.blit(cs, cta.topleft)
-            draw_text(canvas, "GÖREVLERİ GÖRÜNTÜLE  »", cta.center, 12, TEXT_DIM,
+            label = ("BUGÜNÜN TÜM ÖDÜLLERİ ALINDI  »" if all_done
+                     else "GÖREVLERİ GÖRÜNTÜLE  »")
+            draw_text(canvas, label, cta.center, 12, GREEN if all_done else TEXT_DIM,
                       bold=True, center=True, shadow=False)
 
         if clicked and hover:
@@ -7316,37 +8173,207 @@ class App:
             sfx("click", 0.6, 0.0)
 
     # ---------------- GÜNLÜK ÖDÜLLER (arayüz market'i) ----------------
-    def _daily_card(self, canvas, mouse_pos, clicked, dt, rect, icon, title, desc,
-                     reward_txt, status, btn_label, btn_cb, btn_enabled, accent, done=False):
+    def _daily_tasks(self):
+        """Günlük market'teki 10 görevi tek bir listede tarif eder.
+
+        Her görev aynı sözlük biçimini kullanır; böylece kartlar tek bir
+        yerde, tutarlı bir düzenle çizilir (eskiden 10 ayrı kod bloğu vardı
+        ve kartlar arasında hizalama/boşluk tutarsızlıkları oluşuyordu).
+            prog   : (şu an, hedef) — ilerleme çubuğu; yoksa None
+            ready  : şimdi talep edilebilir mi
+            done   : bugün tamamlanıp ödülü alındı mı
+        """
+        S = SaveManager
+        sv = self.save
+        d = sv.data.get("daily", {})
+        day = sv.login_streak_day()
+        ad_left = S.DAILY_AD_MAX - sv.daily_ad_watches()
+        ad_ready = sv.daily_ad_available() and not self.ad_watch_active
+        chest_ready = sv.weekly_chest_available()
+        chest_done = sv._weekly_chest_claimed()
+
+        return [
+            dict(icon="gem", title="GÜNLÜK HEDİYE", accent=GOLD,
+                 desc="Her gün 1 kere bedava elmas al.",
+                 reward=f"+{S.DAILY_FREE_GEMS} Elmas", prog=None,
+                 done=not sv.daily_free_available(), ready=sv.daily_free_available(),
+                 status="Bugün alındı" if not sv.daily_free_available() else "Almaya hazır",
+                 label="ALINDI" if not sv.daily_free_available() else "AL",
+                 cb=sv.claim_daily_free),
+
+            dict(icon="bolt", title="REKLAM İZLE", accent=CYAN,
+                 desc="Kısa bir reklam izle, elmas kazan.",
+                 reward=f"+{S.DAILY_AD_GEMS} Elmas",
+                 prog=(sv.daily_ad_watches(), S.DAILY_AD_MAX),
+                 done=not sv.daily_ad_available(), ready=ad_ready,
+                 status=f"Kalan hak: {max(0, ad_left)}/{S.DAILY_AD_MAX}",
+                 label=("İZLENİYOR" if self.ad_watch_active
+                        else ("BİTTİ" if not sv.daily_ad_available() else "İZLE")),
+                 cb=self._start_ad_watch),
+
+            dict(icon="target", title="3 MAÇ OYNA", accent=GREEN,
+                 desc="Bugün 3 maç bitir.",
+                 reward=f"+{S.DAILY_MATCH_GEMS} Elmas",
+                 prog=(sv.daily_matches_played(), S.DAILY_MATCH_GOAL),
+                 done=d.get("match_reward_claimed", False),
+                 ready=sv.daily_match_reward_available(),
+                 status="Ödül alındı" if d.get("match_reward_claimed") else "Maç bitir",
+                 label=("ALINDI" if d.get("match_reward_claimed")
+                        else ("AL" if sv.daily_match_reward_available() else "OYNA")),
+                 cb=sv.claim_match_reward),
+
+            dict(icon="star", title="GİRİŞ SERİSİ", accent=GOLD,
+                 desc=f"{day}. gün üst üste giriş yaptın.",
+                 reward=f"+{sv.streak_reward_amount()} Elmas",
+                 prog=(((day - 1) % 7) + 1, 7),
+                 done=d.get("streak_claimed", False), ready=sv.streak_reward_available(),
+                 status="Bugün alındı" if d.get("streak_claimed") else "Talep edilebilir",
+                 label="ALINDI" if d.get("streak_claimed") else "AL",
+                 cb=sv.claim_streak_reward),
+
+            dict(icon="shield", title="HAFTALIK SANDIK", accent=GOLD,
+                 desc="Her 7 günlük seride büyük ödül.",
+                 reward=f"+{S.WEEKLY_CHEST_GEMS} Elmas",
+                 prog=(((day - 1) % 7) + 1, 7),
+                 done=chest_done, ready=chest_ready,
+                 status=("Sandık hazır!" if chest_ready else
+                         ("Bu seride alındı" if chest_done
+                          else f"{7 - (((day - 1) % 7) + 1)} gün kaldı")),
+                 label="AÇ" if chest_ready else ("ALINDI" if chest_done else "KİLİTLİ"),
+                 cb=sv.claim_weekly_chest),
+
+            dict(icon="boot", title="DALGA HEDEFİ", accent=BLUE,
+                 desc=f"Bir koşuda dalga {S.DAILY_WAVE_GOAL}'e ulaş.",
+                 reward=f"+{S.DAILY_WAVE_GEMS} Elmas",
+                 prog=(d.get("wave_reached", 0), S.DAILY_WAVE_GOAL),
+                 done=d.get("wave_reward_claimed", False), ready=sv.wave_reward_available(),
+                 status=("Ödül alındı" if d.get("wave_reward_claimed")
+                         else f"En iyi: dalga {d.get('wave_reached', 0)}"),
+                 label=("ALINDI" if d.get("wave_reward_claimed")
+                        else ("AL" if sv.wave_reward_available() else "OYNA")),
+                 cb=sv.claim_wave_reward),
+
+            dict(icon="skull", title="PATRON AVI", accent=RED,
+                 desc="Bugün bir patronu devir.",
+                 reward=f"+{S.DAILY_BOSS_GEMS} Elmas",
+                 prog=(1 if d.get("boss_killed") else 0, 1),
+                 done=d.get("boss_reward_claimed", False), ready=sv.boss_reward_available(),
+                 status=("Ödül alındı" if d.get("boss_reward_claimed")
+                         else ("Patron devrildi!" if d.get("boss_killed") else "Henüz devrilmedi")),
+                 label=("ALINDI" if d.get("boss_reward_claimed")
+                        else ("AL" if sv.boss_reward_available() else "OYNA")),
+                 cb=sv.claim_boss_reward),
+
+            dict(icon="sword", title="SKOR KIRICI", accent=ORANGE,
+                 desc="Kişisel rekorunu geç.",
+                 reward=f"+{S.DAILY_SCORE_GEMS} Elmas",
+                 prog=(1 if d.get("score_beaten") else 0, 1),
+                 done=d.get("score_reward_claimed", False), ready=sv.score_reward_available(),
+                 status=("Ödül alındı" if d.get("score_reward_claimed")
+                         else ("Rekor kırıldı!" if d.get("score_beaten") else "Rekorun kırılmadı")),
+                 label=("ALINDI" if d.get("score_reward_claimed")
+                        else ("AL" if sv.score_reward_available() else "OYNA")),
+                 cb=sv.claim_score_reward),
+
+            dict(icon="fist", title="ÖLDÜRME SERİSİ", accent=PURPLE,
+                 desc=f"Bir koşuda {S.DAILY_KILLSTREAK_GOAL} düşman öldür.",
+                 reward=f"+{S.DAILY_KILLSTREAK_GEMS} Elmas",
+                 prog=(d.get("killstreak", 0), S.DAILY_KILLSTREAK_GOAL),
+                 done=d.get("killstreak_reward_claimed", False),
+                 ready=sv.killstreak_reward_available(),
+                 status=("Ödül alındı" if d.get("killstreak_reward_claimed")
+                         else f"En iyi: {d.get('killstreak', 0)}"),
+                 label=("ALINDI" if d.get("killstreak_reward_claimed")
+                        else ("AL" if sv.killstreak_reward_available() else "OYNA")),
+                 cb=sv.claim_killstreak_reward),
+
+            dict(icon="orbit", title="ŞANS ÇARKI", accent=CYAN,
+                 desc=f"Günde 1 kere çevir, {S.DAILY_WHEEL_MIN}-{S.DAILY_WHEEL_MAX} elmas.",
+                 reward=f"{S.DAILY_WHEEL_MIN}-{S.DAILY_WHEEL_MAX} Elmas", prog=None,
+                 done=d.get("wheel_claimed", False), ready=sv.wheel_reward_available(),
+                 status="Bugün çevrildi" if d.get("wheel_claimed") else "Çevirmeye hazır",
+                 label="ALINDI" if d.get("wheel_claimed") else "ÇEVİR",
+                 cb=self._spin_wheel),
+        ]
+
+    def _daily_card(self, canvas, mouse_pos, clicked, dt, rect, task):
+        """Tek bir günlük görev kartı — hepsi aynı hizada, boşluksuz."""
+        ready, done = task["ready"], task["done"]
+        accent = task["accent"] if (ready or done) else (74, 80, 104)
         hover = rect.collidepoint(mouse_pos)
-        panel(canvas, rect, bg=(28, 30, 46) if hover else (20, 22, 36), edge=accent, alpha=240, radius=14, edge_w=2)
-        cx = rect.centerx
-        icon_cy = rect.y + 36
-        add_glow(canvas, cx, icon_cy, 28, accent, .35)
-        draw_icon(canvas, cx, icon_cy, icon, accent, 15)
-        if done:
-            draw_icon(canvas, rect.right - 20, rect.y + 18, "star", GREEN, 9)
 
-        title_lines = wrap_text(title, 13, rect.w - 20)[:2]
-        ty = rect.y + 62
-        for ln in title_lines:
-            draw_text(canvas, ln, (cx, ty), 13, TEXT, bold=True, center=True)
-            ty += 15
+        if ready:
+            pulse = 0.5 + 0.5 * math.sin(self.t * 3.4 + rect.x * 0.01)
+            add_glow(canvas, rect.centerx, rect.centery, rect.w * 0.82, accent,
+                     0.10 + pulse * 0.07)
+        bg = ((34, 30, 20) if ready else (20, 30, 24) if done else (20, 22, 36))
+        if hover:
+            bg = tuple(min(255, c + 12) for c in bg)
+        panel(canvas, rect, bg=bg, edge=accent, alpha=244, radius=14,
+              edge_w=2 if (ready or done) else 1)
 
-        y = ty + 4
-        for ln in wrap_text(desc, 10, rect.w - 24)[:2]:
-            draw_text(canvas, ln, (cx, y), 10, TEXT_DIM, center=True, shadow=False)
-            y += 13
+        # üst şerit + durum rozeti
+        strip = pygame.Surface((rect.w - 22, 3), pygame.SRCALPHA)
+        pygame.draw.rect(strip, (*accent, 210 if ready else 120), strip.get_rect(), border_radius=2)
+        canvas.blit(strip, (rect.x + 11, rect.y + 6))
+        if ready:
+            bw = text_width("HAZIR", 10, True) + 16
+            br = pygame.Rect(rect.right - bw - 10, rect.y + 12, int(bw), 18)
+            bs = pygame.Surface(br.size, pygame.SRCALPHA)
+            pygame.draw.rect(bs, (*RED, 235), bs.get_rect(), border_radius=9)
+            canvas.blit(bs, br.topleft)
+            draw_text(canvas, "HAZIR", br.center, 10, WHITE, bold=True, center=True, shadow=False)
+        elif done:
+            draw_icon(canvas, rect.right - 20, rect.y + 21, "star", GREEN, 8)
 
-        reward_y = rect.bottom - 66
-        tw = text_width(reward_txt, 14, True)
-        draw_icon(canvas, cx - tw / 2 - 10, reward_y, "gem", GEM_COLOR, 7)
-        draw_text(canvas, reward_txt, (cx, reward_y), 14, GEM_COLOR, bold=True, center=True)
-        draw_text(canvas, status, (cx, rect.bottom - 48), 10, TEXT_DIM, center=True, shadow=False)
+        # ikon madalyonu + başlık
+        icx, icy = rect.x + 30, rect.y + 38
+        add_glow(canvas, icx, icy, 24, accent, .32 if (ready or done) else .16)
+        pygame.draw.circle(canvas, (13, 14, 22), (icx, icy), 17)
+        pygame.draw.circle(canvas, accent, (icx, icy), 17, 1)
+        draw_icon(canvas, icx, icy, task["icon"], accent, 11)
 
-        btn = Button((rect.x + 12, rect.bottom - 34, rect.w - 24, 26), btn_label, btn_cb,
-                     color=(150, 120, 40) if btn_enabled else (40, 42, 56),
-                     hover_color=(190, 155, 60), enabled=btn_enabled, text_size=11)
+        ty = rect.y + 24
+        for ln in wrap_text(task["title"], 13, rect.w - 76)[:2]:
+            draw_text(canvas, ln, (rect.x + 54, ty), 13, TEXT if not done else TEXT_DIM, bold=True)
+            ty += 16
+
+        # açıklama
+        dy = rect.y + 66
+        for ln in wrap_text(task["desc"], 10, rect.w - 26)[:2]:
+            draw_text(canvas, ln, (rect.centerx, dy), 10, TEXT_DIM, center=True, shadow=False)
+            dy += 13
+
+        # ilerleme çubuğu (varsa)
+        prog = task["prog"]
+        if prog:
+            cur, goal = prog
+            cur = min(cur, goal)
+            pb = pygame.Rect(rect.x + 16, rect.y + 96, rect.w - 32, 8)
+            draw_bar(canvas, pb, clamp(cur / max(1, goal), 0, 1),
+                     GREEN if cur >= goal else accent,
+                     bg=(13, 14, 22), border=(48, 52, 74), radius=4)
+            draw_text(canvas, f"{fmt_num(int(cur))} / {fmt_num(int(goal))}",
+                      (rect.centerx, rect.y + 107), 10, TEXT_DIM, center=True, shadow=False)
+        else:
+            draw_text(canvas, task["status"], (rect.centerx, rect.y + 100), 10, TEXT_DIM,
+                      center=True, shadow=False)
+
+        # ödül rozeti
+        ry = rect.y + 126
+        tw = text_width(task["reward"], 14, True)
+        draw_icon(canvas, rect.centerx - tw / 2 - 11, ry + 7, "gem", GEM_COLOR, 7)
+        draw_text(canvas, task["reward"], (rect.centerx + 6, ry), 14, GEM_COLOR,
+                  bold=True, center=True)
+
+        if prog:
+            draw_text(canvas, task["status"], (rect.centerx, rect.y + 147), 10, TEXT_DIM,
+                      center=True, shadow=False)
+
+        # düğme
+        btn = Button((rect.x + 12, rect.bottom - 40, rect.w - 24, 30), task["label"], task["cb"],
+                     color=(150, 120, 40) if ready else (38, 40, 54),
+                     hover_color=(196, 156, 58), enabled=ready, text_size=12)
         btn.update(mouse_pos, dt)
         btn.draw(canvas)
         if clicked:
@@ -7359,151 +8386,118 @@ class App:
         self.ad_watch_timer = 0.0
         sfx("click", 0.6, 0.0)
 
+    def _claim_all_daily(self):
+        gained, n = self.save.claim_all_ready()
+        if n > 0:
+            self.wheel_popup_amount = gained
+            self.wheel_popup_timer = 1.8
+            self.claim_all_count = n
+            sfx("buy", 1.0, 0.0)
+
     def update_daily_rewards(self, dt, mouse_pos, clicked):
         canvas = self.display.canvas
         self.bg.draw(canvas)
-        draw_text(canvas, "GÜNLÜK MARKET", (VIRTUAL_W / 2, 44), 28, GOLD, bold=True, center=True)
-        draw_text(canvas, "10 farklı görevden ücretsiz elmas topla — gece yarısı sıfırlanır.",
-                  (VIRTUAL_W / 2, 76), 13, TEXT_DIM, center=True)
-        gem_txt = f"Elmas: {fmt_num(self.save.get_gems())}"
-        tw = text_width(gem_txt, 18, True)
-        draw_icon(canvas, VIRTUAL_W - 36 - tw - 22, 28, "gem", GEM_COLOR, 10)
-        draw_text(canvas, gem_txt, (VIRTUAL_W - 36 - tw, 19), 18, GEM_COLOR, bold=True)
-        streak_txt = f"Giriş serisi: {self.save.login_streak_day()}. gün"
-        draw_text(canvas, streak_txt, (36, 22), 14, CYAN, bold=True)
 
-        cols, rows = 5, 2
-        card_w, card_h = 222, 228
-        gap_x, gap_y = 16, 16
-        total_w = cols * card_w + (cols - 1) * gap_x
-        start_x = (VIRTUAL_W - total_w) / 2
-        y0 = 102
+        tasks = self._daily_tasks()
+        claimed_n = self.save.daily_claimed_count()
+        total_n = self.save.daily_task_total()
+        all_done = claimed_n >= total_n
+        gems_now = self.save.daily_gems_available_now()
+        ready_n = sum(1 for t in tasks if t["ready"])
+        # reklam dışındaki hazır ödüller tek tuşla toplanabilir
+        quick_n = sum(1 for t in tasks if t["ready"] and t["icon"] != "bolt")
 
-        def slot(i):
+        # Reklam oynarken arkadaki düğmeler tıklanmasın.
+        ui_click = clicked and not self.ad_watch_active
+
+        # ================= ÜST ŞERİT =================
+        top = pygame.Rect(0, 0, VIRTUAL_W, 76)
+        s = pygame.Surface(top.size, pygame.SRCALPHA)
+        pygame.draw.rect(s, (12, 13, 22, 238), top)
+        canvas.blit(s, (0, 0))
+        pygame.draw.line(canvas, GOLD_DIM, (0, 76), (VIRTUAL_W, 76), 2)
+
+        draw_icon(canvas, 34, 30, "gem", GEM_COLOR, 13)
+        draw_text(canvas, "GÜNLÜK MARKET", (56, 16), 26, GOLD, bold=True)
+        draw_text(canvas, f"Gece yarısı sıfırlanır  ·  Yenilenmesine {fmt_hms(seconds_to_midnight())}",
+                  (56, 48), 11, TEXT_DIM, shadow=False)
+
+        # sağ üst: elmas bakiyesi + şu an toplanabilir
+        gem_txt = fmt_num(self.save.get_gems())
+        tw = text_width(gem_txt, 20, True)
+        draw_icon(canvas, VIRTUAL_W - 40 - tw - 20, 26, "gem", GEM_COLOR, 11)
+        draw_text(canvas, gem_txt, (VIRTUAL_W - 40, 16), 20, GEM_COLOR, bold=True, right=True)
+        if gems_now > 0:
+            draw_text(canvas, f"şu an toplanabilir: ≈{fmt_num(gems_now)}",
+                      (VIRTUAL_W - 40, 46), 11, GOLD, bold=True, shadow=False, right=True)
+        else:
+            draw_text(canvas, "bugün toplanacak ödül kalmadı", (VIRTUAL_W - 40, 46), 11,
+                      TEXT_DIM, shadow=False, right=True)
+
+        # ================= GİRİŞ SERİSİ TAKVİMİ =================
+        cal = pygame.Rect(42, 88, VIRTUAL_W - 84, 64)
+        panel(canvas, cal, bg=(18, 19, 30), edge=(72, 62, 40), alpha=230, radius=12, edge_w=1)
+        day, pos = self._draw_streak_strip(
+            canvas, pygame.Rect(cal.x + 176, cal.y + 6, cal.w - 192, cal.h - 12), big=True)
+        draw_text(canvas, "GİRİŞ SERİSİ", (cal.x + 16, cal.y + 12), 12, TEXT_DIM, bold=True, shadow=False)
+        draw_text(canvas, f"{day}. GÜN", (cal.x + 16, cal.y + 28), 22, GOLD, bold=True)
+        draw_text(canvas, f"hafta {((day - 1) // 7) + 1}", (cal.x + 100, cal.y + 36), 11,
+                  TEXT_DIM, shadow=False)
+
+        # ================= GÖREV IZGARASI =================
+        cols = 5
+        card_w, card_h = 228, 200
+        gap_x, gap_y = 14, 16
+        start_x = (VIRTUAL_W - (cols * card_w + (cols - 1) * gap_x)) / 2
+        y0 = 166
+        for i, task in enumerate(tasks):
             c, r = i % cols, i // cols
-            return pygame.Rect(start_x + c * (card_w + gap_x), y0 + r * (card_h + gap_y), card_w, card_h)
+            rect = pygame.Rect(int(start_x + c * (card_w + gap_x)),
+                               int(y0 + r * (card_h + gap_y)), card_w, card_h)
+            self._daily_card(canvas, mouse_pos, ui_click, dt, rect, task)
 
-        # 1) günlük bedava hediye
-        claimed = not self.save.daily_free_available()
-        self._daily_card(
-            canvas, mouse_pos, clicked, dt, slot(0), "gem",
-            "GÜNLÜK HEDİYE", "Her gün 1 kere bedava elmas al.",
-            f"+{SaveManager.DAILY_FREE_GEMS} Elmas",
-            "Bugün alındı" if claimed else "Henüz alınmadı",
-            "ALINDI" if claimed else "AL",
-            self.save.claim_daily_free, not claimed, GOLD if not claimed else PANEL_EDGE, done=claimed)
+        # ================= ALT ŞERİT =================
+        bar_y = y0 + 2 * card_h + gap_y + 14          # = 596
+        bottom = pygame.Rect(42, bar_y, VIRTUAL_W - 84, 66)
+        panel(canvas, bottom, bg=(18, 19, 30), edge=(GREEN if all_done else (64, 70, 96)),
+              alpha=235, radius=12, edge_w=1)
 
-        # 2) reklam izle
-        watches = self.save.daily_ad_watches()
-        ad_left = SaveManager.DAILY_AD_MAX - watches
-        ad_available = self.save.daily_ad_available() and not self.ad_watch_active
-        self._daily_card(
-            canvas, mouse_pos, clicked, dt, slot(1), "bolt",
-            "REKLAM İZLE", "Kısa reklam izle, elmas kazan. Günde 3 kere.",
-            f"+{SaveManager.DAILY_AD_GEMS} Elmas",
-            f"Kalan hak: {max(0, ad_left)}/{SaveManager.DAILY_AD_MAX}",
-            "İZLENİYOR" if self.ad_watch_active else ("BİTTİ" if not self.save.daily_ad_available() else "İZLE"),
-            self._start_ad_watch, ad_available, CYAN if ad_available else PANEL_EDGE,
-            done=not self.save.daily_ad_available())
+        draw_text(canvas, "BUGÜNKÜ İLERLEME", (bottom.x + 18, bottom.y + 12), 11, TEXT_DIM,
+                  bold=True, shadow=False)
+        draw_text(canvas, f"{claimed_n}/{total_n} görev tamamlandı",
+                  (bottom.x + 18, bottom.y + 30), 15,
+                  GREEN if all_done else TEXT, bold=True)
+        pb = pygame.Rect(bottom.x + 232, bottom.y + 30, 330, 12)
+        draw_bar(canvas, pb, claimed_n / max(1, total_n),
+                 GREEN if all_done else GOLD, bg=(13, 14, 22), border=(48, 52, 74), radius=6)
+        draw_text(canvas, f"%{int(claimed_n / max(1, total_n) * 100)}",
+                  (pb.right + 10, bottom.y + 28), 12, TEXT_DIM, bold=True, shadow=False)
 
-        # 3) 3 maç oyna
-        played = self.save.daily_matches_played()
-        goal = SaveManager.DAILY_MATCH_GOAL
-        reward_ready = self.save.daily_match_reward_available()
-        already3 = self.save.data.get("daily", {}).get("match_reward_claimed", False)
-        self._daily_card(
-            canvas, mouse_pos, clicked, dt, slot(2), "target",
-            "3 MAÇ OYNA", "Bugün 3 maç bitir, hediye elmas kazan.",
-            f"+{SaveManager.DAILY_MATCH_GEMS} Elmas",
-            "Ödül alındı" if already3 else f"İlerleme: {played}/{goal} maç",
-            "ALINDI" if already3 else ("AL" if reward_ready else f"{played}/{goal}"),
-            self.save.claim_match_reward, reward_ready, GREEN if reward_ready else PANEL_EDGE, done=already3)
+        # tek tuşla topla
+        cab = pygame.Rect(bottom.right - 396, bottom.y + 16, 214, 34)
+        cab_on = quick_n > 0 and not self.ad_watch_active
+        cbtn = Button(cab, (f"{quick_n} ÖDÜLÜ TOPLA" if cab_on else "TOPLANACAK ÖDÜL YOK"),
+                      self._claim_all_daily,
+                      color=(150, 120, 40) if cab_on else (38, 40, 54),
+                      hover_color=(196, 156, 58), enabled=cab_on, text_size=13)
+        cbtn.update(mouse_pos, dt)
+        cbtn.draw(canvas)
+        if ui_click:
+            cbtn.click(mouse_pos)
 
-        # 4) giriş serisi
-        streak_claimed = self.save.data.get("daily", {}).get("streak_claimed", False)
-        streak_available = self.save.streak_reward_available()
-        self._daily_card(
-            canvas, mouse_pos, clicked, dt, slot(3), "star",
-            "GİRİŞ SERİSİ", f"{self.save.login_streak_day()}. gün üst üste giriş yaptın.",
-            f"+{self.save.streak_reward_amount()} Elmas",
-            "Bugün alındı" if streak_claimed else "Talep edilebilir",
-            "ALINDI" if streak_claimed else "AL",
-            self.save.claim_streak_reward, streak_available, GOLD if streak_available else PANEL_EDGE,
-            done=streak_claimed)
+        back = Button((bottom.right - 172, bottom.y + 16, 156, 34), "ANA MENÜ",
+                      lambda: self.set_state(STATE_MENU),
+                      enabled=not self.ad_watch_active, text_size=14)
+        back.update(mouse_pos, dt)
+        back.draw(canvas)
+        if ui_click:
+            back.click(mouse_pos)
 
-        # 5) haftalık sandık
-        chest_available = self.save.weekly_chest_available()
-        chest_claimed = self.save._weekly_chest_claimed()
-        days_left = 7 - (self.save.login_streak_day() % 7) if self.save.login_streak_day() % 7 != 0 else 0
-        self._daily_card(
-            canvas, mouse_pos, clicked, dt, slot(4), "shield",
-            "HAFTALIK SANDIK", "Her 7 günlük seride büyük ödül kazan.",
-            f"+{SaveManager.WEEKLY_CHEST_GEMS} Elmas",
-            "Sandık hazır!" if chest_available else (f"{days_left} gün kaldı" if not chest_claimed else "Bu seride alındı"),
-            "AÇ" if chest_available else "KİLİTLİ",
-            self.save.claim_weekly_chest, chest_available, GOLD if chest_available else PANEL_EDGE,
-            done=chest_claimed)
+        if ready_n > quick_n:
+            draw_text(canvas, "(reklam ödülü için reklamı izlemen gerekir)",
+                      (bottom.x + 232, bottom.y + 48), 10, TEXT_DIM, shadow=False)
 
-        # 6) dalga hedefi
-        wave_claimed = self.save.data.get("daily", {}).get("wave_reward_claimed", False)
-        wave_now = self.save.data.get("daily", {}).get("wave_reached", 0)
-        wave_ready = self.save.wave_reward_available()
-        self._daily_card(
-            canvas, mouse_pos, clicked, dt, slot(5), "boot",
-            "DALGA HEDEFİ", f"Bir koşuda dalga {SaveManager.DAILY_WAVE_GOAL}'e ulaş.",
-            f"+{SaveManager.DAILY_WAVE_GEMS} Elmas",
-            "Ödül alındı" if wave_claimed else f"En iyi: dalga {wave_now}/{SaveManager.DAILY_WAVE_GOAL}",
-            "ALINDI" if wave_claimed else ("AL" if wave_ready else "OYNA"),
-            self.save.claim_wave_reward, wave_ready, BLUE if wave_ready else PANEL_EDGE, done=wave_claimed)
-
-        # 7) patron avı
-        boss_claimed = self.save.data.get("daily", {}).get("boss_reward_claimed", False)
-        boss_ready = self.save.boss_reward_available()
-        boss_done_today = self.save.data.get("daily", {}).get("boss_killed", False)
-        self._daily_card(
-            canvas, mouse_pos, clicked, dt, slot(6), "skull",
-            "PATRON AVI", "Bugün bir koşuda bir patronu devir.",
-            f"+{SaveManager.DAILY_BOSS_GEMS} Elmas",
-            "Ödül alındı" if boss_claimed else ("Patron devrildi!" if boss_done_today else "Henüz devrilmedi"),
-            "ALINDI" if boss_claimed else ("AL" if boss_ready else "OYNA"),
-            self.save.claim_boss_reward, boss_ready, RED if boss_ready else PANEL_EDGE, done=boss_claimed)
-
-        # 8) skor kırıcı
-        score_claimed = self.save.data.get("daily", {}).get("score_reward_claimed", False)
-        score_ready = self.save.score_reward_available()
-        score_done_today = self.save.data.get("daily", {}).get("score_beaten", False)
-        self._daily_card(
-            canvas, mouse_pos, clicked, dt, slot(7), "sword",
-            "SKOR KIRICI", "Bugün kişisel rekorunu geçtiğinde ödül kazan.",
-            f"+{SaveManager.DAILY_SCORE_GEMS} Elmas",
-            "Ödül alındı" if score_claimed else ("Rekor kırıldı!" if score_done_today else "Rekorun kırılmadı"),
-            "ALINDI" if score_claimed else ("AL" if score_ready else "OYNA"),
-            self.save.claim_score_reward, score_ready, ORANGE if score_ready else PANEL_EDGE, done=score_claimed)
-
-        # 9) öldürme serisi
-        ks_claimed = self.save.data.get("daily", {}).get("killstreak_reward_claimed", False)
-        ks_now = self.save.data.get("daily", {}).get("killstreak", 0)
-        ks_ready = self.save.killstreak_reward_available()
-        self._daily_card(
-            canvas, mouse_pos, clicked, dt, slot(8), "fist",
-            "ÖLDÜRME SERİSİ", f"Bir koşuda {SaveManager.DAILY_KILLSTREAK_GOAL} düşman öldür.",
-            f"+{SaveManager.DAILY_KILLSTREAK_GEMS} Elmas",
-            "Ödül alındı" if ks_claimed else f"En iyi: {ks_now}/{SaveManager.DAILY_KILLSTREAK_GOAL}",
-            "ALINDI" if ks_claimed else ("AL" if ks_ready else "OYNA"),
-            self.save.claim_killstreak_reward, ks_ready, PURPLE if ks_ready else PANEL_EDGE, done=ks_claimed)
-
-        # 10) şans çarkı
-        wheel_claimed = self.save.data.get("daily", {}).get("wheel_claimed", False)
-        wheel_ready = self.save.wheel_reward_available()
-        self._daily_card(
-            canvas, mouse_pos, clicked, dt, slot(9), "orbit",
-            "ŞANS ÇARKI", f"Günde 1 kere çevir, {SaveManager.DAILY_WHEEL_MIN}-{SaveManager.DAILY_WHEEL_MAX} elmas kazan.",
-            f"{SaveManager.DAILY_WHEEL_MIN}-{SaveManager.DAILY_WHEEL_MAX} Elmas",
-            "Bugün alındı" if wheel_claimed else "Çevirmeye hazır",
-            "ALINDI" if wheel_claimed else "ÇEVİR",
-            self._spin_wheel, wheel_ready, CYAN if wheel_ready else PANEL_EDGE, done=wheel_claimed)
-
-        # ---- reklam izleme simülasyonu (offline demo — gerçek reklam SDK'sı entegre edilebilir) ----
+        # ---- reklam izleme simülasyonu (offline demo) ----
         if self.ad_watch_active:
             overlay = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
             pygame.draw.rect(overlay, (4, 5, 10, 225), overlay.get_rect())
@@ -7524,21 +8518,22 @@ class App:
                 if self.save.claim_ad_reward():
                     sfx("buy", 1.0, 0.0)
 
-        # -- şans çarkı sonucu bildirimi --
+        # -- ödül bildirimi (çark / toplu toplama) --
         if self.wheel_popup_timer > 0:
             self.wheel_popup_timer -= dt
-            box = pygame.Rect(0, 0, 340, 130)
+            box = pygame.Rect(0, 0, 380, 140)
             box.center = (VIRTUAL_W / 2, VIRTUAL_H / 2)
+            add_glow(canvas, box.centerx, box.centery, 190, GOLD, 0.16)
             panel(canvas, box, alpha=250, edge=GOLD, edge_w=2)
-            draw_text(canvas, "ÇARK SONUCU!", (box.centerx, box.y + 30), 18, GOLD, bold=True, center=True)
-            draw_text(canvas, f"+{self.wheel_popup_amount} Elmas kazandın", (box.centerx, box.y + 66), 16, GEM_COLOR, bold=True, center=True)
-
-        btn = Button((VIRTUAL_W / 2 - 110, VIRTUAL_H - 40, 220, 34), "ANA MENÜYE DÖN",
-                     lambda: self.set_state(STATE_MENU), enabled=not self.ad_watch_active, text_size=15)
-        btn.update(mouse_pos, dt)
-        btn.draw(canvas)
-        if clicked:
-            btn.click(mouse_pos)
+            n = getattr(self, "claim_all_count", 0)
+            title = f"{n} ÖDÜL TOPLANDI!" if n else "ÇARK SONUCU!"
+            draw_text(canvas, title, (box.centerx, box.y + 30), 20, GOLD, bold=True, center=True)
+            tw2 = text_width(f"+{fmt_num(self.wheel_popup_amount)} Elmas", 20, True)
+            draw_icon(canvas, box.centerx - tw2 / 2 - 14, box.y + 78, "gem", GEM_COLOR, 9)
+            draw_text(canvas, f"+{fmt_num(self.wheel_popup_amount)} Elmas",
+                      (box.centerx + 8, box.y + 68), 20, GEM_COLOR, bold=True, center=True)
+            if self.wheel_popup_timer <= 0:
+                self.claim_all_count = 0
 
     def _spin_wheel(self):
         amount = self.save.claim_wheel_reward()
@@ -7601,6 +8596,14 @@ class App:
                 self.save.save()
                 sfx("click", 0.5, 0.0)
             yy += 36
+
+        # --- SKİN GÖRÜNÜMÜ anahtarı (oyun içinde ESC > menüden de değiştirilebilir) ---
+        self._plain_skin_row(canvas, pygame.Rect(ax, yy, 220, 34), mouse_pos, clicked, compact=True)
+        yy += 42
+        draw_text(canvas, "Kapalıyken karakterin sadece skin renginde", (ax, yy), 10,
+                  TEXT_DIM, shadow=False)
+        draw_text(canvas, "sade bir top olur (bonuslar aynen kalır).", (ax, yy + 13), 10,
+                  TEXT_DIM, shadow=False)
 
         btn = Button((panel_rect.centerx - 100, panel_rect.bottom - 52, 200, 40), "GERİ", lambda: self.set_state(STATE_MENU))
         btn.update(mouse_pos, dt)
@@ -7857,22 +8860,48 @@ class App:
                 b.click(mouse_pos)
 
     # ---------------- KİTAPLIK (görevle açılan kitaplar) ----------------
+    # Görev istatistiklerinin nasıl ilerletileceğini anlatan ipuçları —
+    # kilitli bir kitabı açan oyuncu ne yapması gerektiğini net görsün.
+    UNLOCK_HINTS = {
+        "total_dashes":  "İpucu: SHIFT veya SAĞ TIK ile dash at. Her koşuda onlarca kez kullanırsın.",
+        "total_crits":   "İpucu: Markette kritik şansı veren eşyaları al, kritik sayın hızla artar.",
+        "total_bonks":   "İpucu: SPACE ile BONK at. Bekleme süresi kısa — kalabalıkta sürekli kullan.",
+        "best_run_heal": "İpucu: Kan emme / can yenileme al ve uzun bir koşuda hasar alıp iyileş.",
+        "best_run_kills":"İpucu: Tek bir koşuda mümkün olduğunca uzun hayatta kal.",
+        "total_kills":   "İpucu: Bu sayaç tüm koşuların toplamıdır — oynadıkça kendiliğinden dolar.",
+        "bosses":        "İpucu: Patronlar 10., 15., 20. ... dalgalarda gelir. Her devirdiğin sayılır.",
+        "best_wave":     "İpucu: Dalga hedefini hızlı doldur — dalgalar skorla ilerler.",
+        "best_combo":    "İpucu: Düşmanları arka arkaya, ara vermeden öldür; kombo sayacı sağ üstte.",
+    }
+
+    def _book_sort_key(self, bk):
+        """Listeleme sırası: önce açık olanlar, sonra göreve en yakın olanlar."""
+        owned = self.save.owns_book(bk["key"])
+        cur, need, _ = book_progress(self.save, bk)
+        return (0 if owned else 1, -(cur / max(1, need)) if not owned else 0)
+
     def update_book_market(self, dt, mouse_pos, clicked, wheel_y=0):
         canvas = self.display.canvas
         self.bg.draw(canvas)
 
         owned_n = sum(1 for b in BOOKS if self.save.owns_book(b["key"]))
+        rare_n = sum(1 for b in BOOKS if b.get("rare"))
 
         if self.book_filter == "owned":
             items = [b for b in BOOKS if self.save.owns_book(b["key"])]
         elif self.book_filter == "locked":
             items = [b for b in BOOKS if not self.save.owns_book(b["key"])]
+        elif self.book_filter == "rare":
+            items = [b for b in BOOKS if b.get("rare")]
         else:
             items = list(BOOKS)
+        # Kilitli sekmesinde göreve en yakın kitap en üste gelir.
+        if self.book_filter == "locked":
+            items.sort(key=self._book_sort_key)
 
         cols = 4
-        card_w, card_h = 268, 232
-        gap_x, gap_y = 18, 16
+        card_w, card_h = 268, 244
+        gap_x, gap_y = 18, 18
         start_x = (VIRTUAL_W - (cols * card_w + (cols - 1) * gap_x)) / 2
         list_top = 158
         list_bottom = VIRTUAL_H - 70
@@ -7883,9 +8912,13 @@ class App:
         max_scroll = max(0, content_h - list_h)
 
         list_rect = pygame.Rect(0, list_top, VIRTUAL_W, list_h)
-        if max_scroll > 0 and list_rect.collidepoint(mouse_pos):
+        if max_scroll > 0 and list_rect.collidepoint(mouse_pos) and not self.book_detail:
             self.book_scroll -= wheel_y * 46
         self.book_scroll = clamp(self.book_scroll, 0, max_scroll)
+
+        # Detay penceresi açıkken arkadaki liste tıklamaları yutulmalı.
+        list_click = clicked and not self.book_detail
+        opened_now = False
 
         prev_clip = canvas.get_clip()
         canvas.set_clip(list_rect)
@@ -7897,49 +8930,74 @@ class App:
             rect = pygame.Rect(start_x + col_i * (card_w + gap_x), y, card_w, card_h)
             owned = self.save.owns_book(bk["key"])
             cur, need, done = book_progress(self.save, bk)
-            hover = rect.collidepoint(mouse_pos) and list_rect.collidepoint(mouse_pos)
+            hover = (rect.collidepoint(mouse_pos) and list_rect.collidepoint(mouse_pos)
+                     and not self.book_detail)
+            # Hover'da kart hafifçe yukarı kalkar.
+            if hover:
+                rect = rect.move(0, -3)
 
-            edge = (GOLD if bk.get("rare") else GREEN) if owned else (58, 60, 78)
-            panel(canvas, rect, bg=(32, 30, 52) if hover else (20, 22, 36),
-                  edge=edge, alpha=242, radius=14, edge_w=2)
+            rare = bool(bk.get("rare"))
+            edge = (GOLD if rare else GREEN) if owned else (58, 60, 78)
+            if hover:
+                add_glow(canvas, rect.centerx, rect.centery, 128, edge, 0.13)
+            panel(canvas, rect, bg=(34, 31, 54) if hover else (20, 22, 36),
+                  edge=lighten(edge, 0.25) if hover else edge, alpha=242, radius=14, edge_w=2)
 
-            if bk.get("rare"):
-                draw_icon(canvas, rect.x + 17, rect.y + 15, "star", GOLD, 6)
-                draw_text(canvas, "NADİR", (rect.x + 25, rect.y + 9), 10, GOLD,
-                          bold=True, shadow=False)
+            # ---- üst şerit: nadirlik / durum ----
+            strip_col = GOLD if (rare and owned) else (edge if owned else (72, 66, 96))
+            strip = pygame.Surface((rect.w - 26, 3), pygame.SRCALPHA)
+            pygame.draw.rect(strip, (*strip_col, 200), strip.get_rect(), border_radius=2)
+            canvas.blit(strip, (rect.x + 13, rect.y + 7))
 
-            draw_book(canvas, rect.centerx, rect.y + 72, 92 if hover else 86,
+            if rare:
+                draw_icon(canvas, rect.x + 19, rect.y + 22, "star", GOLD if owned else (128, 112, 70), 6)
+                draw_text(canvas, "NADİR", (rect.x + 27, rect.y + 16), 10,
+                          GOLD if owned else (128, 112, 70), bold=True, shadow=False)
+            if owned and not rare:
+                draw_text(canvas, "AÇIK", (rect.x + 17, rect.y + 16), 10, GREEN, bold=True, shadow=False)
+
+            draw_book(canvas, rect.centerx, rect.y + 84, 92 if hover else 86,
                       bk, self.t, locked=not owned)
 
-            draw_text(canvas, bk["name"], (rect.centerx, rect.y + 124), 15, TEXT,
+            draw_text(canvas, bk["name"], (rect.centerx, rect.y + 138), 15, TEXT,
                       bold=True, center=True)
             for j, ln in enumerate(wrap_text(bk["desc"], 10, rect.w - 26)[:2]):
-                draw_text(canvas, ln, (rect.centerx, rect.y + 146 + j * 13), 10,
+                draw_text(canvas, ln, (rect.centerx, rect.y + 159 + j * 13), 10,
                           TEXT_DIM, center=True, shadow=False)
 
             # ---- alt bölüm: görev durumu ----
             unl = bk.get("unlock")
             if not unl:
-                draw_text(canvas, "BAŞLANGIÇ KİTABI", (rect.centerx, rect.bottom - 34), 12,
+                draw_text(canvas, "BAŞLANGIÇ KİTABI", (rect.centerx, rect.bottom - 40), 12,
                           (120, 200, 150), bold=True, center=True)
             elif owned:
-                draw_icon(canvas, rect.centerx - 34, rect.bottom - 28, "star", GREEN, 6)
-                draw_text(canvas, "AÇILDI", (rect.centerx + 6, rect.bottom - 34), 13, GREEN,
+                draw_icon(canvas, rect.centerx - 36, rect.bottom - 34, "star", GREEN, 6)
+                draw_text(canvas, "AÇILDI", (rect.centerx + 6, rect.bottom - 40), 13, GREEN,
                           bold=True, center=True)
             else:
-                # görev metni + ilerleme çubuğu
                 for j, ln in enumerate(wrap_text(unl["text"], 10, rect.w - 26)[:2]):
-                    draw_text(canvas, ln, (rect.centerx, rect.bottom - 52 + j * 12), 10,
+                    draw_text(canvas, ln, (rect.centerx, rect.bottom - 58 + j * 12), 10,
                               (200, 180, 120), center=True, shadow=False)
-                pb = pygame.Rect(rect.x + 22, rect.bottom - 26, rect.w - 44, 9)
+                pb = pygame.Rect(rect.x + 22, rect.bottom - 32, rect.w - 44, 9)
                 frac = clamp(cur / max(1, need), 0.0, 1.0)
                 draw_bar(canvas, pb, frac, (215, 175, 90), radius=4)
-                draw_text(canvas, f"{fmt_num(int(cur))} / {fmt_num(int(need))}",
-                          (rect.centerx, rect.bottom - 14), 10, TEXT_DIM,
+                draw_text(canvas, f"{fmt_num(int(cur))} / {fmt_num(int(need))}  (%{int(frac * 100)})",
+                          (rect.centerx, rect.bottom - 20), 10, TEXT_DIM,
                           center=True, shadow=False)
 
-            if clicked and hover and not self.book_detail:
+            # Hover'da "oku" ipucu — kitabın tıklanabilir olduğu belli olsun.
+            if hover:
+                draw_text(canvas, "OKUMAK İÇİN TIKLA  »", (rect.centerx, rect.bottom - 11), 9,
+                          lighten(edge, 0.3), bold=True, center=True, shadow=False)
+
+            if list_click and hover:
+                # DÜZELTME: kitap açılırken bu karenin tıklaması BURADA tüketilir.
+                # Eskiden aynı tıklama alttaki _draw_book_detail'e de geçiyor ve
+                # pencere "panel dışına tıklandı" sayılıp anında kapanıyordu; bu
+                # yüzden sadece ekranın ortasındaki kitaplar açılabiliyordu.
                 self.book_detail = bk["key"]
+                self.book_detail_t = 0.0
+                opened_now = True
                 sfx("click", 0.5, 0.0)
         canvas.set_clip(prev_clip)
 
@@ -7952,28 +9010,40 @@ class App:
         pygame.draw.rect(s, (12, 13, 22, 235), top)
         canvas.blit(s, (0, 0))
         pygame.draw.line(canvas, (92, 70, 140), (0, 96), (VIRTUAL_W, 96), 2)
-        draw_text(canvas, "KİTAPLIK", (40, 18), 26, (186, 150, 255), bold=True)
+        draw_icon(canvas, 30, 30, "book", (186, 150, 255), 13)
+        draw_text(canvas, "KİTAPLIK", (52, 18), 26, (186, 150, 255), bold=True)
         draw_text(canvas,
-                  f"Kitaplar görevle açılır — açtığın kitaplar seviye atlayınca karşına çıkar  ({owned_n}/{len(BOOKS)} açık)",
-                  (40, 50), 11, TEXT_DIM, shadow=False)
+                  "Kitaplar görevle açılır — açtığın kitaplar seviye atlayınca karşına çıkar.",
+                  (52, 50), 11, TEXT_DIM, shadow=False)
+
+        # sağ üst: genel ilerleme çubuğu
+        pbw = 250
+        pbx = VIRTUAL_W - pbw - 40
+        draw_text(canvas, f"{owned_n}/{len(BOOKS)} KİTAP AÇIK", (pbx, 20), 12,
+                  GOLD if owned_n >= len(BOOKS) else TEXT, bold=True, shadow=False)
+        draw_bar(canvas, pygame.Rect(pbx, 40, pbw, 10), owned_n / max(1, len(BOOKS)),
+                 GOLD if owned_n >= len(BOOKS) else (168, 132, 245), radius=5)
+        draw_text(canvas, f"%{int(owned_n / max(1, len(BOOKS)) * 100)}", (pbx + pbw + 8, 38), 11,
+                  TEXT_DIM, bold=True, shadow=False)
 
         # ---- filtre sekmeleri ----
         tabs = [("all", f"TÜMÜ ({len(BOOKS)})"),
                 ("owned", f"AÇIK ({owned_n})"),
-                ("locked", f"KİLİTLİ ({len(BOOKS) - owned_n})")]
-        tab_w, tab_h, tab_gap = 190, 34, 10
+                ("locked", f"KİLİTLİ ({len(BOOKS) - owned_n})"),
+                ("rare", f"NADİR ({rare_n})")]
+        tab_w, tab_h, tab_gap = 168, 34, 10
         tabs_x = (VIRTUAL_W - (tab_w * len(tabs) + tab_gap * (len(tabs) - 1))) / 2
         for i, (key, label) in enumerate(tabs):
             r = pygame.Rect(tabs_x + i * (tab_w + tab_gap), 106, tab_w, tab_h)
             active = self.book_filter == key
-            hov = r.collidepoint(mouse_pos)
+            hov = r.collidepoint(mouse_pos) and not self.book_detail
             bg = (78, 56, 118) if active else ((34, 32, 52) if hov else (22, 24, 38))
             pygame.draw.rect(canvas, bg, r, border_radius=9)
             pygame.draw.rect(canvas, (168, 132, 245) if active else PANEL_EDGE, r,
                              width=2, border_radius=9)
             draw_text(canvas, label, r.center, 14, TEXT if active else TEXT_DIM,
                       bold=True, center=True)
-            if clicked and hov and not active and not self.book_detail:
+            if list_click and hov and not active:
                 self.book_filter = key
                 self.book_scroll = 0.0
                 sfx("click", 0.5, 0.0)
@@ -7986,14 +9056,20 @@ class App:
                      lambda: self.set_state(STATE_MENU))
         btn.update(mouse_pos, dt)
         btn.draw(canvas)
-        if clicked and not self.book_detail:
+        if list_click:
             btn.click(mouse_pos)
 
         if self.book_detail:
-            self._draw_book_detail(canvas, dt, mouse_pos, clicked)
+            # Kitabı açan tıklama yukarıda tüketildi; pencereye geçirilmez.
+            self._draw_book_detail(canvas, dt, mouse_pos, clicked and not opened_now)
 
     def _draw_book_detail(self, canvas, dt, mouse_pos, clicked):
-        """Kitaba tıklayınca açılan pencere: etkisi ve açılış görevi."""
+        """Kitaba tıklayınca açılan OKUMA penceresi.
+
+        Kitap gerçekten açılır: iki sayfalık bir yayılım çizilir; sol sayfada
+        kitabın kendisi ve künyesi, sağ sayfada etkisi ile (kilitliyse) açılış
+        görevi, ilerleme çubuğu ve nasıl ilerletileceğine dair ipucu bulunur.
+        """
         bk = BOOK_BY_KEY.get(self.book_detail)
         if not bk:
             self.book_detail = None
@@ -8001,68 +9077,159 @@ class App:
         owned = self.save.owns_book(bk["key"])
         cur, need, done = book_progress(self.save, bk)
         unl = bk.get("unlock")
+        rare = bool(bk.get("rare"))
+        edge = (GOLD if rare else GREEN) if owned else (198, 160, 96)
+
+        self.book_detail_t = min(1.0, self.book_detail_t + dt / 0.22)
+        k = ease_out_cubic(self.book_detail_t)
 
         ov = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
-        pygame.draw.rect(ov, (5, 6, 12, 205), ov.get_rect())
+        pygame.draw.rect(ov, (5, 6, 12, int(212 * k)), ov.get_rect())
         canvas.blit(ov, (0, 0))
 
-        pr = pygame.Rect(0, 0, 520, 508)
-        pr.center = (VIRTUAL_W / 2, VIRTUAL_H / 2)
-        edge = (GOLD if bk.get("rare") else GREEN) if owned else (150, 120, 200)
-        panel(canvas, pr, alpha=250, edge=edge, edge_w=3, radius=18)
+        BW, BH = 860, 470
+        book_rect = pygame.Rect(0, 0, int(BW * (0.55 + 0.45 * k)), int(BH * (0.55 + 0.45 * k)))
+        book_rect.center = (VIRTUAL_W // 2, VIRTUAL_H // 2 - 10)
 
-        draw_book(canvas, pr.centerx, pr.y + 96, 132, bk, self.t, locked=not owned)
-        draw_text(canvas, bk["name"], (pr.centerx, pr.y + 178), 26, TEXT, bold=True, center=True)
-        if bk.get("rare"):
-            draw_icon(canvas, pr.centerx - 48, pr.y + 216, "star", GOLD, 6)
-            draw_text(canvas, "NADİR KİTAP", (pr.centerx + 8, pr.y + 210), 12, GOLD,
+        if k < 0.45:
+            # --- açılma anı: kapalı kitap büyüyerek gelir ---
+            draw_book(canvas, book_rect.centerx, book_rect.centery,
+                      int(200 * (0.5 + k)), bk, self.t, locked=not owned)
+            return
+
+        add_glow(canvas, book_rect.centerx, book_rect.centery, 320, edge, 0.10)
+        left, right = draw_book_open(canvas, book_rect, bk, self.t, locked=not owned)
+
+        # ================= SOL SAYFA: künye =================
+        draw_book(canvas, left.centerx, left.y + 112, 150, bk, self.t, locked=not owned, glow=False)
+
+        ny = left.y + 208
+        for ln in wrap_text(bk["name"], 25, left.w - 40)[:2]:
+            draw_text(canvas, ln, (left.centerx, ny), 25, (46, 38, 26), bold=True,
+                      center=True, shadow=False)
+            ny += 28
+
+        # nadirlik rozeti
+        badge_txt = "NADİR KİTAP" if rare else "KİTAP"
+        badge_col = (168, 122, 30) if rare else (96, 88, 74)
+        bw = text_width(badge_txt, 12, True) + (34 if rare else 24)
+        br = pygame.Rect(0, 0, int(bw), 22)
+        br.center = (left.centerx, int(ny + 12))
+        pygame.draw.rect(canvas, badge_col, br, width=1, border_radius=11)
+        if rare:
+            draw_icon(canvas, br.x + 13, br.centery, "star", badge_col, 6)
+            draw_text(canvas, badge_txt, (br.centerx + 7, br.centery - 7), 12, badge_col,
+                      bold=True, center=True, shadow=False)
+        else:
+            draw_text(canvas, badge_txt, (br.centerx, br.centery - 7), 12, badge_col,
                       bold=True, center=True, shadow=False)
 
-        y = pr.y + 238
-        pygame.draw.line(canvas, PANEL_EDGE, (pr.x + 34, y), (pr.right - 34, y), 1)
-        y += 16
-        draw_text(canvas, "ETKİSİ", (pr.centerx, y), 13, edge, bold=True, center=True)
+        # durum satırı
+        sy = ny + 46
+        if not unl:
+            draw_icon(canvas, left.centerx - 52, sy + 7, "star", (52, 104, 70), 7)
+            draw_text(canvas, "BAŞTAN AÇIK", (left.centerx + 8, sy), 14, (52, 104, 70),
+                      bold=True, center=True, shadow=False)
+            draw_text(canvas, "Hiçbir görev gerektirmez.", (left.centerx, sy + 22), 11,
+                      (108, 100, 84), center=True, shadow=False)
+        elif owned:
+            draw_icon(canvas, left.centerx - 44, sy + 7, "star", (44, 116, 72), 7)
+            draw_text(canvas, "AÇILDI", (left.centerx + 10, sy), 15, (44, 116, 72),
+                      bold=True, center=True, shadow=False)
+            draw_text(canvas, "Seviye atladığında karşına çıkabilir.", (left.centerx, sy + 22), 11,
+                      (108, 100, 84), center=True, shadow=False)
+        else:
+            draw_icon(canvas, left.centerx - 46, sy + 7, "shield", (150, 92, 40), 7)
+            draw_text(canvas, "KİLİTLİ", (left.centerx + 10, sy), 15, (150, 92, 40),
+                      bold=True, center=True, shadow=False)
+            draw_text(canvas, "Görevi tamamla, kalıcı olarak açılsın.", (left.centerx, sy + 22), 11,
+                      (108, 100, 84), center=True, shadow=False)
+
+        # ---- sol sayfa alt künyesi ----
+        iy = sy + 56
+        pygame.draw.line(canvas, (206, 196, 172), (left.x + 40, iy), (left.right - 40, iy), 1)
+        iy += 14
+        rows = [("TÜRÜ", "Nadir Kitap" if rare else "Standart Kitap"),
+                ("NEREDE ÇIKAR", "Seviye atlama ekranı")]
+        if unl:
+            rows.append(("İZLENEN SAYAÇ", f"{fmt_num(int(cur))} / {fmt_num(int(need))}"))
+        for lab, val in rows:
+            draw_text(canvas, lab, (left.x + 42, iy), 10, (140, 128, 104), bold=True, shadow=False)
+            draw_text(canvas, val, (left.right - 42, iy), 11, (66, 58, 44), bold=True,
+                      shadow=False, right=True)
+            iy += 20
+
+        # sayfa numarası / künye satırı
+        idx = BOOKS.index(bk) + 1 if bk in BOOKS else 0
+        draw_text(canvas, f"— {idx} —", (left.centerx, left.bottom - 26), 11, (158, 148, 126),
+                  center=True, shadow=False)
+
+        # ================= SAĞ SAYFA: etki + görev =================
+        y = right.y + 26
+        draw_text(canvas, "ETKİSİ", (right.centerx, y), 13, (150, 96, 30), bold=True,
+                  center=True, shadow=False)
         y += 24
-        for ln in wrap_text(bk["desc"], 15, pr.w - 80):
-            draw_text(canvas, ln, (pr.centerx, y), 15, TEXT, center=True, shadow=False)
-            y += 21
+        for ln in wrap_text(bk["desc"], 16, right.w - 52):
+            draw_text(canvas, ln, (right.centerx, y), 16, (44, 36, 26), center=True, shadow=False)
+            y += 23
 
         y += 12
-        pygame.draw.line(canvas, PANEL_EDGE, (pr.x + 34, y), (pr.right - 34, y), 1)
+        pygame.draw.line(canvas, (206, 196, 172), (right.x + 26, y), (right.right - 26, y), 1)
         y += 16
-        if not unl:
-            draw_text(canvas, "BAŞLANGIÇ KİTABI", (pr.centerx, y), 14, (120, 200, 150),
-                      bold=True, center=True)
-            y += 24
-            draw_text(canvas, "Bu kitap baştan açıktır.", (pr.centerx, y), 13, TEXT_DIM,
-                      center=True, shadow=False)
-        elif owned:
-            draw_text(canvas, "AÇILDI", (pr.centerx, y), 15, GREEN, bold=True, center=True)
-            y += 24
-            draw_text(canvas, "Seviye atladığında karşına çıkabilir.", (pr.centerx, y), 13,
-                      TEXT_DIM, center=True, shadow=False)
-        else:
-            draw_text(canvas, "AÇMAK İÇİN GEREKEN GÖREV", (pr.centerx, y), 13, (225, 190, 110),
-                      bold=True, center=True)
-            y += 26
-            for ln in wrap_text(unl["text"], 17, pr.w - 80):
-                draw_text(canvas, ln, (pr.centerx, y), 17, TEXT, bold=True, center=True)
-                y += 24
-            y += 6
-            pb = pygame.Rect(pr.x + 60, int(y), pr.w - 120, 14)
-            draw_bar(canvas, pb, clamp(cur / max(1, need), 0.0, 1.0), (215, 175, 90), radius=6)
-            y += 22
-            kalan = max(0, int(need) - int(cur))
-            draw_text(canvas, f"{fmt_num(int(cur))} / {fmt_num(int(need))}   —   {fmt_num(kalan)} kaldı",
-                      (pr.centerx, y), 13, TEXT_DIM, center=True, shadow=False)
 
-        cb = pygame.Rect(0, 0, 180, 40)
-        cb.center = (pr.centerx, pr.bottom - 36)
+        if not unl:
+            draw_text(canvas, "BAŞLANGIÇ KİTABI", (right.centerx, y), 14, (52, 104, 70),
+                      bold=True, center=True, shadow=False)
+            y += 26
+            for ln in wrap_text("Hiçbir görev gerektirmez — ilk oyunundan itibaren "
+                                "seviye atlama ekranında karşına çıkar.", 12, right.w - 52):
+                draw_text(canvas, ln, (right.centerx, y), 12, (108, 100, 84),
+                          center=True, shadow=False)
+                y += 17
+        else:
+            draw_text(canvas, "AÇILIŞ GÖREVİ", (right.centerx, y), 13, (150, 96, 30),
+                      bold=True, center=True, shadow=False)
+            y += 24
+            for ln in wrap_text(unl["text"], 17, right.w - 52):
+                draw_text(canvas, ln, (right.centerx, y), 17, (44, 36, 26), bold=True,
+                          center=True, shadow=False)
+                y += 24
+            y += 8
+            frac = clamp(cur / max(1, need), 0.0, 1.0)
+            pb = pygame.Rect(right.x + 40, int(y), right.w - 80, 15)
+            draw_bar(canvas, pb, frac, (44, 140, 84) if done else (208, 158, 60),
+                     bg=(214, 206, 184), border=(176, 166, 142), radius=7)
+            y += 24
+            if done and not owned:
+                draw_text(canvas, "GÖREV TAMAM — kitap açıldı!", (right.centerx, y), 13,
+                          (44, 116, 72), bold=True, center=True, shadow=False)
+            else:
+                kalan = max(0, int(need) - int(cur))
+                draw_text(canvas,
+                          f"{fmt_num(int(cur))} / {fmt_num(int(need))}   —   {fmt_num(kalan)} kaldı",
+                          (right.centerx, y), 13, (96, 88, 74), center=True, shadow=False)
+            y += 26
+            if not owned:
+                hint = self.UNLOCK_HINTS.get(unl["stat"])
+                if hint:
+                    for ln in wrap_text(hint, 11, right.w - 52)[:3]:
+                        draw_text(canvas, ln, (right.centerx, y), 11, (126, 110, 78),
+                                  center=True, shadow=False)
+                        y += 15
+
+        draw_text(canvas, f"— {(BOOKS.index(bk) + 1 if bk in BOOKS else 0)} —",
+                  (right.centerx, right.bottom - 26), 11, (158, 148, 126),
+                  center=True, shadow=False)
+
+        # ================= KAPAT =================
+        cb = pygame.Rect(0, 0, 190, 40)
+        cb.center = (book_rect.centerx, book_rect.bottom + 34)
         hov = cb.collidepoint(mouse_pos)
-        pygame.draw.rect(canvas, (54, 58, 84) if hov else (34, 36, 54), cb, border_radius=10)
+        pygame.draw.rect(canvas, (56, 60, 88) if hov else (32, 34, 52), cb, border_radius=10)
         pygame.draw.rect(canvas, edge if hov else PANEL_EDGE, cb, width=2, border_radius=10)
-        draw_text(canvas, "KAPAT", cb.center, 15, TEXT, bold=True, center=True)
-        if clicked and (hov or not pr.collidepoint(mouse_pos)):
+        draw_text(canvas, "KAPAT  (ESC)", cb.center, 15, TEXT, bold=True, center=True)
+
+        if clicked and (hov or not book_rect.collidepoint(mouse_pos)):
             self.book_detail = None
             sfx("click", 0.5, 0.0)
 
@@ -8105,17 +9272,8 @@ class App:
             edge = GOLD if is_equipped else (sk["color"] if (owned or affordable) else (60, 62, 82))
             panel(canvas, rect, bg=(30, 34, 54) if hover else (20, 22, 36), edge=edge, alpha=240, radius=14, edge_w=2)
 
-            cc = (rect.centerx, rect.y + 62)
-            add_glow(canvas, cc[0], cc[1], 44, sk["color"], .5)
-            pygame.draw.circle(canvas, OUTLINE, cc, 29)
-            pygame.draw.circle(canvas, sk["color"], cc, 28)
-            weapon_ang = self.t * 0.6
-            fake = type("F", (), {})()
-            draw_weapon(canvas, type("PP", (), {"skin": sk, "aim_dir": (math.cos(weapon_ang), math.sin(weapon_ang) * 0.3),
-                                                 "radius": 28, "recoil": 0, "flash_t": 0,
-                                                 "body_color": lambda self_, t: sk["color"]})(),
-                        cc[0], cc[1], self.t)
-            pygame.draw.circle(canvas, WHITE, cc, 28, 2)
+            cc = (rect.centerx, rect.y + 60)
+            draw_skin_preview(canvas, sk, cc[0], cc[1], self.t, r=19)
 
             draw_text(canvas, sk["name"], (rect.centerx, rect.y + 104), 15, TEXT, bold=True, center=True)
             for j, ln in enumerate(wrap_text(sk["desc"], 10, rect.w - 24)[:2]):
@@ -8203,18 +9361,10 @@ class App:
             self.set_state(STATE_SKIN_MARKET)
 
         # önizleme dairesi + canlı silah animasyonu
-        cc = (panel_rect.centerx, panel_rect.y + 100)
-        add_glow(canvas, cc[0], cc[1], 62, sk["color"], .55)
-        pygame.draw.circle(canvas, OUTLINE, cc, 46)
-        pygame.draw.circle(canvas, sk["color"], cc, 45)
-        weapon_ang = self.t * 0.6
-        draw_weapon(canvas, type("PP", (), {"skin": sk, "aim_dir": (math.cos(weapon_ang), math.sin(weapon_ang) * 0.3),
-                                             "radius": 45, "recoil": 0, "flash_t": 0,
-                                             "body_color": lambda self_, t: sk["color"]})(),
-                    cc[0], cc[1], self.t)
-        pygame.draw.circle(canvas, WHITE, cc, 45, 2)
+        cc = (panel_rect.centerx, panel_rect.y + 96)
+        draw_skin_preview(canvas, sk, cc[0], cc[1], self.t, r=26)
 
-        draw_text(canvas, sk["name"], (panel_rect.centerx, panel_rect.y + 158), 26, TEXT, bold=True, center=True)
+        draw_text(canvas, sk["name"], (panel_rect.centerx, panel_rect.y + 166), 26, TEXT, bold=True, center=True)
 
         owned = self.save.owns_skin(sk["id"])
         is_equipped = self.save.equipped_skin_id() == sk["id"]
