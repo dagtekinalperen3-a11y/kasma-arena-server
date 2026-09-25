@@ -1029,11 +1029,22 @@ class SaveManager:
         return skin_id in self.data.get("skins_owned", ["default"])
 
     def buy_skin(self, skin_id, cost):
+        # Premium skinler yalnızca gerçek parayla alınır; elmasla satılmaz.
+        if get_skin(skin_id).get("premium"):
+            return False
         if self.owns_skin(skin_id) or self.get_gems() < cost:
             return False
         self.add_gems(-cost)
         self.data.setdefault("skins_owned", ["default"]).append(skin_id)
         self.equip_skin(skin_id)
+        self.save()
+        return True
+
+    def grant_skin(self, skin_id):
+        """Bir skini kalıcı olarak hesaba ekler (premium satın alma sonrası)."""
+        owned = self.data.setdefault("skins_owned", ["default"])
+        if skin_id not in owned:
+            owned.append(skin_id)
         self.save()
         return True
 
@@ -1114,7 +1125,21 @@ class SaveManager:
         cid = eq.get(slot)
         return cid if cid and self.owns_cosmetic(cid) else None
 
+    def cosmetics_locked(self):
+        """Kuşanılmış skin kendi kostümüyle mi geliyor?
+
+        PREMİUM skinler (Ağ Ustası, Kül Savaşçısı ...) maskesi ve pelerini
+        dahil tek parça gelir; bunlar kuşanıldığında şapka/gözlük/pelerin
+        slotları kilitlenir.
+        """
+        return bool(get_skin(self.equipped_skin_id()).get("locks_cosmetics"))
+
     def equipped_cosmetics(self):
+        # Premium skin kuşanıldığında oyuncunun daha önce taktığı kıyafetler
+        # otomatik olarak devre dışı kalır. Seçim kayıttan SİLİNMEZ — premium
+        # skinden çıkınca eski kıyafetler geri gelir.
+        if self.cosmetics_locked():
+            return {"hat": None, "eyewear": None, "cape": None}
         return {slot: self.equipped_cosmetic_id(slot) for slot in ("hat", "eyewear", "cape")}
 
     # ---- yerel skor tablosu ----
@@ -1838,6 +1863,49 @@ SKINS = [
          perks=["Yörünge Lv.1 ile başlar (etrafında dönen mermi)", "Zırh +%5"],
          perk_set=dict(orbit_level=1),
          perk_add=dict(base_armor=0.05)),
+    # =================================================================
+    # PREMİUM SKİNLER — elmasla DEĞİL, gerçek parayla alınır.
+    # Her biri kendi kostümüyle (maske / pelerin / miğfer) gelir; kuşanıldığında
+    # şapka-gözlük-pelerin slotları KİLİTLENİR ve oyuncunun daha önce taktığı
+    # kıyafetler otomatik olarak devre dışı kalır (locks_cosmetics).
+    # `item_id` Steamworks'teki öğe kimliğiyle birebir aynı olmalıdır.
+    # =================================================================
+    dict(id="web_master", name="Ağ Ustası", color=(205, 45, 58), accent=(60, 105, 215),
+         cost=None, premium=True, item_id=2001, price_hint="₺79", locks_cosmetics=True,
+         weapon="webshooter", proj="web", aura="web", sfx="a", wlen=22,
+         desc="Bileklerinden ağ fırlatan maskeli akrobat. Vurduğu düşman ağa dolanıp "
+              "neredeyse yerinde çakılır.",
+         perks=["Buz Oku Lv.6 ile başlar (markette en fazla Lv.5 alınabilir)",
+                "Kendi maskesi ve kostümüyle gelir"],
+         perk_set=dict(ice_level=6)),
+    dict(id="ash_warrior", name="Kül Savaşçısı", color=(226, 222, 214), accent=(190, 40, 45),
+         cost=None, premium=True, item_id=2002, price_hint="₺79", locks_cosmetics=True,
+         weapon="twinblades", proj="ash", aura="ash", sfx="b", wlen=30,
+         desc="Külle kaplı, kızıl dövmeli bir savaş tanrısı. Her vuruşunda "
+              "düşmanın canını kendine çeker.",
+         perks=["Kan Emici Lv.6 ile başlar (markette en fazla Lv.5 alınabilir)",
+                "Kendi kostümü ve omuz pelerini ile gelir"],
+         perk_set=dict(vamp_level=6)),
+    dict(id="green_titan", name="Yeşil Dev", color=(96, 190, 70), accent=(210, 255, 170),
+         cost=None, premium=True, item_id=2003, price_hint="₺99", locks_cosmetics=True,
+         weapon="fists", proj="rock", aura="titan", sfx="d", wlen=20,
+         desc="Yumruğunu yere vurduğunda bütün arena sarsılır. Sarsıntı, patronlar "
+              "dışındaki her düşmanın canını yarıya indirir.",
+         perks=["EZİCİ DARBE: 10 sn'de bir tüm arenayı kaplar",
+                "Ezici darbe patron dışı düşmanların canını yarıya indirir",
+                "Normal BONK 5 sn'de bir  ·  150 can ile başlar"],
+         perk_set=dict(titan_smash=1, bonk_cd=5.0),
+         perk_add=dict(base_max_hp=50)),
+    dict(id="immortal_merc", name="Ölümsüz Kiralık", color=(190, 35, 48), accent=(28, 30, 38),
+         cost=None, premium=True, item_id=2004, price_hint="₺89", locks_cosmetics=True,
+         weapon="pistols", proj="bullet", aura="merc", sfx="c", wlen=24,
+         desc="Ölmeyi beceremeyen, çenesi düşük bir kiralık katil. Öldüğü darbede "
+              "ayağa kalkar ve dövüşe devam eder.",
+         perks=["İkinci Nefes ile başlar (öleceğin darbede yarı canla dirilirsin)",
+                "Hasar +%45",
+                "Kendi maskesi ve kostümüyle gelir"],
+         perk_add=dict(second_wind_charges=1, run_dmg_mult=0.45)),
+
     dict(id="pink_dream", name="Pembe Rüya", color=(255, 105, 190), accent=(255, 222, 236), cost=1100,
          weapon="scepter", proj="star", aura="halo", sfx="a", wlen=36,
          desc="Tepeden tırnağa pembe — stiliyle olduğu kadar gücüyle de göz doldurur. "
@@ -1850,6 +1918,13 @@ SKIN_BY_ID = {s["id"]: s for s in SKINS}
 
 def get_skin(skin_id):
     return SKIN_BY_ID.get(skin_id, SKINS[0])
+
+
+def skin_gem_cost(sk):
+    """Skinin elmas fiyatı. Premium skinler elmasla SATILMAZ; bu yüzden
+    fiyatları None'dur ve karşılaştırmalarda sonsuz sayılırlar."""
+    c = sk.get("cost")
+    return float("inf") if c is None else int(c)
 
 
 # =====================================================================
@@ -3001,7 +3076,9 @@ def draw_cosmetic_eyewear(surf, p, px, py, t):
 
 
 AURA_INTERVAL = {"motes": .045, "wings": .08, "bubbles": .055, "stars": .09, "arcs": .07,
-                 "shadow": .04, "flames": .022, "halo": .05, "prism": .04}
+                 "shadow": .04, "flames": .022, "halo": .05, "prism": .04,
+                 # premium skinler
+                 "web": .07, "ash": .035, "titan": .05, "merc": .06}
 
 
 def skin_update_fx(p, dt, fx):
@@ -3078,6 +3155,34 @@ def skin_update_fx(p, dt, fx):
         elif a == "prism":
             fx.spark(x + random.uniform(-r * 1.2, r * 1.2), y + random.uniform(-r * 1.2, r * 1.2),
                      hue_col(random.random()), random.uniform(-12, 12), -14, .7, 2.4)
+        elif a == "web":
+            # kopan ağ iplikleri
+            fx.spark(x + random.uniform(-r * 1.3, r * 1.3), y + random.uniform(-r, r),
+                     (232, 238, 250), random.uniform(-16, 16), random.uniform(10, 34),
+                     .7, 1.8, add=False, gravity=60, drag=1.2)
+        elif a == "ash":
+            # savrulan kül + kızıl kor
+            fx.spark(x + random.uniform(-r, r), y + random.uniform(-r * .4, r),
+                     (188, 184, 178), random.uniform(-22, 22), -30, .8, 3.4,
+                     add=False, drag=1.8, grow=2)
+            if random.random() < .45:
+                fx.spark(x + random.uniform(-r, r), y + random.uniform(-r * .4, r * .6),
+                         (210, 60, 52), random.uniform(-14, 14), -42, .5, 2.2)
+        elif a == "titan":
+            # ayak altından fırlayan toprak/çim parçaları
+            fx.spark(x + random.uniform(-r * 1.2, r * 1.2), y + r * .8,
+                     random.choice(((96, 150, 72), (120, 96, 60))),
+                     random.uniform(-40, 40), random.uniform(-70, -20), .7, 3.2,
+                     add=False, gravity=260)
+        elif a == "merc":
+            # boş kovanlar + barut dumanı
+            if random.random() < .5:
+                fx.spark(x + random.uniform(-r, r), y,
+                         (235, 200, 110), random.uniform(-45, 45), -30, .6, 2.0,
+                         gravity=240, drag=.4)
+            fx.spark(x + random.uniform(-r, r), y - r * .2,
+                     (92, 92, 104), random.uniform(-10, 10), -26, .8, 3.4,
+                     add=False, drag=1.6, grow=3)
 
 
 def skin_draw_back(surf, p, px, py, t):
@@ -3208,6 +3313,62 @@ def skin_draw_back(surf, p, px, py, t):
             ring.center = (int(px), int(py + r * 0.15))
             pygame.draw.ellipse(surf, (255, 228, 150) if k == 0 else (232, 196, 110), ring, 2)
 
+    elif a == "web":
+        # AĞ USTASI: arkada gerilmiş ağ perdesi
+        for k in range(3):
+            rad = r * (1.9 + k * 0.5)
+            pts = [(px + math.cos(t * 0.5 + i * math.tau / 8) * rad,
+                    py + math.sin(t * 0.5 + i * math.tau / 8) * rad * 0.8) for i in range(8)]
+            pygame.draw.polygon(surf, (86, 96, 122), pts, 1)
+        for i in range(8):
+            a2 = t * 0.5 + i * math.tau / 8
+            pygame.draw.line(surf, (74, 84, 110), (px, py),
+                             (px + math.cos(a2) * r * 2.9, py + math.sin(a2) * r * 2.3), 1)
+
+    elif a == "ash":
+        # KÜL SAVAŞÇISI: tek omuzdan sarkan kızıl pelerin
+        sway = math.sin(t * 2.2) * r * 0.22
+        pts = [(px - r * 0.2, py - r * 0.7), (px + r * 1.5, py - r * 0.3),
+               (px + r * 1.9 + sway, py + r * 2.2), (px - r * 0.9 + sway, py + r * 2.0),
+               (px - r * 0.9, py - r * 0.2)]
+        pygame.draw.polygon(surf, (126, 26, 30), pts)
+        pygame.draw.polygon(surf, (78, 14, 18), pts, 2)
+        # omuz zırhı
+        for s in (-1, 1):
+            pygame.draw.circle(surf, (168, 164, 156),
+                               (int(px + s * r * 0.95), int(py - r * 0.15)), int(r * 0.42))
+            pygame.draw.circle(surf, (96, 92, 86),
+                               (int(px + s * r * 0.95), int(py - r * 0.15)), int(r * 0.42), 2)
+
+    elif a == "titan":
+        # YEŞİL DEV: devasa omuz kütleleri + yerdeki çatlaklar
+        for s in (-1, 1):
+            pygame.draw.circle(surf, scale_col(col, 0.78),
+                               (int(px + s * r * 1.05), int(py - r * 0.25)), int(r * 0.62))
+            pygame.draw.circle(surf, OUTLINE,
+                               (int(px + s * r * 1.05), int(py - r * 0.25)), int(r * 0.62), 2)
+        rnd = random.Random(7)
+        for i in range(6):
+            a2 = rnd.uniform(0, math.tau)
+            x0 = px + math.cos(a2) * r * 1.3
+            y0 = py + r * 0.8 + math.sin(a2) * r * 0.3
+            x1 = px + math.cos(a2) * r * 2.6
+            y1 = py + r * 0.9 + math.sin(a2) * r * 0.6
+            pygame.draw.line(surf, (58, 44, 30), (x0, y0), (x1, y1), 2)
+
+    elif a == "merc":
+        # ÖLÜMSÜZ KİRALIK: sırtta çapraz iki katana
+        for s in (-1, 1):
+            ang2 = -math.pi / 2 + s * 0.55
+            hx = px - math.cos(ang2) * r * 1.5
+            hy = py - math.sin(ang2) * r * 1.5
+            tx = px + math.cos(ang2) * r * 1.9
+            ty = py + math.sin(ang2) * r * 1.9
+            pygame.draw.line(surf, (206, 210, 222), (hx, hy), (tx, ty), 4)
+            pygame.draw.line(surf, (40, 42, 52), (hx, hy),
+                             (hx - math.cos(ang2) * r * 0.55, hy - math.sin(ang2) * r * 0.55), 5)
+        pygame.draw.circle(surf, (32, 34, 44), (int(px), int(py + r * 0.15)), int(r * 1.25), 3)
+
     elif a == "prism":
         # PRİZMA HALKASI: gökkuşağı renklerinde dönen altıgen
         ang0 = t * 0.9
@@ -3337,6 +3498,68 @@ def skin_draw_front(surf, p, px, py, t):
             dx = px + s * (r + 6)
             pygame.draw.circle(surf, acc, (int(dx), int(py - 6 + dy)), 2)
         add_glow(surf, px, py - r * 0.2, r * 1.2, lighten(col, 0.2), .28 + .12 * math.sin(t * 5))
+
+    elif a == "web":
+        # AĞ MASKESİ: kırmızı maske, ağ deseni ve beyaz badem gözler
+        # (gövdenin sade gözlerinin üzerine çizilir, onları örter)
+        for i in range(5):
+            a2 = -math.pi * 0.5 + (i - 2) * 0.42
+            pygame.draw.line(surf, (128, 24, 32), (px, py),
+                             (px + math.cos(a2) * r * 0.95, py + math.sin(a2) * r * 0.95), 1)
+        for rr in (0.42, 0.72):
+            pygame.draw.arc(surf, (128, 24, 32),
+                            pygame.Rect(int(px - r * rr), int(py - r * rr),
+                                        int(r * rr * 2), int(r * rr * 2)),
+                            math.pi * 0.08, math.pi * 0.92, 1)
+        for s in (-1, 1):
+            ex = px + s * r * 0.40
+            ey = py - r * 0.08
+            pts = [(ex - s * r * 0.30, ey + r * 0.16), (ex + s * r * 0.30, ey + r * 0.04),
+                   (ex + s * r * 0.26, ey - r * 0.26), (ex - s * r * 0.22, ey - r * 0.18)]
+            pygame.draw.polygon(surf, (245, 248, 255), pts)
+            pygame.draw.polygon(surf, (20, 22, 34), pts, 2)
+
+    elif a == "ash":
+        # KÜL BOYASI: yüzü çaprazlayan kızıl dövme + sert bakış
+        pygame.draw.line(surf, (176, 32, 36),
+                         (px - r * 0.62, py - r * 0.55), (px - r * 0.18, py + r * 0.62), 3)
+        pygame.draw.line(surf, (176, 32, 36),
+                         (px + r * 0.22, py - r * 0.62), (px + r * 0.30, py + r * 0.58), 3)
+        for s in (-1, 1):
+            pygame.draw.line(surf, (62, 58, 54),
+                             (px + s * r * 0.20, py - r * 0.36),
+                             (px + s * r * 0.52, py - r * 0.46), 2)
+        # sakal gölgesi
+        pygame.draw.arc(surf, (120, 116, 110),
+                        pygame.Rect(int(px - r * 0.55), int(py - r * 0.1),
+                                    int(r * 1.1), int(r * 1.0)),
+                        math.pi * 1.05, math.pi * 1.95, 3)
+
+    elif a == "titan":
+        # ÖFKELİ SURAT: çatık kaşlar + sıkılı çene
+        for s in (-1, 1):
+            pygame.draw.line(surf, (34, 62, 26),
+                             (px + s * r * 0.16, py - r * 0.44),
+                             (px + s * r * 0.60, py - r * 0.22), 4)
+        pygame.draw.line(surf, (34, 62, 26),
+                         (px - r * 0.36, py + r * 0.40), (px + r * 0.36, py + r * 0.40), 3)
+        for i in range(3):
+            tx = px - r * 0.22 + i * r * 0.22
+            pygame.draw.line(surf, (215, 240, 200),
+                             (tx, py + r * 0.40), (tx, py + r * 0.58), 2)
+        add_glow(surf, px, py, r * 1.6, (150, 255, 130), .18 + .08 * math.sin(t * 3))
+
+    elif a == "merc":
+        # KİRALIK MASKESİ: kırmızı maske, siyah göz bölgeleri
+        for s in (-1, 1):
+            ex = px + s * r * 0.40
+            ey = py - r * 0.08
+            pts = [(ex - s * r * 0.34, ey + r * 0.20), (ex + s * r * 0.32, ey + r * 0.06),
+                   (ex + s * r * 0.28, ey - r * 0.30), (ex - s * r * 0.26, ey - r * 0.20)]
+            pygame.draw.polygon(surf, (26, 28, 36), pts)
+            pygame.draw.polygon(surf, (236, 240, 248), pts, 2)
+        pygame.draw.line(surf, (120, 20, 28),
+                         (px - r * 0.72, py + r * 0.30), (px + r * 0.72, py + r * 0.30), 2)
 
     elif a == "wings":
         # TÜY TACI: başın üstünde titreşen üç tüy
@@ -3513,6 +3736,44 @@ def draw_weapon(surf, p, px, py, t):
         poly([(0, 0), (10, -8), (30, 0), (10, 8)], hc, (255, 255, 255), 2)
         line((0, 0), (30, 0), (255, 255, 255), 1)
         glow(30, 0, 14, hc, .7)
+    # ---------------- PREMİUM SKİN SİLAHLARI ----------------
+    elif w == "webshooter":
+        # AĞ USTASI: bilek ağ fırlatıcısı — bileklik + çıkan ağ hüzmesi
+        poly([(0, -5), (9, -6), (11, -3), (11, 3), (9, 6), (0, 5)], (58, 60, 78), acc, 1)
+        poly([(9, -3), (18, -2), (18, 2), (9, 3)], (150, 155, 175))
+        circ(6, 0, 3, acc)
+        circ(6, 0, 3, (255, 255, 255), 1)
+        for i in range(3):
+            a_ = (i - 1) * 0.30
+            tx, ty = 18 + math.cos(a_) * 10, math.sin(a_) * 10
+            line((18, 0), (tx, ty), (238, 242, 250), 1)
+        glow(20, 0, 10, (235, 240, 255), .45)
+    elif w == "twinblades":
+        # KÜL SAVAŞÇISI: zincire bağlı ikiz kılıçlar
+        for s in (-1, 1):
+            poly([(2, s * 4), (12, s * 9), (30, s * 5), (32, s * 2), (12, s * 3)],
+                 (206, 204, 198), (120, 118, 112), 1)
+            line((2, s * 4), (12, s * 6), (70, 62, 58), 3)
+        line((0, 0), (16, 0), (86, 78, 70), 2)
+        for i in range(3):
+            circ(6 + i * 5, 0, 2, (150, 40, 42))
+        glow(30, 0, 12, acc, .40)
+    elif w == "fists":
+        # YEŞİL DEV: silah yok — dev bir yumruk
+        circ(10, 0, 11, scale_col(col, 0.75))
+        circ(10, 0, 11, OUTLINE, 2)
+        circ(8, -3, 4, lighten(col, 0.35))
+        for i in range(3):
+            line((14, -6 + i * 6), (19, -6 + i * 6), scale_col(col, 0.5), 2)
+        glow(12, 0, 16, acc, .35)
+    elif w == "pistols":
+        # ÖLÜMSÜZ KİRALIK: çift tabanca
+        for s in (-1, 1):
+            poly([(0, s * 2 - 3), (16, s * 2 - 3), (16, s * 2 + 2), (0, s * 2 + 2)],
+                 (46, 48, 60), (150, 152, 168), 1)
+            poly([(2, s * 2 + 2), (7, s * 2 + 2), (5, s * 2 + 9), (1, s * 2 + 9)], (34, 36, 46))
+            circ(17, s * 2, 2, (200, 200, 210))
+        glow(20, 0, 12, col, .45)
     if p.flash_t > 0:
         gx, gy = P(sk["wlen"], 0)
         add_glow(surf, gx, gy, 24, acc, min(1.0, p.flash_t * 16))
@@ -4070,7 +4331,14 @@ class Player:
         self.storm_timer = 2.0
         self.shop_levels = {}
 
+        self.bonk_cd = 1.35
+        # YEŞİL DEV: "EZİCİ DARBE" — periyodik, tüm arenayı kaplayan BONK.
+        self.titan_smash = 0        # 1 ise ezici darbe açık
+        self.smash_timer = 0.0      # ezici darbenin bekleme sayacı
+
         # --- SKIN BAŞLANGIÇ BONUSLARI (perk) ---
+        # DİKKAT: perk'ler buradan SONRA hiçbir alanı yeniden atamamalı;
+        # aksi hâlde skinin verdiği değer varsayılanla ezilir.
         # Bazı skinler kalıcı elmasla alınan özel yeteneklerle gelir; bu bonuslar
         # taban istatistikler belirlendikten hemen sonra, türetilmiş değerler
         # (max_hp, hp vb.) hesaplanmadan ÖNCE uygulanır.
@@ -4088,7 +4356,8 @@ class Player:
         self.xp_to_next = 22
 
         self.atk_timer = 0.0
-        self.bonk_cd = 1.35
+        # NOT: bonk_cd yukarıda, skin perk'lerinden ÖNCE tanımlanır — burada
+        # yeniden atanırsa Yeşil Dev'in 5 saniyelik BONK perk'i ezilir.
         self.bonk_timer = 0.0
         self.dash_cd_timer = 0.0
         self.dash_time = 0.0
@@ -4336,7 +4605,7 @@ class Player:
         if not self.alive:
             return
         for name in ("atk_timer", "bonk_timer", "hit_flash", "invuln", "shield_icd",
-                     "dash_cd_timer", "flash_t", "hurt_vig"):
+                     "dash_cd_timer", "flash_t", "hurt_vig", "smash_timer"):
             v = getattr(self, name)
             if v > 0:
                 setattr(self, name, max(0.0, v - dt))
@@ -4558,7 +4827,9 @@ class EnemyProjectile:
 
 
 STYLE_IV = {"bolt": .03, "feather": .035, "toxic": .03, "star": .04, "lightning": .035,
-            "blackfire": .03, "fireball": .025, "gold": .03, "prism": .03}
+            "blackfire": .03, "fireball": .025, "gold": .03, "prism": .03,
+            # premium skin mermileri
+            "web": .035, "ash": .03, "rock": .04, "bullet": .02}
 
 
 class PlayerProjectile:
@@ -4636,6 +4907,16 @@ class PlayerProjectile:
                 fx.spark(x, y, self.accent if random.random() < .5 else self.color, rv(-25, 25), rv(-25, 25), .4, 2.2)
             elif st == "prism":
                 fx.spark(x, y, hue_col(random.random()), rv(-25, 25), rv(-25, 25), .4, 2.4)
+            elif st == "web":
+                fx.spark(x, y, (238, 242, 250), rv(-14, 14), rv(-14, 14), .45, 2.0, add=False)
+            elif st == "ash":
+                fx.spark(x, y, random.choice(((196, 192, 186), (120, 40, 42))),
+                         rv(-22, 22), rv(-30, 6), .55, 3.0, add=False, drag=2.4, grow=2)
+            elif st == "rock":
+                fx.spark(x, y, random.choice(((120, 170, 90), (86, 120, 66))),
+                         rv(-30, 30), rv(-20, 30), .5, 3.2, add=False, gravity=180)
+            elif st == "bullet":
+                fx.spark(x, y, (255, 214, 120), rv(-10, 10), rv(-10, 10), .18, 1.8)
 
     def draw(self, surf, t):
         x, y = int(self.x), int(self.y)
@@ -4711,6 +4992,45 @@ class PlayerProjectile:
             pts = rot_pts([(10, 0), (0, -5), (-10, 0), (0, 5)], ang, x, y)
             pygame.draw.polygon(surf, hc, pts)
             pygame.draw.polygon(surf, WHITE, pts, 1)
+        elif st == "web":
+            # AĞ TOPU: dönen bir ağ yumağı + arkasında uzayan iplik
+            add_glow(surf, x, y, 16, (225, 235, 255), .55)
+            pygame.draw.line(surf, (215, 222, 238), (x - dx * 22, y - dy * 22), (x, y), 2)
+            pygame.draw.circle(surf, (245, 248, 255), (x, y), 7)
+            pygame.draw.circle(surf, (170, 180, 205), (x, y), 7, 1)
+            sp2 = self.spin + t * 6
+            for i in range(6):
+                a2 = sp2 + i * math.tau / 6
+                pygame.draw.line(surf, (150, 162, 190),
+                                 (x, y), (x + math.cos(a2) * 7, y + math.sin(a2) * 7), 1)
+            for rr in (3, 6):
+                pygame.draw.circle(surf, (150, 162, 190), (x, y), rr, 1)
+        elif st == "ash":
+            # KÜL KESİĞİ: kızıl çekirdekli, külden bir hilal
+            add_glow(surf, x, y, 18, (215, 60, 58), .7)
+            pts = rot_pts([(11, 0), (1, -7), (-7, 0), (1, 7)], ang, x, y)
+            pygame.draw.polygon(surf, (214, 210, 202), pts)
+            pygame.draw.polygon(surf, (150, 36, 40), pts, 2)
+            pygame.draw.circle(surf, (255, 120, 90), (x, y), 3)
+        elif st == "rock":
+            # KAYA PARÇASI: köşeli, ağır
+            add_glow(surf, x, y, 16, c, .5)
+            rnd = random.Random(int(self.spin * 1000))
+            pts = []
+            for i in range(6):
+                a2 = ang + i * math.tau / 6 + self.spin
+                rr = 7 + rnd.uniform(-1.6, 2.2)
+                pts.append((x + math.cos(a2) * rr, y + math.sin(a2) * rr))
+            pygame.draw.polygon(surf, scale_col(c, 0.8), pts)
+            pygame.draw.polygon(surf, OUTLINE, pts, 2)
+            pygame.draw.circle(surf, lighten(c, 0.35), (int(x - 2), int(y - 2)), 2)
+        elif st == "bullet":
+            # KURŞUN: kısa, hızlı, sarı izli
+            add_glow(surf, x, y, 12, (255, 200, 110), .75)
+            pygame.draw.line(surf, (255, 222, 150),
+                             (x - dx * 14, y - dy * 14), (x + dx * 3, y + dy * 3), 3)
+            pygame.draw.line(surf, (255, 255, 235),
+                             (x - dx * 6, y - dy * 6), (x + dx * 3, y + dy * 3), 1)
         else:
             pygame.draw.circle(surf, c, (x, y), self.r)
         if self.homing:
@@ -6274,31 +6594,34 @@ WAVE_GOAL_SCALE = 2.8
 WAVE_SCALE_RAMP = {1: 0.62, 2: 0.74, 3: 0.84, 4: 0.93}
 
 
+# İlk dalgaların skor hedefleri elle belirlenir: oyunun açılışı burada
+# şekillendiği için formüle bırakılmaz. Kabus temposunda her biri kabaca
+# 25-35 saniye sürecek biçimde seçildi.
+WAVE_GOAL_TABLE = {1: 600, 2: 2300, 3: 2900, 4: 3500, 5: 4100}
+# 5. dalgadan sonrası formülle devam eder; bu çarpan, formülü tablodaki
+# son değerle sürekli (kesintisiz) hâle getirir.
+WAVE_GOAL_SCALE = 5.9
+
+
 def wave_score_goal(wave, pace=1.0):
     """Bir sonraki dalgaya geçmek için o dalga içinde toplanması gereken SKOR.
 
-    ÖNEMLİ — ZORLUK ARTIK HEDEFİ DEĞİŞTİRMEZ.
+    ÖNEMLİ — ZORLUK HEDEFİ DEĞİŞTİRMEZ.
     Normal, Zor ve Kabus'ta aynı dalgaya aynı skorla ulaşılır. Zorluk yalnızca
-    düşmanların ne kadar hızlı ve kalabalık geldiğini belirler. Eskiden hedef
-    `pace ** 0.6` ile büyütülüyordu; bu, Kabus'u "daha hızlı" değil "daha
-    UZUN" yapıyordu — oysa Kabus oynayan oyuncunun beklentisi tam tersi:
-    "ben bu oyunu biliyorum, hadi çabuk gelin". Artık Kabus'ta aynı sürede
-    çok daha fazla düşman geldiği için aynı dalgaya kendiliğinden daha çabuk
-    ulaşılır.
+    düşmanların ne kadar hızlı ve kalabalık geldiğini belirler; Kabus'ta aynı
+    sürede çok daha fazla düşman geldiği için aynı dalgaya kendiliğinden daha
+    çabuk ulaşılır. (`pace` yalnızca geriye dönük uyumluluk için duruyor,
+    hesaba KATILMAZ.)
 
-    `pace` parametresi yalnızca geriye dönük uyumluluk için duruyor; hesaba
-    KATILMAZ.
-
-    Eğri: ilk dalgalar kısa ve akıcı (oyun hemen başlasın), orta ve geç
-    dalgalar kademeli olarak uzar.
+    İlk 5 dalga WAVE_GOAL_TABLE'dan gelir, sonrası formülle büyür.
     """
     w = max(1, int(wave))
+    if w in WAVE_GOAL_TABLE:
+        return WAVE_GOAL_TABLE[w]
     # Spawn modeliyle aynı kademeler: aynı anda kaç düşman geliyorsa o dalgada
     # toplanabilecek skor da o oranda artar.
     burst = 1 if w < 3 else 2 if w < 6 else 3 if w < 10 else 4 if w < 16 else 5
-    base = (95 + 22 * w) * burst
-    shape = 1.0 if w <= 5 else (1.18 if w <= 10 else 1.30)
-    goal = base * shape
+    goal = (95 + 22 * w) * burst * WAVE_GOAL_SCALE
     # 10. dalgadan sonra ayrıca sabit bir "nefes payı" eklenir.
     if w >= WAVE_BREATHER_FROM:
         goal += WAVE_BREATHER_BASE + (w - WAVE_BREATHER_FROM) * WAVE_BREATHER_STEP
@@ -6697,6 +7020,16 @@ class RunState:
         self.fx.spark(p.x + aim_dx * p.radius, p.y + aim_dy * p.radius, sk["accent"], aim_dx * 40, aim_dy * 40, .15, 2)
         sfx("shoot_" + sk["sfx"], 0.5, 0.035)
 
+    def _titan_smash_fx(self, p):
+        """EZİCİ DARBE'nin görsel/işitsel gösterisi."""
+        self.fx.popup(p.x, p.y - 56, "EZİCİ DARBE!", (150, 255, 120), 30, life=1.1)
+        self.fx.do_flash((150, 255, 130), 0.4)
+        self.fx.shake(16, 0.45)
+        for k in range(4):
+            self.fx.shockwave(p.x, p.y, 260 + k * 260, (150, 255, 130), 0.55, 8 - k)
+        self.fx.burst(p.x, p.y, (150, 255, 130), n=42, speed=320, life=0.7, r=5)
+        sfx("explosion", 1.0, 0.0)
+
     def _apply_execute(self, p, e, dmg):
         if p.execute_threshold > 0 and not getattr(e, "is_boss", False) and e.kind != "elite" and e.hp > 0:
             if (e.hp - dmg) / e.max_hp <= p.execute_threshold and e.hp > dmg:
@@ -6723,9 +7056,21 @@ class RunState:
         t.extend(b for b in self.bosses if b.alive)
         return t
 
+    TITAN_SMASH_CD = 10.0          # ezici darbe bekleme süresi (saniye)
+    TITAN_SMASH_HP_CUT = 0.5       # patron dışı düşmanların canı bu orana iner
+
     def do_bonk(self):
         p = self.player
-        radius = p.eff_bonk_radius()
+        # YEŞİL DEV — EZİCİ DARBE: 10 saniyede bir, BONK tüm arenayı kaplar ve
+        # patronlar dışındaki her düşmanın canını yarıya indirir. Aradaki
+        # BONK'lar normal (5 saniyede bir) çalışır.
+        smash = bool(p.titan_smash) and p.smash_timer <= 0
+        if smash:
+            p.smash_timer = self.TITAN_SMASH_CD
+            radius = math.hypot(ARENA_RECT.width, ARENA_RECT.height)
+            self._titan_smash_fx(p)
+        else:
+            radius = p.eff_bonk_radius()
         dmg = p.eff_dmg() * 1.9 * p.bonk_mult
         hit_any = 0
         hit_ids = set()
@@ -6750,6 +7095,12 @@ class RunState:
                     p.heal(final_dmg * 0.02 * p.vamp_level)
                 if died:
                     self.on_enemy_killed(e)
+        if smash:
+            # Canı yarıya indirme: hasardan AYRI bir etkidir, patronlara işlemez.
+            for e in self.enemies:
+                if e.alive and not getattr(e, "is_boss", False) and e.hp > 1:
+                    e.hp = max(1.0, e.hp * self.TITAN_SMASH_HP_CUT)
+                    self.fx.spark(e.x, e.y, (170, 255, 140), 0, -40, .5, 3)
         if hit_any >= 8 and self.ach:
             self.ach.unlock("bonk8")
         if p.chain_level > 0:
@@ -7763,6 +8114,7 @@ class App:
         self.gem_msg = None           # satın alma sonucu bildirimi
         self.gem_msg_timer = 0.0
         self.gem_msg_ok = True
+        self.store_tab = "gems"       # MAĞAZA sekmesi: gems | skins
         self.claim_all_count = 0      # "tümünü topla" bildirimi için sayaç
         self.menu_buttons = []
         self.build_menu_buttons()
@@ -7839,6 +8191,9 @@ class App:
         sfx("click", 0.6, 0.0)
 
     def start_run(self):
+        # Kuşanılan skin her zaman KAYITTAN okunur: mağaza, skin market ve
+        # menü farklı yerlerden kuşandırabiliyor; tek doğru kaynak kayıttır.
+        self.selected_skin = self.save.equipped_skin_id()
         self.run = RunState(self.save, self.selected_skin, self.diff, self.ach)
         self.state = STATE_PLAY
         audio.set_music("battle")
@@ -8254,13 +8609,13 @@ class App:
         fake.skin = sk
 
         add_glow(canvas, cx, cy, 58, sk["color"], .38 + .10 * math.sin(t * 2.4))
-        draw_cosmetic_cape(canvas, fake, cx, cy, t)
-        pygame.draw.circle(canvas, OUTLINE, (int(cx), int(cy)), 29)
-        pygame.draw.circle(canvas, sk["color"], (int(cx), int(cy)), 27)
-        pygame.draw.circle(canvas, lighten(sk["color"], .35),
-                           (int(cx - 9), int(cy - 9)), 7)
-        draw_cosmetic_eyewear(canvas, fake, cx, cy, t)
-        draw_cosmetic_hat(canvas, fake, cx, cy, t)
+        if not self.save.cosmetics_locked():
+            draw_cosmetic_cape(canvas, fake, cx, cy, t)
+        # Skinin kendi görünümü (aura, maske, kanat, pelerin...) tam hâliyle
+        draw_skin_preview(canvas, sk, cx, cy, t, r=27, weapon=False)
+        if not self.save.cosmetics_locked():
+            draw_cosmetic_eyewear(canvas, fake, cx, cy, t)
+            draw_cosmetic_hat(canvas, fake, cx, cy, t)
 
         draw_text(canvas, sk["name"], (rect.centerx, rect.y + 126), 15, sk["color"],
                   bold=True, center=True)
@@ -8286,6 +8641,16 @@ class App:
                           center=True, shadow=False)
             draw_text(canvas, label, (sr.centerx, sr.bottom - 12), 8,
                       TEXT_DIM if item else (74, 78, 100), center=True, shadow=False)
+
+        if self.save.cosmetics_locked():
+            # Premium skin kendi kostümüyle gelir: slotların üstüne kilit şeridi.
+            lr = pygame.Rect(int(sx0 + 3), rect.y + 150, int(len(slots) * sw - 6), 32)
+            ls = pygame.Surface(lr.size, pygame.SRCALPHA)
+            pygame.draw.rect(ls, (18, 14, 28, 225), ls.get_rect(), border_radius=7)
+            canvas.blit(ls, lr.topleft)
+            pygame.draw.rect(canvas, PURPLE, lr, width=1, border_radius=7)
+            draw_text(canvas, "KOSTÜM SABİT", lr.center, 11, PURPLE, bold=True,
+                      center=True, shadow=False)
 
         draw_text(canvas, "Değiştirmek için tıkla", (rect.centerx, rect.bottom - 18), 10,
                   GOLD if hover else TEXT_DIM, center=True, shadow=False)
@@ -8515,9 +8880,13 @@ class App:
             self.goto(STATE_DAILY_REWARDS)
             sfx("click", 0.6, 0.0)
 
-    # ---------------- ELMAS MARKETİ KARTI (ana menü, sol alt) ----------------
+    # ---------------- MAĞAZA KARTI (ana menü, sol alt) ----------------
     def draw_gem_store_card(self, canvas, dt, mouse_pos, clicked):
-        """Ana menünün SOL ALT köşesindeki KARE ELMAS MARKETİ kartı."""
+        """Ana menünün SOL ALT köşesindeki KARE MAĞAZA kartı.
+
+        Mağaza hem elmas paketlerini hem de gerçek parayla alınan PREMİUM
+        skinleri satar.
+        """
         rect = self._menu_card_rect("left")
         hover = rect.collidepoint(mouse_pos)
         if hover and not self.gem_card_was_hover:
@@ -8548,10 +8917,10 @@ class App:
         pygame.draw.circle(canvas, (13, 14, 22), (int(bx), int(by)), 14)
         pygame.draw.circle(canvas, accent, (int(bx), int(by)), 14, 2)
         draw_icon(canvas, bx, by, "gem", accent, 9)
-        draw_text(canvas, "ELMAS", (rect.x + 46, rect.y + 14), 12, accent, bold=True, shadow=False)
-        draw_text(canvas, "MARKETİ", (rect.x + 46, rect.y + 27), 12, accent, bold=True, shadow=False)
-        draw_text(canvas, "skin ve kıyafet için", (rect.x + 46, rect.y + 41), 9,
-                  TEXT_DIM, shadow=False)
+        draw_text(canvas, "MAĞAZA", (rect.x + 46, rect.y + 14), 12, accent, bold=True, shadow=False)
+        draw_text(canvas, "elmas + premium", (rect.x + 46, rect.y + 28), 10, TEXT_DIM, shadow=False)
+        draw_text(canvas, f"{sum(1 for s in SKINS if s.get('premium'))} premium skin",
+                  (rect.x + 46, rect.y + 41), 9, PURPLE, bold=True, shadow=False)
 
         pygame.draw.line(canvas, (52, 56, 78), (pl, rect.y + 56), (pr_, rect.y + 56), 1)
 
@@ -8577,7 +8946,7 @@ class App:
         pygame.draw.rect(cs, (255, 255, 255, 55 + int(self.gem_card_anim * 90)),
                          cs.get_rect(), width=2, border_radius=14)
         canvas.blit(cs, cta.topleft)
-        draw_text(canvas, "ELMAS AL  »", cta.center, 13, (235, 248, 255),
+        draw_text(canvas, "MAĞAZAYA GİT  »", cta.center, 13, (235, 248, 255),
                   bold=True, center=True, shadow=False)
 
         if clicked and hover:
@@ -8987,34 +9356,50 @@ class App:
                 pass
         threading.Thread(target=work, daemon=True).start()
 
-    def update_gem_store(self, dt, mouse_pos, clicked):
-        canvas = self.display.canvas
-        self.bg.draw(canvas)
-        can_buy = self.purchase.available() and not self.purchase.busy
+    def _buy_premium_skin(self, sk):
+        """Premium skini gerçek parayla satın almayı başlatır."""
+        pack = dict(id=sk["item_id"], gems=0, bonus=0,
+                    price_hint=sk.get("price_hint", ""), tag="", color=sk["color"])
 
-        # ================= ÜST ŞERİT =================
-        top = pygame.Rect(0, 0, VIRTUAL_W, 76)
-        s = pygame.Surface(top.size, pygame.SRCALPHA)
-        pygame.draw.rect(s, (12, 13, 22, 238), top)
-        canvas.blit(s, (0, 0))
-        pygame.draw.line(canvas, (48, 108, 150), (0, 76), (VIRTUAL_W, 76), 2)
-        draw_icon(canvas, 34, 30, "gem", GEM_COLOR, 13)
-        draw_text(canvas, "ELMAS MARKETİ", (56, 16), 26, GEM_COLOR, bold=True)
-        draw_text(canvas, "Elmasla kalıcı skin ve kıyafet al — oyunun gücünü değiştirmez, görünümünü değiştirir.",
-                  (56, 48), 11, TEXT_DIM, shadow=False)
-        gem_txt = fmt_num(self.save.get_gems())
-        tw = text_width(gem_txt, 20, True)
-        draw_icon(canvas, VIRTUAL_W - 40 - tw - 20, 26, "gem", GEM_COLOR, 11)
-        draw_text(canvas, gem_txt, (VIRTUAL_W - 40, 16), 20, GEM_COLOR, bold=True, right=True)
-        draw_text(canvas, "mevcut elmasın", (VIRTUAL_W - 40, 46), 11, TEXT_DIM,
-                  shadow=False, right=True)
+        def done(ok, msg):
+            self.gem_msg = msg
+            self.gem_msg_ok = ok
+            self.gem_msg_timer = 3.2
+            if ok and FAKE_PURCHASE:
+                # Yalnızca TEST kipinde skin yerel olarak açılır.
+                self.save.grant_skin(sk["id"])
+                self.save.equip_skin(sk["id"])
+                self.gem_msg = f"TEST: {sk['name']} açıldı ve kuşanıldı"
+            elif ok:
+                # Gerçek satın almada sahiplik SUNUCUDA yazılır.
+                self._refresh_gems_from_server()
+            if ok:
+                sfx("buy", 1.0, 0.0)
 
-        # ================= PAKETLER =================
+        self.purchase.begin_purchase(pack, on_done=done)
+
+    def _store_tabs(self, canvas, mouse_pos, clicked):
+        tabs = [("gems", "ELMAS PAKETLERİ"), ("skins", "PREMİUM SKİNLER")]
+        tw, th, gap = 230, 34, 12
+        x0 = (VIRTUAL_W - (len(tabs) * tw + (len(tabs) - 1) * gap)) / 2
+        for i, (key, label) in enumerate(tabs):
+            r = pygame.Rect(x0 + i * (tw + gap), 86, tw, th)
+            active = self.store_tab == key
+            hov = r.collidepoint(mouse_pos)
+            bg = (36, 74, 104) if active else ((30, 34, 50) if hov else (20, 23, 36))
+            pygame.draw.rect(canvas, bg, r, border_radius=9)
+            pygame.draw.rect(canvas, GEM_COLOR if active else PANEL_EDGE, r, width=2, border_radius=9)
+            draw_text(canvas, label, r.center, 14, TEXT if active else TEXT_DIM,
+                      bold=True, center=True)
+            if clicked and hov and not active:
+                self.store_tab = key
+                sfx("click", 0.5, 0.0)
+
+    def _draw_gem_packs(self, canvas, dt, mouse_pos, clicked, can_buy):
         cols = len(GEM_PACKS)
-        card_w, card_h = 246, 300
-        gap = 18
+        card_w, card_h, gap = 246, 300, 18
         start_x = (VIRTUAL_W - (cols * card_w + (cols - 1) * gap)) / 2
-        y0 = 132
+        y0 = 130
         for i, pack in enumerate(GEM_PACKS):
             rect = pygame.Rect(int(start_x + i * (card_w + gap)), y0, card_w, card_h)
             hover = rect.collidepoint(mouse_pos) and can_buy
@@ -9033,10 +9418,9 @@ class App:
                 pygame.draw.rect(bs, (*(GOLD if featured else PURPLE), 240),
                                  bs.get_rect(), border_radius=11)
                 canvas.blit(bs, br.topleft)
-                draw_text(canvas, pack["tag"], br.center, 11, (20, 18, 12) if featured else WHITE,
-                          bold=True, center=True, shadow=False)
+                draw_text(canvas, pack["tag"], br.center, 11,
+                          (20, 18, 12) if featured else WHITE, bold=True, center=True, shadow=False)
 
-            # elmas yığını görseli — paket büyüdükçe daha çok elmas
             n_gem = 1 + i
             cy = rect.y + 74
             for k in range(n_gem):
@@ -9067,8 +9451,9 @@ class App:
             draw_text(canvas, "fiyat Steam'de bölgene göre belirlenir",
                       (rect.centerx, rect.y + 250), 9, TEXT_DIM, center=True, shadow=False)
 
-            btn = Button((rect.x + 18, rect.bottom - 48, rect.w - 36, 34),
-                         "SATIN AL" if can_buy else "YAKINDA", lambda p=pack: self._buy_gem_pack(p),
+            btn = Button((rect.x + 18, rect.bottom - 46, rect.w - 36, 34),
+                         "SATIN AL" if can_buy else "YAKINDA",
+                         lambda p=pack: self._buy_gem_pack(p),
                          color=(40, 110, 155) if can_buy else (38, 40, 54),
                          hover_color=(58, 145, 195), enabled=can_buy, text_size=14)
             btn.update(mouse_pos, dt)
@@ -9076,44 +9461,149 @@ class App:
             if clicked:
                 btn.click(mouse_pos)
 
+    def _draw_premium_skins(self, canvas, dt, mouse_pos, clicked, can_buy):
+        prem = [s for s in SKINS if s.get("premium")]
+        cols = max(1, len(prem))
+        card_w, card_h, gap = 246, 300, 18
+        start_x = (VIRTUAL_W - (cols * card_w + (cols - 1) * gap)) / 2
+        y0 = 130
+        equipped = self.save.equipped_skin_id()
+        for i, sk in enumerate(prem):
+            rect = pygame.Rect(int(start_x + i * (card_w + gap)), y0, card_w, card_h)
+            owned = self.save.owns_skin(sk["id"])
+            is_eq = equipped == sk["id"]
+            hover = rect.collidepoint(mouse_pos)
+            accent = GOLD if is_eq else sk["color"]
+            add_glow(canvas, rect.centerx, rect.centery, 140, accent, 0.07)
+            panel(canvas, rect, bg=(30, 26, 40) if hover else (18, 22, 34),
+                  edge=accent, alpha=246, radius=16, edge_w=3)
+
+            tag = "KUŞANILDI" if is_eq else ("SAHİPSİN" if owned else "PREMİUM")
+            tcol = GOLD if is_eq else (GREEN if owned else PURPLE)
+            tw2 = text_width(tag, 11, True) + 20
+            br = pygame.Rect(0, 0, int(tw2), 22)
+            br.center = (rect.centerx, rect.y + 2)
+            bs = pygame.Surface(br.size, pygame.SRCALPHA)
+            pygame.draw.rect(bs, (*tcol, 240), bs.get_rect(), border_radius=11)
+            canvas.blit(bs, br.topleft)
+            draw_text(canvas, tag, br.center, 11, (20, 18, 12) if is_eq else WHITE,
+                      bold=True, center=True, shadow=False)
+
+            draw_skin_preview(canvas, sk, rect.centerx, rect.y + 72, self.t, r=20)
+
+            draw_text(canvas, sk["name"], (rect.centerx, rect.y + 116), 18, TEXT,
+                      bold=True, center=True)
+            # Özellik listesi kart yüksekliğini AŞMAMALI: ayrılan bandı
+            # doldurduğunda kesilir (eskiden fiyatın üstüne biniyordu).
+            yy = rect.y + 142
+            perk_limit = rect.bottom - 86
+            for perk in sk.get("perks", []):
+                if yy >= perk_limit:
+                    break
+                for j, ln in enumerate(wrap_text(perk, 10, rect.w - 34)[:2]):
+                    if yy >= perk_limit:
+                        break
+                    draw_text(canvas, ("• " if j == 0 else "   ") + ln,
+                              (rect.x + 18, yy), 10, (200, 205, 225), shadow=False)
+                    yy += 11
+                yy += 3
+
+            pygame.draw.line(canvas, (52, 56, 78), (rect.x + 22, rect.bottom - 80),
+                             (rect.right - 22, rect.bottom - 80), 1)
+            if owned:
+                draw_text(canvas, "Kendi kostümüyle gelir", (rect.centerx, rect.bottom - 72),
+                          10, TEXT_DIM, center=True, shadow=False)
+            else:
+                draw_text(canvas, sk.get("price_hint", ""), (rect.centerx, rect.bottom - 74),
+                          19, TEXT, bold=True, center=True)
+
+            if owned:
+                btn = Button((rect.x + 18, rect.bottom - 46, rect.w - 36, 34),
+                             "KUŞANILDI" if is_eq else "KUŞAN",
+                             lambda s=sk: self._equip_premium(s),
+                             color=(60, 130, 90) if not is_eq else (38, 40, 54),
+                             hover_color=(80, 170, 115), enabled=not is_eq, text_size=14)
+            else:
+                btn = Button((rect.x + 18, rect.bottom - 46, rect.w - 36, 34),
+                             "SATIN AL" if can_buy else "YAKINDA",
+                             lambda s=sk: self._buy_premium_skin(s),
+                             color=(120, 60, 150) if can_buy else (38, 40, 54),
+                             hover_color=(160, 90, 200), enabled=can_buy, text_size=14)
+            btn.update(mouse_pos, dt)
+            btn.draw(canvas)
+            if clicked:
+                btn.click(mouse_pos)
+
+    def _equip_premium(self, sk):
+        self.save.equip_skin(sk["id"])
+        self.selected_skin = sk["id"]
+        sfx("click", 0.6, 0.0)
+
+    def update_gem_store(self, dt, mouse_pos, clicked):
+        canvas = self.display.canvas
+        self.bg.draw(canvas)
+        can_buy = self.purchase.available() and not self.purchase.busy
+        ui_click = clicked and not self.ad_watch_active
+
+        # ================= ÜST ŞERİT =================
+        top = pygame.Rect(0, 0, VIRTUAL_W, 76)
+        s = pygame.Surface(top.size, pygame.SRCALPHA)
+        pygame.draw.rect(s, (12, 13, 22, 238), top)
+        canvas.blit(s, (0, 0))
+        pygame.draw.line(canvas, (48, 108, 150), (0, 76), (VIRTUAL_W, 76), 2)
+        draw_icon(canvas, 34, 30, "gem", GEM_COLOR, 13)
+        draw_text(canvas, "MAĞAZA", (56, 16), 26, GEM_COLOR, bold=True)
+        draw_text(canvas, "Elmas paketleri ve premium skinler — oyunun gücünü değil, görünümünü ve tarzını değiştirir.",
+                  (56, 48), 11, TEXT_DIM, shadow=False)
+        gem_txt = fmt_num(self.save.get_gems())
+        tw = text_width(gem_txt, 20, True)
+        draw_icon(canvas, VIRTUAL_W - 40 - tw - 20, 26, "gem", GEM_COLOR, 11)
+        draw_text(canvas, gem_txt, (VIRTUAL_W - 40, 16), 20, GEM_COLOR, bold=True, right=True)
+        draw_text(canvas, "mevcut elmasın", (VIRTUAL_W - 40, 46), 11, TEXT_DIM,
+                  shadow=False, right=True)
+
+        self._store_tabs(canvas, mouse_pos, ui_click)
+        if self.store_tab == "skins":
+            self._draw_premium_skins(canvas, dt, mouse_pos, ui_click, can_buy)
+        else:
+            self._draw_gem_packs(canvas, dt, mouse_pos, ui_click, can_buy)
+
         # ================= ALT BİLGİ =================
-        info = pygame.Rect(120, 456, VIRTUAL_W - 240, 96)
+        info = pygame.Rect(120, 440, VIRTUAL_W - 240, 90)
         panel(canvas, info, bg=(18, 19, 30), edge=(64, 70, 96), alpha=235, radius=12, edge_w=1)
         if FAKE_PURCHASE:
             draw_text(canvas, "TEST KİPİ — GERÇEK ÖDEME ALINMIYOR",
-                      (info.centerx, info.y + 14), 16, (255, 140, 90), bold=True, center=True)
+                      (info.centerx, info.y + 12), 16, (255, 140, 90), bold=True, center=True)
             draw_text(canvas, "KASMA_FAKE_PURCHASE ortam değişkeni açık. Dağıtım yapısında kapatılmalı.",
-                      (info.centerx, info.y + 40), 11, TEXT_DIM, center=True, shadow=False)
+                      (info.centerx, info.y + 38), 11, TEXT_DIM, center=True, shadow=False)
         elif can_buy:
-            draw_icon(canvas, info.centerx - 120, info.y + 24, "shield", GREEN, 9)
-            draw_text(canvas, "Ödeme Steam üzerinden alınır", (info.centerx + 10, info.y + 14),
+            draw_icon(canvas, info.centerx - 120, info.y + 22, "shield", GREEN, 9)
+            draw_text(canvas, "Ödeme Steam üzerinden alınır", (info.centerx + 10, info.y + 12),
                       15, GREEN, bold=True, center=True)
-            draw_text(canvas, "Satın alma penceresi Steam istemcisinde açılır; elmaslar hesabına anında yüklenir.",
-                      (info.centerx, info.y + 42), 11, TEXT_DIM, center=True, shadow=False)
+            draw_text(canvas, "Satın alma penceresi Steam istemcisinde açılır; ürün hesabına anında tanımlanır.",
+                      (info.centerx, info.y + 40), 11, TEXT_DIM, center=True, shadow=False)
         else:
-            draw_text(canvas, "SATIN ALMA HENÜZ AÇIK DEĞİL", (info.centerx, info.y + 12), 15,
+            draw_text(canvas, "SATIN ALMA HENÜZ AÇIK DEĞİL", (info.centerx, info.y + 10), 15,
                       (225, 190, 110), bold=True, center=True)
             draw_text(canvas, self.purchase.unavailable_reason(),
-                      (info.centerx, info.y + 36), 12, TEXT_DIM, center=True, shadow=False)
+                      (info.centerx, info.y + 34), 12, TEXT_DIM, center=True, shadow=False)
             draw_text(canvas, "Elmasları GÜNLÜK MARKET'ten ücretsiz de kazanabilirsin.",
-                      (info.centerx, info.y + 56), 11, GOLD, center=True, shadow=False)
+                      (info.centerx, info.y + 54), 11, GOLD, center=True, shadow=False)
 
-        # ücretsiz elmas kısayolu
-        free = Button((VIRTUAL_W / 2 - 250, VIRTUAL_H - 66, 240, 42), "ÜCRETSİZ ELMAS KAZAN",
+        free = Button((VIRTUAL_W / 2 - 250, VIRTUAL_H - 62, 240, 42), "ÜCRETSİZ ELMAS KAZAN",
                       lambda: self.goto(STATE_DAILY_REWARDS),
                       color=(140, 112, 38), hover_color=(186, 150, 56), text_size=14)
-        back = Button((VIRTUAL_W / 2 + 10, VIRTUAL_H - 66, 240, 42), "ANA MENÜYE DÖN",
+        back = Button((VIRTUAL_W / 2 + 10, VIRTUAL_H - 62, 240, 42), "ANA MENÜYE DÖN",
                       lambda: self.set_state(STATE_MENU), text_size=14)
         for b in (free, back):
             b.update(mouse_pos, dt)
             b.draw(canvas)
-            if clicked:
+            if ui_click:
                 b.click(mouse_pos)
 
-        # ---- satın alma durumu / sonuç bildirimi ----
         if self.purchase.busy:
             draw_text(canvas, self.purchase.status or "İşleniyor...",
-                      (VIRTUAL_W / 2, 440), 13, CYAN, bold=True, center=True)
+                      (VIRTUAL_W / 2, 424), 13, CYAN, bold=True, center=True)
         if self.gem_msg_timer > 0:
             self.gem_msg_timer -= dt
             box = pygame.Rect(0, 0, 460, 110)
@@ -9868,12 +10358,22 @@ class App:
             owned = self.save.owns_skin(sk["id"])
             is_equipped = equipped == sk["id"]
             hover = rect.collidepoint(mouse_pos) and list_rect.collidepoint(mouse_pos)
-            affordable = self.save.get_gems() >= sk["cost"]
-            edge = GOLD if is_equipped else (sk["color"] if (owned or affordable) else (60, 62, 82))
+            premium = bool(sk.get("premium"))
+            affordable = (not premium) and self.save.get_gems() >= skin_gem_cost(sk)
+            edge = GOLD if is_equipped else (sk["color"] if (owned or affordable or premium) else (60, 62, 82))
             panel(canvas, rect, bg=(30, 34, 54) if hover else (20, 22, 36), edge=edge, alpha=240, radius=14, edge_w=2)
 
             cc = (rect.centerx, rect.y + 60)
             draw_skin_preview(canvas, sk, cc[0], cc[1], self.t, r=19)
+            if premium:
+                bw = text_width("PREMİUM", 10, True) + 18
+                br = pygame.Rect(0, 0, int(bw), 20)
+                br.center = (rect.centerx, rect.y + 2)
+                bs = pygame.Surface(br.size, pygame.SRCALPHA)
+                pygame.draw.rect(bs, (*PURPLE, 240), bs.get_rect(), border_radius=10)
+                canvas.blit(bs, br.topleft)
+                draw_text(canvas, "PREMİUM", br.center, 10, WHITE, bold=True,
+                          center=True, shadow=False)
 
             draw_text(canvas, sk["name"], (rect.centerx, rect.y + 104), 15, TEXT, bold=True, center=True)
             for j, ln in enumerate(wrap_text(sk["desc"], 10, rect.w - 24)[:2]):
@@ -9883,9 +10383,15 @@ class App:
                 draw_text(canvas, "KUŞANILDI", (rect.centerx, rect.bottom - 20), 13, GOLD, bold=True, center=True)
             elif owned:
                 draw_text(canvas, "SAHİPSİN — detaylar için tıkla", (rect.centerx, rect.bottom - 18), 10, TEXT_DIM, center=True, shadow=False)
+            elif premium:
+                # Premium skin: elmasla değil, MAĞAZA'dan gerçek parayla alınır.
+                draw_text(canvas, f"PREMİUM  ·  {sk.get('price_hint', '')}",
+                          (rect.centerx, rect.bottom - 27), 14, PURPLE, bold=True, center=True)
+                draw_text(canvas, "MAĞAZA'dan alınır", (rect.centerx, rect.bottom - 12), 10,
+                          TEXT_DIM, center=True, shadow=False)
             else:
                 pcol = GEM_COLOR if affordable else (100, 105, 130)
-                cost_txt = str(sk["cost"])
+                cost_txt = str(skin_gem_cost(sk))
                 tw = text_width(cost_txt, 15, True)
                 draw_icon(canvas, rect.centerx - tw / 2 - 11, rect.bottom - 20, "gem", pcol, 8)
                 draw_text(canvas, cost_txt, (rect.centerx - tw / 2 + 4, rect.bottom - 27), 15, pcol, bold=True)
@@ -9935,8 +10441,13 @@ class App:
         sk = SKIN_BY_ID.get(sk_id)
         if not sk:
             return
-        if self.save.get_gems() >= sk["cost"]:
-            if self.save.buy_skin(sk_id, sk["cost"]):
+        if sk.get("premium"):
+            # Premium skin elmasla alınmaz: oyuncuyu MAĞAZA'ya yönlendir.
+            self.store_tab = "skins"
+            self.goto(STATE_GEM_STORE)
+            return
+        if self.save.get_gems() >= skin_gem_cost(sk):
+            if self.save.buy_skin(sk_id, skin_gem_cost(sk)):
                 self.save.equip_skin(sk_id)
                 self.selected_skin = sk_id
                 self.ach.unlock("fashion")
@@ -9968,15 +10479,18 @@ class App:
 
         owned = self.save.owns_skin(sk["id"])
         is_equipped = self.save.equipped_skin_id() == sk["id"]
-        affordable = self.save.get_gems() >= sk["cost"]
+        affordable = (not sk.get("premium")) and self.save.get_gems() >= skin_gem_cost(sk)
 
         status_y = panel_rect.y + 208
         if is_equipped:
             draw_text(canvas, "KUŞANILMIŞ DURUMDA", (panel_rect.centerx, status_y), 13, GOLD, bold=True, center=True)
         elif owned:
             draw_text(canvas, "SAHİPSİN", (panel_rect.centerx, status_y), 13, GREEN, bold=True, center=True)
+        elif sk.get("premium"):
+            draw_text(canvas, f"PREMİUM SKİN  ·  {sk.get('price_hint', '')}",
+                      (panel_rect.centerx, status_y), 15, PURPLE, bold=True, center=True)
         else:
-            cost_txt = f"{sk['cost']} Elmas"
+            cost_txt = f"{skin_gem_cost(sk)} Elmas"
             draw_text(canvas, cost_txt, (panel_rect.centerx, status_y), 15,
                       GEM_COLOR if affordable else (150, 90, 90), bold=True, center=True)
 
@@ -10014,6 +10528,18 @@ class App:
                 b.draw(canvas)
                 if clicked:
                     b.click(mouse_pos)
+        elif sk.get("premium"):
+            buy_btn = Button((panel_rect.centerx - btn_w - gap / 2, by, btn_w, btn_h),
+                              "MAĞAZA  »", self._buy_detail_skin,
+                              color=(120, 60, 150), hover_color=(160, 90, 200))
+            cancel_btn = Button((panel_rect.centerx + gap / 2, by, btn_w, btn_h), "GERİ",
+                                 lambda: self.set_state(STATE_SKIN_MARKET))
+            for b in (buy_btn, cancel_btn):
+                b.update(mouse_pos, dt)
+                b.draw(canvas)
+                if clicked:
+                    b.click(mouse_pos)
+            return
         else:
             buy_btn = Button((panel_rect.centerx - btn_w - gap / 2, by, btn_w, btn_h),
                               "SATIN AL", self._buy_detail_skin, color=(150, 120, 40), hover_color=(190, 155, 60),
@@ -10072,8 +10598,14 @@ class App:
         pygame.draw.rect(s, (12, 13, 22, 235), top)
         canvas.blit(s, (0, 0))
         draw_text(canvas, "KIYAFET MARKET", (40, 18), 26, CYAN, bold=True)
-        draw_text(canvas, "Şapka, gözlük ve pelerinle karakterini kişiselleştir.",
-                  (40, 50), 11, TEXT_DIM, shadow=False)
+        if self.save.cosmetics_locked():
+            # Premium skin kendi kostümüyle gelir; kıyafet slotları kilitlidir.
+            sk_name = get_skin(self.save.equipped_skin_id())["name"]
+            draw_text(canvas, f"{sk_name} kendi kostümüyle gelir — kıyafetler bu skinde kapalıdır.",
+                      (40, 50), 11, PURPLE, bold=True, shadow=False)
+        else:
+            draw_text(canvas, "Şapka, gözlük ve pelerinle karakterini kişiselleştir.",
+                      (40, 50), 11, TEXT_DIM, shadow=False)
         gem_txt = f"Elmas: {fmt_num(self.save.get_gems())}"
         tw = text_width(gem_txt, 20, True)
         draw_icon(canvas, VIRTUAL_W - 40 - tw - 21, 34, "gem", GEM_COLOR, 11)
