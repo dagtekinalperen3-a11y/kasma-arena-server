@@ -1,0 +1,12 @@
+# Python derleme ciktilari
+__pycache__/
+*.py[cod]
+
+# Oyun kayit dosyasi (kullanici klasorune yazilir, depoya girmemeli)
+kasma_arena_save.json
+kasma_arena_save.json.tmp
+
+# Paketleme ciktilari (PyInstaller / Steam yapilari)
+build/
+dist/
+*.spec
