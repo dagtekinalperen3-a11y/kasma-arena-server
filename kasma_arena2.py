@@ -1181,6 +1181,134 @@ class SteamBridge:
 
 
 # =====================================================================
+# ELMAS PAKETLERİ VE SATIN ALMA
+# =====================================================================
+
+# Paketlerin GERÇEK fiyatı Steam Partner panelinde tanımlanır ve bölgeye göre
+# değişir; buradaki `price_hint` yalnızca ekranda gösterilen bir tahmindir.
+# `id` değeri Steam'deki öğe kimliğiyle (itemid) BİREBİR aynı olmalıdır.
+GEM_PACKS = [
+    dict(id=1001, gems=500,   bonus=0,  price_hint="₺29",   tag="",             color=(120, 200, 255)),
+    dict(id=1002, gems=1200,  bonus=10, price_hint="₺59",   tag="POPÜLER",      color=(140, 215, 255)),
+    dict(id=1003, gems=2600,  bonus=20, price_hint="₺119",  tag="",             color=(170, 190, 255)),
+    dict(id=1004, gems=7000,  bonus=35, price_hint="₺279",  tag="EN AVANTAJLI", color=(255, 205, 110)),
+]
+
+
+def gem_pack_total(pack):
+    """Paketin bonus dahil toplam elmas miktarı."""
+    return int(pack["gems"] * (1 + pack["bonus"] / 100.0))
+
+
+# Satın alma uç noktası. Sunucu tarafı hazır olduğunda doldurulur
+# (bkz. server.py -> /begin_purchase). BOŞ bırakıldığı sürece elmas marketi
+# "yakında" olarak görünür ve hiçbir satın alma başlatılmaz.
+PURCHASE_API_URL = ""
+
+# Geliştirici test kipi. AÇIKSA hiçbir ödeme alınmaz, elmaslar yalnızca yerel
+# olarak eklenir ve ekranda büyük harflerle "TEST" yazar. Oyuncuya dağıtılan
+# yapıda ASLA açık bırakılmamalıdır.
+FAKE_PURCHASE = os.environ.get("KASMA_FAKE_PURCHASE") == "1"
+
+
+class PurchaseBridge:
+    """Elmas paketi satın alma köprüsü.
+
+    GERÇEK PARA AKIŞI OYUNUN İÇİNDE DEĞİL, SUNUCUDA KURULUR.
+    Steam'de oyun-içi satın alma şu sırayla işler:
+
+      1) Oyun, KENDİ sunucusuna "şu oyuncu şu paketi almak istiyor" der.
+      2) Sunucu, Steam'in ISteamMicroTxn/InitTxn ucunu GİZLİ publisher
+         anahtarıyla çağırır. (Bu anahtar asla oyunun içinde bulunmamalıdır;
+         oyun dosyası açılabilir ve anahtar çalınabilir.)
+      3) Steam istemcisinde ödeme penceresi açılır, oyuncu onaylar.
+      4) Steam sunucuya bildirir, sunucu FinalizeTxn çağırır ve elmasları
+         oyuncunun hesabına yazar.
+      5) Oyun /get_player ile güncel elmas sayısını çeker.
+
+    Bu sınıf 1. ve 5. adımları yapar. Sunucu tarafı kurulmadan satın alma
+    AÇILMAZ; aksi hâlde ya parasını alıp elmas vermemiş ya da para almadan
+    elmas vermiş oluruz.
+    """
+
+    def __init__(self, steam, api_url=PURCHASE_API_URL):
+        self.steam = steam
+        self.api_url = (api_url or "").rstrip("/")
+        self.status = None        # ekranda gösterilen son durum metni
+        self.busy = False
+        self.last_error = None
+
+    def available(self):
+        """Satın alma şu an gerçekten yapılabilir mi?"""
+        if FAKE_PURCHASE:
+            return True
+        return bool(self.api_url) and bool(self.steam and self.steam.ok)
+
+    def unavailable_reason(self):
+        if not self.api_url:
+            return "Satın alma sunucusu henüz bağlı değil."
+        if not (self.steam and self.steam.ok):
+            return "Steam istemcisi çalışmıyor — oyunu Steam üzerinden başlat."
+        return ""
+
+    def steam_id(self):
+        if not (self.steam and self.steam.ok):
+            return None
+        try:
+            return str(self.steam.sw.Users.GetSteamID())
+        except Exception:
+            return None
+
+    def begin_purchase(self, pack, on_done=None):
+        """Satın almayı başlatır. Sonuç ASENKRON gelir.
+
+        on_done(ok, mesaj) geri çağrısı ile bildirilir.
+        """
+        if self.busy:
+            return False
+        if FAKE_PURCHASE:
+            # TEST KİPİ — para akışı yok, yalnızca geliştirme içindir.
+            self.status = "TEST KİPİ: ödeme alınmadı"
+            if on_done:
+                on_done(True, "TEST: %s elmas eklendi" % fmt_num(gem_pack_total(pack)))
+            return True
+        if not self.available():
+            self.last_error = self.unavailable_reason()
+            if on_done:
+                on_done(False, self.last_error)
+            return False
+
+        self.busy = True
+        self.status = "Steam ödeme penceresi açılıyor..."
+
+        def work():
+            ok, msg = False, "Satın alma başlatılamadı."
+            try:
+                payload = json.dumps({
+                    "steam_id": self.steam_id(),
+                    "item_id": pack["id"],
+                    "quantity": 1,
+                }).encode("utf-8")
+                req = urllib.request.Request(
+                    self.api_url + "/begin_purchase", data=payload,
+                    headers={"Content-Type": "application/json"})
+                with urllib.request.urlopen(req, timeout=12) as r:
+                    data = json.loads(r.read().decode("utf-8"))
+                ok = bool(data.get("success"))
+                msg = data.get("message") or ("Steam penceresini onayla." if ok
+                                              else "Satın alma reddedildi.")
+            except Exception as e:
+                msg = "Sunucuya ulaşılamadı: %s" % e
+            self.busy = False
+            self.status = msg
+            if on_done:
+                on_done(ok, msg)
+
+        threading.Thread(target=work, daemon=True).start()
+        return True
+
+
+# =====================================================================
 # BAŞARIMLAR
 # =====================================================================
 
@@ -3389,6 +3517,7 @@ def draw_weapon(surf, p, px, py, t):
 TIER_UNLOCK_WAVE = {1: 0, 2: 3, 3: 6, 4: 10}
 
 SHOP_CATS = {
+    "core":      "ÇEKİRDEK",
     "weapon":    "SİLAH",
     "defense":   "SAVUNMA",
     "elemental": "ELEMENT",
@@ -3398,33 +3527,51 @@ SHOP_CATS = {
 }
 
 SHOP_ITEMS = [
+    # ---- ÇEKİRDEK: TAVANI OLMAYAN yükseltmeler --------------------------
+    # Market eskiden birkaç dalga sonra tamamen "MAX" oluyor, biriken altının
+    # harcanacak yeri kalmıyordu. Çekirdekler sonsuz yükseltilebilir; her
+    # seviye biraz daha pahalı olur, böylece altın her zaman bir işe yarar
+    # ve oyuncu kendini sürekli güçlenirken hisseder.
+    {"key": "core_power",    "name": "Güç Çekirdeği",       "desc": "Hasar +%8 (tavanı yok)",
+     "cost": 70,  "cost_mult": 1.28, "max": 999, "endless": True, "icon": "sword",  "color": (240, 110, 110), "tier": 1, "cat": "core"},
+    {"key": "core_speed",    "name": "Hız Çekirdeği",       "desc": "Atış hızı +%6 (tavanı yok)",
+     "cost": 80,  "cost_mult": 1.30, "max": 999, "endless": True, "icon": "boot",   "color": (130, 230, 170), "tier": 1, "cat": "core"},
+    {"key": "core_vitality", "name": "Can Çekirdeği",       "desc": "Azami can +30 ve anında dolar (tavanı yok)",
+     "cost": 60,  "cost_mult": 1.26, "max": 999, "endless": True, "icon": "heart",  "color": (235, 120, 150), "tier": 1, "cat": "core"},
+    {"key": "core_crit",     "name": "Keskinlik Çekirdeği", "desc": "Kritik şans +%3, kritik hasar +%6 (tavanı yok)",
+     "cost": 85,  "cost_mult": 1.29, "max": 999, "endless": True, "icon": "clover", "color": (230, 220, 120), "tier": 1, "cat": "core"},
+    {"key": "core_guard",    "name": "Koruma Çekirdeği",    "desc": "Zırh +%2 (tavanı yok — zırh üst sınırına kadar)",
+     "cost": 90,  "cost_mult": 1.32, "max": 999, "endless": True, "icon": "shield", "color": (160, 180, 220), "tier": 1, "cat": "core"},
+    {"key": "core_greed",    "name": "Talan Çekirdeği",     "desc": "Altın +%12, deneyim +%8 (tavanı yok)",
+     "cost": 65,  "cost_mult": 1.25, "max": 999, "endless": True, "icon": "coin",   "color": (235, 195, 95),  "tier": 1, "cat": "core"},
+
     # ---- Tier 1 (baştan açık) ----
-    {"key": "fire",      "name": "Ateş Oku",        "desc": "Vuruşların yanık bırakır (zamanla hasar)", "cost": 40, "cost_mult": 1.6, "max": 3, "icon": "bolt", "color": ORANGE, "tier": 1, "cat": "elemental"},
-    {"key": "ice",       "name": "Buz Oku",         "desc": "Vuruşların düşmanı yavaşlatır", "cost": 40, "cost_mult": 1.6, "max": 3, "icon": "target", "color": CYAN, "tier": 1, "cat": "elemental"},
-    {"key": "multishot", "name": "Çoklu Atış",      "desc": "+1 ek mermi (yelpaze)", "cost": 75, "cost_mult": 1.85, "max": 3, "icon": "star", "color": PURPLE, "tier": 1, "cat": "weapon"},
-    {"key": "pierce",    "name": "Delici Mermi",    "desc": "Mermi 1 düşman daha delsin", "cost": 55, "cost_mult": 1.7, "max": 3, "icon": "sword", "color": RED, "tier": 1, "cat": "weapon"},
-    {"key": "shield",    "name": "Kalkan",          "desc": "Bir sonraki darbeyi engeller (yığılır)", "cost": 50, "cost_mult": 1.55, "max": 5, "icon": "shield", "color": (160, 170, 200), "tier": 1, "cat": "defense"},
+    {"key": "fire",      "name": "Ateş Oku",        "desc": "Vuruşların yanık bırakır (zamanla hasar)", "cost": 40, "cost_mult": 1.55, "max": 5, "icon": "bolt", "color": ORANGE, "tier": 1, "cat": "elemental"},
+    {"key": "ice",       "name": "Buz Oku",         "desc": "Vuruşların düşmanı yavaşlatır", "cost": 40, "cost_mult": 1.55, "max": 5, "icon": "target", "color": CYAN, "tier": 1, "cat": "elemental"},
+    {"key": "multishot", "name": "Çoklu Atış",      "desc": "+1 ek mermi (yelpaze)", "cost": 75, "cost_mult": 1.8, "max": 5, "icon": "star", "color": PURPLE, "tier": 1, "cat": "weapon"},
+    {"key": "pierce",    "name": "Delici Mermi",    "desc": "Mermi 1 düşman daha delsin", "cost": 55, "cost_mult": 1.65, "max": 5, "icon": "sword", "color": RED, "tier": 1, "cat": "weapon"},
+    {"key": "shield",    "name": "Kalkan",          "desc": "Bir sonraki darbeyi engeller (yığılır)", "cost": 50, "cost_mult": 1.5, "max": 8, "icon": "shield", "color": (160, 170, 200), "tier": 1, "cat": "defense"},
     {"key": "heal",      "name": "İksir",           "desc": "Anında +40 can (10 sn'de bir alınabilir)", "cost": 30, "cost_mult": 1.2, "max": 40, "icon": "heart", "color": GREEN, "tier": 1, "cat": "utility", "instant": True},
     # ---- Tier 2 (Dalga 3+) ----
-    {"key": "haste",     "name": "Çevik Refleks",   "desc": "+%9 atış hızı, +%5 hareket hızı", "cost": 65, "cost_mult": 1.65, "max": 4, "icon": "boot", "color": GREEN, "tier": 2, "cat": "weapon"},
-    {"key": "explosive", "name": "Patlayıcı Mermi", "desc": "Öldürdüğün düşman çevresine sıçrama hasarı verir", "cost": 90, "cost_mult": 1.8, "max": 3, "icon": "star", "color": (240, 110, 60), "tier": 2, "cat": "weapon"},
-    {"key": "vampiric",  "name": "Kan Emici",       "desc": "Verdiğin hasarın %2'si cana döner (seviye başı)", "cost": 85, "cost_mult": 1.75, "max": 3, "icon": "heart", "color": (220, 60, 90), "tier": 2, "cat": "utility"},
-    {"key": "thorns",    "name": "Dikenli Zırh",    "desc": "Sana vuran düşman geri hasar alır", "cost": 60, "cost_mult": 1.6, "max": 4, "icon": "shield", "color": (170, 125, 90), "tier": 2, "cat": "defense"},
-    {"key": "orbit",     "name": "Dönen Bıçaklar",  "desc": "Etrafında dönen bıçaklar (+1 bıçak)", "cost": 100, "cost_mult": 1.8, "max": 4, "icon": "orbit", "color": (150, 220, 255), "tier": 2, "cat": "weapon"},
-    {"key": "dash_cd",   "name": "Sis Adımı",       "desc": "Dash bekleme -%18, mesafe +%10", "cost": 60, "cost_mult": 1.6, "max": 3, "icon": "dash", "color": (140, 230, 190), "tier": 2, "cat": "utility"},
+    {"key": "haste",     "name": "Çevik Refleks",   "desc": "+%9 atış hızı, +%5 hareket hızı", "cost": 65, "cost_mult": 1.6, "max": 8, "icon": "boot", "color": GREEN, "tier": 2, "cat": "weapon"},
+    {"key": "explosive", "name": "Patlayıcı Mermi", "desc": "Öldürdüğün düşman çevresine sıçrama hasarı verir", "cost": 90, "cost_mult": 1.75, "max": 5, "icon": "star", "color": (240, 110, 60), "tier": 2, "cat": "weapon"},
+    {"key": "vampiric",  "name": "Kan Emici",       "desc": "Verdiğin hasarın %2'si cana döner (seviye başı)", "cost": 85, "cost_mult": 1.7, "max": 5, "icon": "heart", "color": (220, 60, 90), "tier": 2, "cat": "utility"},
+    {"key": "thorns",    "name": "Dikenli Zırh",    "desc": "Sana vuran düşman geri hasar alır", "cost": 60, "cost_mult": 1.55, "max": 6, "icon": "shield", "color": (170, 125, 90), "tier": 2, "cat": "defense"},
+    {"key": "orbit",     "name": "Dönen Bıçaklar",  "desc": "Etrafında dönen bıçaklar (+1 bıçak)", "cost": 100, "cost_mult": 1.75, "max": 6, "icon": "orbit", "color": (150, 220, 255), "tier": 2, "cat": "weapon"},
+    {"key": "dash_cd",   "name": "Sis Adımı",       "desc": "Dash bekleme -%18, mesafe +%10", "cost": 60, "cost_mult": 1.55, "max": 5, "icon": "dash", "color": (140, 230, 190), "tier": 2, "cat": "utility"},
     {"key": "blood_pact", "name": "Kan Sözleşmesi", "desc": "Hasar +%40 ama azami can -%25", "cost": 60, "cost_mult": 1.5, "max": 2, "icon": "skull", "color": (215, 50, 70), "tier": 2, "cat": "cursed", "cursed": True},
     {"key": "glass",     "name": "Cam Top",         "desc": "Atış hızı +%30 ama gelen hasar +%25", "cost": 70, "cost_mult": 1.5, "max": 2, "icon": "skull", "color": (200, 90, 220), "tier": 2, "cat": "cursed", "cursed": True},
     {"key": "devil",     "name": "Şeytan Pazarlığı", "desc": "Altın ve XP +%50 ama düşmanlar +%12 dayanıklı", "cost": 80, "cost_mult": 1.5, "max": 3, "icon": "skull", "color": (255, 120, 60), "tier": 2, "cat": "cursed", "cursed": True},
     # ---- Tier 3 (Dalga 6+) ----
-    {"key": "chain",     "name": "Zincir Şok",      "desc": "BONK yakındaki ekstra düşmanlara sıçrar", "cost": 110, "cost_mult": 1.9, "max": 2, "icon": "bolt", "color": (120, 200, 255), "tier": 3, "cat": "elemental"},
+    {"key": "chain",     "name": "Zincir Şok",      "desc": "BONK yakındaki ekstra düşmanlara sıçrar", "cost": 110, "cost_mult": 1.85, "max": 4, "icon": "bolt", "color": (120, 200, 255), "tier": 3, "cat": "elemental"},
     {"key": "homing",    "name": "Güdümlü Mermi",   "desc": "Mermilerin en yakın düşmana yönelir", "cost": 130, "cost_mult": 2.0, "max": 1, "icon": "target", "color": (140, 220, 200), "tier": 3, "cat": "weapon"},
-    {"key": "frenzy",    "name": "Çılgınlık Çekirdeği", "desc": "Ardışık öldürmeler hız ve hasarı artırır", "cost": 100, "cost_mult": 1.85, "max": 3, "icon": "clover", "color": (200, 230, 100), "tier": 3, "cat": "elemental"},
-    {"key": "second_wind", "name": "İkinci Nefes",  "desc": "Öleceğin darbede %50 canla dirilirsin", "cost": 170, "cost_mult": 2.2, "max": 2, "icon": "heart", "color": (255, 215, 120), "tier": 3, "cat": "defense"},
-    {"key": "storm",     "name": "Fırtına",         "desc": "Rastgele düşmanlara yıldırım düşer", "cost": 140, "cost_mult": 2.0, "max": 3, "icon": "bolt", "color": (190, 215, 255), "tier": 3, "cat": "elemental"},
+    {"key": "frenzy",    "name": "Çılgınlık Çekirdeği", "desc": "Ardışık öldürmeler hız ve hasarı artırır", "cost": 100, "cost_mult": 1.8, "max": 5, "icon": "clover", "color": (200, 230, 100), "tier": 3, "cat": "elemental"},
+    {"key": "second_wind", "name": "İkinci Nefes",  "desc": "Öleceğin darbede %50 canla dirilirsin", "cost": 170, "cost_mult": 2.1, "max": 3, "icon": "heart", "color": (255, 215, 120), "tier": 3, "cat": "defense"},
+    {"key": "storm",     "name": "Fırtına",         "desc": "Rastgele düşmanlara yıldırım düşer", "cost": 140, "cost_mult": 1.95, "max": 5, "icon": "bolt", "color": (190, 215, 255), "tier": 3, "cat": "elemental"},
     # ---- Tier 4 — EFSANEVİ (Dalga 10+) ----
-    {"key": "overcharge", "name": "Aşırı Yük",      "desc": "BONK hasarı ve alanı çok büyük ölçüde artar", "cost": 240, "cost_mult": 2.3, "max": 2, "icon": "fist", "color": GOLD, "tier": 4, "cat": "legendary", "legendary": True},
-    {"key": "execute_edge", "name": "İnfaz Kenarı", "desc": "Canı çok azalan düşmanları anında infaz eder", "cost": 240, "cost_mult": 2.3, "max": 2, "icon": "sword", "color": GOLD, "tier": 4, "cat": "legendary", "legendary": True},
-    {"key": "titan_shield", "name": "Titan Kalkanı", "desc": "+2 kalkan yükü ve kalıcı zırh (bu koşu)", "cost": 240, "cost_mult": 2.3, "max": 2, "icon": "shield", "color": GOLD, "tier": 4, "cat": "legendary", "legendary": True},
+    {"key": "overcharge", "name": "Aşırı Yük",      "desc": "BONK hasarı ve alanı çok büyük ölçüde artar", "cost": 240, "cost_mult": 2.2, "max": 4, "icon": "fist", "color": GOLD, "tier": 4, "cat": "legendary", "legendary": True},
+    {"key": "execute_edge", "name": "İnfaz Kenarı", "desc": "Canı çok azalan düşmanları anında infaz eder", "cost": 240, "cost_mult": 2.2, "max": 3, "icon": "sword", "color": GOLD, "tier": 4, "cat": "legendary", "legendary": True},
+    {"key": "titan_shield", "name": "Titan Kalkanı", "desc": "+2 kalkan yükü ve kalıcı zırh (bu koşu)", "cost": 240, "cost_mult": 2.2, "max": 4, "icon": "shield", "color": GOLD, "tier": 4, "cat": "legendary", "legendary": True},
 ]
 SHOP_BY_KEY = {it["key"]: it for it in SHOP_ITEMS}
 
@@ -3438,6 +3585,29 @@ def shop_item_unlocked(item, current_wave):
 
 
 def apply_shop_item(player, key):
+    # --- ÇEKİRDEKLER: tavanı yok, her alımda birikir ---
+    if key == "core_power":
+        player.run_dmg_mult += 0.08
+        return
+    if key == "core_speed":
+        player.run_aspd_mult += 0.06
+        return
+    if key == "core_vitality":
+        player.base_max_hp += 30
+        player.max_hp += 30
+        player.hp = min(player.max_hp, player.hp + 30)   # eklenen can anında dolar
+        return
+    if key == "core_crit":
+        player.crit_chance = clamp(player.crit_chance + 0.03, 0, 0.9)
+        player.crit_dmg_mult += 0.06
+        return
+    if key == "core_guard":
+        player.base_armor = clamp(player.base_armor + 0.02, 0, 0.5)
+        return
+    if key == "core_greed":
+        player.run_coin_mult += 0.12
+        player.run_xp_mult += 0.08
+        return
     if key == "fire":
         player.fire_level += 1
     elif key == "ice":
@@ -3992,6 +4162,34 @@ class Player:
     def eff_xp_mult(self):
         return self.xp_mult * self.run_xp_mult
 
+    def estimated_dps(self):
+        """Oyuncunun patrona karşı kabaca saniyede verebileceği hasar.
+
+        Patron canını oyuncunun GÜCÜNE göre ölçeklemek için kullanılır;
+        böylece patron dövüşü hem yeni başlayan hem de eşyalarını doldurmuş
+        bir oyuncuda yaklaşık aynı süre kadar sürer. Kesin olması gerekmez,
+        büyüklük sırası yeterlidir.
+        """
+        shots = 1 + self.multishot_level
+        cd = max(0.05, self.eff_atk_cd())
+        crit = 1.0 + self.eff_crit_chance() * (self.eff_crit_dmg() - 1.0)
+        dmg = self.eff_dmg()
+        dps = dmg * shots * crit / cd
+        # Tek hedefe (patrona) vururken delme fazladan hasar getirmez; buna
+        # karşılık yan etkiler (zincir, fırtına, yörünge, ateş, zehir, yankı)
+        # kaba bir pay olarak eklenir.
+        extra = 1.0
+        extra += 0.25 * self.echo_level
+        extra += 0.10 * self.chain_level
+        extra += 0.12 * self.storm_level
+        extra += 0.10 * self.orbit_level
+        extra += 0.08 * self.fire_level
+        extra += 0.08 * self.poison_level
+        dps *= extra
+        # BONK: bekleme süresine bölünmüş alan hasarı
+        dps += (dmg * 2.0 * self.bonk_mult) / max(1.0, self.eff_bonk_cd())
+        return max(1.0, dps)
+
     def eff_crit_chance(self):
         return clamp(self.crit_chance + self.run_crit_bonus, 0, 0.9)
 
@@ -4308,7 +4506,7 @@ class Player:
 
 class EnemyProjectile:
     def __init__(self, x, y, vx, vy, dmg, color=(235, 210, 70), r=6, life=4.0,
-                 target=None, turn=0.0, accel=0.0):
+                 target=None, turn=0.0, accel=0.0, owner=None):
         self.x, self.y = x, y
         self.vx, self.vy = vx, vy
         self.dmg = dmg
@@ -4322,6 +4520,8 @@ class EnemyProjectile:
         self.target = target
         self.turn = turn
         self.accel = accel
+        # Mermiyi atan (patron): isabet edince can çalabilmesi için.
+        self.owner = owner
 
     def update(self, dt):
         if self.target is not None and self.turn > 0 and getattr(self.target, "alive", False):
@@ -4599,11 +4799,13 @@ class MarketPortal:
 # =====================================================================
 
 class Hazard:
-    def __init__(self, x, y, r, delay, dmg):
+    def __init__(self, x, y, r, delay, dmg, owner=None):
         self.x, self.y = x, y
         self.r = r
         self.delay = delay
         self.dmg = dmg
+        # Tuzağı kuran (patron): isabet edince can çalabilmesi için.
+        self.owner = owner
         self.t = 0.0
         self.exploded = False
         self.linger = 0.0
@@ -4618,6 +4820,8 @@ class Hazard:
                 p = run.player
                 if p.alive and dist(self.x, self.y, p.x, p.y) < self.r + p.radius - 2:
                     p.take_damage(self.dmg, run.fx, self.x, self.y, "Tuzak")
+                    if self.owner is not None:
+                        self.owner.on_damage_dealt(self.dmg)
                 run.fx.shockwave(self.x, self.y, self.r * 1.15, (255, 90, 70), 0.4, 6)
                 run.fx.burst(self.x, self.y, (255, 140, 70), n=18, speed=200, life=0.5, r=3.5)
                 run.fx.shake(6, 0.2)
@@ -5223,6 +5427,24 @@ BOSS_WAVE_STEP = 5
 BOSS_RING_HAZARD_R = 46
 BOSS_RING_GAP_MIN = 126
 
+# --- PATRON DÖVÜŞÜ SÜRESİ ---------------------------------------------
+# Patron canı artık sabit değil: oyuncunun gücüne göre ölçekleniyor.
+# Amaç, patron dövüşünün oyuncu ne kadar güçlenirse güçlensin yaklaşık
+# BOSS_FIGHT_TARGET saniye sürmesi. Eskiden eşyalarını dolduran bir oyuncu
+# patronu birkaç saniyede eritiyordu.
+#   UPTIME  : oyuncu dövüş boyunca hasarının ancak bu kadarını basabiliyor
+#             (kaçma, konumlanma, bekleme süreleri yüzünden)
+#   CAP     : taban canın en fazla kaç katına çıkılabileceği (emniyet tavanı)
+BOSS_FIGHT_TARGET = 90.0
+BOSS_FIGHT_UPTIME = 0.60
+BOSS_HP_SCALE_MAX = 60.0
+BOSS_HP_SCALE_MIN = 0.30
+# Patronun can çalmasının ÜST SINIRI: saniyede en fazla azami canının bu
+# kadarını geri kazanabilir. Sınır olmasaydı, hasarı düşük bir oyuncuya
+# karşı patron kendini sonsuza kadar iyileştirip dövüşü kazanılamaz hâle
+# getirebilirdi.
+BOSS_LIFESTEAL_CAP = 0.008
+
 BOSS_HP_NERF = 0.85
 BOSS_DMG_NERF = 0.85
 BOSS_TELEGRAPH_EXTRA = 0.40
@@ -5331,6 +5553,30 @@ class Boss:
         # Zehir patronlarda da işler (süresi yoktur, ölene kadar sürer).
         self.poison_dps = 0.0
         self.poison_tick_acc = 0.0
+        # --- CAN ÇALMA ---------------------------------------------------
+        # Oyuncu kan emme eşyalarıyla sürekli can çalıyor ve patronu tek
+        # taraflı olarak eritiyordu. Artık patron da verdiği hasarın bir
+        # kısmını canına ekliyor; dövüş gerçek bir düelloya dönüşüyor.
+        self.lifesteal = clamp(0.20 + 0.05 * (self.boss_index - 1), 0.0, 0.45)
+        self.heal_budget = 0.0         # saniyede yenilenen can çalma bütçesi
+        self.heal_flash = 0.0
+        self.healed_total = 0.0
+        self.fight_time = 0.0          # dövüşün başından beri geçen süre
+
+    def on_damage_dealt(self, amount):
+        """Patron verdiği hasarın bir kısmını canına ekler (can çalma)."""
+        if not self.alive or self.lifesteal <= 0 or amount <= 0:
+            return
+        heal = min(amount * self.lifesteal, self.heal_budget)
+        if heal <= 0:
+            return
+        self.heal_budget -= heal
+        before = self.hp
+        self.hp = min(self.max_hp, self.hp + heal)
+        gained = self.hp - before
+        if gained > 0.5:
+            self.heal_flash = 0.45
+            self.healed_total += gained
 
     def apply_poison(self, dps):
         self.poison_dps += dps
@@ -5350,7 +5596,13 @@ class Boss:
         if not self.alive:
             return
         self.spawn_t += dt
+        self.fight_time += dt
         self.wobble += dt * 3
+        # can çalma bütçesi saniyede yenilenir (en fazla 1 saniyelik birikir)
+        cap = self.max_hp * BOSS_LIFESTEAL_CAP
+        self.heal_budget = min(cap, self.heal_budget + cap * dt)
+        if self.heal_flash > 0:
+            self.heal_flash -= dt
         if self.touch_cd > 0:
             self.touch_cd -= dt
 
@@ -5479,8 +5731,9 @@ class Boss:
             if dist(self.x, self.y, player.x, player.y) < self.hit_r + player.radius - 3:
                 self.touch_cd = 0.42
                 # Hücum eden KOLOS'a çarpmak sıradan temastan çok daha acıtır.
-                player.take_damage(self.dmg * (1.7 if self.charge_t > 0 else 1.0),
-                                   fx, self.x, self.y, self.name)
+                touch_dmg = self.dmg * (1.7 if self.charge_t > 0 else 1.0)
+                player.take_damage(touch_dmg, fx, self.x, self.y, self.name)
+                self.on_damage_dealt(touch_dmg)
 
     def _summon_minions(self, fx):
         """Boss'un yanına yeni, daha küçük yaratıklar doğurur ve oyuncudan
@@ -5571,7 +5824,7 @@ class Boss:
         projectiles.append(EnemyProjectile(
             self.x, self.y, math.cos(ang) * speed, math.sin(ang) * speed,
             self.dmg * dmg_k * self._ranged_dmg_k(), color=color or self.color, r=r,
-            target=target, turn=turn, accel=accel))
+            target=target, turn=turn, accel=accel, owner=self))
 
     def _fire_volley(self, player, fx, projectiles):
         """Her patronun kendine özgü MENZİLLİ saldırısı.
@@ -5710,7 +5963,7 @@ class Boss:
             angs = a if isinstance(a, (list, tuple)) else [a]
             for ang in angs:
                 projectiles.append(EnemyProjectile(self.x, self.y, math.cos(ang) * speed, math.sin(ang) * speed,
-                                                    self.dmg * 0.9, color=self.color, r=8))
+                                                    self.dmg * 0.9, color=self.color, r=8, owner=self))
                 fx.bolt([(self.x, self.y), (self.x + math.cos(ang) * 60, self.y + math.sin(ang) * 60)],
                         self.color, 0.2)
             sfx("shoot_c", 0.6, 0.0)
@@ -5722,7 +5975,7 @@ class Boss:
                 hy = self.y + math.sin(ang) * 150
                 hx = clamp(hx, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
                 hy = clamp(hy, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
-                hazards.append(Hazard(hx, hy, 56, 0.9, self.dmg * 1.0))
+                hazards.append(Hazard(hx, hy, 56, 0.9, self.dmg * 1.0, owner=self))
         elif kind == "ring_player":
             # LANET ÇEMBERİ: oyuncunun çevresine kapanan halka. Oyuncu ya
             # ortada kalır ya da halkadaki boşluktan kaçar — ama artık
@@ -5732,7 +5985,7 @@ class Boss:
                 ang = i * math.tau / n + random.uniform(-0.05, 0.05)
                 hx = clamp(a + math.cos(ang) * c, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
                 hy = clamp(b + math.sin(ang) * c, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
-                hazards.append(Hazard(hx, hy, BOSS_RING_HAZARD_R, 0.45, self.dmg * 0.80))
+                hazards.append(Hazard(hx, hy, BOSS_RING_HAZARD_R, 0.45, self.dmg * 0.80, owner=self))
             fx.shockwave(a, b, c, self.color, 0.45, 6)
         elif kind == "barrage":
             # YAĞMUR: telgraflanan yöne doğru sıkı ve hızlı bir mermi yelpazesi.
@@ -5756,7 +6009,7 @@ class Boss:
             sfx("bonk", 0.6, 0.0)
         elif kind == "scythe":
             # ORAK: hedefin üstüne geniş, hızlı inen bir biçme darbesi.
-            hazards.append(Hazard(a, b, c, 0.04, self.dmg * 1.25))
+            hazards.append(Hazard(a, b, c, 0.04, self.dmg * 1.25, owner=self))
             fx.shockwave(a, b, c, self.color, 0.3, 5)
             fx.shake(8, 0.22)
             sfx("bonk", 0.7, 0.0)
@@ -5768,15 +6021,15 @@ class Boss:
                 rad = random.uniform(40, 130)
                 hx = clamp(a + math.cos(ang) * rad, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
                 hy = clamp(b + math.sin(ang) * rad, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
-                hazards.append(Hazard(hx, hy, 50, 0.2 + i * 0.12, self.dmg * 0.85))
+                hazards.append(Hazard(hx, hy, 50, 0.2 + i * 0.12, self.dmg * 0.85, owner=self))
         elif kind == "slam":
-            hazards.append(Hazard(a, b, c, 0.05, self.dmg * 1.5))
+            hazards.append(Hazard(a, b, c, 0.05, self.dmg * 1.5, owner=self))
             fx.shake(10, 0.3)
             if self.enraged:
                 # öfkeliyken iki gecikmeli darbe daha gelir
                 for k in range(2):
                     hazards.append(Hazard(a + random.uniform(-80, 80), b + random.uniform(-80, 80),
-                                           c * 0.8, 0.3 + k * 0.28, self.dmg * 1.15))
+                                           c * 0.8, 0.3 + k * 0.28, self.dmg * 1.15, owner=self))
 
     def take_damage(self, amount, crit, fx, kx=0.0, ky=0.0):
         # Patron zırhı gelen hasarın sabit bir yüzdesini keser.
@@ -5919,19 +6172,54 @@ class Boss:
                     fy_ = y + math.sin(ang) * (60 + i * 46) * (0.5 + k)
                     pygame.draw.circle(surf, (255, 150, 90), (int(fx_), int(fy_)), max(2, int(5 * k)), 2)
 
-        # HP bar (üst, isim + zırh bilgisi ile)
+        # HP bar (üst, isim + zırh + dövüş süresi ile)
         w = 340
         bx, by = x - w / 2, y - r - 30
         draw_bar(surf, (bx, by, w, 10), self.hp / self.max_hp, (220, 70, 70))
+        # can çaldığında çubuğun üstünde yeşil bir parıltı belirir
+        if self.heal_flash > 0:
+            k = clamp(self.heal_flash / 0.45, 0, 1)
+            gs = pygame.Surface((int(w), 10), pygame.SRCALPHA)
+            pygame.draw.rect(gs, (90, 230, 140, int(120 * k)), gs.get_rect(), border_radius=5)
+            surf.blit(gs, (int(bx), int(by)))
+            draw_text(surf, "CAN ÇALDI", (bx + w + 6, by + 12), 10, (120, 230, 160),
+                      bold=True, shadow=False)
         label = self.name
         if self.desperate:
             label += "  ·  ÇARESİZ"
         elif self.enraged:
             label += "  ·  ÖFKELİ"
         draw_text(surf, label, (x, by - 13), 14, GOLD, bold=True, center=True)
+        draw_text(surf, fmt_time(self.fight_time), (bx - 6, by - 4), 11, TEXT_DIM,
+                  bold=True, shadow=False, right=True)
         if self.armor > 0.005:
             draw_text(surf, f"ZIRH %{int(self.armor * 100)}", (bx + w + 6, by - 2), 11,
                       (170, 190, 220), bold=True, shadow=False)
+
+
+def scale_bosses_to_player(bosses, player):
+    """Dalgadaki TÜM patronların TOPLAM canını oyuncunun gücüne göre ölçekler.
+
+    Amaç: patron dövüşü, oyuncunun eşya durumundan bağımsız olarak yaklaşık
+    BOSS_FIGHT_TARGET saniye sürsün. Eşyalarını dolduran bir oyuncu patronu
+    birkaç saniyede eritiyor, yeni başlayan ise dakikalarca uğraşıyordu.
+
+    Ölçek TOPLAM üzerinden hesaplanır: iki patronlu bir dalgada her patrona
+    ayrı ayrı tam hedef verilseydi dövüş iki katı sürerdi.
+    """
+    if not bosses:
+        return 1.0
+    try:
+        est = player.estimated_dps()
+    except Exception:
+        return 1.0
+    base_total = sum(b.max_hp for b in bosses)
+    want = est * BOSS_FIGHT_UPTIME * BOSS_FIGHT_TARGET
+    scale = clamp(want / max(1.0, base_total), BOSS_HP_SCALE_MIN, BOSS_HP_SCALE_MAX)
+    for b in bosses:
+        b.max_hp *= scale
+        b.hp = b.max_hp
+    return scale
 
 
 # =====================================================================
@@ -5942,8 +6230,8 @@ class Boss:
 # Oyuncu 10 saniyelik yoğunluk penceresinde zaten bolca skor topluyor;
 # bu ek olmadan dalgalar art arda atlıyor. Tek yerden ayarlanabilsin diye sabit.
 WAVE_BREATHER_FROM = 10     # bu dalgadan itibaren uygulanır
-WAVE_BREATHER_BASE = 500    # 10. dalgada eklenen skor
-WAVE_BREATHER_STEP = 180    # her sonraki dalgada üstüne eklenen skor
+WAVE_BREATHER_BASE = 380    # 10. dalgada eklenen skor
+WAVE_BREATHER_STEP = 150    # her sonraki dalgada üstüne eklenen skor
 
 # Dalga hedeflerinin GENEL çarpanı — dalgaların ne kadar süreceğini belirleyen
 # tek düğme. Dalga atlayınca gelen 10 saniyelik yoğunluk penceresinde oyuncu
@@ -5960,43 +6248,57 @@ WAVE_SCALE_RAMP = {1: 0.62, 2: 0.74, 3: 0.84, 4: 0.93}
 def wave_score_goal(wave, pace=1.0):
     """Bir sonraki dalgaya geçmek için o dalga içinde toplanması gereken SKOR.
 
-    Dalgalar artık sadece süreyle ilerlemiyor: oyuncunun o dalgada belirli bir
-    skoru toplaması gerekiyor. Böylece dalga 1 aniden bitip 2'ye atlamıyor,
-    oyuncu gerçekten "dalgayı temizlemiş" oluyor.
+    ÖNEMLİ — ZORLUK ARTIK HEDEFİ DEĞİŞTİRMEZ.
+    Normal, Zor ve Kabus'ta aynı dalgaya aynı skorla ulaşılır. Zorluk yalnızca
+    düşmanların ne kadar hızlı ve kalabalık geldiğini belirler. Eskiden hedef
+    `pace ** 0.6` ile büyütülüyordu; bu, Kabus'u "daha hızlı" değil "daha
+    UZUN" yapıyordu — oysa Kabus oynayan oyuncunun beklentisi tam tersi:
+    "ben bu oyunu biliyorum, hadi çabuk gelin". Artık Kabus'ta aynı sürede
+    çok daha fazla düşman geldiği için aynı dalgaya kendiliğinden daha çabuk
+    ulaşılır.
 
-    Eğri bilinçli olarak iki bölümlü:
-      * İlk 3 dalga daha yüksek katsayılı -> açılış bölümü uzun ve öğretici.
-      * Geç dalgalar daha düşük katsayılı -> oyun tıkanmıyor, patronlara
-        (10, 15, 20 ...) makul sürede ulaşılıyor.
+    `pace` parametresi yalnızca geriye dönük uyumluluk için duruyor; hesaba
+    KATILMAZ.
 
-    `pace` (zorluk temposu) hedefi yumuşak biçimde etkiler: Kabus'ta düşmanlar
-    çok daha sık geldiği için skor da hızlı birikir; hedef hiç ayarlanmazsa
-    dalgalar 8-9 saniyede bitip birbirine karışır. pace**0.6 ile Kabus hâlâ
-    Normal'in yaklaşık iki katı hızlı ilerler, ama dalgalar ayırt edilebilir
-    uzunlukta kalır.
+    Eğri: ilk dalgalar kısa ve akıcı (oyun hemen başlasın), orta ve geç
+    dalgalar kademeli olarak uzar.
     """
     w = max(1, int(wave))
-    # spawn modeliyle aynı kademeler: aynı anda kaç düşman geliyorsa dalgada
+    # Spawn modeliyle aynı kademeler: aynı anda kaç düşman geliyorsa o dalgada
     # toplanabilecek skor da o oranda artar.
-    burst = 1 if w < 4 else 2 if w < 9 else 3 if w < 16 else 4 if w < 24 else 5
-    base = (150 + 26 * w) * burst
-    # Orta ve geç dalgalarda katsayı bilinçli olarak yüksek tutuldu: eskiden
-    # 10-11-12-13 gibi dalgalar birbiri ardına saniyeler içinde geçiyordu.
-    # Artık her dalga gözle görülür bir "nefes aralığı" kadar sürüyor.
-    shape = 2.44 if w <= 3 else (1.72 if w <= 8 else 1.55)
-    # Genel çarpan: ilk dalgalarda kademeli, 5. dalgadan sonra tam güçte.
-    goal = base * shape * WAVE_GOAL_SCALE * WAVE_SCALE_RAMP.get(w, 1.0)
+    burst = 1 if w < 3 else 2 if w < 6 else 3 if w < 10 else 4 if w < 16 else 5
+    base = (95 + 22 * w) * burst
+    shape = 1.0 if w <= 5 else (1.18 if w <= 10 else 1.30)
+    goal = base * shape
     # 10. dalgadan sonra ayrıca sabit bir "nefes payı" eklenir.
     if w >= WAVE_BREATHER_FROM:
         goal += WAVE_BREATHER_BASE + (w - WAVE_BREATHER_FROM) * WAVE_BREATHER_STEP
-    return int(goal * (max(0.3, pace) ** 0.6))
+    return int(goal)
 
 
 # Dalga atlandıktan sonraki "yoğunluk" penceresi: bu süre boyunca düşmanlar
 # belirgin biçimde daha sık ve daha kalabalık gelir, sonra tempo normale döner.
-SURGE_DURATION = 10.0
+SURGE_DURATION = 8.0
 SURGE_RATE = 0.62      # spawn aralığı çarpanı (küçük = daha sık)
 SURGE_EXTRA = 1        # her spawn'da kaç ek düşman
+
+# --- DALGA İÇİ HIZLANMA ---------------------------------------------
+# Oyun artık yalnızca dalga atlayınca hızlanmıyor. AYNI dalga içinde de
+# zaman geçtikçe düşmanlar kademeli olarak daha sık geliyor; böylece bir
+# dalga asla "durgunlaşmıyor", baskı sürekli ve hissedilir biçimde artıyor.
+#   spawn_aralığı /= 1 + min(WAVE_ACCEL_MAX, dalga_süresi * WAVE_ACCEL_RATE)
+WAVE_ACCEL_RATE = 0.030   # saniye başına hızlanma
+WAVE_ACCEL_MAX = 1.10     # en fazla 2.1 kat hızlanır
+# Dalga uzadıkça her dalgada gelen düşman sayısı da artar (kaç saniyede bir
+# ek düşman eklendiği).
+WAVE_ACCEL_EXTRA_AFTER = 26.0
+
+# Arenada aynı anda yaşayabilecek AZAMİ düşman sayısı.
+# Dalga içi hızlanma, oyuncu düşmanları temizleyemediğinde sınırsız birikime
+# yol açabilirdi; bu da kare hızını (FPS) yere serer. Sınır dolduğunda yeni
+# düşman doğmaz — oyuncu biraz temizleyince spawn kendiliğinden devam eder.
+def max_alive_enemies(wave):
+    return int(min(210, 70 + wave * 4))
 
 
 class WaveManager:
@@ -6016,7 +6318,7 @@ class WaveManager:
         # --- skor tabanlı ilerleme ---
         self.wave_start_score = 0      # bu dalgaya girerken oyuncunun skoru
         self.wave_score = 0            # bu dalgada toplanan skor
-        self.wave_goal = wave_score_goal(1, self.pace)
+        self.wave_goal = wave_score_goal(1)
         # --- yoğunluk (surge) penceresi ---
         self.surge_timer = 0.0
 
@@ -6050,7 +6352,7 @@ class WaveManager:
         self.wave_time = 0.0
         self.wave_start_score = total_score
         self.wave_score = 0
-        self.wave_goal = wave_score_goal(new_wave, self.pace)
+        self.wave_goal = wave_score_goal(new_wave)
         self.wave_duration = min(42 / self.pace, self.wave_duration + 1.1 / self.pace)
         self.surge_timer = SURGE_DURATION
         self.announce_timer = 2.2
@@ -6102,24 +6404,33 @@ class WaveManager:
 
         # Zorluk artık düşman istatistiklerini değil yalnızca TEMPOyu (pace)
         # etkiler — spawn hızı tamamen self.pace üzerinden belirlenir.
-        base_interval = max(0.32, 1.45 - self.wave * 0.042) / self.pace
+        # Taban aralık kısaltıldı: ilk dalgalarda oyun "boş" hissettiriyordu.
+        base_interval = max(0.28, 1.15 - self.wave * 0.035) / self.pace
+        # DALGA İÇİ HIZLANMA: aynı dalgada bile tempo sürekli artar.
+        base_interval /= (1.0 + min(WAVE_ACCEL_MAX, self.wave_time * WAVE_ACCEL_RATE))
         if self.surge_active():
             base_interval *= SURGE_RATE
         self.spawn_timer -= dt
         if self.spawn_timer <= 0:
             self.spawn_timer = base_interval
+            # Kalabalık tavanı: arena tıkanmışsa bu turda yeni düşman doğmaz.
+            if len(enemies) >= max_alive_enemies(self.wave):
+                return wave_changed
             # Geç dalgalarda yalnızca hasar değil, düşman YOĞUNLUĞU da artar —
             # maksimum eşyalı bir oyuncu bile kalabalığa yenik düşebilsin.
-            if self.wave < 4:
+            if self.wave < 3:
                 count = 1
-            elif self.wave < 9:
+            elif self.wave < 6:
                 count = 2
-            elif self.wave < 16:
+            elif self.wave < 10:
                 count = 3
-            elif self.wave < 24:
+            elif self.wave < 16:
                 count = 4
             else:
                 count = 5
+            # Dalga uzadıkça kalabalık da büyür (dalga içi hızlanmanın
+            # ikinci ayağı) — oyuncu oyalanırsa baskı gerçekten artar.
+            count += int(self.wave_time // WAVE_ACCEL_EXTRA_AFTER)
             if self.surge_active():
                 count += SURGE_EXTRA
             for _ in range(count):
@@ -6547,6 +6858,9 @@ class RunState:
                     bx = ARENA_RECT.centerx - span / 2 + span * i / max(1, n_boss - 1)
                 by = ARENA_RECT.top + 100
                 self.bosses.append(Boss(kind, bx, by, hp_mult, 1.0, wave))
+            # Patron canı oyuncunun gücüne göre ölçeklenir: dövüş, oyuncu ne
+            # kadar güçlenirse güçlensin benzer uzunlukta sürsün.
+            scale_bosses_to_player(self.bosses, p)
             self.fx.do_flash((255, 60, 50), 0.4)
             if n_boss > 1:
                 self.fx.popup(ARENA_RECT.centerx, ARENA_RECT.top + 60,
@@ -6591,6 +6905,9 @@ class RunState:
             if proj.alive and p.alive:
                 if dist(proj.x, proj.y, p.x, p.y) < proj.r + p.radius:
                     p.take_damage(proj.dmg, self.fx, proj.x, proj.y, "mermi")
+                    owner = getattr(proj, "owner", None)
+                    if owner is not None:
+                        owner.on_damage_dealt(proj.dmg)
                     proj.alive = False
         self.enemy_projectiles = [pr for pr in self.enemy_projectiles if pr.alive]
 
@@ -7308,7 +7625,11 @@ class RunShopOverlay:
                 for j, ln in enumerate(lines[:3]):
                     draw_text(surf, ln, (rect.centerx, rect.y + 108 + j * 14), 11, TEXT_DIM, center=True, shadow=False)
                 if not item.get("instant"):
-                    draw_text(surf, f"Seviye {lvl}/{item['max']}", (rect.centerx, rect.y + 166), 11, TEXT_DIM, center=True, shadow=False)
+                    if item.get("endless"):
+                        draw_text(surf, f"Seviye {lvl}  ·  tavanı yok", (rect.centerx, rect.y + 166),
+                                  11, (198, 180, 120), bold=True, center=True, shadow=False)
+                    else:
+                        draw_text(surf, f"Seviye {lvl}/{item['max']}", (rect.centerx, rect.y + 166), 11, TEXT_DIM, center=True, shadow=False)
                 if maxed:
                     draw_text(surf, "MAKSİMUM", (rect.centerx, rect.bottom - 18), 13, GREEN, bold=True, center=True)
                 else:
@@ -7353,12 +7674,16 @@ STATE_HOW_TO = "howto"
 STATE_SETTINGS = "settings"
 STATE_ACHIEVEMENTS = "achievements"
 STATE_DAILY_REWARDS = "daily_rewards"
+STATE_GEM_STORE = "gem_store"
 
 DIFF_ORDER = ["normal", "hard", "nightmare"]
 DIFF_LABEL = {"normal": "NORMAL", "hard": "ZOR", "nightmare": "KABUS"}
-DIFF_DESC = {"normal": "Sakin tempo. Dalgalar ve düşmanlar daha yavaş gelir.",
-             "hard": "Standart tempo. Düşmanlar normal hızda gelir.",
-             "nightmare": "Yoğun tempo. Düşmanlar çok daha hızlı gelir — ödüller aynı!"}
+# Zorluk yalnızca TEMPOyu değiştirir. Dalga hedefleri, düşman canı/hasarı ve
+# ödüller her zorlukta AYNIDIR; Kabus'ta düşmanlar çok daha sık geldiği için
+# aynı dalgaya daha çabuk ulaşılır.
+DIFF_DESC = {"normal": "Sakin tempo. Düşmanlar daha seyrek gelir — dalgalar aynı.",
+             "hard": "Standart tempo. Düşmanlar normal sıklıkta gelir.",
+             "nightmare": "Yoğun tempo. Aynı dalgalar, çok daha hızlı gelen düşmanlar!"}
 
 
 class App:
@@ -7403,6 +7728,12 @@ class App:
         self.wheel_popup_amount = 0
         self.market_anim = 0.0        # GÜNLÜK MARKET kartı hover animasyonu
         self.market_was_hover = False
+        self.gem_card_anim = 0.0      # ELMAS MARKETİ kartı hover animasyonu
+        self.gem_card_was_hover = False
+        self.purchase = PurchaseBridge(self.steam)
+        self.gem_msg = None           # satın alma sonucu bildirimi
+        self.gem_msg_timer = 0.0
+        self.gem_msg_ok = True
         self.claim_all_count = 0      # "tümünü topla" bildirimi için sayaç
         self.menu_buttons = []
         self.build_menu_buttons()
@@ -7560,6 +7891,7 @@ class App:
             elif self.state == STATE_HOW_TO: self.update_howto(dt, mouse_pos, clicked)
             elif self.state == STATE_ACHIEVEMENTS: self.update_achievements(dt, mouse_pos, clicked, wheel_y)
             elif self.state == STATE_DAILY_REWARDS: self.update_daily_rewards(dt, mouse_pos, clicked)
+            elif self.state == STATE_GEM_STORE: self.update_gem_store(dt, mouse_pos, clicked)
 
             if CFG["fps"]:
                 draw_text(self.display.canvas, f"{self.fps_smpl:0.0f} FPS", (VIRTUAL_W - 10, VIRTUAL_H - 10),
@@ -7580,7 +7912,7 @@ class App:
         elif self.state == STATE_BOOK_MARKET and self.book_detail:
             self.book_detail = None
         elif self.state in (STATE_SKIN_MARKET, STATE_COSMETIC_MARKET, STATE_BOOK_MARKET,
-                            STATE_LEADERBOARD, STATE_WORLD_LB,
+                            STATE_LEADERBOARD, STATE_WORLD_LB, STATE_GEM_STORE,
                             STATE_HOW_TO, STATE_ACHIEVEMENTS, STATE_DAILY_REWARDS):
             if self.ad_watch_active:
                 return
@@ -7972,7 +8304,8 @@ class App:
                   GREEN if self.online.enabled else TEXT_DIM, center=True, shadow=False)
         draw_text(canvas, f"v{GAME_VERSION}   F11: Tam Ekran   F3: FPS   ESC: Geri", (VIRTUAL_W / 2, VIRTUAL_H - 24), 12, TEXT_DIM, center=True, shadow=False)
 
-        # ---- sağ alt köşe: GÜNLÜK MARKET kartı ----
+        # ---- alt şerit: solda ELMAS MARKETİ, sağda GÜNLÜK MARKET ----
+        self.draw_gem_store_card(canvas, dt, mouse_pos, clicked)
         self.draw_daily_market_card(canvas, dt, mouse_pos, clicked)
 
     # ---------------- GÜNLÜK MARKET KARTI (ana menü, sağ alt) ----------------
@@ -8042,18 +8375,25 @@ class App:
                           bold=True, center=True, shadow=False)
         return day, pos
 
-    def draw_daily_market_card(self, canvas, dt, mouse_pos, clicked):
-        """
-        Ana menünün sağ alt köşesindeki GÜNLÜK MARKET kutusu.
+    # Ana menünün alt şeridindeki iki KARE kart: solda ELMAS MARKETİ,
+    # sağda GÜNLÜK MARKET. Boyut, üstteki menü sütunlarına değmeyecek
+    # şekilde seçildi (sütunlar 514'te bitiyor).
+    MENU_CARD = 178
+    MENU_CARD_Y = 524
+    MENU_CARD_MARGIN = 26
 
-        Dört bölgeli bir kart:
-          1) Başlık şeridi     : market rozeti + başlık + gece yarısı geri sayımı
-          2) Giriş serisi      : 7 günlük şerit — bugünün kaçıncı gün olduğu
-          3) Günlük ilerleme   : bugün toplanan ödül sayısı + çubuk
-          4) Eylem             : hazır ödül ikonları + tek bir CTA düğmesi
+    def _menu_card_rect(self, side):
+        s, y, m = self.MENU_CARD, self.MENU_CARD_Y, self.MENU_CARD_MARGIN
+        x = m if side == "left" else VIRTUAL_W - m - s
+        return pygame.Rect(x, y, s, s)
+
+    def draw_daily_market_card(self, canvas, dt, mouse_pos, clicked):
+        """Ana menünün SAĞ ALT köşesindeki KARE GÜNLÜK MARKET kartı.
+
+        Dört bölge: başlık, giriş serisi (kaçıncı gün + 7 günlük şerit),
+        bugünkü ilerleme çubuğu ve tek bir eylem düğmesi.
         """
-        CARD_W, CARD_H, MARGIN = 400, 172, 18
-        rect = pygame.Rect(VIRTUAL_W - CARD_W - MARGIN, VIRTUAL_H - CARD_H - MARGIN, CARD_W, CARD_H)
+        rect = self._menu_card_rect("right")
 
         ready_icons = self.save.daily_ready_icons()
         ready_n = len(ready_icons)
@@ -8061,115 +8401,158 @@ class App:
         claimed_n = self.save.daily_claimed_count()
         total_n = self.save.daily_task_total()
         all_done = claimed_n >= total_n
-        gems_now = self.save.daily_gems_available_now()
 
-        # ---- hover animasyonu (kart yukarı doğru hafifçe kalkar) ----
         hover = rect.collidepoint(mouse_pos)
         if hover and not self.market_was_hover:
             sfx("hover", 0.4, 0.05)
         self.market_was_hover = hover
         self.market_anim += ((1.0 if hover else 0.0) - self.market_anim) * min(1.0, dt * 12)
-        lift = self.market_anim * 4
-        rect = rect.move(0, -lift)
+        rect = rect.move(0, -self.market_anim * 4)
 
         accent = GOLD if has_reward else (GREEN if all_done else (86, 92, 122))
         pulse = (math.sin(self.t * 3.2) * 0.5 + 0.5) if has_reward else 0.0
 
-        # ---- gölge + dış parlama ----
-        # Gölge yalnızca aşağı/yanlara taşar — üstteki menü düğmelerine değmez.
         shadow = pygame.Surface((rect.w + 20, rect.h + 20), pygame.SRCALPHA)
         pygame.draw.rect(shadow, (0, 0, 0, 90), shadow.get_rect(), border_radius=22)
         canvas.blit(shadow, (rect.x - 10, rect.y - 2))
         if has_reward:
-            add_glow(canvas, rect.centerx, rect.centery, 130, GOLD,
+            add_glow(canvas, rect.centerx, rect.centery, 118, GOLD,
                      0.09 + pulse * 0.06 + self.market_anim * 0.06)
 
-        # ---- gövde ----
         body_bg = (34, 30, 22) if (has_reward and hover) else ((26, 24, 20) if has_reward else (20, 21, 32))
         panel(canvas, rect, bg=body_bg, edge=accent, alpha=250, radius=18, edge_w=2)
-
-        strip = pygame.Surface((rect.w - 26, 3), pygame.SRCALPHA)
+        strip = pygame.Surface((rect.w - 24, 3), pygame.SRCALPHA)
         pygame.draw.rect(strip, (*accent, 120 + int(pulse * 80)), strip.get_rect(), border_radius=2)
-        canvas.blit(strip, (rect.x + 13, rect.y + 6))
+        canvas.blit(strip, (rect.x + 12, rect.y + 7))
 
-        pl, pr_ = rect.x + 18, rect.right - 18
+        pl, pr_ = rect.x + 14, rect.right - 14
 
-        # =============== 1) BAŞLIK ŞERİDİ ===============
-        bx, by, badge_r = rect.x + 40, rect.y + 38, 20
-        add_glow(canvas, bx, by, 30, GEM_COLOR, 0.26 + pulse * 0.28)
-        pygame.draw.circle(canvas, (13, 14, 22), (int(bx), int(by)), badge_r)
-        pygame.draw.circle(canvas, accent, (int(bx), int(by)), badge_r, 2)
-        draw_icon(canvas, bx, by, "gem", GEM_COLOR, 12)
-
-        tx = rect.x + 70
-        draw_text(canvas, "GÜNLÜK MARKET", (tx, rect.y + 24), 17,
-                  accent if (has_reward or all_done) else TEXT, bold=True, shadow=False)
-        draw_text(canvas, f"Yenilenmesine {fmt_hms(seconds_to_midnight())}",
-                  (tx, rect.y + 46), 11, TEXT_DIM, shadow=False)
-
-        # sağ üst: hazır ödül sayacı rozeti
+        # ---- başlık ----
+        bx, by = rect.x + 27, rect.y + 32
+        tcol = accent if (has_reward or all_done) else TEXT
+        add_glow(canvas, bx, by, 24, GEM_COLOR, 0.24 + pulse * 0.26)
+        pygame.draw.circle(canvas, (13, 14, 22), (int(bx), int(by)), 14)
+        pygame.draw.circle(canvas, accent, (int(bx), int(by)), 14, 2)
+        draw_icon(canvas, bx, by, "gem", GEM_COLOR, 9)
+        draw_text(canvas, "GÜNLÜK", (rect.x + 46, rect.y + 14), 12, tcol, bold=True, shadow=False)
+        draw_text(canvas, "MARKET", (rect.x + 46, rect.y + 27), 12, tcol, bold=True, shadow=False)
+        draw_text(canvas, fmt_hms(seconds_to_midnight()), (rect.x + 46, rect.y + 41), 9,
+                  TEXT_DIM, shadow=False)
         if has_reward:
-            bw = max(30, text_width(str(ready_n), 13, True) + 20)
-            br = pygame.Rect(rect.right - bw - 16, rect.y + 18, bw, 22)
+            br = pygame.Rect(pr_ - 22, rect.y + 13, 22, 20)
             bs = pygame.Surface(br.size, pygame.SRCALPHA)
-            pygame.draw.rect(bs, (*RED, 235), bs.get_rect(), border_radius=11)
+            pygame.draw.rect(bs, (*RED, 235), bs.get_rect(), border_radius=10)
             canvas.blit(bs, br.topleft)
-            draw_text(canvas, str(ready_n), br.center, 13, WHITE, bold=True, center=True, shadow=False)
-        else:
-            draw_icon(canvas, rect.right - 30, rect.y + 29, "star", GREEN, 9)
+            draw_text(canvas, str(ready_n), br.center, 12, WHITE, bold=True, center=True, shadow=False)
 
-        # =============== 2) GİRİŞ SERİSİ ŞERİDİ ===============
-        day, pos = self._draw_streak_strip(
-            canvas, pygame.Rect(pl + 76, rect.y + 64, pr_ - pl - 76, 24))
-        draw_text(canvas, "SERİ", (pl, rect.y + 64), 10, TEXT_DIM, bold=True, shadow=False)
-        draw_text(canvas, f"{day}. GÜN", (pl, rect.y + 76), 13, GOLD, bold=True, shadow=False)
+        pygame.draw.line(canvas, (52, 56, 78), (pl, rect.y + 56), (pr_, rect.y + 56), 1)
 
-        # =============== 3) GÜNLÜK İLERLEME ===============
-        draw_text(canvas, "BUGÜNKÜ İLERLEME", (pl, rect.y + 98), 10, TEXT_DIM, bold=True, shadow=False)
-        draw_text(canvas, f"{claimed_n}/{total_n}", (pr_, rect.y + 97), 12,
+        # ---- giriş serisi ----
+        day, _pos = self._draw_streak_strip(
+            canvas, pygame.Rect(pl, rect.y + 88, pr_ - pl, 18))
+        draw_text(canvas, "GİRİŞ SERİSİ", (pl, rect.y + 60), 9, TEXT_DIM, bold=True, shadow=False)
+        draw_text(canvas, f"{day}. GÜN", (pl, rect.y + 70), 16, GOLD, bold=True, shadow=False)
+
+        # ---- bugünkü ilerleme ----
+        draw_text(canvas, "BUGÜN", (pl, rect.y + 112), 9, TEXT_DIM, bold=True, shadow=False)
+        draw_text(canvas, f"{claimed_n}/{total_n}", (pr_, rect.y + 111), 10,
                   GREEN if all_done else TEXT, bold=True, shadow=False, right=True)
-        bar = pygame.Rect(pl, rect.y + 112, pr_ - pl, 7)
-        draw_bar(canvas, bar, claimed_n / max(1, total_n),
-                 GREEN if all_done else accent,
-                 bg=(13, 14, 22), border=(48, 52, 74), radius=4)
+        draw_bar(canvas, pygame.Rect(pl, rect.y + 124, pr_ - pl, 6),
+                 claimed_n / max(1, total_n), GREEN if all_done else accent,
+                 bg=(13, 14, 22), border=(48, 52, 74), radius=3)
 
-        # =============== 4) EYLEM ===============
-        cta = pygame.Rect(pl, rect.y + 128, pr_ - pl, 28)
-
+        # ---- eylem ----
+        cta = pygame.Rect(pl, rect.y + 136, pr_ - pl, 28)
+        cs = pygame.Surface(cta.size, pygame.SRCALPHA)
         if has_reward:
-            # hazır ödüllerin mini ikonları, CTA'nın solunda tek satırda
-            icon_x = pl + 9
-            for ic in ready_icons[:5]:
-                pygame.draw.circle(canvas, (13, 14, 22), (int(icon_x), int(cta.centery)), 10)
-                pygame.draw.circle(canvas, (78, 72, 50), (int(icon_x), int(cta.centery)), 10, 1)
-                draw_icon(canvas, icon_x, cta.centery, ic, accent, 7)
-                icon_x += 22
-            glow_k = 0.5 + pulse * 0.3 + self.market_anim * 0.2
-            btn = pygame.Rect(icon_x + 4, cta.y, cta.right - icon_x - 4, cta.h)
-            cs = pygame.Surface(btn.size, pygame.SRCALPHA)
             base = (196, 156, 58) if hover else (150, 118, 40)
             pygame.draw.rect(cs, (*base, 250), cs.get_rect(), border_radius=14)
-            pygame.draw.rect(cs, (255, 255, 255, 55 + int(glow_k * 95)), cs.get_rect(),
-                             width=2, border_radius=14)
-            canvas.blit(cs, btn.topleft)
-            gem_txt = f"{ready_n} ÖDÜL  ·  ≈{fmt_num(gems_now)}"
-            draw_icon(canvas, btn.x + 14, btn.centery, "gem", (255, 250, 236), 6)
-            draw_text(canvas, gem_txt, (btn.centerx + 8, btn.centery - 7), 12,
+            pygame.draw.rect(cs, (255, 255, 255, 55 + int((pulse * 0.3 + 0.5) * 95)),
+                             cs.get_rect(), width=2, border_radius=14)
+            canvas.blit(cs, cta.topleft)
+            draw_text(canvas, f"{ready_n} ÖDÜLÜ TOPLA  »", cta.center, 12,
                       (255, 250, 236), bold=True, center=True, shadow=False)
         else:
-            cs = pygame.Surface(cta.size, pygame.SRCALPHA)
             pygame.draw.rect(cs, (26, 44, 32, 235) if all_done else (30, 33, 48, 235),
                              cs.get_rect(), border_radius=14)
-            pygame.draw.rect(cs, (255, 255, 255, 40 + int(self.market_anim * 60)), cs.get_rect(),
-                             width=2, border_radius=14)
+            pygame.draw.rect(cs, (255, 255, 255, 40 + int(self.market_anim * 60)),
+                             cs.get_rect(), width=2, border_radius=14)
             canvas.blit(cs, cta.topleft)
-            label = ("BUGÜNÜN TÜM ÖDÜLLERİ ALINDI  »" if all_done
-                     else "GÖREVLERİ GÖRÜNTÜLE  »")
-            draw_text(canvas, label, cta.center, 12, GREEN if all_done else TEXT_DIM,
+            draw_text(canvas, "HEPSİ ALINDI" if all_done else "GÖREVLERİ GÖR  »",
+                      cta.center, 11, GREEN if all_done else TEXT_DIM,
                       bold=True, center=True, shadow=False)
 
         if clicked and hover:
             self.goto(STATE_DAILY_REWARDS)
+            sfx("click", 0.6, 0.0)
+
+    # ---------------- ELMAS MARKETİ KARTI (ana menü, sol alt) ----------------
+    def draw_gem_store_card(self, canvas, dt, mouse_pos, clicked):
+        """Ana menünün SOL ALT köşesindeki KARE ELMAS MARKETİ kartı."""
+        rect = self._menu_card_rect("left")
+        hover = rect.collidepoint(mouse_pos)
+        if hover and not self.gem_card_was_hover:
+            sfx("hover", 0.4, 0.05)
+        self.gem_card_was_hover = hover
+        self.gem_card_anim += ((1.0 if hover else 0.0) - self.gem_card_anim) * min(1.0, dt * 12)
+        rect = rect.move(0, -self.gem_card_anim * 4)
+
+        accent = GEM_COLOR
+        pulse = math.sin(self.t * 2.4) * 0.5 + 0.5
+
+        shadow = pygame.Surface((rect.w + 20, rect.h + 20), pygame.SRCALPHA)
+        pygame.draw.rect(shadow, (0, 0, 0, 90), shadow.get_rect(), border_radius=22)
+        canvas.blit(shadow, (rect.x - 10, rect.y - 2))
+        add_glow(canvas, rect.centerx, rect.centery, 112, accent,
+                 0.07 + pulse * 0.04 + self.gem_card_anim * 0.06)
+
+        panel(canvas, rect, bg=(22, 30, 44) if hover else (18, 24, 36),
+              edge=accent, alpha=250, radius=18, edge_w=2)
+        strip = pygame.Surface((rect.w - 24, 3), pygame.SRCALPHA)
+        pygame.draw.rect(strip, (*accent, 150 + int(pulse * 60)), strip.get_rect(), border_radius=2)
+        canvas.blit(strip, (rect.x + 12, rect.y + 7))
+
+        pl, pr_ = rect.x + 14, rect.right - 14
+
+        bx, by = rect.x + 27, rect.y + 32
+        add_glow(canvas, bx, by, 24, accent, 0.30 + pulse * 0.20)
+        pygame.draw.circle(canvas, (13, 14, 22), (int(bx), int(by)), 14)
+        pygame.draw.circle(canvas, accent, (int(bx), int(by)), 14, 2)
+        draw_icon(canvas, bx, by, "gem", accent, 9)
+        draw_text(canvas, "ELMAS", (rect.x + 46, rect.y + 14), 12, accent, bold=True, shadow=False)
+        draw_text(canvas, "MARKETİ", (rect.x + 46, rect.y + 27), 12, accent, bold=True, shadow=False)
+        draw_text(canvas, "skin ve kıyafet için", (rect.x + 46, rect.y + 41), 9,
+                  TEXT_DIM, shadow=False)
+
+        pygame.draw.line(canvas, (52, 56, 78), (pl, rect.y + 56), (pr_, rect.y + 56), 1)
+
+        # ---- mevcut elmas ----
+        draw_text(canvas, "ELMASIN", (pl, rect.y + 60), 9, TEXT_DIM, bold=True, shadow=False)
+        gtxt = fmt_num(self.save.get_gems())
+        draw_icon(canvas, pl + 9, rect.y + 82, "gem", GEM_COLOR, 9)
+        draw_text(canvas, gtxt, (pl + 24, rect.y + 71), 22, GEM_COLOR, bold=True)
+
+        # ---- en avantajlı paket tanıtımı ----
+        best = max(GEM_PACKS, key=lambda p: p["bonus"])
+        pygame.draw.line(canvas, (52, 56, 78), (pl, rect.y + 100), (pr_, rect.y + 100), 1)
+        draw_text(canvas, f"+%{best['bonus']} BONUS", (pl, rect.y + 108), 10, GOLD,
+                  bold=True, shadow=False)
+        draw_text(canvas, f"{fmt_num(gem_pack_total(best))} elmas", (pr_, rect.y + 108), 10,
+                  TEXT_DIM, bold=True, shadow=False, right=True)
+        draw_text(canvas, "en büyük pakette", (pl, rect.y + 121), 9, TEXT_DIM, shadow=False)
+
+        cta = pygame.Rect(pl, rect.y + 136, pr_ - pl, 28)
+        cs = pygame.Surface(cta.size, pygame.SRCALPHA)
+        base = (48, 120, 170) if hover else (34, 88, 128)
+        pygame.draw.rect(cs, (*base, 250), cs.get_rect(), border_radius=14)
+        pygame.draw.rect(cs, (255, 255, 255, 55 + int(self.gem_card_anim * 90)),
+                         cs.get_rect(), width=2, border_radius=14)
+        canvas.blit(cs, cta.topleft)
+        draw_text(canvas, "ELMAS AL  »", cta.center, 13, (235, 248, 255),
+                  bold=True, center=True, shadow=False)
+
+        if clicked and hover:
+            self.goto(STATE_GEM_STORE)
             sfx("click", 0.6, 0.0)
 
     # ---------------- GÜNLÜK ÖDÜLLER (arayüz market'i) ----------------
@@ -8535,6 +8918,186 @@ class App:
             if self.wheel_popup_timer <= 0:
                 self.claim_all_count = 0
 
+    # ---------------- ELMAS MARKETİ (satın alma ekranı) ----------------
+    def _buy_gem_pack(self, pack):
+        """Bir elmas paketi satın almayı başlatır."""
+        def done(ok, msg):
+            self.gem_msg = msg
+            self.gem_msg_ok = ok
+            self.gem_msg_timer = 3.2
+            if ok and FAKE_PURCHASE:
+                # Yalnızca TEST kipinde elmas yerel olarak eklenir.
+                self.save.add_gems(gem_pack_total(pack))
+                self.save.save()
+            elif ok:
+                # Gerçek satın almada elmaslar SUNUCUDA yazılır; oyun yalnızca
+                # güncel değeri çeker (çift ekleme olmasın diye).
+                self._refresh_gems_from_server()
+            if ok:
+                sfx("buy", 1.0, 0.0)
+        self.purchase.begin_purchase(pack, on_done=done)
+
+    def _refresh_gems_from_server(self):
+        """Satın alma sonrası elmas sayısını sunucudan tazeler."""
+        sid = self.purchase.steam_id()
+        if not (sid and self.online.enabled):
+            return
+        def work():
+            try:
+                payload = json.dumps({"steam_id": sid}).encode("utf-8")
+                req = urllib.request.Request(
+                    ONLINE_API_URL.rstrip("/") + "/get_player", data=payload,
+                    headers={"Content-Type": "application/json"})
+                with urllib.request.urlopen(req, timeout=10) as r:
+                    data = json.loads(r.read().decode("utf-8"))
+                if data.get("success"):
+                    gems = int(data["data"].get("gems", self.save.get_gems()))
+                    self.save.data["gems"] = max(0, gems)
+                    self.save.save()
+            except Exception:
+                pass
+        threading.Thread(target=work, daemon=True).start()
+
+    def update_gem_store(self, dt, mouse_pos, clicked):
+        canvas = self.display.canvas
+        self.bg.draw(canvas)
+        can_buy = self.purchase.available() and not self.purchase.busy
+
+        # ================= ÜST ŞERİT =================
+        top = pygame.Rect(0, 0, VIRTUAL_W, 76)
+        s = pygame.Surface(top.size, pygame.SRCALPHA)
+        pygame.draw.rect(s, (12, 13, 22, 238), top)
+        canvas.blit(s, (0, 0))
+        pygame.draw.line(canvas, (48, 108, 150), (0, 76), (VIRTUAL_W, 76), 2)
+        draw_icon(canvas, 34, 30, "gem", GEM_COLOR, 13)
+        draw_text(canvas, "ELMAS MARKETİ", (56, 16), 26, GEM_COLOR, bold=True)
+        draw_text(canvas, "Elmasla kalıcı skin ve kıyafet al — oyunun gücünü değiştirmez, görünümünü değiştirir.",
+                  (56, 48), 11, TEXT_DIM, shadow=False)
+        gem_txt = fmt_num(self.save.get_gems())
+        tw = text_width(gem_txt, 20, True)
+        draw_icon(canvas, VIRTUAL_W - 40 - tw - 20, 26, "gem", GEM_COLOR, 11)
+        draw_text(canvas, gem_txt, (VIRTUAL_W - 40, 16), 20, GEM_COLOR, bold=True, right=True)
+        draw_text(canvas, "mevcut elmasın", (VIRTUAL_W - 40, 46), 11, TEXT_DIM,
+                  shadow=False, right=True)
+
+        # ================= PAKETLER =================
+        cols = len(GEM_PACKS)
+        card_w, card_h = 246, 300
+        gap = 18
+        start_x = (VIRTUAL_W - (cols * card_w + (cols - 1) * gap)) / 2
+        y0 = 132
+        for i, pack in enumerate(GEM_PACKS):
+            rect = pygame.Rect(int(start_x + i * (card_w + gap)), y0, card_w, card_h)
+            hover = rect.collidepoint(mouse_pos) and can_buy
+            featured = pack["tag"] == "EN AVANTAJLI"
+            accent = pack["color"]
+            if featured:
+                add_glow(canvas, rect.centerx, rect.centery, 150, GOLD, 0.10)
+            panel(canvas, rect, bg=(26, 34, 50) if hover else (18, 22, 34),
+                  edge=accent, alpha=246, radius=16, edge_w=3 if featured else 2)
+
+            if pack["tag"]:
+                tw2 = text_width(pack["tag"], 11, True) + 20
+                br = pygame.Rect(0, 0, int(tw2), 22)
+                br.center = (rect.centerx, rect.y + 2)
+                bs = pygame.Surface(br.size, pygame.SRCALPHA)
+                pygame.draw.rect(bs, (*(GOLD if featured else PURPLE), 240),
+                                 bs.get_rect(), border_radius=11)
+                canvas.blit(bs, br.topleft)
+                draw_text(canvas, pack["tag"], br.center, 11, (20, 18, 12) if featured else WHITE,
+                          bold=True, center=True, shadow=False)
+
+            # elmas yığını görseli — paket büyüdükçe daha çok elmas
+            n_gem = 1 + i
+            cy = rect.y + 74
+            for k in range(n_gem):
+                ang = -math.pi / 2 + (k - (n_gem - 1) / 2) * 0.55
+                gx = rect.centerx + math.cos(ang) * (0 if n_gem == 1 else 26)
+                gy = cy + math.sin(ang) * 10 + (0 if n_gem == 1 else 8)
+                sz = 15 + i * 2
+                add_glow(canvas, gx, gy, sz * 2.0, accent, .35)
+                draw_icon(canvas, gx, gy, "gem", accent, sz)
+
+            total = gem_pack_total(pack)
+            draw_text(canvas, fmt_num(total), (rect.centerx, rect.y + 126), 34,
+                      GEM_COLOR, bold=True, center=True)
+            draw_text(canvas, "ELMAS", (rect.centerx, rect.y + 166), 12, TEXT_DIM,
+                      bold=True, center=True, shadow=False)
+            if pack["bonus"]:
+                draw_text(canvas, f"{fmt_num(pack['gems'])} + %{pack['bonus']} bonus",
+                          (rect.centerx, rect.y + 186), 11, GOLD, bold=True,
+                          center=True, shadow=False)
+            else:
+                draw_text(canvas, "başlangıç paketi", (rect.centerx, rect.y + 186), 11,
+                          TEXT_DIM, center=True, shadow=False)
+
+            pygame.draw.line(canvas, (52, 56, 78), (rect.x + 22, rect.y + 208),
+                             (rect.right - 22, rect.y + 208), 1)
+            draw_text(canvas, pack["price_hint"], (rect.centerx, rect.y + 220), 22,
+                      TEXT, bold=True, center=True)
+            draw_text(canvas, "fiyat Steam'de bölgene göre belirlenir",
+                      (rect.centerx, rect.y + 250), 9, TEXT_DIM, center=True, shadow=False)
+
+            btn = Button((rect.x + 18, rect.bottom - 48, rect.w - 36, 34),
+                         "SATIN AL" if can_buy else "YAKINDA", lambda p=pack: self._buy_gem_pack(p),
+                         color=(40, 110, 155) if can_buy else (38, 40, 54),
+                         hover_color=(58, 145, 195), enabled=can_buy, text_size=14)
+            btn.update(mouse_pos, dt)
+            btn.draw(canvas)
+            if clicked:
+                btn.click(mouse_pos)
+
+        # ================= ALT BİLGİ =================
+        info = pygame.Rect(120, 456, VIRTUAL_W - 240, 96)
+        panel(canvas, info, bg=(18, 19, 30), edge=(64, 70, 96), alpha=235, radius=12, edge_w=1)
+        if FAKE_PURCHASE:
+            draw_text(canvas, "TEST KİPİ — GERÇEK ÖDEME ALINMIYOR",
+                      (info.centerx, info.y + 14), 16, (255, 140, 90), bold=True, center=True)
+            draw_text(canvas, "KASMA_FAKE_PURCHASE ortam değişkeni açık. Dağıtım yapısında kapatılmalı.",
+                      (info.centerx, info.y + 40), 11, TEXT_DIM, center=True, shadow=False)
+        elif can_buy:
+            draw_icon(canvas, info.centerx - 120, info.y + 24, "shield", GREEN, 9)
+            draw_text(canvas, "Ödeme Steam üzerinden alınır", (info.centerx + 10, info.y + 14),
+                      15, GREEN, bold=True, center=True)
+            draw_text(canvas, "Satın alma penceresi Steam istemcisinde açılır; elmaslar hesabına anında yüklenir.",
+                      (info.centerx, info.y + 42), 11, TEXT_DIM, center=True, shadow=False)
+        else:
+            draw_text(canvas, "SATIN ALMA HENÜZ AÇIK DEĞİL", (info.centerx, info.y + 12), 15,
+                      (225, 190, 110), bold=True, center=True)
+            draw_text(canvas, self.purchase.unavailable_reason(),
+                      (info.centerx, info.y + 36), 12, TEXT_DIM, center=True, shadow=False)
+            draw_text(canvas, "Elmasları GÜNLÜK MARKET'ten ücretsiz de kazanabilirsin.",
+                      (info.centerx, info.y + 56), 11, GOLD, center=True, shadow=False)
+
+        # ücretsiz elmas kısayolu
+        free = Button((VIRTUAL_W / 2 - 250, VIRTUAL_H - 66, 240, 42), "ÜCRETSİZ ELMAS KAZAN",
+                      lambda: self.goto(STATE_DAILY_REWARDS),
+                      color=(140, 112, 38), hover_color=(186, 150, 56), text_size=14)
+        back = Button((VIRTUAL_W / 2 + 10, VIRTUAL_H - 66, 240, 42), "ANA MENÜYE DÖN",
+                      lambda: self.set_state(STATE_MENU), text_size=14)
+        for b in (free, back):
+            b.update(mouse_pos, dt)
+            b.draw(canvas)
+            if clicked:
+                b.click(mouse_pos)
+
+        # ---- satın alma durumu / sonuç bildirimi ----
+        if self.purchase.busy:
+            draw_text(canvas, self.purchase.status or "İşleniyor...",
+                      (VIRTUAL_W / 2, 440), 13, CYAN, bold=True, center=True)
+        if self.gem_msg_timer > 0:
+            self.gem_msg_timer -= dt
+            box = pygame.Rect(0, 0, 460, 110)
+            box.center = (VIRTUAL_W / 2, VIRTUAL_H / 2)
+            col = GREEN if self.gem_msg_ok else RED
+            add_glow(canvas, box.centerx, box.centery, 200, col, 0.14)
+            panel(canvas, box, alpha=250, edge=col, edge_w=2)
+            draw_text(canvas, "İŞLEM TAMAM" if self.gem_msg_ok else "İŞLEM BAŞARISIZ",
+                      (box.centerx, box.y + 24), 18, col, bold=True, center=True)
+            for j, ln in enumerate(wrap_text(str(self.gem_msg or ""), 12, box.w - 50)[:2]):
+                draw_text(canvas, ln, (box.centerx, box.y + 56 + j * 16), 12, TEXT,
+                          center=True, shadow=False)
+
     def _spin_wheel(self):
         amount = self.save.claim_wheel_reward()
         if amount > 0:
@@ -8557,9 +9120,12 @@ class App:
             ("SPACE", "BONK! — çevrene alan hasarı veren yakın vuruş"),
             ("SHIFT / SAĞ TIK", "DASH — kısa süre hasar almazsın"),
             ("B", "Büyük MARKET'i aç — dalga ilerledikçe yeni katmanlar açılır"),
-            ("DALGALAR SKORLA İLERLER", "Her dalganın bir skor hedefi var — doldur, sonraki dalgaya geç"),
-            ("YOĞUNLUK (10 SN)", "Dalga atlar atlamaz düşmanlar 10 saniye boyunca çok daha sık gelir"),
-            ("10., 15., 20. DALGA...", "10'dan itibaren her 5 dalgada PATRON — zırhlıdırlar, kolay ölmezler"),
+            ("DALGALAR SKORLA İLERLER", "Her dalganın skor hedefi var — hedef her zorlukta AYNI"),
+            ("ZORLUK = TEMPO", "Kabus dalgaları zorlaştırmaz, düşmanları daha hızlı getirir"),
+            ("DALGA İÇİNDE HIZLANIR", "Aynı dalgada bile oyalandıkça düşmanlar sıklaşır ve kalabalıklaşır"),
+            ("MARKET ÇEKİRDEKLERİ", "ÇEKİRDEK sekmesindeki yükseltmelerin tavanı yok — altın hep işe yarar"),
+            ("10., 15., 20. DALGA...", "10'dan itibaren her 5 dalgada PATRON — canları gücüne göre ölçeklenir"),
+            ("PATRONLAR CAN ÇALAR", "Patron da vurdukça iyileşir; dövüş yaklaşık 1,5 dakika sürer"),
             ("KIYAFET MARKET", "Şapka, gözlük ve pelerinlerin her biri küçük kalıcı bonus verir"),
             ("ÖLÜRSEN", "O koşuda market'ten aldıkların silinir — baştan başlarsın"),
             ("SKIN MARKET", "Elmasla kalıcı görünümler al — her skinin kendi silahı var"),
