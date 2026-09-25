@@ -48,7 +48,7 @@ ONLINE_API_URL = "https://kasma-arena-server.onrender.com"
 VIRTUAL_W, VIRTUAL_H = 1280, 720
 FPS = 60
 GAME_TITLE = "ARENA SAVAŞI"
-GAME_VERSION = "3.0"
+GAME_VERSION = "3.1"
 
 
 def _base_dir():
@@ -1278,6 +1278,13 @@ class PurchaseBridge:
                 on_done(False, self.last_error)
             return False
 
+        # EKSİK ADIM (bilerek boş bırakıldı):
+        # Oyuncu Steam penceresinde onayladığında Steam,
+        # MicroTxnAuthorizationResponse_t geri çağrısını gönderir. O anda
+        # sunucudaki /finalize_purchase çağrılmalı ve elmaslar orada yazılır.
+        # SteamworksPy bu geri çağrıyı her sürümde sunmadığı için burada
+        # bağlanmadı; Steam entegrasyonunu kurarken bu kancayı eklemek
+        # ZORUNLUDUR, aksi hâlde ödeme alınır ama elmas yazılmaz.
         self.busy = True
         self.status = "Steam ödeme penceresi açılıyor..."
 
@@ -4179,12 +4186,12 @@ class Player:
         # karşılık yan etkiler (zincir, fırtına, yörünge, ateş, zehir, yankı)
         # kaba bir pay olarak eklenir.
         extra = 1.0
-        extra += 0.25 * self.echo_level
-        extra += 0.10 * self.chain_level
-        extra += 0.12 * self.storm_level
-        extra += 0.10 * self.orbit_level
-        extra += 0.08 * self.fire_level
-        extra += 0.08 * self.poison_level
+        extra += 0.25 * self.echo_level     # doğrudan hasar katlar
+        extra += 0.03 * self.chain_level    # asıl işi kalabalıkta
+        extra += 0.04 * self.storm_level
+        extra += 0.03 * self.orbit_level
+        extra += 0.04 * self.fire_level     # yanık patronda da işler
+        extra += 0.05 * self.poison_level
         dps *= extra
         # BONK: bekleme süresine bölünmüş alan hasarı
         dps += (dmg * 2.0 * self.bonk_mult) / max(1.0, self.eff_bonk_cd())
@@ -5436,14 +5443,26 @@ BOSS_RING_GAP_MIN = 126
 #             (kaçma, konumlanma, bekleme süreleri yüzünden)
 #   CAP     : taban canın en fazla kaç katına çıkılabileceği (emniyet tavanı)
 BOSS_FIGHT_TARGET = 90.0
-BOSS_FIGHT_UPTIME = 0.60
+BOSS_FIGHT_UPTIME = 0.50
 BOSS_HP_SCALE_MAX = 60.0
 BOSS_HP_SCALE_MIN = 0.30
-# Patronun can çalmasının ÜST SINIRI: saniyede en fazla azami canının bu
-# kadarını geri kazanabilir. Sınır olmasaydı, hasarı düşük bir oyuncuya
-# karşı patron kendini sonsuza kadar iyileştirip dövüşü kazanılamaz hâle
-# getirebilirdi.
-BOSS_LIFESTEAL_CAP = 0.008
+# Patronun can çalmasının ÜST SINIRI.
+# Sınır OYUNCUNUN saniyelik hasarına göre konur: patron, oyuncunun saniyede
+# vurduğu hasarın en fazla bu oranı kadarını geri kazanabilir. Böylece can
+# çalma dövüşü yalnızca bir miktar UZATIR, asla kazanılamaz hâle getirmez.
+# (Eskiden tavan patronun azami canının yüzdesiydi; azami can oyuncunun
+#  gücüyle ölçeklendiği için can çalma da birlikte büyüyor ve patron kendini
+#  oyuncudan daha hızlı iyileştirebiliyordu.)
+BOSS_LIFESTEAL_VS_DPS = 0.12
+# Oyuncunun gücü hiç ölçülemezse kullanılan yedek tavan (azami canın oranı).
+BOSS_LIFESTEAL_CAP = 0.004
+
+# Patronun kaçabileceği AZAMİ mesafe.
+# "Çaresiz" faza geçen patron, kısa kaçışlarını üst üste bindirerek arenanın
+# öbür ucuna kadar gidiyor ve orada takılıyordu; ölçümde 10. dalga dövüşü
+# 300 saniyeyi aşıyor, patron pratikte ulaşılamaz hâle geliyordu. Bu mesafeye
+# ulaşınca kaçış iptal edilir ve patron tekrar oyuncuya döner.
+BOSS_FLEE_MAX_DIST = 380.0
 
 BOSS_HP_NERF = 0.85
 BOSS_DMG_NERF = 0.85
@@ -5559,6 +5578,7 @@ class Boss:
         # kısmını canına ekliyor; dövüş gerçek bir düelloya dönüşüyor.
         self.lifesteal = clamp(0.20 + 0.05 * (self.boss_index - 1), 0.0, 0.45)
         self.heal_budget = 0.0         # saniyede yenilenen can çalma bütçesi
+        self.heal_rate = None          # saniyelik can çalma tavanı (spawn'da ayarlanır)
         self.heal_flash = 0.0
         self.healed_total = 0.0
         self.fight_time = 0.0          # dövüşün başından beri geçen süre
@@ -5599,7 +5619,7 @@ class Boss:
         self.fight_time += dt
         self.wobble += dt * 3
         # can çalma bütçesi saniyede yenilenir (en fazla 1 saniyelik birikir)
-        cap = self.max_hp * BOSS_LIFESTEAL_CAP
+        cap = self.heal_rate if self.heal_rate is not None else self.max_hp * BOSS_LIFESTEAL_CAP
         self.heal_budget = min(cap, self.heal_budget + cap * dt)
         if self.heal_flash > 0:
             self.heal_flash -= dt
@@ -5684,9 +5704,13 @@ class Boss:
                 sfx("bonk", 0.8, 0.0)
         elif self.flee_timer > 0:
             self.flee_timer -= dt
-            flee_k = 1.9 if self.desperate else 1.5
-            self.x -= dx * self.speed * flee_k * dt * scale_in
-            self.y -= dy * self.speed * flee_k * dt * scale_in
+            if d >= BOSS_FLEE_MAX_DIST:
+                # Yeterince uzaklaştı: kaçışı kes, dövüşe geri dön.
+                self.flee_timer = 0.0
+            else:
+                flee_k = 1.9 if self.desperate else 1.5
+                self.x -= dx * self.speed * flee_k * dt * scale_in
+                self.y -= dy * self.speed * flee_k * dt * scale_in
         else:
             want_d = self.want_dist
             speed_k = 1.7 if self.enraged else 1.2
@@ -6216,9 +6240,14 @@ def scale_bosses_to_player(bosses, player):
     base_total = sum(b.max_hp for b in bosses)
     want = est * BOSS_FIGHT_UPTIME * BOSS_FIGHT_TARGET
     scale = clamp(want / max(1.0, base_total), BOSS_HP_SCALE_MIN, BOSS_HP_SCALE_MAX)
+    # Can çalma tavanı oyuncunun hasarına göre paylaştırılır: dalgadaki tüm
+    # patronların toplam iyileşmesi, oyuncunun saniyelik hasarının belirli bir
+    # oranını aşamaz.
+    heal_rate = est * BOSS_LIFESTEAL_VS_DPS / max(1, len(bosses))
     for b in bosses:
         b.max_hp *= scale
         b.hp = b.max_hp
+        b.heal_rate = heal_rate
     return scale
 
 
@@ -9130,11 +9159,16 @@ class App:
             ("ÖLÜRSEN", "O koşuda market'ten aldıkların silinir — baştan başlarsın"),
             ("SKIN MARKET", "Elmasla kalıcı görünümler al — her skinin kendi silahı var"),
         ]
-        y = panel_rect.y + 70
+        # Satır aralığı listenin uzunluğuna göre hesaplanır; böylece yeni
+        # madde eklendiğinde yazılar panelin dışına taşmaz.
+        list_top = panel_rect.y + 66
+        list_bottom = panel_rect.bottom - 64      # GERİ düğmesine yer bırak
+        step = clamp((list_bottom - list_top) / max(1, len(lines)), 22, 38)
+        y = list_top
         for title, desc in lines:
-            draw_text(canvas, title, (panel_rect.x + 36, y), 14, GOLD, bold=True)
-            draw_text(canvas, desc, (panel_rect.x + 36, y + 18), 12, TEXT_DIM, shadow=False)
-            y += 38
+            draw_text(canvas, title, (panel_rect.x + 36, y), 13, GOLD, bold=True)
+            draw_text(canvas, desc, (panel_rect.x + 36, y + 15), 11, TEXT_DIM, shadow=False)
+            y += step
 
         # ---- ayarlar ----
         ax = panel_rect.x + 420
