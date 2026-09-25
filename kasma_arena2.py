@@ -7617,6 +7617,18 @@ SKILL_SLOTS = [
     {"key": "B", "name": "MARKET", "icon": "coin", "color": GOLD, "cd": None},
 ]
 
+# Yalnızca belirli skinlerde görünen ek yuvalar.
+SKILL_SLOT_SMASH = {"key": "SPACE", "name": "EZİCİ", "icon": "skull", "color": (150, 255, 130),
+                    "cd": lambda p: (p.smash_timer, RunState.TITAN_SMASH_CD)}
+
+
+def skill_slots_for(p):
+    """Oyuncunun skinine göre gösterilecek yetenek yuvaları."""
+    slots = list(SKILL_SLOTS)
+    if getattr(p, "titan_smash", 0):
+        slots.insert(2, SKILL_SLOT_SMASH)
+    return slots
+
 
 # Yetenek çubuğu boyut kademeleri — duraklatma menüsünden değiştirilir.
 SKILL_SCALES = [(0.65, "ÇOK KÜÇÜK"), (0.75, "KÜÇÜK"), (0.85, "NORMAL"),
@@ -7645,7 +7657,8 @@ def draw_skill_bar(surf, run, t):
     menüsünden küçültüp büyütebilir.
     """
     p = run.player
-    n = len(SKILL_SLOTS)
+    slots = skill_slots_for(p)
+    n = len(slots)
     k = clamp(float(CFG.get("skill_scale", 0.85)), 0.5, 1.4)
     sw, sh, gap = int(62 * k), int(62 * k), max(5, int(10 * k))
     total = n * sw + (n - 1) * gap
@@ -7659,7 +7672,7 @@ def draw_skill_bar(surf, run, t):
     pygame.draw.rect(bs, (58, 62, 88, 220), bs.get_rect(), width=2, border_radius=14)
     surf.blit(bs, back.topleft)
 
-    for i, sk in enumerate(SKILL_SLOTS):
+    for i, sk in enumerate(slots):
         r = pygame.Rect(int(x0 + i * (sw + gap)), int(y0), sw, sh)
         locked = bool(sk.get("lock") and sk["lock"](p))
         col = (86, 90, 112) if locked else sk["color"]
