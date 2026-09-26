@@ -5910,13 +5910,28 @@ class MarketPortal:
 # =====================================================================
 
 class Hazard:
-    def __init__(self, x, y, r, delay, dmg, owner=None):
+    # Tuzağın rengi, onu kuran patronun imza özelliğinden gelir: ateşli
+    # patronun bıraktığı havuz turuncu (alev), zehirli patronunki yeşil
+    # görünsün — hepsi aynı kırmızı daire olmasın.
+    TRAIT_COLORS = {
+        "burn": (255, 132, 46), "inferno": (255, 116, 34),
+        "venom": (150, 226, 74), "chill": (120, 196, 255),
+        "vanish": (196, 116, 246), "blink": (110, 236, 208),
+    }
+    DEFAULT_COLOR = (255, 70, 60)
+
+    def __init__(self, x, y, r, delay, dmg, owner=None, color=None):
         self.x, self.y = x, y
         self.r = r
         self.delay = delay
         self.dmg = dmg
         # Tuzağı kuran (patron): isabet edince can çalabilmesi için.
         self.owner = owner
+        if color is None:
+            trait = getattr(owner, "trait", None)
+            color = self.TRAIT_COLORS.get(trait["kind"], self.DEFAULT_COLOR) if trait \
+                else self.DEFAULT_COLOR
+        self.color = color
         self.t = 0.0
         self.exploded = False
         self.linger = 0.0
@@ -5936,8 +5951,9 @@ class Hazard:
                         self.owner.hit_player(p, self.dmg, run.fx, self.x, self.y)
                     else:
                         p.take_damage(self.dmg, run.fx, self.x, self.y, "Tuzak")
-                run.fx.shockwave(self.x, self.y, self.r * 1.15, (255, 90, 70), 0.4, 6)
-                run.fx.burst(self.x, self.y, (255, 140, 70), n=18, speed=200, life=0.5, r=3.5)
+                run.fx.shockwave(self.x, self.y, self.r * 1.15, self.color, 0.4, 6)
+                run.fx.burst(self.x, self.y, lighten(self.color, 0.25), n=18, speed=200,
+                             life=0.5, r=3.5)
                 run.fx.shake(6, 0.2)
                 sfx("explosion", 0.55, 0.05)
         else:
@@ -5947,15 +5963,17 @@ class Hazard:
 
     def draw(self, surf, t):
         x, y = int(self.x), int(self.y)
+        c = self.color
         if not self.exploded:
             frac = clamp(self.t / self.delay, 0, 1)
-            blit_disc(surf, x, y, self.r * frac, (255, 60, 50), 70)
+            blit_disc(surf, x, y, self.r * frac, c, 70)
             pulse = 0.6 + 0.4 * math.sin(t * 16)
-            pygame.draw.circle(surf, scale_col((255, 70, 60), pulse), (x, y), int(self.r), 2)
-            pygame.draw.line(surf, (255, 120, 100), (x - 7, y - 7), (x + 7, y + 7), 2)
-            pygame.draw.line(surf, (255, 120, 100), (x - 7, y + 7), (x + 7, y - 7), 2)
+            pygame.draw.circle(surf, scale_col(c, pulse), (x, y), int(self.r), 2)
+            mark = lighten(c, 0.35)
+            pygame.draw.line(surf, mark, (x - 7, y - 7), (x + 7, y + 7), 2)
+            pygame.draw.line(surf, mark, (x - 7, y + 7), (x + 7, y - 7), 2)
         else:
-            add_glow(surf, x, y, self.r * 1.4, (255, 120, 60), clamp(self.linger / 0.3, 0, 1))
+            add_glow(surf, x, y, self.r * 1.4, lighten(c, 0.2), clamp(self.linger / 0.3, 0, 1))
 
 
 
@@ -8623,15 +8641,19 @@ class Boss:
                 surf.blit(s, (0, 0))
             elif kind == "hazard_ring":
                 n = 11 if self.enraged else 8
+                tc = Hazard.TRAIT_COLORS.get(self.trait["kind"], (255, 70, 60))
                 for i in range(n):
                     ang = i * math.tau / n
                     hx, hy = x + math.cos(ang) * 150, y + math.sin(ang) * 150
                     hx = clamp(hx, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
                     hy = clamp(hy, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
-                    blit_disc(surf, hx, hy, 30 * k, (255, 70, 60), 90)
+                    blit_disc(surf, hx, hy, 30 * k, tc, 90)
             elif kind in ("slam", "scythe"):
-                blit_disc(surf, a, b, c * k, (255, 70, 60), 80)
-                pygame.draw.circle(surf, (255, 120, 90), (int(a), int(b)), int(c * k), 2)
+                # Alan işareti, patronun imza rengini taşısın: yerdeki tuzakla
+                # (Hazard) aynı renk olsun ki neyin geleceği belli olsun.
+                tc = Hazard.TRAIT_COLORS.get(self.trait["kind"], (255, 70, 60))
+                blit_disc(surf, a, b, c * k, tc, 80)
+                pygame.draw.circle(surf, lighten(tc, 0.3), (int(a), int(b)), int(c * k), 2)
             elif kind == "spore":
                 for i in range(6 if self.enraged else 4):
                     ang = i * math.tau / (6 if self.enraged else 4)
