@@ -3803,7 +3803,8 @@ SHOP_ITEMS = [
     {"key": "devil",     "name": "Şeytan Pazarlığı", "desc": "Altın ve XP +%50 ama düşmanlar +%12 dayanıklı", "cost": 80, "cost_mult": 1.5, "max": 3, "icon": "skull", "color": (255, 120, 60), "tier": 2, "cat": "cursed", "cursed": True},
     # ---- Tier 3 (Dalga 6+) ----
     {"key": "chain",     "name": "Zincir Şok",      "desc": "BONK yakındaki ekstra düşmanlara sıçrar", "cost": 110, "cost_mult": 1.85, "max": 4, "icon": "bolt", "color": (120, 200, 255), "tier": 3, "cat": "elemental"},
-    {"key": "homing",    "name": "Güdümlü Mermi",   "desc": "Mermilerin en yakın düşmana yönelir", "cost": 130, "cost_mult": 2.0, "max": 1, "icon": "target", "color": (140, 220, 200), "tier": 3, "cat": "weapon"},
+    # NOT: "Güdümlü Mermi" MARKETTEN KALDIRILDI. Güdüm yeteneği yalnızca
+    # YÖNELMELİ ŞAHİN skini ve onun özel yeteneğiyle gelir; markette satılmaz.
     {"key": "frenzy",    "name": "Çılgınlık Çekirdeği", "desc": "Ardışık öldürmeler hız ve hasarı artırır", "cost": 100, "cost_mult": 1.8, "max": 5, "icon": "clover", "color": (200, 230, 100), "tier": 3, "cat": "elemental"},
     {"key": "second_wind", "name": "İkinci Nefes",  "desc": "Öleceğin darbede %50 canla dirilirsin", "cost": 170, "cost_mult": 2.1, "max": 3, "icon": "heart", "color": (255, 215, 120), "tier": 3, "cat": "defense"},
     {"key": "storm",     "name": "Fırtına",         "desc": "Rastgele düşmanlara yıldırım düşer", "cost": 140, "cost_mult": 1.95, "max": 5, "icon": "bolt", "color": (190, 215, 255), "tier": 3, "cat": "elemental"},
@@ -3947,8 +3948,6 @@ def apply_shop_item(player, key):
         player.enemy_hp_curse += 0.12
     elif key == "chain":
         player.chain_level += 1
-    elif key == "homing":
-        player.homing_level += 1
     elif key == "frenzy":
         player.frenzy_level += 1
     elif key == "second_wind":
@@ -4445,6 +4444,18 @@ def screen_to_world(x, y, cam):
 # OYUNCU
 # =====================================================================
 
+# Oyuncunun TABAN istatistikleri tek bir yerde durur. Hem Player.__init__
+# hem de İSTATİSTİK paneli (yüzdeleri buna göre hesaplar) aynı değerleri
+# kullansın diye sabit olarak çıkarıldı.
+BASE_SPEED = 215
+BASE_MAX_HP = 100
+BASE_DMG = 17
+BASE_ATK_CD = 0.34
+BASE_PICKUP = 60
+BASE_DASH_CD = 2.4
+BASE_BONK_CD = 1.35
+
+
 class Player:
     def __init__(self, skin_id="default"):
         self.skin = get_skin(skin_id)
@@ -4457,11 +4468,11 @@ class Player:
         self.kbx = self.kby = 0.0
 
         # --- taban istatistikler (herkes eşit başlar) ---
-        self.base_speed = 215
-        self.base_max_hp = 100
-        self.base_dmg = 17
-        self.base_atk_cd = 0.34
-        self.base_pickup = 60
+        self.base_speed = BASE_SPEED
+        self.base_max_hp = BASE_MAX_HP
+        self.base_dmg = BASE_DMG
+        self.base_atk_cd = BASE_ATK_CD
+        self.base_pickup = BASE_PICKUP
         self.base_armor = 0.0
         self.base_regen = 0.0
         self.coin_mult = 1.0
@@ -4549,7 +4560,7 @@ class Player:
         self.thorn_field_r = 0.0
         self.thorn_field_tick = 0.0
 
-        self.bonk_cd = 1.35
+        self.bonk_cd = BASE_BONK_CD
         # YEŞİL DEV: "EZİCİ DARBE" — periyodik, tüm arenayı kaplayan BONK.
         self.titan_smash = 0        # 1 ise ezici darbe açık
         self.smash_timer = 0.0      # ezici darbenin bekleme sayacı
@@ -4595,6 +4606,18 @@ class Player:
         self.alive = True
         self.regen_acc = 0.0
         self.aura_acc = 0.0
+        # --- PATRON DURUM ETKİLERİ ---
+        # Patronlar artık hepsi aynı biçimde vurmuyor: kimi seni YAKIYOR,
+        # kimi ZEHİRLİYOR, kimi YAVAŞLATIYOR. Üçü de burada tutulur ve
+        # Player.update() içinde işlenir.
+        self.burn_t = 0.0        # yanık kalan süre
+        self.burn_dps = 0.0      # yanığın saniyelik hasarı
+        self.burn_acc = 0.0
+        self.poison_t = 0.0      # zehir kalan süre
+        self.poison_dps = 0.0
+        self.poison_acc = 0.0
+        self.slow_t = 0.0        # yavaşlatma kalan süre
+        self.slow_mult = 1.0     # hareket hızı çarpanı (1.0 = etkisiz)
         self.ghosts = []
         self.ghost_t = 0.0
         self.last_hit_by = ""
@@ -4625,7 +4648,11 @@ class Player:
         return self.skin["color"]
 
     def eff_speed(self):
-        return self.base_speed * self.run_spd_mult * (1 + 0.05 * self.frenzy_stacks)
+        sp = self.base_speed * self.run_spd_mult * (1 + 0.05 * self.frenzy_stacks)
+        # Patron yavaşlatması (KOLOS'un sarsıntısı gibi) hızı doğrudan keser.
+        if self.slow_t > 0:
+            sp *= self.slow_mult
+        return sp
 
     def eff_dmg(self):
         d = self.base_dmg * self.run_dmg_mult * (1 + 0.07 * self.frenzy_stacks)
@@ -4706,7 +4733,7 @@ class Player:
         return max(0.45, self.bonk_cd * self.bonk_cd_mult)
 
     def eff_dash_cd(self):
-        return max(0.7, 2.4 * self.dash_cd_mult)
+        return max(0.7, BASE_DASH_CD * self.dash_cd_mult)
 
     def vamp_cap(self):
         return 2.0
@@ -4810,7 +4837,19 @@ class Player:
         fx.burst(self.x, self.y, RED, n=6, speed=120, life=0.35, r=3)
         fx.popup(self.x + random.uniform(-10, 10), self.y - 26, f"-{int(dmg)}", (255, 110, 120), 20, life=0.7)
         sfx("hurt", 0.9, 0.08)
-        if self.hp <= 0 and self.ult and self.ult.get("kind") == "death_defy" and self.ult_ready():
+        self._resolve_lethal(fx)
+        return dmg
+
+    def _resolve_lethal(self, fx):
+        """Can sıfırın altına düştüyse ölümü engelleyen güçleri sırayla dener.
+
+        Hem doğrudan darbeler (take_damage) hem de YANIK / ZEHİR gibi süreli
+        etkiler buradan geçer; böylece "ikinci nefes" bir alev hasarıyla
+        ölürken de çalışır.
+        """
+        if self.hp > 0 or not self.alive:
+            return
+        if self.ult and self.ult.get("kind") == "death_defy" and self.ult_ready():
             # GÖLGE DURUŞU: ölümcül darbede can 1'e sabitlenir ve zaman durur.
             # Canın 10 iken 15'lik hasar yesen bile ölmezsin.
             self.hp = 1.0
@@ -4821,8 +4860,8 @@ class Player:
             fx.ring(self.x, self.y, (190, 120, 255), n=30, speed=300, life=0.6, r=4)
             fx.popup(self.x, self.y - 48, "GÖLGE DURUŞU!", (200, 140, 255), 28, life=1.3)
             sfx("second", 1.0, 0.0)
-            return dmg
-        if self.hp <= 0 and self.purgatory_level > 0 and self.purgatory_timer <= 0:
+            return
+        if self.purgatory_level > 0 and self.purgatory_timer <= 0:
             # ARAF KALKANI: ölümcül darbeyi tamamen yutar, sonra yeniden dolar.
             self.hp = max(1.0, self.max_hp * 0.12)
             self.purgatory_timer = max(8.0, 25.0 - 5.0 * (self.purgatory_level - 1))
@@ -4831,21 +4870,92 @@ class Player:
             fx.shockwave(self.x, self.y, 170, (255, 215, 120), 0.45, 6)
             fx.popup(self.x, self.y - 44, "ARAF KALKANI!", (255, 225, 150), 24, life=1.1)
             sfx("shield", 1.0, 0.0)
-            return dmg
-        if self.hp <= 0:
-            if self.second_wind_charges > 0:
-                self.second_wind_charges -= 1
-                self.hp = self.max_hp * 0.5
-                self.invuln = 1.6
-                fx.ring(self.x, self.y, GOLD, n=26, speed=260, life=0.55, r=4)
-                fx.shockwave(self.x, self.y, 220, GOLD, 0.5, 7)
-                fx.popup(self.x, self.y - 46, "İKİNCİ NEFES!", GOLD, 26, life=1.2)
-                fx.do_flash(GOLD, 0.6)
-                sfx("second", 1.0, 0.0)
-            else:
-                self.hp = 0
-                self.alive = False
-        return dmg
+            return
+        if self.second_wind_charges > 0:
+            self.second_wind_charges -= 1
+            self.hp = self.max_hp * 0.5
+            self.invuln = 1.6
+            fx.ring(self.x, self.y, GOLD, n=26, speed=260, life=0.55, r=4)
+            fx.shockwave(self.x, self.y, 220, GOLD, 0.5, 7)
+            fx.popup(self.x, self.y - 46, "İKİNCİ NEFES!", GOLD, 26, life=1.2)
+            fx.do_flash(GOLD, 0.6)
+            sfx("second", 1.0, 0.0)
+            return
+        self.hp = 0
+        self.alive = False
+
+    # ---------------- DURUM ETKİLERİ (patronlar uygular) ----------------
+    def apply_burn(self, dps, dur, src="alev"):
+        """YANIK: süreli, saniyede hasar veren ateş. En güçlüsü geçerlidir."""
+        if not self.alive:
+            return
+        fresh = self.burn_t <= 0
+        self.burn_dps = max(self.burn_dps, dps)
+        self.burn_t = max(self.burn_t, dur)
+        self.last_hit_by = src
+        if fresh:
+            sfx("hurt", 0.4, 0.05)
+
+    def apply_poison(self, dps, dur, src="zehir"):
+        """ZEHİR: yanıktan daha uzun süren, daha az vuran sızı."""
+        if not self.alive:
+            return
+        self.poison_dps = max(self.poison_dps, dps)
+        self.poison_t = max(self.poison_t, dur)
+        self.last_hit_by = src
+
+    def apply_slow(self, mult, dur):
+        """YAVAŞLATMA: hareket hızını kısar. En sert olanı geçerlidir."""
+        if not self.alive:
+            return
+        if self.slow_t <= 0 or mult < self.slow_mult:
+            self.slow_mult = clamp(mult, 0.25, 1.0)
+        self.slow_t = max(self.slow_t, dur)
+
+    def clear_status(self):
+        self.burn_t = self.poison_t = self.slow_t = 0.0
+        self.burn_dps = self.poison_dps = 0.0
+        self.slow_mult = 1.0
+
+    def _status_tick(self, amount, fx, src, col):
+        """Süreli etkilerin (yanık/zehir) tek bir vuruşu.
+
+        Doğrudan darbelerden farkı: KALKAN yükü harcamaz ve geri tepme
+        uygulamaz — yoksa yanık, kalkanları saniyeler içinde eritirdi.
+        Dokunulmazlık (dash) ise etkiyi durdurur.
+        """
+        if not self.alive or amount <= 0 or self.invuln > 0:
+            return
+        dmg = amount * (1 - self.eff_armor()) * self.dmg_taken_mult
+        self.hp -= dmg
+        self.last_hit_by = src
+        self.hurt_vig = min(1.0, self.hurt_vig + dmg / 90.0)
+        fx.popup(self.x + random.uniform(-12, 12), self.y - 20, f"-{max(1, int(dmg))}",
+                 col, 14, life=0.5)
+        self._resolve_lethal(fx)
+
+    def update_status(self, dt, fx):
+        """Yanık / zehir / yavaşlatma sayaçlarını işler."""
+        if self.burn_t > 0:
+            self.burn_t = max(0.0, self.burn_t - dt)
+            self.burn_acc += dt
+            while self.burn_acc >= 0.5 and self.alive:
+                self.burn_acc -= 0.5
+                self._status_tick(self.burn_dps * 0.5, fx, "alev", (255, 150, 70))
+            if self.burn_t <= 0:
+                self.burn_dps = 0.0
+        if self.poison_t > 0:
+            self.poison_t = max(0.0, self.poison_t - dt)
+            self.poison_acc += dt
+            while self.poison_acc >= 0.5 and self.alive:
+                self.poison_acc -= 0.5
+                self._status_tick(self.poison_dps * 0.5, fx, "zehir", (150, 240, 120))
+            if self.poison_t <= 0:
+                self.poison_dps = 0.0
+        if self.slow_t > 0:
+            self.slow_t = max(0.0, self.slow_t - dt)
+            if self.slow_t <= 0:
+                self.slow_mult = 1.0
 
     def update(self, dt, keys, fx):
         if not self.alive:
@@ -4856,6 +4966,9 @@ class Player:
             if v > 0:
                 setattr(self, name, max(0.0, v - dt))
         self.recoil = max(0.0, self.recoil - dt * 7)
+        self.update_status(dt, fx)
+        if not self.alive:
+            return
         mx = keys.get("right", 0) - keys.get("left", 0)
         my = keys.get("down", 0) - keys.get("up", 0)
         mlen = math.hypot(mx, my)
@@ -5074,6 +5187,32 @@ class Player:
             rect.center = (ix, iy)
             if frac > 0.02:
                 pygame.draw.arc(surf, ORANGE, rect, -math.pi / 2, -math.pi / 2 + math.tau * frac, 3)
+
+        # ---- PATRON DURUM ETKİLERİ (yanık / zehir / yavaşlatma) ----
+        # Oyuncu neden can kaybettiğini gözünün ucuyla görebilsin diye
+        # etkiler doğrudan karakterin üstünde canlandırılır.
+        if self.burn_t > 0:
+            add_glow(surf, px, py, r * 2.3, (255, 130, 50), 0.28 + 0.10 * math.sin(t * 9))
+            for i in range(4):
+                ph = (t * 1.9 + i * 0.27) % 1.0
+                fxp = px + math.sin(t * 5 + i * 2.3) * r * 0.8
+                fyp = py - r * 0.4 - ph * r * 2.1
+                blit_disc(surf, fxp, fyp, max(1.2, 4.2 * (1 - ph)),
+                          (255, 190 - int(70 * ph), 80), int(215 * (1 - ph)))
+        if self.poison_t > 0:
+            pygame.draw.circle(surf, (130, 230, 100), (ix, iy), r + 7, 1)
+            for i in range(3):
+                ph = (t * 1.3 + i * 0.37) % 1.0
+                bxp = px + math.sin(t * 2.6 + i * 2.1) * r * 0.7
+                byp = py - r * 0.3 - ph * r * 1.7
+                pygame.draw.circle(surf, (160, 245, 130), (int(bxp), int(byp)),
+                                   max(1, int(3.4 * (1 - ph))))
+        if self.slow_t > 0:
+            pygame.draw.circle(surf, (140, 200, 255), (ix, iy), r + 10, 1)
+            for i in range(6):
+                a = t * 0.8 + i * math.tau / 6
+                blit_disc(surf, px + math.cos(a) * (r + 12), py + math.sin(a) * (r + 12) * 0.7,
+                          2.4, (170, 220, 255), 170)
 
 
 # =====================================================================
@@ -5527,6 +5666,7 @@ HELL_BOSS_NAMES = {
     "colossus": "LAV KOLOSU",
     "reaper":   "RUH TOPLAYICI",
     "hive":     "AZAP ANASI",
+    "dragon":   "KOR EJDERHA",
 }
 HELL_BOSS_COLORS = {
     "warlord":  (236, 74, 44),
@@ -5534,8 +5674,11 @@ HELL_BOSS_COLORS = {
     "colossus": (168, 78, 46),
     "reaper":   (226, 120, 40),
     "hive":     (246, 158, 48),
+    "dragon":   (228, 58, 30),
 }
-HELL_BOSS_ORDER = ["warlord", "colossus", "reaper", "hive", "witch"]
+# CEHENNEM'in ilk patronu EJDERHA: girer girmez oyuncuyu karşılayan,
+# alev püskürten uçan dev. Sonra sırayla diğerleri gelir.
+HELL_BOSS_ORDER = ["dragon", "warlord", "colossus", "reaper", "hive", "witch"]
 HELL_BOSS_FIRST_WAVE = 5       # cehennemde patron: 5, 10, 15 ...
 HELL_BOSS_STEP = 5
 # Cehennem patronu, arenanın son patronundan (25. dalga = 4. patron) daha
@@ -5664,9 +5807,12 @@ class Hazard:
                 self.linger = 0.3
                 p = run.player
                 if p.alive and dist(self.x, self.y, p.x, p.y) < self.r + p.radius - 2:
-                    p.take_damage(self.dmg, run.fx, self.x, self.y, "Tuzak")
-                    if self.owner is not None:
-                        self.owner.on_damage_dealt(self.dmg)
+                    if self.owner is not None and hasattr(self.owner, "hit_player"):
+                        # Patron tuzağı: hasarla birlikte patronun imza etkisini
+                        # de taşır (yakar / zehirler / yavaşlatır).
+                        self.owner.hit_player(p, self.dmg, run.fx, self.x, self.y)
+                    else:
+                        p.take_damage(self.dmg, run.fx, self.x, self.y, "Tuzak")
                 run.fx.shockwave(self.x, self.y, self.r * 1.15, (255, 90, 70), 0.4, 6)
                 run.fx.burst(self.x, self.y, (255, 140, 70), n=18, speed=200, life=0.5, r=3.5)
                 run.fx.shake(6, 0.2)
@@ -6312,14 +6458,50 @@ class Enemy:
 # =====================================================================
 
 BOSS_DEFS = {
-    "warlord":  {"name": "SAVAŞ LORDU",   "hp": 4600, "speed": 78,  "dmg": 31, "radius": 46, "color": (210, 80, 70)},
-    "witch":    {"name": "GÖLGE CADISI",  "hp": 3900, "speed": 88,  "dmg": 27, "radius": 42, "color": (140, 90, 210)},
-    "colossus": {"name": "KOLOS",         "hp": 6200, "speed": 60,  "dmg": 39, "radius": 54, "color": (110, 130, 160)},
-    "reaper":   {"name": "ORAK",          "hp": 3400, "speed": 108, "dmg": 29, "radius": 40, "color": (70, 200, 170)},
-    "hive":     {"name": "KOVAN ANA",     "hp": 5400, "speed": 64,  "dmg": 25, "radius": 50, "color": (225, 170, 60)},
+    "warlord":  {"name": "SAVAŞ LORDU",   "hp": 4900, "speed": 80,  "dmg": 33, "radius": 46, "color": (210, 80, 70)},
+    "witch":    {"name": "GÖLGE CADISI",  "hp": 4150, "speed": 92,  "dmg": 29, "radius": 42, "color": (140, 90, 210)},
+    "colossus": {"name": "KOLOS",         "hp": 6600, "speed": 62,  "dmg": 41, "radius": 54, "color": (110, 130, 160)},
+    "reaper":   {"name": "ORAK",          "hp": 3650, "speed": 112, "dmg": 31, "radius": 40, "color": (70, 200, 170)},
+    "hive":     {"name": "KOVAN ANA",     "hp": 5750, "speed": 66,  "dmg": 27, "radius": 50, "color": (225, 170, 60)},
+    # EJDERHA: yalnızca CEHENNEM'de çıkan, ateş püskürten uçan patron.
+    "dragon":   {"name": "EJDERHA",       "hp": 7400, "speed": 96,  "dmg": 36, "radius": 58, "color": (206, 66, 40)},
 }
 # Patron sırası: aynı patronla üst üste karşılaşılmasın diye 5 tür dönüşümlü gelir.
+# (EJDERHA arenada çıkmaz — cehenneme özeldir.)
 BOSS_ORDER = ["warlord", "witch", "colossus", "reaper", "hive"]
+
+# ---------------------------------------------------------------------
+# PATRON ÖZELLİKLERİ
+# ---------------------------------------------------------------------
+# Eskiden bütün patronlar aynı şeyi yapıyordu: mermi at, alan hasarı bırak.
+# Artık her patronun KENDİNE ÖZGÜ bir imza mekaniği var ve bu mekanik hem
+# saldırılarına hem de görünümüne yansıyor.
+#
+#   burn    : vuruşları seni YAKAR (süreli ateş hasarı)
+#   venom   : vuruşları seni ZEHİRLER (daha uzun süren, daha yumuşak sızı)
+#   chill   : vuruşları seni YAVAŞLATIR (kaçmak zorlaşır)
+#   vanish  : düzenli aralıklarla GÖRÜNMEZ olur, saldırınca ortaya çıkar
+#   blink   : oyuncunun dibine IŞINLANIR ve anında vurur
+#   inferno : ejderha — hem yakar hem uçar hem alev koridoru bırakır
+#
+# YENİ PATRON EKLEMEK: BOSS_DEFS'e bir satır, buraya bir özellik ve
+# Boss.draw() içine bir çizim dalı eklemek yeterli.
+# ---------------------------------------------------------------------
+BOSS_TRAITS = {
+    "warlord":  {"kind": "burn",    "label": "ATEŞLİ ÇELİK",  "color": (255, 146, 62)},
+    "witch":    {"kind": "vanish",  "label": "GÖLGE PERDESİ", "color": (196, 126, 246)},
+    "colossus": {"kind": "chill",   "label": "SARSINTI",      "color": (150, 200, 240)},
+    "reaper":   {"kind": "blink",   "label": "RUH SIÇRAMASI", "color": (120, 240, 210)},
+    "hive":     {"kind": "venom",   "label": "ZEHİRLİ SPOR",  "color": (186, 232, 92)},
+    "dragon":   {"kind": "inferno", "label": "EJDER ATEŞİ",   "color": (255, 120, 44)},
+}
+
+
+def boss_trait(kind, hellish=False):
+    """Patronun imza özelliği. Cehennem patronları ayrıca ATEŞ de taşır."""
+    tr = dict(BOSS_TRAITS.get(kind, BOSS_TRAITS["warlord"]))
+    tr["hellfire"] = bool(hellish) or tr["kind"] in ("burn", "inferno")
+    return tr
 
 # Patronlar artık 8. dalgada bir kez değil, 10. dalgadan itibaren HER 5 DALGADA
 # bir gelir: 10, 15, 20, 25, 30 ...
@@ -6470,6 +6652,21 @@ class Boss:
         self.flee_timer = 0.0
         self.summoned_enemies = []
         self.teleport_cd = random.uniform(4.0, 6.0)   # yalnızca "reaper" kullanır
+        # --- İMZA ÖZELLİĞİ (bkz. BOSS_TRAITS) ---
+        # Her patron farklı vurur: kimi yakar, kimi zehirler, kimi yavaşlatır,
+        # kimi görünmez olur, kimi dibine ışınlanır.
+        self.trait = boss_trait(kind, hellish)
+        self.vanish_t = 0.0                            # görünmezlik kalan süresi
+        self.vanish_cd = random.uniform(5.5, 8.0)      # bir sonraki görünmezliğe kalan
+        self.fly_t = 0.0                               # EJDERHA: havada geçen süre
+        self.fly_dir = (0.0, 0.0)
+        self.fly_cd = random.uniform(6.0, 9.0)
+        self.trail_acc = 0.0                           # alev/iz bırakma sayacı
+        # Çizim için: patronun baktığı yön (yumuşatılmış) ve yürüyüş fazı.
+        # Gövde, kanatlar, silahlar ve gözler bu yöne göre çizilir; patronlar
+        # artık ekranda dönen soyut şekiller değil, oyuncuya BAKAN yaratıklar.
+        self.face_x, self.face_y = 0.0, 1.0
+        self.gait = random.uniform(0, math.tau)
         # --- YAYLIM ATEŞ -------------------------------------------------
         # Eskiden yalnızca SAVAŞ LORDU ve ORAK mermi atıyordu; GÖLGE CADISI,
         # KOLOS ve KOVAN ANA'nın tek saldırısı yere telgraflanan alan hasarıydı
@@ -6481,7 +6678,7 @@ class Boss:
         self.charge_dir = (0.0, 0.0)
         # Her patron farklı mesafede savaşır: KOLOS üstüne gelir, CADI uzak durur.
         self.want_dist = {"warlord": 190, "witch": 215, "colossus": 110,
-                          "reaper": 160, "hive": 205}.get(kind, 190)
+                          "reaper": 160, "hive": 205, "dragon": 245}.get(kind, 190)
         # Zehir patronlarda da işler (süresi yoktur, ölene kadar sürer).
         self.poison_dps = 0.0
         self.poison_tick_acc = 0.0
@@ -6495,6 +6692,126 @@ class Boss:
         self.heal_flash = 0.0
         self.healed_total = 0.0
         self.fight_time = 0.0          # dövüşün başından beri geçen süre
+
+    # ---------------- İMZA ÖZELLİĞİ ----------------
+    def afflict(self, player, k=1.0):
+        """Patronun imza etkisini oyuncuya uygular.
+
+        Patronun HER hasar kaynağı (temas, mermi, tuzak) buradan geçer;
+        böylece "ateşli patron yakar, zehirli patron zehirler" kuralı tek
+        yerde tanımlı kalır.
+        """
+        if player is None or not player.alive:
+            return
+        tk = self.trait["kind"]
+        base = max(1.0, self.dmg)
+        if tk in ("burn", "inferno"):
+            player.apply_burn(base * (0.34 if tk == "inferno" else 0.28) * k,
+                              3.2, self.name)
+        elif tk == "venom":
+            player.apply_poison(base * 0.22 * k, 5.5, self.name)
+        elif tk == "chill":
+            player.apply_slow(0.58, 1.8)
+        elif tk == "vanish":
+            player.apply_slow(0.74, 1.4)
+            player.apply_poison(base * 0.10 * k, 3.0, self.name)
+        elif tk == "blink":
+            player.apply_poison(base * 0.16 * k, 4.0, self.name)
+        # CEHENNEM patronları ayrıca yakar — cehennemde her darbe ateş taşır.
+        if self.trait.get("hellfire") and tk not in ("burn", "inferno"):
+            player.apply_burn(base * 0.15 * k, 2.4, self.name)
+
+    def hit_player(self, player, amount, fx, src_x=None, src_y=None):
+        """Oyuncuya hasar verir + imza etkisini uygular + can çalar.
+
+        Patronun hasar verdiği her yer bu tek kapıdan geçsin diye var:
+        yeni bir saldırı eklerken etkiyi ayrıca yazmak gerekmez.
+        """
+        if not player.alive:
+            return 0.0
+        dealt = player.take_damage(amount, fx,
+                                   self.x if src_x is None else src_x,
+                                   self.y if src_y is None else src_y, self.name)
+        if dealt > 0:
+            self.afflict(player)
+            self.on_damage_dealt(amount)
+        return dealt
+
+    def is_hidden(self):
+        """GÖLGE PERDESİ açıkken patron neredeyse görünmezdir."""
+        return self.vanish_t > 0
+
+    def _update_trait(self, dt, player, fx, projectiles, hazards):
+        """İmza özelliğinin kare kare işleyişi (görünmezlik, uçuş, alev izi)."""
+        tk = self.trait["kind"]
+
+        # --- GÖLGE PERDESİ: kaybolur, sonra dibinde belirir ---
+        if tk == "vanish" and self.spawn_t > 2.0:
+            if self.vanish_t > 0:
+                self.vanish_t -= dt
+                # görünmezken hızla konum değiştirir
+                dx, dy = norm_dir(self.x, self.y, player.x, player.y)
+                self.x += dx * self.speed * 1.35 * dt
+                self.y += dy * self.speed * 1.35 * dt
+                if random.random() < dt * 6:
+                    fx.spark(self.x + random.uniform(-20, 20), self.y + random.uniform(-20, 20),
+                             self.color, 0, -30, 0.4, 3)
+                if self.vanish_t <= 0:
+                    fx.shockwave(self.x, self.y, 170, self.color, 0.4, 6)
+                    fx.popup(self.x, self.y - self.radius - 28, "BELİRDİ!", self.color, 22, life=0.8)
+                    sfx("warn", 0.7, 0.0)
+                    self.atk_timer = 0.05      # belirir belirmez vurur
+            else:
+                self.vanish_cd -= dt
+                if self.vanish_cd <= 0:
+                    self.vanish_cd = random.uniform(7.0, 10.5) * (0.65 if self.enraged else 1.0)
+                    self.vanish_t = 3.0 if self.enraged else 2.4
+                    fx.ring(self.x, self.y, self.color, n=22, speed=210, life=0.45, r=3)
+                    fx.popup(self.x, self.y - self.radius - 28, "GÖLGE PERDESİ!",
+                             self.color, 20, life=0.9)
+                    sfx("dash", 0.7, 0.0)
+
+        # --- EJDERHA: havalanıp oyuncunun üstüne dalar, ardında alev bırakır ---
+        if tk == "inferno":
+            if self.fly_t > 0:
+                self.fly_t -= dt
+                self.x += self.fly_dir[0] * self.speed * 3.6 * dt
+                self.y += self.fly_dir[1] * self.speed * 3.6 * dt
+                self.trail_acc += dt
+                if self.trail_acc >= 0.14:
+                    self.trail_acc = 0.0
+                    hazards.append(Hazard(self.x, self.y, 52, 0.35, self.dmg * 0.65, owner=self))
+                fx.spark(self.x + random.uniform(-30, 30), self.y + random.uniform(-30, 30),
+                         (255, 170, 70), random.uniform(-40, 40), random.uniform(-40, 40), 0.4, 5)
+                if self.fly_t <= 0:
+                    # yere iniş: çevresine halka biçiminde alev saçar
+                    fx.shockwave(self.x, self.y, 230, (255, 140, 60), 0.5, 8)
+                    fx.shake(12, 0.35)
+                    sfx("explosion", 0.8, 0.0)
+                    for i in range(8):
+                        a = i * math.tau / 8 + random.uniform(-0.2, 0.2)
+                        hx = clamp(self.x + math.cos(a) * 130, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
+                        hy = clamp(self.y + math.sin(a) * 130, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
+                        hazards.append(Hazard(hx, hy, 58, 0.25 + i * 0.05, self.dmg * 0.8, owner=self))
+            else:
+                self.fly_cd -= dt
+                if self.fly_cd <= 0 and self.spawn_t > 2.0:
+                    self.fly_cd = random.uniform(8.0, 12.0) * (0.7 if self.enraged else 1.0)
+                    px, py = self._lead_point(player, 0.5)
+                    self.fly_dir = norm_dir(self.x, self.y, px, py)
+                    self.fly_t = 0.85
+                    self.trail_acc = 0.0
+                    fx.popup(self.x, self.y - self.radius - 30, "EJDERHA DALIYOR!",
+                             (255, 170, 80), 24, life=1.0)
+                    fx.ring(self.x, self.y, (255, 160, 70), n=20, speed=240, life=0.45, r=4)
+                    sfx("warn", 0.9, 0.0)
+
+        # --- ATEŞLİ ÇELİK / EJDER ATEŞİ: yürüdüğü yerde kor bırakır ---
+        if self.trait.get("hellfire") and self.fly_t <= 0 and self.spawn_t > 1.0:
+            if random.random() < dt * 4.5:
+                fx.spark(self.x + random.uniform(-self.radius, self.radius),
+                         self.y + self.radius * 0.5,
+                         (255, 170, 80), random.uniform(-14, 14), -40, 0.5, 4)
 
     def on_damage_dealt(self, amount):
         """Patron verdiği hasarın bir kısmını canına ekler (can çalma)."""
@@ -6560,6 +6877,16 @@ class Boss:
             if not self.alive:
                 return
         scale_in = ease_out_cubic(self.spawn_t / 0.6)
+        # Baktığı yön oyuncuya doğru yumuşakça döner + yürüyüş fazı ilerler.
+        if player.alive:
+            tfx, tfy = norm_dir(self.x, self.y, player.x, player.y)
+            k = min(1.0, dt * 5.0)
+            self.face_x += (tfx - self.face_x) * k
+            self.face_y += (tfy - self.face_y) * k
+            fl = math.hypot(self.face_x, self.face_y) or 1.0
+            self.face_x /= fl
+            self.face_y /= fl
+        self.gait += dt * (7.0 if self.fly_t > 0 else 3.4)
         # Fazlar artık daha erken tetikleniyor: patron dövüşünün büyük bölümü
         # öfkeli geçiyor, yani daha hızlı ve daha agresif.
         if not self.enraged and self.hp < self.max_hp * 0.62:
@@ -6585,21 +6912,42 @@ class Boss:
                 self._summon_minions(fx)
                 self.flee_timer = max(self.flee_timer, 2.4 if self.desperate else 1.6)
 
-        # ORAK: kısa aralıklarla oyuncunun arkasına ışınlanır — kaçmak zor.
+        # --- İMZA ÖZELLİĞİ: görünmezlik / uçuş / alev izi ---
+        self._update_trait(dt, player, fx, projectiles, hazards)
+
+        # ORAK: RUH SIÇRAMASI — oyuncunun DİBİNE ışınlanır ve anında vurur.
+        # Eskiden 150 px uzağa, rastgele bir açıya ışınlanıyordu ve oyuncu
+        # çoğu zaman bunu fark bile etmiyordu. Artık sıçrama gerçek bir tehdit:
+        # arkanda beliriyor ve bekleme süresini sıfırlayıp saldırıya geçiyor.
         if self.kind == "reaper" and self.spawn_t > 1.2:
             self.teleport_cd -= dt
             if self.teleport_cd <= 0:
-                self.teleport_cd = random.uniform(3.4, 5.2) * (0.6 if self.enraged else 1.0)
-                ang = random.uniform(0, math.tau)
-                self.x = clamp(player.x + math.cos(ang) * 150, ARENA_RECT.left + self.radius, ARENA_RECT.right - self.radius)
-                self.y = clamp(player.y + math.sin(ang) * 150, ARENA_RECT.top + self.radius, ARENA_RECT.bottom - self.radius)
-                fx.ring(self.x, self.y, self.color, n=20, speed=220, life=0.35, r=3)
+                self.teleport_cd = random.uniform(2.8, 4.4) * (0.55 if self.enraged else 1.0)
+                fx.ring(self.x, self.y, self.color, n=16, speed=180, life=0.3, r=2.5)
+                # oyuncunun GİTTİĞİ yönün tersine, yani tam arkasına
+                mvx, mvy = getattr(player, "vx", 0.0), getattr(player, "vy", 0.0)
+                ml = math.hypot(mvx, mvy)
+                if ml > 40:
+                    ang = math.atan2(-mvy / ml, -mvx / ml) + random.uniform(-0.5, 0.5)
+                else:
+                    ang = random.uniform(0, math.tau)
+                rad = self.want_dist * 0.62
+                self.x = clamp(player.x + math.cos(ang) * rad,
+                               ARENA_RECT.left + self.radius, ARENA_RECT.right - self.radius)
+                self.y = clamp(player.y + math.sin(ang) * rad,
+                               ARENA_RECT.top + self.radius, ARENA_RECT.bottom - self.radius)
+                fx.ring(self.x, self.y, self.color, n=22, speed=240, life=0.38, r=3)
+                fx.spark(self.x, self.y, self.color, 0, -60, 0.5, 6)
                 sfx("warn", 0.5, 0.0)
                 self.flee_timer = 0.0
+                self.atk_timer = min(self.atk_timer, 0.18)   # belirince hemen vurur
 
         d = dist(self.x, self.y, player.x, player.y)
         dx, dy = norm_dir(self.x, self.y, player.x, player.y)
-        if self.charge_t > 0:
+        if self.fly_t > 0:
+            # EJDERHA havada: yönünü _update_trait belirliyor, burada durulur.
+            pass
+        elif self.charge_t > 0:
             # KOLOS HÜCUMU: telgraflanan yönde hızla ilerler, yolundakini ezer.
             self.charge_t -= dt
             cs = self.speed * 5.4
@@ -6640,7 +6988,7 @@ class Boss:
             self.hit_flash -= dt
 
         # --- YAYLIM ATEŞ: her patronun düzenli menzilli tehdidi ---
-        if self.spawn_t > 1.5 and self.charge_t <= 0:
+        if self.spawn_t > 1.5 and self.charge_t <= 0 and self.fly_t <= 0 and not self.is_hidden():
             self.volley_cd -= dt
             if self.volley_cd <= 0:
                 self.volley_cd = self._volley_interval()
@@ -6656,7 +7004,8 @@ class Boss:
                 self.telegraph = (kind, tx, ty, r, timer, total)
         else:
             self.atk_timer -= dt
-            if self.atk_timer <= 0 and self.spawn_t > 1.0:
+            if (self.atk_timer <= 0 and self.spawn_t > 1.0
+                    and self.fly_t <= 0 and not self.is_hidden()):
                 # Saldırı temposu hem faza hem de kaçıncı patron olduğuna bağlı:
                 # geç dalgalardaki patronlar gözle görülür biçimde daha sık vurur.
                 cadence = 0.32 if self.desperate else (0.46 if self.enraged else 0.85)
@@ -6667,10 +7016,10 @@ class Boss:
         if player.alive and self.touch_cd <= 0:
             if dist(self.x, self.y, player.x, player.y) < self.hit_r + player.radius - 3:
                 self.touch_cd = 0.42
-                # Hücum eden KOLOS'a çarpmak sıradan temastan çok daha acıtır.
-                touch_dmg = self.dmg * (1.7 if self.charge_t > 0 else 1.0)
-                player.take_damage(touch_dmg, fx, self.x, self.y, self.name)
-                self.on_damage_dealt(touch_dmg)
+                # Hücum eden KOLOS'a ya da dalışa geçen EJDERHA'ya çarpmak
+                # sıradan temastan çok daha acıtır.
+                touch_dmg = self.dmg * (1.7 if (self.charge_t > 0 or self.fly_t > 0) else 1.0)
+                self.hit_player(player, touch_dmg, fx)
 
     def _summon_minions(self, fx):
         """Boss'un yanına yeni, daha küçük yaratıklar doğurur ve oyuncudan
@@ -6819,6 +7168,21 @@ class Boss:
                                 470 + bi * 16, 0.40, r=6, color=(120, 240, 210))
             sfx("shoot_c", 0.5, 0.0)
 
+        elif self.kind == "dragon":
+            # ALEV TOPLARI: ağır, yavaş ama peşini bırakmayan kor yumakları
+            # + aralarına serpiştirilen küçük kıvılcımlar.
+            n = 3 + min(3, bi // 2) + (2 if eng else 0)
+            for i in range(n):
+                ang = base + (i - (n - 1) / 2) * 0.22
+                self._shoot(projectiles, ang, 275 + bi * 12, 0.52, r=13,
+                            color=(255, 130, 50), target=player,
+                            turn=1.1 + 0.08 * bi, accel=70)
+            for i in range(4 + bi):
+                self._shoot(projectiles, base + random.uniform(-0.8, 0.8),
+                            360 + bi * 16, 0.26, r=6, color=(255, 205, 110))
+            fx.ring(self.x, self.y, (255, 150, 60), n=16, speed=180, life=0.4, r=3.5)
+            sfx("shoot_c", 0.6, 0.0)
+
         else:  # hive
             # SPOR OKLARI: yavaş ama ısrarla takip eden mermiler.
             n = 5 + min(3, bi) + (3 if eng else 0)
@@ -6877,6 +7241,22 @@ class Boss:
                 # Etrafına dağılan, birbirini takip eden çoklu zehir havuzları.
                 self._set_telegraph("spore", px, py, 90, 0.7 if self.enraged else 0.85)
                 fx.ring(self.x, self.y, self.color, n=16, speed=140, life=0.45, r=3)
+        elif self.kind == "dragon":
+            px, py = self._lead_point(player, 0.40)
+            ang = math.atan2(py - self.y, px - self.x)
+            roll = random.random()
+            if roll < 0.50:
+                # ALEV PÜSKÜRTME: önüne uzanan, yere kor döşeyen alev koridoru
+                self._set_telegraph("breath", ang, 0, 0, 0.62 if self.enraged else 0.80)
+                fx.popup(self.x, self.y - self.radius - 28, "ALEV PÜSKÜRTÜYOR!",
+                         (255, 170, 80), 22, life=0.9)
+            elif roll < 0.78:
+                # ALEV DUVARI: oyuncunun yoluna dikine bir ateş perdesi çeker
+                self._set_telegraph("firewall", px, py, ang, 0.58)
+            else:
+                # KANAT DARBESİ: çevresine halka biçiminde kor saçar
+                self._set_telegraph("wingburst", self.x, self.y, 200, 0.55)
+
         else:  # colossus
             px, py = self._lead_point(player, 0.45)
             if bi >= 2 and random.random() < 0.45:
@@ -6964,6 +7344,46 @@ class Boss:
                 hx = clamp(a + math.cos(ang) * rad, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
                 hy = clamp(b + math.sin(ang) * rad, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
                 hazards.append(Hazard(hx, hy, 50, 0.2 + i * 0.12, self.dmg * 0.85, owner=self))
+        elif kind == "breath":
+            # ALEV PÜSKÜRTME: patronun önünden uzanan, yere kor döşeyen koridor.
+            # Hem hızlı alev mermileri hem de gecikmeli yanma havuzları bırakır.
+            steps = 7 + self.boss_index
+            for i in range(steps):
+                d = 90 + i * 74
+                hx = clamp(self.x + math.cos(a) * d, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
+                hy = clamp(self.y + math.sin(a) * d, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
+                hazards.append(Hazard(hx, hy, 60, 0.06 * i, self.dmg * 0.75, owner=self))
+            n = 9 + self.boss_index * 2
+            for i in range(n):
+                self._shoot(projectiles, a + random.uniform(-0.26, 0.26),
+                            330 + random.uniform(-40, 90), 0.34, r=9,
+                            color=(255, 150 + random.randint(0, 60), 60))
+            fx.shockwave(self.x, self.y, 130, (255, 150, 60), 0.35, 5)
+            fx.shake(7, 0.25)
+            sfx("explosion", 0.6, 0.0)
+
+        elif kind == "firewall":
+            # ALEV DUVARI: hedefin üstünden geçen, yola dik bir ateş perdesi.
+            nx, ny = -math.sin(c), math.cos(c)
+            n = 7 + self.boss_index
+            for i in range(n):
+                off = (i - (n - 1) / 2) * 88
+                hx = clamp(a + nx * off, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
+                hy = clamp(b + ny * off, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
+                hazards.append(Hazard(hx, hy, 54, 0.05 + abs(i - (n - 1) / 2) * 0.05,
+                                      self.dmg * 0.85, owner=self))
+            sfx("explosion", 0.5, 0.0)
+
+        elif kind == "wingburst":
+            # KANAT DARBESİ: çevresine halka hâlinde kor saçar + geri iter.
+            n = 14 + self.boss_index * 2
+            for i in range(n):
+                self._shoot(projectiles, i * math.tau / n + random.uniform(-0.08, 0.08),
+                            250 + self.boss_index * 10, 0.38, r=8, color=(255, 170, 70))
+            fx.shockwave(self.x, self.y, c, (255, 160, 70), 0.45, 7)
+            fx.shake(9, 0.28)
+            sfx("bonk", 0.7, 0.0)
+
         elif kind == "slam":
             hazards.append(Hazard(a, b, c, 0.05, self.dmg * 1.5, owner=self))
             fx.shake(10, 0.3)
@@ -6991,16 +7411,562 @@ class Boss:
             return True
         return False
 
+    # =================================================================
+    # PATRON ÇİZİMLERİ
+    # -----------------------------------------------------------------
+    # Her patronun kendine ait bir gövdesi var. Ortak kurallar:
+    #   * Çizimler, patronun BAKTIĞI yöne göre yapılır. Koordinat üretmek
+    #     için her metodun başındaki P(ileri, yan) yardımcısı kullanılır:
+    #     P(1, 0) patronun bir yarıçap ÖNÜ, P(0, 1) sağı, P(-1, 0) arkasıdır.
+    #     Böylece patron döndükçe kanatları, silahları ve bacakları da döner.
+    #   * Önce OUTLINE ile biraz büyük bir kopya, sonra asıl renk çizilir:
+    #     her parçaya koyu bir dış hat kazandırır (okunurluk).
+    #   * `col` hasar alınca beyaza döner (vuruş geri bildirimi).
+    #
+    # YENİ PATRON EKLEMEK: buraya bir _draw_<tür> metodu yaz ve Boss.draw()
+    # içindeki sözlüğe ekle.
+    # =================================================================
+
+    def _facing(self):
+        """(ileri_x, ileri_y, sağ_x, sağ_y) — çizim için yön vektörleri."""
+        fx_, fy_ = self.face_x, self.face_y
+        l = math.hypot(fx_, fy_) or 1.0
+        fx_, fy_ = fx_ / l, fy_ / l
+        return fx_, fy_, -fy_, fx_
+
+    def _mapper(self, x, y, r):
+        """P(ileri, yan) -> dünya koordinatı. Bütün gövde çizimleri bunu kullanır."""
+        fx_, fy_, sx_, sy_ = self._facing()
+
+        def P(f, s):
+            return (x + fx_ * r * f + sx_ * r * s,
+                    y + fy_ * r * f + sy_ * r * s)
+        return P, fx_, fy_, sx_, sy_
+
+    def _poly(self, surf, pts, col, x, y, grow=0.09, outline=True, width=0):
+        """Koyu dış hatlı çokgen."""
+        if outline and grow > 0:
+            pygame.draw.polygon(surf, OUTLINE,
+                                [(px + (px - x) * grow, py + (py - y) * grow) for px, py in pts])
+        pygame.draw.polygon(surf, col, pts, width)
+
+    def _limb(self, surf, pts, col, w, outline=True):
+        """Kalın, dış hatlı uzuv çizgisi (bacak, boyun, kuyruk)."""
+        if outline:
+            pygame.draw.lines(surf, OUTLINE, False, pts, int(w + 4))
+        pygame.draw.lines(surf, col, False, pts, int(w))
+
+    def _boss_eyes(self, surf, P, r, t, n=2, spread=0.30, fwd=0.50, sz=0.15,
+                   col=(255, 248, 230), glow=(255, 70, 50)):
+        """Patronun gözleri: dışı açık, içi parlayan bir renk + hafif ışıma."""
+        offs = [0.0] if n == 1 else [(i - (n - 1) / 2) * 2 * spread for i in range(n)]
+        for o in offs:
+            ex, ey = P(fwd, o)
+            if glow:
+                add_glow(surf, ex, ey, r * sz * 3.2, glow, 0.42 + 0.16 * math.sin(t * 5))
+            pygame.draw.circle(surf, col, (int(ex), int(ey)), max(2, int(r * sz)))
+            pygame.draw.circle(surf, glow or RED, (int(ex), int(ey)), max(1, int(r * sz * 0.52)))
+
+    def _draw_vanished(self, surf, x, y, r, t):
+        """GÖLGE PERDESİ: gövde yok, yalnız havadaki titreşim ve puslu gözler."""
+        P, fx_, fy_, sx_, sy_ = self._mapper(x, y, r)
+        k = 0.35 + 0.25 * math.sin(t * 7)
+        add_glow(surf, x, y, r * 1.7, self.color, 0.10 + 0.05 * k)
+        for i in range(14):
+            a0 = i * math.tau / 14
+            a1 = a0 + math.tau / 26
+            jit = 1.0 + 0.10 * math.sin(t * 9 + i)
+            pygame.draw.line(surf, scale_col(self.color, 0.75 + 0.25 * k),
+                             (x + math.cos(a0) * r * jit, y + math.sin(a0) * r * jit),
+                             (x + math.cos(a1) * r * jit, y + math.sin(a1) * r * jit), 2)
+        for i in range(5):
+            a = t * 2.0 + i * math.tau / 5
+            blit_disc(surf, x + math.cos(a) * r * 1.1, y + math.sin(a) * r * 1.1,
+                      2.4, lighten(self.color, 0.5), 120)
+        self._boss_eyes(surf, P, r, t, n=2, spread=0.20, fwd=0.32, sz=0.11,
+                        col=(240, 220, 255), glow=(190, 110, 245))
+
+    # ---------------- SAVAŞ LORDU ----------------
+    def _draw_warlord(self, surf, x, y, r, col, t):
+        """Zırhlı savaş lordu: dalgalanan pelerin, omuzluklar, boynuzlu miğfer,
+        iki elinde savaş baltası. ATEŞLİ ÇELİK taşıyorsa baltaları kor gibi yanar."""
+        P, fx_, fy_, sx_, sy_ = self._mapper(x, y, r)
+        step = math.sin(self.gait) * 0.13
+        dark = scale_col(col, 0.58)
+        lite = lighten(col, 0.30)
+        steel = (198, 205, 224)
+        # Pelerin kasten gövdeden ÇOK daha koyu: aksi hâlde ikisi tek bir
+        # kırmızı lekeye dönüşüyor ve zırh okunmuyordu.
+        cape_col = (74, 18, 18) if not self.hellish else (84, 24, 12)
+
+        # --- pelerin: arkaya doğru genişleyen, kenarları dalgalanan kumaş ---
+        cape = [P(0.06, 0.62), P(-0.28, 0.94)]
+        for i in range(5):
+            k = i / 4.0
+            wob = math.sin(t * 2.4 + i * 1.1) * 0.16
+            cape.append(P(-1.12 - 0.30 * math.sin(k * math.pi), (0.5 - k) * 1.72 + wob))
+        cape += [P(-0.28, -0.94), P(0.06, -0.62)]
+        self._poly(surf, cape, cape_col, x, y, grow=0.04)
+        pygame.draw.polygon(surf, (66, 14, 14), cape, 2)
+
+        # --- baltalar: omuz hizasından öne uzanan sap + geniş ağız ---
+        for sgn in (-1, 1):
+            sw = step * sgn
+            grip = P(0.10 + sw, 1.00 * sgn)
+            tip = P(1.05 + sw, 1.12 * sgn)
+            pygame.draw.line(surf, OUTLINE, grip, tip, max(5, int(r * 0.15)))
+            pygame.draw.line(surf, (96, 66, 42), grip, tip, max(3, int(r * 0.10)))
+            blade = [(tip[0] + (fx_ * 0.34 + sx_ * 0.02 * sgn) * r,
+                      tip[1] + (fy_ * 0.34 + sy_ * 0.02 * sgn) * r),
+                     (tip[0] + (fx_ * 0.16 + sx_ * 0.52 * sgn) * r,
+                      tip[1] + (fy_ * 0.16 + sy_ * 0.52 * sgn) * r),
+                     (tip[0] + (-fx_ * 0.30 + sx_ * 0.44 * sgn) * r,
+                      tip[1] + (-fy_ * 0.30 + sy_ * 0.44 * sgn) * r),
+                     (tip[0] - fx_ * 0.16 * r, tip[1] - fy_ * 0.16 * r)]
+            self._poly(surf, blade, steel, x, y, grow=0.03)
+            pygame.draw.polygon(surf, (110, 118, 140), blade, 2)
+            if self.trait.get("hellfire"):
+                add_glow(surf, tip[0], tip[1], r * 0.55, (255, 150, 60), 0.5)
+
+        # --- gövde: omuzları geniş, beli dar bir zırh ---
+        body = [P(0.62, 0.36), P(0.30, 0.82), P(-0.46, 0.92),
+                P(-0.86, 0.46), P(-0.86, -0.46), P(-0.46, -0.92),
+                P(0.30, -0.82), P(0.62, -0.36)]
+        self._poly(surf, body, col, x, y, grow=0.09)
+        pygame.draw.polygon(surf, dark, body, 2)
+        # göğüs plakası + orta kuşak
+        chest = [P(0.46, 0.0), P(0.05, 0.46), P(-0.44, 0.0), P(0.05, -0.46)]
+        self._poly(surf, chest, lite, x, y, grow=0.0, outline=False)
+        pygame.draw.polygon(surf, dark, chest, 2)
+        pygame.draw.line(surf, dark, P(0.30, 0.0), P(-0.50, 0.0), 2)
+
+        # --- omuzluklar ---
+        for sgn in (-1, 1):
+            pl = [P(-0.34, 0.66 * sgn), P(-0.18, 1.14 * sgn),
+                  P(0.34, 1.06 * sgn), P(0.40, 0.62 * sgn)]
+            self._poly(surf, pl, dark, x, y, grow=0.04)
+            pygame.draw.polygon(surf, steel, pl, 2)
+            for i in range(3):
+                pygame.draw.circle(surf, steel,
+                                   [int(v) for v in P(-0.12 + i * 0.22, (0.86 + i * 0.02) * sgn)],
+                                   max(1, int(r * 0.055)))
+
+        # --- miğfer: boynuzlu, vizörlü ---
+        hx, hy = P(0.46, 0.0)
+        pygame.draw.circle(surf, OUTLINE, (int(hx), int(hy)), int(r * 0.42))
+        pygame.draw.circle(surf, dark, (int(hx), int(hy)), int(r * 0.36))
+        pygame.draw.circle(surf, steel, (int(hx), int(hy)), int(r * 0.36), 2)
+        for sgn in (-1, 1):
+            b0 = P(0.40, 0.30 * sgn)
+            b1 = P(0.02, 0.86 * sgn)
+            b2 = P(-0.28, 0.74 * sgn)
+            pygame.draw.lines(surf, OUTLINE, False, [b0, b1, b2], max(5, int(r * 0.15)))
+            pygame.draw.lines(surf, (240, 232, 214), False, [b0, b1, b2], max(3, int(r * 0.09)))
+        pygame.draw.line(surf, (24, 18, 22), P(0.62, -0.22), P(0.62, 0.22), max(3, int(r * 0.13)))
+        eye_glow = (255, 140, 60) if self.trait.get("hellfire") else (255, 90, 66)
+        self._boss_eyes(surf, P, r, t, n=2, spread=0.11, fwd=0.62, sz=0.075, glow=eye_glow)
+
+    # ---------------- GÖLGE CADISI ----------------
+    def _draw_witch(self, surf, x, y, r, col, t):
+        """Kukuletalı cadı: yerden yükselen yırtık cübbe, kollarında asa,
+        çevresinde dönen mühürler. Süzülerek hareket eder (yere basmaz)."""
+        P, fx_, fy_, sx_, sy_ = self._mapper(x, y, r)
+        dark = scale_col(col, 0.52)
+        lite = lighten(col, 0.38)
+        y = y + math.sin(t * 1.8) * r * 0.10
+        P, fx_, fy_, sx_, sy_ = self._mapper(x, y, r)
+
+        # --- dönen mühürler (elips yörünge: yere yatık dursun) ---
+        for i in range(5):
+            a = t * 1.1 + i * math.tau / 5
+            gx = x + math.cos(a) * r * 1.62
+            gy = y + math.sin(a) * r * 1.62 * 0.55 + r * 0.30
+            add_glow(surf, gx, gy, r * 0.30, lite, 0.35)
+            rune = rot_pts([(0, -r * 0.16), (r * 0.12, 0), (0, r * 0.16), (-r * 0.12, 0)],
+                           a * 2.0, gx, gy)
+            pygame.draw.polygon(surf, lite, rune)
+            pygame.draw.polygon(surf, (250, 238, 255), rune, 1)
+
+        # --- cübbe: omuzdan arkaya doğru açılan, etekleri yırtık ---
+        robe = [P(0.46, 0.30), P(0.30, 0.62)]
+        for i in range(7):
+            k = i / 6.0
+            wob = math.sin(t * 3.4 + i * 1.2) * 0.14
+            jag = 0.16 if i % 2 else 0.0
+            robe.append(P(-1.05 - 0.28 * math.sin(k * math.pi) - jag,
+                          (0.5 - k) * 2.20 + wob))
+        robe += [P(0.30, -0.62), P(0.46, -0.30)]
+        self._poly(surf, robe, col, x, y, grow=0.05)
+        pygame.draw.polygon(surf, dark, robe, 2)
+        # cübbenin ön yarığı
+        pygame.draw.line(surf, dark, P(0.30, 0.0), P(-0.95, 0.0), 2)
+
+        # --- kollar (iki yana uzanan geniş yenler) ---
+        for sgn in (-1, 1):
+            sleeve = [P(0.16, 0.42 * sgn), P(0.34, 0.96 * sgn),
+                      P(-0.10, 1.12 * sgn), P(-0.30, 0.52 * sgn)]
+            self._poly(surf, sleeve, dark, x, y, grow=0.04)
+
+        # --- asa: sağ elde, ucunda büyü küresi ---
+        grip = P(0.20, 1.02)
+        top = (grip[0] + fx_ * r * 0.30 - abs(r) * 0.0, grip[1] - r * 1.35)
+        pygame.draw.line(surf, OUTLINE, (grip[0], grip[1] + r * 0.30), top, max(5, int(r * 0.13)))
+        pygame.draw.line(surf, (86, 60, 46), (grip[0], grip[1] + r * 0.30), top, max(3, int(r * 0.08)))
+        orb_k = 0.55 + 0.25 * math.sin(t * 4)
+        add_glow(surf, top[0], top[1], r * 0.80, lite, 0.45 + 0.30 * orb_k)
+        pygame.draw.circle(surf, OUTLINE, (int(top[0]), int(top[1])), int(r * 0.27))
+        pygame.draw.circle(surf, lite, (int(top[0]), int(top[1])), int(r * 0.22))
+        pygame.draw.circle(surf, (252, 242, 255),
+                           (int(top[0] - r * 0.07), int(top[1] - r * 0.07)), max(1, int(r * 0.08)))
+        for i in range(3):
+            a = t * 3.0 + i * math.tau / 3
+            blit_disc(surf, top[0] + math.cos(a) * r * 0.36, top[1] + math.sin(a) * r * 0.36,
+                      2.4, (250, 230, 255), 170)
+
+        # --- kukuleta: sivri tepeli, içi kapkaranlık ---
+        hood = [P(0.74, 0.0), P(0.44, 0.50), P(-0.26, 0.60),
+                P(-0.62, 0.0), P(-0.26, -0.60), P(0.44, -0.50)]
+        self._poly(surf, hood, dark, x, y, grow=0.05)
+        pygame.draw.polygon(surf, scale_col(dark, 0.7), hood, 2)
+        inner = [P(0.56, 0.0), P(0.30, 0.30), P(-0.12, 0.34),
+                 P(-0.26, 0.0), P(-0.12, -0.34), P(0.30, -0.30)]
+        pygame.draw.polygon(surf, (13, 9, 20), inner)
+        self._boss_eyes(surf, P, r, t, n=2, spread=0.13, fwd=0.26, sz=0.085,
+                        col=(246, 228, 255), glow=(208, 124, 255))
+
+    # ---------------- KOLOS ----------------
+    def _draw_colossus(self, surf, x, y, r, col, t):
+        """Taş kolos: düzensiz kaya plakalardan örülü dev gövde, iki ağır yumruk,
+        göğsünde nabız gibi atan akkor çekirdek."""
+        P, fx_, fy_, sx_, sy_ = self._mapper(x, y, r)
+        dark = scale_col(col, 0.55)
+        lite = lighten(col, 0.26)
+        core = (255, 140, 60) if self.hellish else (120, 200, 255)
+        step = math.sin(self.gait) * 0.14
+        pulse = 0.55 + 0.45 * math.sin(t * 3.4)
+
+        # --- bacaklar: kısa, kalın taş sütunlar ---
+        for sgn in (-1, 1):
+            fo = step * sgn
+            self._limb(surf, [P(-0.50, 0.46 * sgn), P(-0.95 + fo, 0.56 * sgn),
+                              P(-1.15 + fo, 0.50 * sgn)], dark, max(8, int(r * 0.30)))
+            foot = [P(-1.02 + fo, 0.24 * sgn), P(-1.36 + fo, 0.34 * sgn),
+                    P(-1.30 + fo, 0.78 * sgn), P(-0.98 + fo, 0.70 * sgn)]
+            self._poly(surf, foot, dark, x, y, grow=0.04)
+
+        # --- kollar + yumruklar (öne uzanmış) ---
+        for sgn in (-1, 1):
+            fo = -step * sgn
+            self._limb(surf, [P(0.20, 0.90 * sgn), P(0.55 + fo, 1.14 * sgn)],
+                       dark, max(7, int(r * 0.26)))
+            fist_c = P(0.78 + fo, 1.22 * sgn)
+            pygame.draw.circle(surf, OUTLINE, (int(fist_c[0]), int(fist_c[1])), int(r * 0.46))
+            pygame.draw.circle(surf, col, (int(fist_c[0]), int(fist_c[1])), int(r * 0.40))
+            pygame.draw.circle(surf, lite,
+                               (int(fist_c[0] - fx_ * r * 0.10), int(fist_c[1] - fy_ * r * 0.10)),
+                               max(2, int(r * 0.15)))
+            for i in range(3):
+                pygame.draw.line(surf, dark,
+                                 P(0.90 + fo, (1.02 + i * 0.14) * sgn),
+                                 P(1.06 + fo, (1.00 + i * 0.14) * sgn), 2)
+
+        # --- gövde: üst üste binmiş düzensiz kaya plakalar ---
+        plates = (
+            (-0.62, 1.02, 0.42),   # kalça
+            (0.02, 1.14, 0.46),    # gövde
+            (0.52, 0.92, 0.34),    # göğüs
+        )
+        for i, (fwd, half_w, half_h) in enumerate(plates):
+            pts = []
+            n = 7
+            for j in range(n):
+                a = j * math.tau / n + 0.35 + i * 0.4
+                jitter = 1.0 + 0.16 * math.sin(j * 2.7 + i)
+                pts.append(P(fwd + math.cos(a) * half_h * jitter,
+                             math.sin(a) * half_w * jitter))
+            self._poly(surf, pts, col if i != 1 else lighten(col, 0.08), x, y, grow=0.05)
+            pygame.draw.polygon(surf, dark, pts, 2)
+
+        # --- akkor çekirdek ---
+        cx, cy = P(0.18, 0.0)
+        add_glow(surf, cx, cy, r * (0.85 + 0.28 * pulse), core, 0.50 + 0.28 * pulse)
+        pygame.draw.circle(surf, (20, 16, 20), (int(cx), int(cy)), int(r * 0.30))
+        pygame.draw.circle(surf, core, (int(cx), int(cy)), int(r * (0.15 + 0.07 * pulse)))
+        for i in range(6):
+            a = i * math.tau / 6 + 0.3
+            pygame.draw.line(surf, scale_col(core, 0.55 + 0.45 * pulse),
+                             (cx + math.cos(a) * r * 0.26, cy + math.sin(a) * r * 0.26),
+                             (cx + math.cos(a) * r * (0.70 + 0.25 * math.sin(i * 1.7)),
+                              cy + math.sin(a) * r * (0.70 + 0.25 * math.sin(i * 1.7))), 2)
+
+        # --- kafa: omuzların arasına gömülü küçük taş blok ---
+        hd = [P(1.10, 0.0), P(0.86, 0.38), P(0.50, 0.30), P(0.50, -0.30), P(0.86, -0.38)]
+        self._poly(surf, hd, dark, x, y, grow=0.05)
+        pygame.draw.polygon(surf, scale_col(dark, 0.75), hd, 2)
+        self._boss_eyes(surf, P, r, t, n=2, spread=0.13, fwd=0.82, sz=0.085,
+                        col=(255, 250, 240), glow=core)
+
+    # ---------------- ORAK ----------------
+    def _draw_reaper(self, surf, x, y, r, col, t):
+        """Ruh toplayıcı: ayağı yere değmeyen paçavra pelerin, boş kukuleta,
+        iki eliyle savurduğu dev tırpan. Ardında ruh izi bırakır."""
+        P, fx_, fy_, sx_, sy_ = self._mapper(x, y, r)
+        dark = scale_col(col, 0.46)
+        lite = lighten(col, 0.42)
+        y = y + math.sin(t * 2.4) * r * 0.13
+        P, fx_, fy_, sx_, sy_ = self._mapper(x, y, r)
+
+        # --- ruh izi ---
+        for i in range(4):
+            k = 1.0 - i / 4.0
+            gx, gy = P(-0.55 - i * 0.45, 0.0)
+            blit_disc(surf, gx, gy, r * 0.40 * k, col, int(64 * k))
+
+        # --- tırpan: uzun sap + kavisli ağız (yavaşça salınır) ---
+        ang0 = math.sin(t * 0.9) * 0.7 + self.wobble * 0.10
+        base = P(0.10, 0.62)
+        sh_end = (base[0] + math.cos(ang0) * r * 2.05, base[1] + math.sin(ang0) * r * 2.05)
+        sh_start = (base[0] - math.cos(ang0) * r * 0.85, base[1] - math.sin(ang0) * r * 0.85)
+        pygame.draw.line(surf, OUTLINE, sh_start, sh_end, max(6, int(r * 0.15)))
+        pygame.draw.line(surf, (62, 50, 46), sh_start, sh_end, max(4, int(r * 0.10)))
+        blade = pygame.Rect(0, 0, int(r * 1.9), int(r * 1.9))
+        blade.center = (int(sh_end[0] - math.cos(ang0) * r * 0.66),
+                        int(sh_end[1] - math.sin(ang0) * r * 0.66))
+        pygame.draw.arc(surf, OUTLINE, blade.inflate(8, 8), ang0 - 0.25, ang0 + math.pi * 0.70, 8)
+        pygame.draw.arc(surf, (228, 238, 246), blade, ang0 - 0.25, ang0 + math.pi * 0.70, 4)
+        add_glow(surf, sh_end[0], sh_end[1], r * 0.55, lite, 0.45)
+
+        # --- pelerin: omuzdan aşağı açılan, etekleri şerit şerit yırtık ---
+        cloak = [P(0.34, 0.54), P(0.10, 0.92)]
+        for i in range(9):
+            k = i / 8.0
+            wob = math.sin(t * 4.2 + i * 1.35) * 0.16
+            depth = -1.10 - 0.45 * math.sin(k * math.pi) - (0.22 if i % 2 else 0.0)
+            cloak.append(P(depth, (0.5 - k) * 2.05 + wob))
+        cloak += [P(0.10, -0.92), P(0.34, -0.54)]
+        self._poly(surf, cloak, col, x, y, grow=0.05)
+        pygame.draw.polygon(surf, dark, cloak, 2)
+
+        # --- iskelet eller (tırpanı kavrar) ---
+        for grip_f, grip_s in ((0.16, 0.62), (-0.10, 0.34)):
+            gx, gy = P(grip_f, grip_s)
+            pygame.draw.circle(surf, OUTLINE, (int(gx), int(gy)), max(3, int(r * 0.16)))
+            pygame.draw.circle(surf, (228, 232, 226), (int(gx), int(gy)), max(2, int(r * 0.12)))
+
+        # --- kukuleta: derin, içi boş ---
+        hood = [P(0.86, 0.0), P(0.58, 0.46), P(-0.06, 0.54),
+                P(-0.30, 0.0), P(-0.06, -0.54), P(0.58, -0.46)]
+        self._poly(surf, hood, dark, x, y, grow=0.05)
+        pygame.draw.polygon(surf, scale_col(dark, 0.7), hood, 2)
+        inner = [P(0.64, 0.0), P(0.42, 0.28), P(0.02, 0.30),
+                 P(-0.08, 0.0), P(0.02, -0.30), P(0.42, -0.28)]
+        pygame.draw.polygon(surf, (9, 13, 15), inner)
+        self._boss_eyes(surf, P, r, t, n=2, spread=0.12, fwd=0.34, sz=0.08,
+                        col=(226, 255, 250), glow=lite)
+
+    # ---------------- KOVAN ANA ----------------
+    def _draw_hive(self, surf, x, y, r, col, t):
+        """Kovan anası: titreyen dört kanat, bölmeli karın, zehir iğnesi,
+        altı eklemli bacak ve çeneli kafa. Çevresinde yavruları dolanır."""
+        P, fx_, fy_, sx_, sy_ = self._mapper(x, y, r)
+        dark = scale_col(col, 0.58)
+        lite = lighten(col, 0.30)
+        venom = (172, 232, 92)
+
+        # --- bacaklar (altı adet, iki eklemli) ---
+        for sgn in (-1, 1):
+            for i in range(3):
+                root_f = 0.34 - i * 0.34
+                sw = math.sin(self.gait * 1.7 + i * 1.2 + (0 if sgn > 0 else 1.7)) * 0.16
+                a = P(root_f, 0.52 * sgn)
+                b = P(root_f + 0.24 + sw, 1.12 * sgn)
+                c = P(root_f - 0.18 + sw, 1.60 * sgn)
+                self._limb(surf, [a, b, c], dark, max(3, int(r * 0.09)))
+
+        # --- kanatlar: ince, uzun, yarı saydam (çırpınca bulanıklaşır) ---
+        flap = 0.16 * math.sin(t * 18)
+        pad = int(r * 3.2)
+        wsurf = pygame.Surface((pad * 2, pad * 2), pygame.SRCALPHA)
+        wcx, wcy = pad, pad
+
+        def W(f, s):
+            return (wcx + fx_ * r * f + sx_ * r * s, wcy + fy_ * r * f + sy_ * r * s)
+
+        for sgn in (-1, 1):
+            for j, (reach, back, alpha) in enumerate(((1.95, -1.35, 78), (1.55, -2.05, 62))):
+                tipo = flap * (1 if j == 0 else -1)
+                wing = [W(-0.15, 0.30 * sgn),
+                        W(0.25 + tipo, (reach * 0.55) * sgn),
+                        W(back * 0.42 + tipo, reach * sgn),
+                        W(back, (reach * 0.42) * sgn)]
+                pygame.draw.polygon(wsurf, (226, 240, 255, alpha), wing)
+                pygame.draw.polygon(wsurf, (255, 255, 255, alpha + 50), wing, 1)
+                pygame.draw.line(wsurf, (255, 255, 255, alpha + 40),
+                                 W(-0.10, 0.30 * sgn), W(back * 0.42 + tipo, reach * sgn), 1)
+        surf.blit(wsurf, (int(x - pad), int(y - pad)))
+
+        # --- karın: arkaya doğru küçülen bölmeler + zehir iğnesi ---
+        for i in range(3):
+            k = 1.0 - i * 0.20
+            ax, ay = P(-0.78 - i * 0.56, 0.0)
+            pygame.draw.circle(surf, OUTLINE, (int(ax), int(ay)), int(r * 0.62 * k + 2))
+            pygame.draw.circle(surf, dark if i % 2 else col, (int(ax), int(ay)), int(r * 0.62 * k))
+            pygame.draw.circle(surf, scale_col(col, 0.75), (int(ax), int(ay)), int(r * 0.62 * k), 2)
+        sting = [P(-1.92, 0.20), P(-2.52, 0.0), P(-1.92, -0.20)]
+        self._poly(surf, sting, venom, x, y, grow=0.03)
+        add_glow(surf, *P(-2.45, 0.0), r * 0.40, venom, 0.5)
+
+        # --- göğüs ---
+        pygame.draw.circle(surf, OUTLINE, (int(x), int(y)), int(r * 0.80))
+        pygame.draw.circle(surf, col, (int(x), int(y)), int(r * 0.74))
+        pygame.draw.circle(surf, lite, [int(v) for v in P(-0.16, 0.0)], int(r * 0.34))
+
+        # --- kafa + çeneler ---
+        hx, hy = P(0.94, 0.0)
+        pygame.draw.circle(surf, OUTLINE, (int(hx), int(hy)), int(r * 0.44))
+        pygame.draw.circle(surf, dark, (int(hx), int(hy)), int(r * 0.38))
+        chomp = 0.5 + 0.5 * math.sin(t * 6)
+        for sgn in (-1, 1):
+            m0 = P(1.18, 0.24 * sgn)
+            m1 = P(1.62, (0.10 + 0.26 * chomp) * sgn)
+            pygame.draw.line(surf, OUTLINE, m0, m1, max(4, int(r * 0.13)))
+            pygame.draw.line(surf, (240, 230, 204), m0, m1, max(2, int(r * 0.08)))
+        # duyargalar
+        for sgn in (-1, 1):
+            self._limb(surf, [P(1.10, 0.20 * sgn), P(1.50, 0.62 * sgn), P(1.40, 1.02 * sgn)],
+                       (60, 48, 30), 3, outline=False)
+        self._boss_eyes(surf, P, r, t, n=2, spread=0.15, fwd=1.02, sz=0.10,
+                        col=(255, 252, 220), glow=venom)
+
+        # --- çevresinde dolanan yavrular ---
+        for i in range(4):
+            a = t * 2.0 + i * math.tau / 4
+            lx = x + math.cos(a) * r * 1.80
+            ly = y + math.sin(a) * r * 1.80 * 0.72
+            pygame.draw.circle(surf, OUTLINE, (int(lx), int(ly)), 6)
+            pygame.draw.circle(surf, lite, (int(lx), int(ly)), 4)
+
+    # ---------------- EJDERHA ----------------
+    def _draw_dragon(self, surf, x, y, r, col, t):
+        """Cehennem ejderhası: kıvrılan dikenli kuyruk, zarlı iki kanat,
+        uzun boyun, dişli çene ve ağzında biriken alev.
+
+        Uçarken (fly_t) gövde yukarı kalkar ve kanatlar tamamen açılır —
+        dalışa geçtiği bir bakışta anlaşılır.
+        """
+        flying = self.fly_t > 0
+        lift = (r * 0.55 if flying else 0.0) + math.sin(t * 2.6) * r * (0.16 if flying else 0.07)
+        y = y - lift
+        P, fx_, fy_, sx_, sy_ = self._mapper(x, y, r)
+        dark = scale_col(col, 0.55)
+        lite = lighten(col, 0.28)
+        belly = (240, 192, 122)
+        fire = (255, 150, 55)
+
+        # --- kuyruk: arkaya kıvrılan, ucunda ok başı ---
+        tail = []
+        for i in range(6):
+            k = i / 5.0
+            curl = math.sin(t * 2.0 + i * 0.85) * 0.34 * k
+            tail.append(P(-0.70 - k * 2.20, curl))
+        self._limb(surf, tail, col, max(5, int(r * 0.20)))
+        td = (tail[-1][0] - tail[-2][0], tail[-1][1] - tail[-2][1])
+        tl = math.hypot(*td) or 1.0
+        td = (td[0] / tl, td[1] / tl)
+        self._poly(surf, [(tail[-1][0] + td[0] * r * 0.50, tail[-1][1] + td[1] * r * 0.50),
+                          (tail[-1][0] - td[1] * r * 0.30, tail[-1][1] + td[0] * r * 0.30),
+                          (tail[-1][0] + td[1] * r * 0.30, tail[-1][1] - td[0] * r * 0.30)],
+                   dark, x, y, grow=0.03)
+
+        # --- kanatlar: kemikli, tırtıklı zar ---
+        flap = (0.86 if flying else 0.58) + 0.22 * math.sin(t * (7.0 if flying else 3.2))
+        for sgn in (-1, 1):
+            sh = P(-0.10, 0.36 * sgn)
+            elbow = P(0.46, (1.06 * flap + 0.30) * sgn)
+            tip = P(-0.20, (2.30 * flap + 0.45) * sgn)
+            n1 = P(-0.72, (1.78 * flap + 0.32) * sgn)
+            n2 = P(-1.02, (1.20 * flap + 0.26) * sgn)
+            n3 = P(-1.14, (0.56 * flap + 0.20) * sgn)
+            memb = [sh, elbow, tip,
+                    P(-0.52, (2.00 * flap + 0.36) * sgn), n1,
+                    P(-0.92, (1.46 * flap + 0.28) * sgn), n2,
+                    P(-1.18, (0.86 * flap + 0.22) * sgn), n3]
+            self._poly(surf, memb, scale_col(col, 0.70), x, y, grow=0.035)
+            pygame.draw.polygon(surf, dark, memb, 2)
+            for f in (elbow, tip, n1, n2, n3):
+                pygame.draw.line(surf, lighten(dark, 0.30), sh, f, max(2, int(r * 0.06)))
+
+        # --- gövde ---
+        body = [P(0.90, 0.0), P(0.60, 0.56), P(-0.10, 0.74),
+                P(-0.84, 0.44), P(-0.84, -0.44), P(-0.10, -0.74), P(0.60, -0.56)]
+        self._poly(surf, body, col, x, y, grow=0.08)
+        pygame.draw.polygon(surf, dark, body, 2)
+        # karın pulları
+        for i in range(4):
+            f = 0.50 - i * 0.32
+            w = 0.46 - i * 0.05
+            pygame.draw.line(surf, belly, P(f, -w), P(f, w), max(2, int(r * 0.08)))
+        # sırt dikenleri
+        for i in range(4):
+            b_f = -0.15 - i * 0.40
+            self._poly(surf, [P(b_f, 0.16), P(b_f - 0.38, 0.0), P(b_f, -0.16)],
+                       (250, 228, 192), x, y, grow=0.03)
+
+        # --- arka pençeler ---
+        for sgn in (-1, 1):
+            self._limb(surf, [P(-0.40, 0.60 * sgn), P(-0.78, 0.96 * sgn)],
+                       dark, max(3, int(r * 0.12)))
+            for k in (-1, 0, 1):
+                pygame.draw.line(surf, (248, 240, 224), P(-0.78, 0.96 * sgn),
+                                 P(-1.02 + k * 0.10, (1.16 + abs(k) * 0.04) * sgn), 2)
+
+        # --- boyun + kafa ---
+        neck = [P(0.60, 0.0), P(1.05, 0.0), P(1.45, 0.0)]
+        self._limb(surf, neck, col, max(6, int(r * 0.28)))
+        hx, hy = P(1.72, 0.0)
+        head = [P(2.22, 0.0), P(1.86, 0.30), P(1.40, 0.34), P(1.30, 0.0),
+                P(1.40, -0.34), P(1.86, -0.30)]
+        self._poly(surf, head, lighten(col, 0.08), x, y, grow=0.05)
+        pygame.draw.polygon(surf, dark, head, 2)
+        # boynuzlar
+        for sgn in (-1, 1):
+            self._limb(surf, [P(1.42, 0.26 * sgn), P(1.02, 0.56 * sgn), P(0.72, 0.52 * sgn)],
+                       (242, 230, 208), max(3, int(r * 0.10)))
+        # çene + dişler
+        jaw = 0.12 + 0.12 * (0.5 + 0.5 * math.sin(t * 3.2))
+        self._poly(surf, [P(2.20, 0.0), P(1.82, 0.22), P(1.76, 0.0), P(1.82, -0.22)],
+                   (42, 14, 12), x, y, grow=0.0, outline=False)
+        for k in (-1, 1):
+            pygame.draw.line(surf, (255, 250, 240), P(1.92, 0.16 * k), P(2.16, 0.06 * k), 2)
+        pygame.draw.line(surf, (255, 250, 240), P(1.90, 0.0), P(2.14 + jaw, 0.0), 2)
+        # ağızda biriken alev
+        glow_k = 0.45 + 0.35 * math.sin(t * 5)
+        if self.telegraph and self.telegraph[0] == "breath":
+            glow_k = 1.0
+        mx_, my_ = P(2.20, 0.0)
+        add_glow(surf, mx_, my_, r * (0.45 + 0.50 * glow_k), fire, 0.30 + 0.50 * glow_k)
+        for i in range(3):
+            ph = (t * 1.6 + i * 0.33) % 1.0
+            ex_, ey_ = P(2.20 + ph * 0.55, random.uniform(-0.10, 0.10))
+            blit_disc(surf, ex_, ey_ - ph * r * 0.45, max(1.0, 4.0 * (1 - ph)),
+                      (255, 205, 110), int(200 * (1 - ph)))
+        self._boss_eyes(surf, P, r, t, n=2, spread=0.14, fwd=1.66, sz=0.09,
+                        col=(255, 248, 214), glow=(255, 170, 60))
+
     def draw(self, surf, t):
         scale = ease_out_cubic(self.spawn_t / 0.6) if self.spawn_t < 0.6 else 1.0
         r = self.radius * scale
         x, y = self.x, self.y
         col = WHITE if self.hit_flash > 0 else self.color
-        surf.blit(shadow_sprite(int(r * 2.4)), (int(x - r * 1.2), int(y + r * 0.6)))
-        add_glow(surf, x, y, r * 2.2, self.color, 0.4 + 0.15 * math.sin(t * 3))
-        if self.enraged:
+        hidden = self.is_hidden()
+        # GÖLGE PERDESİ açıkken gölge, ışıma ve alev çemberi de kaybolur —
+        # yoksa "görünmez" patron ışıldayan bir hedef tahtası olurdu.
+        if not hidden:
+            surf.blit(shadow_sprite(int(r * 2.4)), (int(x - r * 1.2), int(y + r * 0.6)))
+            add_glow(surf, x, y, r * 2.2, self.color, 0.4 + 0.15 * math.sin(t * 3))
+        if self.enraged and not hidden:
             add_glow(surf, x, y, r * 1.6, (255, 70, 50), 0.35)
-        if getattr(self, "hellish", False):
+        if getattr(self, "hellish", False) and not hidden:
             # ayağının dibinde dönen alev çemberi + yukarı süzülen korlar
             add_glow(surf, x, y, r * 3.0, (255, 130, 50), 0.22 + 0.08 * math.sin(t * 2.4))
             ring = pygame.Rect(0, 0, int(r * 2.9), int(r * 1.5))
@@ -7018,53 +7984,21 @@ class Boss:
                 blit_disc(surf, ex, ey, max(1.0, 3.6 * (1.0 - ph)), (255, 170, 70),
                           int(210 * (1.0 - ph)))
 
-        if self.kind == "warlord":
-            pts = []
-            for i in range(8):
-                ang = i * math.tau / 8 + self.wobble * 0.2
-                rad = r * (1.0 if i % 2 == 0 else 0.78)
-                pts.append((x + math.cos(ang) * rad, y + math.sin(ang) * rad))
-            pygame.draw.polygon(surf, OUTLINE, [(px + (px - x) * .08, py + (py - y) * .08) for px, py in pts])
-            pygame.draw.polygon(surf, col, pts)
-        elif self.kind == "witch":
-            pygame.draw.circle(surf, OUTLINE, (int(x), int(y)), int(r + 3))
-            pygame.draw.circle(surf, col, (int(x), int(y)), int(r))
-            for i in range(3):
-                ang = t * 1.5 + i * math.tau / 3
-                pygame.draw.circle(surf, self.color, (int(x + math.cos(ang) * r * 1.3), int(y + math.sin(ang) * r * 1.3)), 6)
-        elif self.kind == "reaper":
-            # Sivri, öne doğru uzayan üçgen gövde + dönen orak ağzı
-            ang0 = self.wobble * 0.9
-            pts = rot_pts([(r * 1.25, 0), (-r * 0.8, -r * 0.85), (-r * 0.35, 0), (-r * 0.8, r * 0.85)], ang0, x, y)
-            pygame.draw.polygon(surf, OUTLINE, [(px + (px - x) * .1, py + (py - y) * .1) for px, py in pts])
-            pygame.draw.polygon(surf, col, pts)
-            blade = pygame.Rect(0, 0, int(r * 2.5), int(r * 2.5))
-            blade.center = (int(x), int(y))
-            pygame.draw.arc(surf, lighten(col, .45), blade, ang0, ang0 + math.pi * 0.85, 4)
-        elif self.kind == "hive":
-            # Altıgen kovan + çevresinde dolanan yavrular
-            pts = [(x + math.cos(i * math.tau / 6 + self.wobble * 0.15) * r,
-                    y + math.sin(i * math.tau / 6 + self.wobble * 0.15) * r) for i in range(6)]
-            pygame.draw.polygon(surf, OUTLINE, [(px + (px - x) * .09, py + (py - y) * .09) for px, py in pts])
-            pygame.draw.polygon(surf, col, pts)
-            inner = [(x + math.cos(i * math.tau / 6 + self.wobble * 0.15) * r * 0.5,
-                      y + math.sin(i * math.tau / 6 + self.wobble * 0.15) * r * 0.5) for i in range(6)]
-            pygame.draw.polygon(surf, scale_col(col, 0.7), inner)
-            for i in range(4):
-                ang = t * 2.2 + i * math.tau / 4
-                pygame.draw.circle(surf, lighten(col, .3),
-                                   (int(x + math.cos(ang) * r * 1.45), int(y + math.sin(ang) * r * 1.45)), 5)
+        # --- GÖVDE ---
+        # Her patronun kendi çizimi var. GÖLGE PERDESİ açıkken gövde hiç
+        # çizilmez; yalnızca havadaki titreşim ve puslu gözler görünür.
+        if hidden:
+            self._draw_vanished(surf, x, y, r, t)
         else:
-            rect = pygame.Rect(0, 0, r * 1.9, r * 1.9)
-            rect.center = (int(x), int(y))
-            pygame.draw.rect(surf, OUTLINE, rect.inflate(6, 6), border_radius=10)
-            pygame.draw.rect(surf, col, rect, border_radius=10)
-            pygame.draw.rect(surf, lighten(col, .25), rect.inflate(-r * .7, -r * .7), border_radius=6)
-
-        pygame.draw.circle(surf, (255, 255, 255), (int(x - r * 0.28), int(y - r * 0.15)), max(2, int(r * .12)))
-        pygame.draw.circle(surf, (255, 255, 255), (int(x + r * 0.28), int(y - r * 0.15)), max(2, int(r * .12)))
-        pygame.draw.circle(surf, RED, (int(x - r * 0.28), int(y - r * 0.15)), max(1, int(r * .06)))
-        pygame.draw.circle(surf, RED, (int(x + r * 0.28), int(y - r * 0.15)), max(1, int(r * .06)))
+            drawer = {
+                "warlord": self._draw_warlord,
+                "witch": self._draw_witch,
+                "colossus": self._draw_colossus,
+                "reaper": self._draw_reaper,
+                "hive": self._draw_hive,
+                "dragon": self._draw_dragon,
+            }.get(self.kind, self._draw_warlord)
+            drawer(surf, x, y, r, col, t)
 
         if self.telegraph:
             kind, a, b, c, timer, total = self.telegraph
@@ -7115,6 +8049,37 @@ class Boss:
                     hy = clamp(b + math.sin(ang) * c, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
                     blit_disc(surf, hx, hy, BOSS_RING_HAZARD_R * 0.56 * k, (230, 90, 220), 92)
                 pygame.draw.circle(surf, (255, 170, 255), (int(a), int(b)), max(2, int(6 * k)))
+            elif kind == "breath":
+                # alev koridoru: patrondan ileri uzanan turuncu huni
+                s = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+                spread = 0.30
+                for sgn in (-1, 1):
+                    ang = a + spread * sgn
+                    ex, ey = x + math.cos(ang) * 900, y + math.sin(ang) * 900
+                    pygame.draw.line(s, (255, 150, 60, int(70 + 110 * k)), (x, y), (ex, ey), 4)
+                ex, ey = x + math.cos(a) * 900, y + math.sin(a) * 900
+                pygame.draw.polygon(s, (255, 110, 40, int(30 + 60 * k)), [
+                    (x, y),
+                    (x + math.cos(a - spread) * 900, y + math.sin(a - spread) * 900),
+                    (x + math.cos(a + spread) * 900, y + math.sin(a + spread) * 900)])
+                surf.blit(s, (0, 0))
+                add_glow(surf, x + math.cos(a) * r * 0.9, y + math.sin(a) * r * 0.9,
+                         26 + 34 * k, (255, 180, 80), 0.4 + 0.4 * k)
+            elif kind == "firewall":
+                # alev duvarı: hedefin üstünden geçen dik perde
+                nx, ny = -math.sin(c), math.cos(c)
+                n = 7 + self.boss_index
+                for i in range(n):
+                    off = (i - (n - 1) / 2) * 88
+                    hx = clamp(a + nx * off, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
+                    hy = clamp(b + ny * off, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
+                    blit_disc(surf, hx, hy, 30 * k, (255, 130, 50), 95)
+            elif kind == "wingburst":
+                pygame.draw.circle(surf, (255, 170, 70), (int(a), int(b)), int(c * k), 3)
+                for i in range(12):
+                    ang = i * math.tau / 12
+                    blit_disc(surf, a + math.cos(ang) * c * k, b + math.sin(ang) * c * k,
+                              7, (255, 190, 90), 130)
             elif kind == "charge":
                 # hücum hattı: patrondan hedefe uzanan geniş kırmızı koridor
                 ang = math.atan2(b - y, a - x)
@@ -7131,9 +8096,17 @@ class Boss:
                     fy_ = y + math.sin(ang) * (60 + i * 46) * (0.5 + k)
                     pygame.draw.circle(surf, (255, 150, 90), (int(fx_), int(fy_)), max(2, int(5 * k)), 2)
 
-        # HP bar (üst, isim + zırh + dövüş süresi ile)
+        # HP bar (üst, isim + imza özelliği + zırh + dövüş süresi ile)
         w = 340
         bx, by = x - w / 2, y - r - 30
+        if self.is_hidden():
+            # GÖLGE PERDESİ: can çubuğu da kaybolur, yalnızca soluk bir iz kalır.
+            hint = pygame.Surface((int(w), 10), pygame.SRCALPHA)
+            pygame.draw.rect(hint, (120, 90, 160, 60), hint.get_rect(), border_radius=5)
+            surf.blit(hint, (int(bx), int(by)))
+            draw_text(surf, "GÖRÜNMEZ", (x, by - 13), 14, (200, 150, 255), bold=True,
+                      center=True)
+            return
         draw_bar(surf, (bx, by, w, 10), self.hp / self.max_hp, (220, 70, 70))
         # can çaldığında çubuğun üstünde yeşil bir parıltı belirir
         if self.heal_flash > 0:
@@ -7149,6 +8122,10 @@ class Boss:
         elif self.enraged:
             label += "  ·  ÖFKELİ"
         draw_text(surf, label, (x, by - 13), 14, GOLD, bold=True, center=True)
+        # İmza özelliği rozeti: oyuncu neyle karşı karşıya olduğunu bilsin.
+        tr = self.trait
+        draw_text(surf, tr["label"], (x, by - 28), 11, tr["color"], bold=True,
+                  center=True, shadow=False)
         draw_text(surf, fmt_time(self.fight_time), (bx - 6, by - 4), 11, TEXT_DIM,
                   bold=True, shadow=False, right=True)
         if self.armor > 0.005:
@@ -7580,6 +8557,8 @@ class RunState:
         self.waves.spawn_pos_fn = self.near_camera_point
         self.combo = ComboMeter()
         self.ach = ach
+        # Arkada kalan yaratıkları önüne ışınlama sayacı (bkz. reposition_stragglers)
+        self.straggler_timer = 0.0
 
         # --- KAMERA ---
         # Dünya ekrandan büyük olduğu için kamera oyuncuyu yumuşak takip eder.
@@ -7609,6 +8588,8 @@ class RunState:
         self.bonk8_check = False
         self.gems_earned = 0
         self.death_cause = ""
+        # Sağ üstteki "⋮" istatistik paneli açık mı?
+        self.show_stats = False
 
     # ---------------- KAMERA ----------------
     def cam_rect(self):
@@ -7651,6 +8632,99 @@ class RunState:
             if not cam.inflate(-80, -80).collidepoint(x, y):
                 return x, y
         return ARENA_RECT.centerx, ARENA_RECT.centery
+
+    # ---------------- KAÇANIN ÖNÜNE IŞINLANMA ----------------
+    # Dünya 3x3 ekran büyüklüğüne çıktığından beri düşmanlardan kaçmak fazla
+    # kolaylaştı: oyuncu bir yöne koşunca sürü geride kalıyor ve dalga
+    # "boşluğa" dönüşüyordu. Artık ARKADA KALAN yaratıklar, oyuncunun KAÇTIĞI
+    # yöne — yani önüne — ışınlanıyor. Kaçmak hâlâ mümkün ama artık bedava değil.
+    STRAGGLER_CHECK = 0.45      # kaç saniyede bir bakılır
+    STRAGGLER_MIN_SPEED = 95.0  # bu hızın altında "kaçıyor" sayılmaz
+    STRAGGLER_BEHIND = 0.25     # arkada sayılması için gereken yön farkı (-1..1)
+    STRAGGLER_FAR = 560.0       # bu mesafeden uzaktakiler ışınlanabilir
+    STRAGGLER_MAX = 4           # tek seferde en fazla kaç yaratık ışınlanır
+    STRAGGLER_COOLDOWN = 3.2    # aynı yaratık tekrar ışınlanana kadar geçen süre
+    # Kaçış yönünde ne kadar ileriye bırakılacağı — kameranın hemen dışı.
+    STRAGGLER_AHEAD_MIN = VIEW_RECT.w * 0.60
+    STRAGGLER_AHEAD_MAX = VIEW_RECT.w * 0.85
+
+    def reposition_stragglers(self, dt):
+        """Oyuncunun arkasında kalan yaratıkları kaçış yönünün ÖNÜNE ışınlar.
+
+        Yeni konum kameranın hemen DIŞINDA seçilir: yaratık gözünün önünde
+        birden belirmez, oyuncu koşmaya devam edince karşısına çıkar. Her iki
+        uçta da kısa bir halka efekti bırakılır ki "ışınlandı" hissi okunsun.
+        """
+        p = self.player
+        if not p.alive:
+            return
+        self.straggler_timer -= dt
+        if self.straggler_timer > 0:
+            return
+        self.straggler_timer = self.STRAGGLER_CHECK
+
+        # Kaçış yönü: oyuncunun gerçek hızı (dash sırasında dash yönü).
+        if p.dash_time > 0:
+            mvx, mvy = p.dash_dx, p.dash_dy
+            speed = p.dash_speed
+        else:
+            speed = math.hypot(p.vx, p.vy)
+            if speed < 1e-3:
+                return
+            mvx, mvy = p.vx / speed, p.vy / speed
+        if speed < self.STRAGGLER_MIN_SPEED:
+            return
+
+        # Bekleme süreleri önce topluca işlenir; aksi hâlde kontenjan dolunca
+        # listenin sonundaki yaratıkların sayacı hiç azalmaz ve sonsuza kadar
+        # "beklemede" kalırlardı.
+        ready = []
+        for e in self.enemies:
+            if not e.alive or getattr(e, "is_boss", False):
+                continue
+            cd = getattr(e, "warp_cd", 0.0)
+            if cd > 0:
+                e.warp_cd = max(0.0, cd - self.STRAGGLER_CHECK)
+            else:
+                ready.append(e)
+
+        cam = self.cam_rect()
+        moved = 0
+        for e in ready:
+            if moved >= self.STRAGGLER_MAX:
+                break
+            dx, dy = e.x - p.x, e.y - p.y
+            d = math.hypot(dx, dy)
+            if d < self.STRAGGLER_FAR:
+                continue
+            # Oyuncunun gittiği yöne göre ARKADA mı? (nokta çarpımı negatifse arkada)
+            if (dx * mvx + dy * mvy) / max(1e-3, d) > -self.STRAGGLER_BEHIND:
+                continue
+            spot = self._ahead_spawn_point(p, mvx, mvy, cam)
+            if spot is None:
+                continue
+            self.fx.ring(e.x, e.y, e.color, n=10, speed=150, life=0.28, r=2.5)
+            e.x, e.y = spot
+            e.warp_cd = self.STRAGGLER_COOLDOWN
+            e.spawn_t = min(e.spawn_t, 0.12)   # küçülüp büyüyerek "doğsun"
+            self.fx.ring(e.x, e.y, e.color, n=14, speed=200, life=0.34, r=3)
+            moved += 1
+
+    def _ahead_spawn_point(self, p, mvx, mvy, cam):
+        """Kaçış yönünde, kameranın hemen dışında kalan bir doğum noktası."""
+        for _ in range(14):
+            spread = random.uniform(-0.75, 0.75)
+            ca, sa = math.cos(spread), math.sin(spread)
+            ax = mvx * ca - mvy * sa
+            ay = mvx * sa + mvy * ca
+            d = random.uniform(self.STRAGGLER_AHEAD_MIN, self.STRAGGLER_AHEAD_MAX)
+            x, y = p.x + ax * d, p.y + ay * d
+            if not ARENA_RECT.inflate(-60, -60).collidepoint(x, y):
+                continue
+            if cam.inflate(60, 60).collidepoint(x, y):
+                continue     # görüş alanının içinde belirmesin
+            return x, y
+        return None
 
     def wave_hp_mult(self, wave):
         if self.biome == "hell":
@@ -7722,6 +8796,8 @@ class RunState:
         self.player_projectiles.clear()
         self.pickups.clear()
         self.time_stop = 0.0
+        # Arenadan kalan yanık/zehir/yavaşlatma cehenneme taşınmasın.
+        p.clear_status()
 
         # Dalga düzeni baştan başlar (1. haritadaki gibi).
         self.waves = WaveManager(self.diff, biome="hell")
@@ -8459,16 +9535,21 @@ class RunState:
             for e in list(self.enemies):
                 e.update(dt, p, self.fx, self.enemy_projectiles, self.on_enemy_killed)
         self.enemies = [e for e in self.enemies if e.alive]
+        if not frozen:
+            # Kaçan oyuncunun arkasında kalan yaratıklar önüne ışınlanır.
+            self.reposition_stragglers(dt)
 
         for proj in list(self.enemy_projectiles):
             if not frozen:
                 proj.update(dt)
             if proj.alive and p.alive and not frozen:
                 if dist(proj.x, proj.y, p.x, p.y) < proj.r + p.radius:
-                    p.take_damage(proj.dmg, self.fx, proj.x, proj.y, "mermi")
                     owner = getattr(proj, "owner", None)
-                    if owner is not None:
-                        owner.on_damage_dealt(proj.dmg)
+                    if owner is not None and hasattr(owner, "hit_player"):
+                        # Patron mermisi: hasarın yanında imza etkisini de taşır.
+                        owner.hit_player(p, proj.dmg, self.fx, proj.x, proj.y)
+                    else:
+                        p.take_damage(proj.dmg, self.fx, proj.x, proj.y, "mermi")
                     proj.alive = False
         self.enemy_projectiles = [pr for pr in self.enemy_projectiles if pr.alive]
 
@@ -8961,7 +10042,7 @@ def draw_minimap(surf, run, t):
 
     # patronlar
     for b in run.bosses:
-        if b.alive:
+        if b.alive and not b.is_hidden():
             px, py = mp(b.x, b.y)
             pulse = 3 + math.sin(t * 6) * 1.2
             pygame.draw.circle(surf, (255, 90, 80), (int(px), int(py)), int(4 + pulse * 0.4))
@@ -9009,7 +10090,8 @@ def draw_offscreen_markers(surf, run, cam, t):
     """Ekran dışındaki önemli hedefler için kenar okları (patron / portallar)."""
     marks = []
     for b in run.bosses:
-        if b.alive:
+        # GÖLGE PERDESİ açıkken patron küçük haritada da, kenar okunda da yoktur.
+        if b.alive and not b.is_hidden():
             marks.append((b.x, b.y, (255, 90, 80), "skull"))
     if run.market_portal is not None:
         marks.append((run.market_portal.x, run.market_portal.y, GOLD, "coin"))
@@ -9186,6 +10268,137 @@ def draw_skill_bar(surf, run, t):
             pygame.draw.line(surf, (140, 100, 110), (r.x + 8, r.y + 8), (r.right - 8, r.bottom - 8), 2)
 
 
+# =====================================================================
+# İSTATİSTİK PANELİ  (sağ üstteki "⋮" düğmesi)
+# ---------------------------------------------------------------------
+# Oyuncunun o anki gücünü YÜZDE olarak gösterir. Ölçü birimi "taban oyuncu
+# = %100"; yani hasarın iki katına çıkmışsa %200, üç katına çıkmışsa %300
+# yazar. Böylece market, kitap, seviye ve skin bonuslarının toplam etkisi
+# tek bakışta görülür.
+#
+# YENİ SATIR EKLEMEK: player_stat_rows() içindeki listeye bir demet eklemek
+# yeterli — (simge, etiket, metin, renk, oran).
+# =====================================================================
+
+STATS_BTN_W, STATS_BTN_H = 30, 26
+STATS_PANEL_W = 336
+
+
+def stats_button_rect():
+    """Sağ üst köşedeki üç nokta düğmesi."""
+    return pygame.Rect(VIRTUAL_W - STATS_BTN_W - 10, 8, STATS_BTN_W, STATS_BTN_H)
+
+
+def stats_panel_rect(n_rows):
+    b = stats_button_rect()
+    h = 54 + n_rows * 21 + 30
+    return pygame.Rect(VIRTUAL_W - STATS_PANEL_W - 10, b.bottom + 6, STATS_PANEL_W, h)
+
+
+def _pct(v):
+    """Oranı yüzdeye çevirir: 1.0 -> "%100", 2.03 -> "%203"."""
+    return f"%{int(round(v * 100))}"
+
+
+def player_stat_rows(p, run):
+    """(simge, etiket, değer metni, renk, çubuk oranı) listesi döndürür.
+
+    Çubuk oranı yalnızca görsel: %100 çubuğun yarısını doldurur, %300 ve
+    üstü çubuğu tamamen doldurur — böylece tavanı olmayan değerler de
+    okunabilir kalır.
+    """
+    dmg_r = p.eff_dmg() / max(1e-6, BASE_DMG)
+    aspd_r = BASE_ATK_CD / max(1e-6, p.eff_atk_cd())
+    spd_r = p.eff_speed() / max(1e-6, BASE_SPEED)
+    hp_r = p.max_hp / max(1e-6, BASE_MAX_HP)
+    pick_r = p.eff_pickup() / max(1e-6, BASE_PICKUP)
+    dash_r = BASE_DASH_CD / max(1e-6, p.eff_dash_cd())
+    bonk_r = BASE_BONK_CD / max(1e-6, p.eff_bonk_cd())
+    shots = 1 + p.multishot_level
+    # Taban oyuncunun saniyelik hasarı: yüzdeyi buna göre veriyoruz.
+    base_dps = BASE_DMG * (1.0 + 0.05 * (1.6 - 1.0)) / BASE_ATK_CD
+    dps = p.estimated_dps()
+
+    rows = [
+        ("sword",  "HASAR",           _pct(dmg_r),   (245, 120, 110), dmg_r),
+        ("target", "ATIŞ HIZI",       _pct(aspd_r),  (150, 210, 255), aspd_r),
+        ("bolt",   "SANİYELİK HASAR", _pct(dps / max(1e-6, base_dps)), (255, 190, 90),
+         dps / max(1e-6, base_dps)),
+        ("boot",   "HAREKET HIZI",    _pct(spd_r),   (130, 230, 170), spd_r),
+        ("heart",  "AZAMİ CAN",       _pct(hp_r),    (235, 120, 150), hp_r),
+        ("shield", "ZIRH",            _pct(p.eff_armor()), (160, 180, 220), p.eff_armor() * 3.0),
+        ("clover", "KRİTİK ŞANS",     _pct(p.eff_crit_chance()), (230, 220, 120),
+         p.eff_crit_chance() * 2.2),
+        ("star",   "KRİTİK HASAR",    _pct(p.eff_crit_dmg()), (255, 210, 130),
+         p.eff_crit_dmg() / 2.0),
+        ("heart",  "CAN ÇALMA",       _pct(0.02 * p.vamp_level), (220, 60, 90),
+         0.02 * p.vamp_level * 5.0),
+        ("coin",   "ALTIN KAZANCI",   _pct(p.eff_coin_mult()), GOLD, p.eff_coin_mult()),
+        ("gem",    "DENEYİM (XP)",    _pct(p.eff_xp_mult()), PURPLE, p.eff_xp_mult()),
+        ("magnet", "TOPLAMA MENZİLİ", _pct(pick_r), (150, 220, 255), pick_r),
+        ("fist",   "BONK TEMPOSU",    _pct(bonk_r),  (245, 150, 80), bonk_r),
+        ("dash",   "DASH TEMPOSU",    _pct(dash_r),  (130, 225, 210), dash_r),
+        ("star",   "MERMİ SAYISI",    f"{shots}",    PURPLE, shots / 4.0),
+        ("sword",  "DELME",           f"{p.eff_pierce_hits()}", RED,
+         p.eff_pierce_hits() / 4.0),
+    ]
+    if p.eff_regen() > 0:
+        rows.append(("heart", "CAN YENİLENME", f"{p.eff_regen():.1f}/sn", GREEN,
+                     p.eff_regen() / 10.0))
+    if p.frenzy_stacks > 0:
+        rows.append(("clover", "ÇILGINLIK", f"x{p.frenzy_stacks}", (255, 200, 80),
+                     p.frenzy_stacks / 10.0))
+    if p.soul_stacks > 0:
+        rows.append(("skull", "RUH YIĞINI", f"x{p.soul_stacks}", (200, 120, 255),
+                     p.soul_stacks / 12.0))
+    return rows
+
+
+def draw_stats_panel(surf, run, t):
+    """İstatistik panelini çizer ve kapladığı dikdörtgeni döndürür."""
+    p = run.player
+    rows = player_stat_rows(p, run)
+    rect = stats_panel_rect(len(rows))
+    panel(surf, rect, bg=(14, 15, 26), edge=(90, 100, 150), alpha=242, radius=14, edge_w=2)
+
+    draw_text(surf, "İSTATİSTİKLER", (rect.centerx, rect.y + 10), 16, GOLD, bold=True, center=True)
+    draw_text(surf, "taban oyuncu = %100", (rect.centerx, rect.y + 30), 10, TEXT_DIM,
+              center=True, shadow=False)
+
+    y = rect.y + 50
+    for (icon, label, value, col, frac) in rows:
+        # arka plan çubuğu: %100'ü ortada olacak biçimde ölçeklenir
+        bar = pygame.Rect(rect.x + 12, y + 3, rect.w - 24, 15)
+        bs = pygame.Surface(bar.size, pygame.SRCALPHA)
+        pygame.draw.rect(bs, (255, 255, 255, 12), bs.get_rect(), border_radius=4)
+        fill = int(bar.w * clamp(frac / 3.0, 0.0, 1.0))
+        if fill > 2:
+            pygame.draw.rect(bs, (*col, 62), pygame.Rect(0, 0, fill, bar.h), border_radius=4)
+        surf.blit(bs, bar.topleft)
+        draw_icon(surf, rect.x + 22, y + 10, icon, col, 7)
+        draw_text(surf, label, (rect.x + 34, y + 3), 12, TEXT, shadow=False)
+        draw_text(surf, value, (rect.right - 14, y + 2), 13, col, bold=True, right=True,
+                  shadow=False)
+        y += 21
+
+    draw_text(surf, "TAB / ⋮ ile kapat", (rect.centerx, rect.bottom - 20), 10, TEXT_DIM,
+              center=True, shadow=False)
+    return rect
+
+
+def draw_stats_button(surf, run, mouse_pos, t):
+    """Sağ üstteki üç nokta düğmesi (açıkken altın renginde yanar)."""
+    r = stats_button_rect()
+    open_ = getattr(run, "show_stats", False)
+    hover = r.collidepoint(mouse_pos) if mouse_pos else False
+    bg = (58, 50, 26) if open_ else ((40, 44, 64) if hover else (24, 26, 42))
+    pygame.draw.rect(surf, bg, r, border_radius=7)
+    pygame.draw.rect(surf, GOLD if (open_ or hover) else PANEL_EDGE, r, width=2, border_radius=7)
+    dot = GOLD if (open_ or hover) else (170, 178, 205)
+    for i in (-1, 0, 1):
+        pygame.draw.circle(surf, dot, (r.centerx, int(r.centery + i * 7)), 2)
+
+
 def draw_hud(surf, run, t):
     p = run.player
     top = pygame.Rect(0, 0, VIRTUAL_W, ARENA_MARGIN_TOP - 6)
@@ -9206,6 +10419,23 @@ def draw_hud(surf, run, t):
     draw_text(surf, f"LV {p.level}", (xp_rect.right + 10, xp_rect.centery), 15, PURPLE, bold=True)
 
     draw_text(surf, f"Altın: {fmt_num(run.gold_wallet)}", (20, 62), 15, GOLD, bold=True)
+
+    # --- PATRON DURUM ETKİLERİ: altının sağında küçük sayaçlar ---
+    st_x = 140
+    for (act, icon, scol, label) in ((p.burn_t, "flame", (255, 150, 70), "YANIK"),
+                                     (p.poison_t, "drop", (150, 240, 120), "ZEHİR"),
+                                     (p.slow_t, "snow", (150, 210, 255), "YAVAŞ")):
+        if act <= 0:
+            continue
+        chip = pygame.Rect(st_x, 56, 74, 18)
+        cs = pygame.Surface(chip.size, pygame.SRCALPHA)
+        pygame.draw.rect(cs, (*scol, 52), cs.get_rect(), border_radius=6)
+        pygame.draw.rect(cs, (*scol, 190), cs.get_rect(), width=1, border_radius=6)
+        surf.blit(cs, chip.topleft)
+        draw_icon(surf, chip.x + 11, chip.centery, icon, scol, 6)
+        draw_text(surf, f"{label} {act:0.1f}", (chip.x + 20, chip.y + 3), 10, scol,
+                  bold=True, shadow=False)
+        st_x += 80
 
     draw_text(surf, fmt_time(run.run_time), (VIRTUAL_W / 2, 18), 26, TEXT, bold=True, center=True)
 
@@ -9241,7 +10471,8 @@ def draw_hud(surf, run, t):
             draw_text(surf, f"YOĞUNLUK {w.surge_timer:0.1f}sn", (gbar.right + 10, 49), 12,
                       ORANGE, bold=True, shadow=False)
 
-    rx = VIRTUAL_W - 24
+    # Sağ üstteki "⋮" istatistik düğmesine yer açmak için biraz sola kaydırıldı.
+    rx = VIRTUAL_W - 48
     draw_text(surf, f"Skor  {fmt_num(run.score)}", (rx, 14), 18, TEXT, bold=True, right=True)
     draw_text(surf, f"Öldürme {run.kills}", (rx, 38), 14, TEXT_DIM, right=True)
 
@@ -9358,6 +10589,10 @@ def draw_run(surf, run, t, aim_pos=None):
     draw_hud(surf, run, t)
     draw_minimap(surf, run, t)
     draw_skill_bar(surf, run, t)
+    # İSTATİSTİK paneli en üstte çizilir: açıkken küçük haritayı örter.
+    draw_stats_button(surf, run, aim_pos, t)
+    if getattr(run, "show_stats", False):
+        draw_stats_panel(surf, run, t)
 
     if aim_pos and run.player.alive:
         ax, ay = aim_pos
@@ -9719,6 +10954,7 @@ class App:
             bonk_pressed = False
             dash_pressed = False
             use_pressed = False      # E — portala gir
+            stats_pressed = False    # TAB — istatistik paneli
             wheel_y = 0
 
             for event in pygame.event.get():
@@ -9741,6 +10977,8 @@ class App:
                         dash_pressed = True
                     elif event.key == pygame.K_e and self.state == STATE_PLAY:
                         use_pressed = True
+                    elif event.key == pygame.K_TAB and self.state == STATE_PLAY:
+                        stats_pressed = True
                     elif event.key == pygame.K_b and self.state == STATE_PLAY:
                         self.run.open_shop()
                         self.state = STATE_RUN_SHOP
@@ -9766,7 +11004,8 @@ class App:
                     wheel_y -= 13.0 * dt
 
             if self.state == STATE_MENU: self.update_menu(dt, mouse_pos, clicked)
-            elif self.state == STATE_PLAY: self.update_play(dt, keys, mouse_pos, mouse_down, bonk_pressed, dash_pressed, use_pressed)
+            elif self.state == STATE_PLAY: self.update_play(dt, keys, mouse_pos, mouse_down, bonk_pressed,
+                                                            dash_pressed, use_pressed, clicked, stats_pressed)
             elif self.state == STATE_PAUSE: self.update_pause(dt, mouse_pos, clicked)
             elif self.state == STATE_LEVELUP: self.update_levelup(dt, mouse_pos, clicked)
             elif self.state == STATE_RUN_SHOP: self.update_run_shop(dt, mouse_pos, clicked)
@@ -9811,7 +11050,21 @@ class App:
 
     # ---------------- OYNANIŞ ----------------
     def update_play(self, dt, keys, mouse_pos, mouse_down, bonk_pressed, dash_pressed,
-                    use_pressed=False):
+                    use_pressed=False, clicked=False, stats_pressed=False):
+        # --- İSTATİSTİK paneli (sağ üstteki "⋮") ---
+        # Panelin üstündeyken SOL TIK ateş etmemeli; yoksa düğmeye basarken
+        # oyuncu boşluğa ateş ediyor ve panel de açılıp kapanıp duruyordu.
+        btn = stats_button_rect()
+        over_ui = btn.collidepoint(mouse_pos)
+        if self.run.show_stats:
+            rows = len(player_stat_rows(self.run.player, self.run))
+            over_ui = over_ui or stats_panel_rect(rows).collidepoint(mouse_pos)
+        if stats_pressed or (clicked and btn.collidepoint(mouse_pos)):
+            self.run.show_stats = not self.run.show_stats
+            sfx("click", 0.5, 0.0)
+        if over_ui:
+            mouse_down = False
+
         input_state = self.gather_input(keys)
         input_state["mouse_down"] = mouse_down
         input_state["bonk_pressed"] = bonk_pressed
