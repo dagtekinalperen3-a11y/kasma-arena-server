@@ -1,6 +1,6 @@
 """
 =====================================================================
- KASMA ARENA  —  v3.3
+ KASMA ARENA  —  v3.4
  2D Top-Down Hayatta Kalma / Skor-Rekor Oyunu
  ---------------------------------------------------------------------
  Dalgalar halinde gelen düşmanlara karşı hayatta kal, nişan al, ateş et,
@@ -8,6 +8,21 @@
  patronları yen, rekorunu kır. Kaybedersen o koşuda aldıkların silinir.
  Elmasla kalıcı SKIN'ler al (her skinin kendi silahı, mermisi, efekti ve
  ÖZEL YETENEĞİ var).
+
+ v3.4 ile gelenler:
+   * PATRONLAR YENİLENDİ: her patronun kendine özgü bir imza mekaniği var
+     (yakma, zehirleme, yavaşlatma, görünmezlik, ışınlanma) ve hepsinin
+     çizimi baştan yazıldı. CEHENNEM'e yeni bir patron geldi: EJDERHA.
+   * PATRON SANDIĞI: devrilen patron sandık bırakır, içinden BALTA /
+     TABANCA / KATANA / OK / ÇEKİÇ çıkar. Bu silahlar otomatik ateşlenir;
+     bekleme süreleri ekranın altındaki yetenek çubuğunda görünür.
+   * İSTATİSTİK PANELİ: sağ üstteki üç nokta düğmesi (ya da TAB) oyuncunun
+     hasarını, hızını, can çalmasını, altın kazancını % olarak gösterir.
+   * CEHENNEM baştan görselleştirildi: lav çatlakları, magma gölleri,
+     süzülen korlar ve her biri kendi çizimine sahip yeni yaratıklar.
+   * CEHENNEM MARKETİ kızıl temaya büründü ve 7 yeni eşya aldı.
+   * Kaçarken arkada kalan yaratıklar kaçtığın yöne, önüne ışınlanır.
+   * "Güdümlü Mermi" marketten kaldırıldı.
 
  v3.3 ile gelenler:
    * HARİTA BÜYÜDÜ: dünya artık oyun penceresinin 3x3'ü (üst/alt/sağ/sol ve
@@ -37,6 +52,7 @@
    SPACE                : BONK! (yakın alan hasarı + geri itme)
    SHIFT / SAĞ TIK      : DASH (kısa süre hasar almazsın)
    B                    : Oyun-içi MARKET (oyunu duraklatır)
+   TAB                  : İSTATİSTİK paneli (sağ üstteki üç nokta düğmesi de açar)
    E                    : CEHENNEM KAPISI'ndan geç (portalın yanındayken)
    ESC                  : Duraklat / Geri          F11: Tam ekran
    F3                   : FPS göstergesi
@@ -71,7 +87,7 @@ ONLINE_API_URL = "https://kasma-arena-server.onrender.com"
 VIRTUAL_W, VIRTUAL_H = 1280, 720
 FPS = 60
 GAME_TITLE = "ARENA SAVAŞI"
-GAME_VERSION = "3.3"
+GAME_VERSION = "3.4"
 
 
 def _base_dir():
@@ -5259,7 +5275,7 @@ class Player:
                 fxp = px + math.sin(t * 5 + i * 2.3) * r * 0.8
                 fyp = py - r * 0.4 - ph * r * 2.1
                 blit_disc(surf, fxp, fyp, max(1.2, 4.2 * (1 - ph)),
-                          (255, 190 - int(70 * ph), 80), int(215 * (1 - ph)))
+                          (255, 190 - (int(70 * ph) // 24) * 24, 80), int(215 * (1 - ph)))
         if self.poison_t > 0:
             pygame.draw.circle(surf, (130, 230, 100), (ix, iy), r + 7, 1)
             for i in range(3):
@@ -10130,6 +10146,17 @@ class RunState:
             sfx("levelup", 0.9, 0.0)
 
     def on_enemy_killed(self, e):
+        # Bir ölüm yalnızca BİR KEZ sayılır.
+        # Patronlar zehir/yanık ile öldüğünde Boss.update içindeki kill_cb
+        # burayı çağırıyor, ama patron listeden ancak bir sonraki karede
+        # çıkarıldığı için ana döngü aynı ölümü ikinci kez işliyordu
+        # (çifte skor, çifte altın, çifte başarım).
+        if getattr(e, "death_counted", False):
+            return
+        try:
+            e.death_counted = True
+        except AttributeError:
+            pass        # __slots__ kullanan bir tür gelirse sessizce geç
         p = self.player
         self.kills += 1
         self.combo.add_kill()
@@ -10876,8 +10903,11 @@ def _draw_hell_air(world, cam, t):
         if xx < cam.left - 20 or xx > cam.right + 20:
             continue
         k = 1.0 - ((ey - yy) % span) / span
+        # Renk kasten BASAMAKLI: blit_disc sprite önbelleği renge göre
+        # anahtarlanıyor, her karede yeni bir ton üretilirse önbellek
+        # sürekli dolup temizleniyor ve kare hızı düşüyor.
         blit_disc(world, xx, yy, sz * (0.45 + 0.55 * k),
-                  (255, 150 + int(70 * k), 60), int(70 + 130 * k))
+                  (255, 150 + (int(70 * k) // 24) * 24, 60), int(70 + 130 * k))
     # ısı parıltısı: ekranın altından yukarı doğru sönen, nabız gibi atan örtü
     h = 170
     peak = 30 + 12 * math.sin(t * 1.3)
@@ -11307,7 +11337,7 @@ def draw_stats_panel(surf, run, t):
                   shadow=False)
         y += 21
 
-    draw_text(surf, "TAB / ⋮ ile kapat", (rect.centerx, rect.bottom - 20), 10, TEXT_DIM,
+    draw_text(surf, "TAB ile de açılıp kapanır", (rect.centerx, rect.bottom - 20), 10, TEXT_DIM,
               center=True, shadow=False)
     return rect
 
@@ -11641,7 +11671,7 @@ class RunShopOverlay:
                 ex = (i * 197 + math.sin(t * 0.7 + i) * 40) % VIRTUAL_W
                 ey = VIRTUAL_H - ph * (VIRTUAL_H + 60)
                 blit_disc(surf, ex, ey, 1.4 + 2.2 * (1 - ph),
-                          (255, 170 - int(60 * ph), 70), int(210 * (1 - ph)))
+                          (255, 170 - (int(60 * ph) // 24) * 24, 70), int(210 * (1 - ph)))
 
     def _draw_header(self, surf, run, hellish, t):
         if hellish:
@@ -12935,52 +12965,63 @@ class App:
     def update_howto(self, dt, mouse_pos, clicked):
         canvas = self.display.canvas
         self.bg.draw(canvas)
-        panel_rect = pygame.Rect(0, 0, 800, 600)
+        # Liste iki sütuna bölündüğü için panel geniş: tek sütunda maddeler
+        # panelin altından taşıyor ve GERİ düğmesinin üstüne biniyordu.
+        panel_rect = pygame.Rect(0, 0, 1200, 660)
         panel_rect.center = (VIRTUAL_W / 2, VIRTUAL_H / 2)
         panel(canvas, panel_rect, alpha=245)
-        draw_text(canvas, "NASIL OYNANIR", (panel_rect.centerx, panel_rect.y + 32), 27, CYAN, bold=True, center=True)
+        draw_text(canvas, "NASIL OYNANIR", (panel_rect.centerx, panel_rect.y + 24), 27, CYAN, bold=True, center=True)
         lines = [
             ("WASD / OK TUŞLARI", "Hareket et, düşmanlardan kaç"),
             ("FARE", "Nişan al — namlu her zaman imleci gösterir"),
             ("SOL TIK (basılı tut)", "Ateş et — nişan aldığın yöne mermi gider"),
             ("SPACE", "BONK! — çevrene alan hasarı veren yakın vuruş"),
             ("SHIFT / SAĞ TIK", "DASH — kısa süre hasar almazsın"),
-            ("B", "Büyük MARKET'i aç — dalga ilerledikçe yeni katmanlar açılır"),
+            ("B", "Büyük MARKET'i aç — dalga ilerledikçe yeni kademeler açılır"),
+            ("TAB  ·  SAĞ ÜST KÖŞE", "Hasarın, hızın, can çalman % olarak görünür"),
             ("DALGALAR SKORLA İLERLER", "Her dalganın skor hedefi var — hedef her zorlukta AYNI"),
             ("ZORLUK = TEMPO", "Kabus dalgaları zorlaştırmaz, düşmanları daha hızlı getirir"),
-            ("DALGA İÇİNDE HIZLANIR", "Aynı dalgada bile oyalandıkça düşmanlar sıklaşır ve kalabalıklaşır"),
-            ("MARKET ÇEKİRDEKLERİ", "ÇEKİRDEK sekmesindeki yükseltmelerin tavanı yok — altın hep işe yarar"),
-            ("10., 15., 20. DALGA...", "10'dan itibaren her 5 dalgada PATRON — canları gücüne göre ölçeklenir"),
+            ("DALGA İÇİNDE HIZLANIR", "Aynı dalgada bile oyalandıkça düşmanlar sıklaşır"),
+            ("MARKET ÇEKİRDEKLERİ", "ÇEKİRDEK yükseltmelerinin tavanı yok — altın hep işe yarar"),
+            ("10., 15., 20. DALGA...", "10'dan itibaren her 5 dalgada PATRON gelir"),
             ("PATRONLAR CAN ÇALAR", "Patron da vurdukça iyileşir; dövüş yaklaşık 1,5 dakika sürer"),
+            ("HER PATRON FARKLI", "Biri yakar, biri zehirler, biri yavaşlatır, biri kaybolur"),
+            ("PATRON SANDIĞI", "Devrilen patron SANDIK bırakır, içinden SİLAH çıkar"),
+            ("SİLAHLAR OTOMATİK", "Balta/Tabanca/Katana/Ok/Çekiç kendi kendine ateş eder"),
+            ("KAÇARKEN DİKKAT", "Arkanda kalan yaratıklar kaçtığın yöne, yani önüne ışınlanır"),
             ("KIYAFET MARKET", "Şapka, gözlük ve pelerinlerin her biri küçük kalıcı bonus verir"),
             ("ÖLÜRSEN", "O koşuda market'ten aldıkların silinir — baştan başlarsın"),
             ("SKIN MARKET", "Elmasla kalıcı görünümler al — her skinin kendi silahı var"),
-            ("HARİTA 3x3 EKRAN", "Dünya ekrandan büyük — kamera seni takip eder, sağ üstte küçük harita var"),
+            ("HARİTA 3x3 EKRAN", "Dünya ekrandan büyük — sağ üstte küçük harita var"),
             ("E  ·  CEHENNEM KAPISI", "25. dalga patronunu devirince açılan MOR portala E ile gir"),
-            ("CEHENNEM (2. HARİTA)", "Yaratıklar bambaşka: 25. dalga kadar güçlü ama 1. dalga kadar yavaş"),
-            ("25'TEN SONRA ARENA", "Yeni patron gelmez; arena her dalgada azar — 32'ye kadar dayanamazsın"),
-            ("CEHENNEM MARKETİ", "Markette yalnızca cehennemde açılan yeni bir kademe var"),
-            ("SKİN ÖZEL YETENEĞİ", "Her skinin OTOMATİK bir yeteneği var; süresi ekranın altında yazar"),
-            ("YETENEK = 0.5 SN DONMA", "Yetenek çalıştığında düşmanlar yarım saniye donar, sonra devam eder"),
+            ("CEHENNEM (2. HARİTA)", "Yaratıklar bambaşka: çok güçlü ama çok yavaş"),
+            ("25'TEN SONRA ARENA", "Yeni patron gelmez; arena her dalgada daha da azar"),
+            ("CEHENNEM MARKETİ", "Kızıl market: yalnızca cehennemde açılan 14 ayrı eşya (2 sayfa)"),
+            ("CEHENNEM PATRONU", "İlk patron EJDERHA: alev püskürtür, üstüne dalar"),
+            ("SKİN ÖZEL YETENEĞİ", "Her skinin OTOMATİK bir yeteneği var, süresi altta yazar"),
+            ("YETENEK = 0.5 SN DONMA", "Yetenek çalışınca düşmanlar yarım saniye donar"),
             ("KİTAPLIK", "Kitapların hepsi kilitli — her birinin kendi görevleri var"),
-            ("BAŞARIMLAR", "Başarıma tıkla: nasıl kazanılacağını, ilerlemeni ve elmas ödülünü gösterir"),
+            ("BAŞARIMLAR", "Başarıma tıkla: nasıl kazanılır, ne kadar kaldı, ödülü ne"),
         ]
-        # Satır aralığı listenin uzunluğuna göre hesaplanır; böylece yeni
-        # madde eklendiğinde yazılar panelin dışına taşmaz.
-        list_top = panel_rect.y + 66
-        list_bottom = panel_rect.bottom - 64      # GERİ düğmesine yer bırak
-        step = clamp((list_bottom - list_top) / max(1, len(lines)), 22, 38)
-        y = list_top
-        for title, desc in lines:
-            draw_text(canvas, title, (panel_rect.x + 36, y), 13, GOLD, bold=True)
-            draw_text(canvas, desc, (panel_rect.x + 36, y + 15), 11, TEXT_DIM, shadow=False)
-            y += step
+        # Maddeler İKİ SÜTUNA bölünür; satır aralığı sütun başına düşen madde
+        # sayısına göre hesaplanır, böylece yeni madde eklenince yazılar
+        # panelin dışına taşmaz.
+        list_top = panel_rect.y + 62
+        list_bottom = panel_rect.bottom - 62      # GERİ düğmesine yer bırak
+        per_col = (len(lines) + 1) // 2
+        step = clamp((list_bottom - list_top) / max(1, per_col), 22, 38)
+        col_x = (panel_rect.x + 28, panel_rect.x + 420)
+        for i, (title, desc) in enumerate(lines):
+            cx = col_x[0 if i < per_col else 1]
+            y = list_top + (i % per_col) * step
+            draw_text(canvas, title, (cx, y), 13, GOLD, bold=True)
+            draw_text(canvas, desc, (cx, y + 15), 10, TEXT_DIM, shadow=False)
 
         # ---- ayarlar ----
-        ax = panel_rect.x + 420
-        draw_text(canvas, "AYARLAR", (ax, panel_rect.y + 70), 18, GOLD, bold=True)
+        ax = panel_rect.x + 840
+        draw_text(canvas, "AYARLAR", (ax, panel_rect.y + 62), 18, GOLD, bold=True)
         st = self.save.data.setdefault("settings", {})
-        yy = panel_rect.y + 104
+        yy = panel_rect.y + 96
         for label, key, is_bool in (("Müzik Sesi", "music_vol", False), ("Efekt Sesi", "sfx_vol", False)):
             draw_text(canvas, label, (ax, yy), 13, TEXT_DIM, shadow=False)
             br = pygame.Rect(ax, yy + 18, 220, 14)
