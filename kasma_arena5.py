@@ -3845,6 +3845,39 @@ SHOP_ITEMS = [
      "desc": "Hasar +%10 ve atış hızı +%7 (tavanı yok)",
      "cost": 260, "cost_mult": 1.32, "max": 999, "endless": True, "icon": "gem",
      "color": (255, 90, 120), "tier": 5, "cat": "hell", "hell_only": True},
+
+    # ---- CEHENNEM MARKETİ GENİŞLEMESİ -------------------------------
+    # Cehennemde geçirilen süre uzadıkça altın birikiyor ama harcanacak
+    # yer kalmıyordu. Aşağıdakiler cehennem dövüşünün farklı ihtiyaçlarına
+    # (kritik, dayanıklılık, kalabalık temizleme, patron avı) cevap verir.
+    {"key": "cursed_dagger", "name": "Lanet Hançeri",
+     "desc": "Kritik şans +%8 ve kritik hasar +%30",
+     "cost": 330, "cost_mult": 1.86, "max": 4, "icon": "sword", "color": (255, 120, 180),
+     "tier": 5, "cat": "hell", "hell_only": True},
+    {"key": "dragon_heart", "name": "Ejderha Kalbi",
+     "desc": "Azami can +80 ve saniyede +2 can yenilenmesi",
+     "cost": 350, "cost_mult": 1.88, "max": 4, "icon": "heart", "color": (255, 88, 70),
+     "tier": 5, "cat": "hell", "hell_only": True},
+    {"key": "flame_orbit", "name": "Alev Yörüngesi",
+     "desc": "Çevrende dönen bir alev topu daha + vuruşların yakar",
+     "cost": 340, "cost_mult": 1.84, "max": 4, "icon": "flame", "color": (255, 160, 60),
+     "tier": 5, "cat": "hell", "hell_only": True},
+    {"key": "soul_lantern", "name": "Ruh Feneri",
+     "desc": "Altın +%35, deneyim +%25, toplama menzili +%30",
+     "cost": 300, "cost_mult": 1.78, "max": 4, "icon": "coin", "color": (255, 210, 110),
+     "tier": 5, "cat": "hell", "hell_only": True},
+    {"key": "doom_sigil", "name": "Kıyamet Mührü",
+     "desc": "Patronlara ve elitlere verdiğin hasar +%30",
+     "cost": 380, "cost_mult": 1.92, "max": 3, "icon": "skull", "color": (198, 90, 255),
+     "tier": 5, "cat": "hell", "hell_only": True},
+    {"key": "ember_step", "name": "Kor Adımı",
+     "desc": "Hareket hızı +%14 ve dash bekleme -%15",
+     "cost": 290, "cost_mult": 1.76, "max": 4, "icon": "boot", "color": (255, 150, 90),
+     "tier": 5, "cat": "hell", "hell_only": True},
+    {"key": "demon_pact", "name": "Şeytan Sözleşmesi",
+     "desc": "Hasar +%60 ama gelen hasar +%20 — cehennem pazarlığı",
+     "cost": 400, "cost_mult": 1.95, "max": 3, "icon": "skull", "color": (226, 48, 62),
+     "tier": 5, "cat": "hell", "hell_only": True, "cursed": True},
 ]
 SHOP_BY_KEY = {it["key"]: it for it in SHOP_ITEMS}
 
@@ -3930,6 +3963,29 @@ def apply_shop_item(player, key):
     elif key == "infernal_core":
         player.run_dmg_mult += 0.10
         player.run_aspd_mult += 0.07
+    elif key == "cursed_dagger":
+        player.run_crit_bonus += 0.08
+        player.run_critdmg_bonus += 0.30
+    elif key == "dragon_heart":
+        player.base_max_hp += 80
+        player.max_hp += 80
+        player.hp = min(player.max_hp, player.hp + 80)
+        player.run_regen_bonus += 2.0
+    elif key == "flame_orbit":
+        player.orbit_level += 1
+        player.fire_level += 1
+    elif key == "soul_lantern":
+        player.run_coin_mult += 0.35
+        player.run_xp_mult += 0.25
+        player.run_pickup_mult += 0.30
+    elif key == "doom_sigil":
+        player.boss_hunter += 1
+    elif key == "ember_step":
+        player.run_spd_mult += 0.14
+        player.dash_cd_mult = max(0.30, player.dash_cd_mult - 0.15)
+    elif key == "demon_pact":
+        player.run_dmg_mult += 0.60
+        player.dmg_taken_mult += 0.20
     elif key == "orbit":
         player.orbit_level += 1
     elif key == "dash_cd":
@@ -11539,106 +11595,262 @@ class LevelUpOverlay:
 # =====================================================================
 
 class RunShopOverlay:
+    """Oyun-içi market ekranı.
+
+    CEHENNEM'de açıldığında (ya da CEHENNEM sekmesi seçiliyken) ekran
+    tamamen kızıla döner: zemin kor rengine boyanır, havada kıvılcımlar
+    süzülür, kartların kenarları ergimiş gibi yanar. Amaç, 2. haritanın
+    kendi kimliğinin markette de sürmesi.
+
+    Bir kategoride 10'dan fazla eşya varsa alt kısımda SAYFA okları belirir.
+    """
+
+    COLS = 5
+    ROWS = 2
+
     def __init__(self):
         self.tab = next(iter(SHOP_CATS))
+        self.page = 0
 
-    def draw_and_handle(self, surf, run, mouse_pos, clicked, t):
+    # ---------------- yardımcılar ----------------
+    @staticmethod
+    def _hellish(run, tab):
+        """Market kızıl temaya bürünsün mü?"""
+        return run.biome == "hell" or tab == "hell"
+
+    def _draw_backdrop(self, surf, hellish, t):
         overlay = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
-        pygame.draw.rect(overlay, (5, 6, 12, 205), overlay.get_rect())
+        if hellish:
+            # kızıl degrade + alttan yükselen kor parıltısı
+            for y in range(0, VIRTUAL_H, 4):
+                k = y / VIRTUAL_H
+                pygame.draw.rect(overlay, (int(26 + 34 * k), int(6 + 8 * k), int(8 + 6 * k), 232),
+                                 pygame.Rect(0, y, VIRTUAL_W, 4))
+            glow = pygame.Surface((VIRTUAL_W, 220), pygame.SRCALPHA)
+            for i in range(220):
+                a = int(46 * (i / 219.0) ** 2 * (0.75 + 0.25 * math.sin(t * 1.4)))
+                pygame.draw.line(glow, (255, 96, 36, a), (0, i), (VIRTUAL_W, i))
+            overlay.blit(glow, (0, VIRTUAL_H - 220))
+        else:
+            pygame.draw.rect(overlay, (5, 6, 12, 205), overlay.get_rect())
         surf.blit(overlay, (0, 0))
-        draw_text(surf, "MARKET", (VIRTUAL_W / 2, 40), 32, GOLD, bold=True, center=True)
-        draw_text(surf, f"Altın: {fmt_num(run.gold_wallet)}", (VIRTUAL_W / 2, 70), 17, GOLD, center=True)
-        draw_text(surf, "Sadece bu koşu için geçerli — kaybedersen silinir.", (VIRTUAL_W / 2, 89), 12, TEXT_DIM, center=True)
+        if hellish:
+            # havada süzülen kıvılcımlar
+            for i in range(46):
+                ph = (t * 0.30 + i * 0.0217) % 1.0
+                ex = (i * 197 + math.sin(t * 0.7 + i) * 40) % VIRTUAL_W
+                ey = VIRTUAL_H - ph * (VIRTUAL_H + 60)
+                blit_disc(surf, ex, ey, 1.4 + 2.2 * (1 - ph),
+                          (255, 170 - int(60 * ph), 70), int(210 * (1 - ph)))
 
+    def _draw_header(self, surf, run, hellish, t):
+        if hellish:
+            title, tcol = "CEHENNEM MARKETİ", (255, 132, 56)
+            pulse = 0.55 + 0.45 * math.sin(t * 2.6)
+            add_glow(surf, VIRTUAL_W / 2, 48, 210, (255, 90, 40), 0.18 + 0.10 * pulse)
+            # başlığın iki yanında alev dilleri
+            for sgn in (-1, 1):
+                bx = VIRTUAL_W / 2 + sgn * 168
+                for i in range(3):
+                    h = 22 + 12 * math.sin(t * 7 + i * 1.5 + (0 if sgn > 0 else 2.0))
+                    pygame.draw.polygon(surf, (255, 150 - i * 26, 50),
+                                        [(bx + i * 9 * sgn, 60), (bx + 4 * sgn + i * 9 * sgn, 60 - h),
+                                         (bx + 9 * sgn + i * 9 * sgn, 60)])
+        else:
+            title, tcol = "MARKET", GOLD
+        draw_text(surf, title, (VIRTUAL_W / 2, 30), 32, tcol, bold=True, center=True)
+        draw_text(surf, f"Altın: {fmt_num(run.gold_wallet)}", (VIRTUAL_W / 2, 64), 17,
+                  GOLD, center=True)
+        sub = ("Cehennem eşyaları yalnızca burada satılır — kaybedersen silinir."
+               if hellish else
+               "Sadece bu koşu için geçerli — kaybedersen silinir.")
+        draw_text(surf, sub, (VIRTUAL_W / 2, 84), 12,
+                  (226, 150, 120) if hellish else TEXT_DIM, center=True)
+
+    def _draw_tabs(self, surf, run, mouse_pos, clicked, hellish, t):
         tabs = list(SHOP_CATS.items())
         tab_w, tab_h, tab_gap = 118, 30, 7
         total_tw = len(tabs) * tab_w + (len(tabs) - 1) * tab_gap
         tx0 = VIRTUAL_W / 2 - total_tw / 2
-        ty = 106
-        for key, label in tabs:
-            i = [k for k, _ in tabs].index(key)
+        ty = 102
+        for i, (key, label) in enumerate(tabs):
             r = pygame.Rect(tx0 + i * (tab_w + tab_gap), ty, tab_w, tab_h)
             active = (self.tab == key)
             hover = r.collidepoint(mouse_pos)
-            bg = (90, 70, 30) if active else ((40, 44, 64) if hover else (24, 26, 42))
-            pygame.draw.rect(surf, bg, r, border_radius=8)
-            pygame.draw.rect(surf, GOLD if active else PANEL_EDGE, r, width=2, border_radius=8)
-            draw_text(surf, label, r.center, 12, TEXT if active else TEXT_DIM, bold=active, center=True, shadow=False)
+            is_hell_tab = (key == "hell")
+            # CEHENNEM sekmesi 2. haritada erişilebilir; arenada kilitli görünür
+            locked = is_hell_tab and run.biome != "hell"
+            if is_hell_tab:
+                base = (128, 40, 18) if active else ((72, 26, 16) if hover else (44, 18, 14))
+                edge = (255, 120, 50) if (active or hover) else (128, 58, 34)
+            else:
+                base = (90, 70, 30) if active else ((40, 44, 64) if hover else (24, 26, 42))
+                edge = GOLD if active else PANEL_EDGE
+            if locked:
+                base, edge = (30, 20, 22), (92, 54, 44)
+            pygame.draw.rect(surf, base, r, border_radius=8)
+            pygame.draw.rect(surf, edge, r, width=2, border_radius=8)
+            if is_hell_tab and not locked:
+                add_glow(surf, r.centerx, r.centery, 34, (255, 110, 50),
+                         0.20 + 0.10 * math.sin(t * 3))
+                draw_icon(surf, r.x + 15, r.centery, "flame", (255, 150, 60), 8)
+            txt_col = TEXT if active else (TEXT_DIM if not locked else (120, 86, 80))
+            draw_text(surf, label, (r.centerx + (6 if is_hell_tab else 0), r.centery), 12,
+                      txt_col, bold=active, center=True, shadow=False)
             if clicked and hover:
+                if self.tab != key:
+                    self.page = 0
                 self.tab = key
                 sfx("click", 0.5, 0.0)
 
+    def _draw_card(self, surf, run, item, rect, mouse_pos, clicked, hellish, t, i):
+        p = run.player
+        unlocked = shop_item_unlocked(item, run.waves.wave, run.biome)
+        hover = rect.collidepoint(mouse_pos) and unlocked
+        lvl = p.shop_levels.get(item["key"], 0)
+        maxed = lvl >= item.get("max", 999)
+        cost = shop_item_cost(item, lvl)
+        affordable = unlocked and not maxed and run.gold_wallet >= cost
+        is_hell_item = bool(item.get("hell_only"))
+
+        if is_hell_item and unlocked:
+            bg = (62, 22, 18) if hover else (36, 14, 14)
+            edge_col = item["color"] if hover else (150, 62, 34)
+        else:
+            bg = (34, 38, 60) if hover else (20, 22, 36)
+            edge_col = (item["color"] if (hover and affordable)
+                        else (GOLD if item.get("legendary") and unlocked else PANEL_EDGE))
+        if not unlocked:
+            bg = (16, 17, 26) if not is_hell_item else (22, 12, 14)
+        panel(surf, rect, bg=bg, edge=edge_col, alpha=245 if unlocked else 200,
+              radius=16, edge_w=3)
+
+        if is_hell_item and unlocked:
+            # ergimiş kenar: kartın alt kenarında akkor bir şerit + kıvılcımlar
+            molten = pygame.Surface((rect.w - 10, 5), pygame.SRCALPHA)
+            for xx in range(molten.get_width()):
+                k = 0.5 + 0.5 * math.sin(t * 3 + xx * 0.08 + i)
+                pygame.draw.line(molten, (255, int(110 + 90 * k), 50, 190),
+                                 (xx, 0), (xx, 5))
+            surf.blit(molten, (rect.x + 5, rect.bottom - 7))
+            for e in range(3):
+                ph = (t * 0.9 + e * 0.33 + i * 0.2) % 1.0
+                ex = rect.x + 16 + ((e * 73 + i * 37) % max(1, rect.w - 32))
+                ey = rect.bottom - 10 - ph * 40
+                blit_disc(surf, ex, ey, max(1.0, 2.6 * (1 - ph)), (255, 190, 90),
+                          int(190 * (1 - ph)))
+
+        icon_col = item["color"] if unlocked else (70, 72, 86)
+        icon_c = (rect.centerx, rect.y + 46)
+        if unlocked and not maxed:
+            add_glow(surf, icon_c[0], icon_c[1], 30, icon_col,
+                     0.28 + 0.12 * math.sin(t * 3 + i))
+        pygame.draw.circle(surf, OUTLINE, icon_c, 25)
+        pygame.draw.circle(surf, icon_col, icon_c, 25, 2)
+        draw_icon(surf, icon_c[0], icon_c[1], item["icon"] if unlocked else "shield",
+                  icon_col, 19 if unlocked else 15)
+
+        name_col = TEXT if unlocked else TEXT_DIM
+        draw_text(surf, item["name"], (rect.centerx, rect.y + 84), 15, name_col,
+                  bold=True, center=True)
+        if item.get("cursed"):
+            draw_text(surf, "LANETLİ", (rect.centerx, rect.y + 101), 9, (235, 90, 110),
+                      bold=True, center=True, shadow=False)
+
+        if not unlocked:
+            if is_hell_item:
+                draw_text(surf, "CEHENNEM'de açılır", (rect.centerx, rect.y + 112), 12,
+                          (255, 150, 90), center=True, shadow=False)
+            else:
+                need_wave = TIER_UNLOCK_WAVE.get(item["tier"], 0)
+                draw_text(surf, f"DALGA {need_wave}'te açılır", (rect.centerx, rect.y + 112),
+                          12, GOLD_DIM, center=True, shadow=False)
+            return
+
+        off = 12 if item.get("cursed") else 0
+        lines = wrap_text(item["desc"], 11, rect.w - 26)
+        for j, ln in enumerate(lines[:3]):
+            draw_text(surf, ln, (rect.centerx, rect.y + 108 + off + j * 14), 11,
+                      TEXT_DIM, center=True, shadow=False)
+        if not item.get("instant"):
+            if item.get("endless"):
+                draw_text(surf, f"Seviye {lvl}  ·  tavanı yok", (rect.centerx, rect.y + 166),
+                          11, (198, 180, 120), bold=True, center=True, shadow=False)
+            else:
+                draw_text(surf, f"Seviye {lvl}/{item['max']}", (rect.centerx, rect.y + 166),
+                          11, TEXT_DIM, center=True, shadow=False)
+        if maxed:
+            draw_text(surf, "MAKSİMUM", (rect.centerx, rect.bottom - 18), 13, GREEN,
+                      bold=True, center=True)
+        else:
+            pcol = GOLD if affordable else (120, 95, 60)
+            cost_txt = f"{cost}"
+            tw = text_width(cost_txt, 17, True)
+            draw_icon(surf, rect.centerx - tw / 2 - 12, rect.bottom - 24, "coin", pcol, 10)
+            draw_text(surf, cost_txt, (rect.centerx - tw / 2, rect.bottom - 32), 17, pcol,
+                      bold=True)
+            if hover and affordable:
+                pygame.draw.rect(surf, item["color"],
+                                 (rect.x + 12, rect.bottom - 12, rect.w - 24, 3), border_radius=2)
+            if hover and clicked and affordable:
+                run.buy_shop_item(item["key"])
+
+    # ---------------- ana çizim ----------------
+    def draw_and_handle(self, surf, run, mouse_pos, clicked, t):
+        hellish = self._hellish(run, self.tab)
+        self._draw_backdrop(surf, hellish, t)
+        self._draw_header(surf, run, hellish, t)
+        self._draw_tabs(surf, run, mouse_pos, clicked, hellish, t)
+
         offers = [it for it in run.shop_offers if it["cat"] == self.tab]
-        cols = 5
+        per_page = self.COLS * self.ROWS
+        pages = max(1, (len(offers) + per_page - 1) // per_page)
+        self.page = clamp(self.page, 0, pages - 1)
+        shown = offers[self.page * per_page:(self.page + 1) * per_page]
+
         card_w, card_h = 216, 224
         gap_x, gap_y = 12, 12
-        total_w = cols * card_w + (cols - 1) * gap_x
+        total_w = self.COLS * card_w + (self.COLS - 1) * gap_x
         start_x = VIRTUAL_W / 2 - total_w / 2
-        start_y = 148
-        max_rows_visible = 2
+        start_y = 144
 
-        for i, item in enumerate(offers[:cols * max_rows_visible]):
-            col_i, row = i % cols, i // cols
-            rect = pygame.Rect(start_x + col_i * (card_w + gap_x), start_y + row * (card_h + gap_y), card_w, card_h)
-            unlocked = shop_item_unlocked(item, run.waves.wave, run.biome)
-            hover = rect.collidepoint(mouse_pos) and unlocked
-            lvl = run.player.shop_levels.get(item["key"], 0)
-            maxed = lvl >= item.get("max", 999)
-            cost = shop_item_cost(item, lvl)
-            affordable = unlocked and not maxed and run.gold_wallet >= cost
-
-            bg = (34, 38, 60) if hover else (20, 22, 36)
-            if not unlocked:
-                bg = (16, 17, 26)
-            edge_col = item["color"] if (hover and affordable) else (GOLD if item.get("legendary") and unlocked else PANEL_EDGE)
-            panel(surf, rect, bg=bg, edge=edge_col, alpha=245 if unlocked else 200, radius=16, edge_w=3)
-
-            icon_col = item["color"] if unlocked else (70, 72, 86)
-            icon_c = (rect.centerx, rect.y + 46)
-            if unlocked and not maxed:
-                add_glow(surf, icon_c[0], icon_c[1], 30, icon_col, 0.28 + 0.12 * math.sin(t * 3 + i))
-            pygame.draw.circle(surf, OUTLINE, icon_c, 25)
-            pygame.draw.circle(surf, icon_col, icon_c, 25, 2)
-            draw_icon(surf, icon_c[0], icon_c[1], item["icon"] if unlocked else "shield", icon_col, 19 if unlocked else 15)
-
-            name_col = TEXT if unlocked else TEXT_DIM
-            draw_text(surf, item["name"], (rect.centerx, rect.y + 84), 15, name_col, bold=True, center=True)
-
-            if not unlocked:
-                if item.get("hell_only"):
-                    draw_text(surf, "CEHENNEM'de açılır", (rect.centerx, rect.y + 112), 12,
-                              HELL_PORTAL_COLOR2, center=True, shadow=False)
-                else:
-                    need_wave = TIER_UNLOCK_WAVE.get(item["tier"], 0)
-                    draw_text(surf, f"DALGA {need_wave}'te açılır", (rect.centerx, rect.y + 112), 12, GOLD_DIM, center=True, shadow=False)
-            else:
-                lines = wrap_text(item["desc"], 11, rect.w - 26)
-                for j, ln in enumerate(lines[:3]):
-                    draw_text(surf, ln, (rect.centerx, rect.y + 108 + j * 14), 11, TEXT_DIM, center=True, shadow=False)
-                if not item.get("instant"):
-                    if item.get("endless"):
-                        draw_text(surf, f"Seviye {lvl}  ·  tavanı yok", (rect.centerx, rect.y + 166),
-                                  11, (198, 180, 120), bold=True, center=True, shadow=False)
-                    else:
-                        draw_text(surf, f"Seviye {lvl}/{item['max']}", (rect.centerx, rect.y + 166), 11, TEXT_DIM, center=True, shadow=False)
-                if maxed:
-                    draw_text(surf, "MAKSİMUM", (rect.centerx, rect.bottom - 18), 13, GREEN, bold=True, center=True)
-                else:
-                    pcol = GOLD if affordable else (120, 95, 60)
-                    cost_txt = f"{cost}"
-                    tw = text_width(cost_txt, 17, True)
-                    draw_icon(surf, rect.centerx - tw / 2 - 12, rect.bottom - 24, "coin", pcol, 10)
-                    draw_text(surf, cost_txt, (rect.centerx - tw / 2, rect.bottom - 32), 17, pcol, bold=True)
-                    if hover and affordable:
-                        pygame.draw.rect(surf, item["color"], (rect.x + 12, rect.bottom - 12, rect.w - 24, 3), border_radius=2)
-                    if hover and clicked and affordable:
-                        run.buy_shop_item(item["key"])
+        for i, item in enumerate(shown):
+            col_i, row = i % self.COLS, i // self.COLS
+            rect = pygame.Rect(start_x + col_i * (card_w + gap_x),
+                               start_y + row * (card_h + gap_y), card_w, card_h)
+            self._draw_card(surf, run, item, rect, mouse_pos, clicked, hellish, t, i)
 
         if not offers:
-            draw_text(surf, "Bu kategoride henüz bir şey yok.", (VIRTUAL_W / 2, start_y + 90), 18, TEXT_DIM, center=True)
+            draw_text(surf, "Bu kategoride henüz bir şey yok.",
+                      (VIRTUAL_W / 2, start_y + 90), 18, TEXT_DIM, center=True)
+
+        # --- sayfa okları (bir kategoride 10'dan fazla eşya varsa) ---
+        if pages > 1:
+            py = VIRTUAL_H - 92
+            for dx in (-1, 1):
+                br = pygame.Rect(int(VIRTUAL_W / 2 + dx * 118 - 20), py, 40, 30)
+                can = (self.page > 0) if dx < 0 else (self.page < pages - 1)
+                hov = br.collidepoint(mouse_pos) and can
+                bcol = ((96, 36, 20) if hellish else (44, 48, 70)) if hov else (
+                    (52, 22, 16) if hellish else (26, 28, 44))
+                pygame.draw.rect(surf, bcol, br, border_radius=8)
+                pygame.draw.rect(surf, (255, 120, 50) if hellish else PANEL_EDGE, br,
+                                 width=2, border_radius=8)
+                # Ok işareti yazı tipine bağlı kalmasın diye üçgen çiziliyor.
+                acol = TEXT if can else (96, 90, 104)
+                pygame.draw.polygon(surf, acol, [
+                    (br.centerx + dx * 7, br.centery),
+                    (br.centerx - dx * 5, br.centery - 8),
+                    (br.centerx - dx * 5, br.centery + 8)])
+                if hov and clicked:
+                    self.page = clamp(self.page + dx, 0, pages - 1)
+                    sfx("click", 0.5, 0.0)
+            draw_text(surf, f"SAYFA {self.page + 1}/{pages}", (VIRTUAL_W / 2, py + 6), 15,
+                      (255, 170, 110) if hellish else TEXT, bold=True, center=True)
 
         btn = Button((VIRTUAL_W / 2 - 130, VIRTUAL_H - 50, 260, 38), "KAPAT (B)", None,
-                     color=(70, 76, 100), hover_color=(95, 105, 140))
+                     color=(104, 44, 26) if hellish else (70, 76, 100),
+                     hover_color=(150, 66, 36) if hellish else (95, 105, 140))
         btn.update(mouse_pos, 1 / 60)
         btn.draw(surf)
         return btn.rect.collidepoint(mouse_pos) and clicked
