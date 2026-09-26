@@ -1,6 +1,6 @@
 """
 =====================================================================
- KASMA ARENA  —  v3.4
+ KASMA ARENA  —  v3.5
  2D Top-Down Hayatta Kalma / Skor-Rekor Oyunu
  ---------------------------------------------------------------------
  Dalgalar halinde gelen düşmanlara karşı hayatta kal, nişan al, ateş et,
@@ -8,6 +8,23 @@
  patronları yen, rekorunu kır. Kaybedersen o koşuda aldıkların silinir.
  Elmasla kalıcı SKIN'ler al (her skinin kendi silahı, mermisi, efekti ve
  ÖZEL YETENEĞİ var).
+
+ v3.5 ile gelenler:
+   * PATRONLAR ARTIK SADECE ATEŞ ETMİYOR. Her patronun 3 ek yeteneği var:
+     üstüne atılır (ATILIŞ), kaçtığın yöne tuzak perdesi çeker (DUVAR),
+     çevreni halkayla kapatır (KAFES), üstüne darbe yağdırır (KOR YAĞMURU),
+     seni kendine çeker (ÇEKİM), yeri sarsar, savaş çığlığıyla güçlenir,
+     dibine ışınlanıp biçer ya da sürü çağırır.
+   * KAÇMAK ARTIK BEDAVA DEĞİL: fazla uzaklaşırsan patron AVLANMA moduna
+     geçer ve senden hızlı koşar. Ayrıca istenen mesafedeyken yerinde
+     çakılı durmuyor, çevrende dönüyor.
+   * NİŞAN DÜZELDİ: patronlar merminin uçuş süresini hesaplayıp oyuncunun
+     O ANDA olacağı yere atıyor. Düz kaçmak artık işe yaramıyor — yön
+     değiştirmen gerekiyor.
+   * Yanık ve zehir şiddeti oyuncunun canına göre tavanlandı, geç
+     patronların alan hasarı da kademeli olarak kısıldı.
+   * BALTA dönerek uçuyor (hareket bulanıklığı + savurma yayı), OK ise
+     arkasında uzun bir hız izi bırakıyor.
 
  v3.4 ile gelenler:
    * PATRONLAR YENİLENDİ: her patronun kendine özgü bir imza mekaniği var
@@ -87,7 +104,7 @@ ONLINE_API_URL = "https://kasma-arena-server.onrender.com"
 VIRTUAL_W, VIRTUAL_H = 1280, 720
 FPS = 60
 GAME_TITLE = "ARENA SAVAŞI"
-GAME_VERSION = "3.4"
+GAME_VERSION = "3.5"
 
 
 def _base_dir():
@@ -5436,9 +5453,13 @@ class PlayerProjectile:
             elif st == "bullet":
                 fx.spark(x, y, (255, 214, 120), rv(-10, 10), rv(-10, 10), .18, 1.8)
             elif st == "w_axe":
-                fx.spark(x, y, self.color, rv(-18, 18), rv(-18, 18), .3, 2.6)
+                # dönen ağızlardan savrulan kıvılcımlar + savrulan toz
+                fx.spark(x, y, (255, 240, 210), rv(-90, 90), rv(-90, 90), .28, 2.2)
+                fx.spark(x, y, self.color, rv(-30, 30), rv(-30, 30), .38, 3.4,
+                         add=False, drag=2.2, grow=2)
             elif st == "w_arrow":
-                fx.spark(x, y, self.color, rv(-8, 8), rv(-8, 8), .25, 1.8)
+                fx.spark(x, y, self.accent, rv(-6, 6), rv(-6, 6), .18, 1.6)
+                fx.spark(x, y, self.color, rv(-14, 14), rv(-14, 14), .34, 2.4)
 
     def draw(self, surf, t):
         x, y = int(self.x), int(self.y)
@@ -5554,34 +5575,88 @@ class PlayerProjectile:
             pygame.draw.line(surf, (255, 255, 235),
                              (x - dx * 6, y - dy * 6), (x + dx * 3, y + dy * 3), 1)
         elif st == "w_axe":
-            # BALTA: kendi ekseninde dönen, iki ağızlı savaş baltası
-            spin = t * 16 + self.spin
-            add_glow(surf, x, y, 20, c, .55)
-            hx0, hy0 = math.cos(spin), math.sin(spin)
-            pygame.draw.line(surf, (92, 62, 40),
-                             (x - hx0 * 13, y - hy0 * 13), (x + hx0 * 13, y + hy0 * 13), 4)
-            for sgn in (-1, 1):
-                bx0, by0 = x + hx0 * 12 * sgn, y + hy0 * 12 * sgn
+            # BALTA: fırıl fırıl dönen, arkasında hareket bulanıklığı bırakan
+            # iki ağızlı savaş baltası.
+            #
+            # Dönüş HIZLI olduğu için tek kare yeterince "dönüyor" hissi
+            # vermiyordu. Bu yüzden baltanın geçtiği yol boyunca giderek
+            # sönen KOPYALARI çiziliyor: balta düz uçtuğu için geçmiş
+            # konumları hız vektörünün tersinde birebir hesaplanabiliyor.
+            spin = t * 19 + self.spin
+            SPIN_PER_STEP = 0.62      # kopyalar arasındaki dönüş farkı
+            STEP = 11                 # kopyalar arasındaki mesafe (piksel)
+
+            def _axe(ax, ay, sp, body, edge, w_blade, w_haft, glow=0.0):
+                hx0, hy0 = math.cos(sp), math.sin(sp)
                 nx0, ny0 = -hy0, hx0
-                blade = [(bx0 + hx0 * 7 * sgn, by0 + hy0 * 7 * sgn),
-                         (bx0 + nx0 * 9, by0 + ny0 * 9),
-                         (bx0 - hx0 * 5 * sgn, by0 - hy0 * 5 * sgn),
-                         (bx0 - nx0 * 9, by0 - ny0 * 9)]
-                pygame.draw.polygon(surf, OUTLINE, blade)
-                pygame.draw.polygon(surf, (222, 228, 240), blade, 0)
-                pygame.draw.polygon(surf, scale_col(c, 0.8), blade, 1)
+                if glow > 0:
+                    add_glow(surf, ax, ay, 26, c, glow)
+                pygame.draw.line(surf, body,
+                                 (ax - hx0 * 14, ay - hy0 * 14),
+                                 (ax + hx0 * 14, ay + hy0 * 14), w_haft)
+                for sgn in (-1, 1):
+                    bx0, by0 = ax + hx0 * 12 * sgn, ay + hy0 * 12 * sgn
+                    blade = [(bx0 + hx0 * 8 * sgn, by0 + hy0 * 8 * sgn),
+                             (bx0 + nx0 * 10, by0 + ny0 * 10),
+                             (bx0 - hx0 * 6 * sgn, by0 - hy0 * 6 * sgn),
+                             (bx0 - nx0 * 10, by0 - ny0 * 10)]
+                    pygame.draw.polygon(surf, edge, blade)
+                    if w_blade:
+                        pygame.draw.polygon(surf, scale_col(c, 0.85), blade, w_blade)
+
+            # 1) geçmiş konumlar — giderek sönen hayaletler
+            for i in (3, 2, 1):
+                k = 1.0 - i * 0.26
+                gx = x - dx * STEP * i
+                gy = y - dy * STEP * i
+                ghost = scale_col(mix_col((196, 206, 224), c, 0.45), 0.34 + 0.26 * k)
+                _axe(gx, gy, spin - SPIN_PER_STEP * i, scale_col((92, 62, 40), 0.40),
+                     ghost, 0, 2)
+
+            # 2) dönüş halkası — baltanın süpürdüğü daire
+            ring_a = int(70 + 50 * abs(math.sin(spin * 2)))
+            rs = pygame.Surface((56, 56), pygame.SRCALPHA)
+            pygame.draw.circle(rs, (*c, ring_a), (28, 28), 21, 3)
+            surf.blit(rs, (x - 28, y - 28))
+
+            # 3) asıl balta
+            _axe(x, y, spin, (98, 66, 42), (228, 234, 246), 1, 5, glow=0.60)
+            # kıvılcım: ağızların ucunda parlayan nokta
+            hx0, hy0 = math.cos(spin), math.sin(spin)
+            for sgn in (-1, 1):
+                pygame.draw.circle(surf, (255, 246, 226),
+                                   (int(x + hx0 * 19 * sgn), int(y + hy0 * 19 * sgn)), 2)
         elif st == "w_arrow":
-            # OK: uzun gövde, tüylü arka, sivri uç
-            add_glow(surf, x, y, 14, c, .5)
-            pygame.draw.line(surf, (150, 112, 70),
-                             (x - dx * 17, y - dy * 17), (x + dx * 9, y + dy * 9), 3)
-            tip = rot_pts([(15, 0), (5, -5), (5, 5)], ang, x, y)
-            pygame.draw.polygon(surf, OUTLINE, tip)
-            pygame.draw.polygon(surf, (236, 244, 252), tip)
+            # OK: arkasında uzun bir hız izi bırakan, sivri uçlu uzun ok.
             nx0, ny0 = -dy, dx
+            # 1) hız izi — okun arkasında sivrilerek sönen bir çizgi.
+            #    Geniş uç OKTA, sivri uç arkada: göz hareketi böyle okuyor.
+            PAD = 70
+            trail = pygame.Surface((PAD * 2, PAD * 2), pygame.SRCALPHA)
+            for (ln, wd, al, tcol) in ((68, 6, 46, c), (42, 5, 92, c),
+                                       (22, 4, 165, lighten(c, 0.45))):
+                pygame.draw.polygon(trail, (*tcol, al), [
+                    (PAD + dx * 4 + nx0 * wd, PAD + dy * 4 + ny0 * wd),
+                    (PAD + dx * 4 - nx0 * wd, PAD + dy * 4 - ny0 * wd),
+                    (PAD - dx * ln, PAD - dy * ln)])
+            surf.blit(trail, (x - PAD, y - PAD))
+            add_glow(surf, x, y, 16, c, .55)
+            # 2) gövde
+            pygame.draw.line(surf, (60, 44, 30),
+                             (x - dx * 20, y - dy * 20), (x + dx * 11, y + dy * 11), 5)
+            pygame.draw.line(surf, (168, 126, 78),
+                             (x - dx * 19, y - dy * 19), (x + dx * 10, y + dy * 10), 3)
+            # 3) uç — koyu hatlı, parlak çelik
+            tip = rot_pts([(19, 0), (6, -6), (9, 0), (6, 6)], ang, x, y)
+            pygame.draw.polygon(surf, OUTLINE, rot_pts([(22, 0), (5, -8), (9, 0), (5, 8)], ang, x, y))
+            pygame.draw.polygon(surf, (240, 246, 253), tip)
+            pygame.draw.line(surf, WHITE, tip[0], tip[2], 1)
+            # 4) tüyler
             for k in (-1, 1):
-                pygame.draw.line(surf, c, (x - dx * 17, y - dy * 17),
-                                 (x - dx * 10 + nx0 * 5 * k, y - dy * 10 + ny0 * 5 * k), 2)
+                pygame.draw.polygon(surf, c, [
+                    (x - dx * 20, y - dy * 20),
+                    (x - dx * 11 + nx0 * 7 * k, y - dy * 11 + ny0 * 7 * k),
+                    (x - dx * 8, y - dy * 8)])
         else:
             pygame.draw.circle(surf, c, (x, y), self.r)
         if self.homing:
@@ -7125,6 +7200,47 @@ BOSS_TRAITS = {
 }
 
 
+# ---------------------------------------------------------------------
+# PATRONLARIN EK YETENEKLERİ
+# ---------------------------------------------------------------------
+# Patron artık yalnızca "dur ve ateş et" yapmıyor. Her patronun, imza
+# özelliğinin yanında bir de YETENEK LİSTESİ var; belirli aralıklarla
+# bunlardan birini kullanıyor. Hepsinin ortak amacı aynı: oyuncunun basitçe
+# uzaklaşıp dövüşten çıkmasını engellemek.
+#
+#   lunge   : telgraflanan yöne fırlar (mesafeyi kapatır)
+#   wall    : oyuncunun KAÇTIĞI yöne dik tuzak perdesi çeker
+#   cage    : oyuncunun çevresine tuzak halkası kurar
+#   meteor  : oyuncunun çevresine gecikmeli darbeler yağdırır
+#   pull    : oyuncuyu kendine doğru çeker
+#   quake   : çevresinden halka halka yayılan taş darbeleri + yavaşlatma
+#   warcry  : kendini güçlendirir, çevresini iter ve tutuşturur
+#   harvest : oyuncunun dibine ışınlanıp geniş bir kesik atar
+#   swarm   : fazladan yaratık çağırır + iki yana zehir havuzu bırakır
+BOSS_SKILL_SETS = {
+    "warlord":  ("lunge", "wall", "warcry"),
+    "witch":    ("pull", "cage", "meteor"),
+    "colossus": ("quake", "lunge", "wall"),
+    "reaper":   ("harvest", "cage", "pull"),
+    "hive":     ("swarm", "cage", "wall"),
+    "dragon":   ("meteor", "lunge", "wall"),
+}
+
+# AVLANMA MODU: oyuncu bu mesafeden uzaklaşır ve orada bir süre kalırsa,
+# patron dövüş mesafesini bırakıp doğrudan kovalamaya başlar.
+BOSS_HUNT_DIST = 520.0     # bu mesafenin ötesi "kaçıyor" sayılır
+BOSS_HUNT_DELAY = 1.1      # kaç saniye sonra kovalamaya geçer
+BOSS_HUNT_TIME = 6.5       # kovalama en fazla bu kadar sürer
+BOSS_HUNT_SPEED = 2.9      # kovalarken kendi hızının çarpanı
+# Kovalama, oyuncunun O ANKİ hızının en az bu katı olur. Patronların taban
+# hızı (60-112) oyuncununkinin (215) çok altında; sabit bir çarpan
+# kullanılınca KOLOS gibi ağır patronlar kaçan oyuncuya asla yetişemiyordu.
+BOSS_HUNT_MIN_VS_PLAYER = 1.24
+# SAVAŞ ÇIĞLIĞI'nın verdiği güç artışı (hız ve saldırı temposu).
+BOSS_BUFF_SPEED = 1.45
+BOSS_BUFF_CADENCE = 0.62
+
+
 def boss_trait(kind, hellish=False):
     """Patronun imza özelliği. Cehennem patronları ayrıca ATEŞ de taşır."""
     tr = dict(BOSS_TRAITS.get(kind, BOSS_TRAITS["warlord"]))
@@ -7290,6 +7406,17 @@ class Boss:
         self.fly_dir = (0.0, 0.0)
         self.fly_cd = random.uniform(6.0, 9.0)
         self.trail_acc = 0.0                           # alev/iz bırakma sayacı
+        # --- EK YETENEKLER (bkz. BOSS_SKILL_SETS) ---
+        self.skill_cd = random.uniform(3.5, 6.0)       # bir sonraki yeteneğe kalan
+        self.last_skill = ""                           # üst üste aynısı gelmesin
+        self.pull_t = 0.0                              # ÇEKİM kalan süresi
+        self.buff_t = 0.0                              # SAVAŞ ÇIĞLIĞI kalan süresi
+        self.hunt_t = 0.0                              # AVLANMA kalan süresi
+        self.hunt_check = 0.0                          # kaç saniyedir uzakta
+        # DÖNME (strafe): istenen mesafedeyken patron yerinde ÇAKILI kalmasın
+        # diye oyuncunun çevresinde dolanır. Yön belli aralıklarla değişir.
+        self.strafe_dir = random.choice((-1, 1))
+        self.strafe_t = random.uniform(1.4, 2.6)
         # Çizim için: patronun baktığı yön (yumuşatılmış) ve yürüyüş fazı.
         # Gövde, kanatlar, silahlar ve gözler bu yöne göre çizilir; patronlar
         # artık ekranda dönen soyut şekiller değil, oyuncuya BAKAN yaratıklar.
@@ -7322,6 +7449,27 @@ class Boss:
         self.fight_time = 0.0          # dövüşün başından beri geçen süre
 
     # ---------------- İMZA ÖZELLİĞİ ----------------
+    # Süreli etkilerin (yanık / zehir) saniyelik hasar TAVANI, oyuncunun azami
+    # canının oranı olarak konur. Patronun vuruş hasarı geç dalgalarda yüzlere
+    # çıkıyor; buna oranlanan bir yanık oyuncuyu birkaç saniyede eritiyordu.
+    # Tavan sayesinde yanık "baskı" olarak kalıyor, tek başına öldüren bir
+    # şeye dönüşmüyor.
+    BURN_CAP_FRAC = 0.050      # azami canın %5'i / saniye
+    POISON_CAP_FRAC = 0.035    # azami canın %3.5'i / saniye
+
+    def _dot_dps(self, player, want, frac):
+        """Süreli etkinin saniyelik hasarı — oyuncunun canına göre tavanlanır."""
+        return min(want, max(2.0, player.max_hp * frac))
+
+    def _area_dmg_k(self):
+        """Alan yeteneklerinin hasar katsayısı (geç patronlarda kısılır).
+
+        Menzilli mermilerde olduğu gibi (bkz. _ranged_dmg_k), alan
+        saldırıları da patron dizini büyüdükçe üstel biçimde patlamasın:
+        tuzaklar oyuncuyu kıstırmak için var, tek darbede silmek için değil.
+        """
+        return max(0.45, 1.0 - (self.boss_index - 1) * 0.07)
+
     def afflict(self, player, k=1.0):
         """Patronun imza etkisini oyuncuya uygular.
 
@@ -7333,21 +7481,25 @@ class Boss:
             return
         tk = self.trait["kind"]
         base = max(1.0, self.dmg)
+        BC, PC = self.BURN_CAP_FRAC, self.POISON_CAP_FRAC
         if tk in ("burn", "inferno"):
-            player.apply_burn(base * (0.34 if tk == "inferno" else 0.28) * k,
-                              3.2, self.name)
+            want = base * (0.34 if tk == "inferno" else 0.28) * k
+            player.apply_burn(self._dot_dps(player, want, BC), 3.2, self.name)
         elif tk == "venom":
-            player.apply_poison(base * 0.22 * k, 5.5, self.name)
+            player.apply_poison(self._dot_dps(player, base * 0.22 * k, PC), 5.5, self.name)
         elif tk == "chill":
             player.apply_slow(0.58, 1.8)
         elif tk == "vanish":
             player.apply_slow(0.74, 1.4)
-            player.apply_poison(base * 0.10 * k, 3.0, self.name)
+            player.apply_poison(self._dot_dps(player, base * 0.10 * k, PC * 0.5),
+                                3.0, self.name)
         elif tk == "blink":
-            player.apply_poison(base * 0.16 * k, 4.0, self.name)
+            player.apply_poison(self._dot_dps(player, base * 0.16 * k, PC * 0.7),
+                                4.0, self.name)
         # CEHENNEM patronları ayrıca yakar — cehennemde her darbe ateş taşır.
         if self.trait.get("hellfire") and tk not in ("burn", "inferno"):
-            player.apply_burn(base * 0.15 * k, 2.4, self.name)
+            player.apply_burn(self._dot_dps(player, base * 0.15 * k, BC * 0.6),
+                              2.4, self.name)
 
     def hit_player(self, player, amount, fx, src_x=None, src_y=None):
         """Oyuncuya hasar verir + imza etkisini uygular + can çalar.
@@ -7406,9 +7558,9 @@ class Boss:
                 self.x += self.fly_dir[0] * self.speed * 3.6 * dt
                 self.y += self.fly_dir[1] * self.speed * 3.6 * dt
                 self.trail_acc += dt
-                if self.trail_acc >= 0.14:
+                if self.trail_acc >= 0.19:
                     self.trail_acc = 0.0
-                    hazards.append(Hazard(self.x, self.y, 52, 0.35, self.dmg * 0.65, owner=self))
+                    hazards.append(Hazard(self.x, self.y, 52, 0.35, self.dmg * 0.48 * self._area_dmg_k(), owner=self))
                 fx.spark(self.x + random.uniform(-30, 30), self.y + random.uniform(-30, 30),
                          (255, 170, 70), random.uniform(-40, 40), random.uniform(-40, 40), 0.4, 5)
                 if self.fly_t <= 0:
@@ -7420,7 +7572,7 @@ class Boss:
                         a = i * math.tau / 8 + random.uniform(-0.2, 0.2)
                         hx = clamp(self.x + math.cos(a) * 130, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
                         hy = clamp(self.y + math.sin(a) * 130, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
-                        hazards.append(Hazard(hx, hy, 58, 0.25 + i * 0.05, self.dmg * 0.8, owner=self))
+                        hazards.append(Hazard(hx, hy, 58, 0.25 + i * 0.05, self.dmg * 0.62 * self._area_dmg_k(), owner=self))
             else:
                 self.fly_cd -= dt
                 if self.fly_cd <= 0 and self.spawn_t > 2.0:
@@ -7440,6 +7592,197 @@ class Boss:
                 fx.spark(self.x + random.uniform(-self.radius, self.radius),
                          self.y + self.radius * 0.5,
                          (255, 170, 80), random.uniform(-14, 14), -40, 0.5, 4)
+
+    # ================= EK YETENEKLER =================
+    # Patronlar eskiden yerinde durup mermi atıyordu; oyuncu basitçe uzaklaşınca
+    # dövüş bitiyordu. Aşağıdaki yetenekler bunun için var: mesafeyi kapatır,
+    # kaçış yolunu keser, oyuncuyu kendine çeker ya da çevresini kapatır.
+    #
+    # YENİ YETENEK EKLEMEK: BOSS_SKILL_SETS'e adını yaz, _cast_skill() içine
+    # bir dal ekle; nişan alması gerekiyorsa _set_telegraph() ile telgrafla ve
+    # _unleash() ile draw()'daki telgraf çizimine birer dal ekle.
+
+    def _skill_interval(self):
+        """İki ek yetenek arasındaki süre."""
+        base = max(3.6, 9.0 - (self.boss_index - 1) * 0.9)
+        if self.desperate:
+            base *= 0.55
+        elif self.enraged:
+            base *= 0.72
+        if self.buff_t > 0:
+            base *= 0.75
+        return base * random.uniform(0.85, 1.15)
+
+    def _escape_angle(self, player):
+        """Oyuncunun KAÇTIĞI yön. Duruyorsa patrondan uzağa doğru sayılır."""
+        vx, vy = getattr(player, "vx", 0.0), getattr(player, "vy", 0.0)
+        if math.hypot(vx, vy) > 60:
+            return math.atan2(vy, vx)
+        return math.atan2(player.y - self.y, player.x - self.x)
+
+    def _cast_skill(self, player, fx, projectiles, hazards):
+        """Patronun yetenek listesinden birini seçip kullanır."""
+        pool = [k for k in BOSS_SKILL_SETS.get(self.kind, ("lunge",))
+                if k != self.last_skill] or list(BOSS_SKILL_SETS.get(self.kind, ("lunge",)))
+        name = random.choice(pool)
+        self.last_skill = name
+        px, py = self._lead_point(player, 0.35)
+
+        if name == "lunge":
+            # ATILIŞ: telgraflanan yöne fırlar — mesafeyi bir anda kapatır.
+            self._set_telegraph("lunge", px, py, 0, 0.55)
+            fx.popup(self.x, self.y - self.radius - 30, "ATILIYOR!",
+                     (255, 150, 90), 22, life=0.8)
+
+        elif name == "wall":
+            # ALEV/TAŞ DUVARI: oyuncunun KAÇTIĞI yöne dik bir tuzak perdesi.
+            esc = self._escape_angle(player)
+            wx = clamp(player.x + math.cos(esc) * 190, ARENA_RECT.left + 30, ARENA_RECT.right - 30)
+            wy = clamp(player.y + math.sin(esc) * 190, ARENA_RECT.top + 30, ARENA_RECT.bottom - 30)
+            self._set_telegraph("wall", wx, wy, esc, 0.62)
+            fx.popup(self.x, self.y - self.radius - 30, "YOLUNU KESİYOR!",
+                     self.trait["color"], 20, life=0.9)
+
+        elif name == "cage":
+            # KAFES: oyuncunun çevresine kapanan tuzak halkası (boşluğu var).
+            self._set_telegraph("cage", px, py, self._ring_radius() * 0.82,
+                                0.60 if self.enraged else 0.78)
+            fx.ring(px, py, self.trait["color"], n=22, speed=170, life=0.5, r=3)
+
+        elif name == "meteor":
+            # KOR YAĞMURU: oyuncunun çevresine gecikmeli olarak inen darbeler.
+            self._set_telegraph("meteor", px, py, 0, 0.55)
+            fx.popup(self.x, self.y - self.radius - 30, "KOR YAĞMURU!",
+                     (255, 170, 80), 22, life=0.9)
+
+        elif name == "pull":
+            # ÇEKİM: oyuncuyu kendine doğru çeker — kaçış iptal olur.
+            self._set_telegraph("pull", self.x, self.y, 0, 0.62)
+            fx.popup(self.x, self.y - self.radius - 30, "ÇEKİYOR!",
+                     (200, 130, 255), 22, life=0.9)
+
+        elif name == "quake":
+            # SARSINTI: patronun çevresinden yayılan halka halka taş darbeleri.
+            fx.shockwave(self.x, self.y, 300, self.color, 0.55, 8)
+            fx.shake(13, 0.4)
+            fx.popup(self.x, self.y - self.radius - 30, "YER SARSILIYOR!",
+                     (170, 200, 240), 22, life=1.0)
+            for ring in range(3):
+                n = 8 + ring * 3
+                rad = 150 + ring * 115
+                for i in range(n):
+                    a = i * math.tau / n + ring * 0.24
+                    hx = clamp(self.x + math.cos(a) * rad, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
+                    hy = clamp(self.y + math.sin(a) * rad, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
+                    hazards.append(Hazard(hx, hy, 56, 0.25 + ring * 0.30, self.dmg * 0.50 * self._area_dmg_k(),
+                                          owner=self))
+            if dist(self.x, self.y, player.x, player.y) < 520:
+                player.apply_slow(0.62, 2.2)
+            sfx("explosion", 0.7, 0.0)
+
+        elif name == "warcry":
+            # SAVAŞ ÇIĞLIĞI: kendini güçlendirir, çevresini iter ve tutuşturur.
+            self.buff_t = 6.5
+            fx.shockwave(self.x, self.y, 260, (255, 120, 60), 0.5, 7)
+            fx.ring(self.x, self.y, (255, 180, 90), n=26, speed=300, life=0.55, r=4)
+            fx.popup(self.x, self.y - self.radius - 30, "SAVAŞ ÇIĞLIĞI!",
+                     (255, 180, 90), 26, life=1.2)
+            fx.shake(10, 0.3)
+            if dist(self.x, self.y, player.x, player.y) < 300:
+                kx, ky = norm_dir(self.x, self.y, player.x, player.y)
+                player.kbx += kx * 1500
+                player.kby += ky * 1500
+                player.apply_burn(self.dmg * 0.22, 3.0, self.name)
+            sfx("boss", 0.8, 0.0)
+
+        elif name == "harvest":
+            # RUH BİÇİMİ: oyuncunun dibine ışınlanır ve geniş bir kesik atar.
+            ang = random.uniform(0, math.tau)
+            self.x = clamp(player.x + math.cos(ang) * 90,
+                           ARENA_RECT.left + self.radius, ARENA_RECT.right - self.radius)
+            self.y = clamp(player.y + math.sin(ang) * 90,
+                           ARENA_RECT.top + self.radius, ARENA_RECT.bottom - self.radius)
+            fx.ring(self.x, self.y, self.color, n=24, speed=260, life=0.4, r=3)
+            hazards.append(Hazard(self.x, self.y, 165, 0.30, self.dmg * 1.00 * self._area_dmg_k(), owner=self))
+            fx.popup(self.x, self.y - self.radius - 30, "RUH BİÇİMİ!",
+                     self.color, 24, life=1.0)
+            self.flee_timer = 0.0
+            sfx("warn", 0.9, 0.0)
+
+        elif name == "swarm":
+            # SÜRÜ: fazladan yaratık + hem kendi hem oyuncunun çevresine zehir.
+            self._summon_minions(fx)
+            for cx, cy in ((self.x, self.y), (player.x, player.y)):
+                for i in range(5):
+                    a = i * math.tau / 5 + random.uniform(-0.3, 0.3)
+                    hx = clamp(cx + math.cos(a) * 110, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
+                    hy = clamp(cy + math.sin(a) * 110, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
+                    hazards.append(Hazard(hx, hy, 54, 0.30 + i * 0.10, self.dmg * 0.50 * self._area_dmg_k(),
+                                          owner=self))
+            fx.popup(self.x, self.y - self.radius - 30, "SÜRÜ GELİYOR!",
+                     (200, 230, 100), 22, life=1.0)
+
+    def _update_skills(self, dt, player, fx, projectiles, hazards, d):
+        """Yeteneklerin kare kare işleyişi: çekim, güç artışı, avlanma."""
+        # --- ÇEKİM: oyuncuyu patrona doğru sürükler ---
+        if self.pull_t > 0:
+            self.pull_t -= dt
+            if player.alive:
+                dx, dy = norm_dir(player.x, player.y, self.x, self.y)
+                pull_v = 470.0 * (1.0 if not self.enraged else 1.25)
+                player.x = clamp(player.x + dx * pull_v * dt,
+                                 ARENA_RECT.left + player.radius, ARENA_RECT.right - player.radius)
+                player.y = clamp(player.y + dy * pull_v * dt,
+                                 ARENA_RECT.top + player.radius, ARENA_RECT.bottom - player.radius)
+                if random.random() < dt * 14:
+                    fx.spark(player.x + random.uniform(-24, 24), player.y + random.uniform(-24, 24),
+                             (200, 140, 255), dx * 160, dy * 160, 0.35, 2.6)
+
+        # --- SAVAŞ ÇIĞLIĞI güç artışı ---
+        if self.buff_t > 0:
+            self.buff_t -= dt
+            if random.random() < dt * 5:
+                fx.spark(self.x + random.uniform(-self.radius, self.radius),
+                         self.y + random.uniform(-self.radius, self.radius),
+                         (255, 170, 80), 0, -60, 0.45, 3)
+
+        # --- AVLANMA: oyuncu fazla uzaklaşırsa patron kovalamaya başlar ---
+        can_hunt = (self.flee_timer <= 0 and self.charge_t <= 0 and self.fly_t <= 0
+                    and self.pull_t <= 0 and self.spawn_t > 2.0)
+        if can_hunt and d > BOSS_HUNT_DIST:
+            self.hunt_check += dt
+            if self.hunt_check >= BOSS_HUNT_DELAY and self.hunt_t <= 0:
+                self.hunt_t = BOSS_HUNT_TIME
+                self.hunt_check = 0.0
+                fx.popup(self.x, self.y - self.radius - 30, "AVLANIYOR!",
+                         (255, 90, 70), 24, life=1.0)
+                sfx("warn", 0.8, 0.0)
+        else:
+            self.hunt_check = 0.0
+        if self.hunt_t > 0:
+            self.hunt_t -= dt
+            if d < self.want_dist * 1.15:
+                self.hunt_t = 0.0      # yetişti, normal dövüş mesafesine döndü
+
+        # --- dönme yönü zaman zaman değişsin (tahmin edilemez olsun) ---
+        self.strafe_t -= dt
+        if self.strafe_t <= 0:
+            self.strafe_t = random.uniform(1.4, 2.8)
+            self.strafe_dir = -self.strafe_dir
+
+        # --- ek yetenek zamanlayıcısı ---
+        if (self.spawn_t > 2.5 and self.charge_t <= 0 and self.fly_t <= 0
+                and self.pull_t <= 0 and not self.is_hidden()):
+            self.skill_cd -= dt
+            if self.skill_cd <= 0:
+                if self.telegraph is not None:
+                    # Ekranda hâlihazırda bir uyarı varken yenisini kurmak
+                    # onu siler ve oyuncu kaçmaya çalıştığı işaretin ortadan
+                    # kalktığını görür. Yetenek, telgraf boşalana kadar bekler.
+                    self.skill_cd = 0.15
+                else:
+                    self.skill_cd = self._skill_interval()
+                    self._cast_skill(player, fx, projectiles, hazards)
 
     def on_damage_dealt(self, amount):
         """Patron verdiği hasarın bir kısmını canına ekler (can çalma)."""
@@ -7572,6 +7915,8 @@ class Boss:
 
         d = dist(self.x, self.y, player.x, player.y)
         dx, dy = norm_dir(self.x, self.y, player.x, player.y)
+        # --- EK YETENEKLER: çekim, güç artışı, avlanma ve yetenek sayacı ---
+        self._update_skills(dt, player, fx, projectiles, hazards, d)
         if self.fly_t > 0:
             # EJDERHA havada: yönünü _update_trait belirliyor, burada durulur.
             pass
@@ -7600,9 +7945,35 @@ class Boss:
                 flee_k = 1.9 if self.desperate else 1.5
                 self.x -= dx * self.speed * flee_k * dt * scale_in
                 self.y -= dy * self.speed * flee_k * dt * scale_in
+        elif self.hunt_t > 0:
+            # AVLANMA: dövüş mesafesi umurunda değil, doğrudan üstüne gelir.
+            hs = max(self.speed * BOSS_HUNT_SPEED,
+                     player.eff_speed() * BOSS_HUNT_MIN_VS_PLAYER)
+            if self.buff_t > 0:
+                hs *= BOSS_BUFF_SPEED
+            self.x += dx * hs * dt * scale_in
+            self.y += dy * hs * dt * scale_in
+            if random.random() < dt * 8:
+                fx.spark(self.x - dx * self.radius, self.y - dy * self.radius,
+                         self.trait["color"], -dx * 90, -dy * 90, 0.35, 3)
         else:
             want_d = self.want_dist
             speed_k = 1.7 if self.enraged else 1.2
+            if self.buff_t > 0:
+                speed_k *= BOSS_BUFF_SPEED
+            # Mesafe açıldıkça yaklaşma hızı da artar: patron dövüş mesafesine
+            # dönmek için oyalanmaz.
+            if d > want_d + 200:
+                speed_k *= 1.55
+            # DÖNME: hangi yönde olursa olsun patron aynı anda oyuncunun
+            # çevresinde de kayar. Eskiden istenen mesafeye gelince TAMAMEN
+            # duruyor ve yerinde ateş eden bir hedef tahtasına dönüyordu.
+            sxp, syp = -dy, dx
+            strafe_k = 0.95 if self.enraged else 0.75
+            if self.buff_t > 0:
+                strafe_k *= BOSS_BUFF_SPEED
+            self.x += sxp * self.speed * strafe_k * self.strafe_dir * dt * scale_in
+            self.y += syp * self.speed * strafe_k * self.strafe_dir * dt * scale_in
             if d > want_d + 20:
                 self.x += dx * self.speed * speed_k * dt * scale_in
                 self.y += dy * self.speed * speed_k * dt * scale_in
@@ -7638,6 +8009,8 @@ class Boss:
                 # geç dalgalardaki patronlar gözle görülür biçimde daha sık vurur.
                 cadence = 0.32 if self.desperate else (0.46 if self.enraged else 0.85)
                 cadence *= max(0.45, 1.0 - (self.boss_index - 1) * 0.11)
+                if self.buff_t > 0:
+                    cadence *= BOSS_BUFF_CADENCE
                 self.atk_timer = random.uniform(0.9, 1.45) * cadence
                 self._start_attack(player, fx)
 
@@ -7694,11 +8067,36 @@ class Boss:
         oyuncu bir saniyelik hazırlık süresi boyunca yürüyüp gittiği için
         KOLOS ve KOVAN ANA gibi yalnızca alan saldırısı olan patronlar hiçbir
         zaman isabet ettiremiyordu.
+
+        `lead`, saldırının hazırlık (telgraf) süresine yakın seçilmelidir:
+        0.2 saniyelik öngörü, 1 saniyelik bir telgrafta hiçbir işe yaramaz.
+        Yine de tam isabet YOK — oyuncu yön değiştirerek kaçabilir, zaten
+        telgrafın amacı da bu.
         """
         lx = player.x + getattr(player, "vx", 0.0) * lead
         ly = player.y + getattr(player, "vy", 0.0) * lead
         return (clamp(lx, ARENA_RECT.left + 20, ARENA_RECT.right - 20),
                 clamp(ly, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20))
+
+    def _aim_angle(self, player, speed, jitter=0.10):
+        """Merminin oyuncuyu YAKALAYACAĞI açı (gerçek kesişim noktası).
+
+        Eskiden nişan yalnızca 0.2 saniyelik bir öngörüyle alınıyordu. Mermi
+        500 piksellik yolu ~1.2 saniyede aldığı için, düz kaçan bir oyuncuya
+        atılan her şey arkasından geçiyordu — "kaçmak çok basit" hissinin asıl
+        sebebi buydu. Artık uçuş süresi hesaplanıp oyuncunun O ANDA olacağı
+        yere nişan alınıyor; `jitter` ise nişanın kusursuz olmamasını sağlar.
+        """
+        px, py = player.x, player.y
+        vx, vy = getattr(player, "vx", 0.0), getattr(player, "vy", 0.0)
+        speed = max(60.0, speed)
+        t_hit = dist(self.x, self.y, px, py) / speed
+        for _ in range(2):      # iki yineleme yeterince yakınsıyor
+            t_hit = dist(self.x, self.y, px + vx * t_hit, py + vy * t_hit) / speed
+        t_hit += random.uniform(-jitter, jitter)
+        tx = clamp(px + vx * t_hit, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
+        ty = clamp(py + vy * t_hit, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
+        return math.atan2(ty - self.y, tx - self.x)
 
     def _ring_count(self):
         """Lanet çemberindeki tuzak sayısı.
@@ -7753,25 +8151,27 @@ class Boss:
         şok dalgası, KOVAN ANA takip eden spor okları atar.
         """
         bi = self.boss_index
-        px, py = self._lead_point(player, 0.20)
-        base = math.atan2(py - self.y, px - self.x)
         eng = self.enraged or self.desperate
 
         if self.kind == "warlord":
             # Üç mermilik kısa seri — SAVAŞ LORDU zaten ışın yağdırıyor.
+            spd = 420 + bi * 14
+            base = self._aim_angle(player, spd)
             n = 3 + min(3, (bi - 1) // 2)
             for i in range(n):
                 self._shoot(projectiles, base + (i - (n - 1) / 2) * 0.16,
-                            420 + bi * 14, 0.50, r=7)
+                            spd, 0.50, r=7)
             sfx("shoot_c", 0.5, 0.0)
 
         elif self.kind == "witch":
             # LANET MERMİLERİ: yay biçiminde çıkar, bir süre oyuncuyu takip eder.
+            spd = 290 + bi * 14
+            base = self._aim_angle(player, spd, jitter=0.18)
             n = 4 + min(3, bi) + (2 if eng else 0)
             spread = 1.05
             for i in range(n):
                 ang = base + (i - (n - 1) / 2) * (spread / max(1, n - 1))
-                self._shoot(projectiles, ang, 290 + bi * 14, 0.46, r=8,
+                self._shoot(projectiles, ang, spd, 0.46, r=8,
                             color=(175, 110, 235), target=player,
                             turn=1.9 + 0.12 * bi, accel=40)
             fx.ring(self.x, self.y, (175, 110, 235), n=14, speed=150, life=0.35, r=3)
@@ -7790,33 +8190,41 @@ class Boss:
 
         elif self.kind == "reaper":
             # ÇAPRAZ KESİK: iki hızlı, dar mermi dalgası.
+            spd = 470 + bi * 16
+            base = self._aim_angle(player, spd, jitter=0.07)
             for wave_i in range(2):
                 for o in (-0.22, 0.0, 0.22):
                     self._shoot(projectiles, base + o + wave_i * 0.11,
-                                470 + bi * 16, 0.40, r=6, color=(120, 240, 210))
+                                spd, 0.40, r=6, color=(120, 240, 210))
             sfx("shoot_c", 0.5, 0.0)
 
         elif self.kind == "dragon":
             # ALEV TOPLARI: ağır, yavaş ama peşini bırakmayan kor yumakları
             # + aralarına serpiştirilen küçük kıvılcımlar.
+            spd = 275 + bi * 12
+            base = self._aim_angle(player, spd, jitter=0.16)
             n = 3 + min(3, bi // 2) + (2 if eng else 0)
             for i in range(n):
                 ang = base + (i - (n - 1) / 2) * 0.22
-                self._shoot(projectiles, ang, 275 + bi * 12, 0.52, r=13,
+                self._shoot(projectiles, ang, spd, 0.52, r=13,
                             color=(255, 130, 50), target=player,
                             turn=1.1 + 0.08 * bi, accel=70)
+            spark_spd = 360 + bi * 16
+            spark_base = self._aim_angle(player, spark_spd, jitter=0.14)
             for i in range(4 + bi):
-                self._shoot(projectiles, base + random.uniform(-0.8, 0.8),
-                            360 + bi * 16, 0.26, r=6, color=(255, 205, 110))
+                self._shoot(projectiles, spark_base + random.uniform(-0.8, 0.8),
+                            spark_spd, 0.26, r=6, color=(255, 205, 110))
             fx.ring(self.x, self.y, (255, 150, 60), n=16, speed=180, life=0.4, r=3.5)
             sfx("shoot_c", 0.6, 0.0)
 
         else:  # hive
             # SPOR OKLARI: yavaş ama ısrarla takip eden mermiler.
+            spd = 225 + bi * 12
+            base = self._aim_angle(player, spd, jitter=0.20)
             n = 5 + min(3, bi) + (3 if eng else 0)
             for i in range(n):
                 ang = base + random.uniform(-0.9, 0.9)
-                self._shoot(projectiles, ang, 225 + bi * 12, 0.40, r=9,
+                self._shoot(projectiles, ang, spd, 0.40, r=9,
                             color=(230, 190, 70), target=player,
                             turn=1.5 + 0.10 * bi, accel=55)
             fx.ring(self.x, self.y, (230, 190, 70), n=12, speed=130, life=0.35, r=3)
@@ -7828,8 +8236,9 @@ class Boss:
             n = 9 if self.enraged else 5
             n += min(4, bi - 1)          # geç patron daha geniş yelpaze açar
             spread = 0.30 if self.enraged else 0.38
-            px, py = self._lead_point(player, 0.22)
-            base = math.atan2(py - self.y, px - self.x)
+            # Işınlar 375-430 hızında mermi; telgraf süresi de eklenerek
+            # oyuncunun ateş anında OLACAĞI yere nişan alınır.
+            base = self._aim_angle(player, 400, jitter=0.12)
             angs = [base + (i - (n - 1) / 2) * spread for i in range(n)]
             self._telegraph_beams(angs)
         elif self.kind == "witch":
@@ -7840,37 +8249,36 @@ class Boss:
             # telgraflanan lanet yağmuru. Tek saldırılı patron tahmin
             # edilebilir ve sıkıcı oluyordu.
             if random.random() < (0.50 if bi >= 2 else 0.30):
-                px, py = self._lead_point(player, 0.25)
-                ang = math.atan2(py - self.y, px - self.x)
+                ang = self._aim_angle(player, 330 + bi * 20, jitter=0.16)
                 self._set_telegraph("barrage", ang, 0, 0, 0.45)
             else:
-                px, py = self._lead_point(player, 0.25)
+                px, py = self._lead_point(player, 0.95)
                 r = self._ring_radius()
                 self._set_telegraph("ring_player", px, py, r, 0.62 if self.enraged else 0.80)
                 fx.ring(px, py, self.color, n=24 if self.enraged else 20, speed=150, life=0.5, r=3)
         elif self.kind == "reaper":
-            px, py = self._lead_point(player, 0.35)
+            px, py = self._lead_point(player, 0.85)
             if random.random() < 0.5:
                 # biçme darbesi: hedefin üstüne inen geniş alan
                 self._set_telegraph("scythe", px, py, 120 if self.enraged else 100,
                                     0.5 if self.enraged else 0.62)
             else:
                 # çapraz kesik: 2-3 hızlı ışın
-                ang = math.atan2(py - self.y, px - self.x)
+                ang = self._aim_angle(player, 400, jitter=0.10)
                 offs = (-0.26, 0.0, 0.26) if self.enraged else (-0.2, 0.2)
                 self._telegraph_beams([ang + o for o in offs])
         elif self.kind == "hive":
-            px, py = self._lead_point(player, 0.35)
+            px, py = self._lead_point(player, 1.00)
             if bi >= 2 and random.random() < 0.40:
                 # SPOR YAĞMURU: telgraflanan, hızlı ve yoğun bir mermi yelpazesi.
-                ang = math.atan2(py - self.y, px - self.x)
+                ang = self._aim_angle(player, 330 + bi * 20, jitter=0.18)
                 self._set_telegraph("barrage", ang, 0, 0, 0.50)
             else:
                 # Etrafına dağılan, birbirini takip eden çoklu zehir havuzları.
                 self._set_telegraph("spore", px, py, 90, 0.7 if self.enraged else 0.85)
                 fx.ring(self.x, self.y, self.color, n=16, speed=140, life=0.45, r=3)
         elif self.kind == "dragon":
-            px, py = self._lead_point(player, 0.40)
+            px, py = self._lead_point(player, 0.90)
             ang = math.atan2(py - self.y, px - self.x)
             roll = random.random()
             if roll < 0.50:
@@ -7886,7 +8294,7 @@ class Boss:
                 self._set_telegraph("wingburst", self.x, self.y, 200, 0.55)
 
         else:  # colossus
-            px, py = self._lead_point(player, 0.45)
+            px, py = self._lead_point(player, 0.95)
             if bi >= 2 and random.random() < 0.45:
                 # HÜCUM: yavaş olan KOLOS artık aradaki mesafeyi kapatabiliyor.
                 self._set_telegraph("charge", px, py, 0, 0.62)
@@ -7950,6 +8358,70 @@ class Boss:
             fx.bolt([(self.x, self.y),
                      (self.x + math.cos(a) * 90, self.y + math.sin(a) * 90)], col, 0.22)
             sfx("shoot_c", 0.7, 0.0)
+        elif kind == "lunge":
+            # ATILIŞ: telgraflanan yöne fırlar. KOLOS'un hücum mekaniğini
+            # kullanır, ama artık her patron bunu yapabiliyor.
+            self.charge_dir = norm_dir(self.x, self.y, a, b)
+            self.charge_t = 0.55
+            self.hunt_t = 0.0
+            fx.shockwave(self.x, self.y, 150, self.trait["color"], 0.35, 5)
+            fx.shake(8, 0.22)
+            sfx("dash", 0.8, 0.0)
+
+        elif kind == "wall":
+            # DUVAR: (a,b) noktasından geçen, c açısına DİK bir tuzak perdesi.
+            # Oyuncunun kaçtığı yöne kurulur; kaçış yolunu kapatır.
+            nx, ny = -math.sin(c), math.cos(c)
+            n = 9 + self.boss_index
+            for i in range(n):
+                off = (i - (n - 1) / 2) * 76
+                hx = clamp(a + nx * off, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
+                hy = clamp(b + ny * off, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
+                hazards.append(Hazard(hx, hy, 52, 0.05 + abs(i - (n - 1) / 2) * 0.05,
+                                      self.dmg * 0.55 * self._area_dmg_k(), owner=self))
+            sfx("explosion", 0.5, 0.0)
+
+        elif kind == "cage":
+            # KAFES: oyuncunun çevresine kapanan halka. Aradan geçilebilecek
+            # kadar boşluk bırakılır (bkz. _ring_count), ama artık oyuncu
+            # rahatça uzaklaşamaz.
+            n = self._ring_count()
+            for i in range(n):
+                ang = i * math.tau / n + random.uniform(-0.05, 0.05)
+                hx = clamp(a + math.cos(ang) * c, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
+                hy = clamp(b + math.sin(ang) * c, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
+                hazards.append(Hazard(hx, hy, BOSS_RING_HAZARD_R, 0.40, self.dmg * 0.55 * self._area_dmg_k(),
+                                      owner=self))
+            fx.shockwave(a, b, c, self.trait["color"], 0.45, 6)
+
+        elif kind == "meteor":
+            # YAĞMUR: oyuncunun çevresine gecikmeli olarak inen darbeler.
+            n = 7 + self.boss_index * 2 + (3 if self.enraged else 0)
+            for i in range(n):
+                ang = random.uniform(0, math.tau)
+                rad = random.uniform(0, 210)
+                hx = clamp(a + math.cos(ang) * rad, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
+                hy = clamp(b + math.sin(ang) * rad, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
+                hazards.append(Hazard(hx, hy, 58, 0.10 + i * 0.13, self.dmg * 0.60 * self._area_dmg_k(), owner=self))
+            fx.shake(7, 0.3)
+            sfx("explosion", 0.55, 0.0)
+
+        elif kind == "pull":
+            # ÇEKİM: oyuncuyu kısa bir süre boyunca patrona doğru sürükler.
+            self.pull_t = 0.85
+            fx.shockwave(self.x, self.y, 420, (200, 130, 255), 0.5, 6)
+            # İÇE doğru akan kıvılcımlar: fx.ring dışa saçtığı için burada
+            # parçacıklar elle, çeperden merkeze doğru üretiliyor.
+            for i in range(26):
+                a2 = i * math.tau / 26
+                sx0 = self.x + math.cos(a2) * 230
+                sy0 = self.y + math.sin(a2) * 230
+                fx.spark(sx0, sy0, (200, 130, 255),
+                         -math.cos(a2) * 320, -math.sin(a2) * 320, 0.6, 3.2)
+            if player.alive:
+                player.apply_slow(0.70, 1.6)
+            sfx("warn", 0.9, 0.0)
+
         elif kind == "charge":
             # KOLOS HÜCUMU: telgraflanan yöne doğru fırlar.
             self.charge_dir = norm_dir(self.x, self.y, a, b)
@@ -7980,7 +8452,7 @@ class Boss:
                 d = 90 + i * 74
                 hx = clamp(self.x + math.cos(a) * d, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
                 hy = clamp(self.y + math.sin(a) * d, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
-                hazards.append(Hazard(hx, hy, 60, 0.06 * i, self.dmg * 0.75, owner=self))
+                hazards.append(Hazard(hx, hy, 60, 0.06 * i, self.dmg * 0.60 * self._area_dmg_k(), owner=self))
             n = 9 + self.boss_index * 2
             for i in range(n):
                 self._shoot(projectiles, a + random.uniform(-0.26, 0.26),
@@ -7999,7 +8471,7 @@ class Boss:
                 hx = clamp(a + nx * off, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
                 hy = clamp(b + ny * off, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
                 hazards.append(Hazard(hx, hy, 54, 0.05 + abs(i - (n - 1) / 2) * 0.05,
-                                      self.dmg * 0.85, owner=self))
+                                      self.dmg * 0.85 * self._area_dmg_k(), owner=self))
             sfx("explosion", 0.5, 0.0)
 
         elif kind == "wingburst":
@@ -8594,6 +9066,17 @@ class Boss:
             add_glow(surf, x, y, r * 2.2, self.color, 0.4 + 0.15 * math.sin(t * 3))
         if self.enraged and not hidden:
             add_glow(surf, x, y, r * 1.6, (255, 70, 50), 0.35)
+        if self.buff_t > 0 and not hidden:
+            # SAVAŞ ÇIĞLIĞI: gövdeyi saran turuncu güç halkası
+            add_glow(surf, x, y, r * 2.4, (255, 170, 70), 0.30 + 0.12 * math.sin(t * 8))
+            pygame.draw.circle(surf, (255, 190, 90), (int(x), int(y)),
+                               int(r * 1.32 + 3 * math.sin(t * 8)), 2)
+        if self.hunt_t > 0 and not hidden:
+            # AVLANMA: arkasında bıraktığı hız izi
+            fxh, fyh, _, _ = self._facing()
+            for i in range(3):
+                blit_disc(surf, x - fxh * r * (0.7 + i * 0.5), y - fyh * r * (0.7 + i * 0.5),
+                          r * (0.55 - i * 0.13), self.trait["color"], 70 - i * 18)
         if getattr(self, "hellish", False) and not hidden:
             # ayağının dibinde dönen alev çemberi + yukarı süzülen korlar
             add_glow(surf, x, y, r * 3.0, (255, 130, 50), 0.22 + 0.08 * math.sin(t * 2.4))
@@ -8712,6 +9195,56 @@ class Boss:
                     ang = i * math.tau / 12
                     blit_disc(surf, a + math.cos(ang) * c * k, b + math.sin(ang) * c * k,
                               7, (255, 190, 90), 130)
+            elif kind == "lunge":
+                # atılış hattı: patrondan hedefe uzanan dar koridor + ok ucu
+                tc = self.trait["color"]
+                ang = math.atan2(b - y, a - x)
+                nx, ny = -math.sin(ang), math.cos(ang)
+                w2 = self.radius * 0.72
+                ls = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+                pygame.draw.polygon(ls, (*tc, int(50 + 80 * k)), [
+                    (x + nx * w2, y + ny * w2), (a + nx * w2, b + ny * w2),
+                    (a - nx * w2, b - ny * w2), (x - nx * w2, y - ny * w2)])
+                surf.blit(ls, (0, 0))
+                pygame.draw.polygon(surf, lighten(tc, 0.3), [
+                    (a + math.cos(ang) * 26, b + math.sin(ang) * 26),
+                    (a + nx * 16, b + ny * 16), (a - nx * 16, b - ny * 16)])
+            elif kind == "wall":
+                # duvar: (a,b) noktasından geçen, c açısına dik tuzak dizisi
+                tc = self.trait["color"]
+                nx, ny = -math.sin(c), math.cos(c)
+                n = 9 + self.boss_index
+                for i in range(n):
+                    off = (i - (n - 1) / 2) * 76
+                    hx = clamp(a + nx * off, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
+                    hy = clamp(b + ny * off, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
+                    blit_disc(surf, hx, hy, 30 * k, tc, 95)
+                pygame.draw.line(surf, lighten(tc, 0.25),
+                                 (a + nx * 360, b + ny * 360), (a - nx * 360, b - ny * 360), 2)
+            elif kind == "cage":
+                # kafes: oyuncunun çevresine kapanan halka
+                tc = self.trait["color"]
+                n = self._ring_count()
+                pygame.draw.circle(surf, tc, (int(a), int(b)), int(c), 2)
+                for i in range(n):
+                    ang = i * math.tau / n
+                    hx = clamp(a + math.cos(ang) * c, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
+                    hy = clamp(b + math.sin(ang) * c, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
+                    blit_disc(surf, hx, hy, BOSS_RING_HAZARD_R * 0.56 * k, tc, 95)
+            elif kind == "meteor":
+                # yağmur: hedefin çevresinde büyüyen uyarı halkası
+                tc = self.trait["color"]
+                pygame.draw.circle(surf, tc, (int(a), int(b)), int(210 * k), 2)
+                for i in range(8):
+                    ang = i * math.tau / 8 + k * 2.0
+                    blit_disc(surf, a + math.cos(ang) * 210 * k, b + math.sin(ang) * 210 * k,
+                              8, lighten(tc, 0.3), 140)
+            elif kind == "pull":
+                # çekim: patrona doğru kapanan halkalar
+                for i in range(3):
+                    rr = 420 * (1.0 - ((k + i * 0.33) % 1.0))
+                    pygame.draw.circle(surf, (200, 130, 255), (int(x), int(y)), int(rr), 2)
+                add_glow(surf, x, y, 60 + 40 * k, (200, 130, 255), 0.35 + 0.35 * k)
             elif kind == "charge":
                 # hücum hattı: patrondan hedefe uzanan geniş kırmızı koridor
                 ang = math.atan2(b - y, a - x)
@@ -8753,6 +9286,11 @@ class Boss:
             label += "  ·  ÇARESİZ"
         elif self.enraged:
             label += "  ·  ÖFKELİ"
+        # Oyuncu patronun ne yaptığını bir bakışta görsün.
+        if self.hunt_t > 0:
+            label += "  ·  AVLANIYOR"
+        if self.buff_t > 0:
+            label += "  ·  GÜÇLENDİ"
         draw_text(surf, label, (x, by - 13), 14, GOLD, bold=True, center=True)
         # İmza özelliği rozeti: oyuncu neyle karşı karşıya olduğunu bilsin.
         tr = self.trait
@@ -9700,6 +10238,13 @@ class RunState:
         elif key == "bow":
             # OK: uzun menzilli, birçok düşmanı delen ok.
             self._weapon_projectile(w, dmg, ang, 760, 3 + lvl // 2, 1.7)
+            # yay boşalırken kirişin geri tepmesi
+            self.fx.bolt([(p.x - math.cos(ang) * 14 - math.sin(ang) * 12,
+                           p.y - math.sin(ang) * 14 + math.cos(ang) * 12),
+                          (p.x + math.cos(ang) * 16, p.y + math.sin(ang) * 16),
+                          (p.x - math.cos(ang) * 14 + math.sin(ang) * 12,
+                           p.y - math.sin(ang) * 14 - math.cos(ang) * 12)],
+                         w["color"], 0.16)
             sfx("shoot_b", 0.35, 0.0)
 
         elif key == "axe":
@@ -9708,6 +10253,14 @@ class RunState:
             for i in range(n):
                 off = (i - (n - 1) / 2) * 0.34
                 self._weapon_projectile(w, dmg, ang + off, 430, 4 + lvl, 1.6)
+            # SAVURMA: oyuncunun çevresinde baltanın çizdiği yay + toz bulutu.
+            # "Harbi attı" hissini veren şey mermi değil, bu savurma anı.
+            arc = [(p.x + math.cos(ang - 1.25 + i * 0.5) * 34,
+                    p.y + math.sin(ang - 1.25 + i * 0.5) * 34) for i in range(6)]
+            self.fx.bolt(arc, w["color"], 0.20)
+            self.fx.ring(p.x + math.cos(ang) * 22, p.y + math.sin(ang) * 22,
+                         w["color"], n=10, speed=190, life=0.26, r=2.6)
+            self.fx.shake(2, 0.08)
             sfx("shoot_c", 0.4, 0.0)
 
         elif key == "katana":
@@ -13008,6 +13561,8 @@ class App:
             ("10., 15., 20. DALGA...", "10'dan itibaren her 5 dalgada PATRON gelir"),
             ("PATRONLAR CAN ÇALAR", "Patron da vurdukça iyileşir; dövüş yaklaşık 1,5 dakika sürer"),
             ("HER PATRON FARKLI", "Biri yakar, biri zehirler, biri yavaşlatır, biri kaybolur"),
+            ("PATRONLAR KOVALAR", "Uzaklaşırsan AVLANMAYA geçer ve senden hızlı koşar"),
+            ("PATRON YETENEKLERİ", "Üstüne atılır, yolunu keser, çevreni kapatır, seni kendine çeker"),
             ("PATRON SANDIĞI", "Devrilen patron SANDIK bırakır, içinden SİLAH çıkar"),
             ("SİLAHLAR OTOMATİK", "Balta/Tabanca/Katana/Ok/Çekiç kendi kendine ateş eder"),
             ("KAÇARKEN DİKKAT", "Arkanda kalan yaratıklar kaçtığın yöne, yani önüne ışınlanır"),
