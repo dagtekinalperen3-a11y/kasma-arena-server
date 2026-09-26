@@ -5633,20 +5633,31 @@ def arena_pressure(wave):
 # ---------------------------------------------------------------------
 
 HELL_ENEMIES = {
-    "h_imp":     dict(name="İmp",            base="blue",     shape="yellow",
+    "h_imp":     dict(name="İmp",            base="blue",     shape="imp",
                       color=(255, 140, 60),  hp=1.00, dmg=1.00, radius=1.05),
-    "h_hound":   dict(name="Tazı",           base="sprinter", shape="red",
+    "h_hound":   dict(name="Tazı",           base="sprinter", shape="hound",
                       color=(226, 58, 40),   hp=1.05, dmg=1.05, radius=1.05),
-    "h_reaver":  dict(name="Yağmacı",        base="red",      shape="brute",
+    "h_reaver":  dict(name="Yağmacı",        base="red",      shape="reaver",
                       color=(178, 40, 52),   hp=1.10, dmg=1.05, radius=1.00),
-    "h_seer":    dict(name="Kör Kâhin",      base="yellow",   shape="blue",
+    "h_seer":    dict(name="Kör Kâhin",      base="yellow",   shape="seer",
                       color=(246, 196, 70),  hp=1.00, dmg=1.10, radius=1.05),
-    "h_golem":   dict(name="Lav Golemi",     base="tank",     shape="tank",
-                      color=(120, 56, 44),   hp=1.20, dmg=1.10, radius=1.05),
-    "h_butcher": dict(name="Kasap",          base="brute",    shape="sprinter",
+    "h_golem":   dict(name="Lav Golemi",     base="tank",     shape="golem",
+                      color=(150, 66, 44),   hp=1.20, dmg=1.10, radius=1.05),
+    "h_butcher": dict(name="Kasap",          base="brute",    shape="butcher",
                       color=(150, 30, 60),   hp=1.15, dmg=1.15, radius=1.05),
-    "h_warden":  dict(name="Cehennem Muhafızı", base="elite", shape="elite",
+    "h_warden":  dict(name="Cehennem Muhafızı", base="elite", shape="warden",
                       color=(255, 96, 40),   hp=1.15, dmg=1.15, radius=1.05),
+}
+
+# Cehennem şekli -> Enemy sınıfındaki çizim metodu. Enemy.draw buradan dağıtır.
+HELL_SHAPES = {
+    "imp": "_draw_imp",
+    "hound": "_draw_hound",
+    "reaver": "_draw_reaver",
+    "seer": "_draw_seer",
+    "golem": "_draw_golem",
+    "butcher": "_draw_butcher",
+    "warden": "_draw_warden",
 }
 
 HELL_ENEMY_COLORS = {k: v["color"] for k, v in HELL_ENEMIES.items()}
@@ -6058,6 +6069,10 @@ DIFF_PACE = {"normal": 0.72, "hard": 1.0, "nightmare": 1.55}
 ENEMY_HITBOX_FACTOR = {
     "red": 1.0, "blue": 0.72, "yellow": 0.8, "tank": 0.95,
     "sprinter": 0.8, "brute": 0.92, "elite": 1.0,
+    # CEHENNEM yaratıkları — vuruş alanı görünen gövdeye göre ayarlandı
+    # (kanat, kuyruk ve zincir gibi uzantılar isabet alanına girmez).
+    "imp": 0.82, "hound": 0.86, "reaver": 0.94, "seer": 0.88,
+    "golem": 0.98, "butcher": 0.92, "warden": 0.96,
 }
 
 
@@ -6357,6 +6372,340 @@ class Enemy:
                 pygame.draw.line(surf, OUTLINE, (bx, by), (tx, ty), width + 2)
                 pygame.draw.line(surf, col, (bx, by), (tx, ty), width)
 
+    # =================================================================
+    # CEHENNEM YARATIK ÇİZİMLERİ
+    # -----------------------------------------------------------------
+    # Cehennem yaratıkları artık arena yaratıklarının boynuz takılmış
+    # kopyası değil: her birinin kendi silueti var. Ortak yardımcı P(),
+    # patronlardaki ile aynı mantıkla çalışır — P(ileri, yan).
+    #
+    # YENİ CEHENNEM YARATIĞI EKLEMEK: HELL_ENEMIES'e "shape" olarak yeni bir
+    # ad yaz, buraya _draw_<ad> metodu ekle ve HELL_SHAPES'e kaydet.
+    # =================================================================
+
+    def _hmap(self, x, y, r):
+        fx_, fy_ = self.face_x, self.face_y
+        l = math.hypot(fx_, fy_) or 1.0
+        fx_, fy_ = fx_ / l, fy_ / l
+        sx_, sy_ = -fy_, fx_
+
+        def P(f, s):
+            return (x + fx_ * r * f + sx_ * r * s, y + fy_ * r * f + sy_ * r * s)
+        return P, fx_, fy_, sx_, sy_
+
+    def _hpoly(self, surf, pts, col, x, y, grow=0.10, width=0):
+        if grow > 0:
+            pygame.draw.polygon(surf, OUTLINE,
+                                [(px + (px - x) * grow, py + (py - y) * grow) for px, py in pts])
+        pygame.draw.polygon(surf, col, pts, width)
+
+    def _horns(self, surf, P, r, col=(232, 220, 204), base_f=-0.30, spread=0.52,
+               reach=0.46, curl=0.26):
+        """İki boynuz — cehennem yaratıklarının ortak imzası.
+
+        Kasten KISA ve KALIN: uzun ince boynuzlar tepeden bakışta gövdenin
+        üstünde çapraz duran beyaz çubuklara dönüşüp silueti bozuyordu.
+        """
+        for sgn in (-1, 1):
+            b0 = P(base_f, spread * sgn)
+            b1 = P(base_f - reach * 0.55, (spread + curl) * sgn)
+            b2 = P(base_f - reach, (spread + curl * 0.25) * sgn)
+            pygame.draw.lines(surf, OUTLINE, False, [b0, b1, b2], max(4, int(r * 0.22)))
+            pygame.draw.lines(surf, col, False, [b0, b1, b2], max(3, int(r * 0.14)))
+
+    def _ember_trail(self, surf, x, y, r, t, n=3, col=(255, 180, 80)):
+        for i in range(n):
+            ph = (t * 1.1 + i * (1.0 / n) + self.wobble * 0.2) % 1.0
+            ex = x + math.sin(t * 2.4 + i * 2.1 + self.wobble) * r * 0.8
+            ey = y - r * 0.4 - ph * r * 1.9
+            blit_disc(surf, ex, ey, max(1.0, 3.0 * (1.0 - ph)), col, int(210 * (1.0 - ph)))
+
+    # ---- İMP: küçük, zıplayan, yarasa kanatlı şeytancık ----
+    def _draw_imp(self, surf, x, y, r, col, t, breathe):
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        dark = scale_col(col, 0.58)
+        hop = abs(math.sin(self.walk * 1.4)) * r * 0.22
+        y -= hop
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        # kanatlar (çırpar)
+        flap = 0.60 + 0.35 * math.sin(t * 14 + self.wobble)
+        wing_col = mix_col(col, (70, 24, 34), 0.55)
+        for sgn in (-1, 1):
+            wing = [P(-0.05, 0.40 * sgn), P(0.42, (1.45 * flap + 0.36) * sgn),
+                    P(-0.34, (1.95 * flap + 0.40) * sgn),
+                    P(-0.70, (1.15 * flap + 0.32) * sgn), P(-0.60, 0.42 * sgn)]
+            self._hpoly(surf, wing, wing_col, x, y, grow=0.05)
+            pygame.draw.polygon(surf, lighten(col, 0.25), wing, 2)
+            # kanat parmakları
+            for f in (wing[1], wing[2], wing[3]):
+                pygame.draw.line(surf, lighten(wing_col, 0.35), wing[0], f, 2)
+        # çatal kuyruk
+        tail = [P(-0.80, 0.0), P(-1.30, math.sin(t * 4 + self.wobble) * 0.40),
+                P(-1.62, math.sin(t * 4 + self.wobble) * 0.62)]
+        pygame.draw.lines(surf, OUTLINE, False, tail, max(4, int(r * 0.20)))
+        pygame.draw.lines(surf, col, False, tail, max(2, int(r * 0.12)))
+        self._hpoly(surf, [(tail[-1][0] + fx_ * r * 0.02, tail[-1][1] + fy_ * r * 0.02),
+                           P(-1.95, 0.42), P(-1.95, 0.86)], (255, 120, 60), x, y, grow=0.0)
+        # gövde
+        pr = r * breathe
+        pygame.draw.circle(surf, OUTLINE, (int(x), int(y)), int(pr + 2))
+        pygame.draw.circle(surf, col, (int(x), int(y)), int(pr))
+        pygame.draw.circle(surf, lighten(col, 0.28),
+                           [int(v) for v in P(-0.22, -0.22)], max(2, int(pr * 0.34)))
+        self._horns(surf, P, r, base_f=0.10, spread=0.42, reach=0.62, curl=0.28)
+        # sırıtan ağız
+        mo = 0.5 + 0.5 * math.sin(self.walk * 1.8)
+        self._hpoly(surf, [P(0.60, -0.30), P(0.94, 0.0), P(0.60, 0.30),
+                           P(0.44 + 0.12 * mo, 0.0)], (46, 14, 18), x, y, grow=0.0)
+        for k in (-1, 0, 1):
+            pygame.draw.line(surf, (255, 246, 226), P(0.62, k * 0.16), P(0.82, k * 0.10), 2)
+        self._eyes(surf, x, y, pr, fx_, fy_, n=2, spread=0.26, fwd=0.32, sz=0.19,
+                   eye_col=(255, 238, 190), glow_col=(255, 140, 60), t=t)
+        self._ember_trail(surf, x, y, r, t, 2)
+
+    # ---- TAZI: alev yeleli, dört ayaklı cehennem köpeği ----
+    def _draw_hound(self, surf, x, y, r, col, t, breathe):
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        dark = scale_col(col, 0.55)
+        if self.dash_t > 0:
+            for k in range(3):
+                add_glow(surf, *P(-0.6 - k * 0.55, 0.0), r * 1.4, (255, 130, 50), 0.32 - k * 0.09)
+        # bacaklar
+        for i in range(2):
+            for sgn in (-1, 1):
+                ph = self.walk * 1.4 + i * 1.8 + (0 if sgn > 0 else math.pi)
+                sw = math.sin(ph) * 0.30
+                a = P(0.42 - i * 0.84, 0.46 * sgn)
+                b = P(0.42 - i * 0.84 + sw, 0.92 * sgn)
+                pygame.draw.line(surf, OUTLINE, a, b, max(4, int(r * 0.20)))
+                pygame.draw.line(surf, dark, a, b, max(2, int(r * 0.13)))
+        # kuyruk
+        tw = math.sin(self.walk * 2.0) * 0.42
+        self._hpoly(surf, [P(-0.86, 0.14), P(-1.50, tw), P(-0.86, -0.14)], col, x, y, grow=0.04)
+        # gövde (uzun, alçak)
+        body = [P(1.05, 0.0), P(0.60, 0.62), P(-0.30, 0.70),
+                P(-0.92, 0.34), P(-0.92, -0.34), P(-0.30, -0.70), P(0.60, -0.62)]
+        self._hpoly(surf, body, col, x, y, grow=0.09)
+        # alev yelesi (ense boyunca yukarı fışkıran korlar)
+        for i in range(5):
+            f = 0.40 - i * 0.26
+            h = 0.42 + 0.22 * math.sin(t * 9 + i * 1.3 + self.wobble)
+            self._hpoly(surf, [P(f, -0.16), P(f + 0.10, -0.16 - h), P(f + 0.22, -0.16)],
+                        (255, 170 - i * 14, 60), x, y, grow=0.0)
+            self._hpoly(surf, [P(f, 0.16), P(f + 0.10, 0.16 + h), P(f + 0.22, 0.16)],
+                        (255, 170 - i * 14, 60), x, y, grow=0.0)
+        # kafa + çene
+        hx, hy = P(1.12, 0.0)
+        pygame.draw.circle(surf, OUTLINE, (int(hx), int(hy)), int(r * 0.40))
+        pygame.draw.circle(surf, dark, (int(hx), int(hy)), int(r * 0.34))
+        self._hpoly(surf, [P(1.20, -0.26), P(1.76, 0.0), P(1.20, 0.26)], dark, x, y, grow=0.05)
+        for k in (-1, 1):
+            pygame.draw.line(surf, (255, 248, 232), P(1.34, 0.14 * k), P(1.62, 0.06 * k), 2)
+        self._horns(surf, P, r, base_f=0.92, spread=0.34, reach=0.54, curl=0.30)
+        self._eyes(surf, x, y, r, fx_, fy_, n=2, spread=0.16, fwd=1.16, sz=0.12,
+                   eye_col=(255, 240, 200), glow_col=(255, 90, 40), t=t)
+
+    # ---- YAĞMACI: iri, tek elinde satır taşıyan cehennem yağmacısı ----
+    def _draw_reaver(self, surf, x, y, r, col, t, breathe):
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        dark = scale_col(col, 0.55)
+        lite = lighten(col, 0.26)
+        step = math.sin(self.walk) * 0.18
+        # bacaklar
+        for sgn in (-1, 1):
+            a = P(-0.36, 0.48 * sgn)
+            b = P(-0.72 + step * sgn, 0.60 * sgn)
+            pygame.draw.line(surf, OUTLINE, a, b, max(5, int(r * 0.26)))
+            pygame.draw.line(surf, dark, a, b, max(3, int(r * 0.18)))
+        # satır (sağ elde)
+        grip = P(0.30 + step, 0.96)
+        tip = P(1.10 + step, 1.10)
+        pygame.draw.line(surf, OUTLINE, grip, tip, max(4, int(r * 0.18)))
+        pygame.draw.line(surf, (96, 66, 44), grip, tip, max(2, int(r * 0.11)))
+        self._hpoly(surf, [tip, P(1.44 + step, 0.74), P(1.10 + step, 0.44), P(0.94 + step, 0.86)],
+                    (224, 230, 242), x, y, grow=0.04)
+        # gövde
+        body = [P(0.62, 0.52), P(0.16, 0.98), P(-0.62, 0.78),
+                P(-0.62, -0.78), P(0.16, -0.98), P(0.62, -0.52)]
+        self._hpoly(surf, body, col, x, y, grow=0.09)
+        # göğüste akkor yara izleri
+        for i in range(3):
+            pygame.draw.line(surf, (255, 150, 60),
+                             P(0.34 - i * 0.22, -0.30 + i * 0.10),
+                             P(0.06 - i * 0.22, 0.34 + i * 0.06), 2)
+        self._hpoly(surf, [P(0.30, 0.0), P(-0.10, 0.40), P(-0.44, 0.0), P(-0.10, -0.40)],
+                    lite, x, y, grow=0.0)
+        # kafa: kaskın altından parlayan gözler
+        self._hpoly(surf, [P(1.02, 0.0), P(0.78, 0.36), P(0.44, 0.28),
+                           P(0.44, -0.28), P(0.78, -0.36)], dark, x, y, grow=0.05)
+        self._horns(surf, P, r, base_f=0.50, spread=0.34, reach=0.66, curl=0.36)
+        self._eyes(surf, x, y, r, fx_, fy_, n=2, spread=0.15, fwd=0.80, sz=0.11,
+                   eye_col=(255, 236, 200), glow_col=(255, 110, 50), t=t)
+        self._ember_trail(surf, x, y, r, t, 2)
+
+    # ---- KÖR KÂHİN: tek dev gözü olan, süzülen büyücü ----
+    def _draw_seer(self, surf, x, y, r, col, t, breathe):
+        y += math.sin(t * 2.0 + self.wobble) * r * 0.16
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        dark = scale_col(col, 0.50)
+        charging = self.shoot_cd < 0.6
+        # dolanan kor halkalar
+        for i in range(3):
+            a = t * 1.5 + i * math.tau / 3
+            rr = r * (1.35 + (0.20 if charging else 0.0))
+            ox, oy = x + math.cos(a) * rr, y + math.sin(a) * rr * 0.7
+            oc = (255, 235, 150) if charging else (255, 150, 60)
+            add_glow(surf, ox, oy, r * 0.30, oc, 0.45)
+            pygame.draw.circle(surf, oc, (int(ox), int(oy)), max(2, int(r * 0.13)))
+        # yırtık pelerin
+        cloak = [P(0.32, 0.46)]
+        for i in range(6):
+            k = i / 5.0
+            wob = math.sin(t * 3.6 + i * 1.3) * 0.16
+            cloak.append(P(-0.90 - 0.30 * math.sin(k * math.pi) - (0.18 if i % 2 else 0),
+                           (0.5 - k) * 1.70 + wob))
+        cloak.append(P(0.32, -0.46))
+        self._hpoly(surf, cloak, dark, x, y, grow=0.05)
+        # kafa: tek dev göz
+        pr = r * breathe
+        if charging:
+            add_glow(surf, x, y, pr * 2.1, (255, 230, 150), 0.55)
+        pygame.draw.circle(surf, OUTLINE, (int(x), int(y)), int(pr + 2))
+        pygame.draw.circle(surf, col, (int(x), int(y)), int(pr))
+        self._horns(surf, P, r, base_f=-0.10, spread=0.56, reach=0.86, curl=0.40)
+        ex, ey = P(0.18, 0.0)
+        pygame.draw.circle(surf, (250, 246, 232), (int(ex), int(ey)), int(pr * 0.56))
+        pygame.draw.circle(surf, OUTLINE, (int(ex), int(ey)), int(pr * 0.56), 2)
+        pupil = (255, 110, 40) if charging else (140, 30, 30)
+        add_glow(surf, ex + fx_ * pr * 0.14, ey + fy_ * pr * 0.14, pr * 0.7, pupil, 0.55)
+        pygame.draw.circle(surf, pupil,
+                           (int(ex + fx_ * pr * 0.14), int(ey + fy_ * pr * 0.14)),
+                           int(pr * 0.24))
+        self._ember_trail(surf, x, y, r, t, 3)
+
+    # ---- LAV GOLEMİ: kabuğu çatlamış, içi ergimiş dev ----
+    def _draw_golem(self, surf, x, y, r, col, t, breathe):
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        dark = scale_col(col, 0.60)
+        magma = (255, 132, 44)
+        pulse = 0.55 + 0.45 * math.sin(t * 2.6 + self.wobble)
+        step = math.sin(self.walk * 0.8) * 0.16
+        # bacaklar
+        for sgn in (-1, 1):
+            a = P(-0.34, 0.50 * sgn)
+            b = P(-0.80 + step * sgn, 0.62 * sgn)
+            pygame.draw.line(surf, OUTLINE, a, b, max(6, int(r * 0.30)))
+            pygame.draw.line(surf, dark, a, b, max(4, int(r * 0.22)))
+        # yumruklar
+        for sgn in (-1, 1):
+            fc = P(0.54 - step * sgn, 1.06 * sgn)
+            pygame.draw.circle(surf, OUTLINE, (int(fc[0]), int(fc[1])), int(r * 0.36))
+            pygame.draw.circle(surf, dark, (int(fc[0]), int(fc[1])), int(r * 0.30))
+        # gövde: düzensiz kaya kabuk
+        pts = []
+        for i in range(8):
+            a = i * math.tau / 8 + 0.3
+            jit = 1.0 + 0.18 * math.sin(i * 2.3 + self.wobble)
+            pts.append((x + math.cos(a) * r * breathe * jit,
+                        y + math.sin(a) * r * breathe * jit))
+        self._hpoly(surf, pts, col, x, y, grow=0.08)
+        # ergimiş çatlaklar
+        add_glow(surf, x, y, r * (1.5 + 0.35 * pulse), magma, 0.22 + 0.18 * pulse)
+        for i in range(5):
+            a = self.wobble + i * 1.27
+            pygame.draw.line(surf, scale_col(magma, 0.6 + 0.4 * pulse),
+                             (x + math.cos(a) * r * 0.16, y + math.sin(a) * r * 0.16),
+                             (x + math.cos(a + 0.5) * r * 0.86, y + math.sin(a + 0.5) * r * 0.86),
+                             max(2, int(r * 0.09)))
+        cx, cy = P(0.10, 0.0)
+        pygame.draw.circle(surf, magma, (int(cx), int(cy)), int(r * (0.18 + 0.06 * pulse)))
+        self._horns(surf, P, r, base_f=-0.24, spread=0.60, reach=0.80, curl=0.40)
+        self._eyes(surf, x, y, r, fx_, fy_, n=2, spread=0.22, fwd=0.52, sz=0.13,
+                   eye_col=(255, 230, 180), glow_col=magma, t=t)
+        self._ember_trail(surf, x, y, r, t, 3)
+
+    # ---- KASAP: maskeli, zincirli çengel taşıyan cehennem kasabı ----
+    def _draw_butcher(self, surf, x, y, r, col, t, breathe):
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        dark = scale_col(col, 0.52)
+        step = math.sin(self.walk * 1.2) * 0.20
+        # zincir + çengel (savrulur)
+        sw = math.sin(t * 2.6 + self.wobble)
+        hook_end = P(1.30 + 0.30 * sw, 1.10 * sw)
+        chain_from = P(0.10, 0.70)
+        for i in range(4):
+            k = (i + 1) / 4.0
+            cx = lerp(chain_from[0], hook_end[0], k)
+            cy = lerp(chain_from[1], hook_end[1], k)
+            pygame.draw.circle(surf, (170, 176, 190), (int(cx), int(cy)), max(2, int(r * 0.09)), 2)
+        pygame.draw.arc(surf, (226, 232, 244),
+                        pygame.Rect(int(hook_end[0] - r * 0.34), int(hook_end[1] - r * 0.34),
+                                    int(r * 0.68), int(r * 0.68)), 0.6, 4.2, 3)
+        # bacaklar
+        for sgn in (-1, 1):
+            a = P(-0.30, 0.44 * sgn)
+            b = P(-0.74 + step * sgn, 0.56 * sgn)
+            pygame.draw.line(surf, OUTLINE, a, b, max(5, int(r * 0.24)))
+            pygame.draw.line(surf, dark, a, b, max(3, int(r * 0.16)))
+        # gövde (önlüklü)
+        body = [P(0.58, 0.46), P(0.10, 0.90), P(-0.66, 0.66),
+                P(-0.66, -0.66), P(0.10, -0.90), P(0.58, -0.46)]
+        self._hpoly(surf, body, col, x, y, grow=0.09)
+        apron = [P(0.46, 0.34), P(-0.30, 0.46), P(-0.30, -0.46), P(0.46, -0.34)]
+        self._hpoly(surf, apron, (232, 224, 214), x, y, grow=0.0)
+        for i in range(4):
+            bl = P(0.30 - i * 0.20, math.sin(i * 2.1) * 0.30)
+            pygame.draw.circle(surf, (168, 30, 34), (int(bl[0]), int(bl[1])),
+                               max(1, int(r * 0.09)))
+        # kafa: dikişli maske
+        self._hpoly(surf, [P(1.02, 0.0), P(0.80, 0.34), P(0.46, 0.30),
+                           P(0.46, -0.30), P(0.80, -0.34)], (222, 212, 198), x, y, grow=0.05)
+        for k in (-1, 1):
+            pygame.draw.line(surf, (70, 60, 56), P(0.66, 0.06 * k), P(0.94, 0.06 * k), 1)
+        self._eyes(surf, x, y, r, fx_, fy_, n=2, spread=0.14, fwd=0.80, sz=0.09,
+                   eye_col=(40, 30, 30), pupil=(255, 90, 60), glow_col=(255, 90, 50), t=t)
+        self._ember_trail(surf, x, y, r, t, 2)
+
+    # ---- CEHENNEM MUHAFIZI: kalkanlı, zırhlı elit ----
+    def _draw_warden(self, surf, x, y, r, col, t, breathe):
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        dark = scale_col(col, 0.52)
+        gold = (236, 190, 86)
+        add_glow(surf, x, y, r * 2.0, (255, 130, 50), 0.40 + 0.10 * math.sin(t * 3))
+        step = math.sin(self.walk) * 0.16
+        # bacaklar
+        for sgn in (-1, 1):
+            a = P(-0.34, 0.48 * sgn)
+            b = P(-0.78 + step * sgn, 0.58 * sgn)
+            pygame.draw.line(surf, OUTLINE, a, b, max(5, int(r * 0.26)))
+            pygame.draw.line(surf, dark, a, b, max(3, int(r * 0.18)))
+        # kalkan (sol kol)
+        shield = [P(0.62, -0.72), P(0.62, -1.40), P(-0.36, -1.40), P(-0.52, -0.72)]
+        self._hpoly(surf, shield, dark, x, y, grow=0.05)
+        pygame.draw.polygon(surf, gold, shield, 3)
+        pygame.draw.line(surf, gold, P(0.20, -1.06), P(-0.10, -1.06), 3)
+        # mızrak (sağ kol)
+        grip = P(0.0, 0.86)
+        tipp = P(1.62, 1.02)
+        pygame.draw.line(surf, OUTLINE, grip, tipp, max(4, int(r * 0.17)))
+        pygame.draw.line(surf, (110, 78, 50), grip, tipp, max(2, int(r * 0.10)))
+        self._hpoly(surf, [tipp, P(1.34, 0.86), P(1.34, 1.18)], (236, 242, 250), x, y, grow=0.04)
+        # gövde
+        body = [P(0.64, 0.46), P(0.18, 0.88), P(-0.60, 0.70),
+                P(-0.60, -0.70), P(0.18, -0.88), P(0.64, -0.46)]
+        self._hpoly(surf, body, col, x, y, grow=0.09)
+        pygame.draw.polygon(surf, gold, body, 2)
+        self._hpoly(surf, [P(0.36, 0.0), P(-0.04, 0.38), P(-0.40, 0.0), P(-0.04, -0.38)],
+                    lighten(col, 0.28), x, y, grow=0.0)
+        # miğfer
+        self._hpoly(surf, [P(1.04, 0.0), P(0.80, 0.34), P(0.44, 0.28),
+                           P(0.44, -0.28), P(0.80, -0.34)], dark, x, y, grow=0.05)
+        pygame.draw.line(surf, (22, 18, 22), P(0.84, -0.22), P(0.84, 0.22), max(3, int(r * 0.11)))
+        self._horns(surf, P, r, col=gold, base_f=0.46, spread=0.34, reach=0.70, curl=0.38)
+        self._eyes(surf, x, y, r, fx_, fy_, n=2, spread=0.13, fwd=0.86, sz=0.09,
+                   eye_col=(255, 240, 210), glow_col=(255, 120, 50), t=t)
+        self._ember_trail(surf, x, y, r, t, 3)
+
     def draw(self, surf, t):
         scale = ease_out_cubic(self.spawn_t / 0.3) if self.spawn_t < 0.3 else 1.0
         flash = self.hit_flash > 0
@@ -6371,7 +6720,11 @@ class Enemy:
         breathe = 1.0 + math.sin(self.walk * 0.9) * 0.045
         surf.blit(shadow_sprite(int(r * 2 + 6)), (int(x - r - 3), int(y + r - 3)))
 
-        if self.shape == "red":
+        # CEHENNEM yaratıklarının kendi çizimleri var (bkz. HELL_SHAPES).
+        hell_draw = HELL_SHAPES.get(self.shape)
+        if hell_draw is not None:
+            getattr(self, hell_draw)(surf, x, y, r, col, t, breathe)
+        elif self.shape == "red":
             # ---- ETLİ SÜRÜNGEN: çenesi olan, tek gözlü, sıçrayarak yürüyen yaratık
             vivid = col if flash else mix_col(self.color, (255, 20, 15), self.red_intensity * 0.85)
             if self.red_intensity > 0.04:
@@ -10249,14 +10602,102 @@ BIOME_STYLE = {
         "name": "ARENA",
     },
     "hell": {
-        "top": (48, 14, 16), "bottom": (16, 6, 10),
-        "grid": (255, 140, 90, 9), "cell": (255, 110, 70, 34),
-        "decal": (190, 70, 45), "wall": (210, 90, 60),
+        "top": (52, 15, 14), "bottom": (13, 5, 8),
+        "grid": (255, 140, 90, 7), "cell": (255, 110, 70, 30),
+        "decal": (150, 52, 32), "wall": (214, 92, 58),
         "name": "CEHENNEM",
+        # CEHENNEM'e özel zemin süslemeleri (bkz. _decorate_hell_floor)
+        "lava": (255, 116, 34), "lava_hot": (255, 206, 120),
+        "rock": (34, 20, 22), "ash": (84, 60, 58),
     },
 }
 
 _FLOOR_CACHE = {}
+
+
+def _decorate_hell_floor(surf, st, rnd):
+    """CEHENNEM zeminini boyar: lav çatlakları, magma gölleri, obsidyen kayalar.
+
+    Bütün bunlar zemin ÖNBELLEĞİNE bir kez çizilir (her karede değil), bu
+    yüzden istediğimiz kadar detay koyabiliyoruz. Canlı olan tek şey
+    draw_world_floor() içindeki kor/ısı katmanı.
+    """
+    lava, hot = st["lava"], st["lava_hot"]
+    rock, ash = st["rock"], st["ash"]
+    W, H = ARENA_RECT.w, ARENA_RECT.h
+
+    # --- yanık kömür lekeleri (zemine derinlik verir) ---
+    for _ in range(260):
+        cx, cy = rnd.uniform(0, W), rnd.uniform(0, H)
+        blit_disc(surf, cx, cy, rnd.uniform(18, 70), (10, 4, 6), int(rnd.uniform(18, 46)))
+
+    # --- magma gölleri: dış hâle + akkor göbek + kabuk kenarı ---
+    for _ in range(18):
+        cx, cy = rnd.uniform(60, W - 60), rnd.uniform(60, H - 60)
+        rad = rnd.uniform(44, 112)
+        pts = []
+        n = rnd.randint(8, 12)
+        for i in range(n):
+            a = i * math.tau / n
+            rr = rad * rnd.uniform(0.72, 1.18)
+            pts.append((cx + math.cos(a) * rr, cy + math.sin(a) * rr * 0.72))
+        add_glow(surf, cx, cy, rad * 1.4, lava, 0.22)
+        # koyu çukur -> soğumuş kabuk -> ergimiş göbek (üç katman)
+        pygame.draw.polygon(surf, (24, 9, 10), [(px, py + 4) for px, py in pts])
+        pygame.draw.polygon(surf, (56, 24, 20), pts)
+        pygame.draw.polygon(surf, scale_col(lava, 0.68),
+                            [(cx + (px - cx) * 0.78, cy + (py - cy) * 0.78) for px, py in pts])
+        pygame.draw.polygon(surf, scale_col(hot, 0.78),
+                            [(cx + (px - cx) * 0.34, cy + (py - cy) * 0.34) for px, py in pts])
+        # kabuk üstünde soğumuş siyah adacıklar
+        for _isl in range(rnd.randint(2, 4)):
+            ia = rnd.uniform(0, math.tau)
+            ir = rad * rnd.uniform(0.15, 0.55)
+            blit_disc(surf, cx + math.cos(ia) * ir, cy + math.sin(ia) * ir * 0.7,
+                      rnd.uniform(6, 16), (26, 12, 14), 230)
+        pygame.draw.polygon(surf, (48, 20, 18), pts, 3)
+
+    # --- lav çatlakları: dallanan, akkor damarlar ---
+    for _ in range(58):
+        x0, y0 = rnd.uniform(0, W), rnd.uniform(0, H)
+        ang = rnd.uniform(0, math.tau)
+        for _branch in range(rnd.randint(1, 3)):
+            bx, by, ba = x0, y0, ang + rnd.uniform(-0.9, 0.9)
+            pts = [(bx, by)]
+            for _seg in range(rnd.randint(4, 9)):
+                ba += rnd.uniform(-0.55, 0.55)
+                step = rnd.uniform(22, 54)
+                bx += math.cos(ba) * step
+                by += math.sin(ba) * step
+                pts.append((bx, by))
+            if len(pts) < 2:
+                continue
+            pygame.draw.lines(surf, (22, 8, 9), False, pts, 6)
+            pygame.draw.lines(surf, scale_col(lava, 0.58), False, pts, 3)
+            pygame.draw.lines(surf, scale_col(hot, 0.80), False, pts, 1)
+
+    # --- obsidyen kayalar ve kemik parçaları ---
+    for _ in range(150):
+        cx, cy = rnd.uniform(20, W - 20), rnd.uniform(20, H - 20)
+        rad = rnd.uniform(9, 26)
+        pts = []
+        n = rnd.randint(5, 7)
+        for i in range(n):
+            a = i * math.tau / n + rnd.uniform(-0.2, 0.2)
+            rr = rad * rnd.uniform(0.7, 1.25)
+            pts.append((cx + math.cos(a) * rr, cy + math.sin(a) * rr * 0.8))
+        pygame.draw.polygon(surf, (12, 6, 9), [(px + 3, py + 4) for px, py in pts])
+        pygame.draw.polygon(surf, rock, pts)
+        pygame.draw.polygon(surf, ash, pts, 1)
+    for _ in range(70):
+        cx, cy = rnd.uniform(20, W - 20), rnd.uniform(20, H - 20)
+        a = rnd.uniform(0, math.tau)
+        ln = rnd.uniform(14, 30)
+        p0 = (cx - math.cos(a) * ln, cy - math.sin(a) * ln * 0.7)
+        p1 = (cx + math.cos(a) * ln, cy + math.sin(a) * ln * 0.7)
+        pygame.draw.line(surf, (186, 176, 158), p0, p1, 3)
+        pygame.draw.circle(surf, (196, 186, 168), (int(p0[0]), int(p0[1])), 3)
+        pygame.draw.circle(surf, (196, 186, 168), (int(p1[0]), int(p1[1])), 3)
 
 
 def _build_floor(biome):
@@ -10284,6 +10725,10 @@ def _build_floor(biome):
         dy = rnd.uniform(0, ARENA_RECT.h)
         dr = rnd.uniform(8, 44)
         blit_disc(surf, dx, dy, dr, st["decal"], int(rnd.uniform(10, 30)))
+
+    # --- CEHENNEM'e özel zemin: lav çatlakları, magma gölleri, obsidyen kaya ---
+    if biome == "hell":
+        _decorate_hell_floor(surf, st, rnd)
 
     # --- ince ızgara + 3x3 hücre sınırları ---
     ov = pygame.Surface((ARENA_RECT.w, ARENA_RECT.h), pygame.SRCALPHA)
@@ -10347,9 +10792,51 @@ def floor_surface(biome):
     return surf
 
 
+# CEHENNEM havasında süzülen korlar. Dünya koordinatında bir kez üretilir;
+# her karede yalnızca kameranın gördükleri çizilir ve zamanla yukarı süzülür.
+_HELL_EMBERS = None
+
+
+def hell_embers():
+    global _HELL_EMBERS
+    if _HELL_EMBERS is None:
+        rnd = random.Random(90210)
+        _HELL_EMBERS = [(rnd.uniform(0, ARENA_RECT.w), rnd.uniform(0, ARENA_RECT.h),
+                         rnd.uniform(16, 46), rnd.uniform(1.4, 3.4),
+                         rnd.uniform(0, math.tau))
+                        for _ in range(900)]
+    return _HELL_EMBERS
+
+
+def _draw_hell_air(world, cam, t):
+    """CEHENNEM'in canlı katmanı: yukarı süzülen korlar ve sıcaklık parıltısı."""
+    span = 420.0
+    for (ex, ey, spd, sz, ph) in hell_embers():
+        # kor yukarı süzülür, tepeye varınca başa sarar
+        yy = ey - (t * spd) % span
+        if yy < cam.top - 20 or yy > cam.bottom + 20:
+            continue
+        xx = ex + math.sin(t * 0.8 + ph) * 22.0
+        if xx < cam.left - 20 or xx > cam.right + 20:
+            continue
+        k = 1.0 - ((ey - yy) % span) / span
+        blit_disc(world, xx, yy, sz * (0.45 + 0.55 * k),
+                  (255, 150 + int(70 * k), 60), int(70 + 130 * k))
+    # ısı parıltısı: ekranın altından yukarı doğru sönen, nabız gibi atan örtü
+    h = 170
+    peak = 30 + 12 * math.sin(t * 1.3)
+    heat = pygame.Surface((8, h), pygame.SRCALPHA)
+    for i in range(h):
+        k = (i / (h - 1)) ** 2          # aşağı indikçe güçlenir, kenarı belli olmaz
+        pygame.draw.line(heat, (255, 92, 40, int(peak * k)), (0, i), (8, i))
+    world.blit(pygame.transform.scale(heat, (cam.w, h)), (cam.left, cam.bottom - h))
+
+
 def draw_world_floor(world, cam, biome, t):
     """Kameranın gördüğü zemin parçasını dünya yüzeyine kopyalar."""
     world.blit(floor_surface(biome), cam.topleft, cam)
+    if biome == "hell":
+        _draw_hell_air(world, cam, t)
 
 
 _VIGNETTE = None
