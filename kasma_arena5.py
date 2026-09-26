@@ -4544,6 +4544,11 @@ class Player:
         self.storm_level = 0
         self.storm_timer = 2.0
         self.shop_levels = {}
+        # --- PATRON SANDIĞINDAN ÇIKAN SİLAHLAR ---
+        # {silah_anahtarı: seviye} ve {silah_anahtarı: kalan bekleme}.
+        # Silahlar otomatik ateşlenir; bkz. RunState.update_boss_weapons().
+        self.weapons = {}
+        self.weapon_timers = {}
 
         # --- SKİN ÖZEL YETENEĞİ (ULTİ) ---
         # Her skinin bir özel yeteneği var; otomatik çalışır ve bekleme süresi
@@ -5268,7 +5273,9 @@ class EnemyProjectile:
 STYLE_IV = {"bolt": .03, "feather": .035, "toxic": .03, "star": .04, "lightning": .035,
             "blackfire": .03, "fireball": .025, "gold": .03, "prism": .03,
             # premium skin mermileri
-            "web": .035, "ash": .03, "rock": .04, "bullet": .02}
+            "web": .035, "ash": .03, "rock": .04, "bullet": .02,
+            # patron sandığı silahları
+            "w_axe": .03, "w_arrow": .035}
 
 
 class PlayerProjectile:
@@ -5356,6 +5363,10 @@ class PlayerProjectile:
                          rv(-30, 30), rv(-20, 30), .5, 3.2, add=False, gravity=180)
             elif st == "bullet":
                 fx.spark(x, y, (255, 214, 120), rv(-10, 10), rv(-10, 10), .18, 1.8)
+            elif st == "w_axe":
+                fx.spark(x, y, self.color, rv(-18, 18), rv(-18, 18), .3, 2.6)
+            elif st == "w_arrow":
+                fx.spark(x, y, self.color, rv(-8, 8), rv(-8, 8), .25, 1.8)
 
     def draw(self, surf, t):
         x, y = int(self.x), int(self.y)
@@ -5470,6 +5481,35 @@ class PlayerProjectile:
                              (x - dx * 14, y - dy * 14), (x + dx * 3, y + dy * 3), 3)
             pygame.draw.line(surf, (255, 255, 235),
                              (x - dx * 6, y - dy * 6), (x + dx * 3, y + dy * 3), 1)
+        elif st == "w_axe":
+            # BALTA: kendi ekseninde dönen, iki ağızlı savaş baltası
+            spin = t * 16 + self.spin
+            add_glow(surf, x, y, 20, c, .55)
+            hx0, hy0 = math.cos(spin), math.sin(spin)
+            pygame.draw.line(surf, (92, 62, 40),
+                             (x - hx0 * 13, y - hy0 * 13), (x + hx0 * 13, y + hy0 * 13), 4)
+            for sgn in (-1, 1):
+                bx0, by0 = x + hx0 * 12 * sgn, y + hy0 * 12 * sgn
+                nx0, ny0 = -hy0, hx0
+                blade = [(bx0 + hx0 * 7 * sgn, by0 + hy0 * 7 * sgn),
+                         (bx0 + nx0 * 9, by0 + ny0 * 9),
+                         (bx0 - hx0 * 5 * sgn, by0 - hy0 * 5 * sgn),
+                         (bx0 - nx0 * 9, by0 - ny0 * 9)]
+                pygame.draw.polygon(surf, OUTLINE, blade)
+                pygame.draw.polygon(surf, (222, 228, 240), blade, 0)
+                pygame.draw.polygon(surf, scale_col(c, 0.8), blade, 1)
+        elif st == "w_arrow":
+            # OK: uzun gövde, tüylü arka, sivri uç
+            add_glow(surf, x, y, 14, c, .5)
+            pygame.draw.line(surf, (150, 112, 70),
+                             (x - dx * 17, y - dy * 17), (x + dx * 9, y + dy * 9), 3)
+            tip = rot_pts([(15, 0), (5, -5), (5, 5)], ang, x, y)
+            pygame.draw.polygon(surf, OUTLINE, tip)
+            pygame.draw.polygon(surf, (236, 244, 252), tip)
+            nx0, ny0 = -dy, dx
+            for k in (-1, 1):
+                pygame.draw.line(surf, c, (x - dx * 17, y - dy * 17),
+                                 (x - dx * 10 + nx0 * 5 * k, y - dy * 10 + ny0 * 5 * k), 2)
         else:
             pygame.draw.circle(surf, c, (x, y), self.r)
         if self.homing:
@@ -5833,6 +5873,151 @@ class Hazard:
             pygame.draw.line(surf, (255, 120, 100), (x - 7, y + 7), (x + 7, y - 7), 2)
         else:
             add_glow(surf, x, y, self.r * 1.4, (255, 120, 60), clamp(self.linger / 0.3, 0, 1))
+
+
+
+# =====================================================================
+# PATRON SANDIĞI ve OTOMATİK SİLAHLAR
+# ---------------------------------------------------------------------
+# Bir patron devrildiğinde yere bir SANDIK düşer. Sandığa dokunan oyuncu
+# içinden bir SİLAH alır. Silahlar yetenekler gibi çalışır: oyuncu hiçbir
+# tuşa basmaz, silah kendi kendine en uygun düşmana ateş eder. Kalan
+# bekleme süresi ekranın altındaki yetenek çubuğunda saniye saniye görünür.
+#
+# HASAR DENGESİ: silah hasarı sabit bir sayı DEĞİLDİR; oyuncunun o anki
+# vuruş hasarının (eff_dmg) katı olarak hesaplanır. Yani market, kitap ve
+# seviye bonuslarıyla oyuncu güçlendikçe silahlar da birlikte güçlenir ve
+# 30. dalgada da işe yaramaya devam eder.
+#
+# AYNI SİLAH tekrar çıkarsa seviyesi artar: hasarı yükselir, bekleme
+# süresi kısalır.
+#
+# YENİ SİLAH EKLEMEK: BOSS_WEAPONS'a bir satır ekle ve
+# RunState._fire_weapon() içine davranışını yaz.
+# =====================================================================
+
+BOSS_WEAPONS = [
+    dict(key="axe", name="BALTA", icon="sword", color=(235, 140, 74),
+         cd=2.4, dmg=2.40, style="w_axe",
+         desc="Dönerek uçan balta — önüne gelen herkesi biçer."),
+    dict(key="pistol", name="TABANCA", icon="target", color=(240, 216, 142),
+         cd=0.75, dmg=0.80, style="bullet",
+         desc="En yakın düşmana seri atış yapar."),
+    dict(key="katana", name="KATANA", icon="sword", color=(176, 232, 255),
+         cd=1.9, dmg=1.95, style=None,
+         desc="Çevrene yarım ay kesik atar, yakındaki herkesi biçer."),
+    dict(key="bow", name="OK", icon="bolt", color=(150, 232, 170),
+         cd=1.5, dmg=1.70, style="w_arrow",
+         desc="Uzun menzilli, birçok düşmanı delen ok."),
+    dict(key="hammer", name="ÇEKİÇ", icon="fist", color=(206, 196, 238),
+         cd=3.6, dmg=3.40, style=None,
+         desc="Gökten inen çekiç — düştüğü yeri sarsar."),
+]
+WEAPON_BY_KEY = {w["key"]: w for w in BOSS_WEAPONS}
+# Yetenek çubuğunda silahların hep aynı sırada görünmesi için.
+BOSS_WEAPONS_ORDER = [w["key"] for w in BOSS_WEAPONS]
+
+WEAPON_MAX_LEVEL = 8
+WEAPON_CD_PER_LEVEL = 0.90      # her seviyede bekleme süresi bu oranla çarpılır
+WEAPON_DMG_PER_LEVEL = 0.38     # her seviyede hasara eklenen oran
+WEAPON_RANGE = 620.0            # silahların hedef arama menzili
+
+
+def weapon_cooldown(w, level):
+    """Silahın iki atışı arasındaki süre (seviye arttıkça kısalır)."""
+    return max(0.22, w["cd"] * (WEAPON_CD_PER_LEVEL ** max(0, level - 1)))
+
+
+def weapon_damage(player, w, level):
+    """Silahın vuruş hasarı — OYUNCUNUN o anki hasarına göre ölçeklenir.
+
+    Böylece silah, alındığı dalgada güçlü olup 10 dalga sonra çöpe dönmez;
+    oyuncunun güç eğrisini takip eder.
+    """
+    return player.eff_dmg() * w["dmg"] * (1.0 + WEAPON_DMG_PER_LEVEL * max(0, level - 1))
+
+
+class BossChest:
+    """Patron ölünce düşen sandık. Oyuncu dokununca açılır ve silah verir."""
+
+    def __init__(self, x, y, boss_name=""):
+        self.x, self.y = x, y
+        self.r = 26
+        self.t = 0.0
+        self.open_t = 0.0          # açılma canlandırması
+        self.opened = False
+        self.taken = False         # ödül verildi mi (RunState işler)
+        self.alive = True
+        self.boss_name = boss_name
+        self.bob = random.uniform(0, math.tau)
+
+    def in_range(self, p):
+        return dist(self.x, self.y, p.x, p.y) < self.r + p.radius + 10
+
+    def update(self, dt, player):
+        self.t += dt
+        if self.opened:
+            self.open_t += dt
+            if self.open_t > 1.1:
+                self.alive = False
+            return
+        if player.alive and self.in_range(player):
+            self.opened = True
+            self.open_t = 0.0
+
+    def draw(self, surf, t):
+        bob = math.sin(t * 2.4 + self.bob) * 3.0
+        x, y = self.x, self.y + bob
+        k = clamp(self.open_t / 0.4, 0.0, 1.0) if self.opened else 0.0
+        surf.blit(shadow_sprite(int(self.r * 2)), (int(x - self.r), int(self.y + self.r * 0.5)))
+        add_glow(surf, x, y, self.r * (2.0 + 1.6 * k), GOLD, 0.35 + 0.18 * math.sin(t * 3) + 0.4 * k)
+
+        w, h = self.r * 1.7, self.r * 1.05
+        # --- gövde ---
+        base = pygame.Rect(int(x - w), int(y - h * 0.25), int(w * 2), int(h * 1.35))
+        pygame.draw.rect(surf, OUTLINE, base.inflate(6, 6), border_radius=6)
+        pygame.draw.rect(surf, (126, 78, 42), base, border_radius=6)
+        pygame.draw.rect(surf, (86, 52, 28), base, width=2, border_radius=6)
+        for i in (-1, 1):
+            pygame.draw.line(surf, (92, 58, 32), (x + i * w * 0.45, base.top + 3),
+                             (x + i * w * 0.45, base.bottom - 3), 3)
+        # --- kapak (açılınca arkaya devrilir) ---
+        lid_lift = h * 1.5 * k
+        lid = pygame.Rect(int(x - w), int(y - h * 0.95 - lid_lift), int(w * 2), int(h * 0.85))
+        pygame.draw.rect(surf, OUTLINE, lid.inflate(6, 6), border_radius=7)
+        pygame.draw.rect(surf, (150, 96, 52), lid, border_radius=7)
+        pygame.draw.rect(surf, GOLD, lid, width=2, border_radius=7)
+        # --- altın kilit ---
+        pygame.draw.rect(surf, GOLD, (int(x - 7), int(y - h * 0.28 - lid_lift * 0.4), 14, 16),
+                         border_radius=3)
+        pygame.draw.circle(surf, (120, 80, 20), (int(x), int(y - h * 0.20 - lid_lift * 0.4)), 3)
+        # --- altın bantlar ---
+        pygame.draw.line(surf, GOLD, (base.left + 2, base.top + 2), (base.right - 2, base.top + 2), 3)
+
+        if self.opened:
+            # açılırken içinden ışık sütunu ve kıvılcımlar fışkırır
+            beam = pygame.Surface((int(w * 2), int(h * 6)), pygame.SRCALPHA)
+            pygame.draw.polygon(beam, (255, 225, 140, int(150 * (1 - k * 0.4))),
+                                [(w * 0.65, beam.get_height()), (w * 1.35, beam.get_height()),
+                                 (w * 2.0, 0), (0, 0)])
+            surf.blit(beam, (int(x - w), int(y - h * 6)))
+            for i in range(8):
+                a = t * 3 + i * math.tau / 8
+                rr = self.r * (0.5 + 1.8 * k)
+                blit_disc(surf, x + math.cos(a) * rr, y + math.sin(a) * rr * 0.6,
+                          3.2 * (1 - k * 0.6), (255, 230, 150), int(220 * (1 - k)))
+        else:
+            # kapalıyken: yukarı süzülen altın zerreler + "YAKLAŞ" ipucu
+            for i in range(4):
+                ph = (t * 0.8 + i * 0.25 + self.bob) % 1.0
+                sx_ = x + math.sin(t * 2 + i * 2.1) * self.r * 0.8
+                sy_ = y - self.r * 0.4 - ph * self.r * 2.2
+                blit_disc(surf, sx_, sy_, max(1.0, 3.0 * (1 - ph)), (255, 225, 140),
+                          int(210 * (1 - ph)))
+            draw_text(surf, "PATRON SANDIĞI", (x, y - self.r * 2.4), 13, GOLD,
+                      bold=True, center=True)
+            draw_text(surf, "yaklaş ve aç", (x, y - self.r * 1.75), 10, TEXT_DIM,
+                      center=True, shadow=False)
 
 
 # =====================================================================
@@ -8590,6 +8775,8 @@ class RunState:
         self.death_cause = ""
         # Sağ üstteki "⋮" istatistik paneli açık mı?
         self.show_stats = False
+        # Patron sandıkları (devrilen patronun yerine düşer)
+        self.chests = []
 
     # ---------------- KAMERA ----------------
     def cam_rect(self):
@@ -8929,6 +9116,181 @@ class RunState:
 
     TITAN_SMASH_CD = 10.0          # ezici darbe bekleme süresi (saniye)
     TITAN_SMASH_HP_CUT = 0.5       # patron dışı düşmanların canı bu orana iner
+
+    # ================= PATRON SANDIĞI / OTOMATİK SİLAHLAR =================
+    def spawn_boss_chest(self, boss):
+        """Devrilen patronun yerine sandık bırakır."""
+        x = clamp(boss.x, ARENA_RECT.left + 60, ARENA_RECT.right - 60)
+        y = clamp(boss.y, ARENA_RECT.top + 60, ARENA_RECT.bottom - 60)
+        self.chests.append(BossChest(x, y, boss.name))
+        self.fx.ring(x, y, GOLD, n=24, speed=230, life=0.6, r=4)
+        self.fx.popup(x, y - 70, "SANDIK DÜŞTÜ!", GOLD, 26, life=1.6)
+        sfx("coin", 0.9, 0.0)
+
+    def grant_weapon(self, chest):
+        """Sandıktan bir silah verir (yoksa yenisini, varsa seviye yükseltir)."""
+        p = self.player
+        missing = [w for w in BOSS_WEAPONS if w["key"] not in p.weapons]
+        if missing:
+            w = random.choice(missing)
+            p.weapons[w["key"]] = 1
+            p.weapon_timers[w["key"]] = weapon_cooldown(w, 1) * 0.35
+            head, sub = f"{w['name']} BULDUN!", w["desc"]
+        else:
+            # Hepsi zaten var: en düşük seviyeli silahlardan biri yükselir.
+            low = min(p.weapons.values())
+            key = random.choice([k for k, v in p.weapons.items() if v == low])
+            w = WEAPON_BY_KEY[key]
+            if p.weapons[key] >= WEAPON_MAX_LEVEL:
+                # Tavana ulaşıldıysa sandık altına dönüşür — boşa gitmesin.
+                gold = 400 + self.waves.wave * 45
+                self.gold_wallet += gold
+                self.coins_earned += gold
+                self.fx.popup(chest.x, chest.y - 60, f"+{gold} ALTIN", GOLD, 26, life=1.6)
+                return
+            p.weapons[key] += 1
+            head = f"{w['name']} SEVİYE {p.weapons[key]}"
+            sub = "daha sert vurur, daha sık ateşler"
+        self.fx.popup(chest.x, chest.y - 74, head, w["color"], 28, life=1.8)
+        self.fx.popup(chest.x, chest.y - 46, sub, TEXT, 14, life=1.8)
+        self.fx.do_flash(w["color"], 0.35)
+        self.fx.ring(chest.x, chest.y, w["color"], n=26, speed=280, life=0.6, r=4)
+        sfx("levelup", 1.0, 0.0)
+
+    def update_chests(self, dt):
+        for ch in list(self.chests):
+            ch.update(dt, self.player)
+            if ch.opened and not ch.taken:
+                ch.taken = True
+                self.grant_weapon(ch)
+        self.chests = [c for c in self.chests if c.alive]
+
+    def _weapon_targets(self, max_d=WEAPON_RANGE):
+        """Silahların vurabileceği, menzildeki canlı hedefler."""
+        p = self.player
+        out = []
+        for e in self.enemies:
+            if e.alive and dist(p.x, p.y, e.x, e.y) <= max_d:
+                out.append(e)
+        for b in self.bosses:
+            # Görünmez patrona silahlar da kilitlenemez.
+            if b.alive and not b.is_hidden() and dist(p.x, p.y, b.x, b.y) <= max_d:
+                out.append(b)
+        return out
+
+    def update_boss_weapons(self, dt):
+        """Sandıktan çıkan silahları otomatik ateşler.
+
+        Oyuncu hiçbir tuşa basmaz: her silahın kendi bekleme süresi dolduğunda
+        menzildeki en uygun hedefe kendiliğinden vurur.
+        """
+        p = self.player
+        if not p.weapons or not p.alive:
+            return
+        targets = None
+        for key in list(p.weapons.keys()):
+            w = WEAPON_BY_KEY.get(key)
+            if w is None:
+                continue
+            lvl = p.weapons[key]
+            p.weapon_timers[key] = p.weapon_timers.get(key, 0.0) - dt
+            if p.weapon_timers[key] > 0:
+                continue
+            if targets is None:
+                targets = self._weapon_targets()
+            if not targets:
+                # Hedef yokken sayaç eksiye kaymasın; silah "hazır" bekler.
+                p.weapon_timers[key] = 0.0
+                continue
+            self._fire_weapon(w, lvl, targets)
+            p.weapon_timers[key] = weapon_cooldown(w, lvl)
+
+    def _weapon_hit(self, e, dmg, kb=90, crit=None):
+        """Silah vuruşunun ortak kapısı: kritik, infaz, kan emme, ölüm."""
+        p = self.player
+        if crit is None:
+            crit = random.random() < p.eff_crit_chance()
+        if crit:
+            p.run_crits += 1
+            dmg *= p.eff_crit_dmg()
+        if p.boss_hunter > 0 and (getattr(e, "is_boss", False) or getattr(e, "kind", "") == "elite"):
+            dmg *= (1.0 + 0.30 * p.boss_hunter)
+        dmg = self._apply_execute(p, e, dmg)
+        kx, ky = norm_dir(p.x, p.y, e.x, e.y)
+        real_kb = 12 if getattr(e, "is_boss", False) else kb
+        died = e.take_damage(dmg, crit, self.fx, kx * real_kb, ky * real_kb)
+        if p.vamp_level > 0:
+            p.lifesteal(dmg * 0.02 * p.vamp_level)
+        if died:
+            self.on_enemy_killed(e)
+        return died
+
+    def _weapon_projectile(self, w, dmg, ang, speed, hits, life):
+        p = self.player
+        # Silah mermileri de oyuncunun kritik şansını ve kritik hasarını
+        # kullanır; çarpışma çözümü normal mermilerle aynı yerden geçer.
+        pr = PlayerProjectile(p.x, p.y, math.cos(ang) * speed, math.sin(ang) * speed,
+                              dmg, hits, p.eff_crit_chance(), p.eff_crit_dmg(),
+                              style=w["style"] or "bolt", color=w["color"], accent=WHITE)
+        pr.life = life
+        self.player_projectiles.append(pr)
+        return pr
+
+    def _fire_weapon(self, w, lvl, targets):
+        p = self.player
+        dmg = weapon_damage(p, w, lvl)
+        key = w["key"]
+        nearest = min(targets, key=lambda e: dist(p.x, p.y, e.x, e.y))
+        ang = math.atan2(nearest.y - p.y, nearest.x - p.x)
+
+        if key == "pistol":
+            # TABANCA: tek hedefe hızlı kurşun.
+            self._weapon_projectile(w, dmg, ang, 980, 1, 1.0)
+            self.fx.bolt([(p.x, p.y), (p.x + math.cos(ang) * 26, p.y + math.sin(ang) * 26)],
+                         (255, 230, 160), 0.10)
+            sfx("shoot_a", 0.35, 0.0)
+
+        elif key == "bow":
+            # OK: uzun menzilli, birçok düşmanı delen ok.
+            self._weapon_projectile(w, dmg, ang, 760, 3 + lvl // 2, 1.7)
+            sfx("shoot_b", 0.35, 0.0)
+
+        elif key == "axe":
+            # BALTA: dönerek uçar, yoluna çıkan herkesi biçer (çok delici).
+            n = 1 + (1 if lvl >= 4 else 0) + (1 if lvl >= 7 else 0)
+            for i in range(n):
+                off = (i - (n - 1) / 2) * 0.34
+                self._weapon_projectile(w, dmg, ang + off, 430, 4 + lvl, 1.6)
+            sfx("shoot_c", 0.4, 0.0)
+
+        elif key == "katana":
+            # KATANA: oyuncunun çevresine yarım ay kesik — yakındaki herkese vurur.
+            rad = 168 + lvl * 9
+            hit = 0
+            for e in list(self._all_targets()):
+                if e.alive and dist(p.x, p.y, e.x, e.y) <= rad:
+                    self._weapon_hit(e, dmg, kb=150)
+                    hit += 1
+            arc = [(p.x + math.cos(ang + a) * rad * 0.9, p.y + math.sin(ang + a) * rad * 0.9)
+                   for a in (-0.95, -0.5, 0.0, 0.5, 0.95)]
+            self.fx.bolt(arc, w["color"], 0.22)
+            self.fx.shockwave(p.x, p.y, rad, w["color"], 0.22, 3)
+            if hit:
+                self.fx.shake(4, 0.12)
+            sfx("bonk", 0.45, 0.0)
+
+        else:  # hammer
+            # ÇEKİÇ: hedefin üstüne iner, düştüğü yeri sarsar.
+            rad = 132 + lvl * 8
+            tx, ty = nearest.x, nearest.y
+            for e in list(self._all_targets()):
+                if e.alive and dist(tx, ty, e.x, e.y) <= rad:
+                    self._weapon_hit(e, dmg, kb=210)
+            self.fx.shockwave(tx, ty, rad, w["color"], 0.35, 6)
+            self.fx.burst(tx, ty, w["color"], n=18, speed=220, life=0.5, r=3.5)
+            self.fx.bolt([(tx, ty - 260), (tx, ty)], w["color"], 0.18)
+            self.fx.shake(8, 0.22)
+            sfx("explosion", 0.5, 0.0)
 
     def do_bonk(self):
         p = self.player
@@ -9499,6 +9861,8 @@ class RunState:
                         b.summoned_enemies = []
                 else:
                     self.on_enemy_killed(b)
+                    # Devrilen her patron yerine bir SANDIK bırakır.
+                    self.spawn_boss_chest(b)
                     self.bosses.remove(b)
             if not self.bosses:
                 # Tüm patronlar devrildi — dalga normal akışına döner ve
@@ -9538,6 +9902,10 @@ class RunState:
         if not frozen:
             # Kaçan oyuncunun arkasında kalan yaratıklar önüne ışınlanır.
             self.reposition_stragglers(dt)
+        # Patron sandıkları ve sandıktan çıkan otomatik silahlar
+        self.update_chests(dt)
+        if not frozen:
+            self.update_boss_weapons(dt)
 
         for proj in list(self.enemy_projectiles):
             if not frozen:
@@ -10168,6 +10536,21 @@ def skill_slots_for(p):
                       "icon": ult.get("icon", "star"),
                       "color": tuple(ult.get("color", GOLD)),
                       "cd": lambda pp: (pp.ult_timer, pp.ult_cd)})
+    # PATRON SANDIĞINDAN çıkan otomatik silahlar: her biri kendi yuvasını alır.
+    # Tuş etiketi yerine "OTO" yazar — oyuncu bu silahları elle kullanmaz.
+    for key in BOSS_WEAPONS_ORDER:
+        lvl = p.weapons.get(key, 0)
+        if lvl <= 0:
+            continue
+        w = WEAPON_BY_KEY[key]
+        slots.append({
+            "key": "OTO",
+            "name": w["name"] + (f" {lvl}" if lvl > 1 else ""),
+            "icon": w["icon"],
+            "color": w["color"],
+            "cd": (lambda k, ww, lv: lambda pp: (max(0.0, pp.weapon_timers.get(k, 0.0)),
+                                                 weapon_cooldown(ww, lv)))(key, w, lvl),
+        })
     return slots
 
 
@@ -10564,6 +10947,8 @@ def draw_run(surf, run, t, aim_pos=None):
         hz.draw(world, t)
     for pu in run.pickups:
         pu.draw(world, t)
+    for ch in run.chests:
+        ch.draw(world, t)
     for e in sorted(run.enemies, key=lambda e: e.y):
         e.draw(world, t)
     for b in sorted(run.bosses, key=lambda b: b.y):
