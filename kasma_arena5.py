@@ -1,6 +1,6 @@
 """
 =====================================================================
- KASMA ARENA  —  v3.5
+ KASMA ARENA  —  v3.6
  2D Top-Down Hayatta Kalma / Skor-Rekor Oyunu
  ---------------------------------------------------------------------
  Dalgalar halinde gelen düşmanlara karşı hayatta kal, nişan al, ateş et,
@@ -8,6 +8,38 @@
  patronları yen, rekorunu kır. Kaybedersen o koşuda aldıkların silinir.
  Elmasla kalıcı SKIN'ler al (her skinin kendi silahı, mermisi, efekti ve
  ÖZEL YETENEĞİ var).
+
+ v3.6 ile gelenler:
+   * PATRON SANDIĞI SİLAHLARI BAŞTAN YAZILDI. TABANCA / KATANA / OK / ÇEKİÇ
+     kaldırıldı; yerine patron kesmeye değecek altı yeni silah geldi:
+       - BALTA      : 5 saniyede bir rastgele düşmanlara uçup GERİ dönen
+                      bumerang balta. Her seviyede bir balta daha eklenir,
+                      hepsi büyür ve daha ağır vurur.
+       - KİTAP      : çevrende dönen kalkan kitapları. Her kitap gelen BİR
+                      mermiyi yutar ve hasar sayılmaz; yuttuktan sonra bir
+                      süre boşta kalıp yeniden dolar. Her seviyede bir kitap.
+       - PENTAGRAM  : ayağının altındaki mühür, içine gireni sürekli kavurur.
+                      Her seviyede hem alanı hem hasarı büyür.
+       - KIRBAÇ     : en yakın düşmana şaklar, vurur ve İLERİ savurur. Her
+                      seviyede bir kırbaç daha eklenir (2. seviyede biri de
+                      arkanı tarar). Hasarı oyuncunun gücüyle ölçeklenir.
+       - ZEMZEM SUYU: 10 saniyede bir yere su döker; su 3 saniye kalır, içine
+                      gireni yavaşlatır ve eritir. 3. seviyede iki, 6.
+                      seviyede üç ayrı yere döker.
+       - BARAN'IN PAPUCU: alındıktan sonra ASLA bitmez. Her adımında arkanda
+                      bir ateş halkası bırakır; halka kendi içine kapanarak
+                      söner (2.0 / 2.3 / 2.5 / 2.7 / 3.0 saniye).
+       - HORTUM     : 15 saniyede bir kalabalığın ortasına iner, yaratıkları
+                      oraya toplar ve canlarını TAM yarıya indirir. Seviye
+                      atlamaz, hep aynı güçte kalır.
+   * MIKNATIS: yaratıklardan binde bir düşen, parıldayan ve küçük haritada
+     görünen efsanevi eşya. Alındığı anda HARİTADAKİ BÜTÜN altın ve tecrübe —
+     mesafe ne olursa olsun — sana uçar. Kötü şansa karşı kademeli garantisi
+     var: 2500 öldürmeden sonra şans yükselir, 4200'de kesin düşer.
+   * PERFORMANS: görüş alanının dışındaki nesneler artık hiç çizilmiyor ve
+     aynı noktaya düşen altın/tecrübe tek yığında birleşiyor. Yeni silahlar
+     saniyede 30-40 yaratık öldürdüğü için yerde 400'ü aşkın eşya birikiyor
+     ve kare süresinin en büyük kalemi bunları çizmek oluyordu.
 
  v3.5 ile gelenler:
    * PATRONLAR ARTIK SADECE ATEŞ ETMİYOR. Her patronun 3 ek yeteneği var:
@@ -23,16 +55,17 @@
      değiştirmen gerekiyor.
    * Yanık ve zehir şiddeti oyuncunun canına göre tavanlandı, geç
      patronların alan hasarı da kademeli olarak kısıldı.
-   * BALTA dönerek uçuyor (hareket bulanıklığı + savurma yayı), OK ise
-     arkasında uzun bir hız izi bırakıyor.
+   * BALTA dönerek uçuyor (hareket bulanıklığı + savurma yayı).
+     (OK v3.6'da kaldırıldı.)
 
  v3.4 ile gelenler:
    * PATRONLAR YENİLENDİ: her patronun kendine özgü bir imza mekaniği var
      (yakma, zehirleme, yavaşlatma, görünmezlik, ışınlanma) ve hepsinin
      çizimi baştan yazıldı. CEHENNEM'e yeni bir patron geldi: EJDERHA.
-   * PATRON SANDIĞI: devrilen patron sandık bırakır, içinden BALTA /
-     TABANCA / KATANA / OK / ÇEKİÇ çıkar. Bu silahlar otomatik ateşlenir;
-     bekleme süreleri ekranın altındaki yetenek çubuğunda görünür.
+   * PATRON SANDIĞI: devrilen patron sandık bırakır, içinden otomatik
+     ateşlenen bir silah çıkar; bekleme süreleri ekranın altındaki yetenek
+     çubuğunda görünür. (Sandıktan çıkan silahların listesi v3.6'da baştan
+     yazıldı — yukarı bakın.)
    * İSTATİSTİK PANELİ: sağ üstteki üç nokta düğmesi (ya da TAB) oyuncunun
      hasarını, hızını, can çalmasını, altın kazancını % olarak gösterir.
    * CEHENNEM baştan görselleştirildi: lav çatlakları, magma gölleri,
@@ -497,6 +530,24 @@ SFX_BUILDERS = {
     "gameover": lambda: _env_tone(420, .9, .28, "saw", f_end=60, vib=.02),
     "second":   lambda: _mix([(_env_tone(400, .5, .26, "sine", f_end=1200), 0), (_env_tone(300, .5, .12, "tri", f_end=900), 0)]),
     "warn":     lambda: _mix([(_env_tone(460, .07, .12, "square"), 0), (_env_tone(460, .07, .12, "square"), .11)]),
+    # --- YENİ SİLAHLARIN SESLERİ ---
+    # KIRBAÇ: kısa, keskin bir şaklama (yüksekten aşağı süpüren gürültü).
+    "whip":     lambda: _mix([(_env_tone(0, .10, .30, "noise", power=3.2), 0),
+                              (_env_tone(1800, .09, .16, "saw", f_end=240), 0)]),
+    # ZEMZEM: suyun yere çarpması.
+    "splash":   lambda: _mix([(_env_tone(0, .26, .22, "noise", power=1.6), 0),
+                              (_env_tone(520, .22, .14, "sine", f_end=180), 0)]),
+    # HORTUM: alçaktan yükselen uğultu.
+    "vortex":   lambda: _mix([(_env_tone(70, .75, .34, "saw", f_end=320, vib=.08), 0),
+                              (_env_tone(0, .75, .16, "noise", power=1.3), 0)]),
+    # MIKNATIS: her şeyi kendine çeken tiz, parlak çınlama.
+    "magnet":   lambda: _mix(_arp([784, 1047, 1319, 1568, 2093], .07, .26, .22)),
+    # PAPUÇ / ATEŞ HALKASI: yumuşak bir tutuşma.
+    "blaze":    lambda: _mix([(_env_tone(0, .30, .17, "noise", power=1.8), 0),
+                              (_env_tone(180, .28, .13, "tri", f_end=70), 0)]),
+    # KİTAP KALKANI: mermiyi yutan tok "tık".
+    "guard":    lambda: _mix([(_env_tone(700, .09, .20, "tri", f_end=1250), 0),
+                              (_env_tone(240, .10, .12, "square", f_end=120), 0)]),
 }
 
 
@@ -4638,6 +4689,17 @@ class Player:
         # Silahlar otomatik ateşlenir; bkz. RunState.update_boss_weapons().
         self.weapons = {}
         self.weapon_timers = {}
+        # KİTAP KALKANI: her kitabın yeniden dolma sayacı. 0 ise kitap DOLU
+        # (bir mermiyi yutmaya hazır), > 0 ise mermi yutmuş, dolmayı bekliyor.
+        self.book_angle = 0.0
+        self.book_charges = []
+        # PENTAGRAM: dönüş açısı ve hasar tikinin sayacı.
+        self.penta_angle = 0.0
+        self.penta_tick = 0.0
+        # BARAN'IN PAPUCU: son halkanın bırakıldığı yer ve o yerden bu yana
+        # yürünen mesafe. SHOE_STEP piksel yürüyünce yeni halka bırakılır.
+        self.shoe_last = None
+        self.shoe_dist = 0.0
 
         # --- SKİN ÖZEL YETENEĞİ (ULTİ) ---
         # Her skinin bir özel yeteneği var; otomatik çalışır ve bekleme süresi
@@ -5668,7 +5730,8 @@ class PlayerProjectile:
 # =====================================================================
 
 class Pickup:
-    __slots__ = ("x", "y", "kind", "value", "vx", "vy", "bob", "collected", "spawn_t", "dead")
+    __slots__ = ("x", "y", "kind", "value", "vx", "vy", "bob", "collected", "spawn_t", "dead",
+                 "magnet")
 
     def __init__(self, x, y, kind, value):
         self.x, self.y = x, y
@@ -5679,9 +5742,23 @@ class Pickup:
         self.collected = False
         self.dead = False
         self.spawn_t = 0.0
+        # MIKNATIS toplandığında haritadaki her para ve tecrübe taşı bu bayrağı
+        # alır ve toplama menzilini hiç dinlemeden oyuncuya uçar.
+        self.magnet = False
 
     def update(self, dt, player):
         self.spawn_t += dt
+        if self.magnet and player.alive:
+            # MIKNATIS çekimi: mesafe ne olursa olsun hızlanarak oyuncuya gider.
+            d = dist(self.x, self.y, player.x, player.y)
+            dx, dy = norm_dir(self.x, self.y, player.x, player.y)
+            spd = lerp(760, 1500, clamp(self.spawn_t * 0.8, 0, 1))
+            self.x += dx * spd * dt
+            self.y += dy * spd * dt
+            self.vx = self.vy = 0.0
+            if d < 34 or d < spd * dt:
+                self.collected = True
+            return
         k = 1 - min(1, dt * 3)
         self.vx *= k
         self.vy *= k
@@ -6051,6 +6128,704 @@ class Hazard:
             add_glow(surf, x, y, self.r * 1.4, lighten(c, 0.2), clamp(self.linger / 0.3, 0, 1))
 
 
+# =====================================================================
+# MIKNATIS  (çok nadir düşen efsanevi eşya)
+# ---------------------------------------------------------------------
+# Öldürülen her yaratıktan düşme şansı BİNDE BİR'dir; yani ortalama 1000
+# öldürmede bir görürsün. Sırf şansa bırakılmadı: 1200 öldürmedir düşmemişse
+# şans kademeli olarak yükselir ve 2200'de kesin düşer (aşağıdaki
+# MAGNET_PITY_* sabitleri). Böylece kötü şans yüzünden hiç görmeyen oyuncu
+# olmaz, ama eşya da bolluğa düşmez.
+#
+# ETKİSİ: alındığı anda HARİTADAKİ BÜTÜN altın ve tecrübe taşları —
+# mesafeleri ne olursa olsun — oyuncuya uçar.
+# =====================================================================
+
+MAGNET_DROP_CHANCE = 0.001      # öldürme başına temel düşme şansı (binde bir)
+# Garanti eğrisi SADECE aşırı kötü şansı kurtarır. Daha erken başlatıldığında
+# (1200-2200) ortalama 1/625 öldürmeye düşüyor, yani eşya istenenden iki kat
+# sık geliyordu. 2500-4200 aralığında ortalama ~1/1000'de kalıyor ve eğri
+# yalnızca koşuların küçük bir kısmında devreye giriyor.
+MAGNET_PITY_FROM = 2500         # bu öldürmeden sonra şans yükselmeye başlar
+MAGNET_PITY_TO = 4200           # bu öldürmede kesin düşer
+MAGNET_COLOR = (255, 84, 96)
+MAGNET_COLOR2 = (232, 240, 255)
+
+
+def magnet_drop_chance(kills_since):
+    """Son mıknatıstan bu yana yapılan öldürme sayısına göre düşme şansı."""
+    if kills_since >= MAGNET_PITY_TO:
+        return 1.0
+    if kills_since <= MAGNET_PITY_FROM:
+        return MAGNET_DROP_CHANCE
+    # MAGNET_PITY_FROM ile MAGNET_PITY_TO arasında doğrusal olarak 1'e çıkar.
+    k = (kills_since - MAGNET_PITY_FROM) / float(MAGNET_PITY_TO - MAGNET_PITY_FROM)
+    return MAGNET_DROP_CHANCE + (1.0 - MAGNET_DROP_CHANCE) * k
+
+
+class MagnetDrop:
+    """Yerde parıldayan, küçük haritada da görünen mıknatıs.
+
+    Asla kaybolmaz: bu kadar nadir bir eşyanın süresi dolup yok olması
+    oyuncuyu haksız yere cezalandırırdı.
+    """
+
+    def __init__(self, x, y):
+        self.x = clamp(x, ARENA_RECT.left + 30, ARENA_RECT.right - 30)
+        self.y = clamp(y, ARENA_RECT.top + 30, ARENA_RECT.bottom - 30)
+        self.t = random.uniform(0, math.tau)
+        self.collected = False
+        self.alive = True
+
+    def update(self, dt, player):
+        self.t += dt
+        if not player.alive:
+            return
+        # Toplama menzili cömerttir: nadir eşya kıl payı kaçmasın.
+        pr = max(46.0, player.eff_pickup() * 1.3)
+        d = dist(self.x, self.y, player.x, player.y)
+        if d < pr:
+            pull = clamp(1 - d / pr, 0, 1) ** 0.5
+            dx, dy = norm_dir(self.x, self.y, player.x, player.y)
+            spd = lerp(120, 900, pull)
+            self.x += dx * spd * dt
+            self.y += dy * spd * dt
+        if d < 26:
+            self.collected = True
+            self.alive = False
+
+    def draw(self, surf, t):
+        # 1000 öldürmede bir düşen bir eşya kaçırılmamalı: normal bir eşyadan
+        # belirgin şekilde BÜYÜK çizilir, üstünden ışık sütunu yükselir ve
+        # çevresinde içe kapanan çekim halkaları döner.
+        bob = math.sin(self.t * 3.0) * 4.5
+        x, y = self.x, self.y + bob
+        pulse = 0.5 + 0.5 * math.sin(self.t * 5.0)
+        K = 1.45                       # eşyanın boy çarpanı
+        # 1) yukarı yükselen ışık sütunu — uzaktan bile göze çarpsın.
+        # Kalın düz çizgi yerine yukarı doğru sönen parlama noktaları: donuk
+        # renkle çizilen kalın çizgi koyu zeminde kırmızı bir levha gibi
+        # duruyordu, toplamalı parlama ise gerçekten ışık gibi görünüyor.
+        for i in range(7):
+            f = i / 6.0
+            add_glow(surf, x, y - 18 - f * 110, (20 - f * 13) * K,
+                     MAGNET_COLOR2 if i < 2 else MAGNET_COLOR,
+                     (0.30 - 0.26 * f) * (0.7 + 0.3 * pulse))
+        # 2) parıltı: iki kat hâle + dönen ışık kolları
+        add_glow(surf, x, y, (54 + pulse * 18) * K, MAGNET_COLOR, 0.38 + 0.30 * pulse)
+        add_glow(surf, x, y, 26 * K, MAGNET_COLOR2, 0.18 + 0.18 * pulse)
+        for i in range(6):
+            a = self.t * 2.2 + i * math.tau / 6
+            r0, r1 = 18 * K, (34 + pulse * 9) * K
+            pygame.draw.line(surf, scale_col(MAGNET_COLOR2, 0.45 + pulse * 0.55),
+                             (x + math.cos(a) * r0, y + math.sin(a) * r0),
+                             (x + math.cos(a) * r1, y + math.sin(a) * r1), 2)
+        # 3) İÇE kapanan çekim halkaları — "her şeyi çeker" hissi
+        for i in range(3):
+            ph = (self.t * 0.8 + i / 3.0) % 1.0
+            rr = int(lerp(62 * K, 12, ph))
+            dim = 0.55 * (1 - abs(ph - 0.5) * 2) + 0.12
+            if rr > 3 and dim > 0.06:
+                pygame.draw.circle(surf, scale_col(MAGNET_COLOR, dim),
+                                   (int(x), int(y)), rr, 2)
+        # 4) at nalı mıknatıs: kalın kırmızı kemer + iki çelik kutup.
+        # Kutuplar kemerin UÇLARINDAN başlar: konumları göz kararı verilmiyor,
+        # yayın bitiş açısından hesaplanıyor — yoksa kemerle kutuplar arasında
+        # boşluk kalıyor ve eşya parçalanmış görünüyordu.
+        A0, A1 = math.pi * 0.12, math.pi * 0.88     # yayın başlangıç/bitiş açısı
+        rad = 25 * K                                # yayın orta yarıçapı
+        band = 8 * K                                # kemerin kalınlığı
+        cy = y + 3 * K
+        rect = pygame.Rect(0, 0, int(rad * 2), int(rad * 2))
+        rect.center = (int(x), int(cy))
+        pygame.draw.arc(surf, OUTLINE, rect.inflate(6, 6), A0, A1, int(band + 4))
+        pygame.draw.arc(surf, MAGNET_COLOR, rect, A0, A1, int(band))
+        pygame.draw.arc(surf, lighten(MAGNET_COLOR, 0.35),
+                        rect.inflate(int(-band * 0.8), int(-band * 0.8)),
+                        A0 + 0.07, A1 - 0.07, max(2, int(band * 0.32)))
+        # Yayın uçları. pygame'in arc'ı bandı dikdörtgenin KENARINDAN İÇERİ
+        # doğru çizer; yani dış yarıçap rad, bandın ORTASI rad - band/2'dir.
+        # Bacaklar bu orta yarıçaptan çıkmazsa kemerin dışına taşıyor ve
+        # at nalı kopuk görünüyordu.
+        mid = rad - band / 2.0
+        ex = mid * math.cos(A0)
+        ey = -mid * math.sin(A0)
+        leg_len = 16 * K
+        for sgn in (-1, 1):
+            px = x + sgn * ex
+            y0 = cy + ey
+            pygame.draw.line(surf, OUTLINE, (px, y0 - 2), (px, y0 + leg_len), int(band + 4))
+            pygame.draw.line(surf, MAGNET_COLOR2, (px, y0), (px, y0 + leg_len), int(band))
+            pygame.draw.circle(surf, WHITE, (int(px - band * 0.22), int(y0 + leg_len * 0.4)),
+                               max(1, int(band * 0.22)))
+
+
+# =====================================================================
+# ZEMZEM SUYU  —  yerde kalan su birikintisi
+# ---------------------------------------------------------------------
+# Silah suyu fırlatır, su düştüğü yerde bir süre KALIR. İçine giren düşman
+# hem yavaşlar hem de saniye saniye hasar alır.
+# =====================================================================
+
+ZEMZEM_COLOR = (96, 198, 255)
+ZEMZEM_COLOR2 = (208, 246, 255)
+
+
+class WaterZone:
+    """Zemzem birikintisi: yavaşlatır ve saniyede hasar verir."""
+
+    def __init__(self, x, y, r, dps, life, slow=0.52):
+        self.x = clamp(x, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
+        self.y = clamp(y, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
+        self.r = r
+        self.dps = dps
+        self.life = life
+        self.max_life = life
+        self.slow = slow
+        self.tick = 0.0
+        self.t = 0.0
+        self.alive = True
+        # Su birikintisinin düzensiz kıyı çizgisi — her birikinti farklı görünsün.
+        self.shape = [random.uniform(0.82, 1.0) for _ in range(14)]
+        self.splash = 0.28          # yere çarpma anının süresi
+
+    def update(self, dt, run):
+        self.t += dt
+        self.life -= dt
+        self.splash = max(0.0, self.splash - dt)
+        if self.life <= 0:
+            self.alive = False
+            return
+        # Büyümesi: ilk 0.18 saniyede yayılır, sonunda buharlaşırken küçülür.
+        self.tick -= dt
+        if self.tick > 0:
+            return
+        self.tick = 0.18
+        rad = self.cur_r()
+        splash_left = 3          # bu tikte atılabilecek kıvılcım sayısı
+        for e in run._all_targets():
+            if not e.alive:
+                continue
+            if dist(self.x, self.y, e.x, e.y) <= rad + getattr(e, "radius", 12) * 0.6:
+                run._field_damage(e, self.dps * 0.18)
+                if hasattr(e, "apply_slow"):
+                    e.apply_slow(self.slow, 0.55)
+                # PARÇACIK BÜTÇESİ: eskiden her düşman için kıvılcım atıyordu.
+                # Kalabalıkta bu, 650'lik parçacık tavanını tek başına
+                # doldurup kare süresini iki katına çıkarıyordu. Artık tik
+                # başına en fazla 3 kıvılcım çıkıyor.
+                if splash_left > 0 and random.random() < 0.5:
+                    splash_left -= 1
+                    run.fx.spark(e.x + random.uniform(-8, 8), e.y + random.uniform(-6, 6),
+                                 ZEMZEM_COLOR2, random.uniform(-20, 20), random.uniform(-70, -30),
+                                 0.35, 2.0)
+
+    def cur_r(self):
+        grow = clamp(self.t / 0.18, 0, 1)
+        fade = clamp(self.life / 0.5, 0.55, 1.0)
+        return self.r * grow * fade
+
+    def draw(self, surf, t):
+        rad = self.cur_r()
+        if rad < 3:
+            return
+        x, y = self.x, self.y
+        n = len(self.shape)
+        # ÇİZİM NOTU: burada bilerek geçici SRCALPHA yüzeyi AYIRMIYORUZ.
+        # 8. seviyede birikinti yarıçapı ~240 px oluyor; her karede üç tane
+        # 500x500 yüzey ayırmak tek başına kare süresini birkaç milisaniye
+        # şişiriyordu. Saydam gövde için önbellekli blit_disc kullanılıyor,
+        # kalan çizgiler doğrudan hedefe (donuk renkle) çiziliyor.
+        # 1) su gövdesi — önbellekli saydam disk
+        blit_disc(surf, x, y, rad * 0.94, ZEMZEM_COLOR, 92)
+        add_glow(surf, x, y, rad * 0.9, ZEMZEM_COLOR, 0.20)
+        # 2) düzensiz, dalgalanan kıyı çizgisi
+        pts = []
+        for i in range(n):
+            a = i * math.tau / n
+            wob = 1.0 + 0.055 * math.sin(t * 2.6 + i * 1.7)
+            rr = rad * self.shape[i] * wob
+            pts.append((x + math.cos(a) * rr, y + math.sin(a) * rr * 0.86))
+        pygame.draw.polygon(surf, ZEMZEM_COLOR2, pts, 2)
+        # 3) yüzeyde dışa açılan ışık halkaları
+        for i in range(3):
+            ph = (t * 0.55 + i / 3.0) % 1.0
+            rr = rad * (0.25 + 0.72 * ph)
+            if rr < 4:
+                continue
+            col = scale_col(ZEMZEM_COLOR2, 0.30 + 0.55 * (1 - ph))
+            pygame.draw.ellipse(surf, col,
+                                (int(x - rr), int(y - rr * 0.86), int(rr * 2), int(rr * 2 * 0.86)), 2)
+        # 4) yere çarpma anı: yukarı sıçrayan damlalar
+        if self.splash > 0:
+            k = self.splash / 0.28
+            for i in range(8):
+                a = i * math.tau / 8 + self.t
+                rr = rad * (1.0 - k * 0.5)
+                pygame.draw.circle(surf, ZEMZEM_COLOR2,
+                                   (int(x + math.cos(a) * rr), int(y + math.sin(a) * rr * 0.86 - 16 * k)),
+                                   max(1, int(3 * k)))
+
+
+# =====================================================================
+# BARAN'IN PAPUCU  —  ayak izinde kalan ateş halkası
+# ---------------------------------------------------------------------
+# Oyuncu her adım attığında arkasında bir ateş HALKASI bırakır. Halka
+# ömrü boyunca KENDİ İÇİNE doğru kapanarak söner; içinde kalan düşman yanar.
+# Bu eşya bir kez alındıktan sonra asla bitmez — sürekli çalışır.
+# =====================================================================
+
+SHOE_COLOR = (255, 142, 52)
+SHOE_COLOR2 = (255, 226, 140)
+
+
+class FireRing:
+    """Ayak izinde bırakılan, içine doğru kapanan ateş halkası."""
+
+    def __init__(self, x, y, r, dps, life, burn=0.0):
+        self.x, self.y = x, y
+        self.r0 = r
+        self.dps = dps
+        self.life = life
+        self.max_life = max(0.05, life)
+        self.burn = burn
+        self.tick = 0.0
+        self.t = 0.0
+        self.alive = True
+        self.seed = random.uniform(0, math.tau)
+
+    def cur_r(self):
+        """Halkanın o anki yarıçapı — ömrü boyunca içine doğru kapanır."""
+        k = clamp(self.life / self.max_life, 0.0, 1.0)
+        # Başta hızlı açılır (0.12 sn), sonra yavaşça merkeze çöker.
+        opening = clamp(self.t / 0.12, 0, 1)
+        return self.r0 * opening * (0.12 + 0.88 * k)
+
+    def update(self, dt, run):
+        self.t += dt
+        self.life -= dt
+        if self.life <= 0:
+            self.alive = False
+            return
+        self.tick -= dt
+        if self.tick > 0:
+            return
+        self.tick = 0.16
+        rad = self.cur_r()
+        for e in run._all_targets():
+            if not e.alive:
+                continue
+            if dist(self.x, self.y, e.x, e.y) <= rad + getattr(e, "radius", 12) * 0.5:
+                run._field_damage(e, self.dps * 0.16)
+                if self.burn > 0 and hasattr(e, "apply_burn"):
+                    e.apply_burn(self.burn, 1.4)
+
+    def draw(self, surf, t):
+        rad = self.cur_r()
+        if rad < 2:
+            return
+        x, y = self.x, self.y
+        k = clamp(self.life / self.max_life, 0.0, 1.0)
+        # Geçici yüzey ayırmadan çizim: aynı anda 15-20 halka yaşayabiliyor,
+        # her biri için yüzey ayırmak kare süresini uçuruyordu. Saydam kor için
+        # önbellekli blit_disc, alev dilleri için doğrudan çizim.
+        blit_disc(surf, x, y, rad * 0.96, SHOE_COLOR, int(46 * k))
+        add_glow(surf, x, y, rad * 1.15, SHOE_COLOR, 0.22 + 0.22 * k)
+        # alev dili çemberi: yarıçapı titreyen iki çokgen
+        pts, pts_in = [], []
+        n = 22
+        for i in range(n):
+            a = i * math.tau / n
+            fl = 1.0 + 0.16 * math.sin(t * 11 + self.seed + i * 2.1)
+            pts.append((x + math.cos(a) * rad * fl, y + math.sin(a) * rad * fl))
+            pts_in.append((x + math.cos(a) * rad * 0.72, y + math.sin(a) * rad * 0.72))
+        pygame.draw.polygon(surf, scale_col(SHOE_COLOR, 0.45 + 0.55 * k), pts, 4)
+        pygame.draw.polygon(surf, scale_col(SHOE_COLOR2, 0.35 + 0.55 * k), pts_in, 2)
+        # halkanın üstünde yukarı süzülen kıvılcım
+        if random.random() < 0.5:
+            a = random.uniform(0, math.tau)
+            pygame.draw.circle(surf, SHOE_COLOR2,
+                               (int(x + math.cos(a) * rad), int(y + math.sin(a) * rad)),
+                               random.randint(1, 2))
+
+
+# =====================================================================
+# HORTUM  —  düşmanları ortaya toplayan kasırga
+# ---------------------------------------------------------------------
+# 15 saniyede bir düşer: menzilindeki bütün yaratıkları merkezine çeker ve
+# her birinin canını BİR KEZ yarıya indirir (patronlar hariç: patronun canı
+# yarıya inmez, sadece savrulur). Seviye atlaması hortumu değiştirmez.
+# =====================================================================
+
+TORNADO_COLOR = (186, 218, 240)
+TORNADO_COLOR2 = (240, 250, 255)
+
+
+class Tornado:
+    """Menzilindeki yaratıkları merkezine çeken kasırga."""
+
+    # Çekim menzili görünen sahayı kapsar (ekranın yarım köşegeni ~720 px).
+    # Daha küçüktü: hortum bir yaratığın üstüne iniyor, kalabalığın öbür yarısı
+    # menzil dışında kalıyor ve "hepsini ortaya toplar" sözü tutmuyordu.
+    PULL_R = 900.0          # çekim menzili
+    LIFE = 2.4              # kasırganın ömrü (saniye)
+
+    def __init__(self, x, y, hp_cut=0.5):
+        self.x = clamp(x, ARENA_RECT.left + 80, ARENA_RECT.right - 80)
+        self.y = clamp(y, ARENA_RECT.top + 80, ARENA_RECT.bottom - 80)
+        self.life = self.LIFE
+        self.t = 0.0
+        self.alive = True
+        self.hp_cut = hp_cut
+        self.cut_ids = set()    # canı zaten yarılanan yaratıklar
+        self.debris = []        # çevresinde dönen enkaz: (açı, yarıçap, yükseklik, hız)
+        for _ in range(26):
+            self.debris.append([random.uniform(0, math.tau), random.uniform(20, 150),
+                                random.uniform(0, 120), random.uniform(2.6, 5.4)])
+
+    def update(self, dt, run):
+        self.t += dt
+        self.life -= dt
+        if self.life <= 0:
+            self.alive = False
+            return
+        for d in self.debris:
+            d[0] += d[3] * dt
+            d[2] += 46 * dt
+            if d[2] > 130:
+                d[2] = 0.0
+                d[1] = random.uniform(40, 150)
+        for e in run._all_targets():
+            if not e.alive:
+                continue
+            d = dist(self.x, self.y, e.x, e.y)
+            if d > self.PULL_R:
+                continue
+            boss = bool(getattr(e, "is_boss", False))
+            # 1) CANI YARIYA İNDİR — yaratık başına yalnızca bir kez.
+            # Canı doğrudan bölüyoruz: take_damage kullanılsa zırh araya girer
+            # ve "yarı can" sözü tutulmazdı. Patronun canına dokunulmaz.
+            if id(e) not in self.cut_ids:
+                self.cut_ids.add(id(e))
+                if not boss and e.hp > 1:
+                    e.hp = max(1.0, e.hp * self.hp_cut)
+                    e.hit_flash = 0.16
+                    run.fx.popup(e.x, e.y - getattr(e, "radius", 12) - 6, "YARI CAN",
+                                 TORNADO_COLOR2, 14, life=0.6)
+            # 2) MERKEZE ÇEK — patron daha ağırdır, daha az savrulur.
+            dx, dy = norm_dir(e.x, e.y, self.x, self.y)
+            spd = (150.0 if boss else 620.0) * clamp(d / 160.0, 0.25, 1.0)
+            # Çekerken hafifçe etrafında döndür: düz içeri sürüklenmesin.
+            tx, ty = -dy, dx
+            e.x += (dx * spd + tx * spd * 0.42) * dt
+            e.y += (dy * spd + ty * spd * 0.42) * dt
+            e.x = clamp(e.x, ARENA_RECT.left + 16, ARENA_RECT.right - 16)
+            e.y = clamp(e.y, ARENA_RECT.top + 16, ARENA_RECT.bottom - 16)
+
+    def draw(self, surf, t):
+        x, y = self.x, self.y
+        k = clamp(self.life / self.LIFE, 0, 1)
+        fade = clamp(self.t / 0.25, 0, 1) * clamp(self.life / 0.4, 0, 1)
+        add_glow(surf, x, y, 120, TORNADO_COLOR, 0.22 * fade)
+        # Huni ve toz halkaları doğrudan hedefe çizilir; eskiden her elips için
+        # ayrı bir SRCALPHA yüzeyi ayrılıyordu (kare başına 13 yüzey).
+        # Saydamlık yerine rengi karartıyoruz: koyu zeminde göz aynı şeyi görür.
+        for i in range(11):
+            h = i / 10.0
+            ey = y - h * 150
+            erx = lerp(16, 118, h ** 0.8)
+            ery = erx * 0.34
+            wob = math.sin(t * 7 - h * 5.2) * (8 + h * 20)
+            dim = (0.60 - 0.28 * h) * fade
+            if dim <= 0.04:
+                continue
+            rect = (int(x + wob - erx), int(ey - ery), int(erx * 2), int(ery * 2))
+            pygame.draw.ellipse(surf, scale_col(TORNADO_COLOR, dim), rect, 3)
+            if erx > 26:
+                inner = (int(x + wob - erx * 0.7), int(ey - ery * 0.7),
+                         int(erx * 1.4), int(ery * 1.4))
+                pygame.draw.ellipse(surf, scale_col(TORNADO_COLOR2, dim * 0.55), inner, 2)
+        # çevresinde dönen enkaz
+        for d in self.debris:
+            a, rr, hh, _ = d
+            px = x + math.cos(a) * rr * (0.35 + hh / 200.0)
+            py = y - hh + math.sin(a) * rr * 0.30
+            col = TORNADO_COLOR2 if (hh % 2 < 1) else TORNADO_COLOR
+            pygame.draw.circle(surf, col, (int(px), int(py)), max(1, int(3 * fade)))
+        # zeminde dışa açılan toz halkası
+        for i in range(2):
+            ph = (t * 1.4 + i * 0.5) % 1.0
+            rr = lerp(30, self.PULL_R * 0.42, ph)
+            dim = 0.42 * (1 - ph) * fade
+            if dim > 0.04:
+                pygame.draw.ellipse(surf, scale_col(TORNADO_COLOR, dim),
+                                    (int(x - rr), int(y - rr * 0.35),
+                                     int(rr * 2), int(rr * 0.7)), 2)
+        # ömrü dolarken huni incelip tek bir çizgiye düşer
+        if k < 0.3:
+            pygame.draw.line(surf, TORNADO_COLOR2, (x, y - 150 * k), (x, y), 2)
+
+
+# =====================================================================
+# BALTA  —  hedefe gidip GERİ DÖNEN bumerang balta
+# =====================================================================
+
+AXE_COLOR = (235, 140, 74)
+
+
+def draw_axe_shape(surf, x, y, spin, k=1.0, color=AXE_COLOR, glow=0.6):
+    """Dönen iki ağızlı savaş baltası. k, baltanın boy çarpanıdır."""
+    hx, hy = math.cos(spin), math.sin(spin)
+    nx, ny = -hy, hx
+    haft = 15 * k
+    if glow > 0:
+        add_glow(surf, x, y, 28 * k, color, glow)
+    # sap
+    pygame.draw.line(surf, OUTLINE, (x - hx * haft, y - hy * haft),
+                     (x + hx * haft, y + hy * haft), max(3, int(7 * k)))
+    pygame.draw.line(surf, (108, 72, 44), (x - hx * haft, y - hy * haft),
+                     (x + hx * haft, y + hy * haft), max(2, int(5 * k)))
+    # iki ağız
+    for sgn in (-1, 1):
+        bx, by = x + hx * 12 * k * sgn, y + hy * 12 * k * sgn
+        blade = [(bx + hx * 9 * k * sgn, by + hy * 9 * k * sgn),
+                 (bx + nx * 11 * k, by + ny * 11 * k),
+                 (bx - hx * 6 * k * sgn, by - hy * 6 * k * sgn),
+                 (bx - nx * 11 * k, by - ny * 11 * k)]
+        pygame.draw.polygon(surf, OUTLINE, blade)
+        pygame.draw.polygon(surf, (232, 238, 248), blade)
+        pygame.draw.polygon(surf, scale_col(color, 0.9), blade, max(1, int(2 * k)))
+        # ağzın ucunda kıvılcım
+        pygame.draw.circle(surf, (255, 248, 230),
+                           (int(x + hx * 20 * k * sgn), int(y + hy * 20 * k * sgn)),
+                           max(1, int(2 * k)))
+
+
+class FlyingAxe:
+    """Rastgele bir düşmana uçup oyuncuya GERİ DÖNEN balta.
+
+    İki aşaması var: "out" (hedefe gidiş) ve "back" (oyuncuya dönüş).
+    Dönüşte isabet listesi sıfırlanır — yani aynı düşmana gidişte ve
+    dönüşte ayrı ayrı vurur.
+    """
+
+    OUT_SPEED = 620.0
+    BACK_SPEED = 760.0
+    MAX_OUT = 1.5           # hedefe varamazsa bu süre sonunda geri döner
+
+    def __init__(self, player, target, dmg, k=1.0, color=AXE_COLOR):
+        self.x, self.y = player.x, player.y
+        self.dmg = dmg
+        self.k = k                      # boy çarpanı (seviyeyle büyür)
+        self.color = color
+        self.phase = "out"
+        self.target = target
+        self.tx, self.ty = target.x, target.y
+        self.spin = random.uniform(0, math.tau)
+        self.t = 0.0
+        self.hit_set = set()
+        self.alive = True
+        self.trail = []                 # son konumlar: hareket bulanıklığı için
+
+    def update(self, dt, run):
+        p = run.player
+        self.t += dt
+        self.spin += dt * 17
+        self.trail.append((self.x, self.y, self.spin))
+        if len(self.trail) > 5:
+            self.trail.pop(0)
+
+        if self.phase == "out":
+            # Hedef yaşıyorsa peşinden git; öldüyse son bilinen yere devam et.
+            if self.target is not None and getattr(self.target, "alive", False):
+                self.tx, self.ty = self.target.x, self.target.y
+            dx, dy = norm_dir(self.x, self.y, self.tx, self.ty)
+            self.x += dx * self.OUT_SPEED * dt
+            self.y += dy * self.OUT_SPEED * dt
+            if dist(self.x, self.y, self.tx, self.ty) < 26 or self.t > self.MAX_OUT:
+                self.phase = "back"
+                self.hit_set.clear()    # dönüşte yeniden vurabilsin
+                run.fx.ring(self.x, self.y, self.color, n=10, speed=200, life=0.28, r=2.6 * self.k)
+        else:
+            dx, dy = norm_dir(self.x, self.y, p.x, p.y)
+            self.x += dx * self.BACK_SPEED * dt
+            self.y += dy * self.BACK_SPEED * dt
+            if dist(self.x, self.y, p.x, p.y) < 26 or self.t > self.MAX_OUT + 3.2:
+                self.alive = False
+                run.fx.spark(p.x, p.y, self.color, 0, -40, 0.25, 3)
+                return
+
+        hit_r = 19 * self.k
+        for e in run._all_targets():
+            if not e.alive or id(e) in self.hit_set:
+                continue
+            if dist(self.x, self.y, e.x, e.y) < hit_r + getattr(e, "radius", 12):
+                self.hit_set.add(id(e))
+                run._weapon_hit(e, self.dmg, kb=180)
+                # 8 balta aynı anda uçarken her isabette 6 parçacık parçacık
+                # tavanını dolduruyordu; isabetlerin yarısında 3 parçacık yeter.
+                if random.random() < 0.5:
+                    run.fx.burst(self.x, self.y, lighten(self.color, 0.3), n=3, speed=150,
+                                 life=0.28, r=2.6)
+
+    def draw(self, surf, t):
+        # 1) geçmiş konumlar — sönen hayaletler
+        for i, (gx, gy, gs) in enumerate(self.trail[:-1]):
+            fade = (i + 1) / max(1, len(self.trail))
+            draw_axe_shape(surf, gx, gy, gs, self.k * (0.6 + 0.3 * fade),
+                           scale_col(self.color, 0.35 + 0.3 * fade), glow=0.0)
+        # 2) süpürme halkası
+        rr = int(24 * self.k)
+        ring_a = int(70 + 50 * abs(math.sin(self.spin * 2)))
+        rs = pygame.Surface((rr * 2 + 6, rr * 2 + 6), pygame.SRCALPHA)
+        pygame.draw.circle(rs, (*self.color, ring_a), (rr + 3, rr + 3), rr, 3)
+        surf.blit(rs, (self.x - rr - 3, self.y - rr - 3))
+        # 3) asıl balta
+        draw_axe_shape(surf, self.x, self.y, self.spin, self.k, self.color, glow=0.6)
+
+
+# =====================================================================
+# KIRBAÇ  —  şaklayıp düşmanı savuran darbe (yalnızca görsel)
+# ---------------------------------------------------------------------
+# Hasar ve savurma kırbaç atıldığı anda hesaplanır; bu nesne yalnızca
+# şaklama ANINI çizer.
+# =====================================================================
+
+WHIP_COLOR = (238, 152, 84)
+WHIP_COLOR2 = (255, 226, 176)
+
+
+class WhipLash:
+    """Kırbacın şaklama anı: uçtan uca incelen, kıvrılan bir darbe izi."""
+
+    LIFE = 0.24
+
+    def __init__(self, x, y, ang, length, width, color=WHIP_COLOR):
+        self.x, self.y = x, y
+        self.ang = ang
+        self.length = length
+        self.width = width
+        self.color = color
+        self.life = self.LIFE
+        self.alive = True
+        self.curve = random.choice((-1, 1)) * random.uniform(0.5, 0.9)
+
+    def update(self, dt, run):
+        self.life -= dt
+        if self.life <= 0:
+            self.alive = False
+
+    def draw(self, surf, t):
+        k = clamp(self.life / self.LIFE, 0, 1)
+        # Kırbaç ileri doğru AÇILIR: ömrünün başında kısa, sonunda tam boy.
+        reach = self.length * (1.0 - k * 0.35)
+        ca, sa = math.cos(self.ang), math.sin(self.ang)
+        nx, ny = -sa, ca
+        segs = 14
+        pts = []
+        for i in range(segs + 1):
+            f = i / segs
+            # S kıvrımı: kırbaç düz değil, savrulurken bükülür.
+            off = math.sin(f * math.pi) * self.curve * 26 * (1 - f * 0.4) * k
+            pts.append((self.x + ca * reach * f + nx * off,
+                        self.y + sa * reach * f + ny * off))
+        # 1) parlama hâlesi
+        add_glow(surf, pts[-1][0], pts[-1][1], 26, WHIP_COLOR2, 0.45 * k)
+        # 2) kalından inceye: uçta sivrilen deri gövde
+        for i in range(segs):
+            w = max(1, int(self.width * (1 - i / segs) ** 0.7 * (0.5 + 0.5 * k)))
+            pygame.draw.line(surf, OUTLINE, pts[i], pts[i + 1], w + 2)
+        for i in range(segs):
+            w = max(1, int(self.width * (1 - i / segs) ** 0.7 * (0.5 + 0.5 * k)))
+            col = mix_col(self.color, WHIP_COLOR2, i / segs)
+            pygame.draw.line(surf, col, pts[i], pts[i + 1], w)
+        # 3) uçtaki şaklama kıvılcımı
+        ex, ey = pts[-1]
+        for i in range(4):
+            a = self.ang + random.uniform(-1.1, 1.1)
+            ln = random.uniform(8, 22) * k
+            pygame.draw.line(surf, WHIP_COLOR2, (ex, ey),
+                             (ex + math.cos(a) * ln, ey + math.sin(a) * ln), 2)
+
+
+# =====================================================================
+# KİTAP KALKANI ve PENTAGRAM  (çizim yardımcıları)
+# =====================================================================
+
+BOOK_COLOR = (168, 152, 255)
+BOOK_COLOR2 = (246, 232, 190)
+PENTA_COLOR = (238, 78, 122)
+PENTA_COLOR2 = (255, 182, 208)
+
+
+def draw_shield_book(surf, x, y, ang, k=1.0, charged=True, t=0.0):
+    """Oyuncunun çevresinde dönen kalkan kitabı.
+
+    charged False ise kitap bir mermiyi yeni yutmuştur: soluk bir hayalet
+    olarak çizilir ve yeniden dolmasını bekler.
+    """
+    w, h = 13 * k, 17 * k
+    cover = BOOK_COLOR if charged else scale_col(BOOK_COLOR, 0.32)
+    page = BOOK_COLOR2 if charged else scale_col(BOOK_COLOR2, 0.30)
+    if charged:
+        add_glow(surf, x, y, 22 * k, BOOK_COLOR, 0.45 + 0.15 * math.sin(t * 5 + ang))
+    # Kitap, yörüngesi boyunca yatık durur: dönüş açısına göre eğilir.
+    tilt = ang + math.pi / 2
+    body = rot_pts([(-w, -h), (w, -h), (w, h), (-w, h)], tilt, x, y)
+    pygame.draw.polygon(surf, OUTLINE, body, 0)
+    inner = rot_pts([(-w + 2, -h + 2), (w - 2, -h + 2), (w - 2, h - 2), (-w + 2, h - 2)], tilt, x, y)
+    pygame.draw.polygon(surf, cover, inner)
+    # sayfalar: ön kenardaki açık şerit
+    pg = rot_pts([(w * 0.35, -h + 3), (w - 3, -h + 3), (w - 3, h - 3), (w * 0.35, h - 3)], tilt, x, y)
+    pygame.draw.polygon(surf, page, pg)
+    # sırt ve kapaktaki işaret
+    sp = rot_pts([(-w + 3, -h + 3), (-w * 0.2, -h + 3), (-w * 0.2, h - 3), (-w + 3, h - 3)], tilt, x, y)
+    pygame.draw.polygon(surf, scale_col(cover, 0.72), sp)
+    if charged:
+        c1 = rot_pts([(-w * 0.55, -3), (-w * 0.55, 3)], tilt, x, y)
+        c2 = rot_pts([(-w * 0.55 - 3, 0), (-w * 0.55 + 3, 0)], tilt, x, y)
+        pygame.draw.line(surf, page, c1[0], c1[1], max(1, int(2 * k)))
+        pygame.draw.line(surf, page, c2[0], c2[1], max(1, int(2 * k)))
+
+
+def draw_pentagram(surf, cx, cy, r, ang, t=0.0, color=PENTA_COLOR, color2=PENTA_COLOR2):
+    """Oyuncunun ayağının altında dönen pentagram alanı.
+
+    Doğrudan hedef yüzeye çizer. 8. seviyede yarıçap ~356 px oluyor; buna
+    geçici bir SRCALPHA yüzeyi ayırmak (700x700) tek başına kare süresinin
+    büyük kısmını yiyordu. Saydam dolgu önbellekli blit_disc ile, kalan
+    çizgiler karartılmış donuk renkle çiziliyor.
+    """
+    if r < 6:
+        return
+    pulse = 0.5 + 0.5 * math.sin(t * 3.1)
+    # 1) alanın kendisi — kanla dolu soluk daire
+    blit_disc(surf, cx, cy, r, color, int(30 + 14 * pulse))
+    add_glow(surf, cx, cy, r * 0.75, color, 0.16 + 0.08 * pulse)
+    # 2) iki çember
+    pygame.draw.circle(surf, scale_col(color, 0.68), (int(cx), int(cy)), int(r), 3)
+    pygame.draw.circle(surf, scale_col(color2, 0.48), (int(cx), int(cy)), int(r * 0.88), 2)
+    # 3) beş köşeli yıldız — köşeleri atlayarak bağlanır
+    pts = []
+    for i in range(5):
+        a = ang - math.pi / 2 + i * math.tau / 5
+        pts.append((cx + math.cos(a) * r * 0.86, cy + math.sin(a) * r * 0.86))
+    order = (0, 2, 4, 1, 3, 0)
+    star_col = scale_col(color2, 0.60 + 0.25 * pulse)
+    for i in range(5):
+        pygame.draw.line(surf, star_col, pts[order[i]], pts[order[i + 1]], 3)
+    # 4) köşelerde yanan mumlar
+    for (px, py) in pts:
+        pygame.draw.circle(surf, color2, (int(px), int(py)), 4)
+        pygame.draw.circle(surf, WHITE, (int(px), int(py)), 2)
+    # 5) çember boyunca dönen işaretler
+    rune_col = scale_col(color, 0.55)
+    for i in range(12):
+        a = -ang * 0.6 + i * math.tau / 12
+        ca, sa = math.cos(a), math.sin(a)
+        pygame.draw.line(surf, rune_col, (cx + ca * r * 0.94, cy + sa * r * 0.94),
+                         (cx + ca * r * 1.02, cy + sa * r * 1.02), 2)
+
 
 # =====================================================================
 # PATRON SANDIĞI ve OTOMATİK SİLAHLAR
@@ -6069,25 +6844,46 @@ class Hazard:
 # süresi kısalır.
 #
 # YENİ SİLAH EKLEMEK: BOSS_WEAPONS'a bir satır ekle ve
-# RunState._fire_weapon() içine davranışını yaz.
+# RunState._fire_weapon() içine davranışını yaz. Sürekli çalışan (bekleme
+# süresi olmayan) bir silah ekleyecekseniz satıra passive=True koyun ve
+# davranışını RunState.update_passive_weapons() içine yazın.
 # =====================================================================
 
+# passive=True olan silahlar SÜREKLİ çalışır: bekleme süresi yoktur,
+# _fire_weapon() ile atılmazlar; kendi güncelleme yerlerinde işlenirler
+# (kitap kalkanı, pentagram alanı, Baran'ın papucu).
 BOSS_WEAPONS = [
-    dict(key="axe", name="BALTA", icon="sword", color=(235, 140, 74),
-         cd=2.4, dmg=2.40, style="w_axe",
-         desc="Dönerek uçan balta — önüne gelen herkesi biçer."),
-    dict(key="pistol", name="TABANCA", icon="target", color=(240, 216, 142),
-         cd=0.75, dmg=0.80, style="bullet",
-         desc="En yakın düşmana seri atış yapar."),
-    dict(key="katana", name="KATANA", icon="sword", color=(176, 232, 255),
-         cd=1.9, dmg=1.95, style=None,
-         desc="Çevrene yarım ay kesik atar, yakındaki herkesi biçer."),
-    dict(key="bow", name="OK", icon="bolt", color=(150, 232, 170),
-         cd=1.5, dmg=1.70, style="w_arrow",
-         desc="Uzun menzilli, birçok düşmanı delen ok."),
-    dict(key="hammer", name="ÇEKİÇ", icon="fist", color=(206, 196, 238),
-         cd=3.6, dmg=3.40, style=None,
-         desc="Gökten inen çekiç — düştüğü yeri sarsar."),
+    dict(key="axe", name="BALTA", icon="sword", color=AXE_COLOR,
+         cd=5.0, dmg=7.0, style=None, dpl=0.06, cdl=1.0,
+         up="bir balta daha — hepsi daha büyük, daha ağır vurur",
+         desc="Rastgele düşmanlara uçup sana geri döner. Her seviyede bir balta daha."),
+    dict(key="book", name="KİTAP", icon="book", color=BOOK_COLOR,
+         cd=0.0, dmg=2.2, style=None, passive=True, dpl=0.10,
+         up="bir kitap daha — aynı anda bir mermi fazla yutarsın",
+         desc="Çevrende dönen kalkan kitapları. Her kitap bir mermiyi yutar."),
+    dict(key="pentagram", name="PENTAGRAM", icon="star", color=PENTA_COLOR,
+         cd=0.0, dmg=0.80, style=None, passive=True,
+         up="mühür genişler ve daha çok kavurur",
+         desc="Ayağının altındaki mühür, içine gireni sürekli yakar. Her seviyede büyür."),
+    dict(key="whip", name="KIRBAÇ", icon="dash", color=WHIP_COLOR,
+         cd=1.15, dmg=4.1, style=None, dpl=0.10,
+         up="bir kırbaç daha — biri de arkanı tarar",
+         desc="En yakın düşmana şaklar, vurur ve savurur. Her seviyede bir kırbaç daha."),
+    dict(key="zemzem", name="ZEMZEM", icon="drop", color=ZEMZEM_COLOR,
+         cd=10.0, dmg=2.2, style=None, dpl=0.20, cdl=1.0,
+         up="su birikintisi genişler ve daha çok eritir",
+         desc="Yere su döker: içine giren yavaşlar ve erir. 3. seviyede iki yere döker."),
+    dict(key="shoe", name="PAPUÇ", icon="boot", color=SHOE_COLOR,
+         cd=0.0, dmg=1.35, style=None, passive=True, dpl=0.05,
+         up="halka büyür, daha uzun yanar ve daha çok kavurur",
+         desc="Baran'ın papucu: her adımında arkanda kapanan bir ateş halkası bırakır."),
+    # HORTUM seviye atlamaz (max=1): istenen davranış "seviye atlayınca hiçbir
+    # şey değişmesin". Seviyesi yükselebilseydi grant_weapon her seferinde en
+    # düşük seviyeli silahı seçtiği için bütün yükseltmeler hortuma gidip
+    # diğer silahlar 1. seviyede çakılı kalırdı.
+    dict(key="tornado", name="HORTUM", icon="orbit", color=TORNADO_COLOR,
+         cd=15.0, dmg=0.0, style=None, max=1, cdl=1.0,
+         desc="Yaratıkları ortaya toplar ve canlarını yarıya indirir."),
 ]
 WEAPON_BY_KEY = {w["key"]: w for w in BOSS_WEAPONS}
 # Yetenek çubuğunda silahların hep aynı sırada görünmesi için.
@@ -6098,10 +6894,110 @@ WEAPON_CD_PER_LEVEL = 0.90      # her seviyede bekleme süresi bu oranla çarpı
 WEAPON_DMG_PER_LEVEL = 0.38     # her seviyede hasara eklenen oran
 WEAPON_RANGE = 620.0            # silahların hedef arama menzili
 
+# --- KİTAP KALKANI ---
+BOOK_ORBIT_R = 62.0             # kitapların oyuncudan uzaklığı
+BOOK_SPIN = 1.9                 # kitapların dönme hızı (radyan/saniye)
+BOOK_RECHARGE = 5.0             # yutulan kitabın yeniden dolma süresi (sn)
+BOOK_RECHARGE_PER_LEVEL = 0.35  # her seviyede dolma süresinden düşen saniye
+
+# --- PENTAGRAM ---
+PENTA_BASE_R = 118.0            # 1. seviyedeki yarıçap
+PENTA_R_PER_LEVEL = 34.0        # her seviyede eklenen yarıçap
+PENTA_TICK = 0.22               # hasar tikinin aralığı (saniye)
+
+# --- ZEMZEM SUYU ---
+ZEMZEM_BASE_R = 96.0
+ZEMZEM_R_PER_LEVEL = 20.0
+ZEMZEM_LIFE = 3.0               # su birikintisinin yerde kalma süresi (sn)
+ZEMZEM_THROW = 240.0            # suyun oyuncudan atıldığı mesafe
+
+# --- BARAN'IN PAPUCU ---
+SHOE_STEP = 52.0                # kaç piksel yürüyünce yeni halka bırakılır
+SHOE_BASE_R = 58.0
+SHOE_R_PER_LEVEL = 7.0
+# Halkanın ömrü seviyeye göre: 2.0 / 2.3 / 2.5 / 2.7 / 3.0 ... (sonra +0.15)
+SHOE_LIFE_STEPS = (2.0, 2.3, 2.5, 2.7, 3.0)
+
+# --- KIRBAÇ ---
+WHIP_LEN = 200.0                # kırbacın erişimi
+WHIP_LEN_PER_LEVEL = 14.0
+WHIP_ARC = 0.52                 # kırbacın taradığı yarım açı (radyan)
+WHIP_KB = 620.0                 # savurma kuvveti
+
+
+def book_slot_pos(p, i, lvl):
+    """i numaralı kalkan kitabının dünya konumu ve yörünge açısı.
+
+    Kitaplar oyuncunun çevresinde eşit aralıkla dizilir ve hep birlikte döner;
+    böylece hem çizim hem de mermi yutma aynı konumu kullanır.
+    """
+    a = p.book_angle + i * math.tau / max(1, lvl)
+    # Hafif elips: kitaplar tepe noktasında biraz yakın görünür, "yattığı"
+    # hissi verir.
+    return (p.x + math.cos(a) * BOOK_ORBIT_R,
+            p.y + math.sin(a) * BOOK_ORBIT_R * 0.72,
+            a)
+
+
+def penta_radius(lvl):
+    """PENTAGRAM alanının yarıçapı — her seviyede büyür."""
+    return PENTA_BASE_R + PENTA_R_PER_LEVEL * max(0, lvl - 1)
+
+
+def shoe_radius(lvl):
+    """BARAN'IN PAPUCU'nun bıraktığı ateş halkasının başlangıç yarıçapı."""
+    return SHOE_BASE_R + SHOE_R_PER_LEVEL * max(0, lvl - 1)
+
+
+def shoe_life(lvl):
+    """Ateş halkasının ömrü: 2.0 / 2.3 / 2.5 / 2.7 / 3.0 ... (sonra +0.15)."""
+    if lvl <= len(SHOE_LIFE_STEPS):
+        return SHOE_LIFE_STEPS[max(0, lvl - 1)]
+    return SHOE_LIFE_STEPS[-1] + 0.15 * (lvl - len(SHOE_LIFE_STEPS))
+
+
+def draw_pentagram_field(surf, p, t):
+    """Oyuncunun ayağının altındaki PENTAGRAM mührü (varsa)."""
+    lvl = p.weapons.get("pentagram", 0)
+    if lvl <= 0:
+        return
+    draw_pentagram(surf, p.x, p.y, penta_radius(lvl), p.penta_angle, t)
+
+
+def draw_shield_books(surf, p, t):
+    """Oyuncunun çevresinde dönen KALKAN KİTAPLARI (varsa).
+
+    Mermiyi yeni yutmuş (boşa çıkmış) kitap soluk çizilir: oyuncu kaç
+    kalkanının kaldığını tek bakışta görsün.
+    """
+    lvl = p.weapons.get("book", 0)
+    if lvl <= 0:
+        return
+    k = 1.0 + 0.045 * (lvl - 1)         # kalabalıkta kitaplar biraz büyür
+    for i in range(lvl):
+        bx, by, a = book_slot_pos(p, i, lvl)
+        charged = not (i < len(p.book_charges) and p.book_charges[i] > 0)
+        draw_shield_book(surf, bx, by, a, k, charged, t)
+
+
+def weapon_max_level(w):
+    """Silahın çıkabileceği en yüksek seviye.
+
+    Silahın kendi "max" alanı varsa o geçerlidir (örn. HORTUM seviye atlamaz);
+    yoksa ortak tavan WEAPON_MAX_LEVEL kullanılır.
+    """
+    return int(w.get("max", WEAPON_MAX_LEVEL))
+
 
 def weapon_cooldown(w, level):
-    """Silahın iki atışı arasındaki süre (seviye arttıkça kısalır)."""
-    return max(0.22, w["cd"] * (WEAPON_CD_PER_LEVEL ** max(0, level - 1)))
+    """Silahın iki atışı arasındaki süre.
+
+    Normalde seviye arttıkça kısalır. Bekleme süresi TASARIM GEREĞİ sabit
+    kalması gereken silahlar (BALTA 5 sn, ZEMZEM 10 sn, HORTUM 15 sn) satırına
+    cdl=1.0 yazar; böylece "şu kadar saniyede bir" sözü her seviyede tutar.
+    """
+    k = float(w.get("cdl", WEAPON_CD_PER_LEVEL))
+    return max(0.22, w["cd"] * (k ** max(0, level - 1)))
 
 
 def weapon_damage(player, w, level):
@@ -6109,8 +7005,15 @@ def weapon_damage(player, w, level):
 
     Böylece silah, alındığı dalgada güçlü olup 10 dalga sonra çöpe dönmez;
     oyuncunun güç eğrisini takip eder.
+
+    DENGE: seviye başına hasar artışı silaha göre değişir (dpl alanı). Sayısı
+    ya da alanı seviyeyle büyüyen silahlarda (BALTA, KIRBAÇ, KİTAP, PAPUÇ,
+    ZEMZEM) tek vuruşun hasarı daha yavaş artar — yoksa "iki kat balta x iki
+    kat hasar x iki kat sıklık" üst üste binip 8. seviyede oyunu anlamsız
+    kılıyordu.
     """
-    return player.eff_dmg() * w["dmg"] * (1.0 + WEAPON_DMG_PER_LEVEL * max(0, level - 1))
+    dpl = float(w.get("dpl", WEAPON_DMG_PER_LEVEL))
+    return player.eff_dmg() * w["dmg"] * (1.0 + dpl * max(0, level - 1))
 
 
 class BossChest:
@@ -6475,7 +7378,7 @@ class Enemy:
                     if died and kill_cb:
                         kill_cb(self)
 
-    def take_damage(self, amount, crit, fx, kx=0.0, ky=0.0):
+    def take_damage(self, amount, crit, fx, kx=0.0, ky=0.0, quiet=False):
         # 25. dalgadan sonraki arena yaratıklarının zırhı gelen hasarı keser.
         if self.armor > 0:
             amount *= (1.0 - self.armor)
@@ -6483,9 +7386,13 @@ class Enemy:
         self.hit_flash = 0.14
         self.knock_x += kx
         self.knock_y += ky
+        # quiet=True: ALAN hasarı (su / ateş / pentagram / kitap). Bu alanlar
+        # saniyede birkaç kez vurduğu için hasar sayısı basmaz — yoksa ekran
+        # okunmaz hâle geliyor. Geri bildirim yaratığın beyaz parlamasıdır.
         col = (255, 230, 120) if crit else WHITE
-        fx.popup(self.x, self.y - self.radius - 4, f"{int(amount)}" + ("!" if crit else ""),
-                 col, 22 if crit else 15, life=0.5)
+        if not quiet:
+            fx.popup(self.x, self.y - self.radius - 4, f"{int(amount)}" + ("!" if crit else ""),
+                     col, 22 if crit else 15, life=0.5)
         if crit:
             sfx("crit", 0.7, 0.03)
         if self.hp <= 0 and self.alive:
@@ -8493,14 +9400,16 @@ class Boss:
                     hazards.append(Hazard(a + random.uniform(-80, 80), b + random.uniform(-80, 80),
                                            c * 0.8, 0.3 + k * 0.28, self.dmg * 1.15, owner=self))
 
-    def take_damage(self, amount, crit, fx, kx=0.0, ky=0.0):
+    def take_damage(self, amount, crit, fx, kx=0.0, ky=0.0, quiet=False):
         # Patron zırhı gelen hasarın sabit bir yüzdesini keser.
         amount = amount * (1.0 - self.armor)
         self.hp -= amount
         self.hit_flash = 0.12
         col = (255, 230, 120) if crit else WHITE
-        fx.popup(self.x + random.uniform(-20, 20), self.y - self.radius, f"{int(amount)}" + ("!" if crit else ""),
-                 col, 20 if crit else 15, life=0.45)
+        if not quiet:
+            fx.popup(self.x + random.uniform(-20, 20), self.y - self.radius,
+                     f"{int(amount)}" + ("!" if crit else ""),
+                     col, 20 if crit else 15, life=0.45)
         if self.hp <= 0 and self.alive:
             self.alive = False
             fx.burst(self.x, self.y, self.color, n=40, speed=260, life=0.8, r=5)
@@ -9762,6 +10671,16 @@ class RunState:
         self.show_stats = False
         # Patron sandıkları (devrilen patronun yerine düşer)
         self.chests = []
+        # --- YENİ SİLAHLARIN DÜNYA NESNELERİ ---
+        self.water_zones = []       # ZEMZEM birikintileri
+        self.fire_rings = []        # BARAN'IN PAPUCU ateş halkaları
+        self.tornados = []          # HORTUM
+        self.flying_axes = []       # uçan BALTALAR
+        self.whip_lashes = []       # KIRBAÇ şaklama izleri
+        # --- MIKNATIS ---
+        self.magnets = []           # yerde duran mıknatıslar
+        self.magnet_kills = 0       # son mıknatıstan bu yana yapılan öldürme
+        self.magnets_taken = 0      # bu koşuda toplanan mıknatıs sayısı
 
     # ---------------- KAMERA ----------------
     def cam_rect(self):
@@ -9967,6 +10886,17 @@ class RunState:
         self.enemy_projectiles.clear()
         self.player_projectiles.clear()
         self.pickups.clear()
+        # Arenada kalan su/ateş/hortum ve uçan baltalar cehenneme taşınmaz.
+        self.water_zones.clear()
+        self.fire_rings.clear()
+        self.tornados.clear()
+        self.flying_axes.clear()
+        self.whip_lashes.clear()
+        # Yerde kalan mıknatıs KAYBOLMAZ: bu kadar nadir bir eşya geçiş
+        # yüzünden yok olmasın, oyuncunun ayağının dibine taşınır.
+        for mg in self.magnets:
+            mg.x, mg.y = ARENA_RECT.centerx + random.uniform(-70, 70), \
+                ARENA_RECT.centery + random.uniform(60, 120)
         self.time_stop = 0.0
         # Arenadan kalan yanık/zehir/yavaşlatma cehenneme taşınmasın.
         p.clear_status()
@@ -10122,20 +11052,27 @@ class RunState:
             p.weapon_timers[w["key"]] = weapon_cooldown(w, 1) * 0.35
             head, sub = f"{w['name']} BULDUN!", w["desc"]
         else:
-            # Hepsi zaten var: en düşük seviyeli silahlardan biri yükselir.
-            low = min(p.weapons.values())
-            key = random.choice([k for k, v in p.weapons.items() if v == low])
-            w = WEAPON_BY_KEY[key]
-            if p.weapons[key] >= WEAPON_MAX_LEVEL:
-                # Tavana ulaşıldıysa sandık altına dönüşür — boşa gitmesin.
+            # Hepsi zaten var: HENÜZ TAVANA ULAŞMAMIŞ en düşük seviyeli
+            # silahlardan biri yükselir. Tavanı kendi olan silahlar (örn.
+            # seviye atlamayan HORTUM) bu havuzun dışında kalır; yoksa bütün
+            # yükseltmeler onlara gider ve diğer silahlar yerinde sayardı.
+            can_up = [k for k, v in p.weapons.items()
+                      if v < weapon_max_level(WEAPON_BY_KEY[k])]
+            if not can_up:
+                # Her silah tavanda: sandık altına dönüşür — boşa gitmesin.
                 gold = 400 + self.waves.wave * 45
                 self.gold_wallet += gold
                 self.coins_earned += gold
                 self.fx.popup(chest.x, chest.y - 60, f"+{gold} ALTIN", GOLD, 26, life=1.6)
+                self.fx.popup(chest.x, chest.y - 34, "bütün silahlar tavanda", TEXT, 14, life=1.6)
+                sfx("coin", 0.9, 0.0)
                 return
+            low = min(p.weapons[k] for k in can_up)
+            key = random.choice([k for k in can_up if p.weapons[k] == low])
+            w = WEAPON_BY_KEY[key]
             p.weapons[key] += 1
             head = f"{w['name']} SEVİYE {p.weapons[key]}"
-            sub = "daha sert vurur, daha sık ateşler"
+            sub = w.get("up") or "daha sert vurur, daha sık ateşler"
         self.fx.popup(chest.x, chest.y - 74, head, w["color"], 28, life=1.8)
         self.fx.popup(chest.x, chest.y - 46, sub, TEXT, 14, life=1.8)
         self.fx.do_flash(w["color"], 0.35)
@@ -10176,6 +11113,10 @@ class RunState:
         for key in list(p.weapons.keys()):
             w = WEAPON_BY_KEY.get(key)
             if w is None:
+                continue
+            # SÜREKLİ silahlar (kitap / pentagram / papuç) buradan atılmaz;
+            # bkz. update_passive_weapons().
+            if w.get("passive"):
                 continue
             lvl = p.weapons[key]
             p.weapon_timers[key] = p.weapon_timers.get(key, 0.0) - dt
@@ -10221,6 +11162,177 @@ class RunState:
         self.player_projectiles.append(pr)
         return pr
 
+    def _field_damage(self, e, dmg, burn=0.0):
+        """ALAN hasarının ortak kapısı (su / ateş / pentagram / kitap).
+
+        Alanlar saniyede birkaç kez vurduğu için burada kritik hesaplanmaz ve
+        hasar sayısı ekrana basılmaz (bkz. take_damage quiet parametresi);
+        yoksa ekran okunmaz hâle geliyor. İnfaz, can çalma ve ölüm normal
+        yoldan işlenir.
+        """
+        p = self.player
+        if p.boss_hunter > 0 and (getattr(e, "is_boss", False) or getattr(e, "kind", "") == "elite"):
+            dmg *= (1.0 + 0.30 * p.boss_hunter)
+        dmg = self._apply_execute(p, e, dmg)
+        died = e.take_damage(dmg, False, self.fx, quiet=True)
+        if burn > 0 and hasattr(e, "apply_burn"):
+            e.apply_burn(burn, 1.4)
+        if p.vamp_level > 0:
+            p.lifesteal(dmg * 0.01 * p.vamp_level)
+        if died:
+            self.on_enemy_killed(e)
+        return died
+
+    # ---------------- SÜREKLİ ÇALIŞAN SİLAHLAR ----------------
+    def update_passive_weapons(self, dt):
+        """Bekleme süresi olmayan, hep açık duran silahlar.
+
+        KİTAP (çevrede dönen kalkan), PENTAGRAM (ayak altındaki mühür) ve
+        BARAN'IN PAPUCU (ayak izinde ateş halkası) buradan işlenir.
+        """
+        p = self.player
+        if not p.alive:
+            return
+
+        # ---- KİTAP KALKANI ----
+        # Kitap sayısı seviyeye eşittir. Dolu bir kitap gelen bir mermiyi
+        # yutar (bkz. block_with_book) ve bir süre boşta kalır.
+        blvl = p.weapons.get("book", 0)
+        if blvl > 0:
+            p.book_angle += dt * BOOK_SPIN
+            while len(p.book_charges) < blvl:
+                p.book_charges.append(0.0)
+            if len(p.book_charges) > blvl:
+                del p.book_charges[blvl:]
+            for i in range(blvl):
+                if p.book_charges[i] > 0:
+                    p.book_charges[i] = max(0.0, p.book_charges[i] - dt)
+                    if p.book_charges[i] <= 0:
+                        # kitap yeniden doldu
+                        bx, by, _a = book_slot_pos(p, i, blvl)
+                        self.fx.ring(bx, by, BOOK_COLOR, n=8, speed=120, life=0.3, r=2.2)
+            # Kitaplar dokundukları yaratığı da hafifçe öğütür.
+            bw = WEAPON_BY_KEY["book"]
+            bdmg = weapon_damage(p, bw, blvl) * dt
+            for i in range(blvl):
+                if p.book_charges[i] > 0:
+                    continue
+                bx, by, _a = book_slot_pos(p, i, blvl)
+                for e in self._all_targets():
+                    if not e.alive:
+                        continue
+                    if dist(bx, by, e.x, e.y) < getattr(e, "radius", 12) + 15:
+                        self._field_damage(e, bdmg * 6.0)
+
+        # ---- PENTAGRAM ----
+        plvl = p.weapons.get("pentagram", 0)
+        if plvl > 0:
+            p.penta_angle += dt * 0.65
+            p.penta_tick -= dt
+            if p.penta_tick <= 0:
+                p.penta_tick = PENTA_TICK
+                pw = WEAPON_BY_KEY["pentagram"]
+                rad = penta_radius(plvl)
+                tick_dmg = weapon_damage(p, pw, plvl) * PENTA_TICK
+                hit = 0
+                # Kıvılcım bütçesi: mührün içinde 40 yaratık varken 40 kıvılcım
+                # atmak parçacık tavanını doldurup kareyi yavaşlatıyordu.
+                sparks_left = 3
+                for e in self._all_targets():
+                    if not e.alive:
+                        continue
+                    if dist(p.x, p.y, e.x, e.y) <= rad + getattr(e, "radius", 12) * 0.5:
+                        self._field_damage(e, tick_dmg)
+                        hit += 1
+                        if sparks_left > 0 and random.random() < 0.4:
+                            sparks_left -= 1
+                            self.fx.spark(e.x + random.uniform(-9, 9), e.y,
+                                          PENTA_COLOR2, random.uniform(-14, 14),
+                                          random.uniform(-70, -34), 0.4, 2.2)
+                if hit:
+                    sfx("hit", 0.10, 0.10)
+
+        # ---- BARAN'IN PAPUCU ----
+        slvl = p.weapons.get("shoe", 0)
+        if slvl > 0:
+            if p.shoe_last is None:
+                p.shoe_last = (p.x, p.y)
+            if dist(p.x, p.y, p.shoe_last[0], p.shoe_last[1]) >= SHOE_STEP:
+                p.shoe_last = (p.x, p.y)
+                sw = WEAPON_BY_KEY["shoe"]
+                dps = weapon_damage(p, sw, slvl)
+                self.fire_rings.append(FireRing(p.x, p.y, shoe_radius(slvl), dps,
+                                                shoe_life(slvl), burn=dps * 0.30))
+                sfx("blaze", 0.16, 0.06)
+
+    # ---------------- YENİ SİLAHLARIN DÜNYA NESNELERİ ----------------
+    def update_weapon_objects(self, dt):
+        """Su birikintileri, ateş halkaları, hortumlar, baltalar, kırbaçlar."""
+        for lst_name in ("water_zones", "fire_rings", "tornados",
+                         "flying_axes", "whip_lashes"):
+            lst = getattr(self, lst_name)
+            for obj in list(lst):
+                obj.update(dt, self)
+            setattr(self, lst_name, [o for o in lst if o.alive])
+
+    # ---------------- KİTAP KALKANI: MERMİYİ YUTMA ----------------
+    def block_with_book(self, proj):
+        """Gelen düşman mermisi bir kitaba değdi mi?
+
+        Değdiyse mermi yok olur, HASAR SAYILMAZ ve o kitap bir süre boşa
+        çıkar. Kaç kitap varsa o kadar mermi aynı anda yutulabilir.
+        """
+        p = self.player
+        lvl = p.weapons.get("book", 0)
+        if lvl <= 0 or not p.book_charges:
+            return False
+        rech = max(1.4, BOOK_RECHARGE - BOOK_RECHARGE_PER_LEVEL * (lvl - 1))
+        for i in range(min(lvl, len(p.book_charges))):
+            if p.book_charges[i] > 0:
+                continue
+            bx, by, _a = book_slot_pos(p, i, lvl)
+            if dist(proj.x, proj.y, bx, by) < getattr(proj, "r", 5) + 17:
+                p.book_charges[i] = rech
+                proj.alive = False
+                self.fx.ring(bx, by, BOOK_COLOR, n=14, speed=210, life=0.35, r=3)
+                self.fx.burst(bx, by, BOOK_COLOR2, n=8, speed=140, life=0.3, r=2.4)
+                self.fx.popup(bx, by - 22, "YUTTU", BOOK_COLOR2, 14, life=0.5)
+                sfx("guard", 0.34, 0.02)
+                return True
+        return False
+
+    # ---------------- MIKNATIS ----------------
+    def update_magnets(self, dt):
+        p = self.player
+        for mg in list(self.magnets):
+            mg.update(dt, p)
+            if mg.collected:
+                self.collect_magnet(mg)
+        self.magnets = [m for m in self.magnets if m.alive]
+
+    def collect_magnet(self, mg):
+        """MIKNATIS toplandı: haritadaki BÜTÜN altın ve tecrübe oyuncuya uçar."""
+        p = self.player
+        n = 0
+        for pu in self.pickups:
+            if pu.kind in ("coin", "xp") and not pu.magnet:
+                pu.magnet = True
+                # Yeni düşmüş eşyaların 0.15 sn bekleme süresi çekimi
+                # geciktirmesin.
+                pu.spawn_t = max(pu.spawn_t, 0.2)
+                n += 1
+        self.magnets_taken += 1
+        self.fx.popup(p.x, p.y - 74, "MIKNATIS!", MAGNET_COLOR, 34, life=1.8)
+        self.fx.popup(p.x, p.y - 44, f"{n} eşya çekiliyor", MAGNET_COLOR2, 16, life=1.6)
+        self.fx.do_flash(MAGNET_COLOR, 0.42)
+        self.fx.shake(6, 0.24)
+        # Oyuncudan dışa doğru açılan üç çekim halkası
+        for i, rr in enumerate((240, 460, 680)):
+            self.fx.shockwave(p.x, p.y, rr, MAGNET_COLOR if i % 2 == 0 else MAGNET_COLOR2,
+                              0.55 + i * 0.15, 5)
+        self.fx.ring(p.x, p.y, MAGNET_COLOR2, n=34, speed=380, life=0.7, r=3.4)
+        sfx("magnet", 1.0, 0.0)
+
     def _fire_weapon(self, w, lvl, targets):
         p = self.player
         dmg = weapon_damage(p, w, lvl)
@@ -10228,69 +11340,107 @@ class RunState:
         nearest = min(targets, key=lambda e: dist(p.x, p.y, e.x, e.y))
         ang = math.atan2(nearest.y - p.y, nearest.x - p.x)
 
-        if key == "pistol":
-            # TABANCA: tek hedefe hızlı kurşun.
-            self._weapon_projectile(w, dmg, ang, 980, 1, 1.0)
-            self.fx.bolt([(p.x, p.y), (p.x + math.cos(ang) * 26, p.y + math.sin(ang) * 26)],
-                         (255, 230, 160), 0.10)
-            sfx("shoot_a", 0.35, 0.0)
+        if key == "axe":
+            # BALTA: her seviyede bir balta daha. Her balta RASTGELE bir
+            # düşmana uçar, vurur ve oyuncuya geri döner. Boyu seviyeyle büyür.
+            k = 0.92 + 0.09 * (lvl - 1)
+            for i in range(lvl):
+                tgt = random.choice(targets)
+                ax = FlyingAxe(p, tgt, dmg, k, w["color"])
+                # Baltalar tam üst üste çıkmasın: oyuncunun çevresine dağıt.
+                a0 = random.uniform(0, math.tau)
+                ax.x += math.cos(a0) * 16
+                ax.y += math.sin(a0) * 16
+                self.flying_axes.append(ax)
+            self.fx.ring(p.x, p.y, w["color"], n=12, speed=220, life=0.3, r=3.0 * k)
+            self.fx.shake(2.5, 0.09)
+            sfx("shoot_c", 0.42, 0.0)
 
-        elif key == "bow":
-            # OK: uzun menzilli, birçok düşmanı delen ok.
-            self._weapon_projectile(w, dmg, ang, 760, 3 + lvl // 2, 1.7)
-            # yay boşalırken kirişin geri tepmesi
-            self.fx.bolt([(p.x - math.cos(ang) * 14 - math.sin(ang) * 12,
-                           p.y - math.sin(ang) * 14 + math.cos(ang) * 12),
-                          (p.x + math.cos(ang) * 16, p.y + math.sin(ang) * 16),
-                          (p.x - math.cos(ang) * 14 + math.sin(ang) * 12,
-                           p.y - math.sin(ang) * 14 - math.cos(ang) * 12)],
-                         w["color"], 0.16)
-            sfx("shoot_b", 0.35, 0.0)
+        elif key == "whip":
+            # KIRBAÇ: ilk kırbaç en yakın düşmana şaklar; her seviyede bir
+            # kırbaç daha eklenir ve yönler çevreye eşit dağılır (2. seviyede
+            # biri öne, biri ARKAYA).
+            reach = WHIP_LEN + WHIP_LEN_PER_LEVEL * (lvl - 1)
+            width = 9 + lvl
+            total_hit = 0
+            # 8 kırbaç x 20 düşman x 7 parçacık = 1120 parçacık; tavan 650.
+            # Bu yüzden şaklama patlaması ATIŞ BAŞINA bütçelidir.
+            fx_left = 6
+            for i in range(lvl):
+                a = ang + i * math.tau / lvl
+                ca, sa = math.cos(a), math.sin(a)
+                self.whip_lashes.append(WhipLash(p.x, p.y, a, reach, width, w["color"]))
+                for e in self._all_targets():
+                    if not e.alive:
+                        continue
+                    d = dist(p.x, p.y, e.x, e.y)
+                    if d > reach + getattr(e, "radius", 12):
+                        continue
+                    if d < 1:
+                        continue
+                    ex, ey = (e.x - p.x) / d, (e.y - p.y) / d
+                    # Kırbacın taradığı koni: yaratık bu açının içinde mi?
+                    if ca * ex + sa * ey < math.cos(WHIP_ARC):
+                        continue
+                    # SAVURMA: hasarla birlikte düşmanı ileri fırlatır.
+                    self._weapon_hit(e, dmg, kb=WHIP_KB)
+                    if fx_left > 0:
+                        fx_left -= 1
+                        self.fx.burst(e.x, e.y, WHIP_COLOR2, n=5, speed=190, life=0.3, r=2.6)
+                    total_hit += 1
+            if total_hit:
+                self.fx.shake(3.5, 0.10)
+            sfx("whip", 0.42, 0.0)
 
-        elif key == "axe":
-            # BALTA: dönerek uçar, yoluna çıkan herkesi biçer (çok delici).
-            n = 1 + (1 if lvl >= 4 else 0) + (1 if lvl >= 7 else 0)
-            for i in range(n):
-                off = (i - (n - 1) / 2) * 0.34
-                self._weapon_projectile(w, dmg, ang + off, 430, 4 + lvl, 1.6)
-            # SAVURMA: oyuncunun çevresinde baltanın çizdiği yay + toz bulutu.
-            # "Harbi attı" hissini veren şey mermi değil, bu savurma anı.
-            arc = [(p.x + math.cos(ang - 1.25 + i * 0.5) * 34,
-                    p.y + math.sin(ang - 1.25 + i * 0.5) * 34) for i in range(6)]
-            self.fx.bolt(arc, w["color"], 0.20)
-            self.fx.ring(p.x + math.cos(ang) * 22, p.y + math.sin(ang) * 22,
-                         w["color"], n=10, speed=190, life=0.26, r=2.6)
-            self.fx.shake(2, 0.08)
-            sfx("shoot_c", 0.4, 0.0)
+        elif key == "zemzem":
+            # ZEMZEM SUYU: yere su döker, su 3 saniye kalır. 3. seviyede iki,
+            # 6. seviyede üç ayrı yere döker.
+            n = 1 + (1 if lvl >= 3 else 0) + (1 if lvl >= 6 else 0)
+            rad = ZEMZEM_BASE_R + ZEMZEM_R_PER_LEVEL * (lvl - 1)
+            spots = []
+            pool = list(targets)
+            random.shuffle(pool)
+            for e in pool:
+                # Birikintiler üst üste binmesin: aralarında en az bir yarıçap olsun.
+                if all(dist(e.x, e.y, sx, sy) > rad * 1.15 for (sx, sy) in spots):
+                    spots.append((e.x, e.y))
+                if len(spots) >= n:
+                    break
+            while len(spots) < n:
+                a = random.uniform(0, math.tau)
+                r2 = random.uniform(ZEMZEM_THROW * 0.35, ZEMZEM_THROW)
+                spots.append((p.x + math.cos(a) * r2, p.y + math.sin(a) * r2))
+            for (sx, sy) in spots:
+                self.water_zones.append(WaterZone(sx, sy, rad, dmg, ZEMZEM_LIFE))
+                self.fx.burst(sx, sy, ZEMZEM_COLOR2, n=16, speed=210, life=0.45, r=3.0)
+                self.fx.shockwave(sx, sy, rad, ZEMZEM_COLOR, 0.35, 4)
+                # suyun oyuncudan hedefe uçtuğu iz
+                self.fx.bolt([(p.x, p.y), ((p.x + sx) / 2, (p.y + sy) / 2 - 70), (sx, sy)],
+                             ZEMZEM_COLOR2, 0.22)
+            sfx("splash", 0.5, 0.0)
 
-        elif key == "katana":
-            # KATANA: oyuncunun çevresine yarım ay kesik — yakındaki herkese vurur.
-            rad = 168 + lvl * 9
-            hit = 0
-            for e in list(self._all_targets()):
-                if e.alive and dist(p.x, p.y, e.x, e.y) <= rad:
-                    self._weapon_hit(e, dmg, kb=150)
-                    hit += 1
-            arc = [(p.x + math.cos(ang + a) * rad * 0.9, p.y + math.sin(ang + a) * rad * 0.9)
-                   for a in (-0.95, -0.5, 0.0, 0.5, 0.95)]
-            self.fx.bolt(arc, w["color"], 0.22)
-            self.fx.shockwave(p.x, p.y, rad, w["color"], 0.22, 3)
-            if hit:
-                self.fx.shake(4, 0.12)
-            sfx("bonk", 0.45, 0.0)
-
-        else:  # hammer
-            # ÇEKİÇ: hedefin üstüne iner, düştüğü yeri sarsar.
-            rad = 132 + lvl * 8
-            tx, ty = nearest.x, nearest.y
-            for e in list(self._all_targets()):
-                if e.alive and dist(tx, ty, e.x, e.y) <= rad:
-                    self._weapon_hit(e, dmg, kb=210)
-            self.fx.shockwave(tx, ty, rad, w["color"], 0.35, 6)
-            self.fx.burst(tx, ty, w["color"], n=18, speed=220, life=0.5, r=3.5)
-            self.fx.bolt([(tx, ty - 260), (tx, ty)], w["color"], 0.18)
-            self.fx.shake(8, 0.22)
-            sfx("explosion", 0.5, 0.0)
+        elif key == "tornado":
+            # HORTUM: kalabalığın ORTASINA iner, yaratıkları oraya toplar ve
+            # canlarını yarıya indirir. Seviye hortumu değiştirmez.
+            #
+            # Eskiden en kalabalık YARATIĞIN üstüne iniyordu; oyuncuyu çevreleyen
+            # bir halkada bu, halkanın bir kenarı oluyor ve karşı taraf menzil
+            # dışında kalıyordu. Artık hedeflerin ağırlık merkezi alınıyor.
+            bx = sum(e.x for e in targets) / len(targets)
+            by = sum(e.y for e in targets) / len(targets)
+            # Ama tam oyuncunun üstüne de inmesin: bütün sürüyü kucağına
+            # boşaltmak ölüm tuzağı olurdu. En az bu kadar uzağa itilir.
+            d0 = dist(bx, by, p.x, p.y)
+            if d0 < 240:
+                a0 = math.atan2(by - p.y, bx - p.x) if d0 > 1 else ang
+                bx = p.x + math.cos(a0) * 260
+                by = p.y + math.sin(a0) * 260
+            self.tornados.append(Tornado(bx, by))
+            self.fx.do_flash(TORNADO_COLOR, 0.22)
+            self.fx.shockwave(bx, by, Tornado.PULL_R * 0.5, TORNADO_COLOR, 0.6, 6)
+            self.fx.shake(9, 0.4)
+            self.fx.popup(bx, by - 170, "HORTUM!", TORNADO_COLOR2, 26, life=1.2)
+            sfx("vortex", 0.7, 0.0)
 
     def do_bonk(self):
         p = self.player
@@ -10720,6 +11870,39 @@ class RunState:
             self._ult_banner(name, col)
             sfx("levelup", 0.9, 0.0)
 
+    # Yerdeki eşya sayısının üst sınırı. Bu sayının üstünde birleştirme
+    # yarıçapı büyür; yani eşyalar kaybolmaz, tek yığında toplanır.
+    PICKUP_SOFT_CAP = 160
+    PICKUP_MERGE_R = 30.0
+    PICKUP_MERGE_R_BUSY = 95.0
+
+    def drop_pickup(self, x, y, kind, value):
+        """Yere altın/tecrübe düşürür; yakındaki aynı türden eşyayla BİRLEŞTİRİR.
+
+        NEDEN: silahlar güçlendikten sonra saniyede 30-40 yaratık ölüyor ve
+        toplanmamış eşya sayısı 400'ü aşıyordu. Bunların hepsi oyuncunun
+        çevresinde, yani ekranın içinde biriktiği için kare süresinin en büyük
+        kalemi hâline geliyordu. Artık aynı noktaya düşen paralar tek bir
+        yığında toplanıyor: hiçbir kazanç kaybolmuyor (değerler toplanıyor),
+        toplamak da daha tok hissediyor.
+        """
+        if value <= 0:
+            return
+        merge_r = (self.PICKUP_MERGE_R_BUSY if len(self.pickups) > self.PICKUP_SOFT_CAP
+                   else self.PICKUP_MERGE_R)
+        best, best_d = None, merge_r
+        for pu in self.pickups:
+            if pu.kind != kind or pu.collected or pu.magnet:
+                continue
+            d = dist(x, y, pu.x, pu.y)
+            if d < best_d:
+                best, best_d = pu, d
+        if best is not None:
+            best.value += value
+            return
+        self.pickups.append(Pickup(x + random.uniform(-8, 8), y + random.uniform(-8, 8),
+                                   kind, value))
+
     def on_enemy_killed(self, e):
         # Bir ölüm yalnızca BİR KEZ sayılır.
         # Patronlar zehir/yanık ile öldüğünde Boss.update içindeki kill_cb
@@ -10750,10 +11933,21 @@ class RunState:
         # Altın ARTIK ölüm anında verilmiyor: yere düşen parayı toplaman gerek.
         # (Kazanç, Pickup "coin" toplandığında işleniyor.)
         self.score += int(e.score * combo_mult)
-        self.pickups.append(Pickup(e.x + random.uniform(-8, 8), e.y + random.uniform(-8, 8), "coin", coin_gain))
-        self.pickups.append(Pickup(e.x + random.uniform(-8, 8), e.y + random.uniform(-8, 8), "xp", xp_gain))
+        self.drop_pickup(e.x, e.y, "coin", coin_gain)
+        self.drop_pickup(e.x, e.y, "xp", xp_gain)
         if random.random() < 0.04 and p.hp < p.max_hp * 0.9:
             self.pickups.append(Pickup(e.x, e.y, "heart", 26))
+        # MIKNATIS: binde bir düşer (kötü şansa karşı kademeli garanti için
+        # bkz. magnet_drop_chance). Aynı anda yerde birden fazla durmasın.
+        self.magnet_kills += 1
+        if not self.magnets and random.random() < magnet_drop_chance(self.magnet_kills):
+            self.magnet_kills = 0
+            self.magnets.append(MagnetDrop(e.x, e.y))
+            self.fx.popup(e.x, e.y - 58, "MIKNATIS DÜŞTÜ!", MAGNET_COLOR, 26, life=2.2)
+            self.fx.ring(e.x, e.y, MAGNET_COLOR, n=30, speed=300, life=0.8, r=4)
+            self.fx.shockwave(e.x, e.y, 160, MAGNET_COLOR2, 0.5, 5)
+            self.fx.do_flash(MAGNET_COLOR, 0.30)
+            sfx("magnet", 0.85, 0.0)
         if self.combo.count > 0 and self.combo.count % 10 == 0:
             self.fx.popup(p.x, p.y - 50, f"COMBO x{self.combo.count}!", CYAN, 24, life=1.0)
         if self.combo.count >= 30 and self.ach:
@@ -10917,11 +12111,20 @@ class RunState:
         self.update_chests(dt)
         if not frozen:
             self.update_boss_weapons(dt)
+            # SÜREKLİ silahlar (kitap kalkanı / pentagram / Baran'ın papucu)
+            self.update_passive_weapons(dt)
+            # Su birikintileri, ateş halkaları, hortumlar, uçan baltalar, kırbaçlar
+            self.update_weapon_objects(dt)
+        self.update_magnets(dt)
 
         for proj in list(self.enemy_projectiles):
             if not frozen:
                 proj.update(dt)
             if proj.alive and p.alive and not frozen:
+                # KİTAP KALKANI: mermi önce kitaplara çarpar. Kitap mermiyi
+                # yutarsa hasar SAYILMAZ — oyuncuya hiç ulaşmaz.
+                if self.block_with_book(proj):
+                    continue
                 if dist(proj.x, proj.y, p.x, p.y) < proj.r + p.radius:
                     owner = getattr(proj, "owner", None)
                     if owner is not None and hasattr(owner, "hit_player"):
@@ -11564,6 +12767,19 @@ def draw_minimap(surf, run, t):
             pygame.draw.circle(surf, (255, 90, 80), (int(px), int(py)), int(4 + pulse * 0.4))
             pygame.draw.circle(surf, WHITE, (int(px), int(py)), 2)
 
+    # MIKNATIS — nadir eşya, küçük haritada nabız gibi atar ki kaçırılmasın
+    for mg in run.magnets:
+        px, py = mp(mg.x, mg.y)
+        pulse = 0.5 + 0.5 * math.sin(t * 7)
+        add_glow(surf, px, py, 16 + pulse * 8, MAGNET_COLOR, 0.45 + pulse * 0.35)
+        pygame.draw.circle(surf, MAGNET_COLOR, (int(px), int(py)), int(4 + pulse * 2))
+        pygame.draw.circle(surf, MAGNET_COLOR2, (int(px), int(py)), 2)
+
+    # hortum (küçük haritada dönen halka)
+    for tn in run.tornados:
+        px, py = mp(tn.x, tn.y)
+        pygame.draw.circle(surf, TORNADO_COLOR, (int(px), int(py)), 5, 1)
+
     # market portalı
     if run.market_portal is not None:
         px, py = mp(run.market_portal.x, run.market_portal.y)
@@ -11613,6 +12829,9 @@ def draw_offscreen_markers(surf, run, cam, t):
         marks.append((run.market_portal.x, run.market_portal.y, GOLD, "coin"))
     if run.hell_portal is not None:
         marks.append((run.hell_portal.x, run.hell_portal.y, HELL_PORTAL_COLOR, "gem"))
+    # MIKNATIS ekran dışında kalırsa kenarda oku görünsün.
+    for mg in run.magnets:
+        marks.append((mg.x, mg.y, MAGNET_COLOR, "magnet"))
     for (wx, wy, col, icon) in marks:
         if cam.collidepoint(wx, wy):
             continue
@@ -11691,6 +12910,17 @@ def skill_slots_for(p):
         if lvl <= 0:
             continue
         w = WEAPON_BY_KEY[key]
+        if w.get("passive"):
+            # SÜREKLİ silahın bekleme süresi yoktur: yuva hep hazır yanar ve
+            # tuş etiketinde "SÜREKLİ" yazar.
+            slots.append({
+                "key": "SÜREKLİ",
+                "name": w["name"] + (f" {lvl}" if lvl > 1 else ""),
+                "icon": w["icon"],
+                "color": w["color"],
+                "cd": None,
+            })
+            continue
         slots.append({
             "key": "OTO",
             "name": w["name"] + (f" {lvl}" if lvl > 1 else ""),
@@ -12091,23 +13321,61 @@ def draw_run(surf, run, t, aim_pos=None):
         run.hell_portal.draw(world, t)
     if run.market_portal is not None:
         run.market_portal.draw(world, run.player)
+    # EKRAN DIŞINI ÇİZME.
+    # Dünya ekranın 3x3'ü kadar; kırpma (set_clip) görünmeyen pikselleri atıyor
+    # ama Python tarafındaki çizim işi ve her nesnenin parlama blit'i yine de
+    # yapılıyordu. Silahlar güçlendikten sonra yerde 400'ü aşkın toplanmamış
+    # altın/tecrübe birikiyor ve bunların hepsini her karede çizmek kare
+    # süresinin en büyük kalemi hâline geliyor. Görünür alanın biraz dışındaki
+    # nesneler artık hiç çizilmiyor.
+    vis_near = cam.inflate(200, 200)        # küçük nesneler (eşya, yaratık)
+    vis_far = cam.inflate(900, 900)         # geniş alanlar (su, ateş, mühür)
+
     for hz in run.hazards:
-        hz.draw(world, t)
+        if vis_far.collidepoint(hz.x, hz.y):
+            hz.draw(world, t)
+    # --- ZEMİNE ÇİZİLEN SİLAH ALANLARI (varlıkların ALTINDA kalır) ---
+    draw_pentagram_field(world, run.player, t)
+    for wz in run.water_zones:
+        if vis_far.collidepoint(wz.x, wz.y):
+            wz.draw(world, t)
+    for fr in run.fire_rings:
+        if vis_far.collidepoint(fr.x, fr.y):
+            fr.draw(world, t)
     for pu in run.pickups:
-        pu.draw(world, t)
+        if vis_near.collidepoint(pu.x, pu.y):
+            pu.draw(world, t)
+    for mg in run.magnets:
+        if vis_far.collidepoint(mg.x, mg.y):
+            mg.draw(world, t)
     for ch in run.chests:
         ch.draw(world, t)
     for e in sorted(run.enemies, key=lambda e: e.y):
-        e.draw(world, t)
+        if vis_near.collidepoint(e.x, e.y):
+            e.draw(world, t)
     for b in sorted(run.bosses, key=lambda b: b.y):
         if b.alive:
             b.draw(world, t)
     for proj in run.enemy_projectiles:
-        proj.draw(world, t)
+        if vis_near.collidepoint(proj.x, proj.y):
+            proj.draw(world, t)
     for proj in run.player_projectiles:
-        proj.draw(world, t)
+        if vis_near.collidepoint(proj.x, proj.y):
+            proj.draw(world, t)
     if run.player.alive:
         run.player.draw(world, t)
+    # --- OYUNCUNUN ÜSTÜNE ÇİZİLENLER ---
+    draw_shield_books(world, run.player, t)
+    for ax in run.flying_axes:
+        if vis_near.collidepoint(ax.x, ax.y):
+            ax.draw(world, t)
+    for wl in run.whip_lashes:
+        if vis_far.collidepoint(wl.x, wl.y):
+            wl.draw(world, t)
+    # Hortum en üstte: huni ekranın yukarısına doğru uzanıyor.
+    for tn in run.tornados:
+        if vis_far.collidepoint(tn.x, tn.y):
+            tn.draw(world, t)
     run.fx.draw(world)
     run.fx.draw_texts(world)          # hasar sayıları da dünya koordinatında
     world.set_clip(prev_clip)
