@@ -7474,7 +7474,12 @@ class Tornado:
         # hasar alır. Değer seviyeyle büyür (bkz. HORTUM satırındaki dmg/dpl).
         self.dps = max(0.0, dps)
         self.grind_t = 0.0
-        self.cut_ids = set()    # canı zaten yarılanan yaratıklar
+        # Canı zaten kesilmiş yaratıklar. Burada id() DEĞİL yaratığın KENDİSİ
+        # saklanıyor: hortum 2.4 saniye yaşıyor ve bu sürede ölen bir
+        # yaratığın id'si yeni doğan birine düşebiliyordu — o yeni yaratık da
+        # "canı zaten kesilmiş" sayılıp kesmeden kurtuluyordu. Küme hortumla
+        # birlikte yok olduğu için nesne tutmak sızıntı yapmaz.
+        self.cut = set()
         self.debris = []        # çevresinde dönen enkaz: (açı, yarıçap, yükseklik, hız)
         for _ in range(26):
             self.debris.append([random.uniform(0, math.tau), random.uniform(20, 150),
@@ -7509,8 +7514,8 @@ class Tornado:
             # 1) CANI YARIYA İNDİR — yaratık başına yalnızca bir kez.
             # Canı doğrudan bölüyoruz: take_damage kullanılsa zırh araya girer
             # ve "yarı can" sözü tutulmazdı. Patronun canına dokunulmaz.
-            if id(e) not in self.cut_ids:
-                self.cut_ids.add(id(e))
+            if e not in self.cut:
+                self.cut.add(e)
                 if not boss and e.hp > 1:
                     e.hp = max(1.0, e.hp * self.hp_cut)
                     e.hit_flash = 0.16
@@ -12740,9 +12745,15 @@ class RunState:
         self.tornados = []          # HORTUM
         self.flying_axes = []       # uçan BALTALAR
         self.whip_lashes = []       # KIRBAÇ savuruş izleri
-        # PENTAGRAM: şu an mührün İÇİNDE olan yaratıkların kimlikleri. Mühre
-        # yeni girenlere bir kerelik kavurucu vuruş atılsın diye tutuluyor
-        # (her tikte sıfırdan kuruluyor; çıkıp yeniden giren yeniden kavrulur).
+        # PENTAGRAM: şu an mührün İÇİNDE olan yaratıklar. Mühre yeni girenlere
+        # bir kerelik kavurucu vuruş atılsın diye tutuluyor (her tikte sıfırdan
+        # kuruluyor; çıkıp yeniden giren yeniden kavrulur).
+        #
+        # DİKKAT: burada id(e) DEĞİL, yaratığın KENDİSİ saklanıyor. id() ölen
+        # bir nesneden boşalınca CPython aynı adresi yeni bir yaratığa
+        # verebiliyordu; o yaratık da "zaten içerideydi" sayılıp kavurucu
+        # vuruşu hiç yemiyordu. Küme her tikte yalnızca O AN içeride olanlarla
+        # yeniden kurulduğu için nesneleri tutmak sızıntı yapmaz.
         self.penta_inside = set()
         # --- MIKNATIS ---
         self.magnets = []           # yerde duran mıknatıslar
@@ -13374,10 +13385,9 @@ class RunState:
                     if not e.alive:
                         continue
                     if dist(p.x, p.y, e.x, e.y) <= rad + getattr(e, "radius", 12) * 0.5:
-                        eid = id(e)
-                        inside_now.add(eid)
+                        inside_now.add(e)
                         bat_capped = False
-                        if eid not in was_inside:
+                        if e not in was_inside:
                             # Mührün eşiğini yeni geçti: kavurucu vuruş. Patronun
                             # canından ORAN kesilmez (tornado ile aynı ilke),
                             # yalnızca sabit kısmı yer.
@@ -19513,6 +19523,37 @@ class App:
                   (row.right - 14, row.centery - 8), 13, TEXT_DIM, right=True,
                   shadow=False)
 
+    def _lb_empty_row(self, canvas, row, i, t, appear):
+        """Henüz sahibi olmayan sıra: kesik çizgili, davet eden bir yuva."""
+        if appear <= 0.02:
+            return
+        row = row.move(int((1.0 - appear) * 46), 0)
+        breathe = 0.5 + 0.5 * math.sin(t * 1.5 + i * 0.6)
+        col = tuple(int(lerp(40, 66, breathe)) for _ in range(3))
+        # kesik çizgili çerçeve
+        seg, gap_l = 9, 6
+        for (ax, ay, bx, by) in ((row.x, row.y, row.right, row.y),
+                                 (row.x, row.bottom, row.right, row.bottom),
+                                 (row.x, row.y, row.x, row.bottom),
+                                 (row.right, row.y, row.right, row.bottom)):
+            ln = math.hypot(bx - ax, by - ay)
+            if ln < 1:
+                continue
+            ux, uy = (bx - ax) / ln, (by - ay) / ln
+            d = 0.0
+            while d < ln:
+                d2 = min(ln, d + seg)
+                pygame.draw.line(canvas, col, (ax + ux * d, ay + uy * d),
+                                 (ax + ux * d2, ay + uy * d2), 1)
+                d += seg + gap_l
+        draw_text(canvas, str(i + 1), (row.x + 22, row.centery), 15,
+                  tuple(int(lerp(72, 104, breathe)) for _ in range(3)),
+                  bold=True, center=True, shadow=False)
+        draw_text(canvas, "bu sıra boş — sahibini bekliyor",
+                  (row.centerx, row.centery), 12,
+                  tuple(int(lerp(78, 112, breathe)) for _ in range(3)),
+                  center=True, shadow=False)
+
     def update_world_leaderboard(self, dt, mouse_pos, clicked):
         canvas = self.display.canvas
         self.bg.draw(canvas)
@@ -19602,15 +19643,35 @@ class App:
                 # basamakların yükseklikleri: birinci en yüksekte durur
                 step_h = {0: pod_h - 54, 1: pod_h - 74, 2: pod_h - 88}
                 for slot, idx in enumerate(order):
-                    if idx >= len(board):
-                        continue
-                    e = board[idx]
                     col, shine = self._rank_style(idx)
                     ap = clamp((self.world_lb_t - idx * 0.10) / 0.35, 0.0, 1.0)
                     ap = ease_out_cubic(ap)
                     if ap <= 0.01:
                         continue
                     cx = pod.x + slot_w * slot + slot_w / 2
+                    if idx >= len(board):
+                        # Sahibi olmayan podyum basamağı: sönük, kesik çizgili
+                        # bir kaide olarak yine de durur — podyumun bir ayağı
+                        # eksik kalmasın.
+                        bh = step_h[idx] * ap
+                        st_r = pygame.Rect(int(cx - slot_w * 0.36),
+                                           int(pod.bottom - bh),
+                                           int(slot_w * 0.72), int(max(2, bh)))
+                        dim = scale_col(col, 0.34)
+                        for yy in range(0, st_r.h, 12):
+                            pygame.draw.line(canvas, scale_col(col, 0.16),
+                                             (st_r.x + 4, st_r.y + yy),
+                                             (st_r.right - 4, st_r.y + yy), 1)
+                        pygame.draw.rect(canvas, dim, st_r, width=1,
+                                         border_top_left_radius=10,
+                                         border_top_right_radius=10)
+                        self._draw_medal(canvas, cx, st_r.y - 22, idx, 18, t)
+                        draw_text(canvas, "boş", (cx, st_r.y + 20), 15, dim,
+                                  bold=True, center=True, shadow=False)
+                        draw_text(canvas, "sahibini bekliyor", (cx, st_r.y + 42), 10,
+                                  scale_col(col, 0.30), center=True, shadow=False)
+                        continue
+                    e = board[idx]
                     base_y = pod.bottom
                     bh = step_h[idx] * ap
                     step = pygame.Rect(int(cx - slot_w * 0.36), int(base_y - bh),
@@ -19658,25 +19719,27 @@ class App:
                                  (pod.right, pod.bottom), 2)
 
                 # ---- 4. sıradan itibaren liste ----
+                # Liste HER ZAMAN 10 sıraya kadar çizilir: sahibi olmayan
+                # sıralar boş bırakılmaz, "bu sıra seni bekliyor" diyen kesik
+                # çizgili bir yuva olarak durur. Kullanıcının şikâyeti tam
+                # buydu: "10. demişsin, sonra aşağısı bomboş."
                 rest = board[3:WORLD_LB_SIZE]
+                n_slots = WORLD_LB_SIZE - 3
                 list_top = pod.bottom + 12
                 list_bottom = panel_rect.bottom - 70
-                if rest:
-                    # Satırlar kalan boşluğa TAM oturur: liste 10'da bittiği
-                    # için altta boş bant kalmaz.
-                    span = list_bottom - list_top
-                    row_h = clamp(span / len(rest), 26, 42)
-                    for j, e in enumerate(rest):
-                        i = j + 3
-                        ap = ease_out_cubic(clamp((self.world_lb_t - 0.30 - j * 0.06) / 0.30, 0.0, 1.0))
-                        row = pygame.Rect(panel_rect.x + 34, int(list_top + j * row_h),
-                                          panel_rect.w - 68, int(row_h) - 5)
+                row_h = (list_bottom - list_top) / n_slots
+                for j in range(n_slots):
+                    i = j + 3
+                    ap = ease_out_cubic(clamp((self.world_lb_t - 0.30 - j * 0.06) / 0.30,
+                                              0.0, 1.0))
+                    row = pygame.Rect(panel_rect.x + 34, int(list_top + j * row_h),
+                                      panel_rect.w - 68, int(row_h) - 5)
+                    if j < len(rest):
+                        e = rest[j]
                         frac = clamp(int(e.get("score", 0) or 0) / best, 0.0, 1.0)
                         self._lb_row(canvas, row, i, e, my_name, t, ap, frac * ap)
-                else:
-                    draw_text(canvas, "Sıralamada henüz 3'ten fazla oyuncu yok.",
-                              (panel_rect.centerx, list_top + 30), 15, TEXT_DIM,
-                              center=True, shadow=False)
+                    else:
+                        self._lb_empty_row(canvas, row, i, t, ap)
 
         w, h = 200, 44
         btn = Button((panel_rect.centerx - w - 8, panel_rect.bottom - 56, w, h), "YENİLE",
