@@ -15033,14 +15033,16 @@ def _decorate_arena_floor(surf, st, rnd):
     ccx, ccy = W * 0.5, H * 0.5
     R = 300
     blit_disc(surf, ccx, ccy, R * 1.06, sand, 60)
-    for k, rad in ((0.30, R), (0.42, R * 0.82), (0.22, R * 0.55), (0.34, R * 0.40)):
+    # Halkalar taştan biraz AÇIK olsun: koyu kalınca zemine oyulmuş bir oluk
+    # değil, üzerine çizilmiş siyah bir daire gibi duruyordu.
+    for k, rad in ((0.52, R), (0.68, R * 0.82), (0.40, R * 0.55), (0.58, R * 0.40)):
         ring_aa(surf, ccx, ccy, rad, scale_col(rune, k), 3)
     # yazıt kuşağı: iki halka arasında eşit aralıklı kısa çentikler
     for i in range(72):
         a = i * math.tau / 72
         r0, r1 = R * 0.84, R * 0.98
         w = 3 if i % 6 == 0 else 1
-        pygame.draw.line(surf, scale_col(rune, 0.42 if i % 6 == 0 else 0.22),
+        pygame.draw.line(surf, scale_col(rune, 0.70 if i % 6 == 0 else 0.42),
                          (ccx + math.cos(a) * r0, ccy + math.sin(a) * r0),
                          (ccx + math.cos(a) * r1, ccy + math.sin(a) * r1), w)
     # sekiz kollu yıldız
@@ -15049,9 +15051,9 @@ def _decorate_arena_floor(surf, st, rnd):
         a = -math.pi / 2 + i * math.pi / 8
         rr = R * (0.38 if i % 2 == 0 else 0.15)
         star.append((ccx + math.cos(a) * rr, ccy + math.sin(a) * rr))
-    poly_aa(surf, star, scale_col(rune, 0.16))
-    poly_edge(surf, star, scale_col(rune, 0.38), 2)
-    circle_aa(surf, ccx, ccy, R * 0.09, scale_col(rune, 0.30))
+    poly_aa(surf, star, scale_col(rune, 0.26))
+    poly_edge(surf, star, scale_col(rune, 0.62), 2)
+    circle_aa(surf, ccx, ccy, R * 0.09, scale_col(rune, 0.50))
 
     # --- KÖŞE SÜTUN KAİDELERİ -----------------------------------------
     # Dört köşede yıkılmış sütunların kaidesi: harita bir "yapı" gibi dursun.
@@ -15063,7 +15065,7 @@ def _decorate_arena_floor(surf, st, rnd):
                     py + math.sin(i * math.tau / 8) * rr * 0.86) for i in range(8)]
             pygame.draw.polygon(surf, scale_col(stone, k), pts)
             pygame.draw.polygon(surf, scale_col(stone_lo, 0.9), pts, 2)
-        ring_aa(surf, px, py, 30, scale_col(rune, 0.30), 2)
+        ring_aa(surf, px, py, 30, scale_col(rune, 0.52), 2)
         # kırık sütun gövdesi: kaidenin üstünde kısa bir kütük
         for i in range(3):
             rr = 26 - i * 5
