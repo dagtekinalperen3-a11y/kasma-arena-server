@@ -15981,26 +15981,63 @@ def draw_stats_button(surf, run, mouse_pos, t):
         pygame.draw.circle(surf, dot, (r.centerx, int(r.centery + i * 7)), 2)
 
 
+_hud_bar_cache = {}
+
+
+def _hud_top_bar(w, h):
+    """HUD'ın üst şeridi: degrade zemin + altında ince altın bir ayraç."""
+    key = (w, h)
+    s = _hud_bar_cache.get(key)
+    if s is None:
+        if len(_hud_bar_cache) > 8:
+            _hud_bar_cache.clear()
+        s = pygame.Surface((w, h), pygame.SRCALPHA)
+        for yy in range(h):
+            f = yy / max(1, h - 1)
+            a = int(lerp(238, 196, f))
+            pygame.draw.line(s, (int(lerp(19, 9, f)), int(lerp(21, 10, f)),
+                                 int(lerp(34, 18, f)), a), (0, yy), (w, yy))
+        _hud_bar_cache[key] = s
+    return s
+
+
 def draw_hud(surf, run, t):
     p = run.player
     top = pygame.Rect(0, 0, VIRTUAL_W, ARENA_MARGIN_TOP - 6)
-    s = pygame.Surface(top.size, pygame.SRCALPHA)
-    pygame.draw.rect(s, (12, 13, 22, 230), top)
-    surf.blit(s, (0, 0))
-    pygame.draw.line(surf, PANEL_EDGE, (0, top.height), (VIRTUAL_W, top.height), 2)
+    surf.blit(_hud_top_bar(top.w, top.h), (0, 0))
+    # şeridin altında iki katlı ayraç: koyu taban + üstünde ince ışık
+    pygame.draw.line(surf, (46, 54, 84), (0, top.height), (VIRTUAL_W, top.height), 3)
+    pygame.draw.line(surf, (120, 138, 190), (0, top.height - 1), (VIRTUAL_W, top.height - 1), 1)
+    # ortada, sürenin arkasında yumuşak bir vurgu
+    add_glow(surf, VIRTUAL_W / 2, 26, 150, (70, 96, 160), 0.13)
 
     hp_rect = pygame.Rect(20, 16, 260, 22)
     frac = clamp(p.hp / p.max_hp, 0, 1)
     hp_col = GREEN if frac > 0.5 else (ORANGE if frac > 0.25 else RED)
+    # can azalınca çubuk nabız gibi atsın
+    if frac < 0.35:
+        add_glow(surf, hp_rect.centerx, hp_rect.centery, 130, RED,
+                 0.10 + 0.10 * (0.5 + 0.5 * math.sin(t * 6)))
     draw_bar(surf, hp_rect, frac, hp_col)
+    # çubuğun üst yarısına cam parlaması
+    gl = pygame.Surface((hp_rect.w - 4, hp_rect.h // 2 - 1), pygame.SRCALPHA)
+    gl.fill((255, 255, 255, 26))
+    surf.blit(gl, (hp_rect.x + 2, hp_rect.y + 2))
     draw_text(surf, f"{int(p.hp)}/{int(p.max_hp)}", hp_rect.center, 14, WHITE, bold=True, center=True)
     draw_icon(surf, hp_rect.x - 12, hp_rect.centery, "heart", RED, 12)
 
     xp_rect = pygame.Rect(20, 44, 260, 12)
     draw_bar(surf, xp_rect, p.xp / p.xp_to_next, PURPLE, radius=5)
-    draw_text(surf, f"LV {p.level}", (xp_rect.right + 10, xp_rect.centery), 15, PURPLE, bold=True)
+    # seviye rozeti: sayı düz yazı yerine mor bir madalyonda
+    lv_txt = f"LV {p.level}"
+    lv_r = pygame.Rect(0, 0, text_width(lv_txt, 14, True) + 18, 19)
+    lv_r.midleft = (xp_rect.right + 8, xp_rect.centery)
+    pygame.draw.rect(surf, (28, 20, 44), lv_r, border_radius=9)
+    pygame.draw.rect(surf, PURPLE, lv_r, width=1, border_radius=9)
+    draw_text(surf, lv_txt, lv_r.center, 14, PURPLE, bold=True, center=True, shadow=False)
 
-    draw_text(surf, f"Altın: {fmt_num(run.gold_wallet)}", (20, 62), 15, GOLD, bold=True)
+    draw_coin_label(surf, 20 + coin_label_width(fmt_num(run.gold_wallet), 15, 7) / 2,
+                    70, fmt_num(run.gold_wallet), GOLD, 15, icon_r=7)
 
     # --- PATRON DURUM ETKİLERİ: altının sağında küçük sayaçlar ---
     st_x = 140
