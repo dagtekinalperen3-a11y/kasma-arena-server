@@ -1,6 +1,6 @@
 """
 =====================================================================
- KASMA ARENA  —  v3.11
+ KASMA ARENA  —  v3.13
  2D Top-Down Hayatta Kalma / Skor-Rekor Oyunu
  ---------------------------------------------------------------------
  Dalgalar halinde gelen düşmanlara karşı hayatta kal, nişan al, ateş et,
@@ -8,6 +8,55 @@
  patronları yen, rekorunu kır. Kaybedersen o koşuda aldıkların silinir.
  Elmasla kalıcı SKIN'ler al (her skinin kendi silahı, mermisi, efekti ve
  ÖZEL YETENEĞİ var).
+
+ v3.13 ile gelenler (SEVİYE, DENGE ve GÖRÜNÜM):
+   * SİLAH TAVANI 8 -> 25. Seviye atlamak artık kolay olduğu için silahlar
+     koşunun ilk yarısında tavana dayanıyor ve sonraki seviyeler hiçbir şey
+     ifade etmiyordu. Tavanı üçe katlayıp artışları aynı bırakmak silahları
+     üç kat güçlendirirdi; bunun yerine bütün artışlar 25 seviyeye YAYILDI:
+       - weapon_growth(): İÇBÜKEY eğri. İlk seviyeler büyük pay alır,
+         sonrakiler küçülür (8. seviye doğrusalın 1.65 katı, 25. seviyedeki
+         toplam aynı). Hasar, menzil, alan ve bekleme süresi — hepsi bu tek
+         fonksiyondan besleniyor, yani "seviye mantığı" her silahta aynı.
+       - weapon_count(): balta/kırbaç/kalkan SAYISI artık seviyeye eşit
+         değil, bantlı artıyor. 25. seviyede 25 değil 9 parça (hem denge
+         hem kare hızı için).
+       - Sonuç: 25. seviye, eski 8. seviyenin 1.36-1.51 katı.
+     HORTUM'un kendine ait 5'lik tavanı da kalktı; o da 25'e çıkıyor.
+   * PENTAGRAM ARTIK HER ŞEYİ TEK ATMIYOR. Mühre ilk adım vuruşu, yaratığın
+     o anki canının en çok penta_sear_cap(seviye) kadarını alabiliyor:
+     1. seviyede %55, ~17. seviyede fren tamamen kalkıyor. Mührün içinde
+     kalan yine sürekli yanıyor, yani zayıflar yine mühürden çıkamıyor;
+     değişen şey "değen anında buharlaşır"ın kalkması.
+   * PATRONLARA %20 DAHA FAZLA CAN — ve asıl sebep düzeltildi: patron canını
+     ölçekleyen estimated_dps() SİLAHLARI HİÇ SAYMIYORDU. Oyuncunun gerçek
+     hasarı tahminin 5-10 katı olduğu için "90 saniyelik" patron dövüşü
+     gerçekte 10-12 saniye sürüyordu. Artık taşınan silahların tek hedefe
+     verdiği hasar da hesaba katılıyor (weapons_dps_estimate) ve dövüş,
+     oyuncunun donanımından bağımsız olarak ~25 saniye sürüyor.
+   * CEHENNEM SERTLEŞTİ. Can tabanı +%25, dalga başına artış %20 -> %26,
+     hasar eğrisi arenayla aynı hıza çekildi. Hız artık 1. dalga temposuna
+     geri sarmıyor: 8. dalga temposunda başlayıp her dalga 1.5 arena dalgası
+     hızlanıyor. Cehennem yaratıklarının artık ZIRHI var (%10 -> %40) ve
+     cehennem patronu yavaşlamıyor.
+   * MARKETTEN "Dönen Bıçaklar" ve "Çifte Bıçak" kaldırıldı.
+   * 1. HARİTA (ARENA) ELDEN GEÇTİ. Düz bir degrade + rastgele lekeydi;
+     artık kırık taş döşeme, derzlerden fışkıran yosun, merkezde kadim bir
+     mühür, dört köşede yıkık sütun kaideleri, yerden çıkan kristaller,
+     moloz ve eski dövüş izleri var. Üstünde canlı bir katman: yükselen ışık
+     zerreleri ve mührün nefes alan hâlesi.
+   * ARAYÜZ: bütün düğmeler ve paneller yeniden çizildi (gölge, degrade
+     gövde, pah ışığı, cam parlaması, hover hâlesi). Bütün simgeler ortak
+     bir ölçü kutusuna oturtulup görsel merkezleri hizalandı; simge + sayı
+     ikilileri (fiyat pastilleri, altın kesesi, elmas sayaçları) artık tek
+     blok olarak ortalanıyor. Menü zeminine dolaşan renkli sis ve kırpışan
+     yıldızlar, başlığa altın hâle ve ayraçlar eklendi.
+   * DÜNYA SIRALAMASI yeniden yazıldı: podyum, taç, madalyalar, sırayla
+     beliren satır kartları, satır zemininde skor oranı. Liste İLK 10'da
+     bitiyor — altta boş bant kalmıyor.
+   * KARE HIZI: silah yuvası paneli, düğme gövdeleri ve panel zeminleri
+     önbelleğe alındı. Ölçüm: oyun-içi çizim 125 -> 136 FPS (yeni zemine ve
+     efektlere rağmen eskisinden hızlı).
 
  v3.11 ile gelenler (DENGE ve HİSSİYAT):
    * SEVİYE EĞRİSİ BANTLANDI: eski eğri tek bir çarpandı (x1.24) ve üssel
@@ -257,7 +306,7 @@ ONLINE_API_URL = "https://kasma-arena-server.onrender.com"
 VIRTUAL_W, VIRTUAL_H = 1280, 720
 FPS = 60
 GAME_TITLE = "ARENA SAVAŞI"
-GAME_VERSION = "3.11"
+GAME_VERSION = "3.13"
 
 
 def _base_dir():
