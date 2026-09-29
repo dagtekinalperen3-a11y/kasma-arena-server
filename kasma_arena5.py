@@ -1,6 +1,6 @@
 """
 =====================================================================
- KASMA ARENA  —  v3.11
+ KASMA ARENA  —  v3.13
  2D Top-Down Hayatta Kalma / Skor-Rekor Oyunu
  ---------------------------------------------------------------------
  Dalgalar halinde gelen düşmanlara karşı hayatta kal, nişan al, ateş et,
@@ -8,6 +8,40 @@
  patronları yen, rekorunu kır. Kaybedersen o koşuda aldıkların silinir.
  Elmasla kalıcı SKIN'ler al (her skinin kendi silahı, mermisi, efekti ve
  ÖZEL YETENEĞİ var).
+
+ v3.13 ile gelenler (BÜYÜK DENGE GEÇİŞİ — ilk haritanın tamamı ölçüldü):
+   * SEVİYE ARTIK KAZANILIYOR. v3.11'de bantlanan eğri 11-25 aralığını
+     neredeyse düzleştirmişti (çarpan 1.045): ölçümde ilk patrona (10. dalga)
+     varılırken 28. SEVİYEYE çıkılıyor, oyuncu daha oyunun başında 27
+     yükseltme topluyordu; 25. dalgada seviye 58'e ulaşıyordu. Yeni eğriyle
+     aynı kazançta 10. dalga ~13, 25. dalga ~21. seviye (bkz. XP_CURVE_BANDS).
+   * MARKET ARTIK 1. HARİTADA DOLMUYOR. Ölçümde 25. dalgaya kadar toplanan
+     altın, tavanı olan bütün arena eşyalarını maksimuma çıkarmaya YETİYOR
+     ve %70 fazlası kalıyordu. Üç koldan düzeltildi: yaratık altını ~%38,
+     altın/tecrübe çarpanı veren eşyalar ~%35 kısıldı ve tavanlı eşyaların
+     seviye başına pahalanması sertleşti (SHOP_CAPPED_COST_GROWTH). Aynı
+     kazançla artık tavanlı eşyaların ancak ~%75'i alınabiliyor: market bir
+     SEÇİM ekranı, bir kontrol listesi değil.
+   * PATRONLAR "TEK YENMİYOR". Patron canı oyuncunun gücüne göre ölçekleniyordu
+     (scale_bosses_to_player) ama o tahmin yalnızca oyuncunun HAM MERMİSİNİ
+     sayıyor, sandık silahlarını (BALTA, EMANET, PENTAGRAM, HORTUM ...) hiç
+     hesaba katmıyordu. Oysa geç oyunda hasarın ~%80'i o silahlardan geliyor:
+     patron, gerçek hasarın beşte birine göre canlanıp saniyeler içinde
+     eriyordu. Artık silahlar da tahmine giriyor (WEAPON_BOSS_HITS /
+     weapon_boss_dps) ve patron hasarındaki %15 indirim kaldırıldı.
+   * HORTUM AĞIR NERF. Menzil 260 px yarıçaptaydı, yani 520 px ÇAP: görüş
+     penceresi 1264x634 olduğu için ekranın yüksekliğinin %82'si — 5.
+     seviyede (880 px çap) ekrandan bile taşıyordu. Üstüne çektiği her
+     yaratığın canının %35-67'sini bir kerede siliyordu. Artık 1. seviyede
+     çap ekran yüksekliğinin ~%47'si, 5. seviyede ~%70'i; can kesme payı
+     %18-38 (bkz. Tornado.BASE_PULL_R / TORNADO_HP_CUT_STEPS).
+   * BÜTÜN SİLAHLAR DENGELENDİ: seviye başına hasar artışı %22 -> %15,
+     silahların taban hasarı ~%25 kısıldı ve alanları daraltıldı (PENTAGRAM,
+     PAPUÇ, EMANET, KIRBAÇ, ZEMZEM). EMANET'in zırh yok sayma bonusu
+     %85 -> %55.
+   * KALABALIK ARTIK KUM TORBASI DEĞİL: yaratık canı dalga başına %22 yerine
+     %30 büyüyor. Dalga hedefleri SKOR tabanlı olduğu için bu, bir dalgada
+     kazanılan altın/tecrübeyi değiştirmez — yalnızca dövüşü gerçek yapar.
 
  v3.11 ile gelenler (DENGE ve HİSSİYAT):
    * SEVİYE EĞRİSİ BANTLANDI: eski eğri tek bir çarpandı (x1.24) ve üssel
@@ -18,8 +52,8 @@
      40-50 bandı görülebiliyor, 50 sonrası uzun bir tırmanış olarak kalıyor
      (bkz. XP_CURVE_BANDS).
    * HORTUM'da SEVİYE ARTIK HASAR DEMEK: menzilin yanında can kesme payı da
-     derinleşiyor (%35 / %35 / %48 / %58 / %67) ve huninin içinde kalan
-     yaratık artık SÜREKLİ öğütülüyor. İlk iki seviye bilerek eski dengede.
+     derinleşiyor ve huninin içinde kalan yaratık artık SÜREKLİ öğütülüyor.
+     (Oranlar v3.13'te ağır biçimde kısıldı — bkz. TORNADO_HP_CUT_STEPS.)
    * KIRBAÇ artık BAKTIĞIN YÖNE sallanarak savruluyor: ucu hedef açının bir
      yanından öbürüne bir yay çizerek geçiyor, gövdesi ucun arkasından
      sürükleniyor, arkasında savurmanın izi kalıyor ve tam açılırken
@@ -4327,19 +4361,19 @@ SHOP_ITEMS = [
     # harcanacak yeri kalmıyordu. Çekirdekler sonsuz yükseltilebilir; her
     # seviye biraz daha pahalı olur, böylece altın her zaman bir işe yarar
     # ve oyuncu kendini sürekli güçlenirken hisseder.
-    {"key": "core_power",    "name": "Güç Çekirdeği",       "desc": "Hasar +%8 (tavanı yok)",
+    {"key": "core_power",    "name": "Güç Çekirdeği",       "desc": "Hasar +%5 (tavanı yok)",
      "cost": 70,  "cost_mult": 1.28, "max": 999, "endless": True, "icon": "sword",  "color": (240, 110, 110), "tier": 1, "cat": "core"},
-    {"key": "core_speed",    "name": "Hız Çekirdeği",       "desc": "Atış hızı +%6 (tavanı yok)",
+    {"key": "core_speed",    "name": "Hız Çekirdeği",       "desc": "Atış hızı +%4 (tavanı yok)",
      "cost": 80,  "cost_mult": 1.30, "max": 999, "endless": True, "icon": "boot",   "color": (130, 230, 170), "tier": 1, "cat": "core"},
     {"key": "core_vitality", "name": "Can Çekirdeği",       "desc": "Azami can +30 ve anında dolar (tavanı yok)",
      "cost": 60,  "cost_mult": 1.26, "max": 999, "endless": True, "icon": "heart",  "color": (235, 120, 150), "tier": 1, "cat": "core"},
-    {"key": "core_crit",     "name": "Keskinlik Çekirdeği", "desc": "Kritik şans +%3, kritik hasar +%6 (tavanı yok)",
+    {"key": "core_crit",     "name": "Keskinlik Çekirdeği", "desc": "Kritik şans +%2, kritik hasar +%4 (tavanı yok)",
      "cost": 85,  "cost_mult": 1.29, "max": 999, "endless": True, "icon": "clover", "color": (230, 220, 120), "tier": 1, "cat": "core"},
     {"key": "core_guard",    "name": "Koruma Çekirdeği",    "desc": "Zırh +%2 (tavanı yok — zırh üst sınırına kadar)",
      "cost": 90,  "cost_mult": 1.32, "max": 999, "endless": True, "icon": "shield", "color": (160, 180, 220), "tier": 1, "cat": "core"},
-    {"key": "core_greed",    "name": "Talan Çekirdeği",     "desc": "Altın +%12, deneyim +%8 (tavanı yok)",
+    {"key": "core_greed",    "name": "Talan Çekirdeği",     "desc": "Altın +%8, deneyim +%5 (tavanı yok)",
      "cost": 65,  "cost_mult": 1.25, "max": 999, "endless": True, "icon": "coin",   "color": (235, 195, 95),  "tier": 1, "cat": "core"},
-    {"key": "core_reach",    "name": "Mıknatıs Çekirdeği",  "desc": "Toplama menzili +%14, deneyim +%6 (tavanı yok)",
+    {"key": "core_reach",    "name": "Mıknatıs Çekirdeği",  "desc": "Toplama menzili +%14, deneyim +%4 (tavanı yok)",
      "cost": 70,  "cost_mult": 1.26, "max": 999, "endless": True, "icon": "magnet", "color": (150, 220, 255), "tier": 1, "cat": "core"},
 
     # ---- ARENA GENİŞLEMESİ ---------------------------------------------
@@ -4348,7 +4382,7 @@ SHOP_ITEMS = [
     # eşyalar arenanın farklı ihtiyaçlarını (tempo, dayanıklılık, kalabalık,
     # patron avı) karşılar ve hepsi ZATEN VAR OLAN oyuncu alanlarını kullanır.
     {"key": "quickdraw",  "name": "Seri El",
-     "desc": "Atış hızı +%7 ve kritik şans +%2",
+     "desc": "Atış hızı +%5 ve kritik şans +%2",
      "cost": 55, "cost_mult": 1.52, "max": 6, "icon": "dash", "color": (150, 235, 200),
      "tier": 1, "cat": "weapon"},
     {"key": "bandage",    "name": "Sargı Bezi",
@@ -4356,7 +4390,7 @@ SHOP_ITEMS = [
      "cost": 45, "cost_mult": 1.45, "max": 6, "icon": "cross", "color": (140, 225, 175),
      "tier": 1, "cat": "defense"},
     {"key": "lucky_coin", "name": "Uğurlu Akçe",
-     "desc": "Altın +%15 ve kritik şans +%2",
+     "desc": "Altın +%10 ve kritik şans +%2",
      "cost": 50, "cost_mult": 1.48, "max": 5, "icon": "clover", "color": (240, 205, 110),
      "tier": 1, "cat": "utility"},
     {"key": "gale_boots", "name": "Rüzgâr Çizmesi",
@@ -4372,23 +4406,23 @@ SHOP_ITEMS = [
      "cost": 95, "cost_mult": 1.70, "max": 5, "icon": "shield", "color": (170, 186, 214),
      "tier": 2, "cat": "defense"},
     {"key": "frost_core", "name": "Ayaz Çekirdeği",
-     "desc": "Buz etkisi +1 kademe ve hasar +%5",
+     "desc": "Buz etkisi +1 kademe ve hasar +%3",
      "cost": 80, "cost_mult": 1.62, "max": 5, "icon": "snow", "color": (140, 215, 255),
      "tier": 2, "cat": "elemental"},
     {"key": "twin_blades", "name": "Çifte Bıçak",
-     "desc": "Çevrende bir bıçak daha döner ve atış hızı +%5",
+     "desc": "Çevrende bir bıçak daha döner ve atış hızı +%3",
      "cost": 115, "cost_mult": 1.80, "max": 5, "icon": "orbit", "color": (200, 225, 255),
      "tier": 3, "cat": "weapon"},
     {"key": "hunters_mark", "name": "Avcı Nişanı",
-     "desc": "Patronlara ve elitlere verdiğin hasar +%30",
+     "desc": "Patronlara ve elitlere verdiğin hasar +%20",
      "cost": 150, "cost_mult": 1.92, "max": 3, "icon": "target", "color": (210, 120, 235),
      "tier": 3, "cat": "weapon"},
     {"key": "sunder",     "name": "Zırh Kırıcı",
-     "desc": "Canı azalan düşmanları infaz eşiği +%6 ve hasar +%8",
+     "desc": "Canı azalan düşmanları infaz eşiği +%5 ve hasar +%5",
      "cost": 130, "cost_mult": 1.86, "max": 4, "icon": "sword", "color": (238, 128, 110),
      "tier": 3, "cat": "weapon"},
     {"key": "soul_jar",   "name": "Ruh Kavanozu",
-     "desc": "Her öldürme +2 can verir ve deneyim +%10",
+     "desc": "Her öldürme +2 can verir ve deneyim +%7",
      "cost": 140, "cost_mult": 1.88, "max": 4, "icon": "gem", "color": (190, 140, 245),
      "tier": 3, "cat": "utility"},
     {"key": "bulwark",    "name": "Siper Duvarı",
@@ -4400,7 +4434,7 @@ SHOP_ITEMS = [
      "cost": 260, "cost_mult": 2.2, "max": 2, "icon": "flame", "color": GOLD,
      "tier": 4, "cat": "legendary", "legendary": True},
     {"key": "kings_ransom", "name": "Hazine Fermanı",
-     "desc": "Altın +%45 ve deneyim +%20 — geç dalgalarda market açılır",
+     "desc": "Altın +%28 ve deneyim +%12 — geç dalgalarda market açılır",
      "cost": 220, "cost_mult": 2.0, "max": 3, "icon": "coin", "color": GOLD,
      "tier": 4, "cat": "legendary", "legendary": True},
 
@@ -4412,15 +4446,15 @@ SHOP_ITEMS = [
     {"key": "shield",    "name": "Kalkan",          "desc": "Bir sonraki darbeyi engeller (yığılır)", "cost": 50, "cost_mult": 1.5, "max": 8, "icon": "shield", "color": (160, 170, 200), "tier": 1, "cat": "defense"},
     {"key": "heal",      "name": "İksir",           "desc": "Anında +40 can (10 sn'de bir alınabilir)", "cost": 30, "cost_mult": 1.2, "max": 40, "icon": "heart", "color": GREEN, "tier": 1, "cat": "utility", "instant": True},
     # ---- Tier 2 (Dalga 3+) ----
-    {"key": "haste",     "name": "Çevik Refleks",   "desc": "+%9 atış hızı, +%5 hareket hızı", "cost": 65, "cost_mult": 1.6, "max": 8, "icon": "boot", "color": GREEN, "tier": 2, "cat": "weapon"},
+    {"key": "haste",     "name": "Çevik Refleks",   "desc": "+%6 atış hızı, +%4 hareket hızı", "cost": 65, "cost_mult": 1.6, "max": 8, "icon": "boot", "color": GREEN, "tier": 2, "cat": "weapon"},
     {"key": "explosive", "name": "Patlayıcı Mermi", "desc": "Öldürdüğün düşman çevresine sıçrama hasarı verir", "cost": 90, "cost_mult": 1.75, "max": 5, "icon": "star", "color": (240, 110, 60), "tier": 2, "cat": "weapon"},
     {"key": "vampiric",  "name": "Kan Emici",       "desc": "Verdiğin hasarın %2'si cana döner (seviye başı)", "cost": 85, "cost_mult": 1.7, "max": 5, "icon": "heart", "color": (220, 60, 90), "tier": 2, "cat": "utility"},
     {"key": "thorns",    "name": "Dikenli Zırh",    "desc": "Sana vuran düşman geri hasar alır", "cost": 60, "cost_mult": 1.55, "max": 6, "icon": "shield", "color": (170, 125, 90), "tier": 2, "cat": "defense"},
     {"key": "orbit",     "name": "Dönen Bıçaklar",  "desc": "Etrafında dönen bıçaklar (+1 bıçak)", "cost": 100, "cost_mult": 1.75, "max": 6, "icon": "orbit", "color": (150, 220, 255), "tier": 2, "cat": "weapon"},
     {"key": "dash_cd",   "name": "Sis Adımı",       "desc": "Dash bekleme -%18, mesafe +%10", "cost": 60, "cost_mult": 1.55, "max": 5, "icon": "dash", "color": (140, 230, 190), "tier": 2, "cat": "utility"},
-    {"key": "blood_pact", "name": "Kan Sözleşmesi", "desc": "Hasar +%40 ama azami can -%25", "cost": 60, "cost_mult": 1.5, "max": 2, "icon": "skull", "color": (215, 50, 70), "tier": 2, "cat": "cursed", "cursed": True},
-    {"key": "glass",     "name": "Cam Top",         "desc": "Atış hızı +%30 ama gelen hasar +%25", "cost": 70, "cost_mult": 1.5, "max": 2, "icon": "skull", "color": (200, 90, 220), "tier": 2, "cat": "cursed", "cursed": True},
-    {"key": "devil",     "name": "Şeytan Pazarlığı", "desc": "Altın ve XP +%50 ama düşmanlar +%12 dayanıklı", "cost": 80, "cost_mult": 1.5, "max": 3, "icon": "skull", "color": (255, 120, 60), "tier": 2, "cat": "cursed", "cursed": True},
+    {"key": "blood_pact", "name": "Kan Sözleşmesi", "desc": "Hasar +%28 ama azami can -%25", "cost": 60, "cost_mult": 1.5, "max": 2, "icon": "skull", "color": (215, 50, 70), "tier": 2, "cat": "cursed", "cursed": True},
+    {"key": "glass",     "name": "Cam Top",         "desc": "Atış hızı +%20 ama gelen hasar +%25", "cost": 70, "cost_mult": 1.5, "max": 2, "icon": "skull", "color": (200, 90, 220), "tier": 2, "cat": "cursed", "cursed": True},
+    {"key": "devil",     "name": "Şeytan Pazarlığı", "desc": "Altın ve XP +%32 ama düşmanlar +%12 dayanıklı", "cost": 80, "cost_mult": 1.5, "max": 3, "icon": "skull", "color": (255, 120, 60), "tier": 2, "cat": "cursed", "cursed": True},
     # ---- Tier 3 (Dalga 6+) ----
     {"key": "chain",     "name": "Zincir Şok",      "desc": "BONK yakındaki ekstra düşmanlara sıçrar", "cost": 110, "cost_mult": 1.85, "max": 4, "icon": "bolt", "color": (120, 200, 255), "tier": 3, "cat": "elemental"},
     # NOT: "Güdümlü Mermi" MARKETTEN KALDIRILDI. Güdüm yeteneği yalnızca
@@ -4438,7 +4472,7 @@ SHOP_ITEMS = [
     # için oyuncunun ilerlemeye devam edebilmesi gerekiyor: bu eşyalar
     # yalnızca CEHENNEM'de satılır ve cehennem dövüşüne göre tasarlandı.
     {"key": "brimstone", "name": "Kükürt Mermisi",
-     "desc": "Hasar +%25 (cehennem çeliğiyle dövülmüş mermi)",
+     "desc": "Hasar +%16 (cehennem çeliğiyle dövülmüş mermi)",
      "cost": 300, "cost_mult": 1.85, "max": 5, "icon": "flame", "color": (255, 120, 60),
      "tier": 5, "cat": "hell", "hell_only": True},
     {"key": "hell_ward", "name": "Kor Muskası",
@@ -4462,7 +4496,7 @@ SHOP_ITEMS = [
      "cost": 420, "cost_mult": 2.1, "max": 2, "icon": "heart", "color": (255, 215, 120),
      "tier": 5, "cat": "hell", "hell_only": True},
     {"key": "infernal_core", "name": "Cehennem Çekirdeği",
-     "desc": "Hasar +%10 ve atış hızı +%7 (tavanı yok)",
+     "desc": "Hasar +%6 ve atış hızı +%4 (tavanı yok)",
      "cost": 260, "cost_mult": 1.32, "max": 999, "endless": True, "icon": "gem",
      "color": (255, 90, 120), "tier": 5, "cat": "hell", "hell_only": True},
 
@@ -4483,11 +4517,11 @@ SHOP_ITEMS = [
      "cost": 340, "cost_mult": 1.84, "max": 4, "icon": "flame", "color": (255, 160, 60),
      "tier": 5, "cat": "hell", "hell_only": True},
     {"key": "soul_lantern", "name": "Ruh Feneri",
-     "desc": "Altın +%35, deneyim +%25, toplama menzili +%30",
+     "desc": "Altın +%24, deneyim +%16, toplama menzili +%30",
      "cost": 300, "cost_mult": 1.78, "max": 4, "icon": "coin", "color": (255, 210, 110),
      "tier": 5, "cat": "hell", "hell_only": True},
     {"key": "doom_sigil", "name": "Kıyamet Mührü",
-     "desc": "Patronlara ve elitlere verdiğin hasar +%30",
+     "desc": "Patronlara ve elitlere verdiğin hasar +%20",
      "cost": 380, "cost_mult": 1.92, "max": 3, "icon": "skull", "color": (198, 90, 255),
      "tier": 5, "cat": "hell", "hell_only": True},
     {"key": "ember_step", "name": "Kor Adımı",
@@ -4495,15 +4529,30 @@ SHOP_ITEMS = [
      "cost": 290, "cost_mult": 1.76, "max": 4, "icon": "boot", "color": (255, 150, 90),
      "tier": 5, "cat": "hell", "hell_only": True},
     {"key": "demon_pact", "name": "Şeytan Sözleşmesi",
-     "desc": "Hasar +%60 ama gelen hasar +%20 — cehennem pazarlığı",
+     "desc": "Hasar +%40 ama gelen hasar +%20 — cehennem pazarlığı",
      "cost": 400, "cost_mult": 1.95, "max": 3, "icon": "skull", "color": (226, 48, 62),
      "tier": 5, "cat": "hell", "hell_only": True, "cursed": True},
 ]
 SHOP_BY_KEY = {it["key"]: it for it in SHOP_ITEMS}
 
 
+# Market ilk haritada tamamen "MAX" oluyordu. Altın gelirini kısmak tek başına
+# yetmedi: TAVANI OLAN eşyaların son seviyeleri hâlâ ucuzdu, çünkü asıl
+# pahalanma yalnızca tavanı OLMAYAN çekirdeklerde üsseldi. Bu çarpan, tavanlı
+# eşyaların seviye başına pahalanmasını sertleştirir — tavanı yüksek olan
+# eşyada (ör. 8 seviyelik KALKAN) etkisi kendiliğinden daha büyük olur.
+# Çekirdeklere dokunulmaz: onlar zaten sonsuz ve üssel, biriken altının
+# harcanacağı yer olarak kalmalı.
+#   Büyütürsen  -> tavanlı eşyaları maksimuma çıkarmak zorlaşır
+#   Küçültürsen -> market daha çabuk dolar
+SHOP_CAPPED_COST_GROWTH = 1.14
+
+
 def shop_item_cost(item, level):
-    return int(math.ceil(item["cost"] * (item["cost_mult"] ** level)))
+    mult = item["cost_mult"]
+    if not item.get("endless"):
+        mult *= SHOP_CAPPED_COST_GROWTH
+    return int(math.ceil(item["cost"] * (mult ** level)))
 
 
 def shop_item_unlocked(item, current_wave, biome="arena"):
@@ -4520,10 +4569,10 @@ def shop_item_unlocked(item, current_wave, biome="arena"):
 def apply_shop_item(player, key):
     # --- ÇEKİRDEKLER: tavanı yok, her alımda birikir ---
     if key == "core_power":
-        player.run_dmg_mult += 0.08
+        player.run_dmg_mult += 0.05
         return
     if key == "core_speed":
-        player.run_aspd_mult += 0.06
+        player.run_aspd_mult += 0.04
         return
     if key == "core_vitality":
         player.base_max_hp += 30
@@ -4531,19 +4580,19 @@ def apply_shop_item(player, key):
         player.hp = min(player.max_hp, player.hp + 30)   # eklenen can anında dolar
         return
     if key == "core_crit":
-        player.crit_chance = clamp(player.crit_chance + 0.03, 0, 0.9)
-        player.crit_dmg_mult += 0.06
+        player.crit_chance = clamp(player.crit_chance + 0.02, 0, 0.9)
+        player.crit_dmg_mult += 0.04
         return
     if key == "core_guard":
         player.base_armor = clamp(player.base_armor + 0.02, 0, 0.5)
         return
     if key == "core_greed":
-        player.run_coin_mult += 0.12
-        player.run_xp_mult += 0.08
+        player.run_coin_mult += 0.08
+        player.run_xp_mult += 0.05
         return
     if key == "core_reach":
         player.run_pickup_mult += 0.14
-        player.run_xp_mult += 0.06
+        player.run_xp_mult += 0.04
         return
     if key == "fire":
         player.fire_level += 1
@@ -4558,8 +4607,8 @@ def apply_shop_item(player, key):
     elif key == "heal":
         player.heal(40)
     elif key == "haste":
-        player.run_aspd_mult += 0.09
-        player.run_spd_mult += 0.05
+        player.run_aspd_mult += 0.06
+        player.run_spd_mult += 0.04
     elif key == "explosive":
         player.explosive_level += 1
     elif key == "vampiric":
@@ -4568,7 +4617,7 @@ def apply_shop_item(player, key):
         player.thorns_level += 1
     # ---- ARENA GENİŞLEMESİ ----
     elif key == "quickdraw":
-        player.run_aspd_mult += 0.07
+        player.run_aspd_mult += 0.05
         player.run_crit_bonus += 0.02
     elif key == "bandage":
         player.run_regen_bonus += 0.6
@@ -4576,7 +4625,7 @@ def apply_shop_item(player, key):
         player.max_hp += 12
         player.hp = min(player.max_hp, player.hp + 12)
     elif key == "lucky_coin":
-        player.run_coin_mult += 0.15
+        player.run_coin_mult += 0.10
         player.run_crit_bonus += 0.02
     elif key == "gale_boots":
         player.run_spd_mult += 0.08
@@ -4592,18 +4641,18 @@ def apply_shop_item(player, key):
         player.hp = min(player.max_hp, player.hp + 20)
     elif key == "frost_core":
         player.ice_level += 1
-        player.run_dmg_mult += 0.05
+        player.run_dmg_mult += 0.03
     elif key == "twin_blades":
         player.orbit_level += 1
-        player.run_aspd_mult += 0.05
+        player.run_aspd_mult += 0.03
     elif key == "hunters_mark":
         player.boss_hunter += 1
     elif key == "sunder":
-        player.execute_threshold = min(0.35, player.execute_threshold + 0.06)
-        player.run_dmg_mult += 0.08
+        player.execute_threshold = min(0.35, player.execute_threshold + 0.05)
+        player.run_dmg_mult += 0.05
     elif key == "soul_jar":
         player.kill_heal += 2
-        player.run_xp_mult += 0.10
+        player.run_xp_mult += 0.07
     elif key == "bulwark":
         player.shield_charges += 1
         player.thorns_level += 1
@@ -4611,11 +4660,11 @@ def apply_shop_item(player, key):
         player.second_wind_charges += 1
         player.run_regen_bonus += 1.5
     elif key == "kings_ransom":
-        player.run_coin_mult += 0.45
-        player.run_xp_mult += 0.20
+        player.run_coin_mult += 0.28
+        player.run_xp_mult += 0.12
     # ---- CEHENNEM eşyaları ----
     elif key == "brimstone":
-        player.run_dmg_mult += 0.25
+        player.run_dmg_mult += 0.16
     elif key == "hell_ward":
         player.base_armor += 0.06
         player.base_max_hp += 40
@@ -4632,8 +4681,8 @@ def apply_shop_item(player, key):
         player.purgatory_level += 1
         player.purgatory_timer = 0.0
     elif key == "infernal_core":
-        player.run_dmg_mult += 0.10
-        player.run_aspd_mult += 0.07
+        player.run_dmg_mult += 0.06
+        player.run_aspd_mult += 0.04
     elif key == "cursed_dagger":
         player.run_crit_bonus += 0.08
         player.run_critdmg_bonus += 0.30
@@ -4646,8 +4695,8 @@ def apply_shop_item(player, key):
         player.orbit_level += 1
         player.fire_level += 1
     elif key == "soul_lantern":
-        player.run_coin_mult += 0.35
-        player.run_xp_mult += 0.25
+        player.run_coin_mult += 0.24
+        player.run_xp_mult += 0.16
         player.run_pickup_mult += 0.30
     elif key == "doom_sigil":
         player.boss_hunter += 1
@@ -4655,7 +4704,7 @@ def apply_shop_item(player, key):
         player.run_spd_mult += 0.14
         player.dash_cd_mult = max(0.30, player.dash_cd_mult - 0.15)
     elif key == "demon_pact":
-        player.run_dmg_mult += 0.60
+        player.run_dmg_mult += 0.40
         player.dmg_taken_mult += 0.20
     elif key == "orbit":
         player.orbit_level += 1
@@ -4663,15 +4712,15 @@ def apply_shop_item(player, key):
         player.dash_cd_mult = max(0.35, player.dash_cd_mult - 0.18)
         player.dash_dist_mult += 0.10
     elif key == "blood_pact":
-        player.run_dmg_mult += 0.40
+        player.run_dmg_mult += 0.28
         player.max_hp = max(30, int(player.max_hp * 0.75))
         player.hp = min(player.hp, player.max_hp)
     elif key == "glass":
-        player.run_aspd_mult += 0.30
+        player.run_aspd_mult += 0.20
         player.dmg_taken_mult += 0.25
     elif key == "devil":
-        player.run_coin_mult += 0.50
-        player.run_xp_mult += 0.50
+        player.run_coin_mult += 0.32
+        player.run_xp_mult += 0.32
         player.enemy_hp_curse += 0.12
     elif key == "chain":
         player.chain_level += 1
@@ -4751,7 +4800,7 @@ def rq_weapon(weapon_key, text=None):
 
 BOOKS = [
     # ---- TEMEL KİTAPLAR (en kolay görevler — ilk koşularda açılır) ----
-    {"key": "r_dmg", "name": "Hasar Kitabı", "desc": "Hasarını %18 artırır",
+    {"key": "r_dmg", "name": "Hasar Kitabı", "desc": "Hasarını %10 artırır",
      "color": RED, "icon": "sword", "rare": False, "basic": True,
      "unlock": dict(text="Arenaya alış: 60 düşman öldür",
                     reqs=[rq_stat("total_kills", 60, "Toplam 60 düşman öldür")])},
@@ -4773,12 +4822,12 @@ BOOKS = [
      "unlock": dict(text="Dash ustası ol",
                     reqs=[rq_stat("total_dashes", 400, "Toplam 400 kez dash at"),
                           rq_stat("best_run_dashes", 40, "Tek koşuda 40 kez dash at")])},
-    {"key": "r_crit", "name": "Kritik Kitabı", "desc": "Kritik vuruş şansını %8 artırır",
+    {"key": "r_crit", "name": "Kritik Kitabı", "desc": "Kritik vuruş şansını %5 artırır",
      "color": (140, 230, 120), "icon": "clover", "rare": False,
      "unlock": dict(text="Kritik vuruşla tanış",
                     reqs=[rq_stat("total_crits", 600, "Toplam 600 kritik vuruş yap"),
                           rq_stat("best_wave", 7, "7. dalgaya ulaş")])},
-    {"key": "r_critd", "name": "Kritik Güç Kitabı", "desc": "Kritik hasarını %40 artırır",
+    {"key": "r_critd", "name": "Kritik Güç Kitabı", "desc": "Kritik hasarını %22 artırır",
      "color": (240, 90, 90), "icon": "fist", "rare": False,
      "unlock": dict(text="Kritik hasarda uzmanlaş",
                     reqs=[rq_stat("total_crits", 3000, "Toplam 3.000 kritik vuruş yap"),
@@ -5208,20 +5257,31 @@ BASE_BONK_CD = 1.35
 # gerekiyor, 25'te 9.400, 30'da 27.500 — bir koşuda toplanan tecrübe bunu
 # asla yakalayamıyor.
 #
-# Artık eğri BANTLI: her bant (üst_seviye, çarpan, sabit_ek) demek ve
-# seviye o bandın içindeyken o çarpan işler.
-#   1-10  : eskisinin aynısı — bu aralık zaten iyi dengelenmişti.
-#   11-25 : neredeyse doğrusal; seviye oyunun akışına ayak uydurur.
-#   26-50 : hâlâ ölçülü büyür — seviye gelmeye devam eder ama hızlanmaz.
-#   51+   : belirgin şekilde sertleşir; 50'den sonrası uzun bir tırmanış.
-# Böylece iyi bir koşuda 40-50 bandı görülebiliyor, 50 sonrası ise gerçek
-# bir başarı olarak kalıyor.
-XP_BASE_NEED = 22
+# Eğri BANTLI: her bant (üst_seviye, çarpan, sabit_ek) demek ve seviye o
+# bandın içindeyken o çarpan işler.
+#
+# v3.13 — SEVİYE ÇOK HIZLI GELİYORDU. Bantlı eğri 10-25 aralığını neredeyse
+# DÜZLEŞTİRMİŞTİ (çarpan 1.045): 11. seviyeden 25'e kadar her seviye bir
+# öncekinden yalnızca %4.5 daha pahalıydı, yani 25. seviye 10. seviyenin iki
+# katı bile değildi. Ölçümde ilk patrona (10. dalga) varılırken 25. seviyeye
+# çıkılıyor, oyuncu daha oyunun başında 24 yükseltme topluyordu; geri kalan
+# 15 dalga boyunca yapacak bir şey kalmıyordu.
+#
+# Yeni eğri her bantta GERÇEKTEN büyüyor. Ölçülen kazançla (dalga hedefleri
+# skor tabanlı olduğu için bir dalgada toplanan tecrübe sabittir):
+#   10. dalga (1. patron)  -> ~12. seviye   (eskiden 25)
+#   25. dalga (harita sonu) -> ~20-21. seviye
+# Yani seviye hâlâ düzenli geliyor ama her biri kazanılıyor.
+#   1-10  : açılış — hızlı, oyuncu ilk silahlarını kursun
+#   11-25 : asıl gövde; her seviye belirgin biçimde pahalanır
+#   26-50 : uzun tırmanış
+#   51+   : gerçek bir başarı
+XP_BASE_NEED = 34
 XP_CURVE_BANDS = (
-    (10,   1.240, 8),
-    (25,   1.045, 4),
-    (50,   1.035, 7),
-    (None, 1.185, 26),
+    (10,   1.360, 14),
+    (25,   1.240, 26),
+    (50,   1.140, 55),
+    (None, 1.180, 120),
 )
 
 
@@ -5522,6 +5582,14 @@ class Player:
         dps *= extra
         # BONK: bekleme süresine bölünmüş alan hasarı
         dps += (dmg * 2.0 * self.bonk_mult) / max(1.0, self.eff_bonk_cd())
+        # SANDIK SİLAHLARI: geç oyunda hasarın ÇOĞU buradan gelir. Bu satır
+        # olmadan patron canı oyuncunun gerçek gücünün küçük bir kesrine göre
+        # ölçekleniyor ve patron saniyeler içinde eriyordu (bkz.
+        # WEAPON_BOSS_HITS / weapon_boss_dps).
+        for wkey, wlvl in self.weapons.items():
+            w = WEAPON_BY_KEY.get(wkey)
+            if w is not None:
+                dps += weapon_boss_dps(self, w, wlvl)
         return max(1.0, dps)
 
     def eff_crit_chance(self):
@@ -5558,7 +5626,7 @@ class Player:
     }
 
     def apply_run_upgrade(self, key):
-        if key == "r_dmg": self.run_dmg_mult += 0.15
+        if key == "r_dmg": self.run_dmg_mult += 0.10
         elif key == "r_spd": self.run_spd_mult += 0.10
         elif key == "r_aspd": self.run_aspd_mult += 0.12
         elif key == "r_hp":
@@ -5570,8 +5638,8 @@ class Player:
         elif key == "r_coin": self.run_coin_mult += 0.18
         elif key == "r_xp": self.run_xp_mult += 0.18
         elif key == "r_regen": self.run_regen_bonus += 0.5
-        elif key == "r_crit": self.run_crit_bonus += 0.06
-        elif key == "r_critd": self.run_critdmg_bonus += 0.30
+        elif key == "r_crit": self.run_crit_bonus += 0.05
+        elif key == "r_critd": self.run_critdmg_bonus += 0.22
         elif key == "r_bonk":
             self.bonk_mult += 0.22
             self.bonk_radius_mult += 0.12
@@ -7225,15 +7293,21 @@ TORNADO_COLOR2 = (240, 250, 255)
 # Seviye 1..5 için canın KALAN oranı. 1-2. seviye eski değerde (0.65);
 # sonrası kademeli olarak daha derin kesiyor. Tavan seviye 5 olduğu için
 # liste 5 adım uzunluğunda; daha yükseği son adımla sınırlanır.
-TORNADO_HP_CUT_STEPS = (0.65, 0.65, 0.52, 0.42, 0.33)
+# v3.13 — HORTUM AĞIR NERF. Eski değerlerle (0.65 -> 0.33) hortum, çektiği
+# HER yaratığın canının %35-67'sini bir kerede siliyordu; menzili de ekranın
+# tamamına yakın olduğu için bu pratikte "bütün haritayı topla ve öldür"
+# demekti. Artık kesme payı belirgin ama öldürücü değil: hortum kalabalığı
+# TOPLAYAN bir silah, tek başına temizleyen bir silah değil.
+TORNADO_HP_CUT_STEPS = (0.82, 0.78, 0.73, 0.68, 0.62)
 
 
 def tornado_hp_cut(lvl):
     """HORTUM'un yaratığı içine çekerken canından kestiği pay.
 
-    Dönen değer, canın KALAN oranıdır (0.65 = canı %35 azalır). İlk iki
-    seviye bilerek eski değerde bırakıldı ("ilk 2 seviye gayet iyi"); 3.
-    seviyeden sonra her seviye canı daha derinden kesiyor.
+    Dönen değer, canın KALAN oranıdır (0.82 = canı %18 azalır). Seviye
+    yükseldikçe kesim derinleşir ama v3.13'ten beri hiçbir seviyede "canı
+    yarıla" seviyesine çıkmaz: hortum kalabalığı TOPLAYAN bir silah, tek
+    başına temizleyen bir silah değil.
     """
     steps = TORNADO_HP_CUT_STEPS
     i = clamp(int(lvl) - 1, 0, len(steps) - 1)
@@ -7243,13 +7317,14 @@ def tornado_hp_cut(lvl):
 class Tornado:
     """Menzilindeki yaratıkları merkezine çeken, içindekini öğüten kasırga."""
 
-    # NERF (v3.10): 520 px hâlâ ekranın büyük bölümünü kapsıyordu ("ekranımın
-    # yarısı kadar bile olabilir" isteği üstüne). Menzil artık 1. seviyede
-    # ekranın YAKLAŞIK YARISI kadar (~260 px) ve her seviyede biraz açılıyor;
-    # en yüksek seviyede bile eski değerin çok altında kalıyor.
-    BASE_PULL_R = 260.0        # 1. seviyedeki çekim menzili
-    PULL_R_PER_LEVEL = 45.0    # her seviyede eklenen menzil
-    LIFE = 2.4                 # kasırganın ömrü (saniye)
+    # NERF (v3.13): 260 px YARIÇAP demek 520 px çap demekti; görüş penceresi
+    # 1264x634 olduğu için bu, ekranın YÜKSEKLİĞİNİN %82'si ediyordu — 5.
+    # seviyede (440 px yarıçap, 880 px çap) ekrandan bile taşıyordu. "Nerdeyse
+    # tüm mapi çekiyor" şikâyeti tam olarak bu. Artık 1. seviyede çap ekran
+    # yüksekliğinin yarısından biraz azı, 5. seviyede ~%77'si kadar.
+    BASE_PULL_R = 150.0        # 1. seviyedeki çekim menzili
+    PULL_R_PER_LEVEL = 18.0    # her seviyede eklenen menzil
+    LIFE = 2.0                 # kasırganın ömrü (saniye)
     GRIND_TICK = 0.20          # öğütme hasarının tik aralığı (saniye)
     # Geriye dönük uyumluluk: bu sınıfa hâlâ Tornado.PULL_R diye erişen bir
     # yer kalırsa (mod/araç), 1. seviye değeriyle eşleşsin.
@@ -7958,7 +8033,7 @@ def draw_pentagram(surf, cx, cy, r, ang, t=0.0, color=PENTA_COLOR, color2=PENTA_
 # (kalkan, pentagram alanı, Baran'ın papucu, görünmezlik pelerini).
 BOSS_WEAPONS = [
     dict(key="axe", name="BALTA", icon="sword", color=AXE_COLOR,
-         cd=5.0, dmg=7.0, style=None, dpl=0.05, cdl=1.0,
+         cd=5.0, dmg=5.6, style=None, dpl=0.05, cdl=1.0,
          up="bir balta daha — hepsi daha büyük, daha ağır vurur",
          desc="Rastgele düşmanlara uçup sana geri döner. Her seviyede bir balta daha.",
          how="Balta, elini kirletene gelir. Yeterince yaratık devir; o seni bulur.",
@@ -7967,14 +8042,14 @@ BOSS_WEAPONS = [
     # NOT: anahtar hâlâ "book". Eski kayıtlarda açılmış silahlar bu anahtarla
     # saklanıyor; değiştirilse oyuncular silahı sıfırdan açmak zorunda kalırdı.
     dict(key="book", name="KALKAN", icon="shield", color=SHIELD_COLOR,
-         cd=0.0, dmg=2.2, style=None, passive=True, dpl=0.09,
+         cd=0.0, dmg=1.70, style=None, passive=True, dpl=0.07,
          up="bir kalkan daha — aynı anda bir mermi fazla savuşturursun",
          desc="Çevrende dönen dövme kalkanlar. Her kalkan bir mermiyi savuşturur.",
          how="Kalkan, dayak yemeyi öğrenene verilir. Bir koşuda 8. dalgayı gör.",
          unlock=dict(text="Ayakta kal: 8. dalgaya ulaş",
                      reqs=[rq_stat("best_wave", 8, "8. dalgaya ulaş")])),
     dict(key="pentagram", name="PENTAGRAM", icon="star", color=PENTA_COLOR,
-         cd=0.0, dmg=1.70, style=None, passive=True, dpl=0.26,
+         cd=0.0, dmg=1.25, style=None, passive=True, dpl=0.17,
          up="mühür genişler, ilk adımda daha sert kavurur ve daha çok yakar",
          desc="Ayağının altındaki mühür, içine ilk adımı atanı kavurur ve "
               "içinde kalanı sürekli yakar. Her seviyede büyür ve daha çok vurur.",
@@ -7983,14 +8058,14 @@ BOSS_WEAPONS = [
                      reqs=[rq_stat("bosses", 1, "1 patron devir"),
                            rq_stat("total_kills", 400, "Toplam 400 yaratık öldür")])),
     dict(key="whip", name="KIRBAÇ", icon="dash", color=WHIP_COLOR,
-         cd=1.15, dmg=4.1, style=None, dpl=0.08,
+         cd=1.15, dmg=3.2, style=None, dpl=0.07,
          up="bir kırbaç daha — biri de arkanı tarar",
          desc="En yakın düşmana şaklar, vurur ve savurur. Her seviyede bir kırbaç daha.",
          how="Kırbaç mesafe tanımaz — sen de tanıma. 40 kez dash at.",
          unlock=dict(text="Yakın dövüşe alış: toplam 40 dash at",
                      reqs=[rq_stat("total_dashes", 40, "Toplam 40 dash at")])),
     dict(key="zemzem", name="ZEMZEM", icon="drop", color=ZEMZEM_COLOR,
-         cd=10.0, dmg=2.2, style=None, dpl=0.15, cdl=1.0,
+         cd=10.0, dmg=1.70, style=None, dpl=0.11, cdl=1.0,
          up="su birikintisi genişler ve daha çok eritir",
          desc="Yere su döker: içine giren yavaşlar ve erir. 3. seviyede iki yere döker.",
          how="Şifa veren de o, eriten de. Bir koşuda 400 can yenile.",
@@ -8002,7 +8077,7 @@ BOSS_WEAPONS = [
     # dururken de yanar — ama ömrü kısa ve oyuncunun ayağının dibinde kalır
     # (bkz. SHOE_BASE_R / SHOE_R_PER_LEVEL / SHOE_IDLE_EVERY / dpl).
     dict(key="shoe", name="PAPUÇ", icon="boot", color=SHOE_COLOR,
-         cd=0.0, dmg=1.30, style=None, passive=True, dpl=0.16,
+         cd=0.0, dmg=1.00, style=None, passive=True, dpl=0.11,
          up="halka büyür, daha uzun yanar ve daha çok kavurur",
          desc="Baran'ın papucu: her adımında arkanda kapanan bir ateş halkası "
               "bırakır — durduğun yerde de yanmaya devam eder.",
@@ -8010,7 +8085,7 @@ BOSS_WEAPONS = [
          unlock=dict(text="Sahada toplam 25 dakika geçir",
                      reqs=[rq_stat("total_time", 1500, "Toplam 25 dakika oyna")])),
     dict(key="frost", name="BUZ İZİ", icon="snow", color=FROST_COLOR,
-         cd=0.0, dmg=0.62, style=None, passive=True, dpl=0.13,
+         cd=0.0, dmg=0.48, style=None, passive=True, dpl=0.10,
          up="halka biraz büyür, daha uzun donar ve daha çok üşütür",
          desc="Papucun buzu: arkanda kapanan bir don halkası bırakır, içine gireni yavaşlatır.",
          how="Önce ateşi taşımayı öğren: PAPUÇ açılsın, sonra 12. dalgayı gör.",
@@ -8024,7 +8099,7 @@ BOSS_WEAPONS = [
     # hortum bir süre diğer silahlardan daha ucuz yükseliyor gibi görünebilir.
     # Tavan 5'te tutulduğu için bu etkinin ömrü sınırlı.
     dict(key="emanet", name="EMANET", icon="sword", color=EMANET_COLOR,
-         cd=1.0, dmg=2.35, style=None, dpl=0.15, cdl=1.0,
+         cd=1.0, dmg=1.80, style=None, dpl=0.11, cdl=1.0,
          up="yay genişler, kılıç daha uzağa uzanır ve daha derin keser",
          desc="Dedenin emaneti. Saniyede bir yay çizerek keser; ZIRHLI ve "
               "KALKANLI düşmanları zırhını hiç saymadan biçer.",
@@ -8045,7 +8120,7 @@ BOSS_WEAPONS = [
                      reqs=[rq_stat("best_wave", 12, "12. dalgaya ulaş"),
                            rq_stat("total_dashes", 800, "Toplam 800 dash at")])),
     dict(key="tornado", name="HORTUM", icon="orbit", color=TORNADO_COLOR,
-         cd=15.0, dmg=1.20, style=None, max=5, cdl=1.0, dpl=0.34,
+         cd=15.0, dmg=0.85, style=None, max=5, cdl=1.0, dpl=0.18,
          up="menzil genişler, canı daha derin keser ve içinde daha çok öğütür",
          desc="Yaratıkları ortaya toplar, canlarını azaltır ve huninin içinde "
               "kalanı sürekli öğütür. Her seviyede daha çok yakar.",
@@ -8058,13 +8133,14 @@ WEAPON_BY_KEY = {w["key"]: w for w in BOSS_WEAPONS}
 BOSS_WEAPONS_ORDER = [w["key"] for w in BOSS_WEAPONS]
 
 WEAPON_MAX_LEVEL = 8
-# DENGE NOTU: seviye atlamanın getirdiği artış BİLEREK ölçülü tutuldu.
-# Silahlar zaten sandıktan ve seviye atlamadan sık sık geliyor; eski
-# değerlerle (bekleme -%10, hasar +%38, alan +34 px) 4-5 seviye sonra silahlar
-# haritayı tek başına süpürüyor ve oyunun geri kalanı anlamsız kalıyordu.
-# Artık her seviye "orta" bir sıçrama: hissedilir ama oyunu bitirmez.
-WEAPON_CD_PER_LEVEL = 0.94      # her seviyede bekleme süresi bu oranla çarpılır
-WEAPON_DMG_PER_LEVEL = 0.22     # her seviyede hasara eklenen oran
+# DENGE NOTU (v3.13): seviye başına artış BİR KEZ DAHA kısıldı. Silahların
+# hasarı oyuncunun eff_dmg() değerine bağlı olduğu için (bkz. weapon_damage)
+# seviye başına artış, market/kitap çarpanlarının ÜSTÜNE biniyor: 8. seviyede
+# +%154 hasar, oyuncunun kendi hasar çarpanıyla çarpıldığında silahlar
+# haritayı tek başına süpürüyordu. Yeni değerle 8. seviye +%105 veriyor —
+# hâlâ büyük bir yükseltme ama oyunu bitirmiyor.
+WEAPON_CD_PER_LEVEL = 0.96      # her seviyede bekleme süresi bu oranla çarpılır
+WEAPON_DMG_PER_LEVEL = 0.15     # her seviyede hasara eklenen oran
 WEAPON_RANGE = 620.0            # silahların hedef arama menzili
 
 # --- KALKAN (eski kitap kalkanı; anahtarı hâlâ "book") ---
@@ -8074,8 +8150,10 @@ BOOK_RECHARGE = 5.0             # savuşturan kalkanın yeniden dolma süresi (s
 BOOK_RECHARGE_PER_LEVEL = 0.30  # her seviyede dolma süresinden düşen saniye
 
 # --- PENTAGRAM ---
-PENTA_BASE_R = 112.0            # 1. seviyedeki yarıçap
-PENTA_R_PER_LEVEL = 17.0        # her seviyede eklenen yarıçap
+# v3.13: 8. seviyede yarıçap 231 px (çap 462) oluyordu — oyuncunun ayağının
+# altındaki mühür ekranın yarısını kaplıyordu. Küçültüldü.
+PENTA_BASE_R = 88.0             # 1. seviyedeki yarıçap
+PENTA_R_PER_LEVEL = 11.0        # her seviyede eklenen yarıçap
 PENTA_TICK = 0.22               # hasar tikinin aralığı (saniye)
 # MÜHRE İLK ADIM (v3.11): mühür eskiden yalnızca yavaş yavaş kavuruyordu ve
 # küçük yaratıklar içinden geçip gidiyordu. Artık mühre GİREN yaratık bir
@@ -8083,10 +8161,13 @@ PENTA_TICK = 0.22               # hasar tikinin aralığı (saniye)
 # düşer, iri olanların da canı belirgin şekilde iner. Vuruş iki parçadan
 # oluşur — sabit kısım silahın hasarına, oran kısmı yaratığın O ANKİ canına
 # bağlıdır (patronlarda oran kısmı işlemez).
-PENTA_SEAR_K = 0.95             # sabit kısım: silahın saniyelik hasarının katı
-PENTA_SEAR_HP = 0.14            # 1. seviyede canın kesilen oranı
-PENTA_SEAR_HP_PER_LEVEL = 0.02  # her seviyede oranın artışı
-PENTA_SEAR_HP_MAX = 0.30        # oranın tavanı
+# v3.13: ilk adım vuruşu tek başına bir "can yarılaması"ydı (8. seviyede
+# canın %30'u + sabit kısım). Mühür oyuncunun etrafındaki her şeyi eşiği
+# geçerken siliyordu; oran ve sabit kısım birlikte kısıldı.
+PENTA_SEAR_K = 0.55             # sabit kısım: silahın saniyelik hasarının katı
+PENTA_SEAR_HP = 0.08            # 1. seviyede canın kesilen oranı
+PENTA_SEAR_HP_PER_LEVEL = 0.015 # her seviyede oranın artışı
+PENTA_SEAR_HP_MAX = 0.20        # oranın tavanı
 # YARASAYA ÖZEL KURAL (v3.12): mühür yarasaları (mavi, çevik yaratık) ilk
 # seviyelerde TEK ATIYORDU — sürünün tamamı mührün kenarına değer değmez
 # buharlaşıyordu. Artık yalnızca YARASADA iki fren var:
@@ -8100,8 +8181,8 @@ PENTA_BAT_SEAR_CAP = (0.50, 0.50, 0.50, 0.68, 0.84, 1.0)
 PENTA_BAT_TICK = (0.45, 0.45, 0.45, 0.65, 0.82, 1.0)
 
 # --- ZEMZEM SUYU ---
-ZEMZEM_BASE_R = 94.0
-ZEMZEM_R_PER_LEVEL = 11.0
+ZEMZEM_BASE_R = 80.0
+ZEMZEM_R_PER_LEVEL = 8.0
 ZEMZEM_LIFE = 3.0               # su birikintisinin yerde kalma süresi (sn)
 ZEMZEM_THROW = 240.0            # suyun oyuncudan atıldığı mesafe
 
@@ -8116,15 +8197,15 @@ ZEMZEM_THROW = 240.0            # suyun oyuncudan atıldığı mesafe
 # Yine de eski "haritayı kapla" hâline dönmüyor: halka kısa ömürlü ve
 # oyuncunun ayağının dibinde kalıyor.
 SHOE_STEP = 74.0                # kaç piksel yürüyünce yeni halka bırakılır
-SHOE_IDLE_EVERY = 0.85          # durunca kaç saniyede bir halka tutuşur
-SHOE_BASE_R = 55.0
-SHOE_R_PER_LEVEL = 8.0
+SHOE_IDLE_EVERY = 1.10          # durunca kaç saniyede bir halka tutuşur
+SHOE_BASE_R = 46.0
+SHOE_R_PER_LEVEL = 6.0
 # Halkanın ömrü seviyeye göre: 1.5 / 1.7 / 1.9 / 2.1 / 2.3 ... (sonra +0.12)
 SHOE_LIFE_STEPS = (1.5, 1.7, 1.9, 2.1, 2.3)
 
 # --- KIRBAÇ ---
-WHIP_LEN = 200.0                # kırbacın erişimi
-WHIP_LEN_PER_LEVEL = 9.0
+WHIP_LEN = 172.0                # kırbacın erişimi
+WHIP_LEN_PER_LEVEL = 6.0
 WHIP_ARC = 0.62                 # kırbacın taradığı yarım açı (radyan)
 WHIP_KB = 620.0                 # savurma kuvveti
 # Kırbaç artık baktığın yöne doğru SALLANARAK atılıyor. Ucu, hedef açının
@@ -8139,11 +8220,13 @@ WHIP_GRIP = 17.0                # kabzanın ucunun oyuncu merkezinden uzaklığ�
 
 
 # --- EMANET (kılıç) ---
-EMANET_BASE_R = 132.0           # 1. seviyedeki erişim (yarıçap)
-EMANET_R_PER_LEVEL = 13.0       # her seviyede eklenen erişim
+EMANET_BASE_R = 112.0           # 1. seviyedeki erişim (yarıçap)
+EMANET_R_PER_LEVEL = 9.0        # her seviyede eklenen erişim
 EMANET_BASE_ARC = 0.62          # taradığı yarım açı (radyan)
-EMANET_ARC_PER_LEVEL = 0.075    # her seviyede genişleyen yarım açı
-EMANET_ARMOR_BONUS = 0.85       # zırhlı/kalkanlı düşmana ek hasar oranı
+EMANET_ARC_PER_LEVEL = 0.055    # her seviyede genişleyen yarım açı
+# v3.13: %85 ek hasar + zırhın tamamen yok sayılması, EMANET'i patron
+# dövüşünde diğer bütün silahların toplamından güçlü yapıyordu.
+EMANET_ARMOR_BONUS = 0.55       # zırhlı/kalkanlı düşmana ek hasar oranı
 EMANET_KB = 180.0               # savurma kuvveti
 
 # --- GÖRÜNMEZLİK PELERİNİ ---
@@ -8360,6 +8443,70 @@ def weapon_damage(player, w, level):
     return player.eff_dmg() * w["dmg"] * (1.0 + dpl * max(0, level - 1))
 
 
+# =====================================================================
+# SİLAHLARIN PATRONA GİDEN HASARI  (kaba tahmin)
+# ---------------------------------------------------------------------
+# NEDEN GEREKLİ: patron canı sabit değil, oyuncunun GÜCÜNE göre ölçeklenir
+# (bkz. Player.estimated_dps -> scale_bosses_to_player). Ama o tahmin
+# yalnızca oyuncunun KENDİ MERMİSİNİ ve BONK'unu sayıyordu; sandık silahları
+# (BALTA, PENTAGRAM, EMANET, PAPUÇ, HORTUM, KIRBAÇ ...) hesaba hiç
+# katılmıyordu. Oysa bu silahların hasarı da eff_dmg() ile ölçeklenir ve
+# 4 silah 5-8. seviyede oyuncunun ham mermisinin kat kat üstüne çıkar.
+# Sonuç: patron, oyuncunun GERÇEK hasarının küçük bir kesrine göre
+# canlandırılıyor ve saniyeler içinde eriyordu ("bosslar tek yiyor").
+#
+# Aşağıdaki tablo her silahın TEK bir büyük hedefe saniyede kaç kez indiğini
+# kabaca söyler. Kesin olması gerekmez, büyüklük sırası yeterlidir.
+#   ("cast",  f) : her atışta hedefe f(lvl) kez iner -> f / bekleme_süresi
+#   ("field", f) : sürekli alan -> saniyede weapon_damage * f(lvl)
+# "field" çarpanları, hedefin alanın İÇİNDE geçirdiği tahmini payı da
+# içerir (patron oyuncuyu kovaladığı için mühür/halka payı yüksek, yere
+# atılan su ve hortum payı düşüktür).
+# =====================================================================
+WEAPON_BOSS_HITS = {
+    # --- bekleme süresi olan silahlar ---
+    # BALTA hem gidişte hem dönüşte vurur (2 * lvl'e kadar), ama patron
+    # dövüşünde patronun çağırdığı yaratıklar baltaların bir kısmını çalar.
+    "axe":     ("cast",  lambda lvl: float(lvl)),
+    "whip":    ("cast",  lambda lvl: 1.0 + 0.25 * (lvl - 1)),
+    # EMANET zırhlı hedefe ek hasar vurur VE zırhın kestiği payı geri alır;
+    # patron her zaman zırhlıdır, bu yüzden çarpan 1'in belirgin üstünde.
+    "emanet":  ("cast",  lambda lvl: 1.75),
+    # ZEMZEM: 10 sn'de bir, 3 sn yaşayan birikinti. 3. ve 6. seviyede ikinci
+    # ve üçüncü birikinti gelir ama patron hepsinin içinde durmaz.
+    "zemzem":  ("field", lambda lvl: 0.15 * (1 + (lvl >= 3) + (lvl >= 6))),
+    # HORTUM: 15 sn'de bir, 2 sn yaşar. Patron çekilmez ve canı yarılanmaz;
+    # yalnızca huninin içinde kaldığı sürece öğütme hasarı alır.
+    "tornado": ("field", lambda lvl: 0.08),
+    # --- sürekli açık silahlar ---
+    # KALKAN: yalnızca DOLU kalkanlar öğütür ve patrona ancak dibine
+    # girildiğinde değer (temas hasarı weapon_damage * 6).
+    "book":    ("field", lambda lvl: 6.0 * 0.18 * min(2.0, lvl)),
+    # PENTAGRAM: oyuncunun ayağının altında; patron oyuncuyu kovaladığı için
+    # dövüşün büyük bölümünde mührün içindedir.
+    "pentagram": ("field", lambda lvl: 0.70),
+    "shoe":    ("field", lambda lvl: 0.50),
+    "frost":   ("field", lambda lvl: 0.45),
+    # PELERİN hasar vermez.
+    "cloak":   ("field", lambda lvl: 0.0),
+}
+
+
+def weapon_boss_dps(player, w, lvl):
+    """Bir silahın TEK bir büyük hedefe (patrona) karşı kaba saniyelik hasarı."""
+    entry = WEAPON_BOSS_HITS.get(w["key"])
+    if entry is None or lvl <= 0:
+        return 0.0
+    mode, factor = entry
+    k = float(factor(lvl))
+    if k <= 0:
+        return 0.0
+    dmg = weapon_damage(player, w, lvl)
+    if mode == "cast":
+        return dmg * k / max(0.05, weapon_cooldown(w, lvl))
+    return dmg * k
+
+
 class BossChest:
     """Patron ölünce düşen sandık. Oyuncu dokununca açılır ve silah verir."""
 
@@ -8460,23 +8607,29 @@ ENEMY_COLORS = {
     "shieldman": (128, 168, 214),   # SİPERCİ — onu koruyan kalkanlı
 }
 
+# ÖDÜL DENGESİ (v3.13): "coin" ve "xp" alanları BİLEREK kısıldı (altın ~%38,
+# tecrübe ~%32). Dalga hedefleri SKOR tabanlı olduğu için ("score" alanı
+# değişmedi) bu kısıntı dalgaların ne kadar sürdüğünü DEĞİŞTİRMEZ; yalnızca
+# bir dalgada kaç seviye atlandığını ve markette ne kadar harcanabildiğini
+# değiştirir. Eskiden ilk patrona varılırken 25. seviyeye çıkılıyor ve market
+# daha 1. haritada tamamen doluyordu.
 ENEMY_DEFS = {
-    "red":      {"hp": 30,  "speed": 100, "dmg": 10, "radius": 14, "coin": 5,  "xp": 4,  "score": 12,  "contact_dps": 17},
-    "blue":     {"hp": 14,  "speed": 194, "dmg": 6,  "radius": 10, "coin": 1,  "xp": 2,  "score": 6,   "contact_dps": 10},
-    "yellow":   {"hp": 23,  "speed": 78,  "dmg": 9,  "radius": 13, "coin": 3,  "xp": 6,  "score": 16,  "contact_dps": 12},
-    "tank":     {"hp": 118, "speed": 58,  "dmg": 21, "radius": 22, "coin": 8,  "xp": 10, "score": 28,  "contact_dps": 27},
-    "sprinter": {"hp": 18,  "speed": 270, "dmg": 8,  "radius": 11, "coin": 3,  "xp": 4,  "score": 14,  "contact_dps": 14},
-    "brute":    {"hp": 70,  "speed": 84,  "dmg": 16, "radius": 18, "coin": 6,  "xp": 8,  "score": 22,  "contact_dps": 23},
-    "elite":    {"hp": 340, "speed": 70,  "dmg": 29, "radius": 28, "coin": 32, "xp": 36, "score": 150, "contact_dps": 36},
+    "red":      {"hp": 30,  "speed": 100, "dmg": 10, "radius": 14, "coin": 3,  "xp": 3,  "score": 12,  "contact_dps": 17},
+    "blue":     {"hp": 14,  "speed": 194, "dmg": 6,  "radius": 10, "coin": 1,  "xp": 1,  "score": 6,   "contact_dps": 10},
+    "yellow":   {"hp": 23,  "speed": 78,  "dmg": 9,  "radius": 13, "coin": 2,  "xp": 4,  "score": 16,  "contact_dps": 12},
+    "tank":     {"hp": 118, "speed": 58,  "dmg": 21, "radius": 22, "coin": 5,  "xp": 7,  "score": 28,  "contact_dps": 27},
+    "sprinter": {"hp": 18,  "speed": 270, "dmg": 8,  "radius": 11, "coin": 2,  "xp": 3,  "score": 14,  "contact_dps": 14},
+    "brute":    {"hp": 70,  "speed": 84,  "dmg": 16, "radius": 18, "coin": 4,  "xp": 5,  "score": 22,  "contact_dps": 23},
+    "elite":    {"hp": 340, "speed": 70,  "dmg": 29, "radius": 28, "coin": 18, "xp": 24, "score": 150, "contact_dps": 36},
     # --- YARI PATRON ---
     # Canı ve hasarı BİLEREK düşük: bu bir güç sınavı değil, bir BULMACA.
     # Zorluğu kendi canından değil, onu çevreleyen SİPERCİ'lerden geliyor;
     # onlar yaşadığı sürece sancaktara giden hasarın neredeyse hepsi emiliyor.
-    "herald":    {"hp": 190, "speed": 52,  "dmg": 8,  "radius": 24, "coin": 26, "xp": 30, "score": 120, "contact_dps": 11},
+    "herald":    {"hp": 190, "speed": 52,  "dmg": 8,  "radius": 24, "coin": 16, "xp": 20, "score": 120, "contact_dps": 11},
     # SİPERCİ: kalın kalkanı ve zırhı var ama HİÇ HASAR VERMEZ. Tek işi
     # sancaktarın önüne geçmek. Oyuncu ona vurmak zorunda değil — etrafından
     # dolanabilir de.
-    "shieldman": {"hp": 95,  "speed": 62,  "dmg": 0,  "radius": 17, "coin": 7,  "xp": 9,  "score": 30,  "contact_dps": 0},
+    "shieldman": {"hp": 95,  "speed": 62,  "dmg": 0,  "radius": 17, "coin": 4,  "xp": 6,  "score": 30,  "contact_dps": 0},
 }
 
 # Zorluk seviyeleri artık düşman istatistiklerini (can/hasar) DEĞİL, yalnızca
@@ -9777,9 +9930,11 @@ BOSS_RING_GAP_MIN = 126
 #   UPTIME  : oyuncu dövüş boyunca hasarının ancak bu kadarını basabiliyor
 #             (kaçma, konumlanma, bekleme süreleri yüzünden)
 #   CAP     : taban canın en fazla kaç katına çıkılabileceği (emniyet tavanı)
-BOSS_FIGHT_TARGET = 90.0
-BOSS_FIGHT_UPTIME = 0.50
-BOSS_HP_SCALE_MAX = 60.0
+BOSS_FIGHT_TARGET = 75.0
+BOSS_FIGHT_UPTIME = 0.55
+# Tavan yükseltildi: silahlar artık hasar tahminine KATILDIĞI için (bkz.
+# weapon_boss_dps) istenen can eski tavanı aşıyordu ve patron yine eriyordu.
+BOSS_HP_SCALE_MAX = 140.0
 BOSS_HP_SCALE_MIN = 0.30
 # Patronun can çalmasının ÜST SINIRI.
 # Sınır OYUNCUNUN saniyelik hasarına göre konur: patron, oyuncunun saniyede
@@ -9800,8 +9955,15 @@ BOSS_LIFESTEAL_CAP = 0.004
 BOSS_FLEE_MAX_DIST = 380.0
 
 BOSS_HP_NERF = 0.85
-BOSS_DMG_NERF = 0.85
+# v3.13: patron hasarındaki %15 indirim kaldırıldı. Patronlar "tek yeniyor"
+# diye şikâyet edilirken oyuncu hiç ciddi hasar da almıyordu.
+BOSS_DMG_NERF = 1.0
 BOSS_TELEGRAPH_EXTRA = 0.40
+
+# PATRON AVCISI / KIYAMET MÜHRÜ eşyalarının patron ve elitlere verdiği ek
+# hasar. İkisi de yığıldığı için (3 + 3 seviye) eski %30 tek başına patron
+# hasarını 2.8 katına çıkarıyordu; tek yerden ayarlanabilsin diye sabit.
+BOSS_HUNTER_BONUS = 0.20
 
 
 def boss_index_for_wave(wave):
@@ -9894,8 +10056,8 @@ class Boss:
         self.is_boss = True
         # Zorlaştıkça ödül de büyür — geç dalgadaki patronu yenmek gerçekten değsin.
         self.score = int(800 * (1.0 + (self.boss_index - 1) * 0.45))
-        self.coin = int(260 * (1.0 + (self.boss_index - 1) * 0.35))
-        self.xp = int(220 * (1.0 + (self.boss_index - 1) * 0.30))
+        self.coin = int(170 * (1.0 + (self.boss_index - 1) * 0.28))
+        self.xp = int(150 * (1.0 + (self.boss_index - 1) * 0.25))
         # Yaratık çağırma / kaçış mekaniği
         self.summon_cd = random.uniform(5.0, 7.0)
         self.flee_timer = 0.0
@@ -12437,7 +12599,12 @@ class RunState:
             # Cehennem yaratıkları arenanın 25. dalgası kadar canlı başlar.
             base = hell_hp_mult(wave)
         else:
-            base = 1.0 + (wave - 1) * 0.22
+            # v3.13: dalga başına +%22 çok yumuşaktı. Oyuncunun gücü dalga
+            # başına bundan çok daha hızlı büyüdüğü için yaratıklar 10.
+            # dalgadan sonra kum torbasına dönüyordu. Dalga hedefleri SKOR
+            # tabanlı olduğundan bu artış dalgada toplanan altın/tecrübeyi
+            # değiştirmez, yalnızca kalabalığı gerçek bir tehdit yapar.
+            base = 1.0 + (wave - 1) * 0.30
         return base * (1.0 + self.player.enemy_hp_curse)
 
     def open_shop(self):
@@ -12713,7 +12880,7 @@ class RunState:
         can_up = [k for k, lvl in p.weapons.items()
                   if k in WEAPON_BY_KEY and lvl < weapon_max_level(WEAPON_BY_KEY[k])]
         if not can_up:
-            gold = 400 + self.waves.wave * 45
+            gold = 260 + self.waves.wave * 26
             self.gold_wallet += gold
             self.coins_earned += gold
             self.fx.popup(chest.x, chest.y - 60, f"+{gold} ALTIN", GOLD, 26, life=1.6)
@@ -12799,7 +12966,7 @@ class RunState:
             p.run_crits += 1
             dmg *= p.eff_crit_dmg()
         if p.boss_hunter > 0 and (getattr(e, "is_boss", False) or getattr(e, "kind", "") == "elite"):
-            dmg *= (1.0 + 0.30 * p.boss_hunter)
+            dmg *= (1.0 + BOSS_HUNTER_BONUS * p.boss_hunter)
         dmg = self._apply_execute(p, e, dmg)
         kx, ky = norm_dir(p.x, p.y, e.x, e.y)
         real_kb = 12 if getattr(e, "is_boss", False) else kb
@@ -12831,7 +12998,7 @@ class RunState:
         """
         p = self.player
         if p.boss_hunter > 0 and (getattr(e, "is_boss", False) or getattr(e, "kind", "") == "elite"):
-            dmg *= (1.0 + 0.30 * p.boss_hunter)
+            dmg *= (1.0 + BOSS_HUNTER_BONUS * p.boss_hunter)
         dmg = self._apply_execute(p, e, dmg)
         died = e.take_damage(dmg, False, self.fx, quiet=True)
         if burn > 0 and hasattr(e, "apply_burn"):
@@ -13275,7 +13442,7 @@ class RunState:
                 final_dmg = self._apply_execute(p, e, final_dmg)
                 kx, ky = norm_dir(p.x, p.y, e.x, e.y)
                 if p.boss_hunter > 0 and (getattr(e, "is_boss", False) or e.kind == "elite"):
-                    final_dmg *= (1.0 + 0.30 * p.boss_hunter)
+                    final_dmg *= (1.0 + BOSS_HUNTER_BONUS * p.boss_hunter)
                 died = e.take_damage(final_dmg, crit, self.fx, kx * 260, ky * 260)
                 # KÜKREME KİTABI: BONK yiyen sıradan düşmanlar korkup kaçar
                 if p.roar_level > 0 and not getattr(e, "is_boss", False) and hasattr(e, "fear_timer"):
@@ -13346,7 +13513,7 @@ class RunState:
         """Yetenek hasarı uygular; ölürse ödülleri işler."""
         p = self.player
         if p.boss_hunter > 0 and (getattr(e, "is_boss", False) or getattr(e, "kind", "") == "elite"):
-            dmg *= (1.0 + 0.30 * p.boss_hunter)
+            dmg *= (1.0 + BOSS_HUNTER_BONUS * p.boss_hunter)
         kx, ky = norm_dir(p.x, p.y, e.x, e.y)
         died = e.take_damage(dmg, crit, self.fx, kx * kb, ky * kb)
         if died:
@@ -14000,7 +14167,7 @@ class RunState:
                         dmg = proj.dmg * (proj.crit_mult if crit else 1.0)
                         # PATRON AVCISI KİTABI: patron ve elitlere ek hasar
                         if p.boss_hunter > 0 and (getattr(e, "is_boss", False) or e.kind == "elite"):
-                            dmg *= (1.0 + 0.30 * p.boss_hunter)
+                            dmg *= (1.0 + BOSS_HUNTER_BONUS * p.boss_hunter)
                         dmg = self._apply_execute(p, e, dmg)
                         kx, ky = norm_dir(p.x, p.y, e.x, e.y)
                         kb = 12 if getattr(e, "is_boss", False) else 90
