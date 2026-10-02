@@ -1,6 +1,6 @@
 """
 =====================================================================
- KASMA ARENA  —  v3.13
+ KASMA ARENA  —  v3.16
  2D Top-Down Hayatta Kalma / Skor-Rekor Oyunu
  ---------------------------------------------------------------------
  Dalgalar halinde gelen düşmanlara karşı hayatta kal, nişan al, ateş et,
@@ -8,6 +8,54 @@
  patronları yen, rekorunu kır. Kaybedersen o koşuda aldıkların silinir.
  Elmasla kalıcı SKIN'ler al (her skinin kendi silahı, mermisi, efekti ve
  ÖZEL YETENEĞİ var).
+
+ v3.16 ile gelenler (KİTAP TAKIMI, TEK-ATMA FRENİ, YENİ HUD, GİZLİ DENGE):
+   * KİTAPLAR ARTIK BİR TAKIM. Bir koşuda en çok 4 NORMAL kitap taşınır ve her
+     biri 15. SEVİYEYE kadar büyür (MAX_RUN_BOOKS / BOOK_MAX_LEVEL); ayrıca
+     YALNIZCA BİR NADİR kitap alınır ve alındığı anda havuzdaki bütün nadirler
+     kapanır (MAX_RUN_RARE_BOOKS). Kitap sayısı 18'den 27'ye çıktı: altın,
+     tecrübe, mıknatıs, tempo, delgi, sülük ve üç yeni nadir kitap eklendi.
+     Bütün değerler 15 seviyeye yayılacak biçimde yeniden dengelendi; "üst üste
+     binince tavanı delen" bonuslar azalan getiriye bağlandı (stack_bonus).
+   * SEVİYE ATLAMA ELİ DENGELENDİ: artık her elde mümkünse en az bir SİLAH ve
+     en az bir KİTAP kartı bulunuyor. Eskiden silahların ağırlığı yüksek olduğu
+     için üç kartın üçü birden silah çıkabiliyor, oyun tamamen silah üzerine
+     gidiyordu. Ölçüm: ilk 12 seviyede kartların ~%54'ü artık kitap.
+   * TEK-ATMA FRENİ (cap_oneshot): bir silahın TEK vuruşu, yaratığın o anki
+     canının ancak belirli bir oranını alabilir. Oran yaratığın sıkletine ve
+     silahın seviyesine bağlı: HAFİF yaratıklar 10. seviyeden sonra yeniden
+     tek atılır, TANK/ELİT/ZIRHLI ise HİÇBİR seviyede tek atılamaz. Patronlar
+     frenden muaftır.
+   * KIRBAÇ nerf: tek vuruş hasarı 4.1 -> 2.75, bekleme 1.15 -> 1.25 sn. Buna
+     karşılık mesafesi artık seviyeyle gerçekten uzuyor (158 -> ~350 px) ve
+     yayı genişliyor; "al ve kazan" silahı olmaktan çıkıp "besle ve uzat"
+     silahına döndü.
+   * HORTUM: 1. seviyede her şeyi buharlaştırması bitti (öğütme hasarı artık
+     frenden geçiyor, taban hasar 1.20 -> 0.98) ve ağır yaratıklarda can kesme
+     payı yarıya indi. 10. seviyeden sonra küçükleri yine anında siliyor.
+   * BUZ İZİ artık PAPUÇ'un birebir aynısı: aynı adım mesafesi, aynı yarıçap,
+     aynı ömür, aynı hasar ve dururken de halka bırakma. Tek fark element:
+     papuç yakar, buz izi yavaşlatır.
+   * BALTA'ya dokunulmadı; yalnızca seviye başına büyümesi kısıldı
+     (dpl 0.031 -> 0.023, boy artışı 0.03 -> 0.021). İlk 10 seviye aynı.
+   * EŞYA EFEKTİ artık %0-%100 arası SÜREKLİ bir ayar ve OYUN İÇİNDEN (ESC)
+     yapılıyor. Hasar hiçbir değerde değişmez, yalnızca çizim soluklaşır.
+   * HUD YENİDEN DİZİLDİ: üstteki opak lacivert şerit kaldırıldı (arena artık
+     ekranın en üstüne kadar görünüyor); silah yuvaları canın altında YATAY bir
+     şeride taşındı ve hemen altına KİTAP ŞERİDİ eklendi (4 normal + 1 nadir).
+   * İSTATİSTİK PANELİ (TAB) yeniden tasarlandı: çubuklu uzun liste yerine
+     konu başlıklarına ayrılmış, iki sütun hizalı, belirgin biçimde dar bir
+     künye (bkz. player_stat_groups).
+   * PETLER artık MAĞAZA'dan gerçek parayla (₺) alınıyor; KIYAFET MARKET'teki
+     PET sekmesi yalnızca kuşanmaya yarıyor.
+   * GİZLİ DENGE (anti-meta): oyun dünya sıralamalı olduğu için her koşunun
+     aynı bitmesi istenmiyor. Üç fren birlikte çalışıyor ve hiçbiri oyuncuya
+     gösterilmiyor — KADER KİLİDİ (her koşunun başında birkaç silah/kitap o
+     koşuya hiç gelmemek üzere kapanır), KOMBO ISISI (bilinen güçlü setlerin
+     eksik parçası, set tamamlandıkça seyrekleşir) ve TEKRAR BASKISI (aynı kart
+     üst üste çıkmaz). Bkz. RunState._roll_destiny / _combo_damp / _meta_weight.
+   * SİMETRİ: ana menü sütunları artık ortak eksende, Ayarlar ekranı beşer
+     satırlık iki eşit sütuna ayrıldı, NASIL OYNANIR üç sütuna çıktı.
 
  v3.15 ile gelenler (AYARLAR, PETLER, 240 FPS, SİLAH GÖRSELLERİ):
    * KARE HIZI SINIRI: Ayarlar > FPS SINIRI ile 60 / 90 / 120 / 144 / 165 / 240
@@ -18,10 +66,11 @@
      sayıları, FPS göstergesi, FPS sınırı, silah görselleri, pet görünümü,
      skin görünümü, yetenek çubuğu boyutu. NASIL OYNANIR artık Ayarlar
      ekranındaki düğmeden açılıyor.
-   * SİLAH GÖRSELLERİ: AÇIK / KISIK / KAPALI. Balta, kırbaç, kılıç yayı,
+   * SİLAH GÖRSELLERİ: AÇIK / KISIK / KAPALI (v3.16'da %0-%100 sürekli ayara
+     dönüştü ve oyun içine taşındı). Balta, kırbaç, kılıç yayı,
      kalkan, pentagram, zemzem, papuç ve hortum çizimlerini soluklaştırır ya
      da gizler. Hasar ve mekanik AYNEN işler, yalnızca çizim değişir.
-   * PETLER: Kıyafet Market > PET sekmesi. 8 pet, elmasla alınır; yalnızca
+   * PETLER: 8 pet (v3.16'da MAĞAZA'ya taşındı, gerçek parayla alınır); yalnızca
      görünüş amaçlı, hiçbir bonus vermez, oyuncunun arkasında gezer. Ayarlardan
      kapatılabilir. Menüdeki karakter önizlemesinde de görünür.
 
@@ -352,11 +401,21 @@ FPS = 60
 # v3.15: KARE HIZI SINIRI artık ayarlardan seçiliyor. Varsayılan 60; güçlü
 # bilgisayarlar 240'a kadar çıkabilir (oyun dt tabanlı, hız değişmez).
 FPS_CHOICES = [60, 90, 120, 144, 165, 240]
-# Silah görselleri: full = tam, dim = kısık (soluk), off = kapalı.
-WEAPON_FX_MODES = ["full", "dim", "off"]
-WEAPON_FX_DIM_VISIBLE = 0.32      # kısık modda silah efektinin görünürlüğü
+# SİLAH / EŞYA EFEKT GÖRÜNÜRLÜĞÜ  (v3.16)
+# ---------------------------------------------------------------------
+# Eskiden üç kademeli bir ayardı (AÇIK / KISIK / KAPALI) ve yalnızca ana
+# menünün Ayarlar ekranından değiştirilebiliyordu. Artık %0 ile %100
+# arasında SÜREKLİ bir değer ve OYUN İÇİNDEN (ESC) ayarlanıyor: oyuncu
+# ekranı kalabalıklaştığı anda, oyundan çıkmadan efektleri kısabiliyor.
+# HASAR HİÇ DEĞİŞMEZ — yalnızca çizimin görünürlüğü değişir.
+#   %100 = efektler tam görünür (hiç ek maliyet yok)
+#   %1-99 = efekt katmanı o oranda saydam basılır
+#   %0   = efekt katmanı hiç çizilmez (en hızlısı)
+WEAPON_FX_DEFAULT = 100           # yeni oyuncunun başlangıç değeri (%)
+# Eski üç kademeli ayarın sayısal karşılıkları (kayıt göçü için).
+WEAPON_FX_LEGACY = {"full": 100, "dim": 32, "off": 0}
 GAME_TITLE = "ARENA SAVAŞI"
-GAME_VERSION = "3.15"
+GAME_VERSION = "3.16"
 
 
 def _base_dir():
@@ -413,7 +472,7 @@ OUTLINE     = (10, 10, 16)
 # ve tüm skin efektleri olmadan yalnızca skininin renginde sade bir top olarak
 # çizilir. Skin'in verdiği bonuslar aynen devam eder — yalnızca görünüm kapanır.
 CFG = {"shake": True, "dmg": True, "fps": False, "plain_skin": False,
-       "fps_cap": 60, "weapon_fx": "full", "pet_show": True}
+       "fps_cap": 60, "weapon_fx": WEAPON_FX_DEFAULT, "pet_show": True}
 
 random.seed()
 
@@ -1113,7 +1172,7 @@ class SaveManager:
         "settings": {"fullscreen": False, "player_name": "", "music_vol": 0.5, "sfx_vol": 0.7,
                      "shake": True, "dmg": True, "fps": False, "difficulty": "normal",
                      "skill_scale": 0.85, "plain_skin": False,
-                     "fps_cap": 60, "weapon_fx": "full", "pet_show": True},
+                     "fps_cap": 60, "weapon_fx": WEAPON_FX_DEFAULT, "pet_show": True},
         "stats": {"runs": 0, "best_score": 0, "total_kills": 0, "total_time": 0.0,
                   "bosses": 0, "best_wave": 0, "total_shots": 0, "total_lifesteal": 0.0,
                   "total_gold": 0, "best_run_gold": 0, "best_run_dashes": 0,
@@ -1181,8 +1240,17 @@ class SaveManager:
         CFG["plain_skin"] = bool(st.get("plain_skin", False))
         cap = st.get("fps_cap", 60)
         CFG["fps_cap"] = cap if cap in FPS_CHOICES else 60
-        fxm = st.get("weapon_fx", "full")
-        CFG["weapon_fx"] = fxm if fxm in WEAPON_FX_MODES else "full"
+        # EŞYA EFEKTİ artık %0-100 arası bir sayı. Eski kayıtlarda metin
+        # ("full"/"dim"/"off") duruyor olabilir; onu sayıya çeviriyoruz.
+        fxm = st.get("weapon_fx", WEAPON_FX_DEFAULT)
+        if isinstance(fxm, str):
+            fxm = WEAPON_FX_LEGACY.get(fxm, WEAPON_FX_DEFAULT)
+        try:
+            fxm = int(round(float(fxm)))
+        except (TypeError, ValueError):
+            fxm = WEAPON_FX_DEFAULT
+        CFG["weapon_fx"] = int(clamp(fxm, 0, 100))
+        st["weapon_fx"] = CFG["weapon_fx"]
         CFG["pet_show"] = bool(st.get("pet_show", True))
 
     # ---- elmas ----
@@ -2879,30 +2947,44 @@ def cosmetics_by_slot(slot):
 # Kayıtta kıyafetlerle aynı yerde durur (cosmetics_owned / equipped_cosmetics
 # ["pet"]) ama oyuncunun istatistiklerine HİÇ dokunmaz.
 # =====================================================================
+# PET'ler artık ELMASLA DEĞİL, MAĞAZA'dan GERÇEK PARAYLA (₺) alınır — tıpkı
+# premium skinler gibi. KIYAFET MARKET'teki PET sekmesi yalnızca sahip
+# olduklarını KUŞANMAYA yarar; satın alma oradan kalktı.
+#   cost       : eski elmas fiyatı (geriye dönük kayıtlar ve "TEST" kipi için)
+#   price_hint : mağazada görünen ₺ etiketi
+#   item_id    : Steamworks öğe kimliği (bkz. PurchaseBridge)
 PET_PERK_TEXT = "Sadece görünüş — yanında gezer"
 PETS = [
     dict(id="pet_cat", slot="pet", kind="cat", name="Yavru Kedi", cost=120,
+         item_id=3001, price_hint="₺29",
          color=(240, 168, 92), accent=(255, 214, 190),
          desc="Peşinden ayrılmayan miskin bir turuncu kedi.", perk_text=PET_PERK_TEXT),
     dict(id="pet_dog", slot="pet", kind="dog", name="Minik Köpek", cost=140,
+         item_id=3002, price_hint="₺29",
          color=(186, 132, 84), accent=(240, 214, 176),
          desc="Kuyruğunu durmadan sallayan sadık bir dost.", perk_text=PET_PERK_TEXT),
     dict(id="pet_bunny", slot="pet", kind="bunny", name="Tavşan", cost=160,
+         item_id=3003, price_hint="₺39",
          color=(238, 236, 244), accent=(255, 170, 200),
          desc="Uzun kulaklı, zıplayarak takip eden tatlı bir tavşan.", perk_text=PET_PERK_TEXT),
     dict(id="pet_slime", slot="pet", kind="slime", name="Slime", cost=200,
+         item_id=3004, price_hint="₺39",
          color=(110, 214, 140), accent=(200, 255, 220),
          desc="Yumuşacık, sürekli sallanan yeşil bir jöle.", perk_text=PET_PERK_TEXT),
     dict(id="pet_ghost", slot="pet", kind="ghost", name="Sevimli Hayalet", cost=260,
+         item_id=3005, price_hint="₺49",
          color=(206, 220, 255), accent=(255, 170, 190),
          desc="Korkutmaz, sadece havada süzülür.", perk_text=PET_PERK_TEXT),
     dict(id="pet_owl", slot="pet", kind="owl", name="Baykuş", cost=320,
+         item_id=3006, price_hint="₺49",
          color=(150, 110, 78), accent=(255, 210, 90),
          desc="Kocaman gözlü, havada çırpınan bilge bir baykuş.", perk_text=PET_PERK_TEXT),
     dict(id="pet_drone", slot="pet", kind="drone", name="Mini Drone", cost=380,
+         item_id=3007, price_hint="₺59",
          color=(120, 132, 156), accent=(100, 235, 255),
          desc="Pervaneleri dönen, neon gözlü küçük bir drone.", perk_text=PET_PERK_TEXT),
     dict(id="pet_dragon", slot="pet", kind="dragon", name="Yavru Ejderha", cost=520,
+         item_id=3008, price_hint="₺79",
          color=(90, 190, 110), accent=(255, 170, 70),
          desc="Kanatlarını çırpan, ara sıra ateş üfleyen minik ejderha.", perk_text=PET_PERK_TEXT),
 ]
@@ -3150,29 +3232,57 @@ def draw_run_pet(world, run, t):
 
 
 # ---- SİLAH GÖRSELLERİ (AÇIK / KISIK / KAPALI) ------------------------------
+def weapon_fx_pct():
+    """EŞYA EFEKTİ görünürlüğü, 0-100 arası tam sayı (oyuncu ayarı)."""
+    v = CFG.get("weapon_fx", WEAPON_FX_DEFAULT)
+    if isinstance(v, str):                       # çok eski kayıt
+        v = WEAPON_FX_LEGACY.get(v, WEAPON_FX_DEFAULT)
+    try:
+        return int(clamp(int(round(float(v))), 0, 100))
+    except (TypeError, ValueError):
+        return WEAPON_FX_DEFAULT
+
+
+def set_weapon_fx_pct(v):
+    """Ayarı yazar (0-100 arasına kırpılır) ve değeri geri döndürür."""
+    CFG["weapon_fx"] = int(clamp(int(round(float(v))), 0, 100))
+    return CFG["weapon_fx"]
+
+
 def weapon_fx_mode():
-    m = CFG.get("weapon_fx", "full")
-    return m if m in WEAPON_FX_MODES else "full"
+    """Eski üç kademeli ad — kodun geri kalanıyla uyum için."""
+    v = weapon_fx_pct()
+    if v <= 0:
+        return "off"
+    return "full" if v >= 100 else "dim"
 
 
 def _wfx_begin(world, cam, need=True):
-    """KISIK modda: silah katmanı çizilmeden önce görüntüyü saklar.
+    """Efekt katmanı çizilmeden ÖNCE görüntüyü saklar (kısık görünürlükte).
+
+    %100'de hiçbir şey saklanmaz (ek maliyet yok), %0'da katman zaten hiç
+    çizilmez. Arada kalan her değerde eski görüntü saklanır ve katmanın
+    üstüne o oranda geri basılır — efekt o kadar soluklaşır.
 
     need=False: çizilecek silah yok — pahalı ekran kopyası hiç alınmaz."""
-    if not need or weapon_fx_mode() != "dim":
+    if not need:
+        return None
+    pct = weapon_fx_pct()
+    if pct >= 100 or pct <= 0:
         return None
     try:
-        return world.subsurface(cam.clip(world.get_rect())).copy(), cam.clip(world.get_rect()).topleft
+        clip = cam.clip(world.get_rect())
+        return world.subsurface(clip).copy(), clip.topleft, pct
     except Exception:
         return None
 
 
 def _wfx_end(world, snap):
-    """Saklanan eski görüntüyü yarı saydam basar: silah efekti soluklaşır."""
+    """Saklanan eski görüntüyü yarı saydam basar: efekt o oranda soluklaşır."""
     if snap is None:
         return
-    img, pos = snap
-    img.set_alpha(int(255 * (1.0 - WEAPON_FX_DIM_VISIBLE)))
+    img, pos, pct = snap
+    img.set_alpha(int(clamp(255 * (1.0 - pct / 100.0), 0, 255)))
     world.blit(img, pos)
 
 
@@ -5247,18 +5357,51 @@ def rq_weapon(weapon_key, text=None):
     return dict(kind="weapon", weapon=weapon_key, need=1, text=text)
 
 
+# =====================================================================
+# KİTAPLAR  (v3.16 — KOŞU İÇİ SEVİYE SİSTEMİ)
+# ---------------------------------------------------------------------
+# Eskiden kitapların bir sınırı yoktu: aynı kitap bir koşuda sonsuz kez
+# gelebiliyor, oyuncu da çoğu kez silahları seçip kitapları hiç almıyordu.
+# Artık kitaplar da tıpkı silahlar gibi bir "takım" kuruyor:
+#
+#   * EN ÇOK 4 NORMAL KİTAP taşınabilir (MAX_RUN_BOOKS) ve her biri
+#     15. SEVİYEYE kadar çıkar (BOOK_MAX_LEVEL). Yani bir kitabı seçmek
+#     "bir kerelik küçük bir bonus" değil, koşu boyunca besleyeceğin bir
+#     yatırım. Bir kitabı 15'e çıkarmak, dördünü birden 4'te bırakmaktan
+#     farklı bir oyun kurar.
+#   * EN ÇOK 1 NADİR KİTAP alınabilir (MAX_RUN_RARE_BOOKS) ve alındığı
+#     anda havuzdaki BÜTÜN nadir kitaplar kapanır — bir daha hiç çıkmaz.
+#     Nadir kitap her koşuda verilen TEK BÜYÜK karardır.
+#
+# DENGE: seviye tavanı geldiği için seviye BAŞINA kazançlar düşürüldü.
+# "Çok güçlü" kitaplar aşağı, "alınmaya değmez" kitaplar yukarı çekilerek
+# hepsi birbirine yaklaştırıldı — 15 seviye sonunda hiçbiri tek başına
+# oyunu bitirmiyor, hiçbiri de boşa seçim olmuyor.
+#
+# NADİR kitaplar her zaman 1. seviyede kalır (tek kopya), bu yüzden
+# değerleri "tek seferlik büyük etki" olarak ayarlıdır.
+# =====================================================================
+# Bir koşuda taşınabilecek en fazla NORMAL kitap.
+MAX_RUN_BOOKS = 4
+# Bir koşuda alınabilecek en fazla NADİR kitap (alınınca havuz kapanır).
+MAX_RUN_RARE_BOOKS = 1
+# Normal kitapların çıkabileceği en yüksek seviye.
+BOOK_MAX_LEVEL = 15
+
 BOOKS = [
     # ---- TEMEL KİTAPLAR (en kolay görevler — ilk koşularda açılır) ----
-    {"key": "r_dmg", "name": "Hasar Kitabı", "desc": "Hasarını %12 artırır",
+    {"key": "r_dmg", "name": "Hasar Kitabı", "desc": "Her seviyede hasarını %7 artırır",
      "color": RED, "icon": "sword", "rare": False, "basic": True,
      "unlock": dict(text="Arenaya alış: 60 düşman öldür",
                     reqs=[rq_stat("total_kills", 60, "Toplam 60 düşman öldür")])},
-    {"key": "r_hp", "name": "Can Kitabı", "desc": "Azami canını %25 artırır (anında dolar)",
+    {"key": "r_hp", "name": "Can Kitabı",
+     "desc": "Her seviyede azami canını 16 artırır (anında dolar)",
      "color": (230, 110, 130), "icon": "heart", "rare": False, "basic": True,
      "unlock": dict(text="3 koşu tamamla ve 4. dalgayı gör",
                     reqs=[rq_stat("runs", 3, "3 koşu tamamla"),
                           rq_stat("best_wave", 4, "4. dalgaya ulaş")])},
-    {"key": "r_armor", "name": "Zırh Kitabı", "desc": "Aldığın hasarı %5 azaltır ve +15 can verir",
+    {"key": "r_armor", "name": "Zırh Kitabı",
+     "desc": "Her seviyede aldığın hasarı %2,5 azaltır ve +10 can verir",
      "color": (160, 170, 200), "icon": "shield", "rare": False, "basic": True,
      "unlock": dict(text="500 altın topla ve 5. dalgaya ulaş",
                     reqs=[rq_stat("total_gold", 500, "Toplam 500 altın topla"),
@@ -5266,47 +5409,85 @@ BOOKS = [
 
     # ---- ORTA KİTAPLAR (belli bir oynanışı gerektirir) ----
     {"key": "r_spd", "name": "Rüzgâr Kitabı",
-     "desc": "Hareket hızın %12, dash mesafen %20 artar",
+     "desc": "Her seviyede hareket hızın %6, dash mesafen %8 artar",
      "color": GREEN, "icon": "boot", "rare": False,
      "unlock": dict(text="Dash ustası ol",
                     reqs=[rq_stat("total_dashes", 400, "Toplam 400 kez dash at"),
                           rq_stat("best_run_dashes", 40, "Tek koşuda 40 kez dash at")])},
-    {"key": "r_crit", "name": "Kritik Kitabı", "desc": "Kritik vuruş şansını %5 artırır",
+    {"key": "r_aspd", "name": "Tempo Kitabı",
+     "desc": "Her seviyede atış hızın %6 artar",
+     "color": (150, 210, 255), "icon": "target", "rare": False,
+     "unlock": dict(text="Tetiği bırakma: 25.000 mermi at",
+                    reqs=[rq_stat("total_shots", 25000, "Toplam 25.000 mermi at")])},
+    {"key": "r_crit", "name": "Kritik Kitabı",
+     "desc": "Her seviyede kritik vuruş şansını %3,5 artırır",
      "color": (140, 230, 120), "icon": "clover", "rare": False,
      "unlock": dict(text="Kritik vuruşla tanış",
                     reqs=[rq_stat("total_crits", 600, "Toplam 600 kritik vuruş yap"),
                           rq_stat("best_wave", 7, "7. dalgaya ulaş")])},
-    {"key": "r_critd", "name": "Kritik Güç Kitabı", "desc": "Kritik hasarını %25 artırır",
+    {"key": "r_critd", "name": "Kritik Güç Kitabı",
+     "desc": "Her seviyede kritik hasarını %14 artırır",
      "color": (240, 90, 90), "icon": "fist", "rare": False,
      "unlock": dict(text="Kritik hasarda uzmanlaş",
                     reqs=[rq_stat("total_crits", 3000, "Toplam 3.000 kritik vuruş yap"),
                           rq_ach("combo30", "«Kombo Kralı» başarımını aç")])},
-    {"key": "r_regen", "name": "Şifa Kitabı", "desc": "Saniyede 0.8 can yeniler",
+    {"key": "r_regen", "name": "Şifa Kitabı",
+     "desc": "Her seviyede saniyede 0,45 can yeniler",
      "color": (120, 220, 170), "icon": "cross", "rare": False,
      "unlock": dict(text="Yaralarını sar",
                     reqs=[rq_stat("best_run_heal", 1200, "Tek koşuda 1.200 can yenile"),
                           rq_stat("total_healed", 6000, "Toplam 6.000 can yenile")])},
+    # --- YENİ (v3.16): kazanç kitapları. Oyuncu artık seviye atlama ekranında
+    #     "güç mü, ekonomi mi?" diye düşünüyor; ikisi de aynı karttan geliyor.
+    {"key": "r_coin", "name": "Altın Kitabı",
+     "desc": "Her seviyede topladığın altın %15 artar",
+     "color": GOLD, "icon": "coin", "rare": False,
+     "unlock": dict(text="Kasanı doldur: tek koşuda 1.500 altın",
+                    reqs=[rq_stat("best_run_gold", 1500, "Tek koşuda 1.500 altın kazan")])},
+    {"key": "r_xp", "name": "Bilgelik Kitabı",
+     "desc": "Her seviyede kazandığın tecrübe %15 artar",
+     "color": PURPLE, "icon": "gem", "rare": False,
+     "unlock": dict(text="Tecrübeyle büyü: bir koşuda 10. seviyeye çık",
+                    reqs=[rq_ach("lvl10", "«Tecrübeli» başarımını aç"),
+                          rq_stat("runs", 8, "8 koşu tamamla")])},
+    {"key": "r_mag", "name": "Mıknatıs Kitabı",
+     "desc": "Her seviyede toplama menzilin %20 artar",
+     "color": (150, 220, 255), "icon": "magnet", "rare": False,
+     "unlock": dict(text="Yerdekini bırakma: toplam 20.000 altın topla",
+                    reqs=[rq_stat("total_gold", 20000, "Toplam 20.000 altın topla")])},
+    {"key": "r_vamp", "name": "Sülük Kitabı",
+     "desc": "Her seviyede verdiğin hasarın %2'si kadar can çalarsın",
+     "color": (210, 70, 100), "icon": "drop", "rare": False,
+     "unlock": dict(text="Kanla beslen: toplam 10.000 can çal",
+                    reqs=[rq_ach("leech10k", "«Sülük» başarımını aç")])},
+    {"key": "r_pierce", "name": "Delgi Kitabı",
+     "desc": "Tek seviyede +1 delme; sonra her iki seviyede bir +1",
+     "color": (220, 140, 90), "icon": "sword", "rare": False,
+     "unlock": dict(text="Sırayı dizip tek mermiyle biç: 8. dalgaya ulaş",
+                    reqs=[rq_stat("best_wave", 8, "8. dalgaya ulaş"),
+                          rq_stat("total_shots", 60000, "Toplam 60.000 mermi at")])},
     {"key": "r_bonk", "name": "BONK Kitabı",
-     "desc": "BONK hasarın %35, vuruş alanın %20 büyür",
+     "desc": "Her seviyede BONK hasarın %14, vuruş alanın %7 büyür",
      "color": (240, 120, 60), "icon": "fist", "rare": False,
      "unlock": dict(text="Yumruğunla konuş",
                     reqs=[rq_stat("total_bonks", 500, "Toplam 500 kez BONK at"),
                           rq_stat("total_bonk_hits", 2500, "BONK ile toplam 2.500 düşmana vur")])},
     {"key": "r_swarm", "name": "Sürü Kitabı",
-     "desc": "Çevrende 3+ düşman varken hasarın %30 artar",
+     "desc": "Çevrende 3+ düşman varken hasarın artar (seviyeyle büyür)",
      "color": (210, 160, 70), "icon": "orbit", "rare": False,
      "unlock": dict(text="Kalabalığın ortasında yaşa",
                     reqs=[rq_stat("best_run_kills", 250, "Tek koşuda 250 düşman öldür"),
                           rq_ach("massacre", "«Katliam» başarımını aç")])},
     {"key": "r_bosshunter", "name": "Patron Avcısı Kitabı",
-     "desc": "Patronlara ve elit düşmanlara %30 fazla hasar vurursun",
+     "desc": "Patronlara ve elitlere fazla hasar vurursun (seviyeyle büyür)",
      "color": (200, 90, 220), "icon": "target", "rare": False,
      "unlock": dict(text="Patron avına çık",
                     reqs=[rq_stat("bosses", 6, "6 patron devir"),
                           rq_ach("boss", "«Dev Avcısı» başarımını aç")])},
 
-    # ---- NADİR KİTAPLAR: markette hiç olmayan güçlü etkiler ----
-    # Bunlar oyunun en güçlü etkileri; şartları da buna göre ağırdır.
+    # ---- NADİR KİTAPLAR: bir koşuda YALNIZCA BİR TANE ----
+    # Alındığı anda bütün nadir kitaplar havuzdan çıkar. Hepsi tek seferlik
+    # ve büyük etkilidir; seviyesi yükselmez.
     {"key": "r_poison", "name": "Zehir Kitabı",
      "desc": "Vurduğun düşmanı ÖLENE KADAR zehirler — zehir üst üste birikir",
      "color": (120, 225, 90), "icon": "drop", "rare": True,
@@ -5320,6 +5501,12 @@ BOOKS = [
      "unlock": dict(text="Tetiği bırakma: yarım milyon mermi",
                     reqs=[rq_stat("total_shots", 500000, "Toplam 500.000 mermi at"),
                           rq_ach("shots50k", "«Mermi Fabrikası» başarımını aç")])},
+    {"key": "r_multi", "name": "Çoğalma Kitabı",
+     "desc": "Her atışında bir mermi daha çıkar",
+     "color": (175, 140, 255), "icon": "star", "rare": True,
+     "unlock": dict(text="Tek namludan fazlasını hak et: 15. dalgaya ulaş",
+                    reqs=[rq_ach("wave15", "«Arena Ustası» başarımını aç"),
+                          rq_stat("total_shots", 120000, "Toplam 120.000 mermi at")])},
     {"key": "r_killheal", "name": "Kan Kitabı",
      "desc": "Öldürdüğün her düşman sana 3 can verir",
      "color": (220, 60, 90), "icon": "heart", "rare": True,
@@ -5332,6 +5519,12 @@ BOOKS = [
      "unlock": dict(text="Patronların kâbusu ol",
                     reqs=[rq_stat("bosses", 12, "12 patron devir"),
                           rq_stat("best_run_kills", 400, "Tek koşuda 400 düşman öldür")])},
+    {"key": "r_execute", "name": "İnfaz Kitabı",
+     "desc": "Canı %18'in altına düşen sıradan düşmanlar anında ölür",
+     "color": (255, 160, 60), "icon": "skull", "rare": True,
+     "unlock": dict(text="Bitirmeyi öğren: 20. dalgaya ulaş",
+                    reqs=[rq_ach("wave20", "«Efsane» başarımını aç"),
+                          rq_stat("total_kills", 8000, "Toplam 8.000 düşman öldür")])},
     {"key": "r_roar", "name": "Kükreme Kitabı",
      "desc": "BONK'ladığın düşmanlar korkup senden kaçar",
      "color": (235, 140, 60), "icon": "skull", "rare": True,
@@ -5346,6 +5539,12 @@ BOOKS = [
                     reqs=[rq_stat("best_wave", 14, "14. dalgaya ulaş"),
                           rq_stat("total_dashes", 1500, "Toplam 1.500 kez dash at"),
                           rq_book("r_spd", "Önce Rüzgâr Kitabı'nı aç")])},
+    {"key": "r_second_wind", "name": "İkinci Nefes Kitabı",
+     "desc": "Öldüğünde bir kez yarı canla ayağa kalkarsın",
+     "color": (255, 240, 180), "icon": "cross", "rare": True,
+     "unlock": dict(text="Bir kez daha kalk: 18. dalgaya ulaş",
+                    reqs=[rq_stat("best_wave", 18, "18. dalgaya ulaş"),
+                          rq_stat("total_healed", 40000, "Toplam 40.000 can yenile")])},
     {"key": "r_lasthope", "name": "Son Umut Kitabı",
      "desc": "Canın %30'unun altındayken aldığın hasar %20 azalır",
      "color": (255, 215, 120), "icon": "shield", "rare": True,
@@ -5367,9 +5566,10 @@ BOOK_BY_KEY = {b["key"]: b for b in BOOKS}
 # start_levelup_choice() bu listeye düşer.
 STARTER_BOOKS = [b["key"] for b in BOOKS if b.get("basic")]
 # Oyuncunun "bu bana gelmesin" diyerek kapatabileceği en fazla kitap sayısı.
-# 18 kitaptan 5'i kapatılabilir: sevdiğin kitapların gelme şansı yükselir
-# ama elini tamamen kendin dizemezsin.
-MAX_MUTED_BOOKS = 5
+# Kitap sayısı 27'ye çıktığı için pay da büyüdü: 6 kitap kapatılabilir.
+# Sevdiğin kitapların gelme şansı yükselir ama elini tamamen kendin dizemezsin
+# (ayrıca bkz. gizli denge sistemi: _meta_weight).
+MAX_MUTED_BOOKS = 6
 
 
 def book_reqs(book):
@@ -5732,6 +5932,26 @@ XP_CURVE_BANDS = (
 )
 
 
+def stack_bonus(per, lvl, soft=4.0):
+    """Üst üste binen kitap bonuslarının AZALAN GETİRİSİ.
+
+    Kitaplar artık 15. seviyeye kadar çıkabildiği için "seviye x sabit oran"
+    biçimindeki bonuslar (örn. patron avcısı %30) tavanı deliyordu: 15 seviye
+    x %30 = %450. Bu fonksiyon ilk seviyelerde neredeyse tam değeri verir,
+    sonra yavaşlar:
+
+        stack_bonus(0.30, 1) = 0.30     stack_bonus(0.30, 5)  ≈ 1.00
+        stack_bonus(0.30, 3) ≈ 0.72     stack_bonus(0.30, 15) ≈ 1.95
+
+    soft, "yarı yolun" kaç seviyede alındığını belirler; büyüdükçe eğri
+    doğruya yaklaşır.
+    """
+    lvl = max(0.0, float(lvl))
+    if lvl <= 0:
+        return 0.0
+    return per * soft * (1.0 - (soft / (soft + lvl)))
+
+
 def xp_next_need(need, level):
     """`level` seviyesine ulaşan oyuncunun bir sonraki seviye için ihtiyacı.
 
@@ -5837,6 +6057,12 @@ class Player:
         # Silahlar otomatik ateşlenir; bkz. RunState.update_boss_weapons().
         self.weapons = {}
         self.weapon_timers = {}
+        # --- KOŞU İÇİ KİTAPLAR ---
+        # {kitap_anahtarı: seviye}. Bir koşuda en çok MAX_RUN_BOOKS normal
+        # kitap (her biri BOOK_MAX_LEVEL'a kadar) ve MAX_RUN_RARE_BOOKS nadir
+        # kitap taşınabilir. Kitabın ETKİSİ her seviyede yeniden uygulanır
+        # (bkz. apply_run_upgrade), bu sözlük yalnızca sayacı tutar.
+        self.books = {}
         # KALKAN: her kalkanın yeniden dolma sayacı. 0 ise kalkan DOLU (bir
         # mermiyi savuşturmaya hazır), > 0 ise mermi yemiş, dolmayı bekliyor.
         self.book_angle = 0.0
@@ -5855,6 +6081,7 @@ class Player:
         # BUZ İZİ kendi ayak izi sayacını tutar: iki silah birden varsa
         # halkaları aynı noktalara değil, birbirinden bağımsız düşsün.
         self.frost_last = None
+        self.frost_idle = 0.0
         # GÖRÜNMEZLİK PELERİNİ: invis_t > 0 iken oyuncu GÖRÜNMEZDİR — sıradan
         # yaratıklar oldukları yerde kalakalır, yalnızca patronlar görür.
         # cloak_timer bir sonraki görünmezliğe kalan süredir; 0 ile başlar,
@@ -5978,7 +6205,7 @@ class Player:
             d *= (1.0 + 0.04 * self.soul_stacks)
         # ÖFKE KİTABI: canın yarısının altındayken hasar belirgin artar.
         if self.rage_level > 0 and self.max_hp > 0 and self.hp < self.max_hp * 0.5:
-            d *= (1.0 + 0.35 * self.rage_level)
+            d *= (1.0 + self.rage_bonus())
         return d
 
     def eff_atk_cd(self):
@@ -5993,6 +6220,40 @@ class Player:
         if self.lowhp_armor > 0 and self.max_hp > 0 and self.hp < self.max_hp * 0.3:
             a += self.lowhp_armor
         return clamp(a, 0, 0.6)
+
+    def boss_hunter_bonus(self):
+        """PATRON AVCISI kitabının hasar bonusu (azalan getirili).
+
+        1. seviyede ~%30 (eski doğrusal değerle aynı), 15. seviyede ~%109 —
+        doğrusal olsaydı %450 ederdi.
+        """
+        return stack_bonus(0.385, self.boss_hunter, soft=3.5)
+
+    def swarm_bonus(self):
+        """SÜRÜ kitabının kalabalık hasar bonusu (azalan getirili).
+
+        1. seviyede ~%23, 15. seviyede ~%75. Koşullu bir bonus olduğu için
+        (çevrede 3+ düşman) bilerek patron avcısından daha yumuşak.
+        """
+        return stack_bonus(0.30, self.swarm_level, soft=3.0)
+
+    def rage_bonus(self):
+        """ÖFKE kitabının düşük canda hasar bonusu (azalan getirili).
+
+        NADİR kitap olduğu için pratikte hep 1. seviyede kalır ve tam %35
+        verir; birden çok kaynaktan gelirse (skin + kitap) yığın yavaşlar.
+        """
+        return stack_bonus(0.47, self.rage_level, soft=3.0)
+
+    def book_level(self, key):
+        """Bu koşuda o kitabın kaçıncı seviyesi alınmış (yoksa 0)."""
+        return self.books.get(key, 0)
+
+    def normal_book_count(self):
+        return sum(1 for k in self.books if not BOOK_BY_KEY.get(k, {}).get("rare"))
+
+    def rare_book_count(self):
+        return sum(1 for k in self.books if BOOK_BY_KEY.get(k, {}).get("rare"))
 
     def eff_regen(self):
         return self.base_regen + self.run_regen_bonus
@@ -6112,24 +6373,43 @@ class Player:
         "r_storm": "storm",
     }
 
-    def apply_run_upgrade(self, key):
-        if key == "r_dmg": self.run_dmg_mult += 0.12
-        elif key == "r_spd": self.run_spd_mult += 0.10
-        elif key == "r_aspd": self.run_aspd_mult += 0.09
+    def apply_run_upgrade(self, key, lvl=None):
+        """Bir KİTABIN etkisini uygular.
+
+        lvl: kitabın bu seçimden SONRAKİ seviyesi (1 = ilk kez alındı).
+        Değerler 15 seviyeye yayıldığı için seviye başına kazançlar bilerek
+        küçüktür; birkaç seviyede bir değil HER seviyede kazanç verirler.
+        Verilmezse koşu defterinden okunur.
+        """
+        if lvl is None:
+            lvl = self.books.get(key, 0) + 1
+        lvl = max(1, int(lvl))
+
+        if key == "r_dmg": self.run_dmg_mult += 0.07
+        elif key == "r_spd":
+            self.run_spd_mult += 0.06
+            self.dash_dist_mult += 0.08
+        elif key == "r_aspd": self.run_aspd_mult += 0.06
         elif key == "r_hp":
-            gain = max(20, int(self.max_hp * 0.25))
+            # DİKKAT: eskiden O ANKİ azami canın %25'iydi — yani BİLEŞİK
+            # büyüyordu ve 15 seviyede canı 28 katına çıkarıyordu. Artık
+            # TABAN cana göre sabit bir pay: 15 seviyede +240 can.
+            gain = max(16, int(BASE_MAX_HP * 0.16))
             self.max_hp += gain
             self.hp = min(self.max_hp, self.hp + gain)
-        elif key == "r_mag": self.run_pickup_mult += 0.25
-        elif key == "r_armor": self.run_armor_bonus += 0.04
-        elif key == "r_coin": self.run_coin_mult += 0.18
-        elif key == "r_xp": self.run_xp_mult += 0.18
-        elif key == "r_regen": self.run_regen_bonus += 0.5
-        elif key == "r_crit": self.run_crit_bonus += 0.05
-        elif key == "r_critd": self.run_critdmg_bonus += 0.25
+        elif key == "r_mag": self.run_pickup_mult += 0.20
+        elif key == "r_armor":
+            self.run_armor_bonus += 0.025
+            self.max_hp += 10
+            self.hp = min(self.max_hp, self.hp + 10)
+        elif key == "r_coin": self.run_coin_mult += 0.15
+        elif key == "r_xp": self.run_xp_mult += 0.15
+        elif key == "r_regen": self.run_regen_bonus += 0.45
+        elif key == "r_crit": self.run_crit_bonus += 0.035
+        elif key == "r_critd": self.run_critdmg_bonus += 0.14
         elif key == "r_bonk":
-            self.bonk_mult += 0.22
-            self.bonk_radius_mult += 0.12
+            self.bonk_mult += 0.14
+            self.bonk_radius_mult += 0.07
         elif key == "r_dashcd": self.dash_cd_mult = max(0.35, self.dash_cd_mult - 0.15)
         elif key == "r_bonkcd": self.bonk_cd_mult = max(0.35, self.bonk_cd_mult - 0.15)
         elif key == "r_pspeed": self.proj_speed_mult += 0.18
@@ -6149,9 +6429,13 @@ class Player:
             self.hp = min(self.max_hp, self.hp + self.max_hp * 0.40)
             self.base_speed = max(60, self.base_speed - 18)
         elif key == "r_multi": self.multishot_level += 1
-        elif key == "r_pierce": self.pierce_bonus += 1
+        elif key == "r_pierce":
+            # 1. seviyede +1, sonra İKİ seviyede bir +1 (15. seviyede +8).
+            # Her seviyede +1 verseydi 15 delmeli bir mermi çıkıyordu.
+            if lvl == 1 or lvl % 2 == 1:
+                self.pierce_bonus += 1
         elif key == "r_vamp": self.vamp_level += 1
-        elif key == "r_execute": self.execute_threshold = min(0.35, self.execute_threshold + 0.10)
+        elif key == "r_execute": self.execute_threshold = min(0.35, self.execute_threshold + 0.18)
         elif key == "r_second_wind": self.second_wind_charges += 1
         elif key == "r_storm": self.storm_level += 1
         # MARKET'teki karşılığı varsa (örn. Yıldırım -> Fırtına), o sayaç da
@@ -6159,6 +6443,29 @@ class Player:
         shop_key = self.RUN_TO_SHOP_KEY.get(key)
         if shop_key:
             self.shop_levels[shop_key] = self.shop_levels.get(shop_key, 0) + 1
+
+    def take_book(self, key):
+        """Kitabı koşu defterine yazar ve etkisini uygular.
+
+        Dönüş: kitabın yeni seviyesi. Tavanı dolmuş bir kitap için 0 döner.
+        """
+        bk = BOOK_BY_KEY.get(key)
+        rare = bool(bk and bk.get("rare"))
+        cur = self.books.get(key, 0)
+        if rare:
+            if cur > 0 or self.rare_book_count() >= MAX_RUN_RARE_BOOKS:
+                return 0
+            top = 1
+        else:
+            top = BOOK_MAX_LEVEL
+            if cur == 0 and self.normal_book_count() >= MAX_RUN_BOOKS:
+                return 0
+        if cur >= top:
+            return 0
+        new_lvl = cur + 1
+        self.books[key] = new_lvl
+        self.apply_run_upgrade(key, new_lvl)
+        return new_lvl
 
     def gain_xp(self, amount):
         amount *= self.eff_xp_mult() * XP_GAIN_SCALE
@@ -7575,11 +7882,12 @@ ZEMZEM_COLOR2 = (208, 246, 255)
 class WaterZone:
     """Zemzem birikintisi: yavaşlatır ve saniyede hasar verir."""
 
-    def __init__(self, x, y, r, dps, life, slow=0.52):
+    def __init__(self, x, y, r, dps, life, slow=0.52, lvl=1):
         self.x = clamp(x, ARENA_RECT.left + 20, ARENA_RECT.right - 20)
         self.y = clamp(y, ARENA_RECT.top + 20, ARENA_RECT.bottom - 20)
         self.r = r
         self.dps = dps
+        self.lvl = max(1, int(lvl))   # tek-atma freni için silahın seviyesi
         self.life = life
         self.max_life = life
         self.slow = slow
@@ -7608,7 +7916,7 @@ class WaterZone:
             if not e.alive:
                 continue
             if dist(self.x, self.y, e.x, e.y) <= rad + getattr(e, "radius", 12) * 0.6:
-                run._field_damage(e, self.dps * 0.18)
+                run._field_damage(e, self.dps * 0.18, wlvl=self.lvl)
                 if hasattr(e, "apply_slow"):
                     e.apply_slow(self.slow, 0.55)
                 # PARÇACIK BÜTÇESİ: eskiden her düşman için kıvılcım atıyordu.
@@ -7693,10 +8001,11 @@ class FireRing:
     biçim ve uygulanan etki değişiyor.
     """
 
-    def __init__(self, x, y, r, dps, life, burn=0.0, ice=False, slow=0.55):
+    def __init__(self, x, y, r, dps, life, burn=0.0, ice=False, slow=0.55, lvl=1):
         self.x, self.y = x, y
         self.r0 = r
         self.dps = dps
+        self.lvl = max(1, int(lvl))   # tek-atma freni için silahın seviyesi
         self.life = life
         self.max_life = max(0.05, life)
         self.burn = burn
@@ -7731,7 +8040,7 @@ class FireRing:
             if not e.alive:
                 continue
             if dist(self.x, self.y, e.x, e.y) <= rad + getattr(e, "radius", 12) * 0.5:
-                run._field_damage(e, self.dps * 0.16)
+                run._field_damage(e, self.dps * 0.16, wlvl=self.lvl)
                 if self.ice:
                     if hasattr(e, "apply_slow"):
                         e.apply_slow(self.slow, 0.8)
@@ -7904,15 +8213,20 @@ class Tornado:
             if e not in self.cut:
                 self.cut.add(e)
                 if not boss and e.hp > 1:
-                    e.hp = max(1.0, e.hp * self.hp_cut)
+                    # AĞIR yaratıklarda (tank/elit/zırhlı) kesme payı yarıya
+                    # iner: hortum onları yumuşatır ama devirmez.
+                    cut = self.hp_cut
+                    if enemy_weight_class(e) == "tough":
+                        cut = 1.0 - (1.0 - cut) * 0.55
+                    e.hp = max(1.0, e.hp * cut)
                     e.hit_flash = 0.16
                     run.fx.popup(e.x, e.y - getattr(e, "radius", 12) - 6,
-                                 f"-%{int(round((1 - self.hp_cut) * 100))} CAN",
+                                 f"-%{int(round((1 - cut) * 100))} CAN",
                                  TORNADO_COLOR2, 14, life=0.6)
             # 2) ÖĞÜT — huninin içinde kalan her an hasar alır. Patron da
             # bundan payını alır (canı yarılanmıyordu, hasarı yiyor).
             if grind > 0:
-                if run._field_damage(e, grind):
+                if run._field_damage(e, grind, wlvl=self.lvl):
                     continue
             # 3) MERKEZE ÇEK — patron daha ağırdır, daha az savrulur.
             dx, dy = norm_dir(e.x, e.y, self.x, self.y)
@@ -8015,9 +8329,10 @@ class FlyingAxe:
     BACK_SPEED = 760.0
     MAX_OUT = 1.5           # hedefe varamazsa bu süre sonunda geri döner
 
-    def __init__(self, player, target, dmg, k=1.0, color=AXE_COLOR):
+    def __init__(self, player, target, dmg, k=1.0, color=AXE_COLOR, lvl=1):
         self.x, self.y = player.x, player.y
         self.dmg = dmg
+        self.lvl = max(1, int(lvl))     # tek-atma freni için silahın seviyesi
         self.k = k                      # boy çarpanı (seviyeyle büyür)
         self.color = color
         self.phase = "out"
@@ -8063,7 +8378,7 @@ class FlyingAxe:
                 continue
             if dist(self.x, self.y, e.x, e.y) < hit_r + getattr(e, "radius", 12):
                 self.hit_set.add(id(e))
-                run._weapon_hit(e, self.dmg, kb=180)
+                run._weapon_hit(e, self.dmg, kb=180, wlvl=self.lvl)
                 # 8 balta aynı anda uçarken her isabette 6 parçacık parçacık
                 # tavanını dolduruyordu; isabetlerin yarısında 3 parçacık yeter.
                 if random.random() < 0.5:
@@ -8552,8 +8867,11 @@ def draw_pentagram(surf, cx, cy, r, ang, t=0.0, color=PENTA_COLOR, color2=PENTA_
 # _fire_weapon() ile atılmazlar; kendi güncelleme yerlerinde işlenirler
 # (kalkan, pentagram alanı, Baran'ın papucu, görünmezlik pelerini).
 BOSS_WEAPONS = [
+    # BALTA: tabanı HİÇ değişmedi (oyuncunun en sevdiği silah). Yalnızca
+    # SEVİYE BAŞINA büyümesi kısıldı: 25. seviyede eskisi gibi uçup kaçmıyor,
+    # ama 1-10 arası hissedilen güç neredeyse birebir aynı.
     dict(key="axe", name="BALTA", icon="sword", color=AXE_COLOR,
-         cd=5.0, dmg=7.0, style=None, dpl=0.031, cdl=1.0,
+         cd=5.0, dmg=7.0, style=None, dpl=0.023, cdl=1.0,
          up="baltalar büyür, daha ağır vurur — birkaç seviyede bir yenisi eklenir",
          desc="Rastgele düşmanlara uçup sana geri döner. Her seviyede daha ağır "
               "vurur; birkaç seviyede bir de yeni bir balta eklenir.",
@@ -8579,11 +8897,21 @@ BOSS_WEAPONS = [
          unlock=dict(text="Bir patron devir ve 400 yaratık öldür",
                      reqs=[rq_stat("bosses", 1, "1 patron devir"),
                            rq_stat("total_kills", 400, "Toplam 400 yaratık öldür")])),
+    # KIRBAÇ (v3.16 NERF): eskiden 4.1 taban hasarla her şeyi TEK atıyordu ve
+    # 1. seviyede bile 200 px'e erişiyordu. Artık:
+    #   * tek vuruş hasarı belirgin düştü (4.1 -> 2.75),
+    #   * buna karşılık SEVİYE BAŞINA kazancı yükseldi (0.040 -> 0.055),
+    #   * MESAFE kısa başlıyor ama her seviyede daha çok uzuyor
+    #     (bkz. WHIP_LEN / WHIP_LEN_PER_LEVEL),
+    #   * tek-atma freninden geçiyor: hiçbir seviyede tankı tek atamaz.
+    # Yani kırbaç artık "al ve kazan" değil, "besle ve uzat" silahı.
     dict(key="whip", name="KIRBAÇ", icon="dash", color=WHIP_COLOR,
-         cd=1.15, dmg=4.1, style=None, dpl=0.040,
-         up="daha uzağa ve daha sık şaklar — birkaç seviyede bir yenisi eklenir",
-         desc="Baktığın yöne şaklar, vurur ve savurur. Her seviyede daha uzağa "
-              "erişir; birkaç seviyede bir de yeni bir kırbaç eklenir.",
+         cd=1.25, dmg=2.75, style=None, dpl=0.055,
+         up="erişimi uzar, yayı genişler ve daha sert savurur — birkaç "
+            "seviyede bir yenisi eklenir",
+         desc="Baktığın yöne şaklar, vurur ve savurur. Yakın başlar ama her "
+              "seviyede gözle görülür biçimde uzar; birkaç seviyede bir de "
+              "yeni bir kırbaç eklenir.",
          how="Kırbaç mesafe tanımaz — sen de tanıma. 40 kez dash at.",
          unlock=dict(text="Yakın dövüşe alış: toplam 40 dash at",
                      reqs=[rq_stat("total_dashes", 40, "Toplam 40 dash at")])),
@@ -8608,10 +8936,18 @@ BOSS_WEAPONS = [
          how="Papuç, çok yürüyene verilir. Sahada toplam 25 dakika geçir.",
          unlock=dict(text="Sahada toplam 25 dakika geçir",
                      reqs=[rq_stat("total_time", 1500, "Toplam 25 dakika oyna")])),
+    # BUZ İZİ (v3.16): artık PAPUÇ'un BİREBİR aynısı — adım mesafesi, halka
+    # yarıçapı, ömrü, hasarı ve dururken de halka bırakması dahil. TEK FARK
+    # elementidir: papuç YAKAR, buz izi YAVAŞLATIR. Eskiden buz izi hem daha
+    # seyrek halka bırakıyor (adım mesafesi %25 uzundu) hem de yarı hasar
+    # vuruyordu; "aynı şeyin başka rengi" olması gerekirken belirgin biçimde
+    # zayıf bir silahtı.
     dict(key="frost", name="BUZ İZİ", icon="snow", color=FROST_COLOR,
-         cd=0.0, dmg=0.62, style=None, passive=True, dpl=0.07,
-         up="halka biraz büyür, daha uzun donar ve daha çok üşütür",
-         desc="Papucun buzu: arkanda kapanan bir don halkası bırakır, içine gireni yavaşlatır.",
+         cd=0.0, dmg=1.30, style=None, passive=True, dpl=0.08,
+         up="halka büyür, daha uzun durur ve daha çok üşütür",
+         desc="Papucun buzu: her adımında arkanda kapanan bir don halkası "
+              "bırakır — durduğun yerde de donmaya devam eder. Papuçla her "
+              "şeyi aynıdır; o yakar, bu yavaşlatır.",
          how="Önce ateşi taşımayı öğren: PAPUÇ açılsın, sonra 12. dalgayı gör.",
          unlock=dict(text="PAPUÇ'u aç ve 12. dalgaya ulaş",
                      reqs=[rq_weapon("shoe", "PAPUÇ silahını aç"),
@@ -8642,11 +8978,22 @@ BOSS_WEAPONS = [
          unlock=dict(text="12. dalgaya ulaş ve toplam 800 dash at",
                      reqs=[rq_stat("best_wave", 12, "12. dalgaya ulaş"),
                            rq_stat("total_dashes", 800, "Toplam 800 dash at")])),
+    # HORTUM (v3.16): "1. seviyede bile her şeyi tek atıyor" sorunu iki yerden
+    # birden çözüldü:
+    #   1) Öğütme hasarı TEK-ATMA FRENİNDEN geçiyor (bkz. cap_oneshot). Yani
+    #      1. seviyede hiçbir şeyi tek tikte öldüremiyor; 10. SEVİYEDEN sonra
+    #      hafif yaratıkları (mavi küçükler, koşucular, imp — "fare/yarasa")
+    #      yeniden tek atıyor; TANK/ELİT/ZIRHLI'yı ise HİÇBİR seviyede tek
+    #      atamıyor, canının en çok %74'ünü alabiliyor.
+    #   2) Taban öğütme hasarı biraz düştü, buna karşılık seviye başına
+    #      kazancı korundu: silah geç oyunda hâlâ ciddi, ama "indiği anda
+    #      ekranı süpüren" bir düğme değil.
     dict(key="tornado", name="HORTUM", icon="orbit", color=TORNADO_COLOR,
-         cd=20.0, dmg=1.20, style=None, cdl=1.0, dpl=0.092,
+         cd=20.0, dmg=0.98, style=None, cdl=1.0, dpl=0.092,
          up="menzil genişler, canı daha derin keser ve içinde daha çok öğütür",
          desc="Yaratıkları ortaya toplar, canlarını azaltır ve huninin içinde "
-              "kalanı sürekli öğütür. Her seviyede daha çok yakar.",
+              "kalanı sürekli öğütür. 10. seviyeden sonra küçük yaratıkları "
+              "anında siler; tankları ise hiçbir seviyede tek atmaz.",
          how="Kalabalığı savurmak için önce kalabalığa dayanmayı öğren: 3 patron devir.",
          unlock=dict(text="3 patron devir",
                      reqs=[rq_stat("bosses", 3, "3 patron devir")])),
@@ -8792,17 +9139,26 @@ SHOE_LIFE_STEPS = (1.5, 1.7, 1.9, 2.1, 2.3)
 SHOE_LIFE_PER_LEVEL = 0.06      # 5. seviyeden sonra her seviyede eklenen saniye
 
 # --- KIRBAÇ ---
-WHIP_LEN = 200.0                # kırbacın erişimi
-WHIP_LEN_PER_LEVEL = 4.0        # 25. seviyede ~296 px
-WHIP_ARC = 0.62                 # kırbacın taradığı yarım açı (radyan)
-WHIP_KB = 620.0                 # savurma kuvveti
+# v3.16: erişim KISA başlar, seviyeyle BELİRGİN uzar. Oyuncu "seviye atladıkça
+# mesafesi artsın" dedi; eski eğride 1. seviye zaten uzundu ve 25 seviye boyunca
+# ancak %48 uzuyordu. Yeni eğride 1. seviye %18 daha kısa, 25. seviye ise iki
+# katından fazla: 158 -> ~350 px.
+WHIP_LEN = 158.0                # 1. seviyedeki erişim
+WHIP_LEN_PER_LEVEL = 8.0        # 25. seviyede ~350 px
+# Taradığı yarım açı da artık seviyeyle açılıyor: dar başlar, genişler.
+WHIP_ARC = 0.50                 # 1. seviyedeki yarım açı (radyan)
+WHIP_ARC_PER_LEVEL = 0.009      # 25. seviyede ~0.72 rad (~82 derecelik koni)
+WHIP_ARC_MAX = 0.74
+WHIP_KB = 540.0                 # savurma kuvveti
 # Kırbaç artık baktığın yöne doğru SALLANARAK atılıyor. Ucu, hedef açının
 # bir yanından öbürüne WHIP_SWING kadar savrulur; bu değer bilerek
 # WHIP_ARC'ın altında tutuldu, böylece görünen savuruş hasar konisinin
 # dışına taşmaz. WHIP_CURL, gövdenin ortasının dışa ne kadar kabardığı:
 # kırbacın S kıvrımını bu kabarma ile ucun gerisinde kalan kabza açısı
 # birlikte doğurur.
-WHIP_SWING = 0.52               # savurma yayının yarısı (radyan)
+# v3.16: hasar konisi 1. seviyede 0.50 rad'a indiği için görünen savuruş da
+# kısıldı — yoksa kırbaç vurmadığı yere savruluyormuş gibi görünüyordu.
+WHIP_SWING = 0.40               # savurma yayının yarısı (radyan)
 WHIP_CURL = 0.55                # gövdenin ortasının dışa kabarması (radyan)
 WHIP_GRIP = 17.0                # kabzanın ucunun oyuncu merkezinden uzaklığı (px)
 
@@ -8822,6 +9178,16 @@ CLOAK_CD_PER_LEVEL = 1.0        # her seviyede beklemeden düşen saniye
 CLOAK_MIN_CD = 36.0             # 25. seviyede ulaşılan taban
 CLOAK_DUR = 5.0                 # görünmez kalma süresi (saniye)
 CLOAK_DUR_PER_LEVEL = 0.10      # her seviyede süreye eklenen saniye
+
+
+def whip_arc(lvl):
+    """KIRBACIN taradığı yarım açı — dar başlar, seviyeyle genişler."""
+    return min(WHIP_ARC_MAX, WHIP_ARC + WHIP_ARC_PER_LEVEL * weapon_growth(lvl))
+
+
+def whip_reach(lvl):
+    """KIRBACIN erişimi — seviyeyle belirgin biçimde uzar."""
+    return WHIP_LEN + WHIP_LEN_PER_LEVEL * weapon_growth(lvl)
 
 
 def emanet_radius(lvl):
@@ -9049,6 +9415,94 @@ def weapon_damage(player, w, level):
     dpl = float(w.get("dpl", WEAPON_DMG_PER_LEVEL))
     return (player.eff_dmg() * w["dmg"] * WEAPON_DMG_GLOBAL
             * (1.0 + dpl * WEAPON_DPL_SCALE * weapon_growth(level)))
+
+
+# =====================================================================
+# TEK-ATMA FRENİ  (v3.16)
+# ---------------------------------------------------------------------
+# İSTEK: "HİÇBİR EŞYA TEK ATMAMALI" — ve özel olarak: hortum 1. seviyede bile
+# her şeyi buharlaştırıyordu, kırbaç da öyle.
+#
+# Çözüm, hasarı tek tek kısmak değil (o zaman silahlar geç oyunda çöpe
+# dönüyor), ORTAK BİR FREN koymak: bir silahın TEK vuruşu, yaratığın O ANKİ
+# canının en çok belirli bir oranını alabilir. Oran 1.0'ın altındayken o
+# vuruş yaratığı ÖLDÜREMEZ — canını düşürür, gerisini bir sonraki vuruş /
+# tik halleder. Oran yaratığın SIKLETİNE ve silahın SEVİYESİNE bağlıdır:
+#
+#   HAFİF  (mavi küçükler, koşucular, imp — "fare/yarasa")
+#       1. seviyede canın %80'i, 10. SEVİYEDE fren tamamen kalkar.
+#       Yani 10. seviyeden sonra bunlar yeniden tek atılır.
+#   ORTA   (kırmızı, sarı, tazı, kâhin, yağmacı)
+#       1. seviyede %68, 18. seviyede fren kalkar.
+#   AĞIR   (tank, gürz, elit, siperci, sancaktar, golem, kasap, gardiyan ve
+#           zırhı olan her şey — "tank")
+#       %46'dan başlar, 25. seviyede ancak %74'e çıkar: HİÇBİR seviyede
+#       tek atılamaz. Tankı devirmek her zaman birkaç vuruş ister.
+#
+# PATRONLAR frenden muaftır: canları zaten oyuncunun gücüne göre
+# ölçekleniyor (bkz. scale_bosses_to_player), fren orada anlamsız olurdu.
+#
+# Fren PENTAGRAM'ın zaten var olan kendi freniyle (penta_sear_cap) aynı
+# mantıkta çalışır; o silah kendi tablosunu kullanmaya devam eder.
+# =====================================================================
+ENEMY_WEIGHT_CLASS = {
+    "blue": "frail", "sprinter": "frail", "imp": "frail",
+    "red": "normal", "yellow": "normal", "hound": "normal",
+    "seer": "normal", "reaver": "normal",
+    "tank": "tough", "brute": "tough", "elite": "tough",
+    "shieldman": "tough", "herald": "tough",
+    "golem": "tough", "butcher": "tough", "warden": "tough",
+}
+# (1. seviyedeki oran, frenin tamamen kalktığı seviye, hiç kalkmıyorsa tavan)
+ONESHOT_CAP_TABLE = {
+    "frail":  (0.80, 10, 1.0),
+    "normal": (0.68, 18, 1.0),
+    "tough":  (0.46, None, 0.74),
+}
+
+
+def enemy_weight_class(e):
+    """Yaratığın SIKLETİ: "frail" | "normal" | "tough".
+
+    Zırhı olan, kalkanlı, elit ya da yarı patron olan her şey AĞIR sayılır —
+    türü tabloda ne yazarsa yazsın.
+    """
+    if getattr(e, "armor", 0.0) > 0.005:
+        return "tough"
+    if getattr(e, "guard_of", None) is not None:
+        return "tough"
+    if getattr(e, "is_mini", False):
+        return "tough"
+    return ENEMY_WEIGHT_CLASS.get(getattr(e, "kind", ""), "normal")
+
+
+def oneshot_cap(e, lvl):
+    """Tek vuruşun yaratığın O ANKİ canından alabileceği EN ÇOK oran (0..1].
+
+    1.0 dönerse fren yoktur (vuruş öldürebilir).
+    """
+    if getattr(e, "is_boss", False):
+        return 1.0
+    base, gate, top = ONESHOT_CAP_TABLE[enemy_weight_class(e)]
+    lvl = max(1, int(lvl))
+    if gate is None:
+        # Fren hiç kalkmaz: taban ile tavan arasında seviyeyle yumuşak yürür.
+        f = clamp(weapon_growth(lvl) / max(1.0, WEAPON_MAX_LEVEL - 1), 0.0, 1.0)
+        return clamp(lerp(base, top, f), 0.0, 0.999)
+    if lvl >= gate:
+        return 1.0
+    return clamp(lerp(base, 1.0, (lvl - 1) / float(gate - 1)), 0.0, 1.0)
+
+
+def cap_oneshot(e, dmg, lvl):
+    """Hasarı tek-atma frenine göre kırpar (bkz. oneshot_cap)."""
+    if lvl is None or dmg <= 0:
+        return dmg
+    cap = oneshot_cap(e, lvl)
+    if cap >= 1.0:
+        return dmg
+    hp = max(0.0, getattr(e, "hp", 0.0))
+    return min(dmg, hp * cap)
 
 
 class BossChest:
@@ -13182,6 +13636,12 @@ class RunState:
         # her kullanımda pahalanır. Sayaçlar koşu boyunca birikir.
         self.reroll_used = 0
         self.skip_used = 0
+        # --- GİZLİ DENGE (bkz. _roll_destiny / _meta_weight) ---
+        # Her koşunun kendi "kader tohumu" var: hangi silah/kitapların bu
+        # koşuda hiç gelmeyeceği buradan belirleniyor. Oyuncuya gösterilmez.
+        self.destiny_seed = random.randrange(1 << 30)
+        self.destiny_locked = set()
+        self.offer_seen = {}
         self.shop_offers = []
         self.market_portal = None
         self.want_open_shop = False
@@ -13216,6 +13676,8 @@ class RunState:
         # Koşu bitince doldurulur: bu koşuda kilidi açılan silah ve kitaplar.
         self.new_weapons = []
         self.new_books = []
+        # Kader kilidini ŞİMDİ at: havuz koşu boyunca sabit kalsın.
+        self._roll_destiny()
 
     # ---------------- KAMERA ----------------
     def cam_rect(self):
@@ -13513,7 +13975,7 @@ class RunState:
                     if near >= 3:
                         break
             if near >= 3:
-                atk_mult *= (1.0 + 0.30 * p.swarm_level)
+                atk_mult *= (1.0 + p.swarm_bonus())
         n = 1 + p.multishot_level
         spread_deg = 9
         base_ang = math.atan2(aim_dy, aim_dx)
@@ -13715,8 +14177,12 @@ class RunState:
             self._fire_weapon(w, lvl, targets)
             p.weapon_timers[key] = weapon_cooldown(w, lvl)
 
-    def _weapon_hit(self, e, dmg, kb=90, crit=None):
-        """Silah vuruşunun ortak kapısı: kritik, infaz, kan emme, ölüm."""
+    def _weapon_hit(self, e, dmg, kb=90, crit=None, wlvl=None):
+        """Silah vuruşunun ortak kapısı: kritik, infaz, kan emme, ölüm.
+
+        wlvl verilirse TEK-ATMA FRENİ uygulanır (bkz. cap_oneshot): vuruş,
+        yaratığın o anki canının ancak belirli bir oranını alabilir.
+        """
         p = self.player
         if crit is None:
             crit = random.random() < p.eff_crit_chance()
@@ -13724,8 +14190,9 @@ class RunState:
             p.run_crits += 1
             dmg *= p.eff_crit_dmg()
         if p.boss_hunter > 0 and (getattr(e, "is_boss", False) or getattr(e, "kind", "") == "elite"):
-            dmg *= (1.0 + 0.30 * p.boss_hunter)
+            dmg *= (1.0 + p.boss_hunter_bonus())
         dmg = self._apply_execute(p, e, dmg)
+        dmg = cap_oneshot(e, dmg, wlvl)
         kx, ky = norm_dir(p.x, p.y, e.x, e.y)
         real_kb = 12 if getattr(e, "is_boss", False) else kb
         died = e.take_damage(dmg, crit, self.fx, kx * real_kb, ky * real_kb)
@@ -13746,7 +14213,7 @@ class RunState:
         self.player_projectiles.append(pr)
         return pr
 
-    def _field_damage(self, e, dmg, burn=0.0):
+    def _field_damage(self, e, dmg, burn=0.0, wlvl=None):
         """ALAN hasarının ortak kapısı (su / ateş / pentagram / kitap).
 
         Alanlar saniyede birkaç kez vurduğu için burada kritik hesaplanmaz ve
@@ -13756,8 +14223,9 @@ class RunState:
         """
         p = self.player
         if p.boss_hunter > 0 and (getattr(e, "is_boss", False) or getattr(e, "kind", "") == "elite"):
-            dmg *= (1.0 + 0.30 * p.boss_hunter)
+            dmg *= (1.0 + p.boss_hunter_bonus())
         dmg = self._apply_execute(p, e, dmg)
+        dmg = cap_oneshot(e, dmg, wlvl)
         died = e.take_damage(dmg, False, self.fx, quiet=True)
         if burn > 0 and hasattr(e, "apply_burn"):
             e.apply_burn(burn, 1.4)
@@ -13808,7 +14276,7 @@ class RunState:
                     if not e.alive:
                         continue
                     if dist(bx, by, e.x, e.y) < getattr(e, "radius", 12) + 15:
-                        self._field_damage(e, bdmg * 6.0)
+                        self._field_damage(e, bdmg * 6.0, wlvl=blvl)
 
         # ---- PENTAGRAM ----
         plvl = p.weapons.get("pentagram", 0)
@@ -13908,7 +14376,8 @@ class RunState:
                 sw = WEAPON_BY_KEY["shoe"]
                 dps = weapon_damage(p, sw, slvl)
                 self.fire_rings.append(FireRing(p.x, p.y, shoe_radius(slvl), dps,
-                                                shoe_life(slvl), burn=dps * 0.30))
+                                                shoe_life(slvl), burn=dps * 0.30,
+                                                lvl=slvl))
                 sfx("blaze", 0.16, 0.06)
 
         # ---- GÖRÜNMEZLİK PELERİNİ ----
@@ -13946,12 +14415,18 @@ class RunState:
         if flvl > 0:
             if p.frost_last is None:
                 p.frost_last = (p.x, p.y)
-            if dist(p.x, p.y, p.frost_last[0], p.frost_last[1]) >= SHOE_STEP * 1.25:
+            p.frost_idle += dt
+            # PAPUÇ ile BİREBİR aynı kural: ya SHOE_STEP kadar yürünür, ya da
+            # hiç yürümeden SHOE_IDLE_EVERY saniye geçer. Eskiden buz izi
+            # yalnızca yürürken ve %25 daha seyrek halka bırakıyordu.
+            stepped = dist(p.x, p.y, p.frost_last[0], p.frost_last[1]) >= SHOE_STEP
+            if stepped or p.frost_idle >= SHOE_IDLE_EVERY:
                 p.frost_last = (p.x, p.y)
+                p.frost_idle = 0.0
                 fw = WEAPON_BY_KEY["frost"]
                 dps = weapon_damage(p, fw, flvl)
                 self.fire_rings.append(FireRing(p.x, p.y, shoe_radius(flvl), dps,
-                                                shoe_life(flvl), ice=True,
+                                                shoe_life(flvl), ice=True, lvl=flvl,
                                                 slow=max(0.30, 0.62
                                                         - 0.013 * weapon_growth(flvl))))
                 sfx("ice_step", 0.16, 0.06)
@@ -14037,10 +14512,10 @@ class RunState:
             # balta RASTGELE bir düşmana uçar, vurur ve oyuncuya geri döner.
             # Boyu seviyeyle büyür.
             n_axe = weapon_count(lvl)
-            k = 0.92 + 0.03 * weapon_growth(lvl)
+            k = 0.92 + 0.021 * weapon_growth(lvl)
             for i in range(n_axe):
                 tgt = random.choice(targets)
-                ax = FlyingAxe(p, tgt, dmg, k, w["color"])
+                ax = FlyingAxe(p, tgt, dmg, k, w["color"], lvl=lvl)
                 # Baltalar tam üst üste çıkmasın: oyuncunun çevresine dağıt.
                 a0 = random.uniform(0, math.tau)
                 ax.x += math.cos(a0) * 16
@@ -14061,7 +14536,8 @@ class RunState:
             adx, ady = p.aim_dir
             base_ang = math.atan2(ady, adx)
             n_whip = weapon_count(lvl)
-            reach = WHIP_LEN + WHIP_LEN_PER_LEVEL * weapon_growth(lvl)
+            reach = whip_reach(lvl)
+            half_arc = whip_arc(lvl)
             width = 9 + n_whip
             total_hit = 0
             # 8 kırbaç x 20 düşman x 7 parçacık = 1120 parçacık; tavan 650.
@@ -14084,10 +14560,10 @@ class RunState:
                         continue
                     ex, ey = (e.x - p.x) / d, (e.y - p.y) / d
                     # Kırbacın taradığı koni: yaratık bu açının içinde mi?
-                    if ca * ex + sa * ey < math.cos(WHIP_ARC):
+                    if ca * ex + sa * ey < math.cos(half_arc):
                         continue
                     # SAVURMA: hasarla birlikte düşmanı ileri fırlatır.
-                    self._weapon_hit(e, dmg, kb=WHIP_KB)
+                    self._weapon_hit(e, dmg, kb=WHIP_KB, wlvl=lvl)
                     if fx_left > 0:
                         fx_left -= 1
                         self.fx.burst(e.x, e.y, WHIP_COLOR2, n=5, speed=190, life=0.3, r=2.6)
@@ -14125,7 +14601,7 @@ class RunState:
                     if arm > 0.005:
                         # take_damage zırhı ayrıca kesecek; payı burada geri al.
                         edmg /= max(0.25, 1.0 - arm)
-                self._weapon_hit(e, edmg, kb=EMANET_KB)
+                self._weapon_hit(e, edmg, kb=EMANET_KB, wlvl=lvl)
                 if fx_left > 0:
                     fx_left -= 1
                     self.fx.spark(e.x, e.y, EMANET_COLOR2,
@@ -14157,7 +14633,7 @@ class RunState:
                 r2 = random.uniform(ZEMZEM_THROW * 0.35, ZEMZEM_THROW)
                 spots.append((p.x + math.cos(a) * r2, p.y + math.sin(a) * r2))
             for (sx, sy) in spots:
-                self.water_zones.append(WaterZone(sx, sy, rad, dmg, ZEMZEM_LIFE))
+                self.water_zones.append(WaterZone(sx, sy, rad, dmg, ZEMZEM_LIFE, lvl=lvl))
                 self.fx.burst(sx, sy, ZEMZEM_COLOR2, n=16, speed=210, life=0.45, r=3.0)
                 self.fx.shockwave(sx, sy, rad, ZEMZEM_COLOR, 0.35, 4)
                 # suyun oyuncudan hedefe uçtuğu iz
@@ -14216,7 +14692,7 @@ class RunState:
                 final_dmg = self._apply_execute(p, e, final_dmg)
                 kx, ky = norm_dir(p.x, p.y, e.x, e.y)
                 if p.boss_hunter > 0 and (getattr(e, "is_boss", False) or e.kind == "elite"):
-                    final_dmg *= (1.0 + 0.30 * p.boss_hunter)
+                    final_dmg *= (1.0 + p.boss_hunter_bonus())
                 died = e.take_damage(final_dmg, crit, self.fx, kx * 260, ky * 260)
                 # KÜKREME KİTABI: BONK yiyen sıradan düşmanlar korkup kaçar
                 if p.roar_level > 0 and not getattr(e, "is_boss", False) and hasattr(e, "fear_timer"):
@@ -14287,7 +14763,7 @@ class RunState:
         """Yetenek hasarı uygular; ölürse ödülleri işler."""
         p = self.player
         if p.boss_hunter > 0 and (getattr(e, "is_boss", False) or getattr(e, "kind", "") == "elite"):
-            dmg *= (1.0 + 0.30 * p.boss_hunter)
+            dmg *= (1.0 + p.boss_hunter_bonus())
         kx, ky = norm_dir(p.x, p.y, e.x, e.y)
         died = e.take_damage(dmg, crit, self.fx, kx * kb, ky * kb)
         if died:
@@ -14941,7 +15417,7 @@ class RunState:
                         dmg = proj.dmg * (proj.crit_mult if crit else 1.0)
                         # PATRON AVCISI KİTABI: patron ve elitlere ek hasar
                         if p.boss_hunter > 0 and (getattr(e, "is_boss", False) or e.kind == "elite"):
-                            dmg *= (1.0 + 0.30 * p.boss_hunter)
+                            dmg *= (1.0 + p.boss_hunter_bonus())
                         dmg = self._apply_execute(p, e, dmg)
                         kx, ky = norm_dir(p.x, p.y, e.x, e.y)
                         kb = 12 if getattr(e, "is_boss", False) else 90
@@ -15078,13 +15554,92 @@ class RunState:
             "desc": w["desc"] if is_new else (w.get("up") or "daha sert vurur"),
         }
 
-    def _book_offer(self, bk):
+    def _book_offer(self, bk, lvl, is_new):
         """Seviye atlama kartı için KİTAP teklifi."""
+        rare = bool(bk.get("rare"))
         return {
-            "kind": "book", "key": bk["key"], "book": bk,
+            "kind": "book", "key": bk["key"], "book": bk, "lvl": lvl, "new": is_new,
             "name": bk["name"], "color": tuple(bk["color"]), "icon": bk.get("icon", "star"),
-            "desc": bk["desc"], "rare": bool(bk.get("rare")),
+            "desc": bk["desc"], "rare": rare,
+            "max": 1 if rare else BOOK_MAX_LEVEL,
         }
+
+    # ---------------- GİZLİ DENGE (anti-meta) ----------------
+    # Oyun dünya sıralamalı olduğu için her koşunun AYNI bitmesi istenmiyor.
+    # Oyuncu aklındaki kombonun (örn. HORTUM + ZEMZEM + can çalma) eksik
+    # parçasını her koşuda bulabilseydi, sıralama "o komboyu kim daha hızlı
+    # toplar" yarışına dönerdi ve oyun bir koşudan sonra bitmiş olurdu.
+    #
+    # Üç fren birlikte çalışır ve HİÇBİRİ oyuncuya gösterilmez:
+    #   1) KADER KİLİDİ   : her koşunun başında birkaç silah/kitap o koşuya
+    #                       hiç gelmemek üzere kapanır (bkz. _roll_destiny).
+    #   2) KOMBO ISISI    : bilinen güçlü setlerin eksik parçası, oyuncu o
+    #                       setten ne kadar çok parça topladıysa o kadar
+    #                       seyrek çıkar. Kombo yasak değil — PAHALI.
+    #   3) TEKRAR BASKISI : aynı kart üst üste teklif edildikçe ağırlığı
+    #                       düşer; "ben bunu zaten gördüm" hissi azalır.
+    #
+    # Hiçbir fren bir şeyi imkânsız kılmaz: şanslı bir koşuda kombo yine
+    # kurulur. Amaç her koşuyu GARANTİ olmaktan çıkarıp bir kumara çevirmek.
+    COMBO_SETS = [
+        # (parçalar, komboyu ne kadar frenleyeceğimiz)
+        (("tornado", "zemzem", "r_vamp"), 0.80),
+        (("tornado", "zemzem", "r_killheal"), 0.80),
+        (("pentagram", "shoe", "frost"), 0.70),
+        (("whip", "emanet", "r_swarm"), 0.60),
+        (("axe", "r_critd", "r_crit"), 0.60),
+        (("book", "cloak", "r_lasthope"), 0.65),
+        (("r_rage", "r_lasthope", "r_killheal"), 0.75),
+    ]
+
+    def _roll_destiny(self):
+        """Koşunun başında kapanacak silah/kitapları seçer (KADER KİLİDİ).
+
+        Oyuncunun açtığı içerik azsa hiçbir şey kapatılmaz — yeni oyuncunun
+        zaten dar olan havuzu daha da daraltılmaz.
+        """
+        self.destiny_locked = set()
+        rnd = random.Random(self.destiny_seed)
+        wk = [w["key"] for w in self.save.unlocked_weapons()]
+        if len(wk) >= 6:
+            rnd.shuffle(wk)
+            self.destiny_locked.update(wk[:rnd.randint(1, 2)])
+        bk = [b["key"] for b in self.save.unlocked_books() if not b.get("rare")]
+        if len(bk) >= 8:
+            rnd.shuffle(bk)
+            self.destiny_locked.update(bk[:rnd.randint(1, 2)])
+        rb = [b["key"] for b in self.save.unlocked_books() if b.get("rare")]
+        if len(rb) >= 4:
+            rnd.shuffle(rb)
+            self.destiny_locked.update(rb[:rnd.randint(1, 2)])
+
+    def _combo_damp(self, key):
+        """KOMBO ISISI: oyuncu bir setin ne kadarını topladıysa, eksik
+        parçasının ağırlığı o kadar düşer (0.18 .. 1.0 arası çarpan)."""
+        p = self.player
+        owned = set(p.weapons) | set(p.books)
+        damp = 1.0
+        for parts, strength in self.COMBO_SETS:
+            if key not in parts or key in owned:
+                continue
+            have = sum(1 for k in parts if k in owned)
+            if have <= 0:
+                continue
+            # setin tamamına ne kadar yaklaşıldıysa o kadar sert fren
+            f = have / float(len(parts) - 1) if len(parts) > 1 else 1.0
+            damp *= max(0.18, 1.0 - strength * clamp(f, 0.0, 1.0))
+        return damp
+
+    def _meta_weight(self, key, base):
+        """Bir teklifin GERÇEK ağırlığı: gizli frenlerden geçmiş hâli."""
+        if key in self.destiny_locked:
+            return 0.0
+        w = base * self._combo_damp(key)
+        seen = self.offer_seen.get(key, 0)
+        if seen > 2:
+            # aynı kart tekrar tekrar çıkmasın: her fazladan görülmede -%12
+            w *= max(0.45, 1.0 - 0.12 * (seen - 2))
+        return max(0.0, w)
 
     def levelup_pool(self):
         """Bu seviye atlamada çıkabilecek bütün teklifler ve ağırlıkları."""
@@ -15100,40 +15655,99 @@ class RunState:
             if key in have:
                 if p.weapons[key] < weapon_max_level(w):
                     offers.append(self._weapon_offer(w, p.weapons[key] + 1, False))
-                    weights.append(11)
+                    weights.append(self._meta_weight(key, 11))
             elif room:
                 # Henüz 4 silahı dolmayan oyuncuya YENİ silah daha sık çıkar:
                 # oyuncunun önce kendi takımını kurması isteniyor.
                 offers.append(self._weapon_offer(w, 1, True))
-                weights.append(20)
+                weights.append(self._meta_weight(key, 18))
 
         # --- KİTAPLAR ---
+        # v3.16: kitaplar da silahlar gibi YUVALI. Normal kitap yuvası dolmuşsa
+        # yalnızca elindeki kitapların yükseltmesi gelir; nadir kitap alınmışsa
+        # havuzdaki bütün nadirler kapanır.
         books = self.save.unlocked_books()
         if not books:
             # EMNİYET: hiç kitap açılmamışsa ekran boş kalmasın.
-            books = [b for b in BOOKS if b.get("basic")] or list(BOOKS)
+            books = [BOOK_BY_KEY[k] for k in STARTER_BOOKS] or list(BOOKS)
+        book_room = p.normal_book_count() < MAX_RUN_BOOKS
+        rare_room = p.rare_book_count() < MAX_RUN_RARE_BOOKS
         for bk in books:
-            offers.append(self._book_offer(bk))
-            weights.append(4 if bk.get("rare") else 10)
+            key = bk["key"]
+            cur = p.books.get(key, 0)
+            rare = bool(bk.get("rare"))
+            if rare:
+                if cur > 0 or not rare_room:
+                    continue
+                offers.append(self._book_offer(bk, 1, True))
+                weights.append(self._meta_weight(key, 5))
+                continue
+            if cur <= 0:
+                if not book_room:
+                    continue
+                # Yeni kitap, yeni silah kadar sık çıksın: oyuncu seviye
+                # atlarken gerçekten "silah mı, kitap mı?" diye düşünsün.
+                offers.append(self._book_offer(bk, 1, True))
+                weights.append(self._meta_weight(key, 17))
+            elif cur < BOOK_MAX_LEVEL:
+                offers.append(self._book_offer(bk, cur + 1, False))
+                weights.append(self._meta_weight(key, 12))
         return offers, weights
 
     def start_levelup_choice(self):
-        """Üç teklif seçer. Aynı şey iki kez çıkmaz."""
+        """Üç teklif seçer. Aynı şey iki kez çıkmaz.
+
+        v3.16: el DENGELİ dağıtılır — mümkünse en az bir SİLAH ve en az bir
+        KİTAP kartı bulunur. Eskiden silahların ağırlığı yüksek olduğu için
+        üç kartın üçü birden silah çıkabiliyordu ve oyun tamamen silah
+        üzerine gidiyordu.
+        """
         offers, weights = self.levelup_pool()
-        if not offers:
+        pool = [(o, w) for o, w in zip(offers, weights) if w > 0]
+        if not pool:
+            # Gizli frenler her şeyi kapattıysa frensiz havuza düş.
+            pool = [(o, max(1.0, w)) for o, w in zip(offers, weights)]
+        if not pool:
             # Hiçbir teklif üretilemezse (her şey tavanda) seviye boşa gitmesin.
             self.levelup_choices = []
             return
-        chosen, seen, attempts = [], set(), 0
+        offers = [o for o, _ in pool]
+        weights = [w for _, w in pool]
+
+        def draw(cands, cand_w, seen):
+            for _ in range(60):
+                pick = random.choices(cands, weights=cand_w, k=1)[0]
+                if (pick["kind"], pick["key"]) not in seen:
+                    return pick
+            for c in cands:
+                if (c["kind"], c["key"]) not in seen:
+                    return c
+            return None
+
         want = min(3, len(offers))
-        while len(chosen) < want and attempts < 120:
-            attempts += 1
-            pick = random.choices(offers, weights=weights, k=1)[0]
-            sig = (pick["kind"], pick["key"])
-            if sig in seen:
+        chosen, seen = [], set()
+        # 1) Önce birer silah ve birer kitap garanti edilir (varsa).
+        for kind in ("weapon", "book"):
+            if len(chosen) >= want:
+                break
+            cands = [o for o in offers if o["kind"] == kind]
+            if not cands:
                 continue
-            seen.add(sig)
+            cw = [weights[offers.index(o)] for o in cands]
+            pick = draw(cands, cw, seen)
+            if pick is not None:
+                seen.add((pick["kind"], pick["key"]))
+                chosen.append(pick)
+        # 2) Kalan yerler normal ağırlıkla dolar.
+        while len(chosen) < want:
+            pick = draw(offers, weights, seen)
+            if pick is None:
+                break
+            seen.add((pick["kind"], pick["key"]))
             chosen.append(pick)
+        random.shuffle(chosen)
+        for c in chosen:
+            self.offer_seen[c["key"]] = self.offer_seen.get(c["key"], 0) + 1
         self.levelup_choices = chosen
 
     def choose_levelup(self, idx):
@@ -15143,8 +15757,20 @@ class RunState:
         ch = self.levelup_choices[idx]
         p = self.player
         if ch["kind"] == "book":
-            p.apply_run_upgrade(ch["key"])
             col = ch["color"]
+            lvl = p.take_book(ch["key"])
+            if lvl <= 0:
+                # Yuvası dolmuş / tavanı dolmuş bir kitap kartı (olmaması
+                # gerekir ama el bir kare eskimişse olabilir): seviye yanmasın.
+                self.start_levelup_choice()
+                return
+            bk = ch["book"]
+            if bk.get("rare"):
+                self.fx.popup(p.x, p.y - 64, f"{bk['name']}", col, 24, life=1.6)
+            else:
+                self.fx.popup(p.x, p.y - 64,
+                              f"{bk['name']}" + ("" if lvl <= 1 else f"  Lv.{lvl}"),
+                              col, 22, life=1.3)
         else:
             key = ch["key"]
             w = ch["w"]
@@ -16084,8 +16710,19 @@ def cycle_skill_scale():
 _wslot_panel_cache = {}
 
 
-def _weapon_slot_panel(w, h):
-    """Silah yuvalarının arka paneli (degrade + çerçeve) — önbellekli."""
+def _fit_text(txt, size, max_w, bold=False):
+    """Metni verilen genişliğe sığdırır; sığmıyorsa sonunu kısaltır."""
+    if text_width(txt, size, bold) <= max_w:
+        return txt
+    for n in range(len(txt) - 1, 1, -1):
+        cut = txt[:n] + "."
+        if text_width(cut, size, bold) <= max_w:
+            return cut
+    return txt[:1]
+
+
+def _slot_strip(w, h):
+    """Yatay yuva şeridinin arka paneli (degrade + çerçeve) — önbellekli."""
     key = (w, h)
     bs = _wslot_panel_cache.get(key)
     if bs is not None:
@@ -16093,88 +16730,103 @@ def _weapon_slot_panel(w, h):
     if len(_wslot_panel_cache) > 24:
         _wslot_panel_cache.clear()
     bs = pygame.Surface((w, h), pygame.SRCALPHA)
-    base_top, base_bot = (16, 18, 30, 190), (9, 10, 18, 205)
+    top_c, bot_c = (18, 20, 33, 176), (10, 11, 20, 196)
     for yy in range(h):
         f = yy / max(1, h - 1)
-        col_line = tuple(int(lerp(base_top[k], base_bot[k], f)) for k in range(4))
-        pygame.draw.line(bs, col_line, (0, yy), (w, yy))
-    # köşeleri yuvarlamak için üstüne maskeli bir çerçeve daha bas
+        pygame.draw.line(bs, tuple(int(lerp(top_c[k], bot_c[k], f)) for k in range(4)),
+                         (0, yy), (w, yy))
     mask = pygame.Surface((w, h), pygame.SRCALPHA)
     pygame.draw.rect(mask, (255, 255, 255, 255), mask.get_rect(), border_radius=12)
     bs.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
-    pygame.draw.rect(bs, (64, 70, 100, 215), bs.get_rect(), width=2, border_radius=12)
-    pygame.draw.line(bs, (150, 160, 210, 130), (10, 1), (w - 10, 1), 1)
+    pygame.draw.rect(bs, (62, 70, 102, 200), bs.get_rect(), width=2, border_radius=12)
+    pygame.draw.line(bs, (148, 158, 206, 110), (12, 1), (w - 12, 1), 1)
     _wslot_panel_cache[key] = bs
     return bs
 
 
-def draw_weapon_slots(surf, run, t):
-    """SOL ÜSTTEKİ SİLAH YUVALARI.
+def _empty_slot(surf, r, t, i, radius=10):
+    """BOŞ YUVA: nefes alan kesik çizgili çerçeve + soluk artı."""
+    breathe = 0.5 + 0.5 * math.sin(t * 1.6 + i * 0.7)
+    pygame.draw.rect(surf, (15, 16, 25), r, border_radius=radius)
+    dash_col = tuple(int(lerp(40, 68, breathe)) for _ in range(3))
+    dr = r.inflate(-3, -3)
+    seg, gapl = 6, 5
+    pts = [dr.topleft, dr.topright, dr.bottomright, dr.bottomleft, dr.topleft]
+    edges = list(zip(pts, pts[1:]))
+    perim = 2 * (dr.w + dr.h)
+    pos = 0.0
+    while pos < perim:
+        d = pos
+        for (ax, ay), (bx, by) in edges:
+            elen = math.hypot(bx - ax, by - ay)
+            if d <= elen:
+                f0, f1 = d / elen, min(1.0, (d + seg) / elen)
+                pygame.draw.line(surf, dash_col,
+                                 (ax + (bx - ax) * f0, ay + (by - ay) * f0),
+                                 (ax + (bx - ax) * f1, ay + (by - ay) * f1), 2)
+                break
+            d -= elen
+        pos += seg + gapl
+    a_ = int(55 + 65 * breathe)
+    ps = pygame.Surface(r.size, pygame.SRCALPHA)
+    arm = max(4, r.w * 0.13)
+    pygame.draw.line(ps, (140, 150, 190, a_), (r.w / 2 - arm, r.h / 2), (r.w / 2 + arm, r.h / 2), 2)
+    pygame.draw.line(ps, (140, 150, 190, a_), (r.w / 2, r.h / 2 - arm), (r.w / 2, r.h / 2 + arm), 2)
+    surf.blit(ps, r.topleft)
 
-    Oyuncunun seçtiği en fazla MAX_RUN_WEAPONS silahı, seviyesiyle birlikte
-    gösterir. Boş yuvalar nefes alan kesik çizgili bir çerçeve olarak durur
-    ki oyuncu kaç silah daha alabileceğini bir bakışta görsün. Bekleme
-    süresi olan silahların yuvası aşağıdan yukarı, hafif parlayan bir "sıvı
-    seviyesi" gibi dolar; hazır olanlar çevresindeki ışık halkasıyla nabız
-    atar. İkon olarak artık genel sword/star yerine SİLAHLIK ekranıyla aynı
-    kişisel arma (draw_weapon_sigil) kullanılıyor, böylece bütün oyun
-    boyunca aynı silah her yerde aynı simgeyle tanınıyor.
+
+def _level_badge(surf, cx, cy, lvl, col, maxed=False, h=18):
+    """Yuvanın köşesindeki seviye madalyonu (iki haneli sayıda hap biçimi)."""
+    txt = str(lvl)
+    bw = h + (0 if lvl < 10 else 7)
+    badge = pygame.Rect(0, 0, bw, h)
+    badge.center = (int(cx), int(cy))
+    pygame.draw.rect(surf, (9, 10, 17), badge, border_radius=h // 2)
+    pygame.draw.rect(surf, GOLD if maxed else col, badge, width=2, border_radius=h // 2)
+    draw_text(surf, txt, badge.center, 10 if lvl < 10 else 9,
+              GOLD if maxed else lighten(col, 0.2), bold=True, center=True, shadow=False)
+
+
+# Yatay şeritlerin ortak ölçüleri. Hepsi tek yerde dursun ki silah ve kitap
+# şeritleri birbiriyle HİZALI kalsın (eskiden yuvalar sol kenarda dikey bir
+# sütundu ve canın altındaki alanı boydan boya kapatıyordu).
+HUD_STRIP_X = 18
+WSLOT_CELL = 48
+WSLOT_GAP = 8
+BSLOT_CELL = 38
+BSLOT_GAP = 7
+HUD_WEAPON_Y = 96        # silah şeridinin üst kenarı
+HUD_BOOK_Y = HUD_WEAPON_Y + WSLOT_CELL + 35   # kitap şeridinin üst kenarı
+
+
+def draw_weapon_slots(surf, run, t):
+    """CANIN ALTINDAKİ YATAY SİLAH ŞERİDİ.
+
+    v3.16: yuvalar artık sol kenarda dikey bir sütun değil, can/tecrübe
+    çubuklarının hemen ALTINDA YATAY bir şerit. Böylece hem sahanın solu
+    açılıyor hem de hemen altındaki KİTAP şeridiyle birlikte "takımın" tek
+    bakışta okunuyor: üstte 4 silah, altta 4 kitap + 1 nadir.
     """
     p = run.player
-    # y0, HUD'ın sol üstteki can/tecrübe/altın satırlarının ALTINDAN başlar;
-    # daha yukarıda "Altın: ..." yazısının üstüne biniyordu.
-    x0, y0 = 12, 118
-    cell = 50
-    gap = 8
+    cell, gap = WSLOT_CELL, WSLOT_GAP
     keys = [k for k in BOSS_WEAPONS_ORDER if p.weapons.get(k, 0) > 0]
     n_filled = len(keys)
     n = max(MAX_RUN_WEAPONS, n_filled)
+    x0, y0 = HUD_STRIP_X, HUD_WEAPON_Y
 
-    # ---- arka panel: ince degrade zemin + üstte parlak bir vurgu çizgisi ----
-    # Panel yalnızca ÖLÇÜSÜNE bağlı; her karede satır satır üretmek kare
-    # süresinin en büyük kalemiydi (ölçümde ~3.6 ms). Artık önbellekten.
-    back = pygame.Rect(x0 - 8, y0 - 24, cell + 16, 22 + n * (cell + gap) + 4)
-    surf.blit(_weapon_slot_panel(back.w, back.h), back.topleft)
-    head_txt = f"SİLAHLAR  {n_filled}/{MAX_RUN_WEAPONS}"
+    back = pygame.Rect(x0 - 8, y0 - 17, n * cell + (n - 1) * gap + 16, cell + 25)
+    surf.blit(_slot_strip(back.w, back.h), back.topleft)
     full = n_filled >= MAX_RUN_WEAPONS
-    draw_text(surf, head_txt, (back.centerx, y0 - 15), 10,
-              GOLD if full else TEXT_DIM, bold=True, center=True, shadow=False)
+    hcol = GOLD if full else TEXT_DIM
+    draw_text(surf, "SİLAHLAR", (back.x + 10, y0 - 15), 10, hcol, bold=True, shadow=False)
+    draw_text(surf, f"{n_filled}/{MAX_RUN_WEAPONS}",
+              (back.x + 14 + text_width("SİLAHLAR", 10, True), y0 - 15), 10,
+              hcol if full else (104, 110, 136), bold=True, shadow=False)
 
     for i in range(n):
-        r = pygame.Rect(x0, y0 + i * (cell + gap), cell, cell)
-
+        r = pygame.Rect(x0 + i * (cell + gap), y0, cell, cell)
         if i >= n_filled:
-            # BOŞ YUVA: nefes alan kesik çizgili çerçeve + soluk artı
-            breathe = 0.5 + 0.5 * math.sin(t * 1.6 + i * 0.7)
-            pygame.draw.rect(surf, (15, 16, 25), r, border_radius=11)
-            dash_col = tuple(int(lerp(42, 70, breathe)) for _ in range(3))
-            dr = r.inflate(-3, -3)
-            seg, gapl = 7, 5
-            perim = 2 * (dr.w + dr.h)
-            pos = 0.0
-            pts = [dr.topleft, dr.topright, dr.bottomright, dr.bottomleft, dr.topleft]
-            edges = list(zip(pts, pts[1:]))
-            while pos < perim:
-                # kenarlar arasında kesikli çizgi ilerlet
-                d = pos
-                for (ax, ay), (bx, by) in edges:
-                    elen = math.hypot(bx - ax, by - ay)
-                    if d <= elen:
-                        f0 = d / elen
-                        f1 = min(1.0, (d + seg) / elen)
-                        p0 = (ax + (bx - ax) * f0, ay + (by - ay) * f0)
-                        p1 = (ax + (bx - ax) * f1, ay + (by - ay) * f1)
-                        pygame.draw.line(surf, dash_col, p0, p1, 2)
-                        break
-                    d -= elen
-                pos += seg + gapl
-            plus_a = int(60 + 70 * breathe)
-            ps = pygame.Surface(r.size, pygame.SRCALPHA)
-            pygame.draw.line(ps, (140, 150, 190, plus_a),
-                             (r.w / 2 - 6, r.h / 2), (r.w / 2 + 6, r.h / 2), 2)
-            pygame.draw.line(ps, (140, 150, 190, plus_a),
-                             (r.w / 2, r.h / 2 - 6), (r.w / 2, r.h / 2 + 6), 2)
-            surf.blit(ps, r.topleft)
+            _empty_slot(surf, r, t, i)
             continue
 
         key = keys[i]
@@ -16182,16 +16834,12 @@ def draw_weapon_slots(surf, run, t):
         lvl = p.weapons[key]
         col = tuple(w["color"])
         passive = bool(w.get("passive"))
-        # PELERİN "sürekli" bir silah ama kendi bekleme süresi var: yuvada
-        # geri saysın, görünmezlik açıkken de HAZIR gibi parlasın.
         timed = bool(w.get("timed"))
         invis_now = timed and getattr(p, "invis_t", 0.0) > 0
         if timed:
-            if invis_now:
-                remain, total_cd = 0.0, 0.0
-            else:
-                remain = max(0.0, getattr(p, "cloak_timer", 0.0))
-                total_cd = cloak_cooldown(lvl)
+            remain, total_cd = ((0.0, 0.0) if invis_now
+                                else (max(0.0, getattr(p, "cloak_timer", 0.0)),
+                                      cloak_cooldown(lvl)))
         elif passive:
             remain, total_cd = 0.0, 0.0
         else:
@@ -16201,91 +16849,127 @@ def draw_weapon_slots(surf, run, t):
         frac = 0.0 if ready else clamp(remain / max(0.0001, total_cd), 0.0, 1.0)
         pulse = 0.5 + 0.5 * math.sin(t * 3.2 + i * 0.9)
 
-        # hazırken hücrenin ARKASINA yumuşak, silahın kendi renginde bir hale
         if ready:
-            add_glow(surf, r.centerx, r.centery, cell * 0.95, col, 0.22 + 0.14 * pulse)
-
-        # ---- gövde: koyu zemin üstüne silahın renginden hafif bir iç ton ----
-        pygame.draw.rect(surf, (17, 18, 29), r, border_radius=11)
+            add_glow(surf, r.centerx, r.centery, cell * 0.95, col, 0.20 + 0.13 * pulse)
+        pygame.draw.rect(surf, (17, 18, 29), r, border_radius=10)
         tint = pygame.Surface(r.size, pygame.SRCALPHA)
-        pygame.draw.rect(tint, (*scale_col(col, 0.55), 46), tint.get_rect(), border_radius=11)
+        pygame.draw.rect(tint, (*scale_col(col, 0.55), 46), tint.get_rect(), border_radius=10)
         surf.blit(tint, r.topleft)
 
         if frac > 0:
-            # bekleme süresi: aşağıdan yukarı dolan, üstünde ince parlak bir
-            # "sıvı yüzeyi" olan karartma katmanı
             fh = max(1, int(r.h * frac))
             cs = pygame.Surface((r.w, fh), pygame.SRCALPHA)
             pygame.draw.rect(cs, (6, 7, 14, 205), cs.get_rect())
             pygame.draw.line(cs, (*lighten(col, 0.3), 150), (2, 0), (r.w - 2, 0), 2)
             surf.blit(cs, (r.x, r.y + r.h - fh))
         else:
-            gs = pygame.Surface((r.w, r.h), pygame.SRCALPHA)
+            gs = pygame.Surface(r.size, pygame.SRCALPHA)
             pygame.draw.rect(gs, (*col, int(150 * (0.14 + 0.10 * pulse))), gs.get_rect(),
-                             border_radius=11)
+                             border_radius=10)
             surf.blit(gs, r.topleft)
 
-        # ---- dış çerçeve: hazırken canlı ve nefes alan, dolarken sönük ----
         edge_col = col if ready else scale_col(col, 0.42)
-        edge_w = 3 if (ready and pulse > 0.55) else 2
-        pygame.draw.rect(surf, edge_col, r, width=edge_w, border_radius=11)
+        pygame.draw.rect(surf, edge_col, r, width=3 if (ready and pulse > 0.55) else 2,
+                         border_radius=10)
 
-        # ---- ikon: SİLAHLIK'takiyle aynı kişisel arma, ince dönen kertikli
-        #      bir madalyon halkası içinde ----
-        icx, icy = r.centerx, r.centery - 3
+        icx, icy = r.centerx, r.centery - 1
         icon_r = cell * 0.30
         for k_ in range(8):
             a = t * 0.6 + k_ * math.tau / 8
-            r0, r1 = icon_r * 1.28, icon_r * (1.42 + 0.06 * pulse)
+            r0, r1 = icon_r * 1.26, icon_r * (1.40 + 0.06 * pulse)
             ring_col = edge_col if ready else scale_col(edge_col, 0.7)
             pygame.draw.line(surf, ring_col,
                              (icx + math.cos(a) * r0, icy + math.sin(a) * r0),
                              (icx + math.cos(a) * r1, icy + math.sin(a) * r1), 1)
         pygame.draw.circle(surf, (12, 13, 20), (int(icx), int(icy)), int(icon_r * 1.2))
-        draw_weapon_sigil(surf, icx, icy, icon_r,
-                          key, col if ready else scale_col(col, 0.55), t)
+        draw_weapon_sigil(surf, icx, icy, icon_r, key,
+                          col if ready else scale_col(col, 0.55), t)
 
         if frac > 0:
-            # kalan süre yazısının arkasına küçük bir plaket, okunurluk için
             txt = f"{remain:.1f}"
-            tw = text_width(txt, 13, True)
-            plaque = pygame.Rect(0, 0, tw + 8, 15)
-            plaque.center = (r.centerx, r.centery - 5)
+            plaque = pygame.Rect(0, 0, text_width(txt, 12, True) + 8, 14)
+            plaque.center = (r.centerx, r.centery - 2)
             ps = pygame.Surface(plaque.size, pygame.SRCALPHA)
-            pygame.draw.rect(ps, (5, 5, 10, 170), ps.get_rect(), border_radius=5)
+            pygame.draw.rect(ps, (5, 5, 10, 175), ps.get_rect(), border_radius=5)
             surf.blit(ps, plaque.topleft)
-            draw_text(surf, txt, (r.centerx, r.centery - 7), 13, WHITE,
-                      bold=True, center=True)
+            draw_text(surf, txt, (r.centerx, r.centery - 4), 12, WHITE, bold=True, center=True)
 
-        # SEVİYE rozeti — sağ alt köşede, silahın renginde küçük bir madalyon.
-        # Tavan 25 olduğu için iki haneli sayılar geliyor: rozet o zaman
-        # yuvarlak yerine hap biçimine uzuyor, sayı taşmıyor.
-        bx, by = r.right - 2, r.bottom - 2
-        lvl_txt = str(lvl)
-        bw = 22 if lvl < 10 else 28
-        badge = pygame.Rect(0, 0, bw, 22)
-        badge.center = (bx, by)
-        pygame.draw.rect(surf, (10, 11, 18), badge, border_radius=11)
-        pygame.draw.rect(surf, col, badge, width=2, border_radius=11)
-        maxed_w = lvl >= weapon_max_level(w)
-        draw_text(surf, lvl_txt, badge.center, 11 if lvl < 10 else 10,
-                  GOLD if maxed_w else (col if ready else lighten(col, 0.25)),
+        # Rozet ÜST SAĞ köşede: alttaki ad yazısının üstüne binmesin.
+        _level_badge(surf, r.right - 1, r.y + 1, lvl, col,
+                     maxed=lvl >= weapon_max_level(w), h=17)
+        # yuvanın ALTINDA kısa ad; sığmazsa kısaltılır
+        name = _fit_text(w["name"], 8, cell + gap - 1, bold=True)
+        ncol = (CLOAK_COLOR2 if invis_now else
+                (lighten(col, 0.25) if ready else (118, 124, 148)))
+        draw_text(surf, name, (r.centerx, r.bottom + 3), 8, ncol, bold=True,
+                  center=True, shadow=False)
+
+
+def draw_book_slots(surf, run, t):
+    """SİLAH ŞERİDİNİN ALTINDAKİ YATAY KİTAP ŞERİDİ.
+
+    v3.16: kitaplar da artık bir TAKIM. Dört normal yuva (her biri
+    Lv.15'e kadar) ve en sağda altın çerçeveli TEK nadir yuva. Oyuncu
+    seviye atlarken "silah mı, kitap mı?" sorusunu bu şeride bakarak
+    cevaplıyor — eskiden kitapların oyunda hiçbir görünür izi yoktu ve
+    oyun tamamen silah üzerine gidiyordu.
+    """
+    p = run.player
+    cell, gap = BSLOT_CELL, BSLOT_GAP
+    normals = [k for k in p.books if not BOOK_BY_KEY.get(k, {}).get("rare")]
+    rares = [k for k in p.books if BOOK_BY_KEY.get(k, {}).get("rare")]
+    n_norm = max(MAX_RUN_BOOKS, len(normals))
+    n_rare = max(MAX_RUN_RARE_BOOKS, len(rares))
+    n_tot = n_norm + n_rare
+    x0, y0 = HUD_STRIP_X, HUD_BOOK_Y
+    # Nadir yuva, normallerden biraz ayrı dursun: aradaki boşluk iki katı.
+    sep = gap * 2
+
+    width = n_tot * cell + (n_tot - 1) * gap + sep
+    back = pygame.Rect(x0 - 8, y0 - 17, width + 16, cell + 22)
+    surf.blit(_slot_strip(back.w, back.h), back.topleft)
+    full_b = len(normals) >= MAX_RUN_BOOKS
+    hcol = GOLD if full_b else TEXT_DIM
+    draw_text(surf, "KİTAPLAR", (back.x + 10, y0 - 15), 10, hcol, bold=True, shadow=False)
+    draw_text(surf, f"{len(normals)}/{MAX_RUN_BOOKS}",
+              (back.x + 14 + text_width("KİTAPLAR", 10, True), y0 - 15), 10,
+              hcol if full_b else (104, 110, 136), bold=True, shadow=False)
+
+    def slot_rect(i):
+        x = x0 + i * (cell + gap) + (sep if i >= n_norm else 0)
+        return pygame.Rect(x, y0, cell, cell)
+
+    for i in range(n_tot):
+        r = slot_rect(i)
+        rare_slot = i >= n_norm
+        idx = i - n_norm if rare_slot else i
+        src = rares if rare_slot else normals
+        if idx >= len(src):
+            _empty_slot(surf, r, t, i + 3, radius=8)
+            if rare_slot:
+                # boş nadir yuva altın bir ipucu halkası taşır
+                pygame.draw.rect(surf, scale_col(GOLD, 0.45), r, width=1, border_radius=8)
+            continue
+
+        key = src[idx]
+        bk = BOOK_BY_KEY[key]
+        lvl = p.books[key]
+        col = tuple(bk["color"])
+        maxed = lvl >= (1 if rare_slot else BOOK_MAX_LEVEL)
+        pulse = 0.5 + 0.5 * math.sin(t * 2.4 + i * 0.8)
+
+        add_glow(surf, r.centerx, r.centery, cell * 0.9, col, 0.16 + 0.10 * pulse)
+        pygame.draw.rect(surf, (16, 17, 27), r, border_radius=8)
+        tint = pygame.Surface(r.size, pygame.SRCALPHA)
+        pygame.draw.rect(tint, (*scale_col(col, 0.55), 44), tint.get_rect(), border_radius=8)
+        surf.blit(tint, r.topleft)
+        pygame.draw.rect(surf, GOLD if rare_slot else col, r,
+                         width=3 if rare_slot else 2, border_radius=8)
+        draw_icon(surf, r.centerx, r.centery - 1, bk.get("icon", "star"), col, cell * 0.26)
+        _level_badge(surf, r.right - 1, r.y + 1, lvl, col, maxed=maxed, h=15)
+        name = _fit_text(bk["name"].replace(" Kitabı", ""), 8, cell + gap - 1, bold=True)
+        draw_text(surf, name, (r.centerx, r.bottom + 3), 8, lighten(col, 0.2),
                   bold=True, center=True, shadow=False)
-
-        # silahın kısa adı yuvanın sağında, önünde renkli bir nokta rozetiyle
-        name_x = r.right + 10
-        pygame.draw.circle(surf, col, (name_x, r.y + 9), 3)
-        draw_text(surf, w["name"], (name_x + 8, r.y + 3), 11, TEXT, shadow=False)
-        if timed:
-            draw_text(surf, "GİZLİSİN" if invis_now else f"{remain:.0f} sn",
-                      (name_x + 8, r.y + 18), 9,
-                      CLOAK_COLOR2 if invis_now else TEXT_DIM, bold=True, shadow=False)
-        elif passive:
-            draw_text(surf, "∞ sürekli", (name_x + 8, r.y + 18), 9, (128, 205, 160),
-                      bold=True, shadow=False)
-        elif ready:
-            draw_text(surf, "HAZIR", (name_x + 8, r.y + 18), 9, lighten(col, 0.3),
-                      bold=True, shadow=False)
 
 
 def draw_skill_bar(surf, run, t):
@@ -16366,19 +17050,32 @@ def draw_skill_bar(surf, run, t):
 
 
 # =====================================================================
-# İSTATİSTİK PANELİ  (sağ üstteki "⋮" düğmesi)
+# İSTATİSTİK PANELİ  (TAB / sağ üstteki "⋮" düğmesi)
 # ---------------------------------------------------------------------
-# Oyuncunun o anki gücünü YÜZDE olarak gösterir. Ölçü birimi "taban oyuncu
-# = %100"; yani hasarın iki katına çıkmışsa %200, üç katına çıkmışsa %300
-# yazar. Böylece market, kitap, seviye ve skin bonuslarının toplam etkisi
-# tek bakışta görülür.
+# v3.16 — YENİDEN TASARLANDI. Eskiden her satırın arkasında bir dolgu
+# çubuğu olan tek parça uzun bir listeydi: ekranın neredeyse yarısını
+# kaplıyor, oyun sırasında açıldığında sahayı kapatıyor ve hiçbir şey
+# okunmuyordu. Artık klasik bir RPG künyesi gibi:
 #
-# YENİ SATIR EKLEMEK: player_stat_rows() içindeki listeye bir demet eklemek
-# yeterli — (simge, etiket, metin, renk, oran).
+#   * KONU BAŞLIKLARINA ayrılmış  (HAYATTA KALMA / HASAR / HAREKET / KAZANÇ)
+#   * çubuk yok — solda etiket, sağda değer, iki sütun hizalı
+#   * yalnızca ANLAMLI satırlar görünür (kalkanın yoksa "Kalkan" satırı yok)
+#   * panel belirgin biçimde daraldı ve kısaldı
+#
+# Ölçü birimi değişmedi: oran veren değerlerde "taban oyuncu = %100",
+# yani hasarın iki katına çıkmışsa 2,0x yazar.
+#
+# YENİ SATIR EKLEMEK: player_stat_groups() içinde ilgili grubun listesine
+# bir demet eklemek yeterli — (etiket, değer metni, renk).
 # =====================================================================
 
 STATS_BTN_W, STATS_BTN_H = 30, 26
-STATS_PANEL_W = 336
+STATS_PANEL_W = 254      # eski: 336 — panel daraldı
+STATS_HEAD_H = 30        # başlık şeridinin yüksekliği
+STATS_ROW_H = 17         # tek satırın yüksekliği
+STATS_GROUP_GAP = 11     # gruplar arası boşluk
+STATS_GROUP_HEAD_H = 13  # grup başlığının kapladığı yükseklik
+_stats_head_cache = {}
 
 
 def stats_button_rect():
@@ -16386,9 +17083,35 @@ def stats_button_rect():
     return pygame.Rect(VIRTUAL_W - STATS_BTN_W - 10, 8, STATS_BTN_W, STATS_BTN_H)
 
 
-def stats_panel_rect(n_rows):
+def _stats_header(w, h):
+    """İstatistik panelinin başlık şeridi (degrade + alt ayraç) — önbellekli."""
+    key = (w, h)
+    sh = _stats_head_cache.get(key)
+    if sh is None:
+        if len(_stats_head_cache) > 6:
+            _stats_head_cache.clear()
+        sh = pygame.Surface((w, h), pygame.SRCALPHA)
+        for yy in range(h):
+            f = yy / max(1, h - 1)
+            pygame.draw.line(sh, (int(lerp(34, 22, f)), int(lerp(52, 34, f)),
+                                  int(lerp(44, 30, f)), 255), (0, yy), (w, yy))
+        mask = pygame.Surface((w, h), pygame.SRCALPHA)
+        pygame.draw.rect(mask, (255, 255, 255, 255), mask.get_rect(),
+                         border_top_left_radius=10, border_top_right_radius=10,
+                         border_bottom_left_radius=0, border_bottom_right_radius=0)
+        sh.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
+        _stats_head_cache[key] = sh
+    return sh
+
+
+def stats_panel_rect(n_rows, n_groups=0):
+    """Panelin dikdörtgeni. Yükseklik, çizim düzeniyle BİREBİR aynı hesaplanır:
+    başlık şeridi + her grubun kendi başlığı + satırlar + gruplar arası
+    boşluk (ilk grup hariç) + alt pay."""
     b = stats_button_rect()
-    h = 54 + n_rows * 21 + 30
+    h = (STATS_HEAD_H + n_rows * STATS_ROW_H
+         + n_groups * STATS_GROUP_HEAD_H
+         + max(0, n_groups - 1) * STATS_GROUP_GAP + 10)
     return pygame.Rect(VIRTUAL_W - STATS_PANEL_W - 10, b.bottom + 6, STATS_PANEL_W, h)
 
 
@@ -16397,91 +17120,110 @@ def _pct(v):
     return f"%{int(round(v * 100))}"
 
 
-def player_stat_rows(p, run):
-    """(simge, etiket, değer metni, renk, çubuk oranı) listesi döndürür.
+def _mult(v):
+    """Çarpanı okunur biçimde yazar: 2.0 -> "2,0x"."""
+    return f"{v:.1f}x".replace(".", ",")
 
-    Çubuk oranı yalnızca görsel: %100 çubuğun yarısını doldurur, %300 ve
-    üstü çubuğu tamamen doldurur — böylece tavanı olmayan değerler de
-    okunabilir kalır.
+
+def player_stat_groups(p, run):
+    """İstatistikleri GRUPLANMIŞ biçimde döndürür.
+
+    Dönüş: [(grup_adı, [(etiket, değer, renk), ...]), ...]
+
+    v3.16: panel eskiden tek bir uzun liste + her satırda bir arkaplan
+    çubuğuydu; ekranın yarısını kaplıyor ve okunmuyordu. Artık konu
+    başlıklarına ayrılmış, çubuksuz, iki sütun hizalı bir künye: solda
+    etiket, sağda değer. Panel bu sayede hem daha dar hem daha kısa.
     """
     dmg_r = p.eff_dmg() / max(1e-6, BASE_DMG)
     aspd_r = BASE_ATK_CD / max(1e-6, p.eff_atk_cd())
     spd_r = p.eff_speed() / max(1e-6, BASE_SPEED)
-    hp_r = p.max_hp / max(1e-6, BASE_MAX_HP)
     pick_r = p.eff_pickup() / max(1e-6, BASE_PICKUP)
     dash_r = BASE_DASH_CD / max(1e-6, p.eff_dash_cd())
     bonk_r = BASE_BONK_CD / max(1e-6, p.eff_bonk_cd())
-    shots = 1 + p.multishot_level
-    # Taban oyuncunun saniyelik hasarı: yüzdeyi buna göre veriyoruz.
     base_dps = BASE_DMG * (1.0 + 0.05 * (1.6 - 1.0)) / BASE_ATK_CD
-    dps = p.estimated_dps()
 
-    rows = [
-        ("sword",  "HASAR",           _pct(dmg_r),   (245, 120, 110), dmg_r),
-        ("target", "ATIŞ HIZI",       _pct(aspd_r),  (150, 210, 255), aspd_r),
-        ("bolt",   "SANİYELİK HASAR", _pct(dps / max(1e-6, base_dps)), (255, 190, 90),
-         dps / max(1e-6, base_dps)),
-        ("boot",   "HAREKET HIZI",    _pct(spd_r),   (130, 230, 170), spd_r),
-        ("heart",  "AZAMİ CAN",       _pct(hp_r),    (235, 120, 150), hp_r),
-        ("shield", "ZIRH",            _pct(p.eff_armor()), (160, 180, 220), p.eff_armor() * 3.0),
-        ("clover", "KRİTİK ŞANS",     _pct(p.eff_crit_chance()), (230, 220, 120),
-         p.eff_crit_chance() * 2.2),
-        ("star",   "KRİTİK HASAR",    _pct(p.eff_crit_dmg()), (255, 210, 130),
-         p.eff_crit_dmg() / 2.0),
-        ("heart",  "CAN ÇALMA",       _pct(0.02 * p.vamp_level), (220, 60, 90),
-         0.02 * p.vamp_level * 5.0),
-        ("coin",   "ALTIN KAZANCI",   _pct(p.eff_coin_mult()), GOLD, p.eff_coin_mult()),
-        ("gem",    "DENEYİM (XP)",    _pct(p.eff_xp_mult()), PURPLE, p.eff_xp_mult()),
-        # NOT: menzil tecrübe, can VE altın için çalışır — altın biraz daha
-        # yakından çekilir (bkz. COIN_PICKUP_FACTOR).
-        ("magnet", "TOPLAMA MENZİLİ", _pct(pick_r), (150, 220, 255), pick_r),
-        ("fist",   "BONK TEMPOSU",    _pct(bonk_r),  (245, 150, 80), bonk_r),
-        ("dash",   "DASH TEMPOSU",    _pct(dash_r),  (130, 225, 210), dash_r),
-        ("star",   "MERMİ SAYISI",    f"{shots}",    PURPLE, shots / 4.0),
-        ("sword",  "DELME",           f"{p.eff_pierce_hits()}", RED,
-         p.eff_pierce_hits() / 4.0),
+    hayat = [
+        ("Azami Can", f"{int(p.max_hp)}", (235, 120, 150)),
+        ("Can Yenileme", f"{p.eff_regen():.1f}/sn", GREEN),
+        ("Zırh", _pct(p.eff_armor()), (160, 180, 220)),
+        ("Can Çalma", _pct(0.02 * p.vamp_level), (220, 60, 90)),
     ]
-    if p.eff_regen() > 0:
-        rows.append(("heart", "CAN YENİLENME", f"{p.eff_regen():.1f}/sn", GREEN,
-                     p.eff_regen() / 10.0))
-    if p.frenzy_stacks > 0:
-        rows.append(("clover", "ÇILGINLIK", f"x{p.frenzy_stacks}", (255, 200, 80),
-                     p.frenzy_stacks / 10.0))
-    if p.soul_stacks > 0:
-        rows.append(("skull", "RUH YIĞINI", f"x{p.soul_stacks}", (200, 120, 255),
-                     p.soul_stacks / 12.0))
-    return rows
+    if p.shield_charges:
+        hayat.append(("Kalkan", f"{p.shield_charges}", (160, 170, 200)))
+    if p.second_wind_charges:
+        hayat.append(("İkinci Nefes", f"{p.second_wind_charges}", GOLD))
+    if p.thorns_level:
+        hayat.append(("Diken", f"{p.thorns_level}", (170, 125, 90)))
+
+    hasar = [
+        ("Hasar", _mult(dmg_r), (245, 120, 110)),
+        ("Kritik Şans", _pct(p.eff_crit_chance()), (230, 220, 120)),
+        ("Kritik Hasar", _mult(p.eff_crit_dmg()), (255, 210, 130)),
+        ("Atış Hızı", _pct(aspd_r), (150, 210, 255)),
+        ("Saniyelik Hasar", _pct(p.estimated_dps() / max(1e-6, base_dps)), (255, 190, 90)),
+        ("Mermi Sayısı", f"{1 + p.multishot_level}", PURPLE),
+        ("Delme", f"{p.eff_pierce_hits()}", RED),
+    ]
+    if p.boss_hunter:
+        hasar.append(("Patron Hasarı", f"+{_pct(p.boss_hunter_bonus())}", (200, 90, 220)))
+    if p.execute_threshold > 0:
+        hasar.append(("İnfaz Eşiği", _pct(p.execute_threshold), GOLD))
+
+    hareket = [
+        ("Hareket Hızı", _pct(spd_r), (130, 230, 170)),
+        ("Dash Temposu", _pct(dash_r), (130, 225, 210)),
+        ("BONK Temposu", _pct(bonk_r), (245, 150, 80)),
+        ("Toplama Menzili", f"{int(p.eff_pickup())}", (150, 220, 255)),
+    ]
+
+    kazanc = [
+        ("Altın Kazancı", _pct(p.eff_coin_mult()), GOLD),
+        ("Tecrübe Kazancı", _pct(p.eff_xp_mult()), PURPLE),
+    ]
+    if p.frenzy_stacks:
+        kazanc.append(("Çılgınlık", f"x{p.frenzy_stacks}", (255, 200, 80)))
+    if p.soul_stacks:
+        kazanc.append(("Ruh Yığını", f"x{p.soul_stacks}", (200, 120, 255)))
+
+    return [("HAYATTA KALMA", hayat), ("HASAR", hasar),
+            ("HAREKET", hareket), ("KAZANÇ", kazanc)]
 
 
 def draw_stats_panel(surf, run, t):
     """İstatistik panelini çizer ve kapladığı dikdörtgeni döndürür."""
     p = run.player
-    rows = player_stat_rows(p, run)
-    rect = stats_panel_rect(len(rows))
-    panel(surf, rect, bg=(14, 15, 26), edge=(90, 100, 150), alpha=242, radius=14, edge_w=2)
+    groups = player_stat_groups(p, run)
+    n_rows = sum(len(r) for _g, r in groups)
+    rect = stats_panel_rect(n_rows, len(groups))
+    panel(surf, rect, bg=(13, 14, 23), edge=(96, 106, 152), alpha=244, radius=11, edge_w=2)
 
-    draw_text(surf, "İSTATİSTİKLER", (rect.centerx, rect.y + 10), 16, GOLD, bold=True, center=True)
-    draw_text(surf, "taban oyuncu = %100", (rect.centerx, rect.y + 30), 10, TEXT_DIM,
-              center=True, shadow=False)
+    # ---- başlık şeridi: koyu yeşil bir künye bandı + iki yanında köşebent ----
+    head = pygame.Rect(rect.x + 2, rect.y + 2, rect.w - 4, STATS_HEAD_H - 6)
+    surf.blit(_stats_header(head.w, head.h), head.topleft)
+    pygame.draw.line(surf, (150, 190, 160), (head.x + 6, head.bottom - 1),
+                     (head.right - 6, head.bottom - 1), 1)
+    draw_text(surf, "İSTATİSTİKLER", (head.x + 12, head.y + 5), 16, (226, 236, 226),
+              bold=True, shadow=False)
+    for sgn, ax in ((1, head.right - 11), (-1, head.x + 7)):
+        pygame.draw.polygon(surf, (190, 214, 192),
+                            [(ax, head.y + 5), (ax + sgn * 5, head.y + 5),
+                             (ax + sgn * 5, head.y + 10), (ax, head.y + 10)], 1)
 
-    y = rect.y + 50
-    for (icon, label, value, col, frac) in rows:
-        # arka plan çubuğu: %100'ü ortada olacak biçimde ölçeklenir
-        bar = pygame.Rect(rect.x + 12, y + 3, rect.w - 24, 15)
-        bs = pygame.Surface(bar.size, pygame.SRCALPHA)
-        pygame.draw.rect(bs, (255, 255, 255, 12), bs.get_rect(), border_radius=4)
-        fill = int(bar.w * clamp(frac / 3.0, 0.0, 1.0))
-        if fill > 2:
-            pygame.draw.rect(bs, (*col, 62), pygame.Rect(0, 0, fill, bar.h), border_radius=4)
-        surf.blit(bs, bar.topleft)
-        draw_icon(surf, rect.x + 22, y + 10, icon, col, 7)
-        draw_text(surf, label, (rect.x + 34, y + 3), 12, TEXT, shadow=False)
-        draw_text(surf, value, (rect.right - 14, y + 2), 13, col, bold=True, right=True,
-                  shadow=False)
-        y += 21
-
-    draw_text(surf, "TAB ile de açılıp kapanır", (rect.centerx, rect.bottom - 20), 10, TEXT_DIM,
-              center=True, shadow=False)
+    y = rect.y + STATS_HEAD_H
+    for gi, (gname, rows) in enumerate(groups):
+        if gi:
+            y += STATS_GROUP_GAP
+            pygame.draw.line(surf, (36, 40, 58), (rect.x + 12, y - 6),
+                             (rect.right - 12, y - 6), 1)
+        draw_text(surf, gname, (rect.x + 13, y - 1), 9, (122, 132, 166),
+                  bold=True, shadow=False)
+        y += STATS_GROUP_HEAD_H
+        for (label, value, col) in rows:
+            draw_text(surf, label, (rect.x + 15, y), 13, (206, 211, 228), shadow=False)
+            draw_text(surf, value, (rect.right - 15, y), 13, col, bold=True,
+                      right=True, shadow=False)
+            y += STATS_ROW_H
     return rect
 
 
@@ -16501,34 +17243,39 @@ def draw_stats_button(surf, run, mouse_pos, t):
 _hud_bar_cache = {}
 
 
-def _hud_top_bar(w, h):
-    """HUD'ın üst şeridi: degrade zemin + altında ince altın bir ayraç."""
+def _hud_scrim(w, h):
+    """Üstteki yazıların arkasına basılan ÇOK HAFİF karartma.
+
+    v3.16: eskiden burada tam genişlikte, opak lacivert bir dikdörtgen vardı
+    ve sahanın üst şeridini bütünüyle kapatıyordu ("yukarıyı da görelim").
+    Dikdörtgen kaldırıldı; yerine yalnızca yazıların okunması için aşağı
+    doğru tamamen SÖNEN, çok soluk bir gölge kaldı. Arena artık yukarıya
+    kadar görünüyor.
+    """
     key = (w, h)
-    s = _hud_bar_cache.get(key)
-    if s is None:
+    sc = _hud_bar_cache.get(key)
+    if sc is None:
         if len(_hud_bar_cache) > 8:
             _hud_bar_cache.clear()
-        s = pygame.Surface((w, h), pygame.SRCALPHA)
+        sc = pygame.Surface((w, h), pygame.SRCALPHA)
         for yy in range(h):
             f = yy / max(1, h - 1)
-            a = int(lerp(238, 196, f))
-            pygame.draw.line(s, (int(lerp(19, 9, f)), int(lerp(21, 10, f)),
-                                 int(lerp(34, 18, f)), a), (0, yy), (w, yy))
-        _hud_bar_cache[key] = s
-    return s
+            a = int(lerp(104, 0, f ** 0.75))
+            if a <= 0:
+                continue
+            pygame.draw.line(sc, (6, 7, 14, a), (0, yy), (w, yy))
+        _hud_bar_cache[key] = sc
+    return sc
 
 
 def draw_hud(surf, run, t):
     p = run.player
-    top = pygame.Rect(0, 0, VIRTUAL_W, ARENA_MARGIN_TOP - 6)
-    surf.blit(_hud_top_bar(top.w, top.h), (0, 0))
-    # şeridin altında iki katlı ayraç: koyu taban + üstünde ince ışık
-    pygame.draw.line(surf, (46, 54, 84), (0, top.height), (VIRTUAL_W, top.height), 3)
-    pygame.draw.line(surf, (120, 138, 190), (0, top.height - 1), (VIRTUAL_W, top.height - 1), 1)
-    # ortada, sürenin arkasında yumuşak bir vurgu
-    add_glow(surf, VIRTUAL_W / 2, 26, 150, (70, 96, 160), 0.13)
+    # v3.16: üstteki OPAK LACİVERT ŞERİT KALDIRILDI. Yerinde yalnızca
+    # yazıların okunabilmesi için aşağı doğru sönen çok soluk bir gölge var;
+    # arena artık ekranın en üstüne kadar görünüyor.
+    surf.blit(_hud_scrim(VIRTUAL_W, ARENA_MARGIN_TOP + 14), (0, 0))
 
-    hp_rect = pygame.Rect(20, 16, 260, 22)
+    hp_rect = pygame.Rect(18, 14, 248, 20)
     frac = clamp(p.hp / p.max_hp, 0, 1)
     hp_col = GREEN if frac > 0.5 else (ORANGE if frac > 0.25 else RED)
     # can azalınca çubuk nabız gibi atsın
@@ -16543,7 +17290,7 @@ def draw_hud(surf, run, t):
     draw_text(surf, f"{int(p.hp)}/{int(p.max_hp)}", hp_rect.center, 14, WHITE, bold=True, center=True)
     draw_icon(surf, hp_rect.x - 12, hp_rect.centery, "heart", RED, 12)
 
-    xp_rect = pygame.Rect(20, 44, 260, 12)
+    xp_rect = pygame.Rect(18, 40, 248, 10)
     draw_bar(surf, xp_rect, p.xp / p.xp_to_next, PURPLE, radius=5)
     # seviye rozeti: sayı düz yazı yerine mor bir madalyonda
     lv_txt = f"LV {p.level}"
@@ -16553,17 +17300,17 @@ def draw_hud(surf, run, t):
     pygame.draw.rect(surf, PURPLE, lv_r, width=1, border_radius=9)
     draw_text(surf, lv_txt, lv_r.center, 14, PURPLE, bold=True, center=True, shadow=False)
 
-    draw_coin_label(surf, 20 + coin_label_width(fmt_num(run.gold_wallet), 15, 7) / 2,
-                    70, fmt_num(run.gold_wallet), GOLD, 15, icon_r=7)
+    draw_coin_label(surf, 18 + coin_label_width(fmt_num(run.gold_wallet), 15, 7) / 2,
+                    62, fmt_num(run.gold_wallet), GOLD, 15, icon_r=7)
 
     # --- PATRON DURUM ETKİLERİ: altının sağında küçük sayaçlar ---
-    st_x = 140
+    st_x = 136
     for (act, icon, scol, label) in ((p.burn_t, "flame", (255, 150, 70), "YANIK"),
                                      (p.poison_t, "drop", (150, 240, 120), "ZEHİR"),
                                      (p.slow_t, "snow", (150, 210, 255), "YAVAŞ")):
         if act <= 0:
             continue
-        chip = pygame.Rect(st_x, 56, 74, 18)
+        chip = pygame.Rect(st_x, 54, 74, 18)
         cs = pygame.Surface(chip.size, pygame.SRCALPHA)
         pygame.draw.rect(cs, (*scol, 52), cs.get_rect(), border_radius=6)
         pygame.draw.rect(cs, (*scol, 190), cs.get_rect(), width=1, border_radius=6)
@@ -16828,6 +17575,7 @@ def draw_run(surf, run, t, aim_pos=None):
     draw_hud(surf, run, t)
     draw_minimap(surf, run, t)
     draw_weapon_slots(surf, run, t)
+    draw_book_slots(surf, run, t)
     draw_skill_bar(surf, run, t)
     # İSTATİSTİK paneli en üstte çizilir: açıkken küçük haritayı örter.
     draw_stats_button(surf, run, aim_pos, t)
@@ -17475,14 +18223,24 @@ class LevelUpOverlay:
                   bold=True, center=True)
         p = run.player
         n_w = len(p.weapons)
-        if n_w < MAX_RUN_WEAPONS:
-            sub = f"Bir SİLAH ya da KİTAP seç  —  silah yuvan: {n_w}/{MAX_RUN_WEAPONS}"
+        n_b = p.normal_book_count()
+        n_r = p.rare_book_count()
+        sub = (f"SİLAH {n_w}/{MAX_RUN_WEAPONS}"
+               f"   •   KİTAP {n_b}/{MAX_RUN_BOOKS}"
+               f"   •   NADİR {n_r}/{MAX_RUN_RARE_BOOKS}")
+        draw_text(surf, sub, (VIRTUAL_W / 2, top - 48), 16, TEXT_DIM, center=True)
+        if n_r >= MAX_RUN_RARE_BOOKS:
+            hint = "Nadir kitabını seçtin — bu koşuda başka nadir kitap çıkmaz."
+        elif n_w >= MAX_RUN_WEAPONS and n_b >= MAX_RUN_BOOKS:
+            hint = "Yuvaların dolu — artık yalnızca yükseltme gelir."
         else:
-            sub = f"Silah yuvan dolu ({MAX_RUN_WEAPONS}/{MAX_RUN_WEAPONS}) — artık yükseltme ve kitap gelir"
-        draw_text(surf, sub, (VIRTUAL_W / 2, top - 46), 17, TEXT_DIM, center=True)
+            hint = "Kitaplar 15. seviyeye kadar büyür; nadir kitaptan yalnızca bir tane alırsın."
+        draw_text(surf, hint, (VIRTUAL_W / 2, top - 30), 12,
+                  (190, 170, 120) if n_r >= MAX_RUN_RARE_BOOKS else (120, 126, 150),
+                  center=True, shadow=False)
         # cepteki altın: yenileme/pas bedelleri buradan ödenir
-        draw_coin_label(surf, VIRTUAL_W / 2, top - 20, fmt_num(run.gold_wallet),
-                        GOLD, 18, icon_r=8)
+        draw_coin_label(surf, VIRTUAL_W / 2, top - 11, fmt_num(run.gold_wallet),
+                        GOLD, 17, icon_r=8)
 
         result = None
         for rect, ch, idx in self.cards:
@@ -17505,10 +18263,13 @@ class LevelUpOverlay:
                 lbl = "YENİ SİLAH" if ch["new"] else f"SİLAH  Lv.{ch['lvl']}"
                 lcol = col
             elif rare:
-                lbl = "NADİR KİTAP"
+                lbl = "NADİR KİTAP  —  TEK HAK"
                 lcol = GOLD
+            elif ch.get("new"):
+                lbl = "YENİ KİTAP"
+                lcol = lighten(col, 0.2)
             else:
-                lbl = "KİTAP"
+                lbl = f"KİTAP  Lv.{ch['lvl']}"
                 lcol = TEXT_DIM
             lw = text_width(lbl, 13, True)
             draw_icon(surf, r2.centerx - lw / 2 - 11, r2.y + 24,
@@ -17529,13 +18290,20 @@ class LevelUpOverlay:
                 draw_text(surf, ln, (r2.centerx, r2.y + 188 + i * 19), 14, TEXT_DIM,
                           center=True, shadow=False)
 
-            # ---- silah yükseltmesinde mevcut seviye çubuğu ----
-            if is_weapon and not ch["new"]:
-                mx = weapon_max_level(ch["w"])
+            # ---- yükseltmelerde mevcut seviye çubuğu (silah ve kitap) ----
+            if not ch.get("new"):
+                mx = weapon_max_level(ch["w"]) if is_weapon else ch.get("max", BOOK_MAX_LEVEL)
                 pb = pygame.Rect(r2.x + 30, r2.bottom - 66, r2.w - 60, 8)
                 draw_bar(surf, pb, clamp(ch["lvl"] / max(1, mx), 0, 1), col, radius=4)
                 draw_text(surf, f"Lv.{ch['lvl'] - 1}  »  Lv.{ch['lvl']}   (en çok {mx})",
                           (r2.centerx, r2.bottom - 56), 11, TEXT_DIM, center=True, shadow=False)
+            elif not is_weapon:
+                slot_txt = ("bu koşudaki TEK nadir kitabın olur"
+                            if rare else
+                            f"kitap yuvası {run.player.normal_book_count() + 1}"
+                            f"/{MAX_RUN_BOOKS}  —  Lv.{BOOK_MAX_LEVEL}'e kadar büyür")
+                draw_text(surf, slot_txt, (r2.centerx, r2.bottom - 60), 11,
+                          GOLD_DIM if rare else TEXT_DIM, center=True, shadow=False)
 
             if hover:
                 pygame.draw.rect(surf, col, (r2.x + 16, r2.bottom - 46, r2.w - 32, 32),
@@ -18196,7 +18964,7 @@ class App:
         self.gem_msg = None           # satın alma sonucu bildirimi
         self.gem_msg_timer = 0.0
         self.gem_msg_ok = True
-        self.store_tab = "gems"       # MAĞAZA sekmesi: gems | skins
+        self.store_tab = "gems"       # MAĞAZA sekmesi: gems | skins | pets
         self.world_lb_t = 0.0         # DÜNYA SIRALAMASI beliriş animasyonu
         self.menu_buttons = []
         self.build_menu_buttons()
@@ -18213,26 +18981,23 @@ class App:
         y_dunya = y_skor + alt_h + gap
         center_bottom = y_dunya + alt_h  # = 306+68+16+54+16+54 = 514
 
-        # ---- SOL SÜTUN: SİLAHLIK (üst) + NASIL OYNANIR + BAŞARIMLAR (alt) ----
-        # İki yan sütun ARTIK BİREBİR AYNI ÖLÇÜDE: aynı genişlik (side_w), aynı
-        # yükseklik (side_h) ve aynı satır hizası. SİLAHLIK eskiden OYNA ile
-        # aynı boydaydı (68 px) ve sağdaki KİTAPLIK'tan (58 px) iri duruyordu.
-        side_w, side_h, side_gap = 236, 58, 14
-        # Yan sütunlar orta sütunla aynı hizada biter; sağ alttaki GÜNLÜK MARKET
-        # kartı 530..702 bandını kullandığı için aralarında 20 px boşluk kalır.
-        side_bottom = center_bottom - 4
-        y_side2 = side_bottom - side_h        # BAŞARIMLAR (alt)
-        y_side1 = y_side2 - side_gap - side_h  # NASIL OYNANIR (orta)
-        y_side0 = y_side1 - side_gap - side_h  # SİLAHLIK (üst)
+        # ---- YAN SÜTUNLAR ----
+        # v3.16 SİMETRİ: yan sütunların satırları artık orta sütunun
+        # satırlarıyla AYNI EKSENDE ORTALANIYOR. Eskiden yan sütunlar alttan
+        # hizalanıp yukarı doğru diziliyordu; orta sütunun ilk düğmesi (OYNA)
+        # daha uzun olduğu için üç satır da birkaç piksel kayıyor ve menü
+        # "hafifçe eğri" duruyordu. Artık her satırın ORTASI ortak:
+        #     sol düğme merkezi == orta düğme merkezi == sağ düğme merkezi
+        side_w, side_h = 236, 58
+        center_mids = (y_oyna + oyna_h / 2.0,
+                       y_skor + alt_h / 2.0,
+                       y_dunya + alt_h / 2.0)
+        y_side0, y_side1, y_side2 = (m - side_h / 2.0 for m in center_mids)
         left_x = cx - cw / 2 - 30 - side_w
 
-        # ---- SAĞ SÜTUN (en aşağıda): SKIN MARKET + KIYAFET MARKET ----
-        right_w = side_w
-        right_h = side_h
+        right_w, right_h = side_w, side_h
         right_x = cx + cw / 2 + 30
-        y_right2 = side_bottom - right_h        # KIYAFET MARKET (alt)
-        y_right1 = y_right2 - side_gap - right_h  # SKIN MARKET (orta)
-        y_right0 = y_right1 - side_gap - right_h  # KİTAP MARKETİ (üst)
+        y_right0, y_right1, y_right2 = y_side0, y_side1, y_side2
 
         self.menu_buttons = [
             Button((cx - cw / 2, y_oyna, cw, oyna_h), "OYNA", self.start_run,
@@ -18508,8 +19273,12 @@ class App:
         btn = stats_button_rect()
         over_ui = btn.collidepoint(mouse_pos)
         if self.run.show_stats:
-            rows = len(player_stat_rows(self.run.player, self.run))
-            over_ui = over_ui or stats_panel_rect(rows).collidepoint(mouse_pos)
+            # Panelin ölçüsü GRUP sayısına da bağlı; ikisini birden vermezsek
+            # isabet kutusu çizilen panelden kısa kalıyor ve panelin alt
+            # kısmına tıklayınca oyuncu boşluğa ateş ediyordu.
+            groups = player_stat_groups(self.run.player, self.run)
+            n_rows = sum(len(r) for _g, r in groups)
+            over_ui = over_ui or stats_panel_rect(n_rows, len(groups)).collidepoint(mouse_pos)
         if stats_pressed or (clicked and btn.collidepoint(mouse_pos)):
             self.run.show_stats = not self.run.show_stats
             sfx("click", 0.5, 0.0)
@@ -18598,52 +19367,91 @@ class App:
         if close:
             self.state = STATE_PLAY
 
+    def _fx_slider(self, canvas, rect, mouse_pos, down):
+        """EŞYA EFEKTİ çubuğu: %0 ile %100 arasında sürüklenerek ayarlanır.
+
+        Oyun İÇİNDEN (ESC) açıldığı için oyuncu ekranı kalabalıklaştığı anda
+        efektleri kısabiliyor. HASAR HİÇ DEĞİŞMEZ — yalnızca çizim soluklaşır.
+        """
+        pct = weapon_fx_pct()
+        hov = rect.collidepoint(mouse_pos)
+        col = GREEN if pct >= 70 else (ORANGE if pct >= 25 else RED)
+        panel(canvas, rect, bg=(32, 36, 54) if hov else (22, 24, 38),
+              edge=lighten(col, .25) if hov else col, alpha=242, radius=10, edge_w=2)
+        draw_text(canvas, "EŞYA EFEKTİ", (rect.x + 16, rect.y + 7), 12, TEXT_DIM,
+                  shadow=False)
+        draw_text(canvas, f"%{pct}", (rect.right - 16, rect.y + 6), 16, col,
+                  bold=True, right=True, shadow=False)
+        br = pygame.Rect(rect.x + 16, rect.y + 27, rect.w - 32, 11)
+        draw_bar(canvas, br, pct / 100.0, col, radius=5)
+        # tutamak: çubuğun dolu ucunda küçük bir madalyon
+        hx = br.x + br.w * (pct / 100.0)
+        pygame.draw.circle(canvas, (10, 11, 18), (int(hx), br.centery), 7)
+        pygame.draw.circle(canvas, col, (int(hx), br.centery), 7, 2)
+        if down and br.inflate(26, 26).collidepoint(mouse_pos):
+            set_weapon_fx_pct((mouse_pos[0] - br.x) / max(1, br.w) * 100.0)
+            self._fx_dirty = True
+        if getattr(self, "_fx_dirty", False) and not down:
+            self._fx_dirty = False
+            self.save.data.setdefault("settings", {})["weapon_fx"] = weapon_fx_pct()
+            self.save.save()
+
     def update_pause(self, dt, mouse_pos, clicked):
+        """DURAKLATMA ekranı (ESC).
+
+        v3.16: ekran artık ortada tek bir panelde toplanıyor ve oyun-içi
+        görünüm ayarları (EŞYA EFEKTİ, YETENEK ÇUBUĞU, SKİN GÖRÜNÜMÜ) burada.
+        """
         canvas = self.display.canvas
         tmp = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
         draw_run(tmp, self.run, self.t)
         canvas.blit(tmp, (0, 0))
         overlay = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
-        pygame.draw.rect(overlay, (5, 6, 12, 200), overlay.get_rect())
+        pygame.draw.rect(overlay, (5, 6, 12, 206), overlay.get_rect())
         canvas.blit(overlay, (0, 0))
-        draw_text(canvas, "DURAKLATILDI", (VIRTUAL_W / 2, 200), 48, TEXT, bold=True, center=True)
-        draw_text(canvas, f"Dalga {self.run.waves.wave}  •  Skor {fmt_num(self.run.score)}",
-                  (VIRTUAL_W / 2, 250), 16, TEXT_DIM, center=True)
 
+        down = pygame.mouse.get_pressed()[0] and not self.chat.open
         cx = VIRTUAL_W / 2
-        w, h, gap = 300, 46, 10
-        y0 = 286
-        buttons = [
-            Button((cx - w / 2, y0, w, h), "DEVAM ET", lambda: self.set_state(STATE_PLAY), color=(60, 130, 90), hover_color=(80, 170, 115)),
-            Button((cx - w / 2, y0 + (h + gap), w, h), "TAM EKRAN AÇ/KAPA", self.display.toggle_fullscreen),
-            Button((cx - w / 2, y0 + 4 * (h + gap), w, h), "BAŞTAN BAŞLA", self.start_run, color=(130, 90, 60), hover_color=(170, 115, 80)),
-            Button((cx - w / 2, y0 + 5 * (h + gap), w, h), "ANA MENÜ", lambda: self.set_state(STATE_MENU)),
-        ]
-        for b in buttons:
-            b.update(mouse_pos, dt)
-            b.draw(canvas)
-            if clicked:
-                b.click(mouse_pos)
+        pr = pygame.Rect(0, 0, 720, 382)
+        pr.center = (cx, VIRTUAL_H / 2 + 6)
+        panel(canvas, pr, bg=(16, 18, 30), edge=(72, 82, 124), alpha=243, radius=18, edge_w=2)
 
-        # --- SKİN GÖRÜNÜMÜ (oyun içinden açılıp kapatılabilir) ---
-        # Kapatıldığında oyuncu; kanat, şapka, gözlük, pelerin ve skin efektleri
-        # olmadan yalnızca skininin renginde sade bir top olarak çizilir.
-        self._plain_skin_row(canvas, pygame.Rect(cx - w / 2, y0 + 3 * (h + gap), w, h),
-                             mouse_pos, clicked)
+        # ---- başlık: iki yanında daralan altın ayraçlarla ----
+        ty = pr.y + 34
+        draw_text(canvas, "DURAKLATILDI", (cx, ty - 18), 40, TEXT, bold=True, center=True)
+        tw_ = text_width("DURAKLATILDI", 40, True)
+        for sgn in (-1, 1):
+            x0 = cx + sgn * (tw_ / 2 + 20)
+            taper_line(canvas, [(x0, ty), (x0 + sgn * 104, ty)], 2.6, 0.4,
+                       scale_col(GOLD, 0.7))
+        draw_text(canvas,
+                  f"Dalga {self.run.waves.wave}   •   Seviye {self.run.player.level}"
+                  f"   •   Skor {fmt_num(self.run.score)}",
+                  (cx, ty + 12), 14, TEXT_DIM, center=True, shadow=False)
 
-        # --- yetenek çubuğu boyutu (oyuncu buradan küçültüp büyütebilir) ---
-        sr = pygame.Rect(cx - w / 2, y0 + 2 * (h + gap), w, h)
+        # ---- iki sütun: solda görünüm ayarları, sağda düğmeler ----
+        colw = 320
+        lx = pr.x + 28
+        rx = pr.right - 28 - colw
+        y = pr.y + 94
+        draw_text(canvas, "GÖRÜNÜM", (lx, y - 20), 12, GOLD, bold=True, shadow=False)
+        draw_text(canvas, "OYUN", (rx, y - 20), 12, GOLD, bold=True, shadow=False)
+
+        # SOL: eşya efekti (0-100) + yetenek çubuğu + skin görünümü
+        self._fx_slider(canvas, pygame.Rect(lx, y, colw, 50), mouse_pos, down)
+        y2 = y + 60
+        sr = pygame.Rect(lx, y2, colw, 48)
         hov = sr.collidepoint(mouse_pos)
-        panel(canvas, sr, bg=(36, 34, 56) if hov else (26, 26, 42),
-              edge=CYAN if hov else PANEL_EDGE, alpha=240, radius=10, edge_w=2)
+        panel(canvas, sr, bg=(32, 36, 54) if hov else (22, 24, 38),
+              edge=CYAN if hov else PANEL_EDGE, alpha=242, radius=10, edge_w=2)
         draw_text(canvas, "YETENEK ÇUBUĞU", (sr.x + 16, sr.y + 7), 12, TEXT_DIM, shadow=False)
-        draw_text(canvas, f"{skill_scale_label()}  »", (sr.x + 16, sr.y + 23), 17,
+        draw_text(canvas, f"{skill_scale_label()}  »", (sr.x + 16, sr.y + 23), 16,
                   CYAN if hov else TEXT, bold=True, shadow=False)
-        # sağda canlı küçük önizleme
         k = clamp(float(CFG.get("skill_scale", 0.85)), 0.5, 1.4)
-        pw = int(26 * k)
+        pw = int(22 * k)
         for i in range(3):
-            prv = pygame.Rect(int(sr.right - 22 - (3 - i) * (pw + 4)), int(sr.centery - pw / 2), pw, pw)
+            prv = pygame.Rect(int(sr.right - 18 - (3 - i) * (pw + 4)),
+                              int(sr.centery - pw / 2), pw, pw)
             pygame.draw.rect(canvas, (18, 19, 30), prv, border_radius=4)
             pygame.draw.rect(canvas, (90, 200, 210), prv, width=1, border_radius=4)
         if clicked and hov:
@@ -18651,6 +19459,35 @@ class App:
             self.save.data.setdefault("settings", {})["skill_scale"] = CFG["skill_scale"]
             self.save.save()
             sfx("click", 0.6, 0.0)
+        self._plain_skin_row(canvas, pygame.Rect(lx, y2 + 58, colw, 48), mouse_pos, clicked)
+
+        note = ("Efekt yüzdesi yalnızca ÇİZİMİ etkiler — silahların hasarı "
+                "hiçbir değerde değişmez.")
+        ny = y2 + 116
+        for ln in wrap_text(note, 10, colw):
+            draw_text(canvas, ln, (lx, ny), 10, TEXT_DIM, shadow=False)
+            ny += 13
+
+        # SAĞ: oyun düğmeleri
+        bh, bgap = 48, 11
+        buttons = [
+            Button((rx, y, colw, bh), "DEVAM ET", lambda: self.set_state(STATE_PLAY),
+                   color=(60, 130, 90), hover_color=(80, 170, 115)),
+            Button((rx, y + (bh + bgap), colw, bh), "TAM EKRAN AÇ/KAPA",
+                   self.display.toggle_fullscreen),
+            Button((rx, y + 2 * (bh + bgap), colw, bh), "BAŞTAN BAŞLA", self.start_run,
+                   color=(130, 90, 60), hover_color=(170, 115, 80)),
+            Button((rx, y + 3 * (bh + bgap), colw, bh), "ANA MENÜ",
+                   lambda: self.set_state(STATE_MENU)),
+        ]
+        for b in buttons:
+            b.update(mouse_pos, dt)
+            b.draw(canvas)
+            if clicked:
+                b.click(mouse_pos)
+
+        draw_text(canvas, "ESC: devam et   •   TAB: istatistikler",
+                  (cx, pr.bottom - 22), 11, TEXT_DIM, center=True, shadow=False)
 
     def _plain_skin_row(self, canvas, rect, mouse_pos, clicked, compact=False):
         """"SKİN GÖRÜNÜMÜ" anahtarı: sağında canlı bir önizleme topu taşır.
@@ -19051,11 +19888,14 @@ class App:
         disc_grad(canvas, bx - 3, by - 3, 13, scale_col(accent, 0.55), (12, 14, 22), 6)
         ring_aa(canvas, bx, by, 13, accent, 2)
         draw_icon(canvas, bx, by, "gem", lighten(accent, 0.3), 9)
-        draw_text(canvas, "MAĞAZA", (rect.x + 46, rect.y + 14), 12, accent, bold=True, shadow=False)
-        draw_text(canvas, f"{len(GEM_PACKS)} elmas paketi", (rect.x + 46, rect.y + 28), 10,
+        tx = rect.x + 52
+        draw_text(canvas, "MAĞAZA", (tx, rect.y + 12), 12, accent, bold=True, shadow=False)
+        draw_text(canvas, f"{len(GEM_PACKS)} elmas paketi", (tx, rect.y + 27), 9,
                   TEXT_DIM, shadow=False)
-        draw_text(canvas, f"{sum(1 for s in SKINS if s.get('premium'))} premium skin",
-                  (rect.x + 46, rect.y + 41), 9, PURPLE, bold=True, shadow=False)
+        draw_text(canvas,
+                  f"{sum(1 for s in SKINS if s.get('premium'))} premium skin"
+                  f"  ·  {len(PETS)} pet",
+                  (tx, rect.y + 39), 9, PURPLE, bold=True, shadow=False)
 
         pygame.draw.line(canvas, (52, 56, 78), (pl, rect.y + 56), (pr_, rect.y + 56), 1)
 
@@ -19072,7 +19912,7 @@ class App:
                   bold=True, shadow=False)
         draw_text(canvas, f"{fmt_num(gem_pack_total(best))} elmas", (pr_, rect.y + 108), 10,
                   TEXT_DIM, bold=True, shadow=False, right=True)
-        draw_text(canvas, "en büyük pakette", (pl, rect.y + 121), 9, TEXT_DIM, shadow=False)
+        draw_text(canvas, "en büyük pakette", (pl, rect.y + 120), 9, TEXT_DIM, shadow=False)
 
         # ---- paket çeşidi: her paket için küçük bir elmas boncuğu ----
         npk = len(GEM_PACKS)
@@ -19081,13 +19921,13 @@ class App:
             px0 = pl + 5
             for j in range(npk):
                 big = (GEM_PACKS[j] is best)
-                circle_aa(canvas, px0 + j * pip_gap, rect.y + 132,
+                circle_aa(canvas, px0 + j * pip_gap, rect.y + 137,
                           5 if big else 3.2, GOLD if big else scale_col(accent, 0.85))
                 if big:
-                    circle_aa(canvas, px0 + j * pip_gap - 1, rect.y + 131, 2,
+                    circle_aa(canvas, px0 + j * pip_gap - 1, rect.y + 136, 2,
                               (255, 248, 210))
 
-        cta = pygame.Rect(pl, rect.y + 142, pr_ - pl, 28)
+        cta = pygame.Rect(pl, rect.y + 147, pr_ - pl, 26)
         cs = pygame.Surface(cta.size, pygame.SRCALPHA)
         base = (48, 120, 170) if hover else (34, 88, 128)
         pygame.draw.rect(cs, (*base, 250), cs.get_rect(), border_radius=14)
@@ -19164,8 +20004,9 @@ class App:
         self.purchase.begin_purchase(pack, on_done=done)
 
     def _store_tabs(self, canvas, mouse_pos, clicked):
-        tabs = [("gems", "ELMAS PAKETLERİ"), ("skins", "PREMİUM SKİNLER")]
-        tw, th, gap = 230, 34, 12
+        tabs = [("gems", "ELMAS PAKETLERİ"), ("skins", "PREMİUM SKİNLER"),
+                ("pets", "PETLER")]
+        tw, th, gap = 212, 34, 12
         x0 = (VIRTUAL_W - (len(tabs) * tw + (len(tabs) - 1) * gap)) / 2
         for i, (key, label) in enumerate(tabs):
             r = pygame.Rect(x0 + i * (tw + gap), 86, tw, th)
@@ -19319,6 +20160,101 @@ class App:
             if clicked:
                 btn.click(mouse_pos)
 
+    def _draw_store_pets(self, canvas, dt, mouse_pos, clicked, can_buy):
+        """MAĞAZA > PETLER sekmesi.
+
+        PET'ler artık elmasla değil GERÇEK PARAYLA (₺) alınır; tıpkı premium
+        skinler gibi satın alma Steam üzerinden yürür. Sahip olunan PET
+        KIYAFET MARKET > PET sekmesinden kuşanılır — burada yalnızca satılır.
+        """
+        cols, rows_n = 4, 2
+        card_w, card_h, gx, gy = 246, 172, 18, 16
+        start_x = (VIRTUAL_W - (cols * card_w + (cols - 1) * gx)) / 2
+        y0 = 130
+        equipped = self.save.equipped_cosmetic_id("pet")
+        for i, pet in enumerate(PETS[:cols * rows_n]):
+            cx_, ry = i % cols, i // cols
+            rect = pygame.Rect(int(start_x + cx_ * (card_w + gx)),
+                               int(y0 + ry * (card_h + gy)), card_w, card_h)
+            owned = self.save.owns_cosmetic(pet["id"])
+            is_eq = equipped == pet["id"]
+            hover = rect.collidepoint(mouse_pos)
+            accent = GOLD if is_eq else pet["color"]
+            add_glow(canvas, rect.centerx, rect.centery, 118, accent, 0.07)
+            panel(canvas, rect, bg=(30, 32, 48) if hover else (18, 22, 34),
+                  edge=accent, alpha=246, radius=14, edge_w=3 if is_eq else 2)
+
+            tag = "KUŞANILDI" if is_eq else ("SAHİPSİN" if owned else "PET")
+            tcol = GOLD if is_eq else (GREEN if owned else PURPLE)
+            br = pygame.Rect(0, 0, int(text_width(tag, 10, True) + 20), 20)
+            br.center = (rect.centerx, rect.y + 1)
+            bs = pygame.Surface(br.size, pygame.SRCALPHA)
+            pygame.draw.rect(bs, (*tcol, 240), bs.get_rect(), border_radius=10)
+            canvas.blit(bs, br.topleft)
+            draw_text(canvas, tag, br.center, 10,
+                      (18, 16, 10) if is_eq or owned else WHITE, bold=True,
+                      center=True, shadow=False)
+
+            draw_pet(canvas, pet["kind"], rect.centerx, rect.y + 50, 16, self.t,
+                     face=1, moving=hover, col=pet["color"], acc=pet["accent"])
+            draw_text(canvas, pet["name"], (rect.centerx, rect.y + 72), 16, TEXT,
+                      bold=True, center=True)
+            for ln in wrap_text(pet["desc"], 10, rect.w - 28)[:1]:
+                draw_text(canvas, ln, (rect.centerx, rect.y + 94), 10,
+                          TEXT_DIM, center=True, shadow=False)
+
+            pygame.draw.line(canvas, (52, 56, 78), (rect.x + 22, rect.bottom - 58),
+                             (rect.right - 22, rect.bottom - 58), 1)
+            if owned:
+                draw_text(canvas, "Kıyafet Market > PET'ten de kuşanılır",
+                          (rect.centerx, rect.bottom - 52), 10, TEXT_DIM,
+                          center=True, shadow=False)
+                btn = Button((rect.x + 18, rect.bottom - 40, rect.w - 36, 30),
+                             "KUŞANILDI" if is_eq else "KUŞAN",
+                             lambda pt=pet: self._equip_store_pet(pt),
+                             color=(38, 40, 54) if is_eq else (60, 130, 90),
+                             hover_color=(80, 170, 115), enabled=not is_eq, text_size=13)
+            else:
+                draw_text(canvas, pet.get("price_hint", ""),
+                          (rect.centerx, rect.bottom - 54), 17, TEXT, bold=True, center=True)
+                btn = Button((rect.x + 18, rect.bottom - 40, rect.w - 36, 30),
+                             "SATIN AL" if can_buy else "YAKINDA",
+                             lambda pt=pet: self._buy_store_pet(pt),
+                             color=(120, 60, 150) if can_buy else (38, 40, 54),
+                             hover_color=(160, 90, 200), enabled=can_buy, text_size=13)
+            btn.update(mouse_pos, dt)
+            btn.draw(canvas)
+            if clicked:
+                btn.click(mouse_pos)
+
+    def _equip_store_pet(self, pet):
+        self.save.equip_cosmetic("pet", pet["id"])
+        self.save.save()
+        sfx("click", 0.6, 0.0)
+
+    def _buy_store_pet(self, pet):
+        """PET'i gerçek parayla satın almayı başlatır (premium skinle aynı yol)."""
+        pack = dict(id=pet["item_id"], gems=0, bonus=0,
+                    price_hint=pet.get("price_hint", ""), tag="", color=pet["color"])
+
+        def done(ok, msg):
+            self.gem_msg = msg
+            self.gem_msg_ok = ok
+            self.gem_msg_timer = 3.2
+            if ok and FAKE_PURCHASE:
+                # Yalnızca TEST kipinde PET yerel olarak açılır.
+                self.save.buy_cosmetic(pet["id"], 0)
+                self.save.equip_cosmetic("pet", pet["id"])
+                self.save.save()
+                self.gem_msg = f"TEST: {pet['name']} açıldı ve kuşanıldı"
+            elif ok:
+                # Gerçek satın almada sahiplik SUNUCUDA yazılır.
+                self._refresh_gems_from_server()
+            if ok:
+                sfx("buy", 1.0, 0.0)
+
+        self.purchase.begin_purchase(pack, on_done=done)
+
     def _equip_premium(self, sk):
         self.save.equip_skin(sk["id"])
         self.selected_skin = sk["id"]
@@ -19338,7 +20274,8 @@ class App:
         pygame.draw.line(canvas, (48, 108, 150), (0, 76), (VIRTUAL_W, 76), 2)
         draw_icon(canvas, 34, 30, "gem", GEM_COLOR, 13)
         draw_text(canvas, "MAĞAZA", (56, 16), 26, GEM_COLOR, bold=True)
-        draw_text(canvas, "Elmas paketleri ve premium skinler — oyunun gücünü değil, görünümünü ve tarzını değiştirir.",
+        draw_text(canvas, "Elmas paketleri, premium skinler ve PET'ler — oyunun gücünü değil, "
+                          "görünümünü ve tarzını değiştirir.",
                   (56, 48), 11, TEXT_DIM, shadow=False)
         gem_txt = fmt_num(self.save.get_gems())
         gw_ = coin_label_width(gem_txt, 20, 10, gap=8)
@@ -19350,11 +20287,14 @@ class App:
         self._store_tabs(canvas, mouse_pos, ui_click)
         if self.store_tab == "skins":
             self._draw_premium_skins(canvas, dt, mouse_pos, ui_click, can_buy)
+        elif self.store_tab == "pets":
+            self._draw_store_pets(canvas, dt, mouse_pos, ui_click, can_buy)
         else:
             self._draw_gem_packs(canvas, dt, mouse_pos, ui_click, can_buy)
 
         # ================= ALT BİLGİ =================
-        info = pygame.Rect(120, 440, VIRTUAL_W - 240, 90)
+        info_y = 500 if self.store_tab == "pets" else 440
+        info = pygame.Rect(120, info_y, VIRTUAL_W - 240, 90)
         panel(canvas, info, bg=(18, 19, 30), edge=(64, 70, 96), alpha=235, radius=12, edge_w=1)
         if FAKE_PURCHASE:
             draw_text(canvas, "TEST KİPİ — GERÇEK ÖDEME ALINMIYOR",
@@ -19385,7 +20325,7 @@ class App:
 
         if self.purchase.busy:
             draw_text(canvas, self.purchase.status or "İşleniyor...",
-                      (VIRTUAL_W / 2, 424), 13, CYAN, bold=True, center=True)
+                      (VIRTUAL_W / 2, info_y - 16), 13, CYAN, bold=True, center=True)
         if self.gem_msg_timer > 0:
             self.gem_msg_timer -= dt
             box = pygame.Rect(0, 0, 460, 110)
@@ -19405,7 +20345,10 @@ class App:
         self.bg.draw(canvas)
         # Liste iki sütuna bölündüğü için panel geniş: tek sütunda maddeler
         # panelin altından taşıyor ve GERİ düğmesinin üstüne biniyordu.
-        panel_rect = pygame.Rect(0, 0, 900, 660)
+        # v3.16: madde sayısı arttığı için panel ÜÇ SÜTUNA çıktı. İki sütunda
+        # satır aralığı okunamayacak kadar sıkışıyor, başlıklarla açıklamalar
+        # üst üste biniyordu.
+        panel_rect = pygame.Rect(0, 0, 1216, 676)
         panel_rect.center = (VIRTUAL_W / 2, VIRTUAL_H / 2)
         panel(canvas, panel_rect, alpha=245)
         draw_text(canvas, "NASIL OYNANIR", (panel_rect.centerx, panel_rect.y + 24), 27, CYAN, bold=True, center=True)
@@ -19416,7 +20359,7 @@ class App:
             ("SPACE", "BONK! — çevrene alan hasarı veren yakın vuruş"),
             ("SHIFT / SAĞ TIK", "DASH — kısa süre hasar almazsın"),
             ("B", "Büyük MARKET'i aç — dalga ilerledikçe yeni kademeler açılır"),
-            ("TAB  ·  SAĞ ÜST KÖŞE", "Hasarın, hızın, can çalman % olarak görünür"),
+            ("TAB  ·  SAĞ ÜST KÖŞE", "İstatistik künyen: hayatta kalma, hasar, hareket, kazanç"),
             ("L", "SOHBET kutusunu sol altta açar — kutu açıkken oyun durur"),
             ("DALGALAR SKORLA İLERLER", "Her dalganın skor hedefi var — hedef her zorlukta AYNI"),
             ("ZORLUK = TEMPO", "Kabus dalgaları zorlaştırmaz, düşmanları daha hızlı getirir"),
@@ -19429,6 +20372,12 @@ class App:
             ("PATRON YETENEKLERİ", "Üstüne atılır, yolunu keser, çevreni kapatır, seni kendine çeker"),
             ("PATRON SANDIĞI", "Devrilen patron SANDIK bırakır, içinden SİLAH çıkar"),
             ("SİLAHLAR OTOMATİK", "Balta/Kalkan/Emanet/Kırbaç/Papuç kendi kendine çalışır"),
+            ("SİLAH + KİTAP TAKIMI",
+             f"{MAX_RUN_WEAPONS} silah  ·  {MAX_RUN_BOOKS} kitap (Lv.{BOOK_MAX_LEVEL}'e kadar)"
+             f"  ·  {MAX_RUN_RARE_BOOKS} nadir kitap"),
+            ("NADİR KİTAP TEK HAK", "Bir nadir kitap seçince o koşuda başka nadir kitap hiç çıkmaz"),
+            ("HİÇBİR EŞYA TEK ATMAZ", "Tanklar hiçbir seviyede tek vuruşta ölmez; küçükler 10. seviyeden sonra ölür"),
+            ("HER KOŞU FARKLI", "Her koşuda bazı silah ve kitaplar sessizce havuzdan çıkar — aynı kombo her sefer kurulmaz"),
             ("KAÇARKEN DİKKAT", "Arkanda kalan yaratıklar kaçtığın yöne, yani önüne ışınlanır"),
             ("KIYAFET MARKET", "Şapka, gözlük ve pelerinlerin her biri küçük kalıcı bonus verir"),
             ("ÖLÜRSEN", "O koşuda market'ten aldıkların silinir — baştan başlarsın"),
@@ -19442,28 +20391,40 @@ class App:
             ("ALTININ 45 SANİYESİ VAR", "Yerde kalan para 45 saniye sonra kaybolur (her paranın kendi sayacı)"),
             ("EMANET (KILIÇ)", "Saniyede bir yay çizer; zırhlı ve kalkanlı düşmanları zırhını saymadan keser"),
             ("GÖRÜNMEZLİK PELERİNİ", "Her dakika 5 saniye kaybolursun — patronlar hariç kimse göremez"),
-            ("KİTAPLARI DA KAPATABİLİRSİN", "Kitaplıkta en fazla 5 kitabı kapat; kapalı kitap seviye atlarken çıkmaz"),
+            ("KİTAPLARI DA KAPATABİLİRSİN",
+             f"Kitaplıkta en fazla {MAX_MUTED_BOOKS} kitabı kapat; kapalı kitap seviye atlarken çıkmaz"),
             ("CEHENNEM PATRONU", "İlk patron EJDERHA: alev püskürtür, üstüne dalar"),
             ("SKİN ÖZEL YETENEĞİ", "Her skinin OTOMATİK bir yeteneği var, süresi altta yazar"),
             ("YETENEK = 0.5 SN DONMA", "Yetenek çalışınca düşmanlar yarım saniye donar"),
             ("KİTAPLIK", "Kitapların hepsi kilitli — her birinin kendi görevleri var"),
             ("BAŞARIMLAR", "Başarıma tıkla: nasıl kazanılır, ne kadar kaldı, ödülü ne"),
-            ("AYARLAR", "Ana menüden: ses, FPS sınırı (240'a kadar), silah görselleri, pet"),
-            ("PETLER", "Kıyafet Market > PET sekmesi: elmasla al, yanında gezer, sadece görünüş"),
+            ("AYARLAR", "Ana menüden: ses, FPS sınırı (240'a kadar), görünüm seçenekleri"),
+            ("ESC  ·  EŞYA EFEKTİ", "Oyunun içinde ESC: efekt yoğunluğunu %0-%100 ayarla (hasar değişmez)"),
+            ("PETLER", "MAĞAZA'dan alınır, Kıyafet Market > PET'ten kuşanılır; sadece görünüş"),
         ]
-        # Maddeler İKİ SÜTUNA bölünür; satır aralığı sütun başına düşen madde
+        # Maddeler ÜÇ SÜTUNA bölünür; satır aralığı sütun başına düşen madde
         # sayısına göre hesaplanır, böylece yeni madde eklenince yazılar
-        # panelin dışına taşmaz.
-        list_top = panel_rect.y + 62
-        list_bottom = panel_rect.bottom - 62      # GERİ düğmesine yer bırak
-        per_col = (len(lines) + 1) // 2
-        step = clamp((list_bottom - list_top) / max(1, per_col), 22, 38)
-        col_x = (panel_rect.x + 28, panel_rect.x + 458)
+        # ne panelin dışına taşar ne de birbirinin üstüne biner.
+        NCOL = 3
+        list_top = panel_rect.y + 64
+        list_bottom = panel_rect.bottom - 64      # GERİ düğmesine yer bırak
+        per_col = (len(lines) + NCOL - 1) // NCOL
+        step = clamp((list_bottom - list_top) / max(1, per_col), 27, 40)
+        pad = 26
+        col_w = (panel_rect.w - pad * 2) / NCOL
         for i, (title, desc) in enumerate(lines):
-            cx = col_x[0 if i < per_col else 1]
+            ci = min(NCOL - 1, i // per_col)
+            cx = panel_rect.x + pad + ci * col_w
             y = list_top + (i % per_col) * step
-            draw_text(canvas, title, (cx, y), 13, GOLD, bold=True)
-            draw_text(canvas, desc, (cx, y + 15), 10, TEXT_DIM, shadow=False)
+            draw_text(canvas, _fit_text(title, 13, col_w - 18, bold=True), (cx, y), 13,
+                      GOLD, bold=True)
+            draw_text(canvas, _fit_text(desc, 10, col_w - 18), (cx, y + 15), 10,
+                      TEXT_DIM, shadow=False)
+            # sütunlar arası ince ayraç
+            if ci and i % per_col == 0:
+                lx_ = cx - 13
+                pygame.draw.line(canvas, (44, 50, 74), (lx_, list_top - 6),
+                                 (lx_, list_top + (per_col - 1) * step + 24), 1)
 
         btn = Button((panel_rect.centerx - 100, panel_rect.bottom - 52, 200, 40), "GERİ",
                      lambda: self.set_state(STATE_SETTINGS if self.prev_state == STATE_SETTINGS else STATE_MENU))
@@ -19502,16 +20463,32 @@ class App:
             self._set_dirty = True
 
     def update_settings(self, dt, mouse_pos, clicked):
+        """AYARLAR ekranı.
+
+        v3.16 SİMETRİ: iki sütunun satır yükseklikleri eşitlendi (eskiden
+        soldaki ses çubukları 52, sağdaki satırlar 50 pikseldi; satırlar
+        aşağı indikçe birbirinden kayıyordu). Her sütunda artık BEŞER satır
+        var ve ikisi de aynı eksende bitiyor. EŞYA EFEKTİ oyun içine
+        taşındığı için altta TAM GENİŞLİKTE bir bilgi şeridine indi.
+        """
         canvas = self.display.canvas
         self.bg.draw(canvas)
-        pr = pygame.Rect(0, 0, 940, 640)
+        pr = pygame.Rect(0, 0, 940, 584)
         pr.center = (VIRTUAL_W / 2, VIRTUAL_H / 2)
         panel(canvas, pr, alpha=245)
-        draw_text(canvas, "AYARLAR", (pr.centerx, pr.y + 26), 28, CYAN, bold=True, center=True)
+        draw_text(canvas, "AYARLAR", (pr.centerx, pr.y + 22), 28, CYAN, bold=True, center=True)
+        tw_ = text_width("AYARLAR", 28, True)
+        for sgn in (-1, 1):
+            x0 = pr.centerx + sgn * (tw_ / 2 + 18)
+            taper_line(canvas, [(x0, pr.y + 36), (x0 + sgn * 120, pr.y + 36)], 2.4, 0.4,
+                       scale_col(CYAN, 0.55))
 
         st = self.save.data.setdefault("settings", {})
         down = pygame.mouse.get_pressed()[0] and not self.chat.open
-        lx, rx, cw = pr.x + 36, pr.x + 484, 420
+        cw = 420
+        lx = pr.centerx - cw - 16
+        rx = pr.centerx + 16
+        ROW_H, ROW_STEP = 52, 60          # iki sütunda da AYNI
         draw_text(canvas, "SES & EKRAN", (lx, pr.y + 62), 15, GOLD, bold=True)
         draw_text(canvas, "GÖRÜNÜM & PERFORMANS", (rx, pr.y + 62), 15, GOLD, bold=True)
 
@@ -19526,63 +20503,72 @@ class App:
                 st[key] = not on
                 save_cfg()
 
-        # ---- SOL SÜTUN ----
-        y = pr.y + 90
-        self._set_slider(canvas, pygame.Rect(lx, y, cw, 52), "MÜZİK SESİ", "music_vol", mouse_pos, down)
-        y += 62
-        self._set_slider(canvas, pygame.Rect(lx, y, cw, 52), "EFEKT SESİ", "sfx_vol", mouse_pos, down)
-        y += 62
+        # ---- SOL SÜTUN (5 satır) ----
+        y = pr.y + 88
+        self._set_slider(canvas, pygame.Rect(lx, y, cw, ROW_H), "MÜZİK SESİ", "music_vol",
+                         mouse_pos, down)
+        y += ROW_STEP
+        self._set_slider(canvas, pygame.Rect(lx, y, cw, ROW_H), "EFEKT SESİ", "sfx_vol",
+                         mouse_pos, down)
+        y += ROW_STEP
         full = bool(self.display.fullscreen)
-        if self._set_row(canvas, pygame.Rect(lx, y, cw, 50), "TAM EKRAN  (F11)",
-                         "AÇIK" if full else "KAPALI", GREEN if full else RED, mouse_pos, clicked):
+        if self._set_row(canvas, pygame.Rect(lx, y, cw, ROW_H), "TAM EKRAN  (F11)",
+                         "AÇIK" if full else "KAPALI", GREEN if full else RED,
+                         mouse_pos, clicked):
             self.display.toggle_fullscreen()
-        y += 60
-        tog(pygame.Rect(lx, y, cw, 50), "EKRAN SARSINTISI", "shake")
-        y += 60
-        tog(pygame.Rect(lx, y, cw, 50), "HASAR SAYILARI", "dmg")
-        y += 60
-        tog(pygame.Rect(lx, y, cw, 50), "FPS GÖSTERGESİ  (F3)", "fps", default=False)
+        y += ROW_STEP
+        tog(pygame.Rect(lx, y, cw, ROW_H), "EKRAN SARSINTISI", "shake")
+        y += ROW_STEP
+        tog(pygame.Rect(lx, y, cw, ROW_H), "HASAR SAYILARI", "dmg")
+        col_bottom = y + ROW_H
 
-        # ---- SAĞ SÜTUN ----
-        y = pr.y + 90
+        # ---- SAĞ SÜTUN (5 satır) ----
+        y = pr.y + 88
         cap = CFG.get("fps_cap", 60)
-        if self._set_row(canvas, pygame.Rect(rx, y, cw, 50), "FPS SINIRI",
+        if self._set_row(canvas, pygame.Rect(rx, y, cw, ROW_H), "FPS SINIRI",
                          f"{cap} FPS  »", CYAN if cap <= 144 else ORANGE, mouse_pos, clicked):
             i = FPS_CHOICES.index(cap) if cap in FPS_CHOICES else 0
             st["fps_cap"] = FPS_CHOICES[(i + 1) % len(FPS_CHOICES)]
             save_cfg()
-        y += 60
-        fxm = weapon_fx_mode()
-        fx_txt = {"full": "AÇIK — tam görünüm", "dim": "KISIK — soluk efekt",
-                  "off": "KAPALI — gizli"}[fxm]
-        fx_col = {"full": GREEN, "dim": ORANGE, "off": RED}[fxm]
-        if self._set_row(canvas, pygame.Rect(rx, y, cw, 50), "SİLAH GÖRSELLERİ",
-                         f"{fx_txt}  »", fx_col, mouse_pos, clicked):
-            i = WEAPON_FX_MODES.index(fxm)
-            st["weapon_fx"] = WEAPON_FX_MODES[(i + 1) % len(WEAPON_FX_MODES)]
-            save_cfg()
-        y += 60
-        tog(pygame.Rect(rx, y, cw, 50), "PET GÖRÜNÜMÜ", "pet_show")
-        y += 60
-        self._plain_skin_row(canvas, pygame.Rect(rx, y, cw, 50), mouse_pos, clicked)
-        y += 60
-        sr = pygame.Rect(rx, y, cw, 50)
+        y += ROW_STEP
+        tog(pygame.Rect(rx, y, cw, ROW_H), "FPS GÖSTERGESİ  (F3)", "fps", default=False)
+        y += ROW_STEP
+        tog(pygame.Rect(rx, y, cw, ROW_H), "PET GÖRÜNÜMÜ", "pet_show")
+        y += ROW_STEP
+        self._plain_skin_row(canvas, pygame.Rect(rx, y, cw, ROW_H), mouse_pos, clicked)
+        y += ROW_STEP
+        sr = pygame.Rect(rx, y, cw, ROW_H)
         if self._set_row(canvas, sr, "YETENEK ÇUBUĞU BOYUTU", f"{skill_scale_label()}  »",
                          CYAN, mouse_pos, clicked):
             CFG["skill_scale"] = cycle_skill_scale()
             st["skill_scale"] = CFG["skill_scale"]
             self.save.save()
-        y += 62
+
+        # ---- TAM GENİŞLİKTE BİLGİ ŞERİDİ: EŞYA EFEKTİ ----
+        # Ayar artık OYUN İÇİNDEN (ESC) yapılıyor; burada yalnızca son değeri
+        # gösteren, tıklanamayan bir şerit var.
+        iy = col_bottom + 18
+        ir = pygame.Rect(lx, iy, rx + cw - lx, 48)
+        fx_pct = weapon_fx_pct()
+        fx_col = GREEN if fx_pct >= 70 else (ORANGE if fx_pct >= 25 else RED)
+        panel(canvas, ir, bg=(20, 22, 36), edge=(52, 58, 84), alpha=235, radius=10, edge_w=2)
+        draw_text(canvas, "EŞYA EFEKTİ", (ir.x + 16, ir.y + 7), 12, TEXT_DIM, shadow=False)
+        draw_text(canvas, f"%{fx_pct}", (ir.x + 16, ir.y + 23), 17, fx_col, bold=True,
+                  shadow=False)
+        bar = pygame.Rect(ir.x + 92, ir.centery - 5, 240, 10)
+        draw_bar(canvas, bar, fx_pct / 100.0, fx_col, radius=5)
+        draw_text(canvas, "oyunun içinde ESC'ye basılarak ayarlanır — hasar hiç değişmez",
+                  (ir.right - 16, ir.centery - 7), 12, TEXT_DIM, right=True, shadow=False)
+
+        # ---- kısa notlar ----
+        ny = ir.bottom + 12
         notes = [
             "FPS sınırı: ekranının yenileme hızından fazlası görünmez. 240 için güçlü bir PC gerekir.",
-            "Silah görselleri: hasar aynı kalır, yalnızca çizim değişir (kısık = soluk, kapalı = gizli).",
-            "Pet: Kıyafet Market > PET sekmesinden alınır; yalnızca görünüştür.",
+            "PET'ler MAĞAZA'dan alınır, KIYAFET MARKET > PET sekmesinden kuşanılır; yalnızca görünüştür.",
         ]
         for ln in notes:
-            for part in wrap_text(ln, 10, cw):
-                draw_text(canvas, part, (rx, y), 10, TEXT_DIM, shadow=False)
-                y += 13
-            y += 3
+            draw_text(canvas, ln, (pr.centerx, ny), 10, TEXT_DIM, center=True, shadow=False)
+            ny += 14
 
         # Sürükleme bitince kaydet (her karede dosya yazma)
         if getattr(self, "_set_dirty", False) and not down:
@@ -19592,10 +20578,10 @@ class App:
         # ---- alt düğmeler ----
         by = pr.bottom - 58
         btns = [
-            Button((pr.centerx - 230, by, 220, 42), "NASIL OYNANIR", lambda: self.goto(STATE_HOW_TO),
-                   text_size=16),
-            Button((pr.centerx + 10, by, 220, 42), "GERİ", lambda: self.set_state(STATE_MENU),
-                   text_size=16),
+            Button((pr.centerx - 236, by, 228, 44), "NASIL OYNANIR",
+                   lambda: self.goto(STATE_HOW_TO), text_size=16),
+            Button((pr.centerx + 8, by, 228, 44), "GERİ",
+                   lambda: self.set_state(STATE_MENU), text_size=16),
         ]
         for b in btns:
             b.update(mouse_pos, dt)
@@ -19822,8 +20808,8 @@ class App:
             draw_text(canvas, "Bu listede başarım yok.", (VIRTUAL_W / 2, list_top + 70), 16,
                       TEXT_DIM, center=True)
 
-        btn = Button((VIRTUAL_W / 2 - 110, VIRTUAL_H - 58, 220, 44), "ANA MENÜYE DÖN",
-                     lambda: self.set_state(STATE_MENU))
+        btn = Button((VIRTUAL_W / 2 - 135, VIRTUAL_H - 58, 270, 44), "ANA MENÜYE DÖN",
+                     lambda: self.set_state(STATE_MENU), text_size=18)
         btn.update(mouse_pos, dt)
         btn.draw(canvas)
         if list_click:
@@ -20585,8 +21571,8 @@ class App:
             draw_text(canvas, self.weapon_toast, (VIRTUAL_W / 2, VIRTUAL_H - 84), 15,
                       (240, 200, 120), bold=True, center=True)
 
-        btn = Button((VIRTUAL_W / 2 - 110, VIRTUAL_H - 58, 220, 44), "ANA MENÜYE DÖN",
-                     lambda: self.set_state(STATE_MENU))
+        btn = Button((VIRTUAL_W / 2 - 135, VIRTUAL_H - 58, 270, 44), "ANA MENÜYE DÖN",
+                     lambda: self.set_state(STATE_MENU), text_size=18)
         btn.update(mouse_pos, dt)
         btn.draw(canvas)
         if list_click:
@@ -20907,7 +21893,11 @@ class App:
         draw_text(canvas,
                   "Kitaplar görevle açılır — açtığın kitaplar seviye atlayınca karşına çıkar. "
                   f"İstemediğin en fazla {MAX_MUTED_BOOKS} kitabı kapatabilirsin.",
-                  (52, 50), 11, TEXT_DIM, shadow=False)
+                  (52, 48), 11, TEXT_DIM, shadow=False)
+        draw_text(canvas,
+                  f"BİR KOŞUDA: {MAX_RUN_BOOKS} normal kitap (her biri Lv.{BOOK_MAX_LEVEL}'e "
+                  f"kadar büyür)  +  {MAX_RUN_RARE_BOOKS} nadir kitap (alınınca bir daha çıkmaz).",
+                  (52, 64), 11, (186, 150, 255), bold=True, shadow=False)
 
         # sağ üst: genel ilerleme çubuğu
         pbw = 250
@@ -20953,8 +21943,8 @@ class App:
             draw_text(canvas, self.book_toast, (VIRTUAL_W / 2, VIRTUAL_H - 84), 15,
                       (240, 200, 120), bold=True, center=True)
 
-        btn = Button((VIRTUAL_W / 2 - 110, VIRTUAL_H - 58, 220, 44), "ANA MENÜYE DÖN",
-                     lambda: self.set_state(STATE_MENU))
+        btn = Button((VIRTUAL_W / 2 - 135, VIRTUAL_H - 58, 270, 44), "ANA MENÜYE DÖN",
+                     lambda: self.set_state(STATE_MENU), text_size=18)
         btn.update(mouse_pos, dt)
         btn.draw(canvas)
         if list_click:
@@ -21031,7 +22021,10 @@ class App:
             draw_icon(canvas, left.centerx - 44, sy + 7, "star", (44, 116, 72), 7)
             draw_text(canvas, "AÇILDI", (left.centerx + 10, sy), 15, (44, 116, 72),
                       bold=True, center=True, shadow=False)
-            draw_text(canvas, "Seviye atladığında karşına çıkabilir.", (left.centerx, sy + 22), 11,
+            hint = ("Bir koşuda yalnızca BİR nadir kitap alabilirsin."
+                    if rare else
+                    f"Seviye atladıkça Lv.{BOOK_MAX_LEVEL}'e kadar büyür.")
+            draw_text(canvas, hint, (left.centerx, sy + 22), 11,
                       (108, 100, 84), center=True, shadow=False)
         else:
             draw_icon(canvas, left.centerx - 46, sy + 7, "shield", (150, 92, 40), 7)
@@ -21047,6 +22040,10 @@ class App:
         rows = [("TÜRÜ", "Nadir Kitap" if rare else
                  ("Temel Kitap" if bk.get("basic") else "Standart Kitap")),
                 ("NEREDE ÇIKAR", "Seviye atlama ekranı"),
+                ("KOŞU İÇİ TAVAN", "1 seviye — tek hak" if rare
+                 else f"Lv.{BOOK_MAX_LEVEL}"),
+                ("YUVA", f"Nadir yuvası (1 adet)" if rare
+                 else f"Kitap yuvası ({MAX_RUN_BOOKS} adet)"),
                 ("GÖREV SAYISI", f"{cur} / {need} tamam")]
         for lab, val in rows:
             draw_text(canvas, lab, (left.x + 42, iy), 10, (140, 128, 104), bold=True, shadow=False)
@@ -21267,7 +22264,8 @@ class App:
         draw_coin_label(canvas, VIRTUAL_W - 40 - gw_ / 2, 40, gem_txt, GEM_COLOR, 21,
                         icon="gem", icon_r=10, gap=8)
 
-        btn = Button((VIRTUAL_W / 2 - 110, VIRTUAL_H - 58, 220, 44), "ANA MENÜYE DÖN", lambda: self.set_state(STATE_MENU))
+        btn = Button((VIRTUAL_W / 2 - 135, VIRTUAL_H - 58, 270, 44), "ANA MENÜYE DÖN",
+                     lambda: self.set_state(STATE_MENU), text_size=18)
         btn.update(mouse_pos, dt)
         btn.draw(canvas)
         if clicked:
@@ -21454,15 +22452,31 @@ class App:
         draw_cosmetic_hat(canvas, fake, cx, cy, t)
 
     def _buy_or_equip_cosmetic(self, item):
+        """Kıyafet marketindeki bir parçaya tıklandı.
+
+        v3.16: PET'ler burada SATILMAZ. Petin tek satış yeri ana menünün sağ
+        alt köşesindeki MAĞAZA kartı (gerçek para / ₺). Burada yalnızca sahip
+        olunan pet kuşanılır ya da çıkarılır. Şapka / gözlük / pelerin
+        eskisi gibi elmasla alınmaya devam eder.
+        """
         slot = item["slot"]
-        if self.save.owns_cosmetic(item["id"]):
+        owned = self.save.owns_cosmetic(item["id"])
+        if owned:
             cur = self.save.equipped_cosmetic_id(slot)
             if cur == item["id"]:
                 self.save.unequip_cosmetic(slot)
             else:
                 self.save.equip_cosmetic(slot, item["id"])
+            self.save.save()
             sfx("click", 0.6, 0.0)
-        elif self.save.get_gems() >= item["cost"]:
+            return
+        if slot == "pet":
+            # Sahip olunmayan pete tıklandı: oyuncuyu MAĞAZA'ya yolla.
+            self.store_tab = "pets"
+            self.set_state(STATE_GEM_STORE)
+            sfx("click", 0.6, 0.0)
+            return
+        if self.save.get_gems() >= item["cost"]:
             if self.save.buy_cosmetic(item["id"], item["cost"]):
                 self.save.equip_cosmetic(slot, item["id"])
                 sfx("buy", 1.0, 0.0)
@@ -21486,8 +22500,10 @@ class App:
             draw_text(canvas, f"{sk_name} kendi kostümüyle gelir — kıyafetler bu skinde kapalıdır.",
                       (40, 50), 11, PURPLE, bold=True, shadow=False)
         else:
-            draw_text(canvas, "Şapka, gözlük, pelerin ve PET'lerle karakterini kişiselleştir.",
-                      (40, 50), 11, TEXT_DIM, shadow=False)
+            hint = ("PET'ler MAĞAZA'dan alınır; burada yalnızca kuşanılır."
+                    if self.cosmetic_tab == "pet"
+                    else "Şapka, gözlük ve pelerinle karakterini kişiselleştir.")
+            draw_text(canvas, hint, (40, 50), 11, TEXT_DIM, shadow=False)
         gem_txt = f"Elmas: {fmt_num(self.save.get_gems())}"
         gw_ = coin_label_width(gem_txt, 20, 10, gap=8)
         draw_coin_label(canvas, VIRTUAL_W - 40 - gw_ / 2, 34, gem_txt, GEM_COLOR, 20,
@@ -21543,10 +22559,12 @@ class App:
                 continue
             rect = pygame.Rect(start_x + col_i * (card_w + gap_x), y, card_w, card_h)
             owned = self.save.owns_cosmetic(item["id"])
+            is_pet = item["slot"] == "pet"
             is_equipped = equipped_id == item["id"]
             hover = rect.collidepoint(mouse_pos) and list_rect.collidepoint(mouse_pos)
-            affordable = self.save.get_gems() >= item["cost"]
-            edge = CYAN if is_equipped else (item["color"] if (owned or affordable) else (60, 62, 82))
+            affordable = (not is_pet) and self.save.get_gems() >= item["cost"]
+            edge = CYAN if is_equipped else (
+                item["color"] if (owned or affordable or is_pet) else (60, 62, 82))
             panel(canvas, rect, bg=(30, 34, 54) if hover else (20, 22, 36), edge=edge, alpha=240, radius=14, edge_w=2)
 
             cc = (rect.centerx, rect.y + 62)
@@ -21566,6 +22584,13 @@ class App:
                 draw_text(canvas, "KUŞANILDI (çıkar için tıkla)", (rect.centerx, rect.bottom - 18), 10, CYAN, bold=True, center=True)
             elif owned:
                 draw_text(canvas, "SAHİPSİN — kuşanmak için tıkla", (rect.centerx, rect.bottom - 18), 10, TEXT_DIM, center=True, shadow=False)
+            elif is_pet:
+                # PET'ler elmasla değil, MAĞAZA'dan gerçek parayla alınır.
+                draw_text(canvas, item.get("price_hint", ""), (rect.centerx, rect.bottom - 32),
+                          15, PURPLE, bold=True, center=True)
+                draw_text(canvas, "MAĞAZA'dan alınır — açmak için tıkla",
+                          (rect.centerx, rect.bottom - 15), 10, TEXT_DIM, center=True,
+                          shadow=False)
             else:
                 pcol = GEM_COLOR if affordable else (100, 105, 130)
                 cost_txt = str(item["cost"])
@@ -21579,7 +22604,8 @@ class App:
         if max_scroll > 0:
             draw_scrollbar(canvas, VIRTUAL_W - 16, list_top, list_h, content_h, self.cosmetic_scroll)
 
-        btn = Button((VIRTUAL_W / 2 - 110, VIRTUAL_H - 58, 220, 44), "ANA MENÜYE DÖN", lambda: self.set_state(STATE_MENU))
+        btn = Button((VIRTUAL_W / 2 - 135, VIRTUAL_H - 58, 270, 44), "ANA MENÜYE DÖN",
+                     lambda: self.set_state(STATE_MENU), text_size=18)
         btn.update(mouse_pos, dt)
         btn.draw(canvas)
         if clicked:
