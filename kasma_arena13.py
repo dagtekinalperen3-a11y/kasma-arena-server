@@ -1,6 +1,6 @@
 """
 =====================================================================
- KASMA ARENA  —  v3.16
+ KASMA ARENA  —  v3.17
  2D Top-Down Hayatta Kalma / Skor-Rekor Oyunu
  ---------------------------------------------------------------------
  Dalgalar halinde gelen düşmanlara karşı hayatta kal, nişan al, ateş et,
@@ -8,6 +8,51 @@
  patronları yen, rekorunu kır. Kaybedersen o koşuda aldıkların silinir.
  Elmasla kalıcı SKIN'ler al (her skinin kendi silahı, mermisi, efekti ve
  ÖZEL YETENEĞİ var).
+
+ v3.17 ile gelenler (HİLE KORUMASI, CEHENNEM DENGESİ, BÜYÜK HARİTA):
+   * HİLE KORUMASI — dört katman, dördü birbirinden bağımsız:
+       1) Kayıt dosyası HMAC-SHA256 ile İMZALANIR ve imza bu bilgisayara
+          bağlıdır. Dosyayı elle düzenleyen ya da başkasının "zengin"
+          kaydını kopyalayan biri imzayı tutturamaz; kayıt kalıcı ŞAİBELİ
+          damgası yer.
+       2) ELMAS DEFTERİ: elmasın değeri "kazanılan - harcanan" toplamını
+          tutmak zorunda. İmzayı taklit etmeyi başaran biri bile elması
+          sıfırdan şişiremez.
+       3) KOŞU DENETİMİ: oyuncunun hasar/can/hız/zırh değerleri, oyunun
+          KENDİ kaynaklarıyla ulaşılabilecek tavanın üstüne çıkarsa o koşu
+          geçersiz sayılır. Tavanlar tahminle değil ÖLÇÜLEREK belirlendi
+          (her şeyi tavanda bir oyuncu: hasar 123x, can 3.630, hız 16,3x)
+          ve o değerlerin iki katına konuldu — dürüst oyuncu takılmaz.
+          Ayrıca skor; öldürme, dalga ve süreyle tutarlı olmak zorunda.
+       4) SUNUCU (asıl koruma): server.py gönderiyi imza + makullük + hız
+          sınırı süzgeçlerinden geçirir. /update_player artık istemciden
+          "gems" ve "skins" KABUL ETMİYOR (eskiden tek bir istekle sınırsız
+          elmas yazdırılabiliyordu).
+     Şaibeli kayıt: dünya sıralamasına giremez, elmas harcayamaz; ana
+     menüde sebebiyle birlikte uyarı görür. Oyun içi hile kodu da bir
+     hiledir ve aynı damgayı vurur.
+     DÜRÜST NOT: istemcide çalışan hiçbir koruma mutlak değildir — oyunun
+     dosyası açılabilir, yerleşik anahtar çıkarılabilir. Bu katmanlar
+     "JSON'u not defterinde değiştirme" seviyesindeki hilenin tamamını
+     durdurur; geri kalanını sunucunun makullük denetimi eler.
+   * CEHENNEM artık OYUNCUNUN GÜCÜNE göre kuruluyor. Eskiden sabitti ve
+     ölçüldüğünde portaldan geçmek yaratıkları ZAYIFLATIYORDU
+     (hell_hp_mult(1) = 7,85 iken arena_hp_mult(25) = 8,58). Artık taban
+     arenanın kendi eğrisinden okunuyor, oyuncunun gücüyle çarpılıyor
+     (bkz. measure_hell_power) ve arena gibi "yavaş başlayıp kasılan" bir
+     eğriyle tırmanıyor.
+   * BÜYÜK HARİTA: M tuşuyla açılıp kapanır, oyun durmaz.
+   * Kenar karartması (vinyet) kaldırıldı — saha artık boğucu değil.
+   * Market kartlarındaki simge madalyonu düzeldi: siyah taban, degrade
+     disk ve halka farklı merkezlerdeydi, simgenin arkasında "oturmamış"
+     ikinci bir daire görünüyordu. Hepsi eş merkezli.
+   * PENTAGRAM ve HORTUM ilk seviyelerde kısıldı (sırasıyla -%16 ve -%14);
+     seviye başına kazançları yükseltildiği için 25. seviyedeki güçleri
+     neredeyse aynı kaldı — nerf oyunun başına bindi, sonuna değil.
+   * Kitap açıklamaları sadeleşti ("Her seviyede ..." kalktı) ve DELGİ
+     kitabı kartında yazdığı gibi her seviyede +1 delme veriyor.
+   * Menüdeki dolgu yazıları (tuş listesi, slogan, çevrimiçi durumu)
+     kaldırıldı.
 
  v3.16 ile gelenler (KİTAP TAKIMI, TEK-ATMA FRENİ, YENİ HUD, GİZLİ DENGE):
    * KİTAPLAR ARTIK BİR TAKIM. Bir koşuda en çok 4 NORMAL kitap taşınır ve her
@@ -387,6 +432,8 @@ import colorsys
 import urllib.request
 import urllib.error
 from array import array
+import hmac
+import hashlib
 
 # =====================================================================
 # ÇEVRİMİÇİ SUNUCU AYARI
@@ -415,7 +462,7 @@ WEAPON_FX_DEFAULT = 100           # yeni oyuncunun başlangıç değeri (%)
 # Eski üç kademeli ayarın sayısal karşılıkları (kayıt göçü için).
 WEAPON_FX_LEGACY = {"full": 100, "dim": 32, "off": 0}
 GAME_TITLE = "ARENA SAVAŞI"
-GAME_VERSION = "3.16"
+GAME_VERSION = "3.17"
 
 
 def _base_dir():
@@ -1150,6 +1197,95 @@ class AudioManager:
 # KAYIT SİSTEMİ
 # =====================================================================
 
+# =====================================================================
+# HİLE KORUMASI  (v3.17)
+# ---------------------------------------------------------------------
+# OLAY: bir oyuncu kayıt dosyasını (JSON) açıp "gems": 100000 ve hasarını
+# elle değiştirip dünya sıralamasına girdi. Buna karşı DÖRT KATMAN var ve
+# dördü birbirinden bağımsız çalışıyor:
+#
+#   1) İMZA        — kayıt dosyası HMAC-SHA256 ile imzalanır. Dosyayı elle
+#                    kurcalayan biri imzayı tutturamaz; kayıt "ŞAİBELİ"
+#                    damgası yer.
+#   2) ELMAS DEFTERİ — elmasın mevcut değeri, "kazanılan - harcanan"
+#                    toplamıyla tutmak ZORUNDA. Birisi imzayı taklit etmeyi
+#                    başarsa bile elması sıfırdan şişiremez; iki sayıyı
+#                    birden tutturması gerekir.
+#   3) KOŞU DENETİMİ — oyun sırasında oyuncunun istatistikleri, o seviyede
+#                    ULAŞILABİLECEK tavanın üstüne çıkarsa (bellek
+#                    düzenleyici / değiştirilmiş kod) O KOŞU geçersiz
+#                    sayılır. Ayrıca skor; öldürme, dalga ve süreyle tutarlı
+#                    olmak zorunda.
+#   4) SUNUCU       — asıl koruma burada. server.py gönderilen skoru kendi
+#                    başına makullük denetiminden geçirir ve imzasız
+#                    istekleri reddeder (bkz. server.py / SUBMIT_SECRET).
+#
+# DÜRÜST NOT: istemcide çalışan hiçbir koruma mutlak değildir — oyunun
+# dosyası açılabilir, yerleşik anahtar çıkarılabilir. Bu katmanlar "JSON'u
+# not defterinde açıp değiştirme" seviyesindeki hilenin tamamını, daha
+# ileri denemelerin de büyük kısmını durdurur; geri kalanı SUNUCUNUN
+# makullük denetimi eler. Sıralamanın temizliği son tahlilde sunucudadır.
+# =====================================================================
+
+# Yerleşik anahtar. Tek başına sır değil (oyun dosyasında duruyor); işi
+# dosyayı elle düzenlemeyi anlamsız kılmak.
+_SAVE_SECRET = b"kasma-arena-save-v1:8f3a1c5e9b2d47a6"
+
+
+def _machine_salt():
+    """Kayıt imzasını BU BİLGİSAYARA bağlayan tuz.
+
+    Böylece bir oyuncunun "zengin" kayıt dosyası başkasına kopyalandığında
+    imza tutmaz. Kullanıcı adı / makine adı okunamazsa sabit bir değere
+    düşülür (imza yine çalışır, yalnızca taşınabilir olur).
+    """
+    try:
+        import getpass
+        import platform
+        return f"{getpass.getuser()}@{platform.node()}".encode("utf-8", "replace")
+    except Exception:
+        return b"anon@unknown"
+
+
+def _canonical(data):
+    """İmzalanacak metin: anahtarlar sıralı, imza alanları hariç."""
+    clean = {k: v for k, v in data.items() if k not in ("_sig", "_sig_ver")}
+    return json.dumps(clean, sort_keys=True, ensure_ascii=False,
+                      separators=(",", ":"))
+
+
+def sign_save(data):
+    """Kayıt sözlüğünün imzası."""
+    key = hashlib.sha256(_SAVE_SECRET + b"|" + _machine_salt()).digest()
+    return hmac.new(key, _canonical(data).encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+# Dünya sıralamasına gönderilen skorun imzası. Sunucudaki SUBMIT_SECRET ile
+# AYNI olmalıdır (bkz. server.py). Amaç: sıralamaya elle istek atılamasın —
+# oyunu hiç çalıştırmadan "curl ile 10 milyon skor" yolu kapansın. Sunucu
+# ayrıca kendi başına makullük denetimi yapar; imza yalnızca ilk kapıdır.
+SUBMIT_SECRET = os.environ.get("KASMA_SUBMIT_SECRET",
+                               "kasma-arena-submit-v1:3d7f90ac41be6528")
+
+
+def sign_submit(payload):
+    """Skor gönderisinin imzası (sunucudaki doğrulamayla birebir aynı sıra)."""
+    msg = "|".join(str(payload.get(k, "")) for k in
+                   ("name", "score", "kills", "wave", "run_time", "created_at"))
+    return hmac.new(SUBMIT_SECRET.encode("utf-8"), msg.encode("utf-8"),
+                    hashlib.sha256).hexdigest()
+
+
+# Oyun içi HİLE KODU da bir hiledir: kullanıldığı anda kayıt şaibelenir ve
+# dünya sıralaması kapanır. Kod oynamak için duruyor, rekor kırmak için değil.
+TAINT_REASONS = {
+    "signature": "kayıt dosyası dışarıdan değiştirilmiş",
+    "gems": "elmas sayısı kendi geçmişiyle tutmuyor",
+    "cheat_code": "oyun içi hile kodu kullanıldı",
+    "stats": "istatistikler ulaşılabilir sınırın üstünde",
+}
+
+
 class SaveManager:
     DEFAULT = {
         "gems": 0,
@@ -1166,6 +1302,14 @@ class SaveManager:
         # Kapalı kitap seviye atlama ekranında çıkmaz.
         "books_muted": [],
         "save_version": 0,
+        # --- HİLE KORUMASI ---
+        # tainted : kayıt bir kez şaibelendiyse bir daha temizlenmez
+        # taint_reasons : hangi denetimin takıldığı (oyuncuya gösterilir)
+        # gems_earned / gems_spent : ELMAS DEFTERİ. gems bu ikisini tutmalı.
+        "tainted": False,
+        "taint_reasons": [],
+        "gems_earned": 0,
+        "gems_spent": 0,
         "equipped_cosmetics": {"hat": None, "eyewear": None, "cape": None, "pet": None},
         "leaderboard": [],
         "achievements": {},
@@ -1185,23 +1329,77 @@ class SaveManager:
 
     def _load(self):
         merged = json.loads(json.dumps(SaveManager.DEFAULT))
+        found = False
+        bad_sig = False
         for path in (SAVE_FILE, LEGACY_SAVE):
             if os.path.exists(path):
                 try:
                     with open(path, "r", encoding="utf-8") as f:
                         loaded = json.load(f)
+                    # ---- 1. KATMAN: İMZA ----
+                    # İmzası olmayan kayıt ESKİ kayıttır (imza sistemi
+                    # öncesi) ve suçsuz sayılır; imzası OLUP tutmayan kayıt
+                    # kurcalanmıştır.
+                    sig = loaded.get("_sig")
+                    if sig is not None and not hmac.compare_digest(
+                            str(sig), sign_save(loaded)):
+                        bad_sig = True
                     for k, v in loaded.items():
+                        if k in ("_sig", "_sig_ver"):
+                            continue
                         if isinstance(v, dict) and isinstance(merged.get(k), dict):
                             merged[k].update(v)
                         else:
                             merged[k] = v
+                    found = True
                     break
                 except Exception:
                     continue
         if "default" not in merged.get("skins_owned", []):
             merged.setdefault("skins_owned", []).append("default")
         merged = self._migrate(merged)
+
+        if bad_sig:
+            self._mark_tainted_dict(merged, "signature")
+        # ---- 2. KATMAN: ELMAS DEFTERİ ----
+        if found:
+            earned = int(merged.get("gems_earned", 0) or 0)
+            spent = int(merged.get("gems_spent", 0) or 0)
+            gems = int(merged.get("gems", 0) or 0)
+            if earned or spent:
+                # Defter varsa elmas ona UYMAK ZORUNDA (küçük bir pay
+                # toleransla: eski kayıtlardan geçişte yuvarlama olabilir).
+                if abs(gems - (earned - spent)) > 2:
+                    self._mark_tainted_dict(merged, "gems")
+            else:
+                # Defteri olmayan ESKİ kayıt: mevcut elması "kazanılmış"
+                # sayıp defteri şimdi açıyoruz. Geçmişi cezalandırmıyoruz.
+                merged["gems_earned"] = gems
+                merged["gems_spent"] = 0
         return merged
+
+    @staticmethod
+    def _mark_tainted_dict(data, reason):
+        """Kayıt sözlüğüne ŞAİBE damgası vurur. Damga asla silinmez."""
+        data["tainted"] = True
+        reasons = data.setdefault("taint_reasons", [])
+        if reason not in reasons:
+            reasons.append(reason)
+
+    # ---- HİLE KORUMASI: dışarıya açık yüzey ----
+    def mark_tainted(self, reason):
+        self._mark_tainted_dict(self.data, reason)
+        self.save()
+
+    def is_tainted(self):
+        return bool(self.data.get("tainted"))
+
+    def taint_text(self):
+        """Oyuncuya gösterilecek kısa açıklama."""
+        rs = self.data.get("taint_reasons") or []
+        if not rs:
+            return "kayıt doğrulanamadı"
+        return " · ".join(TAINT_REASONS.get(r, r) for r in rs)
 
     # Kayıt biçimi değiştiğinde eski kayıtları düzelten tek yer.
     SAVE_VERSION = 3
@@ -1224,6 +1422,11 @@ class SaveManager:
 
     def save(self):
         try:
+            # Her yazımda imza yenilenir. Dosya dışarıdan değiştirilirse
+            # imza tutmaz ve bir sonraki açılışta kayıt şaibelenir.
+            self.data.pop("_sig", None)
+            self.data["_sig_ver"] = 1
+            self.data["_sig"] = sign_save(self.data)
             tmp = SAVE_FILE + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(self.data, f, ensure_ascii=False, indent=2)
@@ -1255,7 +1458,25 @@ class SaveManager:
 
     # ---- elmas ----
     def add_gems(self, amount):
-        self.data["gems"] = max(0, self.data.get("gems", 0) + int(amount))
+        """Elmas ekler/çıkarır ve ELMAS DEFTERİNİ işler.
+
+        Defter (gems_earned / gems_spent), elmasın sıfırdan şişirilmesini
+        yakalar: birisi kayıttaki "gems" değerini elle büyütse bile iki
+        sayacı birden tutturmak zorunda kalır (bkz. _load).
+        """
+        amount = int(amount)
+        before = int(self.data.get("gems", 0))
+        after = max(0, before + amount)
+        self.data["gems"] = after
+        delta = after - before
+        if delta >= 0:
+            self.data["gems_earned"] = int(self.data.get("gems_earned", 0)) + delta
+        else:
+            self.data["gems_spent"] = int(self.data.get("gems_spent", 0)) - delta
+
+    def can_spend(self):
+        """Şaibeli kayıt elmas HARCAYAMAZ (satın alma / kuşanma kilitli)."""
+        return not self.is_tainted()
 
     def get_gems(self):
         return self.data.get("gems", 0)
@@ -1268,7 +1489,7 @@ class SaveManager:
         # Premium skinler yalnızca gerçek parayla alınır; elmasla satılmaz.
         if get_skin(skin_id).get("premium"):
             return False
-        if self.owns_skin(skin_id) or self.get_gems() < cost:
+        if self.owns_skin(skin_id) or self.get_gems() < cost or not self.can_spend():
             return False
         self.add_gems(-cost)
         self.data.setdefault("skins_owned", ["default"]).append(skin_id)
@@ -1297,7 +1518,7 @@ class SaveManager:
         return cid in self.data.get("cosmetics_owned", [])
 
     def buy_cosmetic(self, cid, cost):
-        if self.owns_cosmetic(cid) or self.get_gems() < cost:
+        if self.owns_cosmetic(cid) or self.get_gems() < cost or not self.can_spend():
             return False
         self.add_gems(-cost)
         self.data.setdefault("cosmetics_owned", []).append(cid)
@@ -5390,18 +5611,18 @@ BOOK_MAX_LEVEL = 15
 
 BOOKS = [
     # ---- TEMEL KİTAPLAR (en kolay görevler — ilk koşularda açılır) ----
-    {"key": "r_dmg", "name": "Hasar Kitabı", "desc": "Her seviyede hasarını %7 artırır",
+    {"key": "r_dmg", "name": "Hasar Kitabı", "desc": "Hasarını %7 artırır",
      "color": RED, "icon": "sword", "rare": False, "basic": True,
      "unlock": dict(text="Arenaya alış: 60 düşman öldür",
                     reqs=[rq_stat("total_kills", 60, "Toplam 60 düşman öldür")])},
     {"key": "r_hp", "name": "Can Kitabı",
-     "desc": "Her seviyede azami canını 16 artırır (anında dolar)",
+     "desc": "Azami canını 16 artırır — anında dolar",
      "color": (230, 110, 130), "icon": "heart", "rare": False, "basic": True,
      "unlock": dict(text="3 koşu tamamla ve 4. dalgayı gör",
                     reqs=[rq_stat("runs", 3, "3 koşu tamamla"),
                           rq_stat("best_wave", 4, "4. dalgaya ulaş")])},
     {"key": "r_armor", "name": "Zırh Kitabı",
-     "desc": "Her seviyede aldığın hasarı %2,5 azaltır ve +10 can verir",
+     "desc": "Aldığın hasarı %2,5 azaltır ve +10 can verir",
      "color": (160, 170, 200), "icon": "shield", "rare": False, "basic": True,
      "unlock": dict(text="500 altın topla ve 5. dalgaya ulaş",
                     reqs=[rq_stat("total_gold", 500, "Toplam 500 altın topla"),
@@ -5409,30 +5630,30 @@ BOOKS = [
 
     # ---- ORTA KİTAPLAR (belli bir oynanışı gerektirir) ----
     {"key": "r_spd", "name": "Rüzgâr Kitabı",
-     "desc": "Her seviyede hareket hızın %6, dash mesafen %8 artar",
+     "desc": "Hareket hızın %6, dash mesafen %8 artar",
      "color": GREEN, "icon": "boot", "rare": False,
      "unlock": dict(text="Dash ustası ol",
                     reqs=[rq_stat("total_dashes", 400, "Toplam 400 kez dash at"),
                           rq_stat("best_run_dashes", 40, "Tek koşuda 40 kez dash at")])},
     {"key": "r_aspd", "name": "Tempo Kitabı",
-     "desc": "Her seviyede atış hızın %6 artar",
+     "desc": "Atış hızını %6 artırır",
      "color": (150, 210, 255), "icon": "target", "rare": False,
      "unlock": dict(text="Tetiği bırakma: 25.000 mermi at",
                     reqs=[rq_stat("total_shots", 25000, "Toplam 25.000 mermi at")])},
     {"key": "r_crit", "name": "Kritik Kitabı",
-     "desc": "Her seviyede kritik vuruş şansını %3,5 artırır",
+     "desc": "Kritik vuruş şansını %3,5 artırır",
      "color": (140, 230, 120), "icon": "clover", "rare": False,
      "unlock": dict(text="Kritik vuruşla tanış",
                     reqs=[rq_stat("total_crits", 600, "Toplam 600 kritik vuruş yap"),
                           rq_stat("best_wave", 7, "7. dalgaya ulaş")])},
     {"key": "r_critd", "name": "Kritik Güç Kitabı",
-     "desc": "Her seviyede kritik hasarını %14 artırır",
+     "desc": "Kritik hasarını %14 artırır",
      "color": (240, 90, 90), "icon": "fist", "rare": False,
      "unlock": dict(text="Kritik hasarda uzmanlaş",
                     reqs=[rq_stat("total_crits", 3000, "Toplam 3.000 kritik vuruş yap"),
                           rq_ach("combo30", "«Kombo Kralı» başarımını aç")])},
     {"key": "r_regen", "name": "Şifa Kitabı",
-     "desc": "Her seviyede saniyede 0,45 can yeniler",
+     "desc": "Saniyede 0,45 can yeniler",
      "color": (120, 220, 170), "icon": "cross", "rare": False,
      "unlock": dict(text="Yaralarını sar",
                     reqs=[rq_stat("best_run_heal", 1200, "Tek koşuda 1.200 can yenile"),
@@ -5440,46 +5661,46 @@ BOOKS = [
     # --- YENİ (v3.16): kazanç kitapları. Oyuncu artık seviye atlama ekranında
     #     "güç mü, ekonomi mi?" diye düşünüyor; ikisi de aynı karttan geliyor.
     {"key": "r_coin", "name": "Altın Kitabı",
-     "desc": "Her seviyede topladığın altın %15 artar",
+     "desc": "Topladığın altını %15 artırır",
      "color": GOLD, "icon": "coin", "rare": False,
      "unlock": dict(text="Kasanı doldur: tek koşuda 1.500 altın",
                     reqs=[rq_stat("best_run_gold", 1500, "Tek koşuda 1.500 altın kazan")])},
     {"key": "r_xp", "name": "Bilgelik Kitabı",
-     "desc": "Her seviyede kazandığın tecrübe %15 artar",
+     "desc": "Kazandığın tecrübeyi %15 artırır",
      "color": PURPLE, "icon": "gem", "rare": False,
      "unlock": dict(text="Tecrübeyle büyü: bir koşuda 10. seviyeye çık",
                     reqs=[rq_ach("lvl10", "«Tecrübeli» başarımını aç"),
                           rq_stat("runs", 8, "8 koşu tamamla")])},
     {"key": "r_mag", "name": "Mıknatıs Kitabı",
-     "desc": "Her seviyede toplama menzilin %20 artar",
+     "desc": "Toplama menzilini %20 artırır",
      "color": (150, 220, 255), "icon": "magnet", "rare": False,
      "unlock": dict(text="Yerdekini bırakma: toplam 20.000 altın topla",
                     reqs=[rq_stat("total_gold", 20000, "Toplam 20.000 altın topla")])},
     {"key": "r_vamp", "name": "Sülük Kitabı",
-     "desc": "Her seviyede verdiğin hasarın %2'si kadar can çalarsın",
+     "desc": "Verdiğin hasarın %2'si kadar can çalarsın",
      "color": (210, 70, 100), "icon": "drop", "rare": False,
      "unlock": dict(text="Kanla beslen: toplam 10.000 can çal",
                     reqs=[rq_ach("leech10k", "«Sülük» başarımını aç")])},
     {"key": "r_pierce", "name": "Delgi Kitabı",
-     "desc": "Tek seviyede +1 delme; sonra her iki seviyede bir +1",
+     "desc": "Mermilerine +1 delme verir",
      "color": (220, 140, 90), "icon": "sword", "rare": False,
      "unlock": dict(text="Sırayı dizip tek mermiyle biç: 8. dalgaya ulaş",
                     reqs=[rq_stat("best_wave", 8, "8. dalgaya ulaş"),
                           rq_stat("total_shots", 60000, "Toplam 60.000 mermi at")])},
     {"key": "r_bonk", "name": "BONK Kitabı",
-     "desc": "Her seviyede BONK hasarın %14, vuruş alanın %7 büyür",
+     "desc": "BONK hasarını %14, vuruş alanını %7 büyütür",
      "color": (240, 120, 60), "icon": "fist", "rare": False,
      "unlock": dict(text="Yumruğunla konuş",
                     reqs=[rq_stat("total_bonks", 500, "Toplam 500 kez BONK at"),
                           rq_stat("total_bonk_hits", 2500, "BONK ile toplam 2.500 düşmana vur")])},
     {"key": "r_swarm", "name": "Sürü Kitabı",
-     "desc": "Çevrende 3+ düşman varken hasarın artar (seviyeyle büyür)",
+     "desc": "Çevrende 3+ düşman varken hasarın %23 artar",
      "color": (210, 160, 70), "icon": "orbit", "rare": False,
      "unlock": dict(text="Kalabalığın ortasında yaşa",
                     reqs=[rq_stat("best_run_kills", 250, "Tek koşuda 250 düşman öldür"),
                           rq_ach("massacre", "«Katliam» başarımını aç")])},
     {"key": "r_bosshunter", "name": "Patron Avcısı Kitabı",
-     "desc": "Patronlara ve elitlere fazla hasar vurursun (seviyeyle büyür)",
+     "desc": "Patronlara ve elitlere %30 fazla hasar vurursun",
      "color": (200, 90, 220), "icon": "target", "rare": False,
      "unlock": dict(text="Patron avına çık",
                     reqs=[rq_stat("bosses", 6, "6 patron devir"),
@@ -6430,10 +6651,12 @@ class Player:
             self.base_speed = max(60, self.base_speed - 18)
         elif key == "r_multi": self.multishot_level += 1
         elif key == "r_pierce":
-            # 1. seviyede +1, sonra İKİ seviyede bir +1 (15. seviyede +8).
-            # Her seviyede +1 verseydi 15 delmeli bir mermi çıkıyordu.
-            if lvl == 1 or lvl % 2 == 1:
-                self.pierce_bonus += 1
+            # v3.17: kart ne diyorsa o olsun — her seviyede +1 delme.
+            # (Delme hasarı artırmaz, yalnızca merminin kaç düşmanı birden
+            # geçeceğini belirler; üstelik tek-atma freni her vuruşa ayrı ayrı
+            # uygulanıyor. 15 seviyesini birden buna yatırmak gerçek bir
+            # fedakârlık, çünkü o seviyeler başka bir kitaba gitmiyor.)
+            self.pierce_bonus += 1
         elif key == "r_vamp": self.vamp_level += 1
         elif key == "r_execute": self.execute_threshold = min(0.35, self.execute_threshold + 0.18)
         elif key == "r_second_wind": self.second_wind_charges += 1
@@ -7477,8 +7700,72 @@ def hell_pick_kind(wave):
 # Cehennem yaratıkları arenanın 25. dalgası kadar CANLI ve VURUCU başlar.
 HELL_BASE_WAVE = 25
 # v3.13 denge düğmeleri (bkz. hell_hp_mult / hell_speed_wave).
-HELL_HP_BOOST = 1.25        # cehennem canının taban çarpanı
+HELL_HP_BOOST = 1.10        # cehennem canının taban çarpanı
 HELL_SPEED_BASE_WAVE = 8    # cehennem 1. dalgasının hız temposu (arena dalgası)
+
+# =====================================================================
+# CEHENNEM: OYUNCUNUN GÜCÜNE GÖRE ÖLÇEKLEME  (v3.17)
+# ---------------------------------------------------------------------
+# SORUN: cehennem SABİT bir güce ayarlıydı (arenanın 25. dalgası). Oyuncu
+# oraya kendi gücüyle giriyor; eşyalarını doldurmuş bir oyuncu için
+# cehennem arenadan DAHA KOLAY kalıyordu. Ölçüm: hell_hp_mult(1) = 7.85
+# iken arena_hp_mult(25) = 8.58 — yani portaldan geçmek yaratıkları
+# ZAYIFLATIYORDU.
+#
+# ÇÖZÜM, patronlarda zaten kullanılan mantığın aynısı (bkz.
+# scale_bosses_to_player): oyuncunun gücü ÖLÇÜLÜR ve cehennem ona göre
+# kurulur. Ölçü iki parçadan oluşur — saniyelik hasar ve etkin can
+# (zırhın da sayıldığı can). Referans değerler, "25. dalgaya normal
+# şekilde ulaşmış" bir oyuncunun gerçek değerleridir.
+#
+# Ölçek DOĞRUDAN değil, HELL_POWER_EXP üssüyle uygulanır: iki kat güçlü
+# gelen oyuncu iki kat değil ~1.7 kat canlı yaratıkla karşılaşır. Böylece
+# oyuncu kazandığı gücü HİSSEDER ama cehennem boş geçilmez.
+#
+# Ayrıca cehennem artık arena gibi "yavaş başlayıp kasılıyor": 1. dalga
+# arenadan çıktığın yerin biraz üstü, sonra dalga başına arenadan belirgin
+# biçimde dik tırmanıyor (doğrusal terimin üstünde ikinci derece bir terim).
+# =====================================================================
+HELL_REF_DPS = 930.0        # 25. dalgaya ulaşmış tipik oyuncunun sn/hasarı
+HELL_REF_EHP = 790.0        # ... ve etkin canı (zırh dahil)
+HELL_POWER_DPS_SHARE = 0.68  # ölçünün ne kadarı hasardan geliyor
+HELL_POWER_MIN = 0.80
+HELL_POWER_MAX = 2.60
+HELL_POWER_EXP = 0.75       # cana uygulanan yumuşatma üssü
+HELL_POWER_DMG_WAVES = 4.0  # güç başına eklenen "sanal" hasar dalgası
+HELL_POWER_SPEED_WAVES = 2.5  # güç başına eklenen "sanal" hız dalgası
+
+# Cehennemin güç ölçüsü koşu başına BİR KEZ, portaldan geçerken ölçülür ve
+# o koşu boyunca sabit kalır (bkz. RunState.enter_hell). Tek bir koşu
+# çalıştığı için CFG gibi modül düzeyinde tutuluyor; RunState her
+# kurulduğunda 1.0'a döner.
+_HELL_TUNE = {"power": 1.0}
+
+
+def hell_power():
+    """Cehennemin bu koşudaki güç çarpanı (1.0 = beklenen oyuncu)."""
+    return float(_HELL_TUNE.get("power", 1.0))
+
+
+def set_hell_power(v):
+    _HELL_TUNE["power"] = clamp(float(v), HELL_POWER_MIN, HELL_POWER_MAX)
+    return _HELL_TUNE["power"]
+
+
+def measure_hell_power(p):
+    """Oyuncunun cehenneme NE KADAR güçlü girdiğini ölçer.
+
+    1.0 = 25. dalgaya normal şekilde ulaşmış oyuncu. 1.5 = onun bir buçuk
+    katı. Kesin olması gerekmez, büyüklük sırası yeterlidir.
+    """
+    try:
+        dps = max(1.0, float(p.estimated_dps()))
+        ehp = max(1.0, p.max_hp / max(0.25, 1.0 - p.eff_armor()))
+    except Exception:
+        return 1.0
+    k = (HELL_POWER_DPS_SHARE * (dps / HELL_REF_DPS)
+         + (1.0 - HELL_POWER_DPS_SHARE) * (ehp / HELL_REF_EHP))
+    return clamp(k, HELL_POWER_MIN, HELL_POWER_MAX)
 
 
 # CEHENNEM ZIRHI (v3.13): cehennem yaratıklarının hiç zırhı yoktu —
@@ -7491,35 +7778,44 @@ HELL_ARMOR_MAX = 0.40
 
 
 def hell_armor(wave):
-    """Cehennem yaratığının gelen hasardan kestiği pay."""
-    return clamp(HELL_ARMOR_BASE + HELL_ARMOR_PER_WAVE * (max(1, wave) - 1),
+    """Cehennem yaratığının gelen hasardan kestiği pay.
+
+    Güçlü gelen oyuncuda zırh biraz daha kalın başlar (bkz. hell_power).
+    """
+    extra = 0.06 * (hell_power() - 1.0)
+    return clamp(HELL_ARMOR_BASE + extra + HELL_ARMOR_PER_WAVE * (max(1, wave) - 1),
                  0.0, HELL_ARMOR_MAX)
 
 
 def hell_hp_mult(wave):
-    """Cehennem dalgasının can çarpanı: 25. dalga seviyesinden başlar ve
-    arenadaki gibi dalga başına artar.
+    """Cehennem dalgasının can çarpanı.
 
-    DENGE (v3.13): oyuncu cehenneme artık silahları 25. seviyeye kadar
-    büyüyebilen bir takımla giriyor; eski eğride (taban x1, dalga başına
-    +%20) cehennem yaratıkları 400-500 canda kalıyor ve tek vuruşta
-    eriyordu. Taban %25 yükseltildi ve dalga başına artış %20'den %26'ya
-    yükseltildi — cehennem artık arenanın devamı değil, gerçek bir tırmanış.
+    v3.17: iki şey değişti.
+
+    1) TABAN artık ARENANIN KENDİ EĞRİSİNDEN okunuyor: cehennem 1. dalga,
+       oyuncunun arenada bıraktığı yerin (25. dalga) biraz ÜSTÜ. Eskiden
+       taban elle yazılmış bir sayıydı ve arena 25'in ALTINA düşüyordu —
+       portaldan geçmek yaratıkları zayıflatıyordu.
+    2) TIRMANIŞ arena gibi: doğrusal artışın üstüne ikinci derece bir terim
+       biniyor, yani cehennem de yavaş başlayıp gittikçe kasılıyor.
+
+    Hepsi oyuncunun güç ölçüsüyle çarpılır (bkz. measure_hell_power).
     """
-    base = (1.0 + (HELL_BASE_WAVE - 1) * 0.22) * HELL_HP_BOOST
-    return base * (1.0 + (max(1, wave) - 1) * 0.26)
+    w = max(1, int(wave))
+    base = arena_hp_mult(HELL_BASE_WAVE) * HELL_HP_BOOST
+    curve = 1.0 + (w - 1) * 0.32 + 0.008 * (w - 1) ** 2
+    return base * curve * (hell_power() ** HELL_POWER_EXP)
 
 
 def hell_dmg_wave(wave):
     """Hasar hesabında kullanılan 'sanal' dalga: cehennem 1 = arena 25.
 
-    DENGE (v3.13): artış eskiden arenadan YUMUŞAKTI (dalga başına 0.75
-    arena dalgası) çünkü cehennem yaratıkları yavaştı. Artık hem hızları
-    arttı hem de oyuncu çok daha güçlü geliyor; eğri arenayla aynı hıza
-    (dalga başına 1.0) çekildi, yani cehennemde 16 vuran bir yaratık
-    kalmıyor.
+    Güçlü gelen oyuncuda birkaç dalga ileriden başlar (bkz. hell_power):
+    zırhını ve canını doldurmuş bir oyuncuya cehennemin 16 vuran yaratığı
+    hiçbir şey ifade etmiyordu.
     """
-    return HELL_BASE_WAVE + (max(1, wave) - 1) * 1.0
+    extra = HELL_POWER_DMG_WAVES * (hell_power() - 1.0)
+    return HELL_BASE_WAVE + extra + (max(1, wave) - 1) * 1.0
 
 
 def hell_speed_wave(wave):
@@ -7533,7 +7829,8 @@ def hell_speed_wave(wave):
     yaratıklar hemen tepene binmiyor ama birkaç dalga sonra gerçekten
     kovalıyor.
     """
-    return HELL_SPEED_BASE_WAVE + (max(1, wave) - 1) * 1.5
+    extra = HELL_POWER_SPEED_WAVES * (hell_power() - 1.0)
+    return HELL_SPEED_BASE_WAVE + extra + (max(1, wave) - 1) * 1.5
 
 
 # ---------------------------------------------------------------------
@@ -8122,8 +8419,8 @@ TORNADO_COLOR2 = (240, 250, 255)
 # Canın KALAN oranı (0.65 = canı %35 azalır). Tavan 5'ten 25'e çıkınca
 # kesme payı da 25 seviyeye yayıldı: ilk iki seviye yine eski değerde
 # (0.65), sonra her seviye biraz daha derin kesiyor, 25'te 0.24'e iniyor.
-TORNADO_HP_CUT_BASE = 0.78      # v3.14: 1-2. seviyede canın kalan oranı (%22 keser)
-TORNADO_HP_CUT_PER_LEVEL = 0.007
+TORNADO_HP_CUT_BASE = 0.84      # v3.17: 1-2. seviyede canın kalan oranı (%16 keser)
+TORNADO_HP_CUT_PER_LEVEL = 0.010
 TORNADO_HP_CUT_MIN = 0.55       # v3.14: hiçbir seviyede canın %45'inden fazlasını kesmez
 
 
@@ -8888,8 +9185,12 @@ BOSS_WEAPONS = [
          how="Kalkan, dayak yemeyi öğrenene verilir. Bir koşuda 8. dalgayı gör.",
          unlock=dict(text="Ayakta kal: 8. dalgaya ulaş",
                      reqs=[rq_stat("best_wave", 8, "8. dalgaya ulaş")])),
+    # PENTAGRAM (v3.17): ilk seviyelerde hâlâ fazla vuruyordu. Taban hasar
+    # ve ilk-adım vuruşu kısıldı; buna karşılık seviye başına kazanç
+    # yükseltildi, böylece 25. seviyedeki güç neredeyse aynı kaldı —
+    # nerf oyunun BAŞINA bindi, sonuna değil.
     dict(key="pentagram", name="PENTAGRAM", icon="star", color=PENTA_COLOR,
-         cd=0.0, dmg=1.45, style=None, passive=True, dpl=0.12,
+         cd=0.0, dmg=1.22, style=None, passive=True, dpl=0.135,
          up="mühür genişler, ilk adımda daha sert kavurur ve daha çok yakar",
          desc="Ayağının altındaki mühür, içine ilk adımı atanı kavurur ve "
               "içinde kalanı sürekli yakar. Her seviyede büyür ve daha çok vurur.",
@@ -8989,7 +9290,7 @@ BOSS_WEAPONS = [
     #      kazancı korundu: silah geç oyunda hâlâ ciddi, ama "indiği anda
     #      ekranı süpüren" bir düğme değil.
     dict(key="tornado", name="HORTUM", icon="orbit", color=TORNADO_COLOR,
-         cd=20.0, dmg=0.98, style=None, cdl=1.0, dpl=0.092,
+         cd=20.0, dmg=0.84, style=None, cdl=1.0, dpl=0.105,
          up="menzil genişler, canı daha derin keser ve içinde daha çok öğütür",
          desc="Yaratıkları ortaya toplar, canlarını azaltır ve huninin içinde "
               "kalanı sürekli öğütür. 10. seviyeden sonra küçük yaratıkları "
@@ -9084,7 +9385,7 @@ PENTA_TICK = 0.22               # hasar tikinin aralığı (saniye)
 # düşer, iri olanların da canı belirgin şekilde iner. Vuruş iki parçadan
 # oluşur — sabit kısım silahın hasarına, oran kısmı yaratığın O ANKİ canına
 # bağlıdır (patronlarda oran kısmı işlemez).
-PENTA_SEAR_K = 0.55             # sabit kısım: silahın saniyelik hasarının katı
+PENTA_SEAR_K = 0.42             # sabit kısım: silahın saniyelik hasarının katı
 PENTA_SEAR_HP = 0.14            # 1. seviyede canın kesilen oranı
 PENTA_SEAR_HP_PER_LEVEL = 0.008 # her seviyede oranın artışı
 PENTA_SEAR_HP_MAX = 0.32        # oranın tavanı
@@ -9096,8 +9397,8 @@ PENTA_SEAR_HP_MAX = 0.32        # oranın tavanı
 # alabilir — yani tek başına ÖLDÜREMEZ, ancak seviye yükseldikçe
 # öldürebilir hâle gelir. Mührün içinde kalan yine sürekli yanar, yani
 # zayıflar mühürden çıkamaz; fark, "değen anında ölür"ün kalkması.
-PENTA_SEAR_CAP = 0.42           # 1. seviyede canın en çok bu kadarını alır
-PENTA_SEAR_CAP_PER_LEVEL = 0.017  # v3.14: 25. seviyede ~0.83 — hiçbir zaman tek atmaz
+PENTA_SEAR_CAP = 0.33           # v3.17: 1. seviyede canın en çok bu kadarını alır
+PENTA_SEAR_CAP_PER_LEVEL = 0.021  # 25. seviyede ~0.83 — hiçbir zaman tek atmaz
 # YARASAYA ÖZEL KURAL (v3.12): mühür yarasaları (mavi, çevik yaratık) ilk
 # seviyelerde TEK ATIYORDU — sürünün tamamı mührün kenarına değer değmez
 # buharlaşıyordu. Artık yalnızca YARASADA iki fren var:
@@ -13584,6 +13885,100 @@ def draw_scrollbar(surf, track_x, list_top, list_h, content_h, scroll):
 # RUN STATE
 # =====================================================================
 
+# =====================================================================
+# HİLE KORUMASI — KOŞU DENETİMİ  (3. katman)
+# ---------------------------------------------------------------------
+# İmza ve elmas defteri KAYIT dosyasını korur. Bellek düzenleyici ya da
+# değiştirilmiş kod ise koşunun İÇİNDE değer şişirir: hasarı 1000'e çeker,
+# sonsuz can verir. Bu katman koşu boyunca iki şeye bakar:
+#
+#   TAVAN   : oyuncunun o seviyede ULAŞABİLECEĞİ en yüksek değerin bir
+#             miktar üstü. Oyunun kendi kaynakları (kitaplar, market, skin,
+#             silahlar) toplandığında bile bu tavan aşılamaz; aşılıyorsa
+#             değer dışarıdan yazılmıştır.
+#   TUTARLILIK : koşu bitince skor; öldürme sayısı, dalga ve süreyle
+#             karşılaştırılır. 5 öldürmeyle 10 milyon skor olmaz.
+#
+# Denetimi geçemeyen KOŞU geçersiz sayılır: ne yerel skor tablosuna ne de
+# dünya sıralamasına yazılır. Kayıt şaibelenmez — oyuncu bir sonraki
+# koşuda temiz başlar; cezalandırdığımız şey hilenin SONUCU.
+# =====================================================================
+# TAVANLAR — ÖLÇÜLEREK belirlendi, tahminle değil.
+# Oyunun KENDİ kaynaklarıyla (60. seviye, dört silah 25'te, dört kitap 15'te,
+# markette her eşya 30 kez alınmış, en güçlü skin, çılgınlık ve ruh yığını
+# dolu, öfke kitabı devrede) ulaşılan en uç değerler şunlar:
+#
+#       hasar 123x      azami can 3.630      hız 16,3x      zırh 0,60
+#
+# Buradaki tavanlar o değerlerin kabaca İKİ KATI. Yani dürüst bir oyuncu —
+# oyunun verebileceği her şeyi toplamış olsa bile — asla takılmaz; takılan
+# değer oyunun üretebileceği aralığın dışından, yani dışarıdan yazılmıştır.
+#
+# NOT: bu tavanlar bilerek GEVŞEK. Hile korumasında yanlış pozitif, kaçırılan
+# hileden çok daha pahalıdır: dürüst bir oyuncuyu sıralamadan atmak oyunu
+# bırakmasına yol açar. Asıl eleme zaten SUNUCUDAKİ makullük denetiminde.
+RUNCHK_DMG_BASE = 12.0          # 1. seviyedeki hasar çarpanı tavanı
+RUNCHK_DMG_PER_LEVEL = 4.3      # seviye başına eklenen pay
+RUNCHK_DMG_CAP = 2000.0         # mutlak tavan (taban hasarın katı)
+RUNCHK_HP_BASE = 800.0          # 1. seviyedeki azami can tavanı
+RUNCHK_HP_PER_LEVEL = 120.0
+RUNCHK_HP_CAP = 400000.0
+RUNCHK_SPEED_BASE = 4.5         # 1. seviyedeki hız tavanı (taban hızın katı)
+RUNCHK_SPEED_PER_LEVEL = 0.52
+RUNCHK_SPEED_CAP = 60.0
+RUNCHK_SCORE_PER_KILL = 900.0   # bir öldürmeden çıkabilecek en yüksek skor
+RUNCHK_SCORE_FLOOR = 6000.0     # bu skorun altında tutarlılık aranmaz
+
+
+def run_integrity_check(run):
+    """Koşu hâlâ kurallara uygun mu? Sorun varsa kısa bir sebep döndürür.
+
+    Dönüş: None (temiz) ya da açıklama metni.
+    """
+    p = run.player
+    lvl = max(1, int(getattr(p, "level", 1)))
+    try:
+        dmg_ratio = p.eff_dmg() / max(1e-6, BASE_DMG)
+        spd_ratio = p.eff_speed() / max(1e-6, BASE_SPEED)
+        hp = float(p.max_hp)
+    except Exception:
+        return None
+    if dmg_ratio > min(RUNCHK_DMG_CAP, RUNCHK_DMG_BASE + RUNCHK_DMG_PER_LEVEL * lvl):
+        return "hasar"
+    if hp > min(RUNCHK_HP_CAP, RUNCHK_HP_BASE + RUNCHK_HP_PER_LEVEL * lvl):
+        return "can"
+    if spd_ratio > min(RUNCHK_SPEED_CAP,
+                       RUNCHK_SPEED_BASE + RUNCHK_SPEED_PER_LEVEL * lvl):
+        return "hız"
+    # eff_armor() zaten 0.60'ta kırpıyor; bu yalnızca alanın DOĞRUDAN
+    # yazıldığı durumu yakalar.
+    if p.eff_armor() > 0.61:
+        return "zırh"
+    return None
+
+
+def run_score_plausible(run):
+    """Koşu bitti: skor; öldürme, dalga ve süreyle tutarlı mı?"""
+    score = float(getattr(run, "score", 0))
+    if score < RUNCHK_SCORE_FLOOR:
+        return True
+    kills = max(0, int(getattr(run, "kills", 0)))
+    wave = max(1, int(getattr(run.waves, "wave", 1)))
+    rt = max(1.0, float(getattr(run, "run_time", 1.0)))
+    # 1) Öldürme başına düşen skorun tavanı var.
+    if score > RUNCHK_SCORE_PER_KILL * (kills + 10):
+        return False
+    # 2) Dalga ilerlemesi SKORLA olduğu için skor, ulaşılan dalganın
+    #    hedeflerinin toplamını belirgin biçimde aşamaz.
+    goal_sum = sum(wave_score_goal(w) for w in range(1, wave + 2))
+    if score > goal_sum * 2.5 + RUNCHK_SCORE_FLOOR:
+        return False
+    # 3) Saniyede üretilebilecek skorun bir tavanı var.
+    if score / rt > 4000.0:
+        return False
+    return True
+
+
 class RunState:
     def __init__(self, save, skin_id, diff="normal", ach=None):
         self.save = save
@@ -13617,6 +14012,9 @@ class RunState:
         # --- BÖLGE ---
         self.biome = "arena"          # "arena" | "hell"
         self.hell_portal = None       # 25. dalga patronundan sonra açılan mor portal
+        # Cehennemin güç ölçüsü portaldan geçerken belirlenir; her koşu
+        # nötr (1.0) başlar ki önceki koşudan sızmasın.
+        self.hell_power = set_hell_power(1.0)
 
         self.kills = 0
         # ZAMAN DURDU sayacı: skin yetenekleri düşmanları bu süre boyunca dondurur.
@@ -13629,6 +14027,10 @@ class RunState:
         self.score = 0
         self.game_over = False
         self.submitted_online = False
+        # HİLE KORUMASI (3. katman): koşu denetimi. Bir kez bozulduysa
+        # düzelmez — hile yapılıp geri alınan bir koşu da geçersizdir.
+        self.cheat_flag = ""        # boş = temiz, dolu = takılan denetim
+        self.integrity_timer = 0.0
         self.pending_levelups = 0
         self.levelup_choices = []
         # --- SEVİYE ATLAMA: YENİLEME ve PAS ---
@@ -13650,6 +14052,8 @@ class RunState:
         self.death_cause = ""
         # Sağ üstteki "⋮" istatistik paneli açık mı?
         self.show_stats = False
+        # M tuşuyla açılan büyük harita açık mı? (oyun bu sırada durmaz)
+        self.show_map = False
         # Patron sandıkları (devrilen patronun yerine düşer)
         self.chests = []
         # --- YENİ SİLAHLARIN DÜNYA NESNELERİ ---
@@ -13729,7 +14133,7 @@ class RunState:
     STRAGGLER_CHECK = 0.45      # kaç saniyede bir bakılır
     STRAGGLER_MIN_SPEED = 95.0  # bu hızın altında "kaçıyor" sayılmaz
     STRAGGLER_BEHIND = 0.25     # arkada sayılması için gereken yön farkı (-1..1)
-    STRAGGLER_FAR = 560.0       # bu mesafeden uzaktakiler ışınlanabilir
+    STRAGGLER_FAR = 680.0       # v3.17: bu mesafeden uzaktakiler ışınlanabilir
     STRAGGLER_MAX = 4           # tek seferde en fazla kaç yaratık ışınlanır
     STRAGGLER_COOLDOWN = 3.2    # aynı yaratık tekrar ışınlanana kadar geçen süre
     # Kaçış yönünde ne kadar ileriye bırakılacağı — kameranın hemen dışı.
@@ -13878,6 +14282,12 @@ class RunState:
         if self.biome == "hell":
             return
         p = self.player
+        # CEHENNEMİ OYUNCUYA GÖRE KUR: güç ölçüsü koşu başına BİR KEZ, tam
+        # portaldan geçerken alınır ve cehennem boyunca sabit kalır. Sonradan
+        # ölçülseydi oyuncu cehennemde güçlendikçe cehennem de güçlenir,
+        # ilerleme hissi tamamen kaybolurdu.
+        power = set_hell_power(measure_hell_power(p))
+        self.hell_power = power
         self.biome = "hell"
         self.hell_portal = None
         self.market_portal = None
@@ -15220,6 +15630,15 @@ class RunState:
 
         p = self.player
         self.run_time += dt
+        # HİLE KORUMASI: oyuncunun değerleri yarım saniyede bir denetlenir.
+        # (Her karede bakmanın anlamı yok; denetim ucuz ama bedavaya değil.)
+        self.integrity_timer -= dt
+        if self.integrity_timer <= 0:
+            self.integrity_timer = 0.5
+            if not self.cheat_flag:
+                bad = run_integrity_check(self)
+                if bad:
+                    self.cheat_flag = bad
         if self.time_stop > 0:
             self.time_stop = max(0.0, self.time_stop - dt)
         p.update(dt, input_state, self.fx)
@@ -15824,9 +16243,18 @@ class RunState:
         self._next_levelup_or_close()
         return True, ("bedava pas" if cost == 0 else f"-{cost} altın")
 
+    def run_is_clean(self):
+        """Bu koşu sıralamalara yazılabilir mi? (bkz. run_integrity_check)"""
+        return not self.cheat_flag
+
     def finish_run(self):
         self.game_over = True
-        gems = int(self.gem_coins * 0.12)
+        # Koşu bitti: skor; öldürme, dalga ve süreyle tutarlı mı?
+        if not self.cheat_flag and not run_score_plausible(self):
+            self.cheat_flag = "skor"
+        # Hileli koşu elmas da kazandırmaz; yoksa "hile yap, elması al,
+        # sıralamaya girme" diye bir yol açık kalırdı.
+        gems = int(self.gem_coins * 0.12) if self.run_is_clean() else 0
         self.save.add_gems(gems)
         st = self.save.data["stats"]
         st["runs"] = st.get("runs", 0) + 1
@@ -16485,27 +16913,74 @@ _VIGNETTE = None
 
 
 def view_vignette():
+    """KALDIRILDI (v3.17).
+
+    Sahanın kenarlarını karartan dikdörtgen bir karartma vardı; ortası
+    aydınlık, kenarları koyu olduğu için oyuncu "boğuluyor" hissi veriyordu.
+    Oyuncunun görüş alanı zaten kamera ile sınırlı ve ekrandan çıkan
+    yaratıklar ışınlanıyor (bkz. reposition_stragglers), yani karartmanın
+    oynanışa katkısı da yoktu.
+
+    Fonksiyon duruyor ama tamamen SAYDAM bir yüzey döndürüyor: çağıran yer
+    (draw_run) tek satırda sadeleşsin diye değil, ileride yeniden açılmak
+    istenirse tek yerden açılabilsin diye.
+    """
     global _VIGNETTE
     if _VIGNETTE is None:
-        vg = pygame.Surface(VIEW_RECT.size, pygame.SRCALPHA)
-        pygame.draw.rect(vg, (0, 0, 0, 80), vg.get_rect())
-        pygame.draw.rect(vg, (0, 0, 0, 0), vg.get_rect().inflate(-240, -180), border_radius=150)
-        _VIGNETTE = vg
+        _VIGNETTE = pygame.Surface(VIEW_RECT.size, pygame.SRCALPHA)
     return _VIGNETTE
 
 
-def draw_minimap(surf, run, t):
-    """Sağ üstteki küçük harita.
+MINIMAP_W = 196          # sağ üstteki küçük haritanın genişliği
+BIGMAP_H_FRAC = 0.62     # büyük haritanın ekran yüksekliğine oranı
+
+
+def minimap_rect(big=False):
+    """Haritanın dikdörtgeni. big=True ise ekranın ortasında büyük hâli."""
+    if big:
+        mh = int(VIRTUAL_H * BIGMAP_H_FRAC)
+        mw = int(mh * ARENA_RECT.w / ARENA_RECT.h)
+        if mw > VIRTUAL_W - 200:
+            mw = VIRTUAL_W - 200
+            mh = int(mw * ARENA_RECT.h / ARENA_RECT.w)
+        r = pygame.Rect(0, 0, mw, mh)
+        r.center = (VIRTUAL_W // 2, VIRTUAL_H // 2 + 4)
+        return r
+    mw = MINIMAP_W
+    mh = int(MINIMAP_W * ARENA_RECT.h / ARENA_RECT.w)
+    return pygame.Rect(VIRTUAL_W - mw - 16, ARENA_MARGIN_TOP + 10, mw, mh)
+
+
+def draw_minimap(surf, run, t, big=False):
+    """Dünya haritası.
 
     Dünyanın tamamını, kameranın gördüğü çerçeveyi, düşmanları, patronları,
     portalları ve oyuncuyu gösterir.
+
+    big=False : sağ üstteki küçük harita (her zaman açık)
+    big=True  : M tuşuyla açılan, ekranın ortasındaki BÜYÜK harita. Aynı
+                çizim kodu kullanılır; işaretler haritanın ölçeğiyle birlikte
+                büyür (k çarpanı), böylece büyük haritada noktalar iğne başı
+                kalmaz.
     """
     st = BIOME_STYLE.get(run.biome, BIOME_STYLE["arena"])
-    mw, mh = 196, int(196 * ARENA_RECT.h / ARENA_RECT.w)
-    rect = pygame.Rect(VIRTUAL_W - mw - 16, ARENA_MARGIN_TOP + 10, mw, mh)
+    rect = minimap_rect(big)
+    # İşaretler haritayla doğru orantılı büyürse büyük haritada balon gibi
+    # duruyor (2 px'lik bir yaratık 11 px'e çıkıyordu). Kök ölçek: harita 5
+    # kat büyürken işaretler yalnızca ~2 kat büyüyor.
+    k = max(1.0, (rect.w / float(MINIMAP_W)) ** 0.55)
+
+    if big:
+        # Büyük harita açıkken arkadaki saha karartılır ki harita okunsun.
+        dim = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+        pygame.draw.rect(dim, (4, 5, 11, 188), dim.get_rect())
+        surf.blit(dim, (0, 0))
+        add_glow(surf, rect.centerx, rect.centery, rect.w * 0.60,
+                 st.get("wall", (70, 90, 150)), 0.10)
 
     bg = pygame.Surface((rect.w, rect.h), pygame.SRCALPHA)
-    pygame.draw.rect(bg, (8, 9, 16, 210), bg.get_rect(), border_radius=8)
+    pygame.draw.rect(bg, (8, 9, 16, 236 if big else 210), bg.get_rect(),
+                     border_radius=int(8 * (2 if big else 1)))
     surf.blit(bg, rect.topleft)
 
     sx = rect.w / ARENA_RECT.w
@@ -16535,54 +17010,84 @@ def draw_minimap(surf, run, t):
         px, py = mp(e.x, e.y)
         # Cehennem yaratıklarının kendi renkleri var — küçük haritada da onları göster.
         col = getattr(e, "color", None) or ENEMY_COLORS.get(e.kind, RED)
-        pygame.draw.circle(surf, col, (int(px), int(py)), 2 if e.kind != "elite" else 3)
+        pygame.draw.circle(surf, col, (int(px), int(py)),
+                           max(1, int(k * (2 if e.kind != "elite" else 3))))
 
     # patronlar
     for b in run.bosses:
         if b.alive and not b.is_hidden():
             px, py = mp(b.x, b.y)
             pulse = 3 + math.sin(t * 6) * 1.2
-            pygame.draw.circle(surf, (255, 90, 80), (int(px), int(py)), int(4 + pulse * 0.4))
-            pygame.draw.circle(surf, WHITE, (int(px), int(py)), 2)
+            pygame.draw.circle(surf, (255, 90, 80), (int(px), int(py)),
+                               max(2, int(k * (4 + pulse * 0.4))))
+            pygame.draw.circle(surf, WHITE, (int(px), int(py)), max(1, int(k * 2)))
 
     # MIKNATIS — nadir eşya, küçük haritada nabız gibi atar ki kaçırılmasın
     for mg in run.magnets:
         px, py = mp(mg.x, mg.y)
         pulse = 0.5 + 0.5 * math.sin(t * 7)
-        add_glow(surf, px, py, 16 + pulse * 8, MAGNET_COLOR, 0.45 + pulse * 0.35)
-        pygame.draw.circle(surf, MAGNET_COLOR, (int(px), int(py)), int(4 + pulse * 2))
-        pygame.draw.circle(surf, MAGNET_COLOR2, (int(px), int(py)), 2)
+        add_glow(surf, px, py, (16 + pulse * 8) * k, MAGNET_COLOR, 0.45 + pulse * 0.35)
+        pygame.draw.circle(surf, MAGNET_COLOR, (int(px), int(py)), max(2, int(k * (4 + pulse * 2))))
+        pygame.draw.circle(surf, MAGNET_COLOR2, (int(px), int(py)), max(1, int(k * 2)))
 
     # hortum (küçük haritada dönen halka)
     for tn in run.tornados:
         px, py = mp(tn.x, tn.y)
-        pygame.draw.circle(surf, TORNADO_COLOR, (int(px), int(py)), 5, 1)
+        pygame.draw.circle(surf, TORNADO_COLOR, (int(px), int(py)), max(3, int(k * 5)),
+                           max(1, int(k)))
 
     # market portalı
     if run.market_portal is not None:
         px, py = mp(run.market_portal.x, run.market_portal.y)
-        pygame.draw.circle(surf, GOLD, (int(px), int(py)), 4, 1)
-        draw_icon(surf, px, py, "coin", GOLD, 3)
+        pygame.draw.circle(surf, GOLD, (int(px), int(py)), max(3, int(k * 4)), max(1, int(k)))
+        draw_icon(surf, px, py, "coin", GOLD, max(3, 3 * k))
 
     # cehennem portalı
     if run.hell_portal is not None:
         px, py = mp(run.hell_portal.x, run.hell_portal.y)
         pulse = 0.5 + 0.5 * math.sin(t * 4)
-        add_glow(surf, px, py, 22, HELL_PORTAL_COLOR, 0.25 + pulse * 0.25)
-        pygame.draw.circle(surf, HELL_PORTAL_COLOR, (int(px), int(py)), 5, 2)
+        add_glow(surf, px, py, 22 * k, HELL_PORTAL_COLOR, 0.25 + pulse * 0.25)
+        pygame.draw.circle(surf, HELL_PORTAL_COLOR, (int(px), int(py)),
+                           max(3, int(k * 5)), max(2, int(k * 2)))
 
     # kameranın gördüğü alan
     cam = run.cam_rect()
     vr = pygame.Rect(mp(cam.left, cam.top), (cam.w * sx, cam.h * sy))
-    pygame.draw.rect(surf, (235, 240, 255), vr, width=1)
+    pygame.draw.rect(surf, (235, 240, 255), vr, width=max(1, int(k)))
 
     # oyuncu
     p = run.player
     px, py = mp(p.x, p.y)
-    pygame.draw.circle(surf, WHITE, (int(px), int(py)), 3)
-    pygame.draw.circle(surf, p.skin["color"], (int(px), int(py)), 2)
+    pygame.draw.circle(surf, WHITE, (int(px), int(py)), max(2, int(k * 3)))
+    pygame.draw.circle(surf, p.skin["color"], (int(px), int(py)), max(1, int(k * 2)))
     ax, ay = p.aim_dir
-    pygame.draw.line(surf, WHITE, (px, py), (px + ax * 7, py + ay * 7), 1)
+    pygame.draw.line(surf, WHITE, (px, py), (px + ax * 7 * k, py + ay * 7 * k),
+                     max(1, int(k)))
+
+    if big:
+        # Büyük haritanın çerçevesi, köşebentleri ve başlığı
+        edge = st.get("wall", (90, 110, 170))
+        pygame.draw.rect(surf, lighten(edge, 0.30), rect.inflate(6, 6), width=2,
+                         border_radius=16)
+        for cxs in (-1, 1):
+            for cys in (-1, 1):
+                ox = rect.centerx + cxs * (rect.w / 2 + 3)
+                oy = rect.centery + cys * (rect.h / 2 + 3)
+                pygame.draw.line(surf, GOLD, (ox, oy), (ox - cxs * 22, oy), 3)
+                pygame.draw.line(surf, GOLD, (ox, oy), (ox, oy - cys * 22), 3)
+        # Başlık ve ipucu haritanın İÇİNDE: dışarıda HUD yazılarına biniyordu.
+        head = ("CEHENNEM HARİTASI" if run.biome == "hell" else "ARENA HARİTASI")
+        cap = pygame.Surface((rect.w, 30), pygame.SRCALPHA)
+        pygame.draw.rect(cap, (6, 7, 14, 200), cap.get_rect())
+        surf.blit(cap, (rect.x, rect.y))
+        pygame.draw.line(surf, scale_col(GOLD, 0.6), (rect.x + 10, rect.y + 30),
+                         (rect.right - 10, rect.y + 30), 1)
+        draw_text(surf, head, (rect.x + 14, rect.y + 7), 17, GOLD, bold=True,
+                  shadow=False)
+        draw_text(surf, f"DALGA {run.waves.wave}   ·   {len(run.enemies)} yaratık",
+                  (rect.right - 14, rect.y + 9), 12, TEXT_DIM, right=True, shadow=False)
+        draw_text(surf, "M ile kapat", (rect.centerx, rect.bottom - 20), 12,
+                  (150, 156, 184), center=True, shadow=False)
 
     # çerçeve + etiket
     pygame.draw.rect(surf, st["wall"], rect, width=2, border_radius=8)
@@ -17567,13 +18072,15 @@ def draw_run(surf, run, t, aim_pos=None):
 
     surf.blit(world, VIEW_RECT.topleft, cam)
 
-    # kenar karartması (ekran uzayı) — her karede yeniden üretmek pahalı
-    # olduğu için tek sefer hazırlanıp saklanıyor.
-    surf.blit(view_vignette(), VIEW_RECT.topleft, special_flags=pygame.BLEND_RGBA_SUB)
+    # (v3.17: kenar karartması kaldırıldı — bkz. view_vignette)
 
     draw_offscreen_markers(surf, run, cam, t)
     draw_hud(surf, run, t)
     draw_minimap(surf, run, t)
+    # M ile açılan BÜYÜK harita: küçük haritanın aynısı, ekranın ortasında.
+    # Oyun bu sırada DURMAZ — harita bir mola değil, bir bakış.
+    if getattr(run, "show_map", False):
+        draw_minimap(surf, run, t, big=True)
     draw_weapon_slots(surf, run, t)
     draw_book_slots(surf, run, t)
     draw_skill_bar(surf, run, t)
@@ -18581,9 +19088,12 @@ class RunShopOverlay:
         icx, icy = rect.centerx, rect.y + 52
         if unlocked and not maxed:
             add_glow(surf, icx, icy, 34, icon_col, 0.24 + 0.14 * pulse)
-        circle_aa(surf, icx, icy + 2, 26, OUTLINE)
-        disc_grad(surf, icx - 4, icy - 5, 25, scale_col(icon_col, 0.52),
-                  (16, 17, 26), 6)
+        # v3.17: madalyonun BÜTÜN katmanları artık AYNI MERKEZDE. Eskiden
+        # siyah taban (+2 aşağı) ile degrade disk (-4, -5 yukarı sol) farklı
+        # merkezlerdeydi; siyah taban halkanın altından taşıyor ve simgenin
+        # arkasında "oturmamış" ikinci bir daire gibi görünüyordu. Ayrı bir
+        # siyah taban dairesine de gerek yok: degradenin kenarı zaten koyu.
+        disc_grad(surf, icx, icy, 25, scale_col(icon_col, 0.50), (15, 16, 25), 9)
         ring_aa(surf, icx, icy, 25, icon_col, 2)
         # dönen kertikler — silah armalarıyla aynı dil
         if unlocked:
@@ -19102,7 +19612,8 @@ class App:
         self.chat.say(line, TEXT_DIM)
 
     def _apply_skin_cheat(self):
-        """\"skin\" komutu: 4 PREMİUM skini açar."""
+        """\"skin\" komutu: 4 PREMİUM skini açar. (Bu da bir hiledir.)"""
+        self.save.mark_tainted("cheat_code")
         added = self.save.unlock_premium_skins()
         if added:
             self.chat.say("PREMİUM SKİNLER AÇILDI", GOLD)
@@ -19113,7 +19624,13 @@ class App:
         sfx("buy", 0.9, 0.0)
 
     def _apply_cheat(self):
-        """HİLE KODU: elmas verir ve kilitli bütün içeriği açar."""
+        """HİLE KODU: elmas verir ve kilitli bütün içeriği açar.
+
+        v3.17: kod bir HİLEDİR — kullanıldığı anda kayıt ŞAİBELİ damgası yer
+        ve DÜNYA SIRALAMASI kalıcı olarak kapanır. Kod oyunu kurcalamak için
+        duruyor, rekor kırmak için değil.
+        """
+        self.save.mark_tainted("cheat_code")
         self.save.add_gems(CHAT_CHEAT_GEMS)
         added = self.save.unlock_everything()
         # Kuşanılmış skin kilitliyken varsayılana düşmüş olabilir; artık her
@@ -19121,6 +19638,7 @@ class App:
         # kez daha yazılır (unlock_everything kendi içinde de yazıyor).
         self.save.save()
         self.chat.say(f"HİLE KODU KABUL EDİLDİ  ·  +{fmt_num(CHAT_CHEAT_GEMS)} elmas", GOLD)
+        self.chat.say("DİKKAT: bu kayıt artık DÜNYA SIRALAMASINA giremez.", RED)
         self.chat.say(
             f"açıldı: {added['skins']} skin, {added['cosmetics']} kıyafet, "
             f"{added['pets']} pet, {added['books']} kitap, {added['weapons']} silah", CYAN)
@@ -19173,6 +19691,11 @@ class App:
                         use_pressed = True
                     elif event.key == pygame.K_TAB and self.state == STATE_PLAY:
                         stats_pressed = True
+                    elif event.key == pygame.K_m and self.state == STATE_PLAY:
+                        # BÜYÜK HARİTA aç/kapa. Oyun durmaz; harita yarı
+                        # saydam bir karartmanın üstünde durur.
+                        self.run.show_map = not self.run.show_map
+                        sfx("click", 0.5, 0.0)
                     elif event.key == pygame.K_b and self.state == STATE_PLAY:
                         self.run.open_shop()
                         self.state = STATE_RUN_SHOP
@@ -19325,7 +19848,9 @@ class App:
         if self.run.game_over:
             self.pending_board_rank = -1
             self.online_submit_status = None
-            if self.save.qualifies_for_board(self.run.score):
+            # Doğrulanamayan koşu YEREL tabloya da yazılmaz: isim ekranı hiç
+            # açılmaz, oyuncu doğrudan sonuç ekranına gider.
+            if self.run.run_is_clean() and self.save.qualifies_for_board(self.run.score):
                 self.state = STATE_NAME_ENTRY
             else:
                 self._maybe_submit_online()
@@ -19541,11 +20066,33 @@ class App:
             audio.set_music("menu")
         self.state = s
 
+    def world_block_reason(self):
+        """Bu koşu DÜNYA SIRALAMASINA neden giremiyor? (None = girebilir)
+
+        İki kapı var: KAYIT şaibeliyse (dosya kurcalanmış, elmas defteri
+        tutmuyor ya da hile kodu kullanılmış) ve KOŞU denetimi takıldıysa.
+        """
+        if self.save.is_tainted():
+            return "kayıt şaibeli — " + self.save.taint_text()
+        if self.run is not None and not self.run.run_is_clean():
+            return f"koşu doğrulanamadı ({self.run.cheat_flag})"
+        return None
+
     def _maybe_submit_online(self):
         if self.run.submitted_online:
             return
         self.run.submitted_online = True
         name = self.name_input.strip() or "İsimsiz"
+
+        # ---- HİLE KAPISI ----
+        # Şaibeli kayıt ya da doğrulanamayan koşu dünya sıralamasına ASLA
+        # gönderilmez. Sunucu da ayrıca kendi denetimini yapar (server.py);
+        # bu yalnızca ilk kapı.
+        blocked = self.world_block_reason()
+        if blocked:
+            self.online_submit_status = "reddedildi"
+            self.online_block_text = blocked
+            return
 
         def on_done(ok):
             self.online_submit_status = "gönderildi" if ok else "başarısız"
@@ -19555,7 +20102,7 @@ class App:
         # DÜZELTME: sunucu (server.py) "run_time" ve "created_at" bekliyordu,
         # oyun ise "time"/"diff" gönderiyordu. Bu yüzden dünya sıralamasındaki
         # süre alanı her zaman 0 kaydediliyordu.
-        self.online.submit_score_async({
+        payload = {
             "name": name[:14],
             "score": int(self.run.score),
             "kills": int(self.run.kills),
@@ -19563,7 +20110,11 @@ class App:
             "run_time": float(self.run.run_time),
             "created_at": time.time(),
             "diff": self.run.diff,
-        }, on_done=on_done)
+        }
+        # Gönderiye imza eklenir: sunucu imzasız/yanlış imzalı istekleri
+        # reddeder, böylece sıralamaya elle curl atılamaz (bkz. server.py).
+        payload["sig"] = sign_submit(payload)
+        self.online.submit_score_async(payload, on_done=on_done)
 
     def update_gameover(self, dt, mouse_pos, clicked):
         canvas = self.display.canvas
@@ -19591,10 +20142,28 @@ class App:
             y += 33
         draw_text(canvas, "Bu koşuda market'ten aldıkların silindi.", (panel_rect.centerx, y + 4), 12, TEXT_DIM, center=True, shadow=False)
         y += 26
-        if self.pending_board_rank >= 0:
+        if not r.run_is_clean():
+            draw_text(canvas, "BU KOŞU GEÇERSİZ SAYILDI", (panel_rect.centerx, y), 17,
+                      RED, bold=True, center=True)
+            y += 20
+            draw_text(canvas,
+                      f"doğrulama takıldı: {r.cheat_flag} — skor hiçbir sıralamaya yazılmadı",
+                      (panel_rect.centerx, y), 11, (210, 140, 140), center=True, shadow=False)
+            y += 20
+        elif self.pending_board_rank >= 0:
             draw_text(canvas, f"YEREL SIRALAMADA #{self.pending_board_rank + 1}!", (panel_rect.centerx, y), 18, GOLD, bold=True, center=True)
             y += 24
-        if self.online.enabled and self.online_submit_status:
+        if self.online_submit_status == "reddedildi":
+            draw_text(canvas, "DÜNYA SIRALAMASINA GİRMEDİ", (panel_rect.centerx, y), 14,
+                      RED, bold=True, center=True)
+            y += 19
+            for ln in wrap_text(getattr(self, "online_block_text", ""), 11,
+                                panel_rect.w - 80)[:2]:
+                draw_text(canvas, ln, (panel_rect.centerx, y), 11, (210, 140, 140),
+                          center=True, shadow=False)
+                y += 14
+            y += 6
+        elif self.online.enabled and self.online_submit_status:
             status_col = {"gönderiliyor": TEXT_DIM, "gönderildi": GREEN, "başarısız": RED}.get(self.online_submit_status, TEXT_DIM)
             draw_text(canvas, f"Dünya sıralamasına {self.online_submit_status}", (panel_rect.centerx, y), 13, status_col, center=True, shadow=False)
             y += 22
@@ -19781,7 +20350,6 @@ class App:
                                 [(x1 + sgn * 12, ty + 2), (x1 + sgn * 6, ty + 2 - dsz),
                                  (x1, ty + 2), (x1 + sgn * 6, ty + 2 + dsz)])
         draw_text(canvas, GAME_TITLE, (VIRTUAL_W / 2, ty), 60, GOLD, bold=True, center=True)
-        draw_text(canvas, "Kas, nişan al, rekor kır.", (VIRTUAL_W / 2, 158 + title_bob), 17, TEXT_DIM, center=True)
 
         draw_coin_label(canvas, VIRTUAL_W / 2, 198,
                         f"Elmas: {fmt_num(self.save.get_gems())}", GEM_COLOR, 19,
@@ -19808,10 +20376,24 @@ class App:
             if clicked:
                 b.click(mouse_pos)
 
-        online_txt = "ÇEVRİMİÇİ: AÇIK" if self.online.enabled else "ÇEVRİMİÇİ: KAPALI"
-        draw_text(canvas, online_txt, (VIRTUAL_W / 2, VIRTUAL_H - 44), 12,
-                  GREEN if self.online.enabled else TEXT_DIM, center=True, shadow=False)
-        draw_text(canvas, f"v{GAME_VERSION}   F11: Tam Ekran   F3: FPS   ESC: Geri", (VIRTUAL_W / 2, VIRTUAL_H - 24), 12, TEXT_DIM, center=True, shadow=False)
+        # v3.17: alttaki dolgu yazıları (tuş listesi, sürüm, çevrimiçi durumu)
+        # kaldırıldı. Tuşlar zaten NASIL OYNANIR'da; sürüm ve bağlantı durumu
+        # yalnızca sol altta, göze batmayan tek bir satırda duruyor.
+        draw_text(canvas, f"v{GAME_VERSION}", (16, VIRTUAL_H - 24), 11,
+                  GREEN if self.online.enabled else (92, 96, 118), shadow=False)
+
+        # ---- ŞAİBELİ KAYIT UYARISI ----
+        # Oyuncu neden sıralamaya giremediğini sonuç ekranında değil, BURADA
+        # öğrensin; sessizce engellemek "oyun bozuk" hissi verirdi.
+        if self.save.is_tainted():
+            wr = pygame.Rect(0, 0, 560, 46)
+            wr.center = (VIRTUAL_W / 2, 300)
+            panel(canvas, wr, bg=(44, 18, 22), edge=RED, alpha=238, radius=10, edge_w=2)
+            draw_icon(canvas, wr.x + 24, wr.centery, "shield", RED, 9)
+            draw_text(canvas, "DÜNYA SIRALAMASI KAPALI", (wr.x + 40, wr.y + 7), 13, RED,
+                      bold=True, shadow=False)
+            draw_text(canvas, self.save.taint_text(), (wr.x + 40, wr.y + 25), 10,
+                      (212, 158, 158), shadow=False)
 
         # ---- alt şerit: sağda MAĞAZA kartı ----
         self.draw_gem_store_card(canvas, dt, mouse_pos, clicked)
@@ -19884,8 +20466,8 @@ class App:
                        (bx + math.cos(a) * (18.5 + 1.5 * pulse),
                         by + math.sin(a) * (18.5 + 1.5 * pulse)),
                        1.2, scale_col(accent, 0.40 + 0.45 * pulse))
-        circle_aa(canvas, bx, by + 1, 14, OUTLINE)
-        disc_grad(canvas, bx - 3, by - 3, 13, scale_col(accent, 0.55), (12, 14, 22), 6)
+        # (market kartlarıyla aynı düzeltme: katmanlar eş merkezli)
+        disc_grad(canvas, bx, by, 13, scale_col(accent, 0.55), (12, 14, 22), 7)
         ring_aa(canvas, bx, by, 13, accent, 2)
         draw_icon(canvas, bx, by, "gem", lighten(accent, 0.3), 9)
         tx = rect.x + 52

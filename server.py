@@ -2,8 +2,12 @@ import os
 import json
 import time
 import uuid
+import hmac
+import hashlib
+import threading
 import urllib.parse
 import urllib.request
+from collections import defaultdict, deque
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from supabase import create_client, Client
@@ -27,6 +31,119 @@ def index():
 def static_files(path):
     return send_from_directory(".", path)
 
+# =====================================================================
+# HİLE KORUMASI  (sunucu tarafı — ASIL koruma burasıdır)
+# ---------------------------------------------------------------------
+# İstemcide çalışan hiçbir koruma mutlak değildir: oyunun dosyası açılabilir,
+# yerleşik anahtar çıkarılabilir. Dünya sıralamasının temizliği bu yüzden
+# SUNUCUDA karara bağlanır. Üç süzgeç var:
+#
+#   1) İMZA       — gönderi, oyunun bildiği gizli anahtarla imzalanmış
+#                   olmalı. İmzasız/yanlış imzalı istek (örn. elle atılan
+#                   bir curl) hiç değerlendirilmez.
+#   2) MAKULLÜK   — skor; öldürme sayısı, dalga ve süreyle TUTARLI olmalı.
+#                   Oyunun kendi kuralları içinde üretilemeyecek bir skor
+#                   reddedilir. Bu süzgeç anahtarı çalmış birini de yakalar:
+#                   imzayı taklit etse bile 10 milyonluk skoru 12 saniyede
+#                   üretemez.
+#   3) HIZ SINIRI — aynı kaynaktan dakikalar içinde yağdırılan gönderiler
+#                   kesilir.
+#
+# ÖNEMLİ: SUBMIT_SECRET ortam değişkeninden okunur ve oyundaki değerle AYNI
+# olmalıdır (kasma_arena13.py / SUBMIT_SECRET). Yayına çıkmadan önce ikisi
+# birden değiştirilmelidir; buradaki varsayılan yalnızca geliştirme içindir.
+# =====================================================================
+
+SUBMIT_SECRET = os.environ.get("KASMA_SUBMIT_SECRET",
+                               "kasma-arena-submit-v1:3d7f90ac41be6528")
+# İmza zorunlu mu? Eski istemcilerin bir süre çalışabilmesi için kapatılabilir.
+REQUIRE_SIGNATURE = os.environ.get("KASMA_REQUIRE_SIG", "1") == "1"
+
+# --- MAKULLÜK SINIRLARI ---
+# Hepsi oyunun kendi eğrilerinden türetildi ve dürüst bir oyuncunun asla
+# takılmayacağı kadar geniş bırakıldı.
+MAX_SCORE_PER_KILL = 900.0     # bir öldürmeden çıkabilecek en yüksek skor
+MAX_SCORE_PER_SEC = 4000.0     # saniyede üretilebilecek en yüksek skor
+MAX_KILLS_PER_SEC = 25.0       # saniyede devrilebilecek en çok yaratık
+MIN_RUN_TIME = 5.0             # bundan kısa bir koşu skor üretemez
+MAX_RUN_TIME = 6 * 3600.0      # 6 saatten uzun koşu kabul edilmez
+MAX_WAVE = 400
+MAX_SCORE = 500_000_000
+SCORE_FLOOR = 6000.0           # bu skorun altında makullük aranmaz
+
+# --- HIZ SINIRI ---
+RATE_WINDOW = 300.0            # saniye
+RATE_MAX = 12                  # bu pencerede aynı kaynaktan en çok kaç gönderi
+_rate_hits = defaultdict(deque)
+_rate_lock = threading.Lock()
+
+
+def _rate_ok(key):
+    now = time.time()
+    with _rate_lock:
+        dq = _rate_hits[key]
+        while dq and now - dq[0] > RATE_WINDOW:
+            dq.popleft()
+        if len(dq) >= RATE_MAX:
+            return False
+        dq.append(now)
+        # Sözlük sonsuza kadar büyümesin: boşalan anahtarları at.
+        if len(_rate_hits) > 4096:
+            for k in [k for k, v in _rate_hits.items() if not v]:
+                _rate_hits.pop(k, None)
+        return True
+
+
+def _expected_sig(payload):
+    """İmza, istemcideki sign_submit() ile BİREBİR aynı sırayı kullanır."""
+    msg = "|".join(str(payload.get(k, "")) for k in
+                   ("name", "score", "kills", "wave", "run_time", "created_at"))
+    return hmac.new(SUBMIT_SECRET.encode("utf-8"), msg.encode("utf-8"),
+                    hashlib.sha256).hexdigest()
+
+
+def _wave_goal(wave):
+    """Oyundaki dalga skor hedefinin kaba karşılığı (bkz. wave_score_goal).
+
+    Birebir aynı olması gerekmez; burada yalnızca ÜST SINIR için kullanılıyor,
+    o yüzden bilerek CÖMERT.
+    """
+    w = max(1, int(wave))
+    table = {1: 600, 2: 2300, 3: 2900, 4: 3500, 5: 4100}
+    if w in table:
+        return table[w]
+    return 4100 + 5.9 * (w - 5) * (900 + 60 * (w - 5))
+
+
+def score_is_plausible(name, score, kills, wave, run_time):
+    """Gönderilen skor oyunun kuralları içinde üretilebilir mi?
+
+    Dönüş: (uygun_mu, sebep)
+    """
+    if not (0 <= score <= MAX_SCORE):
+        return False, "skor aralık dışı"
+    if not (0 <= kills <= 2_000_000):
+        return False, "öldürme sayısı aralık dışı"
+    if not (1 <= wave <= MAX_WAVE):
+        return False, "dalga aralık dışı"
+    if not (0 < run_time <= MAX_RUN_TIME):
+        return False, "süre aralık dışı"
+    if score < SCORE_FLOOR:
+        return True, ""
+    if run_time < MIN_RUN_TIME:
+        return False, "koşu süresi skora göre çok kısa"
+    if kills > MAX_KILLS_PER_SEC * run_time + 50:
+        return False, "öldürme sayısı süreye göre imkânsız"
+    if score > MAX_SCORE_PER_KILL * (kills + 10):
+        return False, "skor öldürme sayısına göre imkânsız"
+    if score / run_time > MAX_SCORE_PER_SEC:
+        return False, "saniyelik skor imkânsız"
+    goal_sum = sum(_wave_goal(w) for w in range(1, int(wave) + 2))
+    if score > goal_sum * 2.5 + SCORE_FLOOR:
+        return False, "skor ulaşılan dalgaya göre imkânsız"
+    return True, ""
+
+
 # --- 1. SKOR TABLOSU ENDPOINT'LERİ (Liderlik Tablosu) ---
 
 @app.route("/scores", methods=["GET"])
@@ -44,13 +161,34 @@ def add_score():
     if not supabase:
         return jsonify({"error": "Supabase bağlantısı yapılandırılmamış!"}), 500
     try:
-        data = request.json
-        name = data.get("name", "Anonim")
+        data = request.json or {}
+        name = str(data.get("name", "Anonim"))[:14]
         score = int(data.get("score", 0))
         kills = int(data.get("kills", 0))
         wave = int(data.get("wave", 0))
         run_time = float(data.get("run_time", 0))
         created_at = float(data.get("created_at", 0))
+
+        # ---- SÜZGEÇ 3: HIZ SINIRI ----
+        src = request.headers.get("X-Forwarded-For", request.remote_addr or "?")
+        src = src.split(",")[0].strip()
+        if not _rate_ok(src):
+            return jsonify({"success": False, "error": "çok sık gönderim"}), 429
+
+        # ---- SÜZGEÇ 1: İMZA ----
+        if REQUIRE_SIGNATURE:
+            sig = str(data.get("sig") or "")
+            want = _expected_sig({
+                "name": name, "score": score, "kills": kills, "wave": wave,
+                "run_time": run_time, "created_at": created_at,
+            })
+            if not sig or not hmac.compare_digest(sig, want):
+                return jsonify({"success": False, "error": "imza doğrulanamadı"}), 403
+
+        # ---- SÜZGEÇ 2: MAKULLÜK ----
+        ok, why = score_is_plausible(name, score, kills, wave, run_time)
+        if not ok:
+            return jsonify({"success": False, "error": f"skor reddedildi: {why}"}), 422
 
         payload = {
             "name": name,
@@ -105,22 +243,33 @@ def update_player():
     if not supabase:
         return jsonify({"error": "Supabase bağlantısı yok!"}), 500
     try:
-        data = request.json
+        data = request.json or {}
         steam_id = data.get("steam_id")
-        gems = data.get("gems")
         selected_skin = data.get("selected_skin")
-        skins = data.get("skins")
-        
+
         if not steam_id:
             return jsonify({"error": "steam_id gereklidir!"}), 400
 
+        # HİLE KORUMASI: bu uç nokta ARTIK "gems" ve "skins" KABUL ETMİYOR.
+        # Eskiden istemci kendi elmas sayısını ve sahip olduğu skinleri
+        # doğrudan yazabiliyordu; yani oyunu hiç açmadan atılan tek bir
+        # istekle sınırsız elmas yazdırmak mümkündü. Elmas yalnızca
+        # /finalize_purchase içinde (Steam ödemeyi onayladıktan SONRA)
+        # sunucu tarafında artar; skin sahipliği de aynı yoldan yazılır.
+        # Burada yalnızca KUŞANILAN skin değişebilir ve o da oyuncunun
+        # gerçekten sahip olduğu skinlerden biri olmalıdır.
         payload = {}
-        if gems is not None:
-            payload["gems"] = int(gems)
         if selected_skin is not None:
+            row = supabase.table("players").select("skins").eq(
+                "steam_id", steam_id).execute()
+            owned = (row.data[0].get("skins") if row.data else "") or "default"
+            owned_list = [x.strip() for x in str(owned).split(",") if x.strip()]
+            if selected_skin not in owned_list:
+                return jsonify({"success": False,
+                                "error": "bu skine sahip değilsin"}), 403
             payload["selected_skin"] = selected_skin
-        if skins is not None:
-            payload["skins"] = skins
+        if not payload:
+            return jsonify({"success": True, "data": []})
 
         # Steam ID'ye göre oyuncunun verilerini güvenle güncelliyoruz
         response = supabase.table("players").update(payload).eq("steam_id", steam_id).execute()
