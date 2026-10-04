@@ -7,112 +7,32 @@ Toplam süre: ~15 dakika. Hiçbir adımda oyunun kodunu değiştirmene gerek yok
 
 ---
 
-## ADIM 1 — Supabase tablolarını aç (3 dakika)
+## ADIM 1 — Veritabanını kur (2 dakika)
 
-1. Supabase panelinde sol menüden **SQL Editor**'a gir
-   (şu an **Table Editor**'dasın, hemen altındaki ikon)
-2. **+ New query** de
-3. Aşağıdakinin TAMAMINI yapıştır ve **RUN** (sağ altta yeşil düğme)
+1. Supabase panelinde sol menüden **SQL Editor** → **+ New query**
+2. **`VERITABANI.sql`** dosyasının TAMAMINI yapıştır → **RUN**
+3. "Success. No rows returned" yazmalı
 
-> **v3.20 ile güncellendi.** Daha önce ADIM 1'i çalıştırdıysan aşağıdakini
-> yine çalıştır: `create ... if not exists` ve `add column if not exists`
-> kullanıldığı için var olanlara dokunmaz, yalnızca eksikleri ekler.
+Hepsi bu. Dosya şunları yapıyor:
 
-```sql
--- ============ 1) HESAPLAR ============
-create table if not exists accounts (
-  id            bigserial primary key,
-  email         text unique not null,
-  name          text,
-  provider      text default 'password',
-  password_hash text,
-  google_sub    text,
-  gems          bigint default 0,
-  created_at    double precision
-);
-create index if not exists accounts_email_idx on accounts (lower(email));
+| | Ne |
+|---|---|
+| `accounts` | hesaplar (kullanıcı adı + gmail birlikte) |
+| `sessions` | oturumlar (jetonun yalnızca özeti, cihaza bağlı) |
+| `player_data` | elmas, skinler, petler, istatistikler |
+| `player_events` | **her değişiklik zamanıyla** — elmas artışı, yeni skin, koşu |
+| `scores` | dünya sıralaması (var olana `account_id` eklenir) |
+| 4 görünüm | `player_overview`, `oyuncu_gecmisi`, `dunya_siralamasi`, `oyuncu_detay()` |
 
--- ============ 2) OTURUMLAR ============
-create table if not exists sessions (
-  token_hash  text primary key,
-  account_id  bigint references accounts(id) on delete cascade,
-  device_hash text,
-  created_at  double precision,
-  expires_at  double precision
-);
-create index if not exists sessions_acc_idx on sessions (account_id);
+> **Tekrar tekrar çalıştırabilirsin.** Her şey `if not exists` /
+> `create or replace` ile yazıldı; var olan verine dokunmaz, yalnızca
+> eksikleri tamamlar. Daha önce başka bir SQL çalıştırdıysan da bunu
+> çalıştır.
 
--- v3.20: kullanıcı adı (sıralamada görünen ad, BİR KEZ seçilir)
-alter table accounts add column if not exists username text;
--- Kullanıcı adıyla kayıt olanda e-posta yok: zorunluluğu kaldır.
-alter table accounts alter column email drop not null;
-create unique index if not exists accounts_username_uidx
-  on accounts (lower(username));
-
--- ============ 3) OYUNCU İLERLEMESİ (v3.20) ============
--- Elmas, skinler, petler ve istatistikler HESABA ait. Yeni hesap sıfırdan
--- başlar; oyuncu başka bir bilgisayara girince ilerlemesi onunla gelir.
-create table if not exists player_data (
-  account_id  bigint primary key references accounts(id) on delete cascade,
-  gems        bigint default 0,
-  gems_earned bigint default 0,
-  gems_spent  bigint default 0,
-  best_score  bigint default 0,
-  best_wave   int    default 0,
-  total_kills bigint default 0,
-  runs        int    default 0,
-  skin_count  int    default 0,
-  pet_count   int    default 0,
-  data        jsonb  default '{}'::jsonb,
-  updated_at  double precision
-);
-alter table player_data enable row level security;
-
--- ============ 4) MEVCUT scores TABLOSUNA HESAP BAĞI ============
-alter table scores add column if not exists account_id bigint;
-
--- ============ 5) OYUNCULARA TEK BAKIŞTA BAKMAK İÇİN ============
--- Table Editor'da "player_overview"ı aç: her oyuncunun kullanıcı adı,
--- gmail'i, elması, en iyi skoru, kaç skini ve kaç peti olduğu tek
--- tabloda görünür.
-create or replace view player_overview as
-select
-  a.id,
-  a.username                            as kullanici_adi,
-  a.email                               as gmail,
-  a.provider                            as giris_yolu,
-  coalesce(d.gems, 0)                   as elmas,
-  coalesce(d.best_score, 0)             as en_iyi_skor,
-  coalesce(d.best_wave, 0)              as en_yuksek_dalga,
-  coalesce(d.total_kills, 0)            as toplam_oldurme,
-  coalesce(d.runs, 0)                   as kosu_sayisi,
-  coalesce(d.skin_count, 0)             as skin_sayisi,
-  coalesce(d.pet_count, 0)              as pet_sayisi,
-  d.data -> 'skins_owned'               as skinler,
-  d.data -> 'cosmetics_owned'           as kostumler,
-  to_timestamp(a.created_at)            as kayit_tarihi,
-  to_timestamp(d.updated_at)            as son_oyun
-from accounts a
-left join player_data d on d.account_id = a.id
-order by coalesce(d.best_score, 0) desc;
-
--- ============ 4) GÜVENLİK: bu iki tablo DIŞARIDAN okunamasın ============
-alter table accounts enable row level security;
-alter table sessions enable row level security;
--- (hiç policy eklemiyoruz = anon anahtarla kimse okuyamaz.
---  Sunucu service_role anahtarını kullandığı için RLS onu bağlamaz.)
-```
-
-4. "Success. No rows returned" yazmalı.
-5. Sol menüden **Table Editor**'a dön → artık `accounts`, `scores`, `sessions`
-   olmak üzere **3 tablo** görmelisin.
-
-> **ÖNEMLİ:** `accounts`, `sessions` ve `player_data` tablolarına ASLA
-> policy ekleme.
-> Şifre özetleri ve oturum jetonları orada duruyor; dışarıdan okunabilir
-> olmamalılar. Sunucu zaten service_role anahtarıyla bağlanıyor.
-
----
+> **ÖNEMLİ:** `accounts`, `sessions`, `player_data` ve `player_events`
+> tablolarına **ASLA policy ekleme**. Şifre özetleri ve oturum jetonları
+> orada; dışarıdan okunabilir olmamalılar. Sunucu service_role anahtarıyla
+> bağlandığı için RLS onu bağlamaz.
 
 ## ADIM 2 — Supabase service_role anahtarını al (1 dakika)
 
@@ -205,7 +125,24 @@ değiştir ve **Manual Deploy → Deploy latest commit** de.
 
 ## ADIM 6 — Çalışıyor mu? (1 dakika)
 
-Tarayıcıda şu adresi aç:
+Tarayıcıda **tanı adresini** aç — kurulumun tamamını tek bakışta söyler:
+
+```
+https://kasma-arena-server.onrender.com/diag
+```
+
+Görmen gereken:
+
+```json
+{"supabase": true, "google": true, "ok": true,
+ "yapilacak": ["her şey yerinde"]}
+```
+
+`ok: false` ise `yapilacak` listesi tam olarak neyin eksik olduğunu
+söyler (hangi tablo yok, hangi sütun eksik). `tables` bölümünde her
+tablonun durumu ayrı ayrı yazar.
+
+Giriş yollarını ayrıca görmek istersen:
 
 ```
 https://kasma-arena-server.onrender.com/auth/status
@@ -219,27 +156,59 @@ Görmen gereken:
 
 | Ne görüyorsun | Anlamı | Çözüm |
 |---|---|---|
-| `accounts: true, google: true` | **Her şey hazır** | — |
-| `accounts: true, google: false` | Supabase tamam, Google eksik | Adım 3–4'ü kontrol et |
-| `accounts: false` | Supabase bağlanamadı | `SUPABASE_URL` / `SUPABASE_KEY` yanlış |
+| `ok: true` | **Her şey hazır** | — |
+| `"'player_data' tablosunda eksik sütun: ..."` | SQL eksik çalışmış | `VERITABANI.sql`'i tekrar çalıştır |
+| `"'player_events' tablosu yok"` | eski kurulum | `VERITABANI.sql`'i çalıştır |
+| `supabase: false` | Supabase bağlanamadı | `SUPABASE_URL` / `SUPABASE_KEY` yanlış |
+| `google: false` | Google girişi kapalı (zorunlu değil) | Adım 3–4'ü kontrol et |
 | 404 / sayfa yok | Eski `server.py` yayında | Adım 5 |
 
 ---
 
 ## OYUNCULARA BAKMAK
 
-Supabase > **Table Editor** > sol listeden **player_overview**:
+Supabase > **Table Editor** > sol listede dört görünüm var.
 
-| kullanici_adi | gmail | elmas | en_iyi_skor | skin_sayisi | pet_sayisi | son_oyun |
+### `player_overview` — kim ne durumda
+| kullanici_adi | gmail | giris_yolu | elmas | en_iyi_skor | skin_sayisi | pet_sayisi |
 |---|---|---|---|---|---|---|
-| KASMACI | leon@gmail.com | 1.240 | 128.400 | 7 | 2 | 4 Eki 14:02 |
+| KASMACI | leon@gmail.com | Google | 1240 | 128400 | 3 | 1 |
 
-`skinler` ve `kostumler` sütunlarına tıklayınca hangi skinlere sahip
-olduğunu tek tek görürsün. Liste en iyi skora göre sıralı gelir.
+`skinler`, `kostumler_ve_petler`, `acilan_kitaplar`, `acilan_silahlar`
+sütunlarına tıklayınca tek tek görürsün. En iyi skora göre sıralı gelir.
 
-> Bu bir GÖRÜNÜM (view), tablo değil — içinde veri tutulmaz, her
-> açılışta `accounts` + `player_data`'dan hesaplanır. Silmesi veya
-> yeniden oluşturması zararsızdır.
+### `oyuncu_gecmisi` — saniyesine kadar ne oldu
+| zaman | kullanici_adi | ne_oldu | degisim | sonraki_toplam | aciklama |
+|---|---|---|---|---|---|
+| 2026-10-05 00:13:54 | KASMACI | KOŞU | 1 | 43 | en iyi skor 128400 |
+| 2026-10-05 00:12:30 | KASMACI | SKİN | 1 | 3 | gold |
+| 2026-10-05 00:11:40 | KASMACI | ELMAS | -260 | 860 | harcandı |
+| 2026-10-05 00:10:00 | KASMACI | ELMAS | +120 | 1120 | kazanıldı |
+
+Her elmas artışı, her harcama, her yeni skin ve her koşu buraya
+**zamanıyla** yazılıyor.
+
+### `dunya_siralamasi` — skorlar hesaplarıyla
+| sira | kullanici_adi | gmail | skor | dalga | hesapli |
+|---|---|---|---|---|---|
+| 1 | KASMACI | leon@gmail.com | 128400 | 17 | EVET |
+
+`hesapli` sütunu, skorun bir hesaba bağlı olup olmadığını gösterir.
+Yeni skorların hepsi EVET olmalı (girişsiz gönderim artık reddediliyor);
+HAYIR olanlar v3.20 öncesinden kalan eski kayıtlardır.
+
+### `oyuncu_detay('kullanıcıadı')` — tek oyuncunun her şeyi
+SQL Editor'da:
+
+```sql
+select * from oyuncu_detay('alperenbaba11');
+```
+
+Hesap bilgisi, ilerleme, sahip olduğu her skin ve kostüm, ve bütün
+geçmişi tek listede gelir.
+
+> Bunlar GÖRÜNÜM (view), tablo değil — içlerinde veri tutulmaz, her
+> açılışta hesaplanır. Silmek veya yeniden oluşturmak zararsızdır.
 
 ---
 
@@ -279,6 +248,16 @@ olduğunu tek tek görürsün. Liste en iyi skora göre sıralı gelir.
 **"Google doğrulaması başarısız"**
 → En sık sebep: OAuth istemcisini **Web application** olarak açmışsın.
 Sil, **Desktop app** olarak yeniden oluştur (Adım 3.4).
+
+**Giriş yaptım ama skor dünya sıralamasına düşmüyor**
+→ Önce `/diag`'a bak. Orası temizse sonuç ekranındaki kırmızı satırı oku:
+artık sebebi yazıyor ("önce kullanıcı adı seçmelisin", "giriş gerekli"...).
+Sunucuyu güncellemediysen bu satır boş kalır — `server.py`'yi yenile.
+
+**Elmasım / skinim veritabanında artmıyor**
+→ Oyunda ESC → ANA MENÜ → sağ üstteki hesap çipi → HESAP ekranı. En altta
+"ilerleme kaydedildi · 00:13:54" yazıyorsa her şey yolunda. Kırmızı bir
+hata yazıyorsa sebebi orada; genelde `VERITABANI.sql` çalıştırılmamıştır.
 
 **"column accounts.username does not exist"**
 → v3.20 SQL'i çalıştırmamışsın. ADIM 1'i tekrar çalıştır (var olanlara

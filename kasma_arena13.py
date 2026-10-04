@@ -1,6 +1,6 @@
 """
 =====================================================================
- KASMA ARENA  —  v3.20
+ KASMA ARENA  —  v3.21
  2D Top-Down Hayatta Kalma / Skor-Rekor Oyunu
  ---------------------------------------------------------------------
  Dalgalar halinde gelen düşmanlara karşı hayatta kal, nişan al, ateş et,
@@ -8,6 +8,31 @@
  patronları yen, rekorunu kır. Kaybedersen o koşuda aldıkların silinir.
  Elmasla kalıcı SKIN'ler al (her skinin kendi silahı, mermisi, efekti ve
  ÖZEL YETENEĞİ var).
+
+ v3.21 ile gelenler (HESAP HATALARI DÜZELTİLDİ):
+   * DÜNYA SIRALAMASI DÜZELDİ. Sunucu, oturumdan hesabı okurken sütunları
+     tek tek sayıyordu ve "username" o listede yoktu. Sonuç: oyun yeniden
+     açıldığında /auth/me kullanıcı adı olmayan bir hesap döndürüyor, oyun
+     "daha ad seçmemişsin" sanıp dünya sıralamasını KAPATIYORDU. Giriş
+     yapan herkes etkileniyordu. Artık bütün sütunlar okunuyor.
+   * İLERLEME ARTIK SESSİZCE KAYBOLMUYOR. /player/save hatası yutuluyordu;
+     veritabanında bir sütun eksik olsa bile oyuncu hiçbir şey görmüyordu.
+     Artık hata HESAP ekranında yazıyor ve son başarılı yazmanın saati
+     görünüyor.
+   * SKOR GÖNDERİMİ SEBEBİNİ SÖYLÜYOR. "başarısız" yerine sunucunun
+     söylediği sebep (giriş gerekli, ad seçilmemiş, imza tutmadı...) sonuç
+     ekranında yazıyor.
+   * ANINDA EŞİTLEME. Elmas/skin/pet değişince bir koşunun bitmesi
+     beklenmiyor: 1.5 saniye içinde hesaba yazılıyor (arka arkaya yapılan
+     değişiklikler tek yazmada toplanıyor).
+   * DİL DEĞİŞİNCE MENÜ DE DEĞİŞİYOR. OYNA / AYARLAR / DÜNYA SIRALAMASI
+     düğmelerinin yazısı kurulurken bir kez okunuyordu; artık dil
+     değiştiğinde yeniden kuruluyor.
+   * OLAY GÜNLÜĞÜ (player_events). Her elmas artışı, her harcama, her yeni
+     skin ve her koşu ZAMANIYLA kaydediliyor. Veritabanında dört görünüm:
+     player_overview, oyuncu_gecmisi, dunya_siralamasi, oyuncu_detay().
+   * /diag TANI ADRESİ. Tarayıcıda açınca hangi tablo/sütun eksik,
+     tek bakışta söylüyor.
 
  v3.20 ile gelenler (PERFORMANS, KULLANICI ADI, HESAP İLERLEMESİ):
    * PERFORMANS — tam ekranda kare süresi yarıya indi. Üç darboğaz vardı:
@@ -556,7 +581,7 @@ WEAPON_FX_DEFAULT = 100           # yeni oyuncunun başlangıç değeri (%)
 # Eski üç kademeli ayarın sayısal karşılıkları (kayıt göçü için).
 WEAPON_FX_LEGACY = {"full": 100, "dim": 32, "off": 0}
 GAME_TITLE = "ARENA SAVAŞI"
-GAME_VERSION = "3.20"
+GAME_VERSION = "3.21"
 
 
 # =====================================================================
@@ -884,6 +909,15 @@ STRINGS = {
     "ults.immortal_merc": _T("KURŞUN", "BULLETS", "BALAS", "KUGELN", "ПУЛИ"),
     "ult.pink_dream": _T("RÜYA PATLAMASI", "DREAM BURST", "ESTALLIDO ONÍRICO", "TRAUMSTOSS", "ВЗРЫВ ГРЁЗ"),
     "ults.pink_dream": _T("RÜYA", "DREAM", "SUEÑO", "TRAUM", "ГРЁЗА"),
+    "ui.sync_busy":   _T("ilerleme sunucuya yazılıyor...", "saving progress...",
+                         "guardando progreso...", "Fortschritt wird gespeichert...",
+                         "сохранение прогресса..."),
+    "ui.sync_ok":     _T("ilerleme kaydedildi · {0}", "progress saved · {0}",
+                         "progreso guardado · {0}", "Fortschritt gespeichert · {0}",
+                         "прогресс сохранён · {0}"),
+    "ui.sync_fail":   _T("İLERLEME SUNUCUYA YAZILAMADI", "PROGRESS COULD NOT BE SAVED",
+                         "NO SE PUDO GUARDAR EL PROGRESO", "FORTSCHRITT NICHT GESPEICHERT",
+                         "ПРОГРЕСС НЕ СОХРАНЁН"),
     "ui.sec_fmt":     _T("{0}sn", "{0}s", "{0}s", "{0}s", "{0}с"),
     "ui.per_sec":     _T("/sn", "/s", "/s", "/s", "/с"),
     "ui.ann_hell":    _T("CEHENNEM — DALGA {0}", "HELL — WAVE {0}", "INFIERNO — OLEADA {0}",
@@ -3201,6 +3235,23 @@ class SaveManager:
         else:
             self.data["gems_spent"] = int(self.data.get("gems_spent", 0)) - delta
 
+    # İLERLEME DEĞİŞTİ KANCASI
+    # ---------------------------------------------------------------
+    # Elmas, skin, pet gibi kalıcı bir şey değiştiğinde sunucuya haber
+    # verilir. Oyun bunu bir koşunun bitmesini beklemeden yapar; oyuncu
+    # markete girip skin aldığı anda veritabanında görünsün diye.
+    # AccountClient açılışta kendini buraya bağlar (bkz. AccountClient).
+    on_progress_change = None
+
+    def progress_changed(self):
+        self.save()
+        cb = SaveManager.on_progress_change
+        if cb is not None:
+            try:
+                cb()
+            except Exception:
+                pass          # eşitleme oyunun yoluna çıkmasın
+
     def can_spend(self):
         """Şaibeli kayıt elmas HARCAYAMAZ (satın alma / kuşanma kilitli)."""
         return not self.is_tainted()
@@ -3220,8 +3271,8 @@ class SaveManager:
             return False
         self.add_gems(-cost)
         self.data.setdefault("skins_owned", ["default"]).append(skin_id)
-        self.equip_skin(skin_id)
-        self.save()
+        self.data["equipped_skin"] = skin_id
+        self.progress_changed()
         return True
 
     def grant_skin(self, skin_id):
@@ -3229,12 +3280,12 @@ class SaveManager:
         owned = self.data.setdefault("skins_owned", ["default"])
         if skin_id not in owned:
             owned.append(skin_id)
-        self.save()
+        self.progress_changed()
         return True
 
     def equip_skin(self, skin_id):
         self.data["equipped_skin"] = skin_id
-        self.save()
+        self.progress_changed()
 
     def equipped_skin_id(self):
         sid = self.data.get("equipped_skin", "default")
@@ -3249,7 +3300,7 @@ class SaveManager:
             return False
         self.add_gems(-cost)
         self.data.setdefault("cosmetics_owned", []).append(cid)
-        self.save()
+        self.progress_changed()
         return True
 
     # ---- kitaplar ----
@@ -3871,7 +3922,7 @@ class AchievementManager:
         gems = int(ACH_BY_ID[ach_id].get("gems", 0) or 0)
         if gems:
             self.save.add_gems(gems)
-        self.save.save()
+        self.save.progress_changed()
         self.toasts.append([ach_id, 4.0])
         sfx("ach", 1.0, 0.0)
         self.steam.set_achievement(ach_id)
@@ -4020,6 +4071,13 @@ class AccountClient:
         self.ok_msg = ""
         self.google_ready = False
         self.client_id = ""
+        # --- ilerleme eşitlemesi ---
+        self.sync_error = ""        # son yazma hatası (hesap ekranında görünür)
+        self.sync_at = 0.0          # son BAŞARILI yazmanın zamanı
+        self.sync_busy = False
+        self._sync_pending = False
+        # Kalıcı bir şey değiştiğinde (elmas, skin, pet) sunucuya yaz.
+        SaveManager.on_progress_change = self._progress_changed
         self._lock = threading.Lock()
         if self.enabled:
             threading.Thread(target=self._boot, daemon=True).start()
@@ -4097,6 +4155,23 @@ class AccountClient:
         return a.get("username") or a.get("name") or ""
 
     # ---------- İLERLEME EŞİTLEME ----------
+    def _progress_changed(self):
+        """Kayıt değişti: kısa bir gecikmeyle sunucuya yaz.
+
+        Gecikme, arka arkaya yapılan değişikliklerin (market'te üç şey
+        almak gibi) TEK bir yazmada toplanması için. Yoksa her tıklamada
+        ayrı bir istek giderdi.
+        """
+        if not self.token or not self.logged_in() or self._sync_pending:
+            return
+        self._sync_pending = True
+
+        def later():
+            time.sleep(1.5)
+            self._sync_pending = False
+            self.push_progress()
+        threading.Thread(target=later, daemon=True).start()
+
     def pull_progress(self):
         """Hesabın sunucudaki ilerlemesini indirir ve uygular.
 
@@ -4109,16 +4184,30 @@ class AccountClient:
         try:
             res = self._post("/player/load", {"token": self.token,
                                               "device": device_id()}, timeout=15)
-        except Exception:
-            return          # ağ yoksa yereldeki kopya kullanılmaya devam eder
+        except Exception as e:
+            # Ağ yoksa yereldeki kopya kullanılmaya devam eder — ama sessiz
+            # kalmıyoruz, hesap ekranı durumu gösteriyor.
+            self.sync_error = self._err_text(e)
+            return
         if res.get("success") and isinstance(res.get("progress"), dict):
             self.save.import_progress(res["progress"])
+            self.sync_error = ""
+            self.sync_at = time.time()
+        else:
+            self.sync_error = str(res.get("error") or "ilerleme okunamadı")
 
-    def push_progress(self):
-        """İlerlemeyi hesaba yazar (koşu sonunda, arka planda)."""
+    def push_progress(self, reason=""):
+        """İlerlemeyi hesaba yazar. Arka planda, oyunu bekletmeden.
+
+        HATA SESSİZ KALMAZ. Eskiden buradaki istisna yutuluyordu; sunucuda
+        bir sütun eksik olsa bile oyuncu hiçbir şey görmüyor, "elmasım
+        veritabanında artmıyor" diye bakakalıyordu. Artık son hata
+        saklanıyor ve HESAP ekranında yazıyor.
+        """
         if not self.token or not self.logged_in():
             return
         prog = self.save.export_progress()
+        self.sync_busy = True
 
         def worker():
             try:
@@ -4128,8 +4217,14 @@ class AccountClient:
                 if res.get("success") and isinstance(res.get("progress"), dict):
                     # Sunucu düzelttiyse (örn. elmas sınırı) onunki geçerli.
                     self.save.import_progress(res["progress"])
-            except Exception:
-                pass        # sessiz: bir sonraki koşuda yeniden denenir
+                    self.sync_error = ""
+                    self.sync_at = time.time()
+                else:
+                    self.sync_error = str(res.get("error") or "bilinmeyen hata")
+            except Exception as e:
+                self.sync_error = self._err_text(e)
+            finally:
+                self.sync_busy = False
         threading.Thread(target=worker, daemon=True).start()
 
     # ---------- kullanıcı adı / şifre ----------
@@ -4313,19 +4408,32 @@ class OnlineClient:
         threading.Thread(target=self._submit_worker, args=(payload, on_done), daemon=True).start()
 
     def _submit_worker(self, payload, on_done):
-        ok = False
+        """Skoru gönderir. BAŞARISIZSA SEBEBİNİ DE DÖNDÜRÜR.
+
+        Eskiden yalnızca "başarısız" yazıyordu; oyuncu da geliştirici de
+        neden girmediğini bilemiyordu. Artık sunucunun söylediği sebep
+        (ör. "önce kullanıcı adı seçmelisin") sonuç ekranında görünüyor.
+        """
+        ok, why = False, ""
         try:
             body = json.dumps(payload).encode("utf-8")
             req = urllib.request.Request(
                 self.base_url + "/submit", data=body,
                 headers={"Content-Type": "application/json"}, method="POST")
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                resp.read()
-                ok = True
-        except Exception:
-            ok = False
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                res = json.loads(resp.read().decode("utf-8") or "{}")
+            ok = bool(res.get("success", True))
+            if not ok:
+                why = str(res.get("error", ""))
+        except urllib.error.HTTPError as e:
+            try:
+                why = str(json.loads(e.read().decode("utf-8")).get("error", "")) or str(e.reason)
+            except Exception:
+                why = str(e.reason)
+        except Exception as e:
+            why = str(e)
         if on_done:
-            on_done(ok)
+            on_done(ok, why)
 
 
 # =====================================================================
@@ -18393,7 +18501,7 @@ class RunState:
         # Toplam sayaçlara bağlı başarımları tara (Usta Avcı, Sülük, ...).
         if self.ach:
             self.ach.check_stats()
-        self.save.save()
+        self.save.progress_changed()
         self.gems_earned = gems
         sfx("gameover", 1.0, 0.0)
 
@@ -22425,8 +22533,9 @@ class App:
             self.online_block_text = blocked
             return
 
-        def on_done(ok):
+        def on_done(ok, why=""):
             self.online_submit_status = "gönderildi" if ok else "başarısız"
+            self.online_block_text = "" if ok else why
 
         if self.online.enabled:
             self.online_submit_status = "gönderiliyor"
@@ -22491,10 +22600,13 @@ class App:
         elif self.pending_board_rank >= 0:
             draw_text(canvas, L("ui.local_rank", self.pending_board_rank + 1), (panel_rect.centerx, y), 18, GOLD, bold=True, center=True)
             y += 24
-        if self.online_submit_status == "reddedildi":
+        if self.online_submit_status in ("reddedildi", "başarısız"):
             draw_text(canvas, L("ui.not_submitted"), (panel_rect.centerx, y), 14,
                       RED, bold=True, center=True)
             y += 19
+            # SEBEBİ YAZ. "başarısız" tek başına kimseye bir şey anlatmıyor;
+            # sunucunun söylediği sebep (giriş yok, ad seçilmemiş, imza...)
+            # burada görünüyor.
             for ln in wrap_text(getattr(self, "online_block_text", ""), 11,
                                 panel_rect.w - 80)[:2]:
                 draw_text(canvas, ln, (panel_rect.centerx, y), 11, (210, 140, 140),
@@ -22670,6 +22782,14 @@ class App:
             sfx("click", 0.6, 0.0)
 
     def update_menu(self, dt, mouse_pos, clicked):
+        # DİL DEĞİŞTİYSE DÜĞMELERİ YENİDEN KUR. Düğmelerin yazısı
+        # kurulurken BİR KEZ okunuyor; bu olmadan dil değişmesine rağmen
+        # OYNA / AYARLAR / DÜNYA SIRALAMASI eski dilde kalıyordu. Denetim
+        # ayarlar ekranında değil burada: menüye hangi yoldan gelinirse
+        # gelinsin çalışsın.
+        if getattr(self, "_menu_lang", None) != lang():
+            self._menu_lang = lang()
+            self.build_menu_buttons()
         self.bg.update(dt)
         canvas = self.display.canvas
         self.bg.draw(canvas)
@@ -22927,7 +23047,7 @@ class App:
             if ok and FAKE_PURCHASE:
                 # Yalnızca TEST kipinde elmas yerel olarak eklenir.
                 self.save.add_gems(gem_pack_total(pack))
-                self.save.save()
+                self.save.progress_changed()
             elif ok:
                 # Gerçek satın almada elmaslar SUNUCUDA yazılır; oyun yalnızca
                 # güncel değeri çeker (çift ekleme olmasın diye).
@@ -23468,7 +23588,7 @@ class App:
             self.login_fields["user"] = ""
 
         if acc.logged_in() and not acc.needs_username():
-            ph = 430
+            ph = 470
         elif acc.logged_in():
             ph = 400                       # kullanıcı adı seçme
         elif not acc.enabled:
@@ -23538,6 +23658,23 @@ class App:
             prov = a.get("provider", "password")
             draw_text(canvas, "Google" if prov == "google" else L("ui.username"),
                       (cx, pr.y + 264), 11, (150, 180, 230), center=True, shadow=False)
+            # ---- İLERLEME EŞİTLEMESİ ----
+            # Elmas/skin sunucuya yazılabiliyor mu? Sessiz kalmıyoruz:
+            # bir şey ters giderse oyuncu (ve geliştirici) burada görüyor.
+            sy = pr.y + 292
+            if acc.sync_busy:
+                draw_text(canvas, L("ui.sync_busy"), (cx, sy), 11, CYAN,
+                          center=True, shadow=False)
+            elif acc.sync_error:
+                draw_text(canvas, L("ui.sync_fail"), (cx, sy), 11, RED,
+                          bold=True, center=True, shadow=False)
+                for i, ln in enumerate(wrap_text(acc.sync_error, 10, pr.w - 60)[:2]):
+                    draw_text(canvas, ln, (cx, sy + 14 + i * 12), 10, (212, 150, 150),
+                              center=True, shadow=False)
+            elif acc.sync_at:
+                draw_text(canvas, L("ui.sync_ok", time.strftime(
+                    "%H:%M:%S", time.localtime(acc.sync_at))),
+                    (cx, sy), 11, GREEN, center=True, shadow=False)
             for b in (Button((cx - 150, pr.bottom - 118, 300, 44), L("ui.sign_out"),
                              self._login_logout, color=(130, 70, 70),
                              hover_color=(170, 95, 95), text_size=17),
