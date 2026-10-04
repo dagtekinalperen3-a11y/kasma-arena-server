@@ -192,8 +192,13 @@ def _account_by_session(tok, device=None):
         # yalnızca İKİSİ de doluyken eşitlik arıyoruz.
         if want and _clean_device(device) != want:
             return None
-    acc = supabase.table("accounts").select(
-        "id,email,name,provider,gems,created_at").eq(
+    # DİKKAT: sütunları TEK TEK saymıyoruz. Daha önce burada sabit bir
+    # liste vardı ve "username" o listede yoktu; sonucu şuydu: oyun yeniden
+    # açıldığında /auth/me kullanıcı adı olmayan bir hesap döndürüyor, oyun
+    # "daha ad seçmemişsin" sanıp DÜNYA SIRALAMASINI KAPATIYORDU. Yeni bir
+    # sütun eklendiğinde aynı hatanın tekrarlamaması için hepsini alıyoruz;
+    # şifre özeti zaten _public_account süzgecinden geçmeden dışarı çıkmıyor.
+    acc = supabase.table("accounts").select("*").eq(
         "id", sess["account_id"]).execute()
     return acc.data[0] if acc.data else None
 
@@ -292,6 +297,61 @@ def _find_or_create_account(email, name, provider, password_hash=None, google_su
         new["google_sub"] = google_sub
     res = supabase.table("accounts").insert(new).execute()
     return res.data[0], True
+
+
+@app.route("/diag", methods=["GET"])
+def diag():
+    """KURULUM DOĞRU MU? Tarayıcıda açılıp bakılacak tek adres.
+
+    Eksik bir tablo ya da sütun yüzünden ilerleme sessizce yazılamıyorsa
+    burada görünür. Hiçbir oyuncu verisi döndürmez — yalnızca "var / yok".
+    """
+    out = {"supabase": bool(supabase), "google": _google_enabled(),
+           "tables": {}, "ok": True, "yapilacak": []}
+    if not supabase:
+        out["ok"] = False
+        out["yapilacak"].append("SUPABASE_URL ve SUPABASE_KEY girilmemiş "
+                                "(service_role anahtarı olmalı)")
+        return jsonify(out)
+    # Her tablodan tek satır okumayı dene; hata metni eksik olanı söyler.
+    need = {
+        "accounts": ["id", "username", "email", "provider", "password_hash",
+                     "google_sub", "created_at"],
+        "sessions": ["token_hash", "account_id", "device_hash", "expires_at"],
+        "player_data": ["account_id", "gems", "gems_earned", "gems_spent",
+                        "best_score", "best_wave", "total_kills", "runs",
+                        "skin_count", "pet_count", "data", "updated_at"],
+        "player_events": ["account_id", "at", "kind", "delta", "total", "note"],
+        "scores": ["name", "score", "kills", "wave", "run_time", "created_at",
+                   "account_id"],
+    }
+    for tbl, cols in need.items():
+        info = {"var": False, "eksik_sutunlar": []}
+        try:
+            supabase.table(tbl).select("*").limit(1).execute()
+            info["var"] = True
+        except Exception as e:
+            info["hata"] = str(e)[:160]
+            out["ok"] = False
+            out["yapilacak"].append(f"'{tbl}' tablosu yok — VERITABANI.sql'i çalıştır")
+            out["tables"][tbl] = info
+            continue
+        for c in cols:
+            try:
+                supabase.table(tbl).select(c).limit(1).execute()
+            except Exception:
+                info["eksik_sutunlar"].append(c)
+        if info["eksik_sutunlar"]:
+            out["ok"] = False
+            out["yapilacak"].append(
+                f"'{tbl}' tablosunda eksik sütun: " + ", ".join(info["eksik_sutunlar"]))
+        out["tables"][tbl] = info
+    if not _google_enabled():
+        out["yapilacak"].append("Google girişi kapalı (GOOGLE_CLIENT_ID / "
+                                "GOOGLE_CLIENT_SECRET yok) — zorunlu değil")
+    if out["ok"] and not out["yapilacak"]:
+        out["yapilacak"].append("her şey yerinde")
+    return jsonify(out)
 
 
 @app.route("/auth/status", methods=["GET"])
@@ -603,6 +663,28 @@ def player_load():
     return jsonify({"success": True, "progress": _stored_progress(_player_row(acc["id"]))})
 
 
+def _log_event(account_id, kind, delta, total, note=""):
+    """Oyuncunun ilerlemesindeki her değişikliği ZAMANIYLA kaydeder.
+
+    Amaç: "bu oyuncu ne zaman kaç elmas kazandı, hangi skini ne zaman
+    aldı" sorularına saniyesi saniyesine cevap verebilmek
+    (bkz. player_events tablosu ve gem_history görünümü).
+
+    Günlük yazılamazsa oyun durmaz: kayıt asıl iş değil, iz bırakmaktır.
+    """
+    try:
+        supabase.table("player_events").insert({
+            "account_id": account_id,
+            "at": time.time(),
+            "kind": str(kind)[:16],
+            "delta": int(delta),
+            "total": int(total),
+            "note": str(note)[:120],
+        }).execute()
+    except Exception:
+        pass
+
+
 @app.route("/player/save", methods=["POST"])
 def player_save():
     """Oyundaki ilerlemeyi hesaba yazar (birleştirerek)."""
@@ -616,8 +698,10 @@ def player_save():
     if not isinstance(incoming, dict):
         return jsonify({"success": False, "error": "ilerleme verisi yok"}), 400
     row = _player_row(acc["id"])
-    merged = _merge_progress(_stored_progress(row), incoming)
+    before = _stored_progress(row)
+    merged = _merge_progress(before, incoming)
     st = merged.get("stats") or {}
+    st_before = before.get("stats") or {}
     payload = {
         "account_id": acc["id"],
         "gems": int(merged["gems"]),
@@ -636,11 +720,38 @@ def player_save():
                  if k not in ("gems", "gems_earned", "gems_spent")},
         "updated_at": time.time(),
     }
-    if row:
-        supabase.table("player_data").update(payload).eq(
-            "account_id", acc["id"]).execute()
-    else:
-        supabase.table("player_data").insert(payload).execute()
+    try:
+        if row:
+            supabase.table("player_data").update(payload).eq(
+                "account_id", acc["id"]).execute()
+        else:
+            supabase.table("player_data").insert(payload).execute()
+    except Exception as e:
+        # HATAYI YUTMUYORUZ. Eksik bir sütun yüzünden ilerleme sessizce
+        # yazılmazsa oyuncu "elmasım artmıyor" diye bakakalır; oyun bu
+        # metni hesap ekranında gösteriyor.
+        return jsonify({"success": False,
+                        "error": "ilerleme yazılamadı: " + str(e)[:200]}), 500
+
+    # ---- OLAY GÜNLÜĞÜ ----
+    d_gem = int(merged["gems_earned"]) - int(before.get("gems_earned", 0) or 0)
+    if d_gem:
+        _log_event(acc["id"], "gem", d_gem, merged["gems"], "kazanıldı")
+    d_spent = int(merged["gems_spent"]) - int(before.get("gems_spent", 0) or 0)
+    if d_spent:
+        _log_event(acc["id"], "gem", -d_spent, merged["gems"], "harcandı")
+    new_skins = [x for x in (merged.get("skins_owned") or [])
+                 if x not in (before.get("skins_owned") or [])]
+    for sk in new_skins[:20]:
+        _log_event(acc["id"], "skin", 1, len(merged.get("skins_owned") or []), sk)
+    new_cos = [x for x in (merged.get("cosmetics_owned") or [])
+               if x not in (before.get("cosmetics_owned") or [])]
+    for cs in new_cos[:20]:
+        _log_event(acc["id"], "kostum", 1, len(merged.get("cosmetics_owned") or []), cs)
+    d_runs = int(st.get("runs", 0) or 0) - int(st_before.get("runs", 0) or 0)
+    if d_runs > 0:
+        _log_event(acc["id"], "kosu", d_runs, int(st.get("runs", 0) or 0),
+                   "en iyi skor %d" % int(st.get("best_score", 0) or 0))
     return jsonify({"success": True, "progress": merged})
 
 
