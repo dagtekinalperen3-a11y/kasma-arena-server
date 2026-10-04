@@ -2000,14 +2000,57 @@ def glow_sprite(r, color, level):
     return s
 
 
+_glow_cache_a = {}
+
+
+def glow_sprite_alpha(r, color, level):
+    """SAYDAM yüzeye basılabilen parlama.
+
+    Normal parlama opak zemine TOPLAMALI basılır; saydam bir yüzeyde ise
+    alfa 0 kaldığı için hiç görünmez. Burada alfa da yarıçapla birlikte
+    sönüyor, böylece önbelleğe alınmış bir sprite'ın içindeki parlama,
+    sprite dünyaya basıldığında yumuşak bir hâle olarak çıkıyor.
+    """
+    key = (r, color, level)
+    s = _glow_cache_a.get(key)
+    if s is None:
+        if len(_glow_cache_a) > 900:
+            _glow_cache_a.clear()
+        s = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
+        steps = int(min(26, max(5, r // 2 + 3)))
+        k = level / 8.0
+        for i in range(steps):
+            f = i / (steps - 1)
+            rad = max(1, int(r * (1 - f * 0.94)))
+            inten = (f ** 2.3) * k
+            # DİKKAT: renk TAM parlaklıkta, sönümleme YALNIZCA alfada.
+            # Hem rengi hem alfayı sönümlersek katkı inten² olur ve hâle
+            # neredeyse kaybolur (toplamalı sürümde katkı inten'dir).
+            pygame.draw.circle(s, (color[0], color[1], color[2],
+                                   int(clamp(255 * inten, 0, 255))), (r, r), rad)
+        _glow_cache_a[key] = s
+    return s
+
+
+# Saydam bir ara yüzeye (simge / yaratık gövdesi önbelleği) çizerken açılır.
+_GLOW_ON_ALPHA = False
+
+
 def add_glow(surf, x, y, r, color, k=1.0):
-    """Toplamalı (additive) parlama. Yalnızca opak yüzeylere çizilir."""
+    """Parlama. Opak zeminde toplamalı, saydam yüzeyde alfalı."""
     level = int(clamp(k, 0.0, 1.0) * 8 + 0.5)
     if level <= 0:
         return
     r = max(2, int(r) // 2 * 2)
-    sp = glow_sprite(r, (int(color[0]), int(color[1]), int(color[2])), level)
-    surf.blit(sp, (int(x - r), int(y - r)), special_flags=pygame.BLEND_RGB_ADD)
+    c = (int(color[0]), int(color[1]), int(color[2]))
+    pos = (int(x - r), int(y - r))
+    if _GLOW_ON_ALPHA:
+        # Saydam yüzeyde NORMAL alfa karışımı kullanılır. Toplamalı karışım
+        # alfaya değil doğrudan RGB'ye eklediği için gövdeyi beyaza boğuyordu.
+        surf.blit(glow_sprite_alpha(r, c, level), pos)
+    else:
+        surf.blit(glow_sprite(r, c, level), pos,
+                  special_flags=pygame.BLEND_RGB_ADD)
 
 
 def disc_sprite(r, color, alpha):
@@ -11693,6 +11736,11 @@ class Enemy:
         self.walk = random.uniform(0, math.tau)
         # KÜKREME KİTABI: korkan düşman bir süre oyuncudan kaçar.
         self.fear_timer = 0.0
+        # --- gövde önbelleği (bkz. draw) ---
+        self._spr = None            # son çizilmiş gövde yüzeyi
+        self._spr_key = None        # o yüzeyin ait olduğu görünüş anahtarı
+        self._spr_pad = 0           # yüzeyin merkez kaydırması
+        self._blink = None          # önbelleğe çizerken sabitlenen göz kırpma
 
     def apply_poison(self, dps):
         self.poison_dps += dps
@@ -11954,11 +12002,9 @@ class Enemy:
         bu yüzden bütün düşman türleri bunu kullanır.
         """
         sx_, sy_ = -fy_, fx_
-        blink = 1.0
-        # ~4 saniyede bir kısa göz kırpma (her düşman farklı fazda)
-        ph = (t * 0.9 + self.wobble) % 4.0
-        if ph < 0.13:
-            blink = max(0.12, abs(ph - 0.065) / 0.065)
+        # Göz kırpma değeri gövde önbelleğinin anahtarına da giriyor; o yüzden
+        # tek bir yerden hesaplanıyor (bkz. _blink_at / draw).
+        blink = self._blink if self._blink is not None else self._blink_at(t)
         for i in range(n):
             off = 0.0 if n == 1 else (i - (n - 1) / 2.0) * spread * 2.0
             ex = x + fx_ * r * fwd + sx_ * r * off
@@ -12322,19 +12368,101 @@ class Enemy:
                    eye_col=(255, 240, 210), glow_col=(255, 120, 50), t=t)
         self._ember_trail(surf, x, y, r, t, 3)
 
+    # ---------------- ÇİZİM ----------------
+    # YARATIK GÖVDESİ ÖNBELLEĞİ
+    # -----------------------------------------------------------------
+    # Her yaratık 20-40 ayrı çizim çağrısıyla elle çiziliyor. Kalabalık bir
+    # dalgada ekranda 100'ü aşkın yaratık olunca bu, kare süresinin YARISINI
+    # tek başına götürüyordu (ölçüm: 110 yaratık = 5.9 ms).
+    #
+    # Çözüm: her yaratık kendi gövdesini küçük bir yüzeye bir kez çizip
+    # saklıyor ve görünüşü DEĞİŞENE KADAR o yüzeyi basıyor. Önbellek
+    # TÜRE değil ÖRNEĞE ait: böylece her yaratığın kendi rengi, kendi öfke
+    # derecesi, kendi salınım fazı aynen korunuyor — tek fark, görünüşün
+    # saniyede ~14 kez tazelenmesi.
+    #
+    # Anahtar değişince (yön döndü, yürüyüş fazı ilerledi, hasar aldı,
+    # göz kırptı...) sprite yeniden çiziliyor.
+    SPR_FACE_STEPS = 24          # yön kaç dilime bölünüyor
+    SPR_WALK_STEP = 0.26         # yürüyüş fazı adımı (radyan)
+    SPR_TIME_HZ = 14.0           # zamana bağlı titreşimlerin tazelenme hızı
+
+    def _blink_at(self, t):
+        """Göz kırpma katsayısı (1.0 = tam açık). ~4 saniyede bir, her
+        yaratık kendi fazında."""
+        ph = (t * 0.9 + self.wobble) % 4.0
+        if ph < 0.13:
+            return max(0.12, abs(ph - 0.065) / 0.065)
+        return 1.0
+
+    def _body_key(self, t, r, blink):
+        """Gövdenin görünüşünü belirleyen her şeyin özeti."""
+        ang = math.atan2(self.face_y, self.face_x)
+        return (
+            int(ang / math.tau * self.SPR_FACE_STEPS),
+            int(self.walk / self.SPR_WALK_STEP),
+            int(t * self.SPR_TIME_HZ),
+            int(r * 2),
+            self.hit_flash > 0,
+            int(blink * 6),
+            int(getattr(self, "red_intensity", 0.0) * 6),
+            int(getattr(self, "block_flash", 0.0) * 6),
+            getattr(self, "shoot_cd", 9.9) < 0.6,
+            self._guard_bucket(),
+        )
+
+    def _guard_bucket(self):
+        """SİPERCİ'nin kalkanı koruduğu sancaktardan DIŞA bakar; bu yön de
+        görünüşün bir parçası, o yüzden anahtara giriyor."""
+        g = self.guard_of
+        if g is None or not g.alive:
+            return -1
+        return int(math.atan2(self.y - g.y, self.x - g.x) / math.tau * 24)
+
     def draw(self, surf, t):
         scale = ease_out_cubic(self.spawn_t / 0.3) if self.spawn_t < 0.3 else 1.0
-        flash = self.hit_flash > 0
-        col = WHITE if flash else self.color
         r = self.radius * scale
         x, y = self.x, self.y
+        # Gölge hep canlı: zaten tek blit.
+        surf.blit(shadow_sprite(int(r * 2 + 6)), (int(x - r - 3), int(y + r - 3)))
+
+        if scale < 1.0:
+            # Doğuş animasyonu: boy her karede değişiyor, önbellek anlamsız.
+            self._blink = None
+            self._draw_body(surf, x, y, t, r)
+            return
+
+        blink = self._blink_at(t)
+        key = self._body_key(t, r, blink)
+        if self._spr is None or self._spr_key != key:
+            # Ölçüm: hiçbir şeklin çizimi r*2.1'i geçmiyor (en genişi
+            # WARDEN, r*1.9). Yüzey ne kadar küçükse blit o kadar ucuz.
+            pad = int(r * 2.2) + 6
+            spr = pygame.Surface((pad * 2, pad * 2), pygame.SRCALPHA)
+            global _GLOW_ON_ALPHA
+            _GLOW_ON_ALPHA = True
+            self._blink = blink
+            try:
+                self._draw_body(spr, pad, pad, t, r)
+            finally:
+                _GLOW_ON_ALPHA = False
+                self._blink = None
+            self._spr, self._spr_key, self._spr_pad = spr, key, pad
+        surf.blit(self._spr, (int(x) - self._spr_pad, int(y) - self._spr_pad))
+
+    # Gövde, her yaratığın KENDİ sprite'ında saklanıyor (bkz. draw).
+    # _draw_body yalnızca "şu noktaya şu anki görünüşü çiz" der; nereye
+    # çizdiğini bilmez, böylece hem dünyaya hem de önbellek yüzeyine
+    # aynı kod çizebiliyor.
+    def _draw_body(self, surf, x, y, t, r):
+        flash = self.hit_flash > 0
+        col = WHITE if flash else self.color
         fx_, fy_ = self.face_x, self.face_y
         sx_, sy_ = -fy_, fx_
         dark = scale_col(col, 0.58)
         lite = lighten(col, 0.34)
         # nefes alma: gövde hafifçe şişip iner
         breathe = 1.0 + math.sin(self.walk * 0.9) * 0.045
-        surf.blit(shadow_sprite(int(r * 2 + 6)), (int(x - r - 3), int(y + r - 3)))
 
         # CEHENNEM yaratıklarının kendi çizimleri var (bkz. HELL_SHAPES).
         hell_draw = HELL_SHAPES.get(self.shape)
@@ -17960,13 +18088,26 @@ class Background:
 # =====================================================================
 
 class Display:
+    """Oyun hep 1280x720'ye çizilir, sonra pencereye ölçeklenir.
+
+    ÖLÇEKLEME NEREDE YAPILIYOR — bu, kare süresinin en büyük tek kalemiydi:
+    eskiden her karede pygame.transform.smoothscale ile 1280x720 görüntü
+    CPU'da pencere boyutuna büyütülüyordu. 1080p tam ekranda bu TEK BAŞINA
+    8-14 ms, yani oyun ne kadar hızlı çizilirse çizilsin üst sınır ~60 FPS
+    oluyordu. (Gözle görülmeyen bir maliyet: ölçekleme oyun kodunda değil,
+    ekrana basma adımındaydı.)
+
+    Artık SDL'in kendi ölçekleyicisi (pygame.SCALED) kullanılıyor: büyütmeyi
+    ekran kartı yapıyor, CPU'nun işi yalnızca 1:1 bir kopya. Sürücü SCALED'i
+    kabul etmezse eski yola düşülüyor; orada da smoothscale yerine hızlı
+    ölçekleme kullanılıyor.
+    """
+
     def __init__(self, save):
         self.save = save
         self.fullscreen = bool(save.data.get("settings", {}).get("fullscreen", False))
-        if self.fullscreen:
-            self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-        else:
-            self.screen = pygame.display.set_mode((VIRTUAL_W, VIRTUAL_H), pygame.RESIZABLE)
+        self.scaled_mode = False
+        self.screen = self._make_screen()
         pygame.display.set_caption(f"{GAME_TITLE}  v{GAME_VERSION}")
         self.canvas = pygame.Surface((VIRTUAL_W, VIRTUAL_H)).convert()
         self.scale = 1.0
@@ -17974,7 +18115,31 @@ class Display:
         self.out_size = (VIRTUAL_W, VIRTUAL_H)
         self._compute_scale()
 
+    def _make_screen(self, size=None):
+        """Ekranı açar. Önce donanım ölçeklemeli (SCALED) kip denenir.
+
+        vsync KAPALI: oyuncu Ayarlar'dan FPS sınırını 60'ın üstüne
+        çıkarabilsin. vsync açık olsaydı sınır her hâlükârda ekranın
+        tazeleme hızı olurdu.
+        """
+        flags = pygame.FULLSCREEN if self.fullscreen else pygame.RESIZABLE
+        want = (0, 0) if self.fullscreen else (size or (VIRTUAL_W, VIRTUAL_H))
+        try:
+            sc = pygame.display.set_mode((VIRTUAL_W, VIRTUAL_H),
+                                         flags | pygame.SCALED)
+            self.scaled_mode = True
+            return sc
+        except Exception:
+            self.scaled_mode = False
+            return pygame.display.set_mode(want, flags)
+
     def _compute_scale(self):
+        if self.scaled_mode:
+            # SDL ölçekliyor: oyun için ekran tam olarak 1280x720.
+            self.scale = 1.0
+            self.offset = (0, 0)
+            self.out_size = (VIRTUAL_W, VIRTUAL_H)
+            return
         sw, sh = self.screen.get_size()
         sw, sh = max(sw, 1), max(sh, 1)
         scale = max(min(sw / VIRTUAL_W, sh / VIRTUAL_H), 0.1)
@@ -17986,10 +18151,7 @@ class Display:
     def toggle_fullscreen(self):
         self.fullscreen = not self.fullscreen
         try:
-            if self.fullscreen:
-                self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-            else:
-                self.screen = pygame.display.set_mode((VIRTUAL_W, VIRTUAL_H), pygame.RESIZABLE)
+            self.screen = self._make_screen()
         except Exception:
             self.fullscreen = not self.fullscreen
         # set_mode bazı sürücülerde imleci yeniden görünür yapıyor: gizle.
@@ -18002,7 +18164,10 @@ class Display:
         self._compute_scale()
 
     def handle_resize(self, size):
-        if not self.fullscreen:
+        # SCALED kipinde boyutlandırmayı SDL kendi hallediyor; set_mode'u
+        # yeniden çağırmak gereksiz (ve bazı sürücülerde pencereyi
+        # titretiyor).
+        if not self.fullscreen and not self.scaled_mode:
             try:
                 self.screen = pygame.display.set_mode(size, pygame.RESIZABLE)
             except Exception:
@@ -18013,13 +18178,19 @@ class Display:
         if abs(self.scale - 1.0) < 1e-3 and self.offset == (0, 0):
             self.screen.blit(self.canvas, (0, 0))
         else:
+            # Yedek yol (SCALED yok). smoothscale yerine HIZLI ölçekleme:
+            # yumuşatma, kare başına milisaniyelerce sürüyordu.
             self.screen.fill((0, 0, 0))
-            scaled = pygame.transform.smoothscale(self.canvas, self.out_size)
-            self.screen.blit(scaled, self.offset)
+            self.screen.blit(pygame.transform.scale(self.canvas, self.out_size),
+                             self.offset)
         pygame.display.flip()
 
     def virtual_mouse(self):
         mx, my = pygame.mouse.get_pos()
+        if self.scaled_mode:
+            # SCALED kipinde SDL fare konumunu zaten sanal çözünürlüğe
+            # çeviriyor.
+            return (float(mx), float(my))
         vx = (mx - self.offset[0]) / self.scale if self.scale else 0
         vy = (my - self.offset[1]) / self.scale if self.scale else 0
         return (vx, vy)
@@ -18994,21 +19165,14 @@ def draw_weapon_slots(surf, run, t):
         if ready:
             add_glow(surf, r.centerx, r.centery, cell * 0.95, col, 0.20 + 0.13 * pulse)
         pygame.draw.rect(surf, (17, 18, 29), r, border_radius=10)
-        tint = pygame.Surface(r.size, pygame.SRCALPHA)
-        pygame.draw.rect(tint, (*scale_col(col, 0.55), 46), tint.get_rect(), border_radius=10)
-        surf.blit(tint, r.topleft)
+        surf.blit(_slot_tint(r.size, scale_col(col, 0.55), 46), r.topleft)
 
         if frac > 0:
             fh = max(1, int(r.h * frac))
-            cs = pygame.Surface((r.w, fh), pygame.SRCALPHA)
-            pygame.draw.rect(cs, (6, 7, 14, 205), cs.get_rect())
-            pygame.draw.line(cs, (*lighten(col, 0.3), 150), (2, 0), (r.w - 2, 0), 2)
-            surf.blit(cs, (r.x, r.y + r.h - fh))
+            surf.blit(_slot_cool(r.w, fh, lighten(col, 0.3)), (r.x, r.y + r.h - fh))
         else:
-            gs = pygame.Surface(r.size, pygame.SRCALPHA)
-            pygame.draw.rect(gs, (*col, int(150 * (0.14 + 0.10 * pulse))), gs.get_rect(),
-                             border_radius=10)
-            surf.blit(gs, r.topleft)
+            surf.blit(_slot_tint(r.size, col, int(150 * (0.14 + 0.10 * pulse))),
+                      r.topleft)
 
         edge_col = col if ready else scale_col(col, 0.42)
         pygame.draw.rect(surf, edge_col, r, width=3 if (ready and pulse > 0.55) else 2,
@@ -19024,8 +19188,8 @@ def draw_weapon_slots(surf, run, t):
                              (icx + math.cos(a) * r0, icy + math.sin(a) * r0),
                              (icx + math.cos(a) * r1, icy + math.sin(a) * r1), 1)
         pygame.draw.circle(surf, (12, 13, 20), (int(icx), int(icy)), int(icon_r * 1.2))
-        draw_weapon_sigil(surf, icx, icy, icon_r, key,
-                          col if ready else scale_col(col, 0.55), t)
+        blit_sigil(surf, icx, icy, icon_r, key,
+                   col if ready else scale_col(col, 0.55))
 
         if frac > 0:
             txt = f"{remain:.1f}"
@@ -19045,6 +19209,40 @@ def draw_weapon_slots(surf, run, t):
                 (lighten(col, 0.25) if ready else (118, 124, 148)))
         draw_text(surf, name, (r.centerx, r.bottom + 3), 8, ncol, bold=True,
                   center=True, shadow=False)
+
+
+# Yuvanın yarı saydam katmanları her karede YENİDEN AYRILIYORDU: 8 silah
+# için kare başına 16 yüzey ayırma + doldurma. İkisi de yalnızca boyuta,
+# renge ve saydamlığa bağlı, o yüzden saklanıyorlar.
+_slot_layer_cache = {}
+
+
+def _slot_tint(size, col, alpha):
+    alpha = int(clamp(alpha, 0, 255)) // 6 * 6
+    ck = ("t", size, (int(col[0]), int(col[1]), int(col[2])), alpha)
+    sfc = _slot_layer_cache.get(ck)
+    if sfc is None:
+        if len(_slot_layer_cache) > 600:
+            _slot_layer_cache.clear()
+        sfc = pygame.Surface(size, pygame.SRCALPHA)
+        pygame.draw.rect(sfc, (int(col[0]), int(col[1]), int(col[2]), alpha),
+                         sfc.get_rect(), border_radius=10)
+        _slot_layer_cache[ck] = sfc
+    return sfc
+
+
+def _slot_cool(w, h, line_col):
+    ck = ("c", w, h, (int(line_col[0]), int(line_col[1]), int(line_col[2])))
+    sfc = _slot_layer_cache.get(ck)
+    if sfc is None:
+        if len(_slot_layer_cache) > 600:
+            _slot_layer_cache.clear()
+        sfc = pygame.Surface((w, h), pygame.SRCALPHA)
+        pygame.draw.rect(sfc, (6, 7, 14, 205), sfc.get_rect())
+        pygame.draw.line(sfc, (int(line_col[0]), int(line_col[1]), int(line_col[2]), 150),
+                         (2, 0), (w - 2, 0), 2)
+        _slot_layer_cache[ck] = sfc
+    return sfc
 
 
 def draw_book_slots(surf, run, t):
@@ -19732,6 +19930,46 @@ def draw_run(surf, run, t, aim_pos=None):
 # =====================================================================
 # SEVİYE ATLAMA KART SEÇİMİ
 # =====================================================================
+
+# ---- SİMGE ÖNBELLEĞİ (HUD) ----------------------------------------
+# Silah simgeleri elle çizilmiş vektör şekiller: her biri 20-60 çizim
+# çağrısı. HUD şeridinde 8 silah varsa bu KARE BAŞINA ~400 çağrı demek ve
+# ölçümde kare süresinin en büyük ikinci kalemiydi. Simge bir kez çizilip
+# saklanıyor; HUD artık tek blit yapıyor.
+#
+# Önbellekteki kopya ZAMANSIZ çizilir (t=0): HUD'daki 20 piksellik simgenin
+# kendi içindeki salınım zaten görünmüyordu. Market ve silahlık kartları
+# eskisi gibi draw_weapon_sigil'i canlı çağırmaya devam ediyor; orada simge
+# büyük ve az sayıda.
+_sigil_cache = {}
+
+
+def sigil_sprite(key, r, col):
+    r = max(4, int(r))
+    col = (int(col[0]), int(col[1]), int(col[2]))
+    ck = (key, r, col)
+    s = _sigil_cache.get(ck)
+    if s is None:
+        if len(_sigil_cache) > 320:
+            _sigil_cache.clear()
+        pad = int(r * 2.4) + 8
+        s = pygame.Surface((pad * 2, pad * 2), pygame.SRCALPHA)
+        global _GLOW_ON_ALPHA
+        _GLOW_ON_ALPHA = True
+        try:
+            draw_weapon_sigil(s, pad, pad, r, key, col, 0.0)
+        finally:
+            _GLOW_ON_ALPHA = False
+        _sigil_cache[ck] = s
+    return s
+
+
+def blit_sigil(surf, cx, cy, r, key, col):
+    """Önbellekten simge basar (HUD için)."""
+    s = sigil_sprite(key, r, col)
+    w = s.get_width() // 2
+    surf.blit(s, (int(cx) - w, int(cy) - w))
+
 
 def draw_weapon_sigil(surf, cx, cy, r, key, col, t=0.0):
     """Silaha ÖZEL, ELLE ÇİZİLMİŞ sembol.
