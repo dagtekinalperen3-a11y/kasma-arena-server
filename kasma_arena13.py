@@ -1,6 +1,6 @@
 """
 =====================================================================
- KASMA ARENA  —  v3.18
+ KASMA ARENA  —  v3.19
  2D Top-Down Hayatta Kalma / Skor-Rekor Oyunu
  ---------------------------------------------------------------------
  Dalgalar halinde gelen düşmanlara karşı hayatta kal, nişan al, ateş et,
@@ -8,6 +8,36 @@
  patronları yen, rekorunu kır. Kaybedersen o koşuda aldıkların silinir.
  Elmasla kalıcı SKIN'ler al (her skinin kendi silahı, mermisi, efekti ve
  ÖZEL YETENEĞİ var).
+
+ v3.19 ile gelenler (HESAP: GOOGLE GİRİŞİ + KAYIT):
+   * HESAP SİSTEMİ. Ana menünün sağ üstünde bir çip var: GİRİŞ YAP ya da
+     hesabın adı. Oradan açılan ekranda üç yol var:
+       - GOOGLE İLE GİRİŞ (tek tık; tarayıcı açılır, hesabını seçersin)
+       - e-posta + şifre ile KAYIT OL
+       - e-posta + şifre ile GİRİŞ YAP
+     Giriş ZORUNLU DEĞİL: hesapsız da tam sürüm oynanır. Hesabın tek işi,
+     dünya sıralamasındaki adın SENİN olması — sunucu skoru hesabın adıyla
+     yazar, istemciden gelen adla değil.
+   * GÜVENLİK, katman katman:
+       - Şifre sunucuda scrypt ile karılır; oyun şifreyi hiçbir yere
+         yazmaz, ekranda da nokta olarak gösterir.
+       - Google girişi OAuth 2.0 + PKCE ile yapılır. client secret YALNIZCA
+         sunucuda durur; .exe'nin içinde bulunacak bir sır yok. Yetkilendirme
+         kodu, onu isteyen makinedeki code_verifier olmadan işe yaramaz.
+       - Oturum jetonunun veritabanında yalnızca SHA-256 ÖZETİ durur.
+       - Jeton kayıt dosyasında DÜZ METİN DEĞİL, bu makineye bağlı sarılı
+         durur (seal_token), ve oturumun kendisi de sunucuda CİHAZ KİMLİĞİNE
+         bağlıdır: kayıt dosyası başkasına kopyalansa bile jeton orada
+         çalışmaz (bkz. device_id / _account_by_session).
+       - "Böyle bir e-posta yok" ile "şifre yanlış" AYNI hatayı döndürür:
+         hangi e-postaların kayıtlı olduğu dışarıdan öğrenilemez.
+       - Kaba kuvvete karşı kaynak başına deneme sınırı var.
+     Kurulum (Supabase tabloları, Google istemcisi, ortam değişkenleri):
+     README_ACCOUNTS.md.
+   * Ağ işleri HEP arka planda döner; sunucu kapalıyken ekran donmaz,
+     giriş ekranı "hesap sunucusu bağlı değil" der ve oyun normal çalışır.
+   * Girişliyken sıralamadaki ad hesabın adıdır; adını giriş ekranında
+     tıklayıp değiştirebilirsin.
 
  v3.18 ile gelenler (5 DİL, NİŞANGAH, DENGE):
    * BEŞ DİL: Türkçe, İngilizce, İspanyolca, Almanca, Rusça. Ayarların en
@@ -459,6 +489,10 @@ import urllib.error
 from array import array
 import hmac
 import hashlib
+import base64
+import http.server
+import webbrowser
+import urllib.parse
 
 # =====================================================================
 # ÇEVRİMİÇİ SUNUCU AYARI
@@ -487,7 +521,7 @@ WEAPON_FX_DEFAULT = 100           # yeni oyuncunun başlangıç değeri (%)
 # Eski üç kademeli ayarın sayısal karşılıkları (kayıt göçü için).
 WEAPON_FX_LEGACY = {"full": 100, "dim": 32, "off": 0}
 GAME_TITLE = "ARENA SAVAŞI"
-GAME_VERSION = "3.18"
+GAME_VERSION = "3.19"
 
 
 # =====================================================================
@@ -1115,6 +1149,76 @@ STRINGS = {
                         "POR PARTIDA: {0} libros normales (hasta Nv.{1})  +  {2} libro raro (no vuelve a salir).",
                         "PRO LAUF: {0} normale Bücher (bis St.{1})  +  {2} seltenes Buch (erscheint danach nie wieder).",
                         "ЗА ЗАБЕГ: {0} обычные книги (до Ур.{1})  +  {2} редкая книга (больше не выпадет)."),
+    # ---- hesap / giriş ----
+    "ui.account":      _T("HESAP", "ACCOUNT", "CUENTA", "KONTO", "АККАУНТ"),
+    "ui.sign_in":      _T("GİRİŞ YAP", "SIGN IN", "INICIAR SESIÓN", "ANMELDEN", "ВОЙТИ"),
+    "ui.sign_up":      _T("KAYIT OL", "SIGN UP", "REGISTRARSE", "REGISTRIEREN", "РЕГИСТРАЦИЯ"),
+    "ui.sign_out":     _T("ÇIKIŞ YAP", "SIGN OUT", "CERRAR SESIÓN", "ABMELDEN", "ВЫЙТИ"),
+    "ui.google_in":    _T("GOOGLE İLE GİRİŞ", "SIGN IN WITH GOOGLE", "ENTRAR CON GOOGLE", "MIT GOOGLE ANMELDEN", "ВОЙТИ ЧЕРЕЗ GOOGLE"),
+    "ui.email":        _T("E-POSTA", "EMAIL", "CORREO", "E-MAIL", "ПОЧТА"),
+    "ui.password":     _T("ŞİFRE", "PASSWORD", "CONTRASEÑA", "PASSWORT", "ПАРОЛЬ"),
+    "ui.nickname":     _T("GÖRÜNEN AD", "DISPLAY NAME", "NOMBRE VISIBLE", "ANZEIGENAME", "ИМЯ В ИГРЕ"),
+    "ui.have_account": _T("Hesabın var mı? GİRİŞ YAP", "Already have an account? SIGN IN", "¿Ya tienes cuenta? INICIAR SESIÓN", "Schon ein Konto? ANMELDEN", "Уже есть аккаунт? ВОЙТИ"),
+    "ui.no_account":   _T("Hesabın yok mu? KAYIT OL", "No account? SIGN UP", "¿Sin cuenta? REGÍSTRATE", "Kein Konto? REGISTRIEREN", "Нет аккаунта? РЕГИСТРАЦИЯ"),
+    "ui.acc_why":      _T("Giriş yapmak ZORUNLU DEĞİL — oyunu hesapsız da oynayabilirsin. Hesap yalnızca DÜNYA SIRALAMASINA girmek için gerekir.",
+                          "Signing in is OPTIONAL — you can play without an account. It is only needed for the WORLD RANKING.",
+                          "Iniciar sesión es OPCIONAL — puedes jugar sin cuenta. Solo hace falta para el RANKING MUNDIAL.",
+                          "Anmelden ist FREIWILLIG — du kannst ohne Konto spielen. Nur für die WELTRANGLISTE nötig.",
+                          "Вход НЕОБЯЗАТЕЛЕН — можно играть без аккаунта. Он нужен только для МИРОВОГО РЕЙТИНГА."),
+    "ui.acc_safe":     _T("Şifren oyunda hiç saklanmaz; sunucuda geri çevrilemez biçimde karılır.",
+                          "Your password is never stored in the game; the server keeps only an irreversible hash.",
+                          "Tu contraseña nunca se guarda en el juego; el servidor solo guarda un hash irreversible.",
+                          "Dein Passwort wird im Spiel nie gespeichert; der Server speichert nur einen Hash.",
+                          "Пароль не хранится в игре; на сервере только необратимый хеш."),
+    "ui.acc_welcome":  _T("Hoş geldin, {0}", "Welcome, {0}", "Bienvenido, {0}", "Willkommen, {0}", "Привет, {0}"),
+    "ui.acc_signed":   _T("GİRİŞ YAPILDI", "SIGNED IN", "SESIÓN INICIADA", "ANGEMELDET", "ВЫПОЛНЕН ВХОД"),
+    "ui.acc_guest":    _T("MİSAFİR", "GUEST", "INVITADO", "GAST", "ГОСТЬ"),
+    "ui.acc_off":      _T("Hesap sunucusu bağlı değil — oyun hesapsız çalışıyor.",
+                          "Account server not connected — the game runs without accounts.",
+                          "Servidor de cuentas no conectado — el juego funciona sin cuenta.",
+                          "Kontoserver nicht verbunden — das Spiel läuft ohne Konto.",
+                          "Сервер аккаунтов не подключён — игра работает без аккаунта."),
+    "ui.acc_google_off": _T("Google girişi bu sunucuda açık değil.", "Google sign-in is not enabled on this server.",
+                            "El acceso con Google no está activo.", "Google-Anmeldung ist hier nicht aktiv.",
+                            "Вход через Google на этом сервере отключён."),
+    "ui.acc_browser":  _T("Tarayıcı açıldı — Google hesabını seç.", "Browser opened — pick your Google account.",
+                          "Navegador abierto — elige tu cuenta de Google.", "Browser geöffnet — wähle dein Google-Konto.",
+                          "Браузер открыт — выбери аккаунт Google."),
+    "ui.acc_nobrowser": _T("Tarayıcı açılamadı.", "Could not open a browser.", "No se pudo abrir el navegador.",
+                           "Browser konnte nicht geöffnet werden.", "Не удалось открыть браузер."),
+    "ui.acc_checking": _T("Doğrulanıyor...", "Verifying...", "Verificando...", "Wird geprüft...", "Проверка..."),
+    "ui.acc_timeout":  _T("Süre doldu, tekrar dene.", "Timed out, try again.", "Tiempo agotado, inténtalo de nuevo.",
+                          "Zeit abgelaufen, versuch es erneut.", "Время вышло, попробуй снова."),
+    "ui.acc_cancel":   _T("Giriş iptal edildi.", "Sign-in cancelled.", "Inicio de sesión cancelado.",
+                          "Anmeldung abgebrochen.", "Вход отменён."),
+    "ui.acc_badstate": _T("Güvenlik denetimi geçilemedi, tekrar dene.", "Security check failed, try again.",
+                          "Falló la comprobación de seguridad.", "Sicherheitsprüfung fehlgeschlagen.",
+                          "Проверка безопасности не пройдена."),
+    "ui.acc_neterr":   _T("Sunucuya ulaşılamadı.", "Could not reach the server.", "No se pudo conectar al servidor.",
+                          "Server nicht erreichbar.", "Сервер недоступен."),
+    "ui.acc_name_ok":  _T("Ad güncellendi.", "Name updated.", "Nombre actualizado.", "Name aktualisiert.", "Имя обновлено."),
+    "ui.acc_working":  _T("Bekleniyor...", "Working...", "Procesando...", "Läuft...", "Ожидание..."),
+    "ui.acc_need":     _T("Giriş yaparsan sıralamadaki ad senin olur — kimse o adla skor gönderemez.",
+                          "Sign in and the ranking name is yours — nobody else can post under it.",
+                          "Inicia sesión y el nombre del ranking es tuyo — nadie más podrá usarlo.",
+                          "Melde dich an und der Ranglistenname gehört dir — niemand sonst kann ihn nutzen.",
+                          "Войдите — и имя в рейтинге станет вашим: никто другой им не воспользуется."),
+    "ui.acc_fill":     _T("E-posta ve şifre gerekli.", "Email and password are required.",
+                          "Correo y contraseña obligatorios.", "E-Mail und Passwort erforderlich.",
+                          "Нужны почта и пароль."),
+    "ui.tab_hint":     _T("TAB: sonraki kutu", "TAB: next field", "TAB: siguiente campo", "TAB: nächstes Feld", "TAB: следующее поле"),
+    "ui.acc_name_fixed": _T("Dünya sıralamasında hesap adın görünür: {0}",
+                            "The world ranking shows your account name: {0}",
+                            "El ranking mundial muestra tu nombre de cuenta: {0}",
+                            "In der Weltrangliste erscheint dein Kontoname: {0}",
+                            "В мировом рейтинге показывается имя аккаунта: {0}"),
+    "ui.save":         _T("KAYDET", "SAVE", "GUARDAR", "SPEICHERN", "СОХРАНИТЬ"),
+    "ui.cancel":       _T("VAZGEÇ", "CANCEL", "CANCELAR", "ABBRECHEN", "ОТМЕНА"),
+    "ui.acc_rename":   _T("adı değiştirmek için tıkla", "click to change your name",
+                          "haz clic para cambiar el nombre", "zum Ändern des Namens klicken",
+                          "нажмите, чтобы изменить имя"),
+    "ui.acc_as":       _T("sıralamaya gidecek ad", "name used in the ranking", "nombre para el ranking",
+                          "Name für die Rangliste", "имя для рейтинга"),
     "ui.weapons_sub": _T("Silahlar görevle açılır. Açtıkların seviye atlayınca karşına çıkar — bir koşuda en fazla {0} silah taşıyabilirsin.",
                          "Weapons unlock through tasks and appear on level up — you may carry {0} per run.",
                          "Las armas se abren con tareas y aparecen al subir de nivel — llevas {0} por partida.",
@@ -2436,6 +2540,56 @@ def _machine_salt():
         return b"anon@unknown"
 
 
+def device_id():
+    """BU BİLGİSAYARIN takma kimliği (hesap oturumunu makineye bağlar).
+
+    Gerçek kullanıcı adı / makine adı SUNUCUYA GİTMEZ: yalnızca bunların
+    geri çevrilemez özeti gider. Sunucu oturumu bu kimliğe bağlar; kayıt
+    dosyası çalınıp başka bilgisayara taşınsa bile jeton orada çalışmaz.
+    """
+    h = hashlib.sha256(b"kasma-device-v1|" + _machine_salt()).hexdigest()
+    return h[:32]
+
+
+def _token_box_key():
+    """Jetonu kayıt dosyasında açıkta tutmamak için kullanılan makine anahtarı."""
+    return hashlib.sha256(b"kasma-token-box-v1|" + _SAVE_SECRET + b"|"
+                          + _machine_salt()).digest()
+
+
+def seal_token(token):
+    """Oturum jetonunu bu makineye bağlı biçimde sarar (XOR + etiket).
+
+    Bu bir ŞİFRELEME VAADİ DEĞİL: anahtar aynı makinede yeniden üretilebilir.
+    İşi, kayıt dosyası e-postayla/Discord'dan paylaşıldığında jetonun düz
+    metin olarak oradan okunup başka yerde kullanılmasını engellemek. Asıl
+    koruma sunucuda: oturum CİHAZ KİMLİĞİNE bağlı (bkz. device_id).
+    """
+    if not token:
+        return ""
+    raw = token.encode("utf-8")
+    key = _token_box_key()
+    out = bytes(b ^ key[i % len(key)] for i, b in enumerate(raw))
+    return "v1:" + base64.urlsafe_b64encode(out).decode("ascii")
+
+
+def open_token(blob):
+    """seal_token'ın tersi. Başka makinede açılırsa anlamsız veri çıkar."""
+    if not blob:
+        return ""
+    if not blob.startswith("v1:"):
+        return ""          # eski/biçimsiz kayıt: jeton yok say, yeniden giriş istenir
+    try:
+        raw = base64.urlsafe_b64decode(blob[3:].encode("ascii"))
+    except Exception:
+        return ""
+    key = _token_box_key()
+    try:
+        return bytes(b ^ key[i % len(key)] for i, b in enumerate(raw)).decode("utf-8")
+    except UnicodeDecodeError:
+        return ""          # yanlış makine → çöz(ül)emedi
+
+
 def _canonical(data):
     """İmzalanacak metin: anahtarlar sıralı, imza alanları hariç."""
     clean = {k: v for k, v in data.items() if k not in ("_sig", "_sig_ver")}
@@ -3397,6 +3551,289 @@ class AchievementManager:
 # DÜNYA SIRALAMASI kaç kişi gösterir. Ekran tam bu sayıya göre kuruldu:
 # 3 kişilik podyum + 7 satır = 10. Değiştirirsen liste de birlikte uzar.
 WORLD_LB_SIZE = 10
+
+
+# =====================================================================
+# HESAP SİSTEMİ  (v3.19) — oyun tarafı
+# ---------------------------------------------------------------------
+# Oyun GİRİŞSİZ DE ÇALIŞIR. Hesap yalnızca dünya sıralamasına girmek için
+# gerekir; giriş yapmayan oyuncu her şeyi oynar, yalnızca skoru yerel kalır.
+#
+# GÜVENLİK — oyun tarafında neye dikkat edildi:
+#   * CLIENT SECRET OYUNDA YOK. Google akışında oyun yalnızca yetkilendirme
+#     KODUNU alır ve sunucuya yollar; kodu jetona çeviren taraf sunucudur.
+#     Oyun .exe'ye çevrilip içi okunsa bile gizli anahtar çıkmaz.
+#   * PKCE: oyun rastgele bir doğrulayıcı üretir, Google'a yalnızca SHA-256
+#     özetini gönderir. Kodu araya girip çalan biri doğrulayıcıyı bilmediği
+#     için kullanamaz.
+#   * state parametresi: Google'dan dönen yanıtın bizim başlattığımız
+#     istek olduğunu doğrular (CSRF).
+#   * Geri dönüş adresi 127.0.0.1 üzerinde RASTGELE bir porttur ve sunucu
+#     TEK bir istek alıp kapanır.
+#   * ŞİFRE OYUNDA HİÇ SAKLANMAZ. Yalnızca girilirken bellekte durur,
+#     HTTPS ile sunucuya gider ve orada scrypt ile karılır.
+#   * Kayıtta yalnızca OTURUM JETONU durur; şifre yazılmaz.
+# =====================================================================
+
+ACCOUNT_SCOPES = "openid email profile"
+GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+
+
+def _pkce_pair():
+    """PKCE doğrulayıcısı ve ondan türeyen özet."""
+    verifier = base64.urlsafe_b64encode(os.urandom(48)).decode().rstrip("=")
+    challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
+    return verifier, challenge
+
+
+class _OAuthCatcher(http.server.BaseHTTPRequestHandler):
+    """Google'ın geri dönüşünü yakalayan tek kullanımlık yerel sunucu."""
+
+    result = None
+
+    def do_GET(self):
+        q = urllib.parse.urlparse(self.path).query
+        params = dict(urllib.parse.parse_qsl(q))
+        _OAuthCatcher.result = params
+        ok = "code" in params
+        body = (ACCOUNT_RETURN_PAGE_OK if ok else ACCOUNT_RETURN_PAGE_FAIL).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *a):
+        pass        # konsolu kirletme
+
+
+ACCOUNT_RETURN_PAGE_OK = """<!doctype html><meta charset="utf-8">
+<title>Kasma Arena</title>
+<body style="background:#11131f;color:#e8eaf4;font:16px system-ui;text-align:center;padding:60px">
+<h2 style="color:#7ee0a0">Giris tamam</h2>
+<p>Bu sekmeyi kapatip oyuna donebilirsin.</p></body>"""
+
+ACCOUNT_RETURN_PAGE_FAIL = """<!doctype html><meta charset="utf-8">
+<title>Kasma Arena</title>
+<body style="background:#11131f;color:#e8eaf4;font:16px system-ui;text-align:center;padding:60px">
+<h2 style="color:#e85a64">Giris yapilamadi</h2>
+<p>Oyuna donup tekrar deneyebilirsin.</p></body>"""
+
+
+class AccountClient:
+    """Hesap işlemleri. Ağ işleri HEP ayrı bir iş parçacığında döner;
+    oyun döngüsü hiçbir zaman beklemez."""
+
+    def __init__(self, base_url, save):
+        self.base_url = (base_url or "").rstrip("/")
+        self.save = save
+        self.enabled = bool(self.base_url)
+        self.account = None          # {"name","email","provider","gems"}
+        # Jeton kayıtta MAKİNEYE BAĞLI sarılı durur; başka bilgisayarda
+        # açılmaz. Sunucu ayrıca oturumu cihaz kimliğine bağlar.
+        self.token = open_token(save.data.get("account_token") or "")
+        self.busy = False
+        self.status = ""             # ekranda görünen son durum metni
+        self.ok_msg = ""
+        self.google_ready = False
+        self.client_id = ""
+        self._lock = threading.Lock()
+        if self.enabled:
+            threading.Thread(target=self._boot, daemon=True).start()
+
+    # ---------- düşük seviye ----------
+    def _post(self, path, payload, timeout=20):
+        req = urllib.request.Request(
+            self.base_url + path,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read().decode("utf-8"))
+
+    def _err_text(self, e):
+        """Sunucunun hata gövdesini okunur bir cümleye çevirir."""
+        try:
+            if isinstance(e, urllib.error.HTTPError):
+                body = json.loads(e.read().decode("utf-8"))
+                return str(body.get("error") or body.get("message") or e.reason)
+        except Exception:
+            pass
+        return L("ui.acc_neterr")
+
+    def _boot(self):
+        """Açılışta: sunucu hangi giriş yollarını açmış, oturumum geçerli mi?"""
+        try:
+            with urllib.request.urlopen(self.base_url + "/auth/status", timeout=12) as r:
+                st = json.loads(r.read().decode("utf-8"))
+            self.google_ready = bool(st.get("google"))
+            self.client_id = st.get("client_id", "")
+            self.enabled = bool(st.get("accounts"))
+        except Exception:
+            self.enabled = False
+            return
+        if self.token:
+            try:
+                res = self._post("/auth/me", {"token": self.token,
+                                              "device": device_id()})
+                if res.get("success"):
+                    self.account = res["account"]
+                else:
+                    self._forget()
+            except Exception:
+                pass        # ağ yoksa jetonu silme: sonra yeniden denenir
+
+    # ---------- kayıt ----------
+    def _remember(self, token, account):
+        self.token = token
+        self.account = account
+        self.save.data["account_token"] = seal_token(token)
+        self.save.data["account_name"] = account.get("name", "")
+        self.save.save()
+
+    def _forget(self):
+        self.token = ""
+        self.account = None
+        self.save.data.pop("account_token", None)
+        self.save.save()
+
+    def logged_in(self):
+        return bool(self.account)
+
+    def display_name(self):
+        return (self.account or {}).get("name", "")
+
+    # ---------- e-posta / şifre ----------
+    def register(self, email, password, name):
+        self._run(lambda: self._auth_call("/auth/register", {
+            "email": email, "password": password, "name": name}))
+
+    def login(self, email, password):
+        self._run(lambda: self._auth_call("/auth/login", {
+            "email": email, "password": password}))
+
+    def _auth_call(self, path, payload):
+        # Oturum BU CİHAZA bağlanır: jeton kopyalanıp başka bilgisayarda
+        # kullanılamasın (sunucu da ayrıca denetler).
+        payload = dict(payload, device=device_id())
+        res = self._post(path, payload)
+        if res.get("success"):
+            self._remember(res["token"], res["account"])
+            self.ok_msg = L("ui.acc_welcome", res["account"].get("name", ""))
+            self.status = ""
+        else:
+            self.status = str(res.get("error", ""))
+
+    def _run(self, fn):
+        """İşi arka planda çalıştırır; ekran donmaz."""
+        if self.busy:
+            return
+        self.busy = True
+        self.status = ""
+        self.ok_msg = ""
+
+        def worker():
+            try:
+                fn()
+            except Exception as e:
+                self.status = self._err_text(e)
+            finally:
+                self.busy = False
+        threading.Thread(target=worker, daemon=True).start()
+
+    def logout(self):
+        tok = self.token
+        self._forget()
+        if tok:
+            def worker():
+                try:
+                    self._post("/auth/logout", {"token": tok}, timeout=8)
+                except Exception:
+                    pass
+            threading.Thread(target=worker, daemon=True).start()
+
+    def set_name(self, name):
+        def fn():
+            res = self._post("/auth/name", {"token": self.token, "name": name})
+            if res.get("success"):
+                self.account = res["account"]
+                self.save.data["account_name"] = self.account.get("name", "")
+                self.save.save()
+                self.ok_msg = L("ui.acc_name_ok")
+            else:
+                self.status = str(res.get("error", ""))
+        self._run(fn)
+
+    # ---------- Google ----------
+    def google_login(self):
+        """Tarayıcıda Google girişini açar ve geri dönüşü bekler.
+
+        Bütün akış ayrı bir iş parçacığında döner; oyuncu bu sırada oyunu
+        kullanmaya devam edebilir, ekranda "bekleniyor" yazar.
+        """
+        if not self.google_ready:
+            self.status = L("ui.acc_google_off")
+            return
+        self._run(self._google_worker)
+
+    def _google_worker(self):
+        verifier, challenge = _pkce_pair()
+        state = base64.urlsafe_b64encode(os.urandom(18)).decode().rstrip("=")
+        # RFC 8252: masaüstü uygulaması için 127.0.0.1 üzerinde rastgele port.
+        srv = http.server.HTTPServer(("127.0.0.1", 0), _OAuthCatcher)
+        srv.timeout = 1
+        port = srv.server_address[1]
+        redirect_uri = f"http://127.0.0.1:{port}"
+        params = {
+            "client_id": self.client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": ACCOUNT_SCOPES,
+            "code_challenge": challenge,
+            "code_challenge_method": "S256",
+            "state": state,
+            "access_type": "offline",
+            "prompt": "select_account",
+        }
+        url = GOOGLE_AUTH_URL + "?" + urllib.parse.urlencode(params)
+        _OAuthCatcher.result = None
+        self.status = L("ui.acc_browser")
+        try:
+            webbrowser.open(url)
+        except Exception:
+            self.status = L("ui.acc_nobrowser")
+            srv.server_close()
+            return
+        # En çok 3 dakika bekle; oyuncu vazgeçerse sessizce kapanır.
+        deadline = time.time() + 180
+        while time.time() < deadline and _OAuthCatcher.result is None:
+            try:
+                srv.handle_request()
+            except Exception:
+                break
+        srv.server_close()
+        res = _OAuthCatcher.result
+        _OAuthCatcher.result = None
+        if not res:
+            self.status = L("ui.acc_timeout")
+            return
+        if res.get("state") != state:
+            # Beklediğimiz istek değil: başlatmadığımız bir giriş denemesi.
+            self.status = L("ui.acc_badstate")
+            return
+        if "code" not in res:
+            self.status = L("ui.acc_cancel")
+            return
+        self.status = L("ui.acc_checking")
+        out = self._post("/auth/google", {
+            "code": res["code"], "code_verifier": verifier,
+            "redirect_uri": redirect_uri, "device": device_id()})
+        if out.get("success"):
+            self._remember(out["token"], out["account"])
+            self.ok_msg = L("ui.acc_welcome", out["account"].get("name", ""))
+            self.status = ""
+        else:
+            self.status = str(out.get("error", ""))
 
 
 class OnlineClient:
@@ -20457,6 +20894,7 @@ STATE_HOW_TO = "howto"
 STATE_SETTINGS = "settings"
 STATE_ACHIEVEMENTS = "achievements"
 STATE_GEM_STORE = "gem_store"
+STATE_LOGIN = "login"
 
 DIFF_ORDER = ["normal", "hard", "nightmare"]
 DIFF_LABEL = {"normal": "NORMAL", "hard": "ZOR", "nightmare": "KABUS"}
@@ -20635,6 +21073,12 @@ class App:
         # L ile açılan sol alt sohbet/komut kutusu (hile kodu da buradan).
         self.chat = ChatConsole()
         self.online = OnlineClient(ONLINE_API_URL)
+        # ---- HESAP ----
+        self.account = AccountClient(ONLINE_API_URL, self.save)
+        self.login_mode = "in"        # "in" = giriş, "up" = kayıt
+        self.login_fields = {"email": "", "password": "", "name": ""}
+        self.login_focus = "email"    # odaklı kutu
+        self.login_caret = 0.0
         self.running = True
         self.name_input = self.save.data.get("settings", {}).get("player_name", "")
         self.pending_board_rank = -1
@@ -20785,10 +21229,11 @@ class App:
     def _chat_can_open(self):
         """Sohbet kutusu bu ekranda açılabilir mi?
 
-        İSİM GİRİŞİ ekranı hariç her yerde açılır: orada klavye zaten isim
-        kutusuna gidiyor, iki metin kutusu aynı tuşları paylaşamaz.
+        İSİM GİRİŞİ ve HESAP ekranı hariç her yerde açılır: orada klavye
+        zaten bir metin kutusuna gidiyor, iki kutu aynı tuşları paylaşamaz.
+        (Yoksa e-postaya "l" yazarken sohbet kutusu açılırdı.)
         """
-        return self.state != STATE_NAME_ENTRY
+        return self.state not in (STATE_NAME_ENTRY, STATE_LOGIN)
 
     def _chat_submit(self, line):
         """Sohbet kutusuna yazılan satırı işler.
@@ -20897,6 +21342,8 @@ class App:
                         self.state = STATE_RUN_SHOP
                     elif event.key == pygame.K_b and self.state == STATE_RUN_SHOP:
                         self.state = STATE_PLAY
+                    elif self.state == STATE_LOGIN:
+                        self.handle_login_key(event)
                     elif self.state == STATE_NAME_ENTRY:
                         self.handle_name_entry_key(event)
                 elif event.type == pygame.MOUSEBUTTONDOWN:
@@ -20945,6 +21392,7 @@ class App:
             elif self.state == STATE_SETTINGS: self.update_settings(dt, mouse_pos, clicked)
             elif self.state == STATE_ACHIEVEMENTS: self.update_achievements(dt, mouse_pos, clicked, wheel_y)
             elif self.state == STATE_GEM_STORE: self.update_gem_store(dt, mouse_pos, clicked)
+            elif self.state == STATE_LOGIN: self.update_login(dt, mouse_pos, clicked)
 
             # Sohbet en üstte durur: hangi ekranda olursak olalım aynı yerde,
             # sol altta görünsün.
@@ -20988,7 +21436,8 @@ class App:
         elif self.state in (STATE_SKIN_MARKET, STATE_COSMETIC_MARKET, STATE_BOOK_MARKET,
                             STATE_WEAPON_CODEX,
                             STATE_LEADERBOARD, STATE_WORLD_LB, STATE_GEM_STORE,
-                            STATE_HOW_TO, STATE_ACHIEVEMENTS, STATE_SETTINGS):
+                            STATE_HOW_TO, STATE_ACHIEVEMENTS, STATE_SETTINGS,
+                            STATE_LOGIN):
             self.state = STATE_MENU
         elif self.state == STATE_GAMEOVER:
             pass
@@ -21061,6 +21510,11 @@ class App:
             # Doğrulanamayan koşu YEREL tabloya da yazılmaz: isim ekranı hiç
             # açılmaz, oyuncu doğrudan sonuç ekranına gider.
             if self.run.run_is_clean() and self.save.qualifies_for_board(self.run.score):
+                # Girişliyse isim kutusu hesabın adıyla gelir: dünya
+                # sıralamasında zaten o ad görünecek, iki farklı ad yazıp
+                # kafa karıştırmasın.
+                if self.account.logged_in():
+                    self.name_input = self.account.display_name()
                 self.state = STATE_NAME_ENTRY
             else:
                 self._maybe_submit_online()
@@ -21292,7 +21746,11 @@ class App:
         if self.run.submitted_online:
             return
         self.run.submitted_online = True
-        name = self.name_input.strip() or "İsimsiz"
+        # Giriş yapılmışsa sıralamada HESABIN adı görünür (sunucu da zaten
+        # istemciden geleni değil hesaptaki adı yazar). Giriş yapmayan da
+        # oynar; adı kendi yazdığıdır.
+        name = (self.account.display_name() if self.account.logged_in()
+                else self.name_input.strip()) or "İsimsiz"
 
         # ---- HİLE KAPISI ----
         # Şaibeli kayıt ya da doğrulanamayan koşu dünya sıralamasına ASLA
@@ -21324,6 +21782,12 @@ class App:
         # Gönderiye imza eklenir: sunucu imzasız/yanlış imzalı istekleri
         # reddeder, böylece sıralamaya elle curl atılamaz (bkz. server.py).
         payload["sig"] = sign_submit(payload)
+        # Oturum jetonu İMZADAN SONRA eklenir: imza yalnızca skor alanlarını
+        # kapsar (bkz. sign_submit / server._expected_sig). Jeton varsa sunucu
+        # skoru hesaba bağlar.
+        if self.account.token:
+            payload["token"] = self.account.token
+            payload["device"] = device_id()
         self.online.submit_score_async(payload, on_done=on_done)
 
     def update_gameover(self, dt, mouse_pos, clicked):
@@ -21441,6 +21905,10 @@ class App:
         draw_text(canvas, L("ui.new_record"), (panel_rect.centerx, panel_rect.y + 40), 32, GOLD, bold=True, center=True)
         draw_text(canvas, L("ui.score_is", fmt_num(self.run.score)), (panel_rect.centerx, panel_rect.y + 78), 20, TEXT, center=True)
         draw_text(canvas, L("ui.enter_name"), (panel_rect.centerx, panel_rect.y + 120), 16, TEXT_DIM, center=True)
+        if self.account.logged_in():
+            draw_text(canvas, L("ui.acc_name_fixed", self.account.display_name()),
+                      (panel_rect.centerx, panel_rect.y + 190), 11, (150, 185, 150),
+                      center=True, shadow=False)
         box = pygame.Rect(0, 0, 320, 46)
         box.center = (panel_rect.centerx, panel_rect.y + 156)
         pygame.draw.rect(canvas, (12, 13, 22), box, border_radius=8)
@@ -21606,8 +22074,57 @@ class App:
             draw_text(canvas, self.save.taint_text(), (wr.x + 40, wr.y + 25), 10,
                       (212, 158, 158), shadow=False)
 
+        # ---- sağ üst: HESAP ÇİPİ ----
+        self.draw_account_chip(canvas, dt, mouse_pos, clicked)
+
         # ---- alt şerit: sağda MAĞAZA kartı ----
         self.draw_gem_store_card(canvas, dt, mouse_pos, clicked)
+
+    # ---------------- HESAP ÇİPİ (ana menü, sağ üst) ----------------
+    def draw_account_chip(self, canvas, dt, mouse_pos, clicked):
+        """Sağ üstte küçük bir çip: girişliyse adı, değilse GİRİŞ YAP.
+
+        Hesap oyunun ÖNÜNE geçmesin: giriş zorunlu değil, çip de köşede
+        duruyor. Tek işi DÜNYA SIRALAMASI'na skorun kimin adına gideceğini
+        göstermek.
+        """
+        acc = self.account
+        if not acc.enabled:
+            return
+        inn = acc.logged_in()
+        label = acc.display_name() if inn else L("ui.sign_in")
+        w = max(150, int(text_width(label, 14, True)) + 62)
+        rect = pygame.Rect(VIRTUAL_W - 20 - w, 18, w, 40)
+        hover = rect.collidepoint(mouse_pos)
+        accent = GREEN if inn else CYAN
+        panel(canvas, rect, bg=(24, 32, 44) if hover else (17, 21, 31),
+              edge=accent if hover else (62, 70, 100), alpha=236, radius=20, edge_w=2)
+        ax = rect.x + 24
+        circle_aa(canvas, ax, rect.centery, 13, (30, 34, 50))
+        ring_aa(canvas, ax, rect.centery, 13, accent, 2)
+        if inn:
+            draw_text(canvas, label[:1].upper(), (ax, rect.centery), 14, accent,
+                      bold=True, center=True, shadow=False)
+        else:
+            # küçük insan silueti
+            circle_aa(canvas, ax, rect.centery - 4, 4, accent)
+            pygame.draw.arc(canvas, accent,
+                            pygame.Rect(ax - 7, rect.centery - 2, 14, 14),
+                            math.pi * 0.08, math.pi * 0.92, 2)
+        draw_text(canvas, label, (rect.x + 44, rect.centery - 8), 14,
+                  TEXT if inn else accent, bold=True, shadow=False)
+        if acc.busy:
+            a = self.t * 5.0
+            for i in range(3):
+                circle_aa(canvas, rect.right - 26 + i * 7, rect.centery,
+                          2.0 + 1.2 * max(0.0, math.sin(a - i * 0.7)), accent)
+        if clicked and hover:
+            sfx("click", 0.6, 0.0)
+            if self.login_mode == "name":
+                self.login_mode = "in"      # ad düzenleme kipi açık kalmasın
+            self.login_focus = self._login_field_order()[0]
+            acc.status = ""
+            self.goto(STATE_LOGIN)
 
     # Ana menünün alt şeridindeki KARE kart (sağ altta MAĞAZA). Boyut, üstteki
     # menü sütunlarına değmeyecek şekilde seçildi (sütunlar 514'te bitiyor).
@@ -22133,6 +22650,310 @@ class App:
                           center=True, shadow=False)
 
     # ---------------- NASIL OYNANIR + AYARLAR ----------------
+    # ---------------- GİRİŞ / KAYIT EKRANI ----------------
+    # Oyun girişsiz de çalışır; bu ekran yalnızca DÜNYA SIRALAMASI için.
+    LOGIN_FIELDS_IN = ("email", "password")
+    LOGIN_FIELDS_UP = ("name", "email", "password")
+
+    def _login_field_order(self):
+        if self.login_mode == "up":
+            return self.LOGIN_FIELDS_UP
+        if self.login_mode == "name":
+            return ("name",)
+        return self.LOGIN_FIELDS_IN
+
+    def handle_login_key(self, event):
+        """Giriş ekranındaki metin kutularının klavyesi.
+
+        ŞİFRE yalnızca bellekte durur ve ekranda nokta olarak görünür;
+        hiçbir yere yazılmaz.
+        """
+        order = self._login_field_order()
+        if event.key == pygame.K_TAB:
+            i = order.index(self.login_focus) if self.login_focus in order else 0
+            self.login_focus = order[(i + 1) % len(order)]
+            return
+        if event.key == pygame.K_RETURN:
+            self._login_submit()
+            return
+        if event.key == pygame.K_BACKSPACE:
+            self.login_fields[self.login_focus] = self.login_fields[self.login_focus][:-1]
+            return
+        ch = event.unicode
+        if not ch or not ch.isprintable():
+            return
+        limit = {"email": 96, "password": 64, "name": 14}[self.login_focus]
+        if len(self.login_fields[self.login_focus]) < limit:
+            self.login_fields[self.login_focus] += ch
+
+    def _login_submit(self):
+        if self.login_mode == "name":
+            self._login_save_name()
+            return
+        f = self.login_fields
+        if not f["email"].strip() or not f["password"]:
+            self.account.status = L("ui.acc_fill")
+            return
+        if self.login_mode == "up":
+            self.account.register(f["email"].strip(), f["password"], f["name"].strip())
+        else:
+            self.account.login(f["email"].strip(), f["password"])
+        # Şifre ekranda da bellekte de gereğinden uzun durmasın.
+        f["password"] = ""
+
+    def _login_save_name(self):
+        nm = self.login_fields["name"].strip()
+        if not nm:
+            self.account.status = L("ui.acc_fill")
+            return
+        self.account.set_name(nm)
+        self.login_mode = "in"
+
+    def _login_logout(self):
+        """Çıkışta yazılanlar da gitsin: başkası bilgisayara geçtiğinde
+        kutularda eski kullanıcının e-postası durmasın."""
+        self.account.logout()
+        self.login_mode = "in"
+        for k in self.login_fields:
+            self.login_fields[k] = ""
+        self.login_focus = "email"
+
+    def _login_box(self, canvas, rect, label, key, mouse_pos, clicked, secret=False):
+        """Tek bir metin kutusu. Tıklanınca odak ona geçer."""
+        focused = self.login_focus == key
+        hov = rect.collidepoint(mouse_pos)
+        panel(canvas, rect, bg=(26, 30, 48) if (focused or hov) else (19, 21, 34),
+              edge=CYAN if focused else PANEL_EDGE, alpha=242, radius=9, edge_w=2)
+        draw_text(canvas, label, (rect.x + 14, rect.y + 6), 10, TEXT_DIM, shadow=False)
+        val = self.login_fields[key]
+        shown = ("•" * len(val)) if secret else val
+        # Uzun metin kutudan taşmasın: sondan göster (yazdığın yeri görürsün).
+        while shown and text_width(shown, 15) > rect.w - 28:
+            shown = shown[1:]
+        draw_text(canvas, shown, (rect.x + 14, rect.y + 22), 15, TEXT, shadow=False)
+        if focused and (self.login_caret % 1.0) < 0.55:
+            cx = rect.x + 14 + text_width(shown, 15)
+            pygame.draw.line(canvas, CYAN, (cx + 1, rect.y + 22), (cx + 1, rect.y + 38), 2)
+        if clicked and hov:
+            self.login_focus = key
+            sfx("click", 0.5, 0.0)
+
+    def update_login(self, dt, mouse_pos, clicked):
+        canvas = self.display.canvas
+        self.bg.update(dt)
+        self.bg.draw(canvas)
+        self.login_caret += dt
+        acc = self.account
+
+        # Panel boyu İÇERİĞE göre: formda bir kutu fazla olduğu için kayıt
+        # kipinde uzar. Sabit yükseklik bırakmak panelin ortasında kocaman
+        # bir boşluk doğuruyordu.
+        if acc.logged_in():
+            ph = 430
+        elif not acc.enabled:
+            ph = 300
+        else:
+            ph = 556 if self.login_mode == "up" else 500
+        pr = pygame.Rect(0, 0, 560, ph)
+        pr.center = (VIRTUAL_W / 2, VIRTUAL_H / 2)
+        panel(canvas, pr, bg=(16, 18, 30), edge=(74, 84, 126), alpha=245, radius=18, edge_w=2)
+        cx = pr.centerx
+
+        draw_text(canvas, L("ui.account"), (cx, pr.y + 22), 30, GOLD, bold=True, center=True)
+        tw_ = text_width(L("ui.account"), 30, True)
+        for sgn in (-1, 1):
+            x0 = cx + sgn * (tw_ / 2 + 16)
+            taper_line(canvas, [(x0, pr.y + 42), (x0 + sgn * 110, pr.y + 42)], 2.4, 0.4,
+                       scale_col(GOLD, 0.6))
+
+        # ---- zaten girişliyse: özet + çıkış ----
+        if acc.logged_in():
+            a = acc.account
+            draw_text(canvas, L("ui.acc_signed"), (cx, pr.y + 70), 14, GREEN,
+                      bold=True, center=True, shadow=False)
+            cc = (cx, pr.y + 132)
+            add_glow(canvas, cc[0], cc[1], 58, GOLD, 0.22)
+            circle_aa(canvas, cc[0], cc[1], 34, (24, 26, 40))
+            ring_aa(canvas, cc[0], cc[1], 34, GOLD, 2)
+            initial = (a.get("name") or "?")[:1].upper()
+            draw_text(canvas, initial, cc, 32, GOLD, bold=True, center=True)
+            if self.login_mode == "name":
+                # AD DEĞİŞTİRME: sıralamada görünen ad buradan değişir.
+                # E-posta ve şifre DEĞİŞMEZ; hesabın kimliği onlar.
+                self._login_box(canvas, pygame.Rect(cx - 160, pr.y + 178, 320, 46),
+                                L("ui.nickname"), "name", mouse_pos, clicked)
+                self.login_focus = "name"
+                nb = Button((cx - 160, pr.y + 234, 155, 38), L("ui.save"),
+                            self._login_save_name, color=(60, 130, 90),
+                            hover_color=(80, 170, 115), text_size=15,
+                            enabled=not acc.busy)
+                cb = Button((cx + 5, pr.y + 234, 155, 38), L("ui.cancel"),
+                            lambda: setattr(self, "login_mode", "in"), text_size=15)
+                for b in (nb, cb):
+                    b.update(mouse_pos, dt)
+                    b.draw(canvas)
+                    if clicked:
+                        b.click(mouse_pos)
+            else:
+                nr = pygame.Rect(cx - 160, pr.y + 176, 320, 34)
+                nhov = nr.collidepoint(mouse_pos)
+                if nhov:
+                    panel(canvas, nr, bg=(26, 30, 48), edge=CYAN, alpha=200,
+                          radius=8, edge_w=1)
+                draw_text(canvas, a.get("name", ""), (cx, pr.y + 182), 24,
+                          TEXT, bold=True, center=True)
+                draw_text(canvas, L("ui.acc_rename") if nhov else L("ui.acc_as"),
+                          (cx, pr.y + 212), 10, CYAN if nhov else TEXT_DIM,
+                          center=True, shadow=False)
+                if clicked and nhov:
+                    self.login_mode = "name"
+                    self.login_fields["name"] = a.get("name", "")
+                    self.login_focus = "name"
+                    acc.status = ""
+                    acc.ok_msg = ""
+                    sfx("click", 0.5, 0.0)
+
+                # E-posta ve giriş yolu yalnızca GÖRÜNÜM kipinde yazılır;
+                # ad düzenlenirken o alanı kaydet/vazgeç düğmeleri kullanıyor.
+                draw_text(canvas, _fit_text(a.get("email", ""), 13, pr.w - 80),
+                          (cx, pr.y + 244), 13, TEXT_DIM, center=True, shadow=False)
+                prov = a.get("provider", "password")
+                draw_text(canvas, "Google" if prov == "google" else L("ui.email"),
+                          (cx, pr.y + 268), 11, (150, 180, 230), center=True,
+                          shadow=False)
+            btns = [
+                Button((cx - 150, pr.bottom - 118, 300, 44), L("ui.sign_out"),
+                       self._login_logout, color=(130, 70, 70),
+                       hover_color=(170, 95, 95), text_size=17),
+                Button((cx - 150, pr.bottom - 66, 300, 44), L("ui.back_menu"),
+                       lambda: self.set_state(STATE_MENU), text_size=17),
+            ]
+            for b in btns:
+                b.update(mouse_pos, dt)
+                b.draw(canvas)
+                if clicked:
+                    b.click(mouse_pos)
+            msg = acc.status or acc.ok_msg
+            if msg:
+                draw_text(canvas, msg, (cx, pr.bottom - 142), 13,
+                          RED if acc.status else GREEN, bold=True, center=True,
+                          shadow=False)
+            return
+
+        # ---- sunucu kapalıysa ----
+        if not acc.enabled:
+            oy = pr.y + 80
+            for ln in wrap_text(L("ui.acc_off"), 13, pr.w - 80)[:2]:
+                draw_text(canvas, ln, (cx, oy), 13, ORANGE, center=True, shadow=False)
+                oy += 17
+            oy += 10
+            for ln in wrap_text(L("ui.acc_why"), 11, pr.w - 80)[:3]:
+                draw_text(canvas, ln, (cx, oy), 11, TEXT_DIM, center=True, shadow=False)
+                oy += 14
+            b = Button((cx - 150, pr.bottom - 62, 300, 44), L("ui.back_menu"),
+                       lambda: self.set_state(STATE_MENU), text_size=17)
+            b.update(mouse_pos, dt)
+            b.draw(canvas)
+            if clicked:
+                b.click(mouse_pos)
+            return
+
+        # ---- NEDEN GİRİŞ? ----
+        # Oyuncu "zorunlu mu?" diye tereddüt etmesin: giriş yalnızca dünya
+        # sıralaması için, oyun hesapsız da tam sürüm.
+        wy = pr.y + 58
+        for ln in wrap_text(L("ui.acc_why"), 11, pr.w - 90)[:2]:
+            draw_text(canvas, ln, (cx, wy), 11, TEXT_DIM, center=True, shadow=False)
+            wy += 14
+
+        # ---- GOOGLE ----
+        gy = pr.y + 96
+        gb = pygame.Rect(cx - 190, gy, 380, 48)
+        ghov = gb.collidepoint(mouse_pos) and acc.google_ready and not acc.busy
+        gcol = (250, 250, 252) if acc.google_ready else (60, 62, 76)
+        pygame.draw.rect(canvas, (14, 16, 26), gb.move(0, 2), border_radius=10)
+        pygame.draw.rect(canvas, gcol if not ghov else (255, 255, 255), gb, border_radius=10)
+        pygame.draw.rect(canvas, (210, 214, 226), gb, width=1, border_radius=10)
+        # Google'ın dört renkli "G" harfi — basit ama tanınır
+        gx, gyc = gb.x + 30, gb.centery
+        for ang0, ang1, col in ((0.35, 1.9, (66, 133, 244)), (1.9, 3.3, (52, 168, 83)),
+                                (3.3, 4.6, (251, 188, 5)), (4.6, 6.2, (234, 67, 53))):
+            pygame.draw.arc(canvas, col, pygame.Rect(gx - 11, gyc - 11, 22, 22),
+                            ang0, ang1, 4)
+        pygame.draw.line(canvas, (66, 133, 244), (gx + 1, gyc), (gx + 12, gyc), 4)
+        draw_text(canvas, L("ui.google_in"), (gb.centerx + 14, gb.centery - 9), 15,
+                  (32, 34, 44) if acc.google_ready else (130, 134, 150),
+                  bold=True, center=True, shadow=False)
+        if clicked and ghov:
+            acc.google_login()
+
+        # ---- ayraç ----
+        dy = gy + 66   # düğmenin altı (gy+48) ile arasında nefes payı
+        for sgn in (-1, 1):
+            pygame.draw.line(canvas, (56, 60, 86), (cx + sgn * 30, dy),
+                             (cx + sgn * 175, dy), 1)
+        draw_text(canvas, "—", (cx, dy - 9), 13, TEXT_DIM, center=True, shadow=False)
+
+        # ---- e-posta / şifre ----
+        y = dy + 16
+        if self.login_mode == "up":
+            self._login_box(canvas, pygame.Rect(cx - 190, y, 380, 46),
+                            L("ui.nickname"), "name", mouse_pos, clicked)
+            y += 56
+        self._login_box(canvas, pygame.Rect(cx - 190, y, 380, 46),
+                        L("ui.email"), "email", mouse_pos, clicked)
+        y += 56
+        self._login_box(canvas, pygame.Rect(cx - 190, y, 380, 46),
+                        L("ui.password"), "password", mouse_pos, clicked, secret=True)
+        y += 60
+
+        main_label = L("ui.sign_up") if self.login_mode == "up" else L("ui.sign_in")
+        mb = Button((cx - 190, y, 380, 46), main_label, self._login_submit,
+                    color=(60, 120, 160), hover_color=(80, 160, 205),
+                    enabled=not acc.busy, text_size=17)
+        mb.update(mouse_pos, dt)
+        mb.draw(canvas)
+        if clicked:
+            mb.click(mouse_pos)
+        y += 54
+
+        swap = L("ui.have_account") if self.login_mode == "up" else L("ui.no_account")
+        sr = pygame.Rect(cx - 190, y, 380, 24)
+        shov = sr.collidepoint(mouse_pos)
+        draw_text(canvas, swap, (cx, y + 3), 12, CYAN if shov else TEXT_DIM,
+                  bold=shov, center=True, shadow=False)
+        if clicked and shov:
+            self.login_mode = "up" if self.login_mode == "in" else "in"
+            self.login_focus = self._login_field_order()[0]
+            acc.status = ""
+            sfx("click", 0.5, 0.0)
+
+        # ---- durum satırı ----
+        msg_y = y + 30
+        if acc.busy:
+            draw_text(canvas, acc.status or L("ui.acc_working"), (cx, msg_y), 13,
+                      CYAN, bold=True, center=True, shadow=False)
+        elif acc.status:
+            for ln in wrap_text(acc.status, 12, pr.w - 70)[:2]:
+                draw_text(canvas, ln, (cx, msg_y), 12, RED, center=True, shadow=False)
+                msg_y += 15
+        elif acc.ok_msg:
+            draw_text(canvas, acc.ok_msg, (cx, msg_y), 13, GREEN, bold=True,
+                      center=True, shadow=False)
+
+        draw_text(canvas, L("ui.tab_hint"), (cx, pr.bottom - 82), 10, (104, 110, 136),
+                  center=True, shadow=False)
+        for i, ln in enumerate(wrap_text(L("ui.acc_safe"), 10, pr.w - 70)[:2]):
+            draw_text(canvas, ln, (cx, pr.bottom - 68 + i * 12), 10, TEXT_DIM,
+                      center=True, shadow=False)
+
+        b = Button((cx - 150, pr.bottom - 44, 300, 36), L("ui.back_menu"),
+                   lambda: self.set_state(STATE_MENU), text_size=15)
+        b.update(mouse_pos, dt)
+        b.draw(canvas)
+        if clicked:
+            b.click(mouse_pos)
+
     def update_howto(self, dt, mouse_pos, clicked):
         canvas = self.display.canvas
         self.bg.draw(canvas)
@@ -22927,7 +23748,11 @@ class App:
         canvas = self.display.canvas
         self.bg.draw(canvas)
         t = self.t
-        my_name = (self.save.data.get("settings", {}).get("player_name") or "").strip().lower()
+        # "SEN" rozetinin eşleştiği ad: girişliyse HESABIN adı, değilse
+        # oyuncunun kendi yazdığı ad. Sunucu da skoru hesap adıyla yazıyor.
+        my_name = (self.account.display_name() if self.account.logged_in()
+                   else self.save.data.get("settings", {}).get("player_name") or "")
+        my_name = my_name.strip().lower()
         # Ekrana her girişte liste sırayla belirsin diye küçük bir sayaç.
         self.world_lb_t = min(3.0, getattr(self, "world_lb_t", 0.0) + dt)
 
@@ -23109,6 +23934,13 @@ class App:
                         self._lb_row(canvas, row, i, e, my_name, t, ap, frac * ap)
                     else:
                         self._lb_empty_row(canvas, row, i, t, ap)
+
+        # Girişsizken tek satırlık hatırlatma: adını hesapla sahiplenirsen
+        # kimse o adla skor gönderemez (sunucu adı hesaptan alır).
+        if self.account.enabled and not self.account.logged_in():
+            draw_text(canvas, L("ui.acc_need"),
+                      (panel_rect.centerx, panel_rect.bottom - 74), 11,
+                      (140, 170, 206), center=True, shadow=False)
 
         w, h = 200, 44
         btn = Button((panel_rect.centerx - w - 8, panel_rect.bottom - 56, w, h), L("ui.refresh"),

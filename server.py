@@ -32,6 +32,407 @@ def static_files(path):
     return send_from_directory(".", path)
 
 # =====================================================================
+# HESAP SİSTEMİ  (v3.19) — GOOGLE İLE GİRİŞ + E-POSTA/ŞİFRE KAYDI
+# ---------------------------------------------------------------------
+# GÜVENLİK TASARIMI — neden böyle kuruldu:
+#
+# 1) ŞİFRE ASLA DÜZ SAKLANMAZ. scrypt ile, kullanıcıya özel rastgele tuzla
+#    karılır (bkz. _hash_password). scrypt bellek-zorlu bir fonksiyondur;
+#    veritabanı çalınsa bile şifreleri kaba kuvvetle çözmek pahalıdır.
+#    Karşılaştırma hmac.compare_digest ile yapılır (zamanlama sızıntısı yok).
+#
+# 2) GOOGLE GİRİŞİNDE "CLIENT SECRET" OYUNDA DURMAZ. Oyun yalnızca
+#    yetkilendirme KODUNU alır ve sunucuya yollar; kodu jetona çeviren ve
+#    kimliği doğrulayan taraf SUNUCUDUR. Oyun dosyası açılsa bile gizli
+#    anahtar çıkmaz. Akış RFC 8252 (native app) + PKCE'dir: oyun rastgele
+#    bir doğrulayıcı üretir, Google'a yalnızca özetini gönderir; kodu
+#    çalan biri doğrulayıcıyı bilmediği için kullanamaz.
+#
+# 3) KİMLİK JETONU GOOGLE'DAN DOĞRUDAN ALINIR. Kod değişimi sunucu ile
+#    Google arasında TLS üzerinden yapıldığı için jeton kanalın kendisiyle
+#    doğrulanmış olur; yine de iss / aud / exp / email_verified alanları
+#    tek tek denetlenir (bkz. _verify_google_id_token).
+#
+# 4) OTURUM JETONU VERİTABANINDA DÜZ DURMAZ. 32 baytlık rastgele bir jeton
+#    üretilir, oyuncuya bir kez verilir, veritabanına yalnızca SHA-256
+#    ÖZETİ yazılır. Veritabanı çalınsa bile oturumlar ele geçirilemez.
+#    Jetonun son kullanma tarihi vardır (SESSION_TTL).
+#
+# 5) GİRİŞ DENEMELERİ SINIRLIDIR (bkz. _rate_ok): aynı kaynaktan şifre
+#    deneyen bir saldırgan kesilir.
+#
+# 6) "Kullanıcı var mı yok mu" SIZDIRILMAZ: yanlış e-posta ile yanlış şifre
+#    aynı hatayı döndürür.
+#
+# KURULUM (bu üçü olmadan Google girişi kapalı kalır, oyun yine çalışır):
+#   GOOGLE_CLIENT_ID      Google Cloud > Kimlik Bilgileri > OAuth istemcisi
+#   GOOGLE_CLIENT_SECRET  (aynı yerden; YALNIZCA sunucuda dursun)
+#   Supabase'de iki tablo gerekir — SQL'i README_ACCOUNTS.md dosyasında.
+# =====================================================================
+
+import base64
+import re as _re
+import secrets
+
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+
+SESSION_TTL = 60 * 60 * 24 * 60          # oturum ömrü: 60 gün
+PW_MIN_LEN = 8
+NAME_MAX = 14
+# scrypt parametreleri. N bellek maliyeti; 2**15 masaüstü/sunucu için
+# makul (yaklaşık 32 MB) ve kaba kuvveti ciddi biçimde pahalılaştırır.
+SCRYPT_N, SCRYPT_R, SCRYPT_P = 2 ** 15, 8, 1
+EMAIL_RE = _re.compile(r"^[^@\s]{1,64}@[^@\s]{1,190}\.[A-Za-z]{2,24}$")
+
+
+def _accounts_enabled():
+    return bool(supabase)
+
+
+def _google_enabled():
+    return bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET and supabase)
+
+
+def _hash_password(password, salt=None):
+    """Şifreyi scrypt ile karar. Dönüş: saklanabilir tek bir metin."""
+    salt = salt or secrets.token_bytes(16)
+    dk = hashlib.scrypt(password.encode("utf-8"), salt=salt,
+                        n=SCRYPT_N, r=SCRYPT_R, p=SCRYPT_P, dklen=32,
+                        maxmem=64 * 1024 * 1024)
+    return "scrypt$%d$%d$%d$%s$%s" % (
+        SCRYPT_N, SCRYPT_R, SCRYPT_P,
+        base64.b64encode(salt).decode(), base64.b64encode(dk).decode())
+
+
+def _verify_password(password, stored):
+    """Şifre doğru mu? Sabit zamanlı karşılaştırma."""
+    try:
+        algo, n, r, pp, salt_b64, dk_b64 = str(stored).split("$")
+        if algo != "scrypt":
+            return False
+        salt = base64.b64decode(salt_b64)
+        want = base64.b64decode(dk_b64)
+        got = hashlib.scrypt(password.encode("utf-8"), salt=salt,
+                             n=int(n), r=int(r), p=int(pp), dklen=len(want),
+                             maxmem=64 * 1024 * 1024)
+        return hmac.compare_digest(got, want)
+    except Exception:
+        return False
+
+
+def _token_hash(tok):
+    return hashlib.sha256(tok.encode("utf-8")).hexdigest()
+
+
+def _clean_device(d):
+    """İstemciden gelen cihaz kimliği: yalnızca 64 karaktere kadar hex.
+
+    Oyun bunu makine adının SHA-256 özetinden üretir (bkz. device_id);
+    sunucuya gerçek kullanıcı/makine adı hiç gelmez. Biçimi burada da
+    daraltıyoruz ki bu alan serbest metin deposuna dönüşmesin.
+    """
+    d = str(d or "")[:64].strip().lower()
+    return d if all(c in "0123456789abcdef" for c in d) and len(d) >= 16 else ""
+
+
+def _new_session(account_id, device=""):
+    """Yeni oturum jetonu. Veritabanına yalnızca ÖZETİ yazılır.
+
+    Oturum, girişin yapıldığı CİHAZA bağlanır: jeton bir başkasının eline
+    geçse (kayıt dosyası paylaşıldı, dosya çalındı) başka bir makinede
+    kabul edilmez.
+    """
+    tok = secrets.token_urlsafe(32)
+    supabase.table("sessions").insert({
+        "token_hash": _token_hash(tok),
+        "account_id": account_id,
+        "device_hash": _clean_device(device),
+        "created_at": time.time(),
+        "expires_at": time.time() + SESSION_TTL,
+    }).execute()
+    return tok
+
+
+def _account_by_session(tok, device=None):
+    """Jetondan hesabı bulur. Süresi dolmuşsa ya da CİHAZ tutmuyorsa None.
+
+    device=None geçilirse cihaz denetimi YAPILMAZ; bu yalnızca skor
+    gönderimi gibi, jetonun tek işinin "adı sahiplenmek" olduğu yerler
+    için. Hesabı okuyan/değiştiren uçlar cihazı mutlaka geçirir.
+    """
+    if not tok or not supabase:
+        return None
+    rows = supabase.table("sessions").select("*").eq(
+        "token_hash", _token_hash(tok)).execute()
+    if not rows.data:
+        return None
+    sess = rows.data[0]
+    if float(sess.get("expires_at", 0)) < time.time():
+        try:
+            supabase.table("sessions").delete().eq(
+                "token_hash", sess["token_hash"]).execute()
+        except Exception:
+            pass
+        return None
+    if device is not None:
+        want = str(sess.get("device_hash") or "")
+        # Eski oturumlarda device_hash boş olabilir: onları kırmıyoruz,
+        # yalnızca İKİSİ de doluyken eşitlik arıyoruz.
+        if want and _clean_device(device) != want:
+            return None
+    acc = supabase.table("accounts").select(
+        "id,email,name,provider,gems,created_at").eq(
+        "id", sess["account_id"]).execute()
+    return acc.data[0] if acc.data else None
+
+
+def _public_account(acc):
+    """Oyuncuya DÖNDÜRÜLEBİLİR alanlar. Şifre özeti asla buraya girmez."""
+    return {
+        "id": acc.get("id"),
+        "email": acc.get("email"),
+        "name": acc.get("name") or (acc.get("email") or "").split("@")[0][:NAME_MAX],
+        "provider": acc.get("provider", "password"),
+        "gems": int(acc.get("gems", 0) or 0),
+    }
+
+
+def _b64url_json(part):
+    pad = "=" * (-len(part) % 4)
+    return json.loads(base64.urlsafe_b64decode(part + pad).decode("utf-8"))
+
+
+def _verify_google_id_token(id_token):
+    """Google kimlik jetonunun İÇERİĞİNİ denetler.
+
+    İMZA ayrıca doğrulanmaz çünkü jeton, SUNUCU ile Google arasında TLS
+    üzerinden yapılan kod değişiminden DOĞRUDAN geldi — araya kimse
+    giremez. (Jeton istemciden gelseydi imza doğrulaması şart olurdu;
+    bu akışta istemci jetonu hiç görmüyor.)
+    """
+    try:
+        payload = _b64url_json(id_token.split(".")[1])
+    except Exception:
+        return None, "kimlik jetonu okunamadı"
+    if payload.get("iss") not in ("accounts.google.com", "https://accounts.google.com"):
+        return None, "kimlik jetonu Google'dan değil"
+    aud = payload.get("aud")
+    if aud != GOOGLE_CLIENT_ID:
+        return None, "kimlik jetonu bu oyun için değil"
+    if float(payload.get("exp", 0)) < time.time():
+        return None, "kimlik jetonunun süresi dolmuş"
+    if not payload.get("email"):
+        return None, "hesapta e-posta yok"
+    if payload.get("email_verified") not in (True, "true"):
+        return None, "Google hesabının e-postası doğrulanmamış"
+    return payload, ""
+
+
+def _find_or_create_account(email, name, provider, password_hash=None, google_sub=None):
+    email = email.strip().lower()
+    rows = supabase.table("accounts").select("*").eq("email", email).execute()
+    if rows.data:
+        acc = rows.data[0]
+        # Google ile giren, daha önce şifreyle açılmış hesabına bağlanabilir.
+        patch = {}
+        if google_sub and not acc.get("google_sub"):
+            patch["google_sub"] = google_sub
+        if name and not acc.get("name"):
+            patch["name"] = name[:NAME_MAX]
+        if patch:
+            supabase.table("accounts").update(patch).eq("id", acc["id"]).execute()
+            acc.update(patch)
+        return acc, False
+    new = {
+        "email": email,
+        "name": (name or email.split("@")[0])[:NAME_MAX],
+        "provider": provider,
+        "gems": 0,
+        "created_at": time.time(),
+    }
+    if password_hash:
+        new["password_hash"] = password_hash
+    if google_sub:
+        new["google_sub"] = google_sub
+    res = supabase.table("accounts").insert(new).execute()
+    return res.data[0], True
+
+
+@app.route("/auth/status", methods=["GET"])
+def auth_status():
+    """Oyun açılışta buraya bakar: hangi giriş yolları açık?"""
+    return jsonify({
+        "accounts": _accounts_enabled(),
+        "google": _google_enabled(),
+        "client_id": GOOGLE_CLIENT_ID if _google_enabled() else "",
+    })
+
+
+@app.route("/auth/register", methods=["POST"])
+def auth_register():
+    if not _accounts_enabled():
+        return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
+    src = (request.headers.get("X-Forwarded-For", request.remote_addr or "?")).split(",")[0].strip()
+    if not _rate_ok("auth:" + src):
+        return jsonify({"success": False, "error": "çok fazla deneme"}), 429
+    data = request.json or {}
+    email = str(data.get("email", "")).strip().lower()
+    password = str(data.get("password", ""))
+    name = str(data.get("name", "")).strip()[:NAME_MAX]
+    if not EMAIL_RE.match(email):
+        return jsonify({"success": False, "error": "e-posta geçersiz"}), 400
+    if len(password) < PW_MIN_LEN:
+        return jsonify({"success": False,
+                        "error": f"şifre en az {PW_MIN_LEN} karakter olmalı"}), 400
+    try:
+        rows = supabase.table("accounts").select("id").eq("email", email).execute()
+        if rows.data:
+            return jsonify({"success": False, "error": "bu e-posta zaten kayıtlı"}), 409
+        acc, _ = _find_or_create_account(email, name, "password",
+                                         password_hash=_hash_password(password))
+        tok = _new_session(acc["id"], data.get("device"))
+        return jsonify({"success": True, "token": tok, "account": _public_account(acc)})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/auth/login", methods=["POST"])
+def auth_login():
+    if not _accounts_enabled():
+        return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
+    src = (request.headers.get("X-Forwarded-For", request.remote_addr or "?")).split(",")[0].strip()
+    if not _rate_ok("auth:" + src):
+        return jsonify({"success": False, "error": "çok fazla deneme"}), 429
+    data = request.json or {}
+    email = str(data.get("email", "")).strip().lower()
+    password = str(data.get("password", ""))
+    try:
+        rows = supabase.table("accounts").select("*").eq("email", email).execute()
+        acc = rows.data[0] if rows.data else None
+        # "Kullanıcı yok" ile "şifre yanlış" AYNI hatayı döndürür: saldırgan
+        # hangi e-postaların kayıtlı olduğunu öğrenemesin.
+        if not acc or not acc.get("password_hash") or \
+                not _verify_password(password, acc["password_hash"]):
+            return jsonify({"success": False,
+                            "error": "e-posta ya da şifre hatalı"}), 401
+        tok = _new_session(acc["id"], data.get("device"))
+        return jsonify({"success": True, "token": tok, "account": _public_account(acc)})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+class _GoogleError(Exception):
+    """Google tarafında bir şey tutmadı. Metni oyuncuya gösterilebilir."""
+
+
+def _exchange_google_code(code, verifier, redirect_uri):
+    """Yetkilendirme kodunu Google'da jetona çevirir ve kimlik iddialarını döndürür.
+
+    client_secret YALNIZCA burada kullanılır; oyun onu hiç görmez.
+    Ayrı bir işlev olmasının ikinci sebebi: test edilebilmesi.
+    """
+    try:
+        body = urllib.parse.urlencode({
+            "code": code,
+            "client_id": GOOGLE_CLIENT_ID,
+            "client_secret": GOOGLE_CLIENT_SECRET,
+            "redirect_uri": redirect_uri,
+            "grant_type": "authorization_code",
+            "code_verifier": verifier,
+        }).encode()
+        req = urllib.request.Request(GOOGLE_TOKEN_URL, data=body)
+        with urllib.request.urlopen(req, timeout=15) as r:
+            tok_res = json.loads(r.read().decode("utf-8"))
+    except Exception:
+        raise _GoogleError("Google doğrulaması başarısız")
+    payload, why = _verify_google_id_token(tok_res.get("id_token", ""))
+    if not payload:
+        raise _GoogleError(why)
+    return payload
+
+
+@app.route("/auth/google", methods=["POST"])
+def auth_google():
+    """Oyundan gelen YETKİLENDİRME KODUNU jetona çevirir (PKCE).
+
+    Oyun hiçbir zaman client secret görmez; kodu jetona çeviren taraf burasıdır.
+    """
+    if not _google_enabled():
+        return jsonify({"success": False,
+                        "error": "Google girişi yapılandırılmamış"}), 503
+    src = (request.headers.get("X-Forwarded-For", request.remote_addr or "?")).split(",")[0].strip()
+    if not _rate_ok("auth:" + src):
+        return jsonify({"success": False, "error": "çok fazla deneme"}), 429
+    data = request.json or {}
+    code = str(data.get("code", ""))
+    verifier = str(data.get("code_verifier", ""))
+    redirect_uri = str(data.get("redirect_uri", ""))
+    if not code or not verifier or not redirect_uri:
+        return jsonify({"success": False, "error": "eksik bilgi"}), 400
+    # Geri dönüş adresi YALNIZCA yerel olabilir (RFC 8252 loopback).
+    if not _re.match(r"^http://(127\.0\.0\.1|\[::1\]|localhost):\d{1,5}/?$", redirect_uri):
+        return jsonify({"success": False, "error": "geri dönüş adresi geçersiz"}), 400
+    try:
+        payload = _exchange_google_code(code, verifier, redirect_uri)
+    except _GoogleError as e:
+        # Google'ın hata gövdesini oyuncuya aynen yansıtmıyoruz.
+        return jsonify({"success": False, "error": str(e)}), 401
+    try:
+        acc, created = _find_or_create_account(
+            payload["email"], payload.get("name") or payload.get("given_name", ""),
+            "google", google_sub=payload.get("sub"))
+        tok = _new_session(acc["id"], data.get("device"))
+        return jsonify({"success": True, "token": tok, "new": created,
+                        "account": _public_account(acc)})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/auth/me", methods=["POST"])
+def auth_me():
+    if not _accounts_enabled():
+        return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
+    data = request.json or {}
+    acc = _account_by_session(str(data.get("token", "")), data.get("device", ""))
+    if not acc:
+        return jsonify({"success": False, "error": "oturum geçersiz"}), 401
+    return jsonify({"success": True, "account": _public_account(acc)})
+
+
+@app.route("/auth/name", methods=["POST"])
+def auth_set_name():
+    """Sıralamada görünecek adı değiştirir."""
+    if not _accounts_enabled():
+        return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
+    data = request.json or {}
+    acc = _account_by_session(str(data.get("token", "")), data.get("device", ""))
+    if not acc:
+        return jsonify({"success": False, "error": "oturum geçersiz"}), 401
+    name = str(data.get("name", "")).strip()[:NAME_MAX]
+    if len(name) < 2:
+        return jsonify({"success": False, "error": "ad en az 2 karakter olmalı"}), 400
+    supabase.table("accounts").update({"name": name}).eq("id", acc["id"]).execute()
+    acc["name"] = name
+    return jsonify({"success": True, "account": _public_account(acc)})
+
+
+@app.route("/auth/logout", methods=["POST"])
+def auth_logout():
+    if not _accounts_enabled():
+        return jsonify({"success": True})
+    tok = str((request.json or {}).get("token", ""))
+    if tok:
+        try:
+            supabase.table("sessions").delete().eq(
+                "token_hash", _token_hash(tok)).execute()
+        except Exception:
+            pass
+    return jsonify({"success": True})
+
+
+# =====================================================================
 # HİLE KORUMASI  (sunucu tarafı — ASIL koruma burasıdır)
 # ---------------------------------------------------------------------
 # İstemcide çalışan hiçbir koruma mutlak değildir: oyunun dosyası açılabilir,
@@ -190,6 +591,18 @@ def add_score():
         if not ok:
             return jsonify({"success": False, "error": f"skor reddedildi: {why}"}), 422
 
+        # ---- HESAP (varsa) ----
+        # Oyuncu giriş yapmışsa skor HESABA bağlanır ve sıralamada hesabın
+        # adı görünür. Böylece isim çalınamaz: adı sunucu belirler, istemci
+        # değil. Giriş yapmayan da oynayabilir (ad kendi yazdığıdır).
+        # Cihaz tutmazsa hesap bağlanmaz, skor yine de kendi adıyla yazılır:
+        # çalınmış bir jetonla başkasının adına skor gönderilemesin.
+        account_id = None
+        acc = _account_by_session(str(data.get("token", "")), data.get("device", ""))
+        if acc:
+            account_id = acc.get("id")
+            name = (acc.get("name") or name)[:14]
+
         payload = {
             "name": name,
             "score": score,
@@ -198,7 +611,9 @@ def add_score():
             "run_time": run_time,
             "created_at": created_at
         }
-        
+        if account_id is not None:
+            payload["account_id"] = account_id
+
         response = supabase.table("scores").insert(payload).execute()
         return jsonify({"success": True, "data": response.data})
     except Exception as e:
