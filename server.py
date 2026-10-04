@@ -86,6 +86,16 @@ NAME_MAX = 14
 SCRYPT_N, SCRYPT_R, SCRYPT_P = 2 ** 15, 8, 1
 EMAIL_RE = _re.compile(r"^[^@\s]{1,64}@[^@\s]{1,190}\.[A-Za-z]{2,24}$")
 
+# KULLANICI ADI: sıralamada görünen ad. Bir kez seçilir, BİR DAHA DEĞİŞMEZ.
+# Harf/rakam/alt çizgi; boşluk ve noktalama yok ki sıralamada başkasının adını
+# taklit eden "KASMACI " gibi varyantlar üretilemesin.
+USERNAME_RE = _re.compile(r"^[A-Za-z0-9ÇĞİÖŞÜçğıöşü_]{3,14}$")
+
+# Oyuncunun adını çalmaya çalışan "admin / moderator" gibi adlar kapalı.
+USERNAME_BLOCK = {"admin", "administrator", "moderator", "mod", "sistem", "system",
+                  "kasma", "kasmaarena", "root", "null", "undefined", "anonim",
+                  "isimsiz", "server", "sunucu", "support", "destek"}
+
 
 def _accounts_enabled():
     return bool(supabase)
@@ -192,11 +202,33 @@ def _public_account(acc):
     """Oyuncuya DÖNDÜRÜLEBİLİR alanlar. Şifre özeti asla buraya girmez."""
     return {
         "id": acc.get("id"),
-        "email": acc.get("email"),
-        "name": acc.get("name") or (acc.get("email") or "").split("@")[0][:NAME_MAX],
+        "email": acc.get("email") or "",
+        "username": acc.get("username") or "",
+        # name = sıralamada görünen ad. Kullanıcı adı seçilmişse odur.
+        "name": acc.get("username") or acc.get("name") or "",
         "provider": acc.get("provider", "password"),
-        "gems": int(acc.get("gems", 0) or 0),
+        # Kullanıcı adı henüz seçilmemişse oyun bir kereye mahsus seçtirir.
+        "needs_username": not bool(acc.get("username")),
     }
+
+
+def _clean_username(u):
+    """Kullanıcı adını denetler. (ok, temiz_ad_veya_hata) döner."""
+    u = str(u or "").strip()
+    if not USERNAME_RE.match(u):
+        return False, "kullanıcı adı 3-14 karakter olmalı (harf, rakam, _)"
+    if u.lower() in USERNAME_BLOCK:
+        return False, "bu kullanıcı adı kullanılamaz"
+    return True, u
+
+
+def _username_taken(u, except_id=None):
+    rows = supabase.table("accounts").select("id,username").execute()
+    low = u.lower()
+    for r in rows.data or []:
+        if str(r.get("username") or "").lower() == low and r.get("id") != except_id:
+            return True
+    return False
 
 
 def _b64url_json(part):
@@ -247,9 +279,11 @@ def _find_or_create_account(email, name, provider, password_hash=None, google_su
         return acc, False
     new = {
         "email": email,
-        "name": (name or email.split("@")[0])[:NAME_MAX],
+        # Google'dan gelen ad yalnızca BİLGİ. Sıralamada görünecek
+        # KULLANICI ADINI oyuncu bir kez kendisi seçer (bkz.
+        # /auth/username) ve bir daha değiştiremez.
+        "name": (name or "")[:NAME_MAX],
         "provider": provider,
-        "gems": 0,
         "created_at": time.time(),
     }
     if password_hash:
@@ -278,20 +312,36 @@ def auth_register():
     if not _rate_ok("auth:" + src):
         return jsonify({"success": False, "error": "çok fazla deneme"}), 429
     data = request.json or {}
-    email = str(data.get("email", "")).strip().lower()
+    # KULLANICI ADI ile kayıt: e-posta İSTEĞE BAĞLI. Oyuncu Gmail'siz de
+    # hesap açabilsin diye. (E-posta verilirse şifre kurtarmada işe yarar.)
+    ok, uname = _clean_username(data.get("username"))
+    if not ok:
+        return jsonify({"success": False, "error": uname}), 400
     password = str(data.get("password", ""))
-    name = str(data.get("name", "")).strip()[:NAME_MAX]
-    if not EMAIL_RE.match(email):
+    email = str(data.get("email", "")).strip().lower()
+    if email and not EMAIL_RE.match(email):
         return jsonify({"success": False, "error": "e-posta geçersiz"}), 400
     if len(password) < PW_MIN_LEN:
         return jsonify({"success": False,
                         "error": f"şifre en az {PW_MIN_LEN} karakter olmalı"}), 400
     try:
-        rows = supabase.table("accounts").select("id").eq("email", email).execute()
-        if rows.data:
-            return jsonify({"success": False, "error": "bu e-posta zaten kayıtlı"}), 409
-        acc, _ = _find_or_create_account(email, name, "password",
-                                         password_hash=_hash_password(password))
+        if _username_taken(uname):
+            return jsonify({"success": False,
+                            "error": "bu kullanıcı adı alınmış"}), 409
+        if email:
+            rows = supabase.table("accounts").select("id").eq("email", email).execute()
+            if rows.data:
+                return jsonify({"success": False,
+                                "error": "bu e-posta zaten kayıtlı"}), 409
+        new_acc = {
+            "email": email or None,
+            "username": uname,
+            "name": uname,
+            "provider": "password",
+            "password_hash": _hash_password(password),
+            "created_at": time.time(),
+        }
+        acc = supabase.table("accounts").insert(new_acc).execute().data[0]
         tok = _new_session(acc["id"], data.get("device"))
         return jsonify({"success": True, "token": tok, "account": _public_account(acc)})
     except Exception as e:
@@ -306,17 +356,29 @@ def auth_login():
     if not _rate_ok("auth:" + src):
         return jsonify({"success": False, "error": "çok fazla deneme"}), 429
     data = request.json or {}
-    email = str(data.get("email", "")).strip().lower()
+    # Oyuncu kullanıcı adını DA e-postasını DA yazabilir; ikisi de aynı
+    # kutudan gelir (bkz. oyundaki giriş ekranı).
+    who = str(data.get("username") or data.get("email") or "").strip()
     password = str(data.get("password", ""))
     try:
-        rows = supabase.table("accounts").select("*").eq("email", email).execute()
-        acc = rows.data[0] if rows.data else None
+        acc = None
+        if "@" in who:
+            rows = supabase.table("accounts").select("*").eq(
+                "email", who.lower()).execute()
+            acc = rows.data[0] if rows.data else None
+        else:
+            rows = supabase.table("accounts").select("*").execute()
+            low = who.lower()
+            for rrow in rows.data or []:
+                if str(rrow.get("username") or "").lower() == low:
+                    acc = rrow
+                    break
         # "Kullanıcı yok" ile "şifre yanlış" AYNI hatayı döndürür: saldırgan
-        # hangi e-postaların kayıtlı olduğunu öğrenemesin.
+        # hangi adların kayıtlı olduğunu öğrenemesin.
         if not acc or not acc.get("password_hash") or \
                 not _verify_password(password, acc["password_hash"]):
             return jsonify({"success": False,
-                            "error": "e-posta ya da şifre hatalı"}), 401
+                            "error": "kullanıcı adı ya da şifre hatalı"}), 401
         tok = _new_session(acc["id"], data.get("device"))
         return jsonify({"success": True, "token": tok, "account": _public_account(acc)})
     except Exception as e:
@@ -401,21 +463,185 @@ def auth_me():
     return jsonify({"success": True, "account": _public_account(acc)})
 
 
-@app.route("/auth/name", methods=["POST"])
-def auth_set_name():
-    """Sıralamada görünecek adı değiştirir."""
+@app.route("/auth/username", methods=["POST"])
+def auth_set_username():
+    """Kullanıcı adını BİR KEZ belirler.
+
+    Google ile gelen oyuncunun sıralamada görünecek adı yoktur; onu burada
+    bir kereye mahsus seçer. SEÇİLDİKTEN SONRA DEĞİŞTİRİLEMEZ: dünya
+    sıralamasında bir ad kimdeyse onda kalsın, kimse "geçen haftanın
+    birincisinin" adını üstüne geçirmesin.
+    """
     if not _accounts_enabled():
         return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
     data = request.json or {}
     acc = _account_by_session(str(data.get("token", "")), data.get("device", ""))
     if not acc:
         return jsonify({"success": False, "error": "oturum geçersiz"}), 401
-    name = str(data.get("name", "")).strip()[:NAME_MAX]
-    if len(name) < 2:
-        return jsonify({"success": False, "error": "ad en az 2 karakter olmalı"}), 400
-    supabase.table("accounts").update({"name": name}).eq("id", acc["id"]).execute()
-    acc["name"] = name
+    if acc.get("username"):
+        return jsonify({"success": False,
+                        "error": "kullanıcı adı bir kez seçilir, değiştirilemez"}), 409
+    ok, uname = _clean_username(data.get("username"))
+    if not ok:
+        return jsonify({"success": False, "error": uname}), 400
+    if _username_taken(uname, except_id=acc["id"]):
+        return jsonify({"success": False, "error": "bu kullanıcı adı alınmış"}), 409
+    supabase.table("accounts").update(
+        {"username": uname, "name": uname}).eq("id", acc["id"]).execute()
+    acc["username"] = uname
+    acc["name"] = uname
     return jsonify({"success": True, "account": _public_account(acc)})
+
+
+# =====================================================================
+# OYUNCU İLERLEMESİ  (v3.20)
+# ---------------------------------------------------------------------
+# Elmas, skinler, petler, kostümler, açılmış kitap/silahlar ve istatistikler
+# HESABA ait. Böylece:
+#   * Yeni hesap SIFIRDAN başlar (misafir oynarken topladıkların gelmez).
+#   * Hesabınla başka bir bilgisayara girdiğinde ilerlemen seninle gelir.
+#   * Kayıt dosyasını düzenleyen biri sunucudaki hesabı şişiremez: elmas
+#     yalnızca MAKUL bir hızla artabilir (bkz. _merge_progress).
+# =====================================================================
+
+# Bir koşudan kazanılabilecek elmas için CÖMERT bir üst sınır. Amaç oyunu
+# kısıtlamak değil, "tek istekle 1.000.000 elmas" yolunu kapatmak.
+GEM_GAIN_CAP_PER_PUSH = 4000
+PROGRESS_LISTS = ("skins_owned", "cosmetics_owned", "books_owned", "weapons_owned")
+PROGRESS_STATS = ("runs", "best_score", "total_kills", "total_time", "bosses",
+                  "best_wave", "total_shots", "total_gold", "total_lifesteal",
+                  "best_run_gold", "best_run_dashes", "best_run_shots",
+                  "total_bonk_hits")
+
+
+def _player_row(account_id):
+    rows = supabase.table("player_data").select("*").eq(
+        "account_id", account_id).execute()
+    return rows.data[0] if rows.data else None
+
+
+def _blank_progress():
+    return {
+        "gems": 0, "gems_earned": 0, "gems_spent": 0,
+        "skins_owned": ["default"], "equipped_skin": "default",
+        "cosmetics_owned": [], "equipped_cosmetics": {},
+        "books_owned": [], "weapons_owned": [],
+        "achievements": {}, "stats": {},
+    }
+
+
+def _stored_progress(row):
+    if not row:
+        return _blank_progress()
+    out = _blank_progress()
+    try:
+        out.update(json.loads(row.get("data") or "{}")
+                   if isinstance(row.get("data"), str) else (row.get("data") or {}))
+    except Exception:
+        pass
+    out["gems"] = int(row.get("gems", 0) or 0)
+    out["gems_earned"] = int(row.get("gems_earned", 0) or 0)
+    out["gems_spent"] = int(row.get("gems_spent", 0) or 0)
+    return out
+
+
+def _merge_progress(old, new):
+    """Sunucudaki ilerlemeyi oyundan geleniyle birleştirir.
+
+    KURAL: ilerleme GERİ GİTMEZ, ve elmas defteri bir seferde en fazla
+    GEM_GAIN_CAP_PER_PUSH kadar artabilir. İstemciden gelen sayıya olduğu
+    gibi güvenilmez — oyun dosyası oyuncunun bilgisayarında duruyor.
+    """
+    out = dict(old)
+    for k in PROGRESS_LISTS:
+        merged = list(old.get(k) or [])
+        for v in (new.get(k) or []):
+            if isinstance(v, str) and v not in merged:
+                merged.append(v)
+        out[k] = merged[:400]
+    for k in ("equipped_skin",):
+        if new.get(k):
+            out[k] = str(new[k])[:40]
+    if isinstance(new.get("equipped_cosmetics"), dict):
+        out["equipped_cosmetics"] = {str(a)[:20]: (str(b)[:40] if b else None)
+                                     for a, b in list(new["equipped_cosmetics"].items())[:12]}
+    # istatistikler: her alan yalnızca BÜYÜYEBİLİR
+    st_old = dict(old.get("stats") or {})
+    st_new = new.get("stats") or {}
+    for k in PROGRESS_STATS:
+        try:
+            st_old[k] = max(float(st_old.get(k, 0) or 0), float(st_new.get(k, 0) or 0))
+        except Exception:
+            pass
+    out["stats"] = st_old
+    ach = dict(old.get("achievements") or {})
+    for k, v in list((new.get("achievements") or {}).items())[:400]:
+        ach.setdefault(str(k)[:40], v)
+    out["achievements"] = ach
+    # --- elmas defteri ---
+    earned_old = int(old.get("gems_earned", 0) or 0)
+    spent_old = int(old.get("gems_spent", 0) or 0)
+    earned_new = int(new.get("gems_earned", 0) or 0)
+    spent_new = int(new.get("gems_spent", 0) or 0)
+    earned = max(earned_old, min(earned_new, earned_old + GEM_GAIN_CAP_PER_PUSH))
+    spent = max(spent_old, spent_new)
+    out["gems_earned"] = earned
+    out["gems_spent"] = min(spent, earned)
+    out["gems"] = max(0, out["gems_earned"] - out["gems_spent"])
+    return out
+
+
+@app.route("/player/load", methods=["POST"])
+def player_load():
+    """Hesabın ilerlemesini döndürür. Yeni hesapta her şey SIFIR."""
+    if not _accounts_enabled():
+        return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
+    data = request.json or {}
+    acc = _account_by_session(str(data.get("token", "")), data.get("device", ""))
+    if not acc:
+        return jsonify({"success": False, "error": "oturum geçersiz"}), 401
+    return jsonify({"success": True, "progress": _stored_progress(_player_row(acc["id"]))})
+
+
+@app.route("/player/save", methods=["POST"])
+def player_save():
+    """Oyundaki ilerlemeyi hesaba yazar (birleştirerek)."""
+    if not _accounts_enabled():
+        return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
+    data = request.json or {}
+    acc = _account_by_session(str(data.get("token", "")), data.get("device", ""))
+    if not acc:
+        return jsonify({"success": False, "error": "oturum geçersiz"}), 401
+    incoming = data.get("progress")
+    if not isinstance(incoming, dict):
+        return jsonify({"success": False, "error": "ilerleme verisi yok"}), 400
+    row = _player_row(acc["id"])
+    merged = _merge_progress(_stored_progress(row), incoming)
+    st = merged.get("stats") or {}
+    payload = {
+        "account_id": acc["id"],
+        "gems": int(merged["gems"]),
+        "gems_earned": int(merged["gems_earned"]),
+        "gems_spent": int(merged["gems_spent"]),
+        # Aşağıdaki sütunlar veritabanında TEK BAKIŞTA okunabilsin diye ayrı
+        # duruyor (bkz. player_overview görünümü).
+        "best_score": int(st.get("best_score", 0) or 0),
+        "best_wave": int(st.get("best_wave", 0) or 0),
+        "total_kills": int(st.get("total_kills", 0) or 0),
+        "runs": int(st.get("runs", 0) or 0),
+        "skin_count": len(merged.get("skins_owned") or []),
+        "pet_count": len([c for c in (merged.get("cosmetics_owned") or [])
+                          if str(c).startswith("pet_")]),
+        "data": {k: v for k, v in merged.items()
+                 if k not in ("gems", "gems_earned", "gems_spent")},
+        "updated_at": time.time(),
+    }
+    if row:
+        supabase.table("player_data").update(payload).eq(
+            "account_id", acc["id"]).execute()
+    else:
+        supabase.table("player_data").insert(payload).execute()
+    return jsonify({"success": True, "progress": merged})
 
 
 @app.route("/auth/logout", methods=["POST"])
@@ -591,17 +817,23 @@ def add_score():
         if not ok:
             return jsonify({"success": False, "error": f"skor reddedildi: {why}"}), 422
 
-        # ---- HESAP (varsa) ----
-        # Oyuncu giriş yapmışsa skor HESABA bağlanır ve sıralamada hesabın
-        # adı görünür. Böylece isim çalınamaz: adı sunucu belirler, istemci
-        # değil. Giriş yapmayan da oynayabilir (ad kendi yazdığıdır).
-        # Cihaz tutmazsa hesap bağlanmaz, skor yine de kendi adıyla yazılır:
-        # çalınmış bir jetonla başkasının adına skor gönderilemesin.
-        account_id = None
+        # ---- HESAP ZORUNLU ----
+        # DÜNYA SIRALAMASI yalnızca giriş yapmış oyunculara açık. Sebebi
+        # tek cümleyle: sıralamadaki bir ad kime aitse onda kalsın ve
+        # hileci bir hesapla birlikte engellenebilsin. Girişsiz oynayan
+        # oyuncu oyunun tamamını oynar, skoru yalnızca KENDİ bilgisayarındaki
+        # yerel tabloya yazılır (oyun bunu sonuç ekranında söylüyor).
         acc = _account_by_session(str(data.get("token", "")), data.get("device", ""))
-        if acc:
-            account_id = acc.get("id")
-            name = (acc.get("name") or name)[:14]
+        if not acc:
+            return jsonify({"success": False,
+                            "error": "dünya sıralaması için giriş gerekli"}), 401
+        if not acc.get("username"):
+            return jsonify({"success": False,
+                            "error": "önce kullanıcı adı seçmelisin"}), 409
+        account_id = acc.get("id")
+        # Ad SUNUCUDAN gelir, istemciden değil: kimse başkasının adıyla
+        # skor gönderemez.
+        name = str(acc.get("username"))[:14]
 
         payload = {
             "name": name,
