@@ -918,6 +918,9 @@ STRINGS = {
     "ui.sync_fail":   _T("İLERLEME SUNUCUYA YAZILAMADI", "PROGRESS COULD NOT BE SAVED",
                          "NO SE PUDO GUARDAR EL PROGRESO", "FORTSCHRITT NICHT GESPEICHERT",
                          "ПРОГРЕСС НЕ СОХРАНЁН"),
+    "ui.gamepad":     _T("KONTROLCÜ", "GAMEPAD", "MANDO", "CONTROLLER", "ГЕЙМПАД"),
+    "ui.gamepad_none": _T("bağlı değil", "not connected", "no conectado",
+                          "nicht verbunden", "не подключён"),
     "ui.sec_fmt":     _T("{0}sn", "{0}s", "{0}s", "{0}s", "{0}с"),
     "ui.per_sec":     _T("/sn", "/s", "/s", "/s", "/с"),
     "ui.ann_hell":    _T("CEHENNEM — DALGA {0}", "HELL — WAVE {0}", "INFIERNO — OLEADA {0}",
@@ -16315,6 +16318,9 @@ class RunState:
     def screen_to_world(self, sx, sy):
         return screen_to_world(sx, sy, self.cam_rect())
 
+    def world_to_screen(self, wx, wy):
+        return world_to_screen(wx, wy, self.cam_rect())
+
     def near_camera_point(self, margin=60):
         """Kameranın hemen dışında, dünyanın içinde kalan bir doğum noktası.
 
@@ -18590,6 +18596,167 @@ class Background:
 # EKRAN / ÖLÇEKLEME
 # =====================================================================
 
+# =====================================================================
+# KONTROLCÜ (GAMEPAD)
+# ---------------------------------------------------------------------
+# NEDEN SANAL İMLEÇ: oyunun bütün arayüzü fare konumuna göre çalışıyor
+# (her ekran mouse_pos alıp collidepoint ediyor). Her ekrana ayrı ayrı
+# "seçili düğme" mantığı eklemek yerine sol çubuk bir SANAL İMLECİ
+# sürüyor ve A tuşu tıklama üretiyor. Böylece menüler, marketler, ayarlar
+# — hepsi tek bir yerden kontrolcüyle çalışır hâle geliyor.
+#
+# NEDEN SDL GameController API: ham joystick eksen numaraları sürücüden
+# sürücüye değişiyor (XInput'ta sol tetik 2. eksen, DirectInput'ta 4.).
+# SDL'in kendi eşleme veritabanı bu işi çözüyor: LEFTX / RIGHTY / BUTTON_A
+# gibi İSİMLERLE okuyoruz, hangi marka pad takılı olursa olsun doğru
+# geliyor.
+# =====================================================================
+
+PAD_DEADZONE = 0.28          # çubuk merkezdeyken titremesin
+PAD_CURSOR_SPEED = 900.0     # menüde imleç hızı (sanal piksel/sn)
+PAD_AIM_RADIUS = 300.0       # oyunda nişangahın oyuncudan uzaklığı
+
+
+def _dz(v, dead=PAD_DEADZONE):
+    """Ölü bölge + yeniden ölçekleme: eşiğin hemen üstünde ani sıçrama olmasın."""
+    a = abs(v)
+    if a < dead:
+        return 0.0
+    return math.copysign((a - dead) / (1.0 - dead), v)
+
+
+class Gamepad:
+    """Tek bir kontrolcüyü okur. Pad yoksa her şey sessizce 0 döner."""
+
+    def __init__(self):
+        self.ok = False
+        self.pad = None
+        self.name = ""
+        self.cursor = [VIRTUAL_W / 2, VIRTUAL_H / 2]
+        self.active = False          # son girdi PAD'den mi geldi?
+        self._prev = {}              # düğme kenarı yakalamak için
+        self._edge = set()           # bu karede YENİ basılan düğmeler
+        try:
+            from pygame._sdl2 import controller as _ctrl
+            _ctrl.init()
+            self._ctrl = _ctrl
+            self.rescan()
+        except Exception:
+            self._ctrl = None
+
+    def rescan(self):
+        """Takılı pad'i bulur. Oyun açıkken takılan pad de yakalanır."""
+        if self._ctrl is None:
+            return
+        try:
+            for i in range(self._ctrl.get_count()):
+                if self._ctrl.is_controller(i):
+                    self.pad = self._ctrl.Controller(i)
+                    self.name = self._ctrl.name_forindex(i) or "Kontrolcü"
+                    self.ok = True
+                    return
+        except Exception:
+            pass
+        self.pad = None
+        self.ok = False
+
+    def handle_event(self, event):
+        """Pad takma/çıkarma olayları."""
+        if event.type in (pygame.JOYDEVICEADDED, pygame.JOYDEVICEREMOVED):
+            self.rescan()
+
+    # ---- ham okuma ----
+    def _axis(self, which):
+        if not self.ok:
+            return 0.0
+        try:
+            return _dz(self.pad.get_axis(which) / 32768.0)
+        except Exception:
+            return 0.0
+
+    def _btn(self, which):
+        if not self.ok:
+            return False
+        try:
+            return bool(self.pad.get_button(which))
+        except Exception:
+            return False
+
+    def update(self, dt, mouse_moved):
+        """Her karede bir kez. Sanal imleci sürer, düğme kenarlarını çıkarır."""
+        if not self.ok:
+            self.active = False
+            self._edge = set()
+            return
+        C = pygame
+        now = {
+            "a": self._btn(C.CONTROLLER_BUTTON_A),
+            "b": self._btn(C.CONTROLLER_BUTTON_B),
+            "x": self._btn(C.CONTROLLER_BUTTON_X),
+            "y": self._btn(C.CONTROLLER_BUTTON_Y),
+            "lb": self._btn(C.CONTROLLER_BUTTON_LEFTSHOULDER),
+            "rb": self._btn(C.CONTROLLER_BUTTON_RIGHTSHOULDER),
+            "start": self._btn(C.CONTROLLER_BUTTON_START),
+            "back": self._btn(C.CONTROLLER_BUTTON_BACK),
+            "up": self._btn(C.CONTROLLER_BUTTON_DPAD_UP),
+            "down": self._btn(C.CONTROLLER_BUTTON_DPAD_DOWN),
+            "left": self._btn(C.CONTROLLER_BUTTON_DPAD_LEFT),
+            "right": self._btn(C.CONTROLLER_BUTTON_DPAD_RIGHT),
+        }
+        self._edge = {k for k, v in now.items() if v and not self._prev.get(k)}
+        self._prev = now
+
+        lx, ly = self.left_stick()
+        rx, ry = self.right_stick()
+        used = (abs(lx) + abs(ly) + abs(rx) + abs(ry)) > 0.01 or any(now.values()) \
+            or self.trigger_right() > 0.2
+        # Fare oynarsa söz fareye geçer, pad oynarsa pad'e. İkisi birbirinin
+        # imlecini kapmasın diye son HAREKET EDEN kazanıyor.
+        if used:
+            self.active = True
+        elif mouse_moved:
+            self.active = False
+        if self.active:
+            self.cursor[0] = clamp(self.cursor[0] + lx * PAD_CURSOR_SPEED * dt, 0, VIRTUAL_W)
+            self.cursor[1] = clamp(self.cursor[1] + ly * PAD_CURSOR_SPEED * dt, 0, VIRTUAL_H)
+
+    # ---- dışarıya açık yüzey ----
+    def left_stick(self):
+        return self._axis(pygame.CONTROLLER_AXIS_LEFTX), self._axis(pygame.CONTROLLER_AXIS_LEFTY)
+
+    def right_stick(self):
+        return self._axis(pygame.CONTROLLER_AXIS_RIGHTX), self._axis(pygame.CONTROLLER_AXIS_RIGHTY)
+
+    def trigger_right(self):
+        if not self.ok:
+            return 0.0
+        try:
+            return clamp(self.pad.get_axis(pygame.CONTROLLER_AXIS_TRIGGERRIGHT) / 32768.0, 0.0, 1.0)
+        except Exception:
+            return 0.0
+
+    def pressed(self, name):
+        """Bu karede YENİ basıldı mı? (basılı tutmak tekrar saymaz)"""
+        return name in self._edge
+
+    def held(self, name):
+        return bool(self._prev.get(name))
+
+    def fire_held(self):
+        """Ateş: sağ tetik ya da A."""
+        return self.trigger_right() > 0.3 or self.held("a")
+
+
+# Pad düğmelerinin arayüzde görünen adları (yetenek çubuğu etiketleri).
+PAD_LABELS = {"fire": "RT", "bonk": "X", "dash": "LB", "shop": "Y",
+              "use": "A", "pause": "START", "stats": "BACK", "map": "RB"}
+
+# Çizim işlevleri App örneğini görmüyor (hepsi serbest fonksiyon). Pad'in
+# etkin olup olmadığını tek elemanlı bir listeyle paylaşıyoruz; ana döngü
+# her karede günceller.
+PAD_ACTIVE = [False]
+
+
 class Display:
     """Oyun hep 1280x720'ye çizilir, sonra pencereye ölçeklenir.
 
@@ -18616,6 +18783,9 @@ class Display:
         self.scale = 1.0
         self.offset = (0, 0)
         self.out_size = (VIRTUAL_W, VIRTUAL_H)
+        # Kontrolcü etkinken ana döngü buraya sanal imleci yazar; None ise
+        # fare kullanılır.
+        self.pad_cursor = None
         self._compute_scale()
 
     def _make_screen(self, size=None):
@@ -18689,6 +18859,9 @@ class Display:
         pygame.display.flip()
 
     def virtual_mouse(self):
+        # Kontrolcü etkinse imleç ondan gelir (bkz. App.run_loop).
+        if self.pad_cursor is not None:
+            return self.pad_cursor
         mx, my = pygame.mouse.get_pos()
         if self.scaled_mode:
             # SCALED kipinde SDL fare konumunu zaten sanal çözünürlüğe
@@ -19468,17 +19641,17 @@ def draw_offscreen_markers(surf, run, cam, t):
 # =====================================================================
 
 SKILL_SLOTS = [
-    {"key": "SOL TIK", "name": "ATEŞ", "icon": "target", "color": (150, 210, 255),
+    {"key": "SOL TIK", "pad": "fire", "name": "ATEŞ", "icon": "target", "color": (150, 210, 255),
      "cd": lambda p: (p.atk_timer, p.eff_atk_cd())},
-    {"key": "SPACE", "name": "BONK", "icon": "fist", "color": (245, 150, 80),
+    {"key": "SPACE", "pad": "bonk", "name": "BONK", "icon": "fist", "color": (245, 150, 80),
      "cd": lambda p: (p.bonk_timer, p.eff_bonk_cd())},
-    {"key": "SHIFT", "name": "DASH", "icon": "dash", "color": (130, 225, 210),
+    {"key": "SHIFT", "pad": "dash", "name": "DASH", "icon": "dash", "color": (130, 225, 210),
      "cd": lambda p: (p.dash_cd_timer, p.eff_dash_cd())},
-    {"key": "B", "name": "MARKET", "icon": "coin", "color": GOLD, "cd": None},
+    {"key": "B", "pad": "shop", "name": "MARKET", "icon": "coin", "color": GOLD, "cd": None},
 ]
 
 # Yalnızca belirli skinlerde görünen ek yuvalar.
-SKILL_SLOT_SMASH = {"key": "SPACE", "name": "EZİCİ", "icon": "skull", "color": (150, 255, 130),
+SKILL_SLOT_SMASH = {"key": "SPACE", "pad": "bonk", "name": "EZİCİ", "icon": "skull", "color": (150, 255, 130),
                     "cd": lambda p: (p.smash_timer, RunState.TITAN_SMASH_CD)}
 
 
@@ -19884,7 +20057,10 @@ def draw_skill_bar(surf, run, t):
         # tuş etiketi
         kb = pygame.Rect(r.x + 3, int(r.bottom - 17 * k), r.w - 6, max(9, int(14 * k)))
         pygame.draw.rect(surf, (30, 33, 50) if not locked else (26, 27, 38), kb, border_radius=4)
-        draw_text(surf, LX("key." + str(sk["key"]), sk["key"]), kb.center,
+        # KONTROLCÜ etkinse tuş yerine PAD DÜĞMESİ yazar: oyuncu elindeki
+        # alete bakıp "SPACE" görmesin.
+        klabel = PAD_LABELS.get(sk.get("pad", ""), "") if PAD_ACTIVE[0] else ""
+        draw_text(surf, klabel or LX("key." + str(sk["key"]), sk["key"]), kb.center,
                   max(6, int(9 * k)), TEXT if not locked else (110, 114, 136),
                   bold=True, center=True, shadow=False)
 
@@ -21866,6 +22042,10 @@ class App:
         self.gem_msg_ok = True
         self.store_tab = "gems"       # MAĞAZA sekmesi: gems | skins | pets
         self.world_lb_t = 0.0         # DÜNYA SIRALAMASI beliriş animasyonu
+        # KONTROLCÜ: pad takılıysa menülerde sanal imleç sürer, oyunda
+        # çift çubukla oynatır (bkz. Gamepad).
+        self.pad = Gamepad()
+        self._mouse_prev = pygame.mouse.get_pos()
         self.menu_buttons = []
         self.build_menu_buttons()
         audio.set_music("menu")
@@ -21968,12 +22148,26 @@ class App:
         # Sohbet kutusu açıkken WASD yazıya gider, yürüyüşe gitmez.
         if self.chat.open:
             return {"left": 0, "right": 0, "up": 0, "down": 0}
-        return {
+        out = {
             "left": 1 if (keys_pressed[pygame.K_a] or keys_pressed[pygame.K_LEFT]) else 0,
             "right": 1 if (keys_pressed[pygame.K_d] or keys_pressed[pygame.K_RIGHT]) else 0,
             "up": 1 if (keys_pressed[pygame.K_w] or keys_pressed[pygame.K_UP]) else 0,
             "down": 1 if (keys_pressed[pygame.K_s] or keys_pressed[pygame.K_DOWN]) else 0,
         }
+        # KONTROLCÜ: sol çubuk. Değerler oyuncunun hareket kodunda zaten
+        # normalleniyor (mx = right - left), o yüzden kesirli değer sorun
+        # değil — çubuk ne kadar yatarsa o kadar yöne basılmış sayılır.
+        if self.pad.ok:
+            lx, ly = self.pad.left_stick()
+            if lx > 0:
+                out["right"] = max(out["right"], lx)
+            elif lx < 0:
+                out["left"] = max(out["left"], -lx)
+            if ly > 0:
+                out["down"] = max(out["down"], ly)
+            elif ly < 0:
+                out["up"] = max(out["up"], -ly)
+        return out
 
     # ---------------- SOHBET / HİLE KODU ----------------
     def _chat_can_open(self):
@@ -22051,6 +22245,7 @@ class App:
             wheel_y = 0
 
             for event in pygame.event.get():
+                self.pad.handle_event(event)      # takma/çıkarma
                 if event.type == pygame.QUIT:
                     self.running = False
                 elif event.type == pygame.VIDEORESIZE:
@@ -22106,6 +22301,20 @@ class App:
                     elif event.button == 3 and self.state == STATE_PLAY:
                         dash_pressed = True
 
+            # ---- KONTROLCÜ ----
+            mpos_now = pygame.mouse.get_pos()
+            mouse_moved = mpos_now != self._mouse_prev
+            self._mouse_prev = mpos_now
+            self.pad.update(dt, mouse_moved)
+            PAD_ACTIVE[0] = self.pad.ok and self.pad.active
+            if self.pad.active:
+                # Menülerde sanal imleç; oyunda nişangah oyuncunun çevresinde
+                # sağ çubuğun gösterdiği yöne oturur (aşağıda).
+                self.display.pad_cursor = (self.pad.cursor[0], self.pad.cursor[1])
+                mouse_pos = self.display.virtual_mouse()
+            else:
+                self.display.pad_cursor = None
+
             keys = pygame.key.get_pressed()
             mouse_down = pygame.mouse.get_pressed()[0]
             if self.chat.open:
@@ -22122,6 +22331,41 @@ class App:
                     wheel_y += 13.0 * dt
                 if keys[pygame.K_DOWN]:
                     wheel_y -= 13.0 * dt
+
+            # ---- KONTROLCÜ EYLEMLERİ ----
+            # Klavye/farenin ürettiği aynı bayraklara yazıyoruz: oyunun geri
+            # kalanı pad'in varlığından habersiz kalıyor.
+            if self.pad.ok and not self.chat.open:
+                pad = self.pad
+                if self.state == STATE_PLAY:
+                    if pad.fire_held():
+                        mouse_down = True
+                    if pad.pressed("x"):
+                        bonk_pressed = True
+                    if pad.pressed("lb") or pad.pressed("rb"):
+                        dash_pressed = True
+                    if pad.pressed("a"):
+                        use_pressed = True
+                    if pad.pressed("back"):
+                        stats_pressed = True
+                    if pad.pressed("y"):
+                        self.run.open_shop()
+                        self.state = STATE_RUN_SHOP
+                    if pad.pressed("start"):
+                        self.handle_escape()
+                elif self.state == STATE_RUN_SHOP and pad.pressed("y"):
+                    self.state = STATE_PLAY
+                else:
+                    # Menülerde A = tıkla, B/START = geri
+                    if pad.pressed("a"):
+                        clicked = True
+                    if pad.pressed("b") or pad.pressed("start"):
+                        self.handle_escape()
+                # Listeler sağ çubukla da kaydırılsın
+                if self.state in (STATE_SKIN_MARKET, STATE_COSMETIC_MARKET,
+                                  STATE_BOOK_MARKET, STATE_WEAPON_CODEX,
+                                  STATE_ACHIEVEMENTS):
+                    wheel_y -= pad.right_stick()[1] * 13.0 * dt
 
             if self.state == STATE_MENU: self.update_menu(dt, mouse_pos, clicked)
             elif self.state == STATE_PLAY: self.update_play(dt, keys, mouse_pos, mouse_down, bonk_pressed,
@@ -22221,6 +22465,18 @@ class App:
         # Fare EKRAN koordinatında gelir. Dünyaya çevirme işi RunState.update
         # içinde, KAMERA GÜNCELLENDİKTEN SONRA yapılır (bkz. aim_sx) — yoksa
         # nişan farenin bir kare gerisinde kalıyor.
+        # KONTROLCÜ NİŞANI: sağ çubuk bir YÖN verir, nokta değil. Nişangahı
+        # oyuncunun çevresinde o yöne oturtuyoruz — hem oyunun geri kalanı
+        # (ekran koordinatı bekleyen) değişmiyor, hem de oyuncu nereye
+        # nişan aldığını gözüyle görüyor.
+        if self.pad.ok:
+            rx, ry = self.pad.right_stick()
+            if abs(rx) + abs(ry) > 0.02:
+                psx, psy = self.run.world_to_screen(self.run.player.x, self.run.player.y)
+                l = math.hypot(rx, ry) or 1.0
+                mouse_pos = (psx + rx / l * PAD_AIM_RADIUS,
+                             psy + ry / l * PAD_AIM_RADIUS)
+                self.pad.cursor[0], self.pad.cursor[1] = mouse_pos
         input_state["aim_sx"] = mouse_pos[0]
         input_state["aim_sy"] = mouse_pos[1]
         aim_wx, aim_wy = self.run.screen_to_world(mouse_pos[0], mouse_pos[1])
@@ -23972,6 +24228,14 @@ class App:
             i = FPS_CHOICES.index(cap) if cap in FPS_CHOICES else 0
             st["fps_cap"] = FPS_CHOICES[(i + 1) % len(FPS_CHOICES)]
             save_cfg()
+        y += ROW_STEP
+        # KONTROLCÜ DURUMU: bilgi satırı (tıklanmaz). Oyuncu pad'inin
+        # tanınıp tanınmadığını buradan görür — "çalışmıyor mu acaba?"
+        # diye tahmin etmesin.
+        pad_on = self.pad.ok
+        self._set_row(canvas, pygame.Rect(rx, y, cw, ROW_H), L("ui.gamepad"),
+                      (self.pad.name[:18] if pad_on else L("ui.gamepad_none")),
+                      GREEN if pad_on else TEXT_DIM, mouse_pos, False)
         y += ROW_STEP
         tog(pygame.Rect(rx, y, cw, ROW_H), L("ui.fps_show"), "fps", default=False)
         y += ROW_STEP
