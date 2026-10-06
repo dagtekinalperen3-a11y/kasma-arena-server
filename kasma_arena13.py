@@ -913,6 +913,21 @@ STRINGS = {
     "ults.immortal_merc": _T("KURŞUN", "BULLETS", "BALAS", "KUGELN", "ПУЛИ"),
     "ult.pink_dream": _T("RÜYA PATLAMASI", "DREAM BURST", "ESTALLIDO ONÍRICO", "TRAUMSTOSS", "ВЗРЫВ ГРЁЗ"),
     "ults.pink_dream": _T("RÜYA", "DREAM", "SUEÑO", "TRAUM", "ГРЁЗА"),
+    "ui.pb_banner":  _T("KİŞİSEL REKOR!", "PERSONAL BEST!", "¡RÉCORD PERSONAL!",
+                        "PERSÖNLICHER REKORD!", "ЛИЧНЫЙ РЕКОРД!"),
+    "ui.pb_up":      _T("eski rekorun {0} — {1} daha iyi",
+                        "your old best was {0} — {1} better",
+                        "tu récord anterior era {0} — {1} mejor",
+                        "dein alter Rekord war {0} — {1} besser",
+                        "прежний рекорд {0} — лучше на {1}"),
+    "ui.pb_first":   _T("ilk kaydın — bundan sonrası hep bunu geçmek",
+                        "your first record — now beat it",
+                        "tu primer récord — ahora supéralo",
+                        "dein erster Rekord — jetzt schlag ihn",
+                        "первый рекорд — теперь побей его"),
+    "ui.pb_best":    _T("en iyi {0}", "best {0}", "mejor {0}", "Bester {0}", "лучший {0}"),
+    "ui.next_unlock": _T("EN YAKIN KİLİT", "CLOSEST UNLOCK", "DESBLOQUEO MÁS CERCANO",
+                         "NÄCHSTE FREISCHALTUNG", "БЛИЖАЙШАЯ РАЗБЛОКИРОВКА"),
     "ui.acc_change_pw": _T("ŞİFREYİ DEĞİŞTİR", "CHANGE PASSWORD", "CAMBIAR CONTRASEÑA",
                            "PASSWORT ÄNDERN", "СМЕНИТЬ ПАРОЛЬ"),
     "ui.acc_set_pw":  _T("ŞİFRE BELİRLE", "SET PASSWORD", "ESTABLECER CONTRASEÑA",
@@ -1144,6 +1159,7 @@ STRINGS = {
     "ui.empty":       _T("boş", "empty", "vacío", "leer", "пусто"),
     "ui.waiting_owner": _T("sahibini bekliyor", "waiting for an owner", "esperando dueño", "wartet auf einen Besitzer", "ждёт хозяина"),
     "ui.world_top":   _T("EN İYİ {0}  ·  her koşudan sonra otomatik gönderilir", "TOP {0}  ·  sent automatically after each run", "TOP {0}  ·  se envía tras cada partida", "TOP {0}  ·  nach jedem Lauf gesendet", "ТОП {0}  ·  отправляется после забега"),
+    "ui.lb_col_name": _T("İsim", "Name", "Nombre", "Name", "Имя"),
     "ui.lb_loading":  _T("Sıralama yükleniyor", "Loading ranking", "Cargando ranking", "Rangliste wird geladen", "Загрузка рейтинга"),
     "ui.lb_none":     _T("Henüz çevrimiçi skor yok.", "No online scores yet.", "Aún no hay puntuaciones en línea.", "Noch keine Online-Scores.", "Онлайн-рекордов пока нет."),
     "ui.lb_be_first": _T("İlk sırayı sen al!", "Take the first spot!", "¡Toma el primer puesto!", "Hol dir den ersten Platz!", "Займи первое место!"),
@@ -18962,6 +18978,19 @@ class RunState:
 
     def finish_run(self):
         self.game_over = True
+        # KİŞİSEL REKOR KUTLAMASI için eski değerleri burada saklıyoruz:
+        # aşağıdaki max(...) satırları birkaç satır sonra bunları EZİYOR,
+        # yani sonuç ekranı "rekor kırdım mı?" sorusunu sonradan
+        # cevaplayamıyordu. Giriş yapmış oyuncu "YENİ REKOR!" yazısını hiç
+        # görmüyordu, çünkü o yazı yalnızca isim girme ekranında çiziliyor
+        # ve o ekran hesabı olan oyuncuda hiç açılmıyor.
+        _st0 = self.save.data.get("stats", {})
+        self.prev_best = {
+            "score": int(_st0.get("best_score", 0) or 0),
+            "wave": int(_st0.get("best_wave", 0) or 0),
+            "kills": int(_st0.get("best_run_kills", 0) or 0),
+            "combo": int(_st0.get("best_combo", 0) or 0),
+        }
         # Koşu bitti: skor; öldürme, dalga ve süreyle tutarlı mı?
         if not self.cheat_flag and not run_score_plausible(self):
             self.cheat_flag = "skor"
@@ -23353,26 +23382,65 @@ class App:
         self.bg.update(dt * 0.2)
         self.bg.draw(canvas)
         r = self.run
-        panel_rect = pygame.Rect(0, 0, 560, 540)
+        # Panel v3.22'de uzadı: kişisel rekor şeridi ve "en yakın kilit"
+        # bloğu eklenince içerik düğmelerin altına taşıyordu.
+        panel_rect = pygame.Rect(0, 0, 560, 600)
         panel_rect.center = (VIRTUAL_W / 2, VIRTUAL_H / 2 - 6)
         panel(canvas, panel_rect, alpha=245)
         draw_text(canvas, L("ui.game_over"), (panel_rect.centerx, panel_rect.y + 38), 36, RED, bold=True, center=True)
         if r.death_cause:
             draw_text(canvas, L("ui.killed_by", r.death_cause), (panel_rect.centerx, panel_rect.y + 68), 13, TEXT_DIM, center=True, shadow=False)
+        # ---- KİŞİSEL REKOR ----
+        # Eski rekorlar finish_run'ın en başında saklanıyor (orada max ile
+        # eziliyorlar). Giriş yapmış oyuncu "YENİ REKOR" yazısını hiç
+        # görmüyordu: o yazı yalnızca isim girme ekranındaydı ve hesabı olan
+        # oyuncuda o ekran hiç açılmıyor.
+        pb = getattr(r, "prev_best", None) or {}
+        rekor = r.run_is_clean() and int(r.score) > int(pb.get("score", 0))
+        if rekor:
+            bar = pygame.Rect(panel_rect.x + 30, panel_rect.y + 84,
+                              panel_rect.w - 60, 34)
+            add_glow(canvas, bar.centerx, bar.centery, bar.w * 0.45, GOLD, 0.18)
+            panel(canvas, bar, bg=(44, 36, 16), edge=GOLD, alpha=238, radius=8,
+                  edge_w=2)
+            draw_text(canvas, L("ui.pb_banner"), (bar.centerx, bar.centery - 10), 18,
+                      GOLD, bold=True, center=True)
+            eski = int(pb.get("score", 0))
+            alt = (L("ui.pb_first") if eski <= 0 else
+                   L("ui.pb_up", fmt_num(eski), "%%%d" % max(1, round(
+                       (int(r.score) / max(1, eski) - 1.0) * 100))))
+            draw_text(canvas, alt, (bar.centerx, bar.bottom + 5), 11, (214, 190, 130),
+                      center=True, shadow=False)
+
+        def _best_txt(key, cur, bicim):
+            """Satırın sağındaki soluk 'en iyi: ...' karşılaştırması."""
+            b = int(pb.get(key, 0) or 0)
+            if b <= 0 or cur > b:
+                return ""
+            return L("ui.pb_best", bicim(b))
+
         rows = [
-            (L("ui.go_score"), fmt_num(r.score), GOLD), (L("ui.go_wave"), str(r.waves.wave), CYAN),
-            (L("ui.go_diff"), LX("diff." + r.diff, DIFF_LABEL.get(r.diff, r.diff)), TEXT), (L("ui.go_kills"), str(r.kills), TEXT),
+            (L("ui.go_score"), fmt_num(r.score), GOLD,
+             _best_txt("score", int(r.score), fmt_num)),
+            (L("ui.go_wave"), str(r.waves.wave), CYAN,
+             _best_txt("wave", r.waves.wave, str)),
+            (L("ui.go_diff"), LX("diff." + r.diff, DIFF_LABEL.get(r.diff, r.diff)), TEXT, ""),
+            (L("ui.go_kills"), str(r.kills), TEXT,
+             _best_txt("kills", int(r.kills), str)),
             (L("ui.go_map"), L("ui.hell") if r.biome == "hell" else L("ui.arena"),
-             (255, 130, 80) if r.biome == "hell" else CYAN),
-            (L("ui.go_time"), fmt_time(r.run_time), TEXT),
-            (L("ui.go_gold"), fmt_num(r.coins_earned), GOLD),
-            (L("ui.go_gems"), fmt_num(r.gems_earned), GEM_COLOR),
+             (255, 130, 80) if r.biome == "hell" else CYAN, ""),
+            (L("ui.go_time"), fmt_time(r.run_time), TEXT, ""),
+            (L("ui.go_gold"), fmt_num(r.coins_earned), GOLD, ""),
+            (L("ui.go_gems"), fmt_num(r.gems_earned), GEM_COLOR, ""),
         ]
-        y = panel_rect.y + 96
-        for label, val, col in rows:
+        y = panel_rect.y + (140 if rekor else 96)
+        for label, val, col, note in rows:
             draw_text(canvas, label, (panel_rect.x + 40, y), 16, TEXT_DIM)
             draw_text(canvas, val, (panel_rect.right - 40, y), 18, col, bold=True, right=True)
-            y += 33
+            if note:
+                draw_text(canvas, note, (panel_rect.x + 40 + text_width(label, 16) + 12,
+                                         y + 4), 10, (118, 122, 146), shadow=False)
+            y += 29
         draw_text(canvas, L("ui.shop_lost"), (panel_rect.centerx, y + 4), 12, TEXT_DIM, center=True, shadow=False)
         y += 26
         if not r.run_is_clean():
@@ -23426,6 +23494,42 @@ class App:
                           + (f" +{len(new_b) - 3}" if len(new_b) > 3 else ""),
                           (panel_rect.x + 58, y), 14, (186, 150, 255), bold=True, shadow=False)
                 y += 21
+
+        # ---- EN YAKIN KİLİT ----
+        # "Bir koşu daha" duygusunun en ucuz kaynağı: oyuncuya kapanırken
+        # NEYE az kaldığını göstermek. Açılmamış silah ve kitaplar görev
+        # ilerlemesine göre sıralanıp en yakın ikisi yazılıyor.
+        yakin = []
+        for w2 in BOSS_WEAPONS:
+            if not self.save.owns_weapon(w2["key"]):
+                yakin.append((weapon_frac(self.save, w2), w_name(w2), "sword",
+                              (238, 150, 100)))
+        for bk in BOOKS:
+            if not self.save.owns_book(bk["key"]):
+                yakin.append((book_frac(self.save, bk), bk_name(bk), "book",
+                              (186, 150, 255)))
+        yakin = [z for z in yakin if z[0] < 0.999]
+        yakin.sort(key=lambda z: -z[0])
+        # Düğmelerin üstüne taşmasın: yer kalmadıysa hiç çizilmez. Panel
+        # içeriği koşuya göre değişiyor (açılan silah/kitap satırları,
+        # sunucu durumu), o yüzden sabit bir yerleşim yetmiyor.
+        yer = panel_rect.bottom - 72 - 14
+        if yakin and y + 36 < yer:
+            yakin = yakin[:2 if y + 56 < yer else 1]
+            y += 4
+            draw_text(canvas, L("ui.next_unlock"), (panel_rect.x + 40, y), 11,
+                      (130, 136, 162), bold=True, shadow=False)
+            y += 16
+            for frac, ad, ikon, col in yakin:
+                draw_icon(canvas, panel_rect.x + 46, y + 7, ikon, col, 6)
+                draw_text(canvas, _fit_text(ad, 13, 210), (panel_rect.x + 60, y), 13,
+                          col, bold=True, shadow=False)
+                pb_r = pygame.Rect(panel_rect.right - 190, y + 5, 150, 8)
+                draw_bar(canvas, pb_r, clamp(frac, 0.0, 1.0), col, radius=4)
+                draw_text(canvas, "%%%d" % round(frac * 100),
+                          (panel_rect.right - 36, y + 1), 11, col, right=True,
+                          shadow=False)
+                y += 20
 
         w, h = 220, 52
         by = panel_rect.bottom - 72
@@ -25261,7 +25365,11 @@ class App:
         panel(canvas, panel_rect, alpha=245)
         draw_text(canvas, L("ui.local_board"), (panel_rect.centerx, panel_rect.y + 40), 30, GOLD, bold=True, center=True)
         board = self.save.data.get("leaderboard", [])
-        headers = ["#", "İsim", "Skor", "Dalga", "Öldürme", "Süre"]
+        # v3.22: bu başlıklar sabit Türkçeydi — ekranın başlığı çevriliyken
+        # tablonun kendisi çevrilmiyordu, yani 4 dildeki oyuncu kendi
+        # ilerlemesini Türkçe sütun adlarıyla okuyordu.
+        headers = ["#", L("ui.lb_col_name"), L("ui.go_score"), L("ui.go_wave"),
+                   L("ui.go_kills"), L("ui.go_time")]
         col_x = [panel_rect.x + 30, panel_rect.x + 70, panel_rect.x + 250, panel_rect.x + 360, panel_rect.x + 450, panel_rect.x + 550]
         hy = panel_rect.y + 90
         for i, h in enumerate(headers):
