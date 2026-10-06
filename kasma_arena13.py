@@ -10666,7 +10666,7 @@ class Tornado:
     # en yüksek seviyede bile eski değerin çok altında kalıyor.
     BASE_PULL_R = 200.0        # v3.14: 1. seviyedeki çekim menzili
     PULL_R_PER_LEVEL = 4.0     # v3.14: her seviyede eklenen menzil (25. sv: ~296 px)
-    LIFE = 2.0                 # v3.14: kasırganın ömrü (saniye)
+    LIFE = 2.6                 # v3.22: kasırganın ömrü (saniye)
     GRIND_TICK = 0.20          # öğütme hasarının tik aralığı (saniye)
     # Geriye dönük uyumluluk: bu sınıfa hâlâ Tornado.PULL_R diye erişen bir
     # yer kalırsa (mod/araç), 1. seviye değeriyle eşleşsin.
@@ -10707,11 +10707,18 @@ class Tornado:
             return
         # Öğütme hasarı tik tik uygulanır: her karede vurmak hem hasar
         # sayılarını hem de can çalma / infaz kapısını gereksiz yere yoruyor.
+        # ÖLÇEK DÜZELTMESİ (v3.22): burada `self.dps` bir kez daha
+        # GRIND_TICK ile çarpılıyordu, yani silah satırındaki `dmg` değeri
+        # saniyelik sayılıp beşe bölünüyordu. Oyundaki diğer bütün alan
+        # silahlarında (PENTAGRAM, PAPUÇ, BUZ İZİ) `dmg` TİK BAŞINA hasardır;
+        # HORTUM tek başına farklı davranıyordu. Ölçüm: 20. dalgada patrona
+        # 12 saniyede 6.1 DPS veriyordu — sonraki en düşük silah 45.1 (ZEMZEM),
+        # en yükseği 839.6 (KALKAN). Artık tik başına uygulanıyor.
         grind = 0.0
         self.grind_t -= dt
         if self.dps > 0 and self.grind_t <= 0:
             self.grind_t = self.GRIND_TICK
-            grind = self.dps * self.GRIND_TICK
+            grind = self.dps
         for d in self.debris:
             d[0] += d[3] * dt
             d[2] += 46 * dt
@@ -11510,8 +11517,15 @@ BOSS_WEAPONS = [
     #   2) Taban öğütme hasarı biraz düştü, buna karşılık seviye başına
     #      kazancı korundu: silah geç oyunda hâlâ ciddi, ama "indiği anda
     #      ekranı süpüren" bir düğme değil.
+    # v3.22 — ÖĞÜTME ÖLÇEĞİ: tik hasarı artık tik başına uygulanıyor (bkz.
+    # Tornado.update), yani eskiden olduğu gibi beşe bölünmüyor. Bu düzeltme
+    # tek başına bırakılsa 1. seviye HORTUM 1. dalgayı tamamen siliyordu
+    # (ölçüm: 24/24). Bu yüzden taban hasar düşürüldü ve seviye kazancı
+    # dikleştirildi: 1->25 arası öğütme x3.0 değil x6.7 büyüyor. Sonuç
+    # (24 kişilik kalabalık, yeni oyuncu): 1. sv 1. dalgada 12/24 (eskisiyle
+    # aynı), 25. sv 20. dalgada 20/24; patrona 25. sv 36.6 DPS (eskiden 6.1).
     dict(key="tornado", name="HORTUM", icon="orbit", color=TORNADO_COLOR,
-         cd=20.0, dmg=0.84, style=None, cdl=1.0, dpl=0.105,
+         cd=20.0, dmg=0.38, style=None, cdl=1.0, dpl=0.295,
          up="menzil genişler, canı daha derin keser ve içinde daha çok öğütür",
          desc="Yaratıkları ortaya toplar, canlarını azaltır ve huninin içinde "
               "kalanı sürekli öğütür. 10. seviyeden sonra küçük yaratıkları "
