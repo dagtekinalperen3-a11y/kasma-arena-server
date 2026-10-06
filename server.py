@@ -832,10 +832,13 @@ def _rate_ok(key):
         return True
 
 
+# Oyundaki SUBMIT_SIG_FIELDS ile BİREBİR aynı olmalı.
+SUBMIT_SIG_FIELDS = ("name", "score", "kills", "wave", "run_time", "created_at", "diff")
+
+
 def _expected_sig(payload):
     """İmza, istemcideki sign_submit() ile BİREBİR aynı sırayı kullanır."""
-    msg = "|".join(str(payload.get(k, "")) for k in
-                   ("name", "score", "kills", "wave", "run_time", "created_at"))
+    msg = "|".join(str(payload.get(k, "")) for k in SUBMIT_SIG_FIELDS)
     return hmac.new(SUBMIT_SECRET.encode("utf-8"), msg.encode("utf-8"),
                     hashlib.sha256).hexdigest()
 
@@ -906,6 +909,11 @@ def add_score():
         wave = int(data.get("wave", 0))
         run_time = float(data.get("run_time", 0))
         created_at = float(data.get("created_at", 0))
+        # ZORLUK: sıralamada görünür, o yüzden imzanın içinde. Bilinmeyen bir
+        # değer gelirse "normal" sayılır (uydurma etiket yazılamasın).
+        diff = str(data.get("diff", "normal"))
+        if diff not in ("normal", "hard", "nightmare"):
+            diff = "normal"
 
         # ---- SÜZGEÇ 3: HIZ SINIRI ----
         src = request.headers.get("X-Forwarded-For", request.remote_addr or "?")
@@ -919,6 +927,7 @@ def add_score():
             want = _expected_sig({
                 "name": name, "score": score, "kills": kills, "wave": wave,
                 "run_time": run_time, "created_at": created_at,
+                "diff": str(data.get("diff", "normal")),
             })
             if not sig or not hmac.compare_digest(sig, want):
                 return jsonify({"success": False, "error": "imza doğrulanamadı"}), 403
@@ -952,7 +961,8 @@ def add_score():
             "kills": kills,
             "wave": wave,
             "run_time": run_time,
-            "created_at": created_at
+            "created_at": created_at,
+            "diff": diff,
         }
         if account_id is not None:
             payload["account_id"] = account_id

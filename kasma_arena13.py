@@ -918,6 +918,7 @@ STRINGS = {
     "ui.sync_fail":   _T("İLERLEME SUNUCUYA YAZILAMADI", "PROGRESS COULD NOT BE SAVED",
                          "NO SE PUDO GUARDAR EL PROGRESO", "FORTSCHRITT NICHT GESPEICHERT",
                          "ПРОГРЕСС НЕ СОХРАНЁН"),
+    "ui.lb_wave_n":   _T("Dalga {0}", "Wave {0}", "Oleada {0}", "Welle {0}", "Волна {0}"),
     "ui.gamepad":     _T("KONTROLCÜ", "GAMEPAD", "MANDO", "CONTROLLER", "ГЕЙМПАД"),
     "ui.gamepad_none": _T("bağlı değil", "not connected", "no conectado",
                           "nicht verbunden", "не подключён"),
@@ -2938,10 +2939,16 @@ SUBMIT_SECRET = os.environ.get("KASMA_SUBMIT_SECRET",
                                "kasma-arena-submit-v1:3d7f90ac41be6528")
 
 
+# İmzaya giren alanlar. Sunucudaki _expected_sig ile BİREBİR aynı olmalı;
+# biri değişirse diğeri de değişmeli, yoksa bütün gönderiler reddedilir.
+# "diff" v3.22'de eklendi: zorluk sıralamada görünüyor, dolayısıyla imzanın
+# içinde olmalı — yoksa oyuncu KABUS'ta oynamadan "KABUS" etiketi yazdırır.
+SUBMIT_SIG_FIELDS = ("name", "score", "kills", "wave", "run_time", "created_at", "diff")
+
+
 def sign_submit(payload):
     """Skor gönderisinin imzası (sunucudaki doğrulamayla birebir aynı sıra)."""
-    msg = "|".join(str(payload.get(k, "")) for k in
-                   ("name", "score", "kills", "wave", "run_time", "created_at"))
+    msg = "|".join(str(payload.get(k, "")) for k in SUBMIT_SIG_FIELDS)
     return hmac.new(SUBMIT_SECRET.encode("utf-8"), msg.encode("utf-8"),
                     hashlib.sha256).hexdigest()
 
@@ -3161,14 +3168,66 @@ class SaveManager:
         """Sunucuya gönderilecek ilerleme (ayarlar HARİÇ)."""
         return self._snapshot_profile()
 
+    # Sunucudan gelen ilerlemede YALNIZCA BÜYÜYEBİLEN alanlar.
+    GROWING_STATS = ("runs", "best_score", "total_kills", "total_time", "bosses",
+                     "best_wave", "total_shots", "total_gold", "total_lifesteal",
+                     "best_run_gold", "best_run_dashes", "best_run_shots",
+                     "total_bonk_hits", "total_crits", "total_dashes",
+                     "total_bonks", "total_healed", "best_run_heal",
+                     "best_combo", "best_run_kills")
+    MERGE_LISTS = ("skins_owned", "cosmetics_owned", "books_owned", "weapons_owned")
+
     def import_progress(self, prog):
-        """Sunucudan gelen ilerlemeyi uygular. Sunucu HAKEMDİR: hesabın
-        gerçek durumu orada tutuluyor, yereldeki kopya yalnızca önbellek."""
+        """Sunucudan gelen ilerlemeyi uygular — ÜZERİNE YAZMADAN, BİRLEŞTİREREK.
+
+        Neden birleştirme: cevap ağdan dönene kadar oyuncu oynamaya devam
+        ediyor. Düz üzerine yazma yapılırsa, istek gittikten SONRA kazanılan
+        elmas/skin sunucunun eski kopyasıyla silinir. (Gerçekten yaşandı:
+        koşu sonunda gönderilen ilerlemenin cevabı, o arada kazanılan 250
+        elması sıfırlıyordu.)
+
+        Kural sunucudakiyle aynı: listeler BİRLEŞİR, sayaçlar BÜYÜR,
+        elmas defteri en yüksek kazanılan/harcanan değerde buluşur.
+        """
         if not isinstance(prog, dict):
             return
         for k in self.PROFILE_KEYS:
-            if k in prog and prog[k] is not None:
-                self.data[k] = json.loads(json.dumps(prog[k]))
+            if k not in prog or prog[k] is None:
+                continue
+            v = json.loads(json.dumps(prog[k]))
+            if k in self.MERGE_LISTS and isinstance(v, list):
+                cur = self.data.get(k) or []
+                self.data[k] = cur + [x for x in v if x not in cur]
+            elif k == "stats" and isinstance(v, dict):
+                cur = dict(self.data.get(k) or {})
+                for sk, sv in v.items():
+                    if sk in self.GROWING_STATS:
+                        try:
+                            cur[sk] = max(float(cur.get(sk, 0) or 0), float(sv or 0))
+                            if float(cur[sk]).is_integer() and sk != "total_time":
+                                cur[sk] = int(cur[sk])
+                        except (TypeError, ValueError):
+                            cur[sk] = sv
+                    else:
+                        cur.setdefault(sk, sv)
+                self.data[k] = cur
+            elif k == "achievements" and isinstance(v, dict):
+                cur = dict(self.data.get(k) or {})
+                for ak, av in v.items():
+                    cur.setdefault(ak, av)
+                self.data[k] = cur
+            elif k in ("gems", "gems_earned", "gems_spent"):
+                continue        # aşağıda defter olarak birlikte işlenir
+            else:
+                self.data[k] = v
+        # --- ELMAS DEFTERİ ---
+        earned = max(int(self.data.get("gems_earned", 0) or 0),
+                     int(prog.get("gems_earned", 0) or 0))
+        spent = max(int(self.data.get("gems_spent", 0) or 0),
+                    int(prog.get("gems_spent", 0) or 0))
+        self.data["gems_earned"] = earned
+        self.data["gems_spent"] = min(spent, earned)
+        self.data["gems"] = max(0, earned - self.data["gems_spent"])
         # ŞAİBE DAMGASI DÜŞER. Buradaki her sayı sunucunun kendi
         # denetiminden geçmiş sayıdır; yerel dosyanın daha önce neye
         # benzediği artık bir şey ifade etmiyor. Bu, bilgisayarının adını
@@ -3181,21 +3240,40 @@ class SaveManager:
             self.data.setdefault("skins_owned", []).append("default")
         self.save()
 
+    # Kaydı AYNI ANDA birden fazla iş parçacığı yazabilir: ana döngü bir
+    # yandan, hesap eşitlemesi (push/pull_progress) öbür yandan. Kilitsizken
+    # ikisi aynı geçici dosyayı kullanıyor, biri yerine koyarken diğerinin
+    # dosyası uçuyordu ve O KAYIT SESSİZCE KAYBOLUYORDU.
+    _save_lock = threading.Lock()
+
     def save(self):
-        try:
-            # Her yazımda imza yenilenir. Dosya dışarıdan değiştirilirse
-            # imza tutmaz ve bir sonraki açılışta kayıt şaibelenir.
-            self.data.pop("_sig", None)
-            self.data["_sig_ver"] = 1
-            self.data["_sig"] = sign_save(self.data)
-            # Dosya ŞİFRELİ yazılır: metin düzenleyiciyle açıp sayı
-            # değiştirme yolu kapansın (bkz. encrypt_save).
-            tmp = SAVE_FILE + ".tmp"
-            with open(tmp, "wb") as f:
-                f.write(encrypt_save(json.dumps(self.data, ensure_ascii=False)))
-            os.replace(tmp, SAVE_FILE)
-        except Exception as e:
-            print("Kayit yazilamadi:", e)
+        with SaveManager._save_lock:
+            try:
+                # Her yazımda imza yenilenir. Dosya dışarıdan değiştirilirse
+                # imza tutmaz ve bir sonraki açılışta kayıt şaibelenir.
+                self.data.pop("_sig", None)
+                self.data["_sig_ver"] = 1
+                self.data["_sig"] = sign_save(self.data)
+                # Dosya ŞİFRELİ yazılır: metin düzenleyiciyle açıp sayı
+                # değiştirme yolu kapansın (bkz. encrypt_save).
+                blob = encrypt_save(json.dumps(self.data, ensure_ascii=False))
+                d = os.path.dirname(SAVE_FILE)
+                if d:
+                    os.makedirs(d, exist_ok=True)   # klasör silinmiş olabilir
+                # Geçici ad iş parçacığına özel: iki yazma çakışsa bile
+                # birbirinin dosyasını almasın.
+                tmp = "%s.%d.tmp" % (SAVE_FILE, threading.get_ident())
+                with open(tmp, "wb") as f:
+                    f.write(blob)
+                    f.flush()
+                    os.fsync(f.fileno())            # çökmede yarım dosya kalmasın
+                os.replace(tmp, SAVE_FILE)
+            except Exception as e:
+                print("Kayit yazilamadi:", e)
+                try:
+                    os.remove(tmp)
+                except Exception:
+                    pass
 
     def apply_cfg(self):
         st = self.data.get("settings", {})
@@ -4115,16 +4193,24 @@ class AccountClient:
         except Exception:
             self.enabled = False
             return
-        if self.token:
-            try:
-                res = self._post("/auth/me", {"token": self.token,
-                                              "device": device_id()})
-                if res.get("success"):
-                    self.account = res["account"]
-                else:
-                    self._forget()
-            except Exception:
-                pass        # ağ yoksa jetonu silme: sonra yeniden denenir
+        # Açılışta saklanan oturum hâlâ geçerli mi? Bu iş ARKA PLANDA dönüyor
+        # ve sunucu yavaşsa saniyeler sürebilir. Bu sırada oyuncu giriş
+        # ekranından YENİ bir oturum açmış olabilir.
+        tok = self.token
+        if not tok:
+            return
+        try:
+            res = self._post("/auth/me", {"token": tok, "device": device_id()})
+        except Exception:
+            return          # ağ yoksa jetonu silme: sonra yeniden denenir
+        if self.token != tok:
+            # Biz sorarken oyuncu giriş yaptı/çıktı. Elimizdeki cevap ESKİ
+            # jetona ait; yeni oturumu onun yüzünden silmeyelim.
+            return
+        if res.get("success"):
+            self.account = res["account"]
+        else:
+            self._forget()
 
     # ---------- kayıt ----------
     def _remember(self, token, account):
@@ -20491,6 +20577,27 @@ def draw_invisible_player(world, p, t):
                   1.6 + 1.2 * ((i + int(t * 3)) % 3 == 0), CLOAK_COLOR2)
 
 
+# Sıralamada ZORLUK rozeti. Zorluk oyunun TEMPOSUNU değiştiriyor (KABUS'ta
+# düşmanlar iki kattan fazla hızlı geliyor), yani aynı skor her zorlukta aynı
+# şeyi ifade etmiyor. Oyuncu kiminle yarıştığını görsün.
+DIFF_BADGE = {"nightmare": ((255, 120, 110), (62, 22, 26)),
+              "hard": ((255, 186, 96), (56, 38, 18)),
+              "normal": ((150, 190, 235), (22, 32, 50))}
+
+
+def _lb_diff_badge(surf, cx, y, diff):
+    d = str(diff or "normal")
+    if d not in DIFF_BADGE:
+        d = "normal"
+    fg, bg = DIFF_BADGE[d]
+    txt = LX("diff." + d, DIFF_LABEL.get(d, d))
+    w = int(text_width(txt, 9, True)) + 14
+    r = pygame.Rect(int(cx - w / 2), int(y), w, 14)
+    pygame.draw.rect(surf, bg, r, border_radius=7)
+    pygame.draw.rect(surf, fg, r, width=1, border_radius=7)
+    draw_text(surf, txt, r.center, 9, fg, bold=True, center=True, shadow=False)
+
+
 def draw_run(surf, run, t, aim_pos=None):
     """Koşuyu çizer.
 
@@ -24792,8 +24899,9 @@ class App:
         draw_coin_label(canvas, row.x + 330, row.centery, fmt_num(e.get("score", 0)),
                         GOLD if not is_me else (190, 245, 190), 16, icon="star",
                         icon_r=7, gap=5, shadow=False)
-        draw_text(canvas, f"Dalga {e.get('wave', '-')}", (row.x + 470, row.centery - 8),
-                  13, (150, 190, 235), shadow=False)
+        draw_text(canvas, L("ui.lb_wave_n", e.get("wave", "-")),
+                  (row.x + 470, row.centery - 8), 13, (150, 190, 235), shadow=False)
+        _lb_diff_badge(canvas, row.x + 592, row.centery - 7, e.get("diff"))
         draw_text(canvas, L("ui.n_kills", fmt_num(e.get("kills", 0))),
                   (row.right - 14, row.centery - 8), 13, TEXT_DIM, right=True,
                   shadow=False)
@@ -24991,8 +25099,9 @@ class App:
                                     col, 19, icon="star", icon_r=8, gap=5)
                     draw_text(canvas, L("ui.lb_wave_k", e.get("wave", "-"), fmt_num(e.get("kills", 0))),
                               (cx, step.y + 62), 10, (176, 190, 220), center=True, shadow=False)
+                    _lb_diff_badge(canvas, cx, step.y + 76, e.get("diff"))
                     if is_me:
-                        draw_text(canvas, L("ui.you"), (cx, step.y + 78), 11, GREEN,
+                        draw_text(canvas, L("ui.you"), (cx, step.y + 92), 11, GREEN,
                                   bold=True, center=True, shadow=False)
                 pygame.draw.line(canvas, (58, 82, 128), (pod.x, pod.bottom),
                                  (pod.right, pod.bottom), 2)

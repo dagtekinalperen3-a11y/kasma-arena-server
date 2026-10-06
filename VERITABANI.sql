@@ -114,6 +114,8 @@ create index if not exists player_events_acc_idx on player_events (account_id, a
 -- 5) SKORLAR  (dünya sıralaması)
 -- =====================================================================
 alter table scores add column if not exists account_id bigint;
+-- v3.22: zorluk sıralamada görünüyor (imzanın içinde, uydurulamaz)
+alter table scores add column if not exists diff text default 'normal';
 create index if not exists scores_acc_idx   on scores (account_id);
 create index if not exists scores_score_idx on scores (score desc);
 
@@ -193,6 +195,10 @@ select
   s.score                                        as skor,
   s.wave                                         as dalga,
   s.kills                                        as oldurme,
+  case coalesce(s.diff, 'normal')
+       when 'nightmare' then 'KABUS'
+       when 'hard'      then 'ZOR'
+       else                  'NORMAL' end         as zorluk,
   round(s.run_time::numeric, 1)                  as sure_sn,
   case when s.account_id is null then 'HAYIR' else 'EVET' end as hesapli,
   to_timestamp(s.created_at)                     as zaman
