@@ -101,6 +101,7 @@ e-postalar giriş yapabilir (en fazla 100 kişi). Oyunu yayınlayınca
 | `GOOGLE_CLIENT_ID` | Adım 3'teki Client ID |
 | `GOOGLE_CLIENT_SECRET` | Adım 3'teki Client secret |
 | `KASMA_SUBMIT_SECRET` | `kasma-arena-submit-v1:3d7f90ac41be6528` |
+| `DIAG_TOKEN` | Kendi uyduracağın uzun bir parola (örn. `tani-8f3a9c2e71b4`) |
 
 4. **Save Changes** → Render servisi kendiliğinden yeniden başlatır (~2 dk)
 
@@ -110,6 +111,12 @@ e-postalar giriş yapabilir (en fazla 100 kişi). Oyunu yayınlayınca
 > `KASMA_SUBMIT_SECRET` oyundaki `SUBMIT_SECRET` ile **birebir aynı**
 > olmalı. Değiştirmek istersen ikisini birden değiştir, yoksa skor
 > gönderimi "imza doğrulanamadı" der.
+
+> `DIAG_TOKEN` olmadan `/diag` sayfası **açılmaz** (404 döner). Bu
+> bilerek böyle: o sayfa veritabanının bütün tablo ve sütun adlarını
+> listeliyor, yani herkese açık olması saldırgana hazır bir harita
+> veriyordu. Kendi uydurduğun parolayı yaz ve sayfayı
+> `https://...onrender.com/diag?key=PAROLAN` diye aç.
 
 ---
 
@@ -128,8 +135,11 @@ değiştir ve **Manual Deploy → Deploy latest commit** de.
 Tarayıcıda **tanı adresini** aç — kurulumun tamamını tek bakışta söyler:
 
 ```
-https://kasma-arena-server.onrender.com/diag
+https://kasma-arena-server.onrender.com/diag?key=PAROLAN
 ```
+
+(`PAROLAN` = Adım 4'te `DIAG_TOKEN` olarak yazdığın değer. Parolasız
+açarsan sayfa 404 verir; bu bilerek böyle.)
 
 Görmen gereken:
 
@@ -250,7 +260,7 @@ geçmişi tek listede gelir.
 Sil, **Desktop app** olarak yeniden oluştur (Adım 3.4).
 
 **Giriş yaptım ama skor dünya sıralamasına düşmüyor**
-→ Önce `/diag`'a bak. Orası temizse sonuç ekranındaki kırmızı satırı oku:
+→ Önce `/diag?key=PAROLAN` adresine bak. Orası temizse sonuç ekranındaki kırmızı satırı oku:
 artık sebebi yazıyor ("önce kullanıcı adı seçmelisin", "giriş gerekli"...).
 Sunucuyu güncellemediysen bu satır boş kalır — `server.py`'yi yenile.
 
