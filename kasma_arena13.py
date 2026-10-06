@@ -837,6 +837,7 @@ STRINGS = {
     "st.regen": _T("Can Yenileme", "Regen", "Regeneración", "Regeneration", "Реген"),
     "st.armor": _T("Zırh", "Armor", "Armadura", "Rüstung", "Броня"),
     "st.vamp": _T("Can Çalma", "Lifesteal", "Robo de vida", "Lebensraub", "Вампиризм"),
+    "st.vamp_cap": _T("en çok {0}/sn", "max {0}/s", "máx {0}/s", "max {0}/s", "макс. {0}/с"),
     "st.shield": _T("Kalkan", "Shield", "Escudo", "Schild", "Щит"),
     "st.second": _T("İkinci Nefes", "Second Wind", "Segundo aliento", "Zweiter Atem", "Второе дыхание"),
     "st.thorns": _T("Diken", "Thorns", "Espinas", "Dornen", "Шипы"),
@@ -8517,6 +8518,7 @@ class Player:
         self.shield_charges = 0
         self.explosive_level = 0
         self.vamp_level = 0
+        self._vamp_spent = 0.0
         self.thorns_level = 0
         self.chain_level = 0
         self.homing_level = 0
@@ -8847,8 +8849,22 @@ class Player:
     def eff_dash_cd(self):
         return max(0.7, BASE_DASH_CD * self.dash_cd_mult)
 
-    def vamp_cap(self):
-        return 2.0
+    def vamp_hit_cap(self):
+        """KAN EMICI'nin TEK vurusta yenileyebilecegi en cok can.
+
+        Tavan olmadan 800 hasarli bir vurus, 10. seviye KAN EMICI ile azami
+        canin %160'ini bir anda dolduruyordu: yuksek hasarli yapilar tek
+        vurusla tam cana donuyor, yani olumsuzlesiyordu. Tavan can havuzuna
+        baglanir; boylece can calma DAYANIKLILIKLA buyur, HASARLA buyumez."""
+        return self.max_hp * 0.25
+
+    def vamp_rate_cap(self):
+        """KAN EMICI'nin bir SANIYEDE yenileyebilecegi en cok can.
+
+        Gercek fren budur: tek vurus tavani, saniyede 30 kez vuran bir yapiyi
+        durdurmaz. Seviye hala sayar (1. sv %6/sn, 10. sv %24/sn), ama artik
+        patlama hasari oyuncuyu oldurebilir."""
+        return self.max_hp * (0.04 + 0.02 * max(1, self.vamp_level))
 
     # Bazı "seviye atlama" yükseltmeleri, oyun-içi MARKET'teki aynı gücün bir
     # kopyasıdır (örn. "Yıldırım" ödülü == MARKET'teki "Fırtına"). İkisi aynı
@@ -9125,6 +9141,8 @@ class Player:
             if v > 0:
                 setattr(self, name, max(0.0, v - dt))
         self.recoil = max(0.0, self.recoil - dt * 7)
+        if self._vamp_spent > 0:
+            self._vamp_spent = max(0.0, self._vamp_spent - self.vamp_rate_cap() * dt)
         self.update_status(dt, fx)
         if not self.alive:
             return
@@ -9256,13 +9274,25 @@ class Player:
         self.ult_timer = self.ult_cd
         self.ult_fx_t = 0.5
 
-    def lifesteal(self, amount):
+    def lifesteal(self, amount, capped=True):
         """KAN EMİCİ ile can çalar ve çalınan miktarı ayrıca sayar.
 
         'Toplam X can çal' türü görevler/başarımlar bu sayacı kullanır; bu
-        yüzden can yenileme (regen) ya da iksirle karışmaması gerekir."""
+        yüzden can yenileme (regen) ya da iksirle karışmaması gerekir.
+
+        capped=True iken vuruş başına (vamp_hit_cap) ve saniye başına
+        (vamp_rate_cap) tavan uygulanır. Saniye tavanı 'sızdıran kova' ile
+        tutulur: _vamp_spent her karede tavan kadar azalır. Uzun bekleme
+        süresi olan ÜLTİLER (Kan Ayini, Kül Kasırgası) bilerek patlama
+        iyileştirmesi yaptığı için capped=False ile çağrılır."""
         if amount <= 0 or not self.alive:
             return
+        if capped:
+            amount = min(amount, self.vamp_hit_cap())
+            amount = min(amount, max(0.0, self.vamp_rate_cap() - self._vamp_spent))
+            if amount <= 0:
+                return
+            self._vamp_spent += amount
         before = self.hp
         self.heal(amount)
         self.run_lifesteal += max(0.0, self.hp - before)
@@ -15693,24 +15723,20 @@ WAVE_BREATHER_FROM = 10     # bu dalgadan itibaren uygulanır
 WAVE_BREATHER_BASE = 380    # 10. dalgada eklenen skor
 WAVE_BREATHER_STEP = 150    # her sonraki dalgada üstüne eklenen skor
 
-# Dalga hedeflerinin GENEL çarpanı — dalgaların ne kadar süreceğini belirleyen
-# tek düğme. Dalga atlayınca gelen 10 saniyelik yoğunluk penceresinde oyuncu
-# çok fazla skor topluyordu ve 2-3-4. dalgalar peş peşe saniyeler içinde
-# geçiyordu. Bu çarpan hepsini birden uzatır.
-#   Büyütürsen  -> dalgalar daha uzun sürer
-#   Küçültürsen -> dalgalar daha hızlı geçer
-WAVE_GOAL_SCALE = 2.8
-# İlk dalgalar öğretici olduğu için çarpan orada kademeli devreye girer:
-# 1. dalga tam çarpanı yemez, 5. dalgadan itibaren tamamı uygulanır.
-WAVE_SCALE_RAMP = {1: 0.62, 2: 0.74, 3: 0.84, 4: 0.93}
-
-
 # İlk dalgaların skor hedefleri elle belirlenir: oyunun açılışı burada
 # şekillendiği için formüle bırakılmaz. Kabus temposunda her biri kabaca
 # 25-35 saniye sürecek biçimde seçildi.
-WAVE_GOAL_TABLE = {1: 600, 2: 2300, 3: 2900, 4: 3500, 5: 4100}
-# 5. dalgadan sonrası formülle devam eder; bu çarpan, formülü tablodaki
-# son değerle sürekli (kesintisiz) hâle getirir.
+#
+# 6. DALGA NEDEN TABLODA: formül 6. dalgada 4017 veriyordu, yani 5. dalganın
+# hedefinden (4100) DAHA DÜŞÜK. Oyuncu 6. dalgayı 5. dalgadan kolay geçiyordu
+# — zorluk eğrisinde geriye doğru bir basamak. 4250, 5. dalganın (4100) üstünde
+# ve formülün 7. dalgada verdiği değerin (4407) altında: basamak düzleşti,
+# dalga süreleri değişmedi.
+WAVE_GOAL_TABLE = {1: 600, 2: 2300, 3: 2900, 4: 3500, 5: 4100, 6: 4250}
+# 6. dalgadan sonrası formülle devam eder; bu çarpan, formülü tablodaki
+# değerlerle sürekli (kesintisiz) hâle getirir.
+#   Büyütürsen  -> dalgalar daha uzun sürer
+#   Küçültürsen -> dalgalar daha hızlı geçer
 WAVE_GOAL_SCALE = 5.9
 
 
@@ -17691,7 +17717,7 @@ class RunState:
                 drained += max(0.0, before - max(0.0, e.hp))
                 self.fx.bolt([(e.x, e.y), (p.x, p.y)], (235, 70, 100), 0.25)
             if drained > 0:
-                p.lifesteal(drained * 0.5)
+                p.lifesteal(drained * 0.5, capped=False)
             self.fx.shockwave(p.x, p.y, rad, col, 0.45, 5)
             self._ult_banner(name, col)
             sfx("hurt", 0.8, 0.0)
@@ -17769,7 +17795,7 @@ class RunState:
                 self._ult_hit(e, dmg, kb=260)
                 total += max(0.0, before - max(0.0, e.hp))
             if total > 0:
-                p.lifesteal(total * 0.25)
+                p.lifesteal(total * 0.25, capped=False)
             for k in range(3):
                 self.fx.shockwave(p.x, p.y, rad * (0.55 + k * 0.25), col, 0.4, 5 - k)
             self._ult_banner(name, col)
@@ -20240,6 +20266,18 @@ def _mult(v):
     return t.replace(".", ",") if lang() == "tr" else t
 
 
+def _vamp_text(p):
+    """Can çalma satırının yazısı.
+
+    Tavan gizli kalırsa oyuncu "%30 can çalma" görüp hasarını büyütmeye
+    çalışır, ama saniye tavanı yüzünden hiçbir şey kazanmaz. Bu yüzden
+    saniye tavanı da yazılır."""
+    oran = _pct(0.02 * p.vamp_level)
+    if p.vamp_level <= 0:
+        return oran
+    return "%s (%s)" % (oran, L("st.vamp_cap", _pct(0.04 + 0.02 * p.vamp_level)))
+
+
 def player_stat_groups(p, run):
     """İstatistikleri GRUPLANMIŞ biçimde döndürür.
 
@@ -20262,7 +20300,7 @@ def player_stat_groups(p, run):
         (L("st.max_hp"), f"{int(p.max_hp)}", (235, 120, 150)),
         (L("st.regen"), f"{p.eff_regen():.1f}" + L("ui.per_sec"), GREEN),
         (L("st.armor"), _pct(p.eff_armor()), (160, 180, 220)),
-        (L("st.vamp"), _pct(0.02 * p.vamp_level), (220, 60, 90)),
+        (L("st.vamp"), _vamp_text(p), (220, 60, 90)),
     ]
     if p.shield_charges:
         hayat.append((L("st.shield"), f"{p.shield_charges}", (160, 170, 200)))
