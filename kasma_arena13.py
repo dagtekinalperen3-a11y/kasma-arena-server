@@ -915,6 +915,20 @@ STRINGS = {
     "ults.pink_dream": _T("RÜYA", "DREAM", "SUEÑO", "TRAUM", "ГРЁЗА"),
     # ---- ARENA USTALIĞI ----
     # ---- GÜNLÜK DÖNGÜ ----
+    # ---- YARATIK ADLARI (ölüm nedeni ekranda bunu yazar) ----
+    # Eskiden ham anahtar yazılıyordu: oyuncu "red tarafından öldürüldün"
+    # görüyordu. Cehennem yaratıklarının adı zaten vardı, arenadakilerin yoktu.
+    "en.red":       _T("Sürüngen", "Crawler", "Reptante", "Kriecher", "Ползун"),
+    "en.blue":      _T("Yavru", "Whelp", "Cría", "Brut", "Детёныш"),
+    "en.yellow":    _T("Tüküren", "Spitter", "Escupidor", "Spucker", "Плевун"),
+    "en.tank":      _T("Tank", "Tank", "Tanque", "Tank", "Танк"),
+    "en.sprinter":  _T("Koşucu", "Sprinter", "Corredor", "Sprinter", "Бегун"),
+    "en.brute":     _T("Kaba Kuvvet", "Brute", "Bruto", "Schläger", "Громила"),
+    "en.elite":     _T("Elit", "Elite", "Élite", "Elite", "Элита"),
+    "en.bomber":    _T("Bombacı", "Bomber", "Bombardero", "Bomber", "Бомбардир"),
+    "en.healer":    _T("Şifacı", "Healer", "Sanador", "Heiler", "Целитель"),
+    "en.herald":    _T("Sancaktar", "Herald", "Heraldo", "Herold", "Герольд"),
+    "en.shieldman": _T("Siperci", "Shieldman", "Escudero", "Schildträger", "Щитоносец"),
     "ui.daily":      _T("GÜNLÜK", "DAILY", "DIARIO", "TÄGLICH", "ЕЖЕДНЕВНО"),
     "ui.daily_streak": _T("{0} gün üst üste", "{0} day streak", "racha de {0} días",
                           "{0} Tage in Folge", "{0} дней подряд"),
@@ -12721,6 +12735,7 @@ def weapon_damage(player, w, level):
 ENEMY_WEIGHT_CLASS = {
     "blue": "frail", "sprinter": "frail", "imp": "frail",
     "red": "normal", "yellow": "normal", "hound": "normal",
+    "bomber": "frail", "healer": "normal",
     "seer": "normal", "reaver": "normal",
     "tank": "tough", "brute": "tough", "elite": "tough",
     "shieldman": "tough", "herald": "tough",
@@ -12908,10 +12923,32 @@ ENEMY_COLORS = {
     "sprinter": (235, 130, 235),
     "brute":  (200, 90, 60),
     "elite":  (232, 186, 90),
+    # --- v3.22: OYUNCUYU HEDEF SEÇMEYE ZORLAYAN İKİ YENİ ARKETİP ---
+    # Oyunun yaratık dağarcığı 4 davranıştan ibaretti: kovala-dokun,
+    # kovala-atıl, mesafe-tut-ateş-et ve sancaktar bulmacası. Hiçbiri
+    # oyuncuya "önce hangisini öldüreyim?" sorusunu sordurmuyordu.
+    "bomber": (255, 128, 52),       # BOMBACI — öldüğü yerde patlar
+    "healer": (120, 224, 140),      # ŞİFACI — çevresindekileri iyileştirir
     # --- YARI PATRON ve KORUMALARI ---
     "herald":    (246, 214, 120),   # SANCAKTAR — sandığı taşıyan yarı patron
     "shieldman": (128, 168, 214),   # SİPERCİ — onu koruyan kalkanlı
 }
+
+# --- BOMBACI ---
+# Öldüğü yerde patlar. Can ve hızı sıradan; tehdidi ÖLÜMÜNDE. Oyuncuyu
+# "nereden öldürüyorum?" diye düşündürür: dibinde öldürürsen cezalısın.
+BOMBER_RADIUS = 104             # patlamanın yarıçapı
+BOMBER_DELAY = 0.55             # telgraf süresi (kaçmak için gerçek pencere)
+BOMBER_DMG_MULT = 2.2           # kendi hasarının katı
+
+# --- ŞİFACI ---
+# Hiç saldırmaz; mesafesini korur ve çevresindeki yaratıkları iyileştirir.
+# Oyuncuyu "önce hangisini öldüreyim?" diye düşündürür.
+HEALER_KEEP = 250               # oyuncuya bu mesafeden yakın durmaz
+HEALER_RADIUS = 190             # iyileştirme menzili
+HEALER_TICK = 1.15              # iyileştirme aralığı (saniye)
+HEALER_FRAC = 0.055             # her tikte azami canın bu oranı kadar
+HEALER_MAX_TARGETS = 6          # bir tikte en çok kaç yaratık (kare hızı)
 
 ENEMY_DEFS = {
     "red":      {"hp": 30,  "speed": 100, "dmg": 10, "radius": 14, "coin": 5,  "xp": 4,  "score": 12,  "contact_dps": 17},
@@ -12921,6 +12958,13 @@ ENEMY_DEFS = {
     "sprinter": {"hp": 18,  "speed": 270, "dmg": 8,  "radius": 11, "coin": 3,  "xp": 4,  "score": 14,  "contact_dps": 14},
     "brute":    {"hp": 70,  "speed": 84,  "dmg": 16, "radius": 18, "coin": 6,  "xp": 8,  "score": 22,  "contact_dps": 23},
     "elite":    {"hp": 340, "speed": 70,  "dmg": 29, "radius": 28, "coin": 32, "xp": 36, "score": 150, "contact_dps": 36},
+    # BOMBACI: canı az, hızı orta. ÖLDÜĞÜ YERDE patlar — yani onu dibinde
+    # öldürmek cezalı. Oyuncuyu "nereden öldürüyorum?" diye düşündürür.
+    "bomber":   {"hp": 46,  "speed": 132, "dmg": 12, "radius": 15, "coin": 6,  "xp": 7,  "score": 20,  "contact_dps": 14},
+    # ŞİFACI: hiç saldırmaz, mesafesini korur ve çevresindeki yaratıkları
+    # iyileştirir. Oyuncuyu "önce hangisini öldüreyim?" diye düşündürür:
+    # şifacı yaşadığı sürece kalabalık erimiyor.
+    "healer":   {"hp": 62,  "speed": 96,  "dmg": 0,  "radius": 14, "coin": 7,  "xp": 9,  "score": 26,  "contact_dps": 0},
     # --- YARI PATRON ---
     # Canı ve hasarı BİLEREK düşük: bu bir güç sınavı değil, bir BULMACA.
     # Zorluğu kendi canından değil, onu çevreleyen SİPERCİ'lerden geliyor;
@@ -13040,8 +13084,17 @@ class Enemy:
         self.kind = kind                 # davranış
         self.variant = variant
         self.hellish = bool(var)
-        self.shape = var["shape"] if var else kind      # çizim biçimi
-        self.disp_name = var["name"] if var else kind   # ölüm nedeni / arayüz
+        # Çizim biçimi. Yeni arketipler (BOMBACI/ŞİFACI) kendi gövdelerini
+        # çizdirmiyor: kanıtlanmış gövdeleri RENK ve DAVRANIŞ farkıyla
+        # yeniden kullanıyorlar. Oyuncu onları renginden ve ne yaptığından
+        # tanıyor; yeni bir çizim yolu eklemek görsel tutarlılığı bozardı.
+        SHAPE_ALIAS = {"bomber": "brute", "healer": "yellow"}
+        self.shape = (var["shape"] if var
+                      else SHAPE_ALIAS.get(kind, kind))      # çizim biçimi
+        # Ölüm nedeni / arayüz adı. Cehennem yaratığının adı kendi satırında
+        # yazılı; arenadakiler için çeviri tablosundan okunur (eskiden ham
+        # anahtar yazılıyordu: "red tarafından öldürüldün").
+        self.disp_name = var["name"] if var else LX("en." + kind, kind)
         self.x, self.y = x, y
 
         # --- cehennemde hız 1. dalga temposuna döner, can/hasar 25. dalga seviyesinde ---
@@ -13099,6 +13152,8 @@ class Enemy:
         self.hit_flash = 0.0
         self.spawn_t = 0.0
         self.shoot_cd = random.uniform(0.6, 1.4)
+        self.heal_cd = random.uniform(0.3, 1.0)   # ŞİFACI'nın iyileştirme sayacı
+        self.heal_flash = 0.0                     # iyileşen yaratığın parlaması
         self.dash_cd = random.uniform(1.2, 2.4)
         self.dash_t = 0.0
         self.dash_dx = self.dash_dy = 0.0
@@ -13140,7 +13195,7 @@ class Enemy:
             self.slow_mult = mult
         self.slow_timer = max(self.slow_timer, duration)
 
-    def update(self, dt, player, fx, projectiles, kill_cb=None):
+    def update(self, dt, player, fx, projectiles, kill_cb=None, enemies=None):
         if not self.alive:
             return
         self.spawn_t += dt
@@ -13304,9 +13359,36 @@ class Enemy:
                     if dd < self.hit_r + player.radius - 2 and self.touch_cd <= 0:
                         self.touch_cd = 0.12
                         player.take_damage(self.contact_dps * 0.12 * 6, fx,
-                                           self.x, self.y, "Sancaktar")
+                                           self.x, self.y, self.disp_name)
                 return
-            if self.kind == "yellow":
+            if self.kind == "healer":
+                # ŞİFACI: oyuncuya hiç saldırmaz, mesafesini korur ve
+                # çevresindeki yaratıkları iyileştirir. Oyuncuyu "önce
+                # hangisini öldüreyim?" diye düşündürmek için var: şifacı
+                # yaşadığı sürece kalabalık erimiyor.
+                d = dist(self.x, self.y, player.x, player.y)
+                if d < HEALER_KEEP:
+                    dx, dy = -dx, -dy              # fazla yaklaştı: geri çekil
+                elif d < HEALER_KEEP + 90:
+                    dx, dy = -dy, dx               # bantta: çevresinde dolan
+                self.heal_cd -= dt
+                if self.heal_cd <= 0 and self.spawn_t > 0.5 and enemies:
+                    self.heal_cd = HEALER_TICK
+                    iyilesen = 0
+                    for o in enemies:
+                        if o is self or not o.alive or o.hp >= o.max_hp:
+                            continue
+                        if dist(self.x, self.y, o.x, o.y) > HEALER_RADIUS:
+                            continue
+                        o.hp = min(o.max_hp, o.hp + o.max_hp * HEALER_FRAC)
+                        o.heal_flash = 0.25
+                        iyilesen += 1
+                        if iyilesen >= HEALER_MAX_TARGETS:
+                            break
+                    if iyilesen:
+                        fx.ring(self.x, self.y, ENEMY_COLORS["healer"], n=12,
+                                speed=120, life=0.35, r=2.5)
+            elif self.kind == "yellow":
                 d = dist(self.x, self.y, player.x, player.y)
                 if d < 230:
                     dx, dy = -dx, -dy
@@ -13333,6 +13415,8 @@ class Enemy:
 
         if self.hit_flash > 0:
             self.hit_flash -= dt
+        if self.heal_flash > 0:
+            self.heal_flash -= dt
 
         if player.alive:
             d = dist(self.x, self.y, player.x, player.y)
@@ -13875,6 +13959,12 @@ class Enemy:
     # çizdiğini bilmez, böylece hem dünyaya hem de önbellek yüzeyine
     # aynı kod çizebiliyor.
     def _draw_body(self, surf, x, y, t, r):
+        # ŞİFACI'nın iyileştirdiği yaratık kısa süre yeşil parlar: oyuncu
+        # "bunlar neden ölmüyor?" sorusunun cevabını EKRANDA görsün, yoksa
+        # şifacıyı hedef seçmeyi öğrenemez.
+        if self.heal_flash > 0:
+            add_glow(surf, x, y, r * 2.0, ENEMY_COLORS["healer"],
+                     clamp(self.heal_flash * 0.9, 0.0, 0.5))
         flash = self.hit_flash > 0
         col = WHITE if flash else self.color
         fx_, fy_ = self.face_x, self.face_y
@@ -16750,6 +16840,10 @@ class WaveManager:
             "yellow": max(0, min(w - 1, 8)),
             "sprinter": max(0, min(w - 3, 7)),
             "brute": max(0, min(w - 5, 6)),
+            # Yeni arketipler sonradan girer: oyuncu önce temel yaratıkları
+            # öğrensin, sonra "hedef seçme" sorusuyla tanışsın.
+            "bomber": max(0, min(w - 6, 5)),
+            "healer": max(0, min((w - 8) // 2, 3)),
         }
         kinds = list(weights.keys())
         wts = list(weights.values())
@@ -18785,6 +18879,16 @@ class RunState:
             e.death_counted = True
         except AttributeError:
             pass        # __slots__ kullanan bir tür gelirse sessizce geç
+        # BOMBACI öldüğü yerde patlar. Telgraflı (BOMBER_DELAY) bir Hazard
+        # bırakır: oyuncunun kaçmak için gerçek bir penceresi var, ama dibinde
+        # öldürürse bedelini öder. Oyuncuyu "nereden öldürüyorum?" diye
+        # düşündüren tek yaratık bu.
+        if getattr(e, "kind", "") == "bomber":
+            self.hazards.append(Hazard(e.x, e.y, BOMBER_RADIUS, BOMBER_DELAY,
+                                       e.dmg * BOMBER_DMG_MULT,
+                                       color=ENEMY_COLORS["bomber"]))
+            self.fx.ring(e.x, e.y, ENEMY_COLORS["bomber"], n=16, speed=180,
+                         life=0.4, r=3)
         p = self.player
         self.kills += 1
         self.combo.add_kill()
@@ -19006,7 +19110,8 @@ class RunState:
 
         if not frozen:
             for e in list(self.enemies):
-                e.update(dt, p, self.fx, self.enemy_projectiles, self.on_enemy_killed)
+                e.update(dt, p, self.fx, self.enemy_projectiles,
+                         self.on_enemy_killed, self.enemies)
         self.enemies = [e for e in self.enemies if e.alive]
         if not frozen:
             # Kaçan oyuncunun arkasında kalan yaratıklar önüne ışınlanır.
