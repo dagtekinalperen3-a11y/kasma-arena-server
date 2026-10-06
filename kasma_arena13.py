@@ -14324,8 +14324,14 @@ def boss_trait(kind, hellish=False):
     tr["hellfire"] = bool(hellish) or tr["kind"] in ("burn", "inferno")
     return tr
 
-# Patronlar artık 8. dalgada bir kez değil, 10. dalgadan itibaren HER 5 DALGADA
-# bir gelir: 10, 15, 20, 25, 30 ...
+# Patronlar 10. dalgadan itibaren HER 5 DALGADA bir gelir.
+# ARENADA yalnızca DÖRT patron dalgası vardır: 10, 15, 20, 25. 25. dalga
+# arenanın finalidir; sonrasında patron GELMEZ (bkz. is_boss_wave), çünkü
+# arena her dalgada acımasızlaşarak oyuncuyu CEHENNEM KAPISI'na itmek üzere
+# kurulmuştur. Yorum eskiden "10, 15, 20, 25, 30 ..." diyordu ve kodun
+# yaptığını yanlış anlatıyordu.
+# CEHENNEMDE patron döngüsü sürer (HELL_BOSS_FIRST_WAVE / HELL_BOSS_STEP);
+# boss_count_for_wave'in 3 patronlu dalı da yalnızca orada çalışır.
 BOSS_FIRST_WAVE = 10
 BOSS_WAVE_STEP = 5
 
@@ -14459,17 +14465,24 @@ def boss_power(wave, index=None):
     return hp, dmg, armor
 
 
+# Birden fazla patronlu dalganın TOPLAM canı, tek patronlu bir dalganın kaç
+# katı olsun. Tek yerde duruyor çünkü iki ayrı yerde iki ayrı şey iddia
+# ediliyordu (bkz. scale_bosses_to_player).
+MULTI_BOSS_TOTAL = 1.7
+
+
 def boss_hp_share(n_boss):
-    """Birden fazla patron varken her birinin can payı.
+    """Birden fazla patron varken canın patronlar ARASINDA dağıtımı.
 
-    Toplam can, tek patronlu bir dalganın 1.7 katı olur: yani iki patron,
-    tek patronun iki katı kadar dayanıklı DEĞİLDİR. Amaç dövüşü uzatmak
-    değil, aynı anda iki ayrı tehdidi yönetmeyi zorunlu kılmak.
+    DİKKAT: bu fonksiyon TOPLAM canı BELİRLEMEZ — toplamı
+    scale_bosses_to_player oyuncunun gücüne göre yeniden kuruyor ve
+    çarpanı (MULTI_BOSS_TOTAL) orada uyguluyor. Burası yalnızca "o toplam
+    patronlar arasında nasıl bölünsün" sorusunun cevabı: eşit bölünür.
 
-    DENGE: pay eskiden 1.35 idi; 20. dalgadaki iki patron tek tek çok çabuk
-    eriyor, dalga tek patronlu 15. dalgadan bile kolay geçiyordu.
+    Eskiden burada 1.7 çarpanı vardı ve ölçekleme onu tamamen geri
+    alıyordu; yani yorum bir şey söylüyor, kod başka bir şey yapıyordu.
     """
-    return 1.0 if n_boss <= 1 else 1.7 / n_boss
+    return 1.0 if n_boss <= 1 else 1.0 / n_boss
 
 
 def boss_count_for_wave(wave):
@@ -14957,8 +14970,9 @@ class Boss:
         self.heal_budget = min(cap, self.heal_budget + cap * dt)
         # v3.14: hasar tavanı havuzu saniyede max_hp / BOSS_MIN_FIGHT_TIME dolar.
         if self.intake_budget is not None:
+            mft = getattr(self, "min_fight_time", BOSS_MIN_FIGHT_TIME)
             self.intake_budget = min(self.max_hp * BOSS_BURST_POOL,
-                                     self.intake_budget + self.max_hp / BOSS_MIN_FIGHT_TIME * dt)
+                                     self.intake_budget + self.max_hp / mft * dt)
         if self.heal_flash > 0:
             self.heal_flash -= dt
         if self.touch_cd > 0:
@@ -16478,20 +16492,47 @@ def scale_bosses_to_player(bosses, player):
         est = player.estimated_dps()
     except Exception:
         return 1.0
+    n = len(bosses)
     base_total = sum(b.max_hp for b in bosses)
     # Hedeflenen toplam can, patron canı bonusuyla birlikte ölçeklenir:
     # "patronlara %20 daha fazla can" sözü, canı oyuncunun gücüne göre
     # yeniden kuran bu ölçekten sonra da geçerli kalsın.
     want = est * BOSS_FIGHT_UPTIME * BOSS_FIGHT_TARGET * BOSS_HP_BONUS
+    # ZIRH (v3.22). take_damage gelen hasarı `amount * (1 - armor)` ile
+    # kesiyor ama bu hesapta zırh HİÇ YOKTU: zırhı 0.365'e çıkan geç
+    # patronlar, ölçekleyicinin hiç hesaplamadığı 1.58 kat ek dayanıklılık
+    # kazanıyordu. Ölçüm: 27 saniyelik hedef, 25. dalgada 37.3 saniyeye
+    # çıkıyordu.
+    # YÖN: zırhlı patronun ETKİLİ canı zaten fazla, o yüzden HAM canı
+    # AZALTMAK gerekir. Süre = ham_can / (dps * (1 - zırh)) olduğundan,
+    # sürenin sabit kalması için ham_can ∝ (1 - zırh).
+    arm = sum(getattr(b, "armor", 0.0) for b in bosses) / max(1, n)
+    want *= max(0.40, 1.0 - arm)
+    # BİRDEN FAZLA PATRON (v3.22). boss_hp_share'in açıklaması "toplam can,
+    # tek patronlu bir dalganın 1.7 katı olur" diyordu ama o çarpan
+    # Boss.__init__'te base_total'a giriyor, burası ise toplamı `want`'a
+    # NORMALİZE ediyordu: çarpan tamamen geri alınıyor, geriye yalnızca
+    # patronlar ARASINDAKİ dağıtım kalıyordu. Ölçüm: tek patronlu 15.
+    # dalgada toplam 10.744, iki patronlu 20. dalgada da 10.744 — yani iki
+    # patron tek patrondan kolaydı. Çarpan artık BURADA uygulanıyor;
+    # boss_hp_share yalnızca DAĞITIM anahtarı.
+    if n > 1:
+        want *= MULTI_BOSS_TOTAL
     scale = clamp(want / max(1.0, base_total), BOSS_HP_SCALE_MIN, BOSS_HP_SCALE_MAX)
     # Can çalma tavanı oyuncunun hasarına göre paylaştırılır: dalgadaki tüm
     # patronların toplam iyileşmesi, oyuncunun saniyelik hasarının belirli bir
     # oranını aşamaz.
-    heal_rate = est * BOSS_LIFESTEAL_VS_DPS / max(1, len(bosses))
+    heal_rate = est * BOSS_LIFESTEAL_VS_DPS / max(1, n)
+    # ASGARİ DÖVÜŞ SÜRESİ PATRON BAŞINA uygulanıyordu (intake_budget her
+    # patronda ayrı dolar): oyuncu patronları sırayla indirdiğinde dalganın
+    # asgari süresi 24 saniye değil n x 24 saniye oluyordu. Süre artık
+    # dalgaya ait: her patron payına düşeni alır.
+    per = BOSS_MIN_FIGHT_TIME / max(1, n)
     for b in bosses:
         b.max_hp *= scale
         b.hp = b.max_hp
         b.heal_rate = heal_rate
+        b.min_fight_time = per
     return scale
 
 
