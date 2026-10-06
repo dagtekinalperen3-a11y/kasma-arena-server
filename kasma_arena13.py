@@ -914,6 +914,44 @@ STRINGS = {
     "ult.pink_dream": _T("RÜYA PATLAMASI", "DREAM BURST", "ESTALLIDO ONÍRICO", "TRAUMSTOSS", "ВЗРЫВ ГРЁЗ"),
     "ults.pink_dream": _T("RÜYA", "DREAM", "SUEÑO", "TRAUM", "ГРЁЗА"),
     # ---- ARENA USTALIĞI ----
+    # ---- GÜNLÜK DÖNGÜ ----
+    "ui.daily":      _T("GÜNLÜK", "DAILY", "DIARIO", "TÄGLICH", "ЕЖЕДНЕВНО"),
+    "ui.daily_streak": _T("{0} gün üst üste", "{0} day streak", "racha de {0} días",
+                          "{0} Tage in Folge", "{0} дней подряд"),
+    "ui.daily_login": _T("GÜNÜN ÖDÜLÜ", "DAILY REWARD", "RECOMPENSA DIARIA",
+                         "TAGESBELOHNUNG", "НАГРАДА ДНЯ"),
+    "ui.daily_claim": _T("AL", "CLAIM", "RECOGER", "ABHOLEN", "ЗАБРАТЬ"),
+    "ui.daily_done": _T("hepsi alındı — yarın yeni görevler",
+                        "all claimed — new quests tomorrow",
+                        "todo recogido — nuevas misiones mañana",
+                        "alles abgeholt — morgen neue Aufgaben",
+                        "всё получено — завтра новые задания"),
+    "daily.kills":   _T("Bir günde 400 yaratık öldür", "Kill 400 creatures in a day",
+                        "Mata 400 criaturas en un día", "Töte 400 Kreaturen an einem Tag",
+                        "Убей 400 тварей за день"),
+    "daily.kills_big": _T("Bir günde 900 yaratık öldür", "Kill 900 creatures in a day",
+                          "Mata 900 criaturas en un día", "Töte 900 Kreaturen an einem Tag",
+                          "Убей 900 тварей за день"),
+    "daily.wave":    _T("12. dalgaya ulaş", "Reach wave 12", "Llega a la oleada 12",
+                        "Erreiche Welle 12", "Дойди до 12-й волны"),
+    "daily.wave_big": _T("18. dalgaya ulaş", "Reach wave 18", "Llega a la oleada 18",
+                         "Erreiche Welle 18", "Дойди до 18-й волны"),
+    "daily.boss":    _T("2 patron devir", "Defeat 2 bosses", "Derrota a 2 jefes",
+                        "Besiege 2 Bosse", "Победи 2 боссов"),
+    "daily.gold":    _T("Bir günde 1.200 altın topla", "Collect 1,200 gold in a day",
+                        "Reúne 1.200 de oro en un día", "Sammle an einem Tag 1.200 Gold",
+                        "Собери 1 200 золота за день"),
+    "daily.time":    _T("Toplam 10 dakika hayatta kal", "Survive 10 minutes in total",
+                        "Sobrevive 10 minutos en total", "Überlebe insgesamt 10 Minuten",
+                        "Выживи в сумме 10 минут"),
+    "daily.combo":   _T("40'lık bir kombo yap", "Hit a 40 combo", "Consigue un combo de 40",
+                        "Erreiche eine 40er-Kombo", "Сделай комбо из 40"),
+    "daily.dash":    _T("Bir günde 60 dash at", "Dash 60 times in a day",
+                        "Haz 60 impulsos en un día", "Dashe an einem Tag 60 Mal",
+                        "Сделай 60 рывков за день"),
+    "daily.bonk":    _T("Bir günde 40 BONK vur", "Land 40 BONKs in a day",
+                        "Golpea 40 BONK en un día", "Lande an einem Tag 40 BONKs",
+                        "Нанеси 40 БОНК за день"),
     "ui.mastery":    _T("ARENA USTALIĞI", "ARENA MASTERY", "MAESTRÍA DE ARENA",
                         "ARENA-MEISTERSCHAFT", "МАСТЕРСТВО АРЕНЫ"),
     "ui.mastery_sub": _T("Elmasla alınan KALICI yükseltmeler — her koşuda, baştan itibaren yanındalar.",
@@ -3142,6 +3180,7 @@ class SaveManager:
                      "fps_cap": 60, "weapon_fx": WEAPON_FX_DEFAULT, "pet_show": True,
                      "lang": DEFAULT_LANG},
         "mastery": {},
+        "daily": {},
         "stats": {"runs": 0, "best_score": 0, "total_kills": 0, "total_time": 0.0,
                   "bosses": 0, "best_wave": 0, "total_shots": 0, "total_lifesteal": 0.0,
                   "total_gold": 0, "best_run_gold": 0, "best_run_dashes": 0,
@@ -3158,7 +3197,7 @@ class SaveManager:
     # ayarlar, dil, ses, tam ekran, oturum jetonu — bunlar hesap değişince
     # değişmez, çünkü onlar oyuncunun değil bilgisayarın tercihleri.
     PROFILE_KEYS = (
-        "gems", "gems_earned", "gems_spent", "mastery",
+        "gems", "gems_earned", "gems_spent", "mastery", "daily",
         "skins_owned", "equipped_skin",
         "cosmetics_owned", "equipped_cosmetics",
         "books_owned", "weapons_owned", "weapons_muted", "books_muted",
@@ -3526,6 +3565,84 @@ class SaveManager:
         """Ustalığa yatırılmış TOPLAM elmas (ekranda gösterilir)."""
         mt = self.data.get("mastery") or {}
         return sum(mastery_total_cost(k, v) for k, v in mt.items())
+
+    # ---- GÜNLÜK DÖNGÜ ----
+    def daily(self):
+        """Bugünün görev defteri. Gün değiştiyse kendiliğinden yenilenir."""
+        d = self.data.setdefault("daily", {})
+        bugun = today_key()
+        if d.get("day") != bugun:
+            # GİRİŞ SERİSİ: dün oynadıysa seri büyür, araya gün girdiyse
+            # baştan başlar. (İlk kez açanda 1'den başlar.)
+            dun = time.strftime("%Y-%m-%d",
+                                time.localtime(time.time() - 86400))
+            d["streak"] = (int(d.get("streak", 0)) + 1) if d.get("day") == dun else 1
+            d["day"] = bugun
+            d["progress"] = {}
+            d["claimed"] = []
+            d["login_claimed"] = False
+        return d
+
+    def daily_quests(self):
+        """Bugünün üç görevi, ilerleme ve ödül durumuyla birlikte."""
+        d = self.daily()
+        prog = d.get("progress") or {}
+        alinan = set(d.get("claimed") or [])
+        out = []
+        for q in daily_quests_for(d["day"]):
+            cur = float(prog.get(q["stat"], 0) or 0)
+            out.append(dict(q, cur=min(cur, q["goal"]),
+                            done=cur >= q["goal"], claimed=q["key"] in alinan))
+        return out
+
+    def daily_login_bonus(self):
+        """Günün ilk ödülü: seriye göre elmas. Zaten alındıysa 0."""
+        d = self.daily()
+        if d.get("login_claimed"):
+            return 0
+        n = max(1, int(d.get("streak", 1)))
+        return LOGIN_STREAK_GEMS[min(n, len(LOGIN_STREAK_GEMS)) - 1]
+
+    def claim_daily_login(self):
+        """Günün giriş ödülünü verir. Dönüş: verilen elmas (0 = zaten alınmış)."""
+        d = self.daily()
+        gem = self.daily_login_bonus()
+        if gem <= 0:
+            return 0
+        d["login_claimed"] = True
+        self.add_gems(gem)
+        self.progress_changed()
+        return gem
+
+    def claim_daily_quest(self, key):
+        """Tamamlanmış bir görevin ödülünü verir. Dönüş: verilen elmas."""
+        d = self.daily()
+        for q in self.daily_quests():
+            if q["key"] == key and q["done"] and not q["claimed"]:
+                d.setdefault("claimed", []).append(key)
+                self.add_gems(q["gem"])
+                self.progress_changed()
+                return q["gem"]
+        return 0
+
+    def daily_track(self, **kw):
+        """Koşu bitince görev ilerlemesini işler.
+
+        BİRİKEN alanlar (öldürme, altın, süre, dash, BONK) toplanır; EN İYİ
+        alanlar (dalga, kombo) en yükseğinde kalır. Patron sayısı birikir.
+        """
+        d = self.daily()
+        prog = d.setdefault("progress", {})
+        for k, v in kw.items():
+            try:
+                v = float(v or 0)
+            except (TypeError, ValueError):
+                continue
+            if k in ("wave", "combo"):
+                prog[k] = max(float(prog.get(k, 0) or 0), v)
+            else:
+                prog[k] = float(prog.get(k, 0) or 0) + v
+        self.progress_changed()
 
     def mastery_bonus(self, key):
         """Kademenin verdiği bonus (0 ise ustalık alınmamış)."""
@@ -8766,6 +8883,69 @@ def mastery_name(m):
 
 def mastery_desc(m):
     return LX("mastery.%s.desc" % m["key"], "")
+
+
+# =====================================================================
+# GÜNLÜK DÖNGÜ  (v3.22) — GÖREVLER ve GİRİŞ SERİSİ
+# ---------------------------------------------------------------------
+# Oyuncuyu ERTESİ GÜN geri getiren hiçbir şey yoktu: oyun açıldığında
+# "bugün şunu yap" diyen bir hedef, art arda oynamayı ödüllendiren bir
+# seri, kaçırılacak bir şey yoktu. Steam/Epic'teki bu türün oyunlarında
+# günlük döngü, oturum sayısını en çok artıran tek sistemdir.
+#
+# TASARIM: hiçbir sunucu işi YOK. Görevler GÜNÜN TARİHİNDEN deterministik
+# olarak seçilir (aynı gün herkeste aynı üç görev çıkar), ilerleme koşu
+# bittiğinde yerel kayda yazılır. Ödül elmastır ve normal elmas defterinden
+# (gems_earned/gems_spent) geçer; yani sunucunun elmas denetimi bunu da
+# kapsar.
+DAILY_QUESTS = [
+    dict(key="kills", goal=400, gem=70, stat="kills"),
+    dict(key="kills_big", goal=900, gem=120, stat="kills"),
+    dict(key="wave", goal=12, gem=90, stat="wave"),
+    dict(key="wave_big", goal=18, gem=150, stat="wave"),
+    dict(key="boss", goal=2, gem=100, stat="bosses"),
+    dict(key="gold", goal=1200, gem=80, stat="gold"),
+    dict(key="time", goal=600, gem=70, stat="time"),
+    dict(key="combo", goal=40, gem=90, stat="combo"),
+    dict(key="dash", goal=60, gem=60, stat="dashes"),
+    dict(key="bonk", goal=40, gem=60, stat="bonks"),
+]
+DAILY_COUNT = 3                 # günde kaç görev
+# Giriş serisi ödülü: 1. gün 50, sonra artar, 7. günden sonra sabitlenir.
+LOGIN_STREAK_GEMS = (50, 70, 90, 120, 150, 200, 250)
+
+
+def today_key(now=None):
+    """Bugünün anahtarı (YYYY-MM-DD, yerel saat).
+
+    Görevler bundan türüyor; oyuncunun saat dilimi ne olursa olsun kendi
+    gününü yaşıyor.
+    """
+    return time.strftime("%Y-%m-%d", time.localtime(now if now else time.time()))
+
+
+def daily_quests_for(day_key):
+    """O günün ÜÇ görevi — tarihten deterministik seçilir.
+
+    Aynı gün aynı üç görev: oyuncular birbirine "bugünkü görev şu" diyebilir
+    ve kayıt dosyasını kurcalayıp kolay görev seçmek işe yaramaz.
+    """
+    h = hashlib.sha256(("kasma-daily-v1|" + str(day_key)).encode("utf-8")).digest()
+    secili, kullanilan = [], set()
+    for i in range(DAILY_COUNT):
+        # Her görev için havuzdan ÇAKIŞMAYAN bir seçim yap.
+        for adim in range(len(DAILY_QUESTS)):
+            idx = (h[i * 3] * 256 + h[i * 3 + 1] + adim) % len(DAILY_QUESTS)
+            q = DAILY_QUESTS[idx]
+            if q["stat"] not in kullanilan:
+                kullanilan.add(q["stat"])
+                secili.append(q)
+                break
+    return secili
+
+
+def daily_quest_text(q):
+    return LX("daily.%s" % q["key"], "%s: %s" % (q["stat"], q["goal"]))
 
 BASE_SPEED = 215
 BASE_MAX_HP = 100
@@ -18549,6 +18729,8 @@ class RunState:
             self.ach.unlock("massacre")
         if getattr(e, "is_boss", False):
             self.save.data["stats"]["bosses"] = self.save.data["stats"].get("bosses", 0) + 1
+            # Günlük görev için bu koşuda devrilen patron sayısı.
+            self.bosses_killed = getattr(self, "bosses_killed", 0) + 1
             if self.ach:
                 self.ach.unlock("boss")
         # SANCAKTAR devrildi: taşıdığı sandığı düşürür. Kalan siperciler
@@ -19232,6 +19414,16 @@ class RunState:
         st["total_shots"] = st.get("total_shots", 0) + int(p.run_shots)
         st["best_run_shots"] = max(st.get("best_run_shots", 0), int(p.run_shots))
         st["total_lifesteal"] = st.get("total_lifesteal", 0.0) + float(p.run_lifesteal)
+        # GÜNLÜK GÖREVLER: koşunun sayıları buradan işleniyor. Hileli koşu
+        # günlük görevi de ilerletmez — yoksa "hile yap, görevi al" diye bir
+        # yol açık kalırdı.
+        if self.run_is_clean():
+            self.save.daily_track(
+                kills=int(self.kills), wave=int(self.waves.wave),
+                bosses=int(getattr(self, "bosses_killed", 0)),
+                gold=int(self.coins_earned), time=float(self.run_time),
+                combo=int(self.combo.best), dashes=int(p.dash_count),
+                bonks=int(p.run_bonks))
         st["total_gold"] = st.get("total_gold", 0) + int(self.coins_earned)
         st["best_run_gold"] = max(st.get("best_run_gold", 0), int(self.coins_earned))
         st["total_bonk_hits"] = st.get("total_bonk_hits", 0) + int(self.bonk_hits)
@@ -23812,6 +24004,81 @@ class App:
             btn.click(mouse_pos)
 
     # ---------------- ANA MENÜ ----------------
+    def _draw_daily_panel(self, canvas, dt, mouse_pos, clicked):
+        """Ana menünün altındaki GÜNLÜK şeridi.
+
+        Oyuncuyu ERTESİ GÜN geri getiren tek şey: bugünün üç görevi, giriş
+        serisi ve günün ödülü. Görevler tarihten deterministik seçiliyor,
+        yani aynı gün herkeste aynı — sunucuya hiç iş düşmüyor.
+        """
+        sv = self.save
+        d = sv.daily()
+        r = pygame.Rect(300, 596, 680, 100)
+        panel(canvas, r, bg=(20, 22, 36), edge=(62, 66, 94), alpha=238, radius=12,
+              edge_w=2)
+        draw_text(canvas, L("ui.daily"), (r.x + 18, r.y + 10), 15, GOLD, bold=True,
+                  shadow=False)
+        draw_text(canvas, L("ui.daily_streak", int(d.get("streak", 1))),
+                  (r.x + 18, r.y + 30), 11, (150, 156, 184), shadow=False)
+
+        # ---- GÜNÜN ÖDÜLÜ ----
+        bonus = sv.daily_login_bonus()
+        lr = pygame.Rect(r.x + 16, r.y + 52, 150, 32)
+        if bonus > 0:
+            hov = lr.collidepoint(mouse_pos)
+            pygame.draw.rect(canvas, (74, 148, 102) if hov else (56, 112, 78), lr,
+                             border_radius=7)
+            pygame.draw.rect(canvas, (96, 170, 122), lr, width=1, border_radius=7)
+            draw_icon(canvas, lr.x + 18, lr.centery, "gem", GEM_COLOR, 7)
+            draw_text(canvas, "+" + fmt_num(bonus), (lr.x + 32, lr.centery - 9), 15,
+                      WHITE, bold=True, shadow=False)
+            draw_text(canvas, L("ui.daily_claim"), (lr.right - 14, lr.centery - 8), 12,
+                      (210, 240, 220), bold=True, right=True, shadow=False)
+            if clicked and hov:
+                if sv.claim_daily_login():
+                    sfx("buy", 0.8, 0.0)
+        else:
+            draw_text(canvas, L("ui.daily_login"), (lr.x, lr.y + 2), 11,
+                      (108, 114, 140), shadow=False)
+            draw_text(canvas, "✓", (lr.x, lr.y + 16), 14, GREEN, bold=True,
+                      shadow=False)
+
+        # ---- ÜÇ GÖREV ----
+        qs = sv.daily_quests()
+        gx = r.x + 182
+        gw = (r.right - 16 - gx) // max(1, len(qs))
+        for i, q in enumerate(qs):
+            qr = pygame.Rect(gx + i * gw, r.y + 10, gw - 10, 80)
+            bitti = q["done"]
+            alindi = q["claimed"]
+            col = (120, 200, 140) if bitti else (150, 156, 184)
+            draw_text(canvas, _fit_text(daily_quest_text(q), 11, qr.w - 6),
+                      (qr.x, qr.y + 2), 11, col, shadow=False)
+            bar = pygame.Rect(qr.x, qr.y + 22, qr.w - 6, 7)
+            draw_bar(canvas, bar, clamp(q["cur"] / max(1.0, q["goal"]), 0, 1),
+                     col, radius=3)
+            draw_text(canvas, "%d / %d" % (int(q["cur"]), int(q["goal"])),
+                      (qr.x, qr.y + 33), 10, (122, 128, 154), shadow=False)
+            br = pygame.Rect(qr.x, qr.y + 50, 112, 26)
+            if alindi:
+                draw_icon(canvas, br.x + 10, br.centery, "star", (110, 170, 125), 6)
+                draw_text(canvas, "+" + fmt_num(q["gem"]), (br.x + 24, br.centery - 7),
+                          12, (110, 170, 125), bold=True, shadow=False)
+            elif bitti:
+                hov = br.collidepoint(mouse_pos)
+                pygame.draw.rect(canvas, (74, 148, 102) if hov else (56, 112, 78), br,
+                                 border_radius=6)
+                draw_icon(canvas, br.x + 14, br.centery, "gem", GEM_COLOR, 6)
+                draw_text(canvas, "+" + fmt_num(q["gem"]), (br.x + 28, br.centery - 7),
+                          12, WHITE, bold=True, shadow=False)
+                if clicked and hov:
+                    if sv.claim_daily_quest(q["key"]):
+                        sfx("buy", 0.8, 0.0)
+            else:
+                draw_icon(canvas, br.x + 10, br.centery, "gem", (88, 96, 124), 6)
+                draw_text(canvas, "+" + fmt_num(q["gem"]), (br.x + 24, br.centery - 7),
+                          12, (108, 114, 140), bold=True, shadow=False)
+
     def _draw_loadout_panel(self, canvas, dt, mouse_pos, clicked):
         """Ana menüdeki sol panel: kuşanılmış karakterin canlı önizlemesi.
 
@@ -23945,6 +24212,7 @@ class App:
         draw_text(canvas, LX("diffd." + self.diff, DIFF_DESC[self.diff]), (VIRTUAL_W / 2, 274), 11, TEXT_DIM, center=True, shadow=False)
 
         self._draw_loadout_panel(canvas, dt, mouse_pos, clicked)
+        self._draw_daily_panel(canvas, dt, mouse_pos, clicked)
 
         for b in self.menu_buttons:
             b.update(mouse_pos, dt)
