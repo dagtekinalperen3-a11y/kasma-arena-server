@@ -267,13 +267,15 @@
      koşunun ilk yarısında tavana dayanıyor ve sonraki seviyeler hiçbir şey
      ifade etmiyordu. Tavanı üçe katlayıp artışları aynı bırakmak silahları
      üç kat güçlendirirdi; bunun yerine bütün artışlar 25 seviyeye YAYILDI:
-       - weapon_growth(): İÇBÜKEY eğri. İlk seviyeler büyük pay alır,
-         sonrakiler küçülür (8. seviye doğrusalın 1.65 katı, 25. seviyedeki
-         toplam aynı). Hasar, menzil, alan ve bekleme süresi — hepsi bu tek
-         fonksiyondan besleniyor, yani "seviye mantığı" her silahta aynı.
+       - weapon_growth(): İÇBÜKEY eğri + DOĞRUSAL TABAN. İlk seviyeler
+         büyük pay alır, sonrakiler küçülür ama hiç sıfırlanmaz: her
+         seviye payının en az %35'ini doğrusal alır, yoksa son beş seviye
+         bedavaya gidiyordu (v3.22'de ölçüldü: +%0.23'e kadar düşüyordu).
+         Hasar, menzil, alan ve bekleme süresi — hepsi bu tek fonksiyondan
+         besleniyor, yani "seviye mantığı" her silahta aynı.
        - weapon_count(): balta/kırbaç/kalkan SAYISI artık seviyeye eşit
          değil, bantlı artıyor. 25. seviyede 25 değil 9 parça (hem denge
-         hem kare hızı için).
+         hem kare hızı için); 22 ve 25 iki gerçek kilometre taşıdır.
        - Sonuç: 25. seviye, eski 8. seviyenin 1.36-1.51 katı.
      HORTUM'un kendine ait 5'lik tavanı da kalktı; o da 25'e çıkıyor.
    * PENTAGRAM ARTIK HER ŞEYİ TEK ATMIYOR. Mühre ilk adım vuruşu, yaratığın
@@ -8815,7 +8817,7 @@ class Player:
             if w is None or lvl <= 0 or w.get("dmg", 0) <= 0:
                 continue
             hit = weapon_damage(self, w, lvl)
-            n = weapon_count(lvl) if key in ("axe", "whip", "book") else 1
+            n = weapon_count(lvl, key) if key in ("axe", "whip", "book") else 1
             cap = self.WEAPON_BOSS_PIECES.get(key, None)
             if cap is not None:
                 n = min(n, cap)
@@ -11558,14 +11560,30 @@ WEAPON_RANGE = 620.0            # silahların hedef arama menzili
 # Silahın seviyeye göre kaç PARÇA çıkardığı: balta sayısı, kırbaç sayısı,
 # kalkan sayısı. 1. seviyede 1, 25. seviyede 9 — "her seviyede bir tane
 # daha" kuralı 25 seviyede hem oyunu hem kare hızını bitiriyordu.
+# 22. ve 25. seviyedeki 8 ve 9, son seviyelerin "hicbir sey vermemesi"
+# sorununun ilacidir: 18-25 arasi sayinin 7'de donmasi, hasarin da zaten
+# doymus olmasi yuzunden o yedi seviye hissedilmiyordu. Iki ek parca
+# +%14 ve +%12.5 DPS demek, yani gercek bir kilometre tasi. "Her seviyede
+# bir tane daha" (25 parca) hala yok; sadece iki parca eklendi.
 WEAPON_COUNT_STEPS = (1, 2, 3, 3, 4, 4, 4, 5, 5, 5,
                       5, 6, 6, 6, 6, 6, 6, 7, 7, 7,
-                      7, 7, 7, 7, 7)
+                      7, 8, 8, 8, 9)
 
 
-def weapon_count(lvl):
+# KIRBAÇ 8 parçada durur. 9 kırbaç çemberi 360/9 = 40 derece aralıkla
+# dizilir, ama 25. seviyede kırbacın YARIM açısı 41 dereceye çıkıyor: koniler
+# üst üste biniyor ve TEK bir yaratık üç koniden birden hasar alıyor. Ölçüm:
+# tek hedef DPS 5.95'ten 17.84'e sıçrıyordu (x3), hem de tam son seviyede.
+# 8 parçada aralık 45 derece, yani yarım açıdan (41) büyük: binme yok.
+WHIP_COUNT_MAX = 8
+
+
+def weapon_count(lvl, key=None):
     """Silahın o seviyede kaç parça çıkardığı (bkz. WEAPON_COUNT_STEPS)."""
-    return WEAPON_COUNT_STEPS[clamp(int(lvl) - 1, 0, len(WEAPON_COUNT_STEPS) - 1)]
+    n = WEAPON_COUNT_STEPS[clamp(int(lvl) - 1, 0, len(WEAPON_COUNT_STEPS) - 1)]
+    if key == "whip":
+        n = min(n, WHIP_COUNT_MAX)
+    return n
 
 
 # --- SEVİYENİN "BÜYÜME PUANI" -----------------------------------------
@@ -11573,20 +11591,32 @@ def weapon_count(lvl):
 # çıkınca ilk seviyeler üçte birine düşerdi: oyunun ilk yarısı belirgin
 # şekilde zayıflar, oyuncu "silahım hiç güçlenmiyor" derdi. Eğri bu yüzden
 # İÇBÜKEY: ilk seviyeler büyük pay alır, sonrakiler gittikçe küçülür.
-#   growth(1) = 0        growth(8) ≈ 11.5   growth(16) ≈ 19.3
+#   growth(1) = 0        growth(8) ≈ 11.2   growth(16) ≈ 19.4
 #   growth(5) ≈ 6.9      growth(12) ≈ 15.9  growth(25) = 24
-# Yani 8. seviye artık (eski tavan) doğrusalın 1.65 katı kadar büyümüş
+# Yani 8. seviye artık (eski tavan) doğrusalın 1.6 katı kadar büyümüş
 # oluyor; 25. seviyedeki toplam ise değişmiyor. Bütün seviye ölçekleri
 # (hasar, menzil, alan, bekleme) bu tek fonksiyondan besleniyor, böylece
 # "seviye mantığı" her silahta aynı çalışıyor.
-WEAPON_GROWTH_EXP = 1.9
+# Saf içbükey eğrinin (exp 1.9) kusuru: tepede EĞİMİ SIFIRA gidiyordu.
+# Ölçüm: 20->25 arası seviyeler sırayla +%1.70, +%1.35, +%0.99, +%0.62,
+# +%0.23 DPS veriyordu — yani son beş seviye bedavaya gidiyordu, oyuncu
+# "yükselttim, hiçbir şey olmadı" diyordu. Çözüm, eğriye DOĞRUSAL BİR
+# TABAN eklemek: her seviye payının en az %35'ini doğrusal olarak alır,
+# kalan %65 eskisi gibi içbükey dağılır. Üsse 2.4 denmesi ilk seviyelerin
+# payını korur (growth(8): 11.54 -> 11.23, farkı hissedilmez) ama son beş
+# seviye artık +%2.0, +%1.9, +%1.7, +%1.5, +%1.4 verir: eğim sabit. Toplam
+# (growth(25) = 24) değişmediği için hiçbir silah topluca güçlenmez.
+WEAPON_GROWTH_EXP = 2.4
+WEAPON_GROWTH_FLOOR = 0.35      # her seviyenin doğrusal olarak aldığı pay
 
 
 def weapon_growth(lvl):
     """`lvl` seviyesine kadar biriken büyüme puanı (0 .. WEAPON_MAX_LEVEL-1)."""
     top = float(WEAPON_MAX_LEVEL - 1)
     x = clamp((float(lvl) - 1.0) / top, 0.0, 1.0)
-    return top * (1.0 - (1.0 - x) ** WEAPON_GROWTH_EXP)
+    icbukey = 1.0 - (1.0 - x) ** WEAPON_GROWTH_EXP
+    return top * (WEAPON_GROWTH_FLOOR * x
+                  + (1.0 - WEAPON_GROWTH_FLOOR) * icbukey)
 
 # --- KALKAN (eski kitap kalkanı; anahtarı hâlâ "book") ---
 BOOK_ORBIT_R = 62.0             # kalkanların oyuncudan uzaklığı
@@ -17269,7 +17299,7 @@ class RunState:
             # (WHIP_SWING) hasar konisinin (WHIP_ARC) içinde kalır.
             adx, ady = p.aim_dir
             base_ang = math.atan2(ady, adx)
-            n_whip = weapon_count(lvl)
+            n_whip = weapon_count(lvl, "whip")
             reach = whip_reach(lvl)
             half_arc = whip_arc(lvl)
             width = 9 + n_whip
