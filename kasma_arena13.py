@@ -10688,8 +10688,31 @@ HELL_SPEED_BASE_WAVE = 8    # cehennem 1. dalgasının hız temposu (arena dalga
 # zırhsız hedeflere iniyor, cehennem arenadan KOLAY geliyordu. Artık
 # cehennemde de zırh var ve dalga başına açılıyor.
 HELL_ARMOR_BASE = 0.10
-HELL_ARMOR_PER_WAVE = 0.014
-HELL_ARMOR_MAX = 0.40
+HELL_ARMOR_PER_WAVE = 0.018     # v3.22: 0.014 -> 0.018 (plato kırıldı)
+HELL_ARMOR_MAX = 0.50           # v3.22: 0.40 -> 0.50
+
+# CEHENNEM BASKISI (v3.22) — arena_pressure'ın cehennemdeki karşılığı.
+# Cehennemde hiçbir baskı eğrisi yoktu: hız cehennemin 13. dalgasında 1.55'e
+# oturup bir daha artmıyor, zırh 23'te tavana vuruyor, doğum aralığı 25'te
+# tabana oturuyordu. Geriye tek büyüyen şey can kalıyordu (+%5.5/dalga ve
+# düşüyor), yani gereken DPS platoya giriyor ve KOŞU BİTMİYORDU: 40. dalga
+# ile 80. dalga birbirinin aynısı oluyordu.
+# Arena baskısı kadar sert DEĞİL (arena oyuncuyu portala İTMEK için var,
+# cehennem ise oyunun sonu), ama plato kırılıyor.
+HELL_PRESSURE_FROM = 15         # bu dalgadan sonra devreye girer
+HELL_PRESSURE_HP = 1.085        # dalga başına can çarpanı
+HELL_PRESSURE_DMG = 1.07        # dalga başına hasar çarpanı
+HELL_PRESSURE_SPD = 0.035       # dalga başına hız artışı
+
+
+def hell_pressure(wave):
+    """Cehennemin geç dalgalarındaki baskı: (can, hasar, hız)."""
+    over = max(0, int(wave) - HELL_PRESSURE_FROM)
+    if over <= 0:
+        return 1.0, 1.0, 1.0
+    return (HELL_PRESSURE_HP ** over,
+            HELL_PRESSURE_DMG ** over,
+            1.0 + HELL_PRESSURE_SPD * over)
 
 
 def hell_armor(wave):
@@ -13025,7 +13048,12 @@ class Enemy:
         spd_wave = hell_speed_wave(wave) if biome == "hell" else wave
         dmg_wave = hell_dmg_wave(wave) if biome == "hell" else wave
         # --- 25. dalgadan sonra arena kasten acımasızlaşır (portala zorlar) ---
-        pr_hp, pr_dmg, pr_spd, pr_armor = (1.0, 1.0, 1.0, 0.0) if biome == "hell" else arena_pressure(wave)
+        if biome == "hell":
+            # Cehennemin kendi baskı eğrisi (zırhı hell_armor veriyor).
+            hp_p, dmg_p, spd_p = hell_pressure(wave)
+            pr_hp, pr_dmg, pr_spd, pr_armor = hp_p, dmg_p, spd_p, 0.0
+        else:
+            pr_hp, pr_dmg, pr_spd, pr_armor = arena_pressure(wave)
 
         hp_var = var["hp"] if var else 1.0
         dmg_var = var["dmg"] if var else 1.0
@@ -16594,6 +16622,9 @@ def wave_score_goal(wave, pace=1.0):
 SURGE_DURATION = 8.0
 SURGE_RATE = 0.62      # spawn aralığı çarpanı (küçük = daha sık)
 SURGE_EXTRA = 1        # her spawn'da kaç ek düşman
+# Dalga atladıktan sonra yoğunluk penceresinin AÇILMASINI bekleyen sükûnet.
+SURGE_CALM = 2.0       # sıradan dalga
+SURGE_CALM_BOSS = 3.2  # patron dalgası (kart/market nefesi daha uzun)
 
 # --- DALGA İÇİ HIZLANMA ---------------------------------------------
 # Oyun artık yalnızca dalga atlayınca hızlanmıyor. AYNI dalga içinde de
@@ -16611,7 +16642,18 @@ WAVE_ACCEL_EXTRA_AFTER = 26.0
 # yol açabilirdi; bu da kare hızını (FPS) yere serer. Sınır dolduğunda yeni
 # düşman doğmaz — oyuncu biraz temizleyince spawn kendiliğinden devam eder.
 def max_alive_enemies(wave):
-    return int(min(210, 70 + wave * 4))
+    """Aynı anda arenada yaşayabilecek en çok yaratık.
+
+    TAVAN 210'DAN 175'E İNDİ (v3.22). 25. dalgadan sonra doğum aralığı
+    tabana (base_interval) oturduğu için saniyede doğan yaratık sayısı
+    artık ARTMIYORDU; buna karşılık bu tavan 35. dalgaya kadar 210'a
+    çıkmaya devam ediyordu. Yani oyuncu temizleyemediğinde arena bedavaya
+    210 yaratıkla doluyor, kare süresi uzuyor ama ZORLUK artmıyordu —
+    sadece ekran tıkanıyordu. Ölçümde 174 yaratığa kadar kare süresi sabit.
+    Baskı artık doğum HIZINDAN geliyor (bkz. base_interval tabanı), ekrandaki
+    yığından değil.
+    """
+    return int(min(175, 70 + wave * 4))
 
 
 class WaveManager:
@@ -16636,6 +16678,7 @@ class WaveManager:
         self.wave_goal = wave_score_goal(1)
         # --- yoğunluk (surge) penceresi ---
         self.surge_timer = 0.0
+        self.surge_delay = 0.0     # pencere açılmadan önceki sükûnet
 
     # Dünya ekrandan büyük olduğu için doğum noktasını RunState belirler
     # (kameranın hemen dışı). Atanmazsa eski davranışa (dünya kenarı) düşer.
@@ -16670,7 +16713,8 @@ class WaveManager:
         return w >= BOSS_FIRST_WAVE and (w - BOSS_FIRST_WAVE) % BOSS_WAVE_STEP == 0
 
     def surge_active(self):
-        return self.surge_timer > 0
+        """Yoğunluk penceresi AÇIK mı? Sükûnet süresi dolmadan açılmaz."""
+        return self.surge_timer > 0 and self.surge_delay <= 0
 
     def goal_progress(self):
         """0..1 arası — dalganın skor hedefine ne kadar yaklaşıldığı."""
@@ -16686,6 +16730,12 @@ class WaveManager:
         self.wave_score = 0
         self.wave_goal = wave_score_goal(new_wave)
         self.wave_duration = min(42 / self.pace, self.wave_duration + 1.1 / self.pace)
+        # NEFES PAYI (v3.22): yoğunluk penceresi eskiden hedef dolduğu KAREDE
+        # açılıyordu — oyuncu dalgayı bitirdiği an yeni bir akının içine
+        # düşüyordu, tek saniyelik bir rahatlama bile yoktu ve "dalgayı
+        # bitirdim" hissi hiç oluşmuyordu. Artık kısa bir sükûnetten sonra
+        # başlıyor; patron dalgasından sonra biraz daha uzun.
+        self.surge_delay = SURGE_CALM_BOSS if self.is_boss_wave(new_wave) else SURGE_CALM
         self.surge_timer = SURGE_DURATION
         self.announce_timer = 2.2
 
@@ -16709,7 +16759,12 @@ class WaveManager:
         self.wave_time += dt
         if self.announce_timer > 0:
             self.announce_timer -= dt
-        if self.surge_timer > 0:
+        # SIRA ÖNEMLİ: önce sükûnet tükenir, yoğunluk penceresi ANCAK ondan
+        # sonra işlemeye başlar. Tersi olsaydı 8 saniyelik pencerenin ilk 2
+        # saniyesi sükûnette eriyip gidecekti.
+        if self.surge_delay > 0:
+            self.surge_delay = max(0.0, self.surge_delay - dt)
+        elif self.surge_timer > 0:
             self.surge_timer = max(0.0, self.surge_timer - dt)
 
         # O dalgada toplanan skor = güncel toplam - dalga başındaki toplam
@@ -16744,7 +16799,12 @@ class WaveManager:
         # Zorluk artık düşman istatistiklerini değil yalnızca TEMPOyu (pace)
         # etkiler — spawn hızı tamamen self.pace üzerinden belirlenir.
         # Taban aralık kısaltıldı: ilk dalgalarda oyun "boş" hissettiriyordu.
-        base_interval = max(0.28, 1.15 - self.wave * 0.035) / self.pace
+        # TABAN 0.28 -> 0.20 (v3.22): kalabalık tavanı düştüğü için baskının
+        # ekrandaki yığından değil DOĞUM HIZINDAN gelmesi gerekiyor. Böylece
+        # geç dalgalar hem gerçekten sertleşiyor hem de kare hızı sabit
+        # kalıyor (yaratıklar hızlı doğuyor ama hızlı da ölüyor).
+        # Sükûnet önce tükenir, yoğunluk penceresi ondan sonra işlemeye başlar.
+        base_interval = max(0.20, 1.15 - self.wave * 0.035) / self.pace
         # DALGA İÇİ HIZLANMA: aynı dalgada bile tempo sürekli artar.
         base_interval /= (1.0 + min(WAVE_ACCEL_MAX, self.wave_time * WAVE_ACCEL_RATE))
         if self.surge_active():
