@@ -1313,11 +1313,11 @@ STRINGS = {
     "cat.cursed":  _T("LANETLİ", "CURSED", "MALDITO", "VERFLUCHT", "ПРОКЛЯТОЕ"),
     "cat.legendary": _T("EFSANE", "LEGEND", "LEYENDA", "LEGENDE", "ЛЕГЕНДА"),
     "cat.hell":    _T("CEHENNEM", "HELL", "INFIERNO", "HÖLLE", "АД"),
-    "ui.books_sub":  _T("Kitaplar görevle açılır — açtığın kitaplar seviye atlayınca karşına çıkar. İstemediğin en fazla {0} kitabı kapatabilirsin.",
-                        "Books unlock through tasks and then appear on level up. You may mute up to {0} you don't want.",
-                        "Los libros se abren con tareas y aparecen al subir de nivel. Puedes silenciar hasta {0}.",
-                        "Bücher werden durch Aufgaben frei und erscheinen beim Aufstieg. Du kannst bis zu {0} sperren.",
-                        "Книги открываются заданиями и выпадают при повышении уровня. Можно отключить до {0}."),
+    "ui.books_sub":  _T("Kitaplar görevle açılır — açtığın kitaplar seviye atlayınca karşına çıkar. İstemediğin en fazla {0} kitabı kapatabilirsin ({1} tanesi nadir olabilir).",
+                        "Books unlock through tasks and then appear on level up. You may mute up to {0} you don't want ({1} of them may be rare).",
+                        "Los libros se abren con tareas y aparecen al subir de nivel. Puedes silenciar hasta {0} ({1} puede ser raro).",
+                        "Bücher werden durch Aufgaben frei und erscheinen beim Aufstieg. Du kannst bis zu {0} sperren ({1} davon selten).",
+                        "Книги открываются заданиями и выпадают при повышении уровня. Можно отключить до {0} ({1} из них — редкая)."),
     "ui.books_rule": _T("BİR KOŞUDA: {0} normal kitap (her biri Lv.{1}'e kadar büyür)  +  {2} nadir kitap (alınınca bir daha çıkmaz).",
                         "PER RUN: {0} normal books (each grows to Lv.{1})  +  {2} rare book (never appears again once taken).",
                         "POR PARTIDA: {0} libros normales (hasta Nv.{1})  +  {2} libro raro (no vuelve a salir).",
@@ -1687,7 +1687,7 @@ STRINGS.update({
     "b.r_lasthope.name": _T("Son Umut Kitabı", "Book of Last Hope", "Libro de la Última Esperanza", "Buch der letzten Hoffnung", "Книга Последней Надежды"),
     "b.r_lasthope.desc": _T("Canın %30'unun altındayken aldığın hasar %20 azalır", "Take 20% less damage below 30% health", "Recibes 20% menos de daño bajo el 30% de vida", "20% weniger Schaden unter 30% Leben", "На 20% меньше урона при здоровье ниже 30%"),
     "b.r_hp_big.name": _T("Dev Kitabı", "Book of the Giant", "Libro del Gigante", "Buch des Riesen", "Книга Великана"),
-    "b.r_hp_big.desc": _T("Azami canın %40 artar ama biraz yavaşlarsın", "Max health +40%, but you move a little slower", "Vida máxima +40%, pero te mueves más lento", "Max. Leben +40%, aber etwas langsamer", "Макс. здоровье +40%, но ты чуть медленнее"),
+    "b.r_hp_big.desc": _T("Azami canın +120 artar ama biraz yavaşlarsın", "Max health +120, but you move a little slower", "Vida máxima +120, pero te mueves más lento", "Max. Leben +120, aber etwas langsamer", "Макс. здоровье +120, но ты чуть медленнее"),
 })
 
 
@@ -3432,15 +3432,23 @@ class SaveManager:
     def toggle_book_mute(self, key):
         """Kitabı kapatır/açar. Dönüş: (yeni_durum, mesaj).
 
-        En fazla MAX_MUTED_BOOKS kitap kapatılabilir; ayrıca oyuncu AÇIK
-        kitaplarının hepsini birden kapatamaz — kapatılmamış en az bir kitap
-        kalmalı, yoksa seviye atlama ekranı hiç kitap öneremez.
+        En fazla MAX_MUTED_BOOKS kitap kapatılabilir; NADİRLER için ayrı ve
+        çok daha sert bir tavan vardır (MAX_MUTED_RARE_BOOKS), çünkü nadir
+        havuzunu daraltmak koşunun tek büyük kararını kesinleştiriyordu.
+        Ayrıca oyuncu AÇIK kitaplarının hepsini birden kapatamaz — kapatılmamış
+        en az bir kitap kalmalı, yoksa seviye atlama ekranı hiç kitap öneremez.
         """
         muted = self.data.setdefault("books_muted", [])
         if key in muted:
             muted.remove(key)
             self.save()
             return False, "açıldı"
+        rare = bool(BOOK_BY_KEY.get(key, {}).get("rare"))
+        if rare:
+            n_rare = sum(1 for k in muted if BOOK_BY_KEY.get(k, {}).get("rare"))
+            if n_rare >= MAX_MUTED_RARE_BOOKS:
+                return True, (f"en fazla {MAX_MUTED_RARE_BOOKS} nadir kitap "
+                              "kapatabilirsin")
         if len(muted) >= MAX_MUTED_BOOKS:
             return True, f"en fazla {MAX_MUTED_BOOKS} kitap kapatabilirsin"
         open_left = [b["key"] for b in BOOKS
@@ -3448,13 +3456,37 @@ class SaveManager:
                      and b["key"] != key]
         if not open_left:
             return False, "son açık kitabını kapatamazsın"
+        # Nadir havuzu da hiç boşalmasın: en az bir nadir açık kalmalı, yoksa
+        # nadir yuvası koşu boyunca hiç dolmaz.
+        if rare and not [b["key"] for b in BOOKS
+                         if b.get("rare") and self.owns_book(b["key"])
+                         and b["key"] not in muted and b["key"] != key]:
+            return False, "son açık nadir kitabını kapatamazsın"
         muted.append(key)
         self.save()
         return True, "kapatıldı"
 
+    def effective_muted_books(self):
+        """Gerçekten uygulanan kapatma listesi.
+
+        Nadir tavanı (MAX_MUTED_RARE_BOOKS) BURADA da uygulanır, sadece
+        kapatma anında değil: aksi hâlde tavandan ÖNCE 6 nadiri kapatmış
+        bir kayıt (ya da kayıt dosyasını kurcalayan biri) sömürüyü sürdürür.
+        Fazla nadir kapatmalar listedeki sıraya göre yok sayılır.
+        """
+        muted = list(self.data.get("books_muted", []))
+        out, n_rare = [], 0
+        for k in muted:
+            if BOOK_BY_KEY.get(k, {}).get("rare"):
+                n_rare += 1
+                if n_rare > MAX_MUTED_RARE_BOOKS:
+                    continue
+            out.append(k)
+        return out
+
     def unlocked_books(self):
         """Seviye atlamada çıkabilecek kitaplar: AÇIK ve KAPATILMAMIŞ olanlar."""
-        muted = self.data.get("books_muted", [])
+        muted = self.effective_muted_books()
         return [b for b in BOOKS if self.owns_book(b["key"]) and b["key"] not in muted]
 
     # ---- silahlar (kitaplarla aynı mantık) ----
@@ -7875,6 +7907,25 @@ MAX_RUN_RARE_BOOKS = 1
 # Normal kitapların çıkabileceği en yüksek seviye.
 BOOK_MAX_LEVEL = 15
 
+
+def book_max_level(key_or_book):
+    """Bir kitabın çıkabileceği EN YÜKSEK seviye.
+
+    Nadir kitaplar her zaman tek seviyedir. Normal kitaplar BOOK_MAX_LEVEL'a
+    kadar çıkar — ama bir kitap kendi satırına `max` yazarak daha erken
+    durabilir. Bu, DOYAN kitaplar için gerekli: DELGİ KİTABI 15 seviyede 16
+    delmeye çıkıyordu, oysa arenada tek bir mermi hattında 16 yaratığın
+    dizilmesi pratikte hiç olmuyor — yani son 10 seviye oyuncunun seviye
+    bütçesini yakıyordu. Tavanı olan kitap artık dolduğunda kart olarak
+    çıkmıyor, seviye başka bir kitaba gidiyor.
+    """
+    b = BOOK_BY_KEY.get(key_or_book) if isinstance(key_or_book, str) else key_or_book
+    if not b:
+        return BOOK_MAX_LEVEL
+    if b.get("rare"):
+        return 1
+    return int(b.get("max", BOOK_MAX_LEVEL))
+
 BOOKS = [
     # ---- TEMEL KİTAPLAR (en kolay görevler — ilk koşularda açılır) ----
     {"key": "r_dmg", "name": "Hasar Kitabı", "desc": "Hasarını %7 artırır",
@@ -7947,8 +7998,10 @@ BOOKS = [
      "color": (210, 70, 100), "icon": "drop", "rare": False,
      "unlock": dict(text="Kanla beslen: toplam 10.000 can çal",
                     reqs=[rq_ach("leech10k", "«Sülük» başarımını aç")])},
-    {"key": "r_pierce", "name": "Delgi Kitabı",
-     "desc": "Mermilerine +1 delme verir",
+    # max=5: doyan kitap. 15 seviyede 16 delmeye çıkıyordu ama arenada tek
+    # bir mermi hattında 16 yaratığın dizilmesi pratikte hiç olmuyor.
+    {"key": "r_pierce", "name": "Delgi Kitabı", "max": 5,
+     "desc": "Mermilerine +1 delme verir (Lv.5'e kadar)",
      "color": (220, 140, 90), "icon": "sword", "rare": False,
      "unlock": dict(text="Sırayı dizip tek mermiyle biç: 8. dalgaya ulaş",
                     reqs=[rq_stat("best_wave", 8, "8. dalgaya ulaş"),
@@ -8040,7 +8093,7 @@ BOOKS = [
                           rq_ach("wave15", "«Arena Ustası» başarımını aç"),
                           rq_shop("shield", 6, "Kalkan'ı markette Lv.6'ya çıkar")])},
     {"key": "r_hp_big", "name": "Dev Kitabı",
-     "desc": "Azami canın %40 artar ama biraz yavaşlarsın",
+     "desc": "Azami canın +120 artar ama biraz yavaşlarsın",
      "color": (200, 140, 90), "icon": "skull", "rare": True,
      "unlock": dict(text="Devleşecek kadar dayan",
                     reqs=[rq_stat("best_combo", 45, "45'lik bir kombo yap"),
@@ -8057,6 +8110,15 @@ STARTER_BOOKS = [b["key"] for b in BOOKS if b.get("basic")]
 # Sevdiğin kitapların gelme şansı yükselir ama elini tamamen kendin dizemezsin
 # (ayrıca bkz. gizli denge sistemi: _meta_weight).
 MAX_MUTED_BOOKS = 6
+# NADİR kitaplar için AYRI ve sert bir tavan (v3.22). Sessize alma hakkı
+# nadir/normal ayrımı yapmıyordu ve 11 nadirin 6'sı kapatılabiliyordu. Hesap:
+# zayıf 6 nadir kapatılınca nadir havuzu 11 -> 5'e düşüyor ve 30 seviyede
+# ÇOĞALMA KİTABI'nı en az bir kez görme olasılığı %88'e çıkıyordu. Yani
+# koşunun "TEK büyük kararı" kumardan çıkıp neredeyse kesinleşiyordu — oyunun
+# en çok övündüğü sistem (gizli denge / anti-meta) kitaplık ekranından tek
+# tıkla devre dışı kalıyordu. Tek nadir kapatma hakkı, "sevmediğim bir kartı
+# eleyeyim" isteğini karşılar ama havuzu belirleyemez.
+MAX_MUTED_RARE_BOOKS = 1
 
 
 def book_reqs(book):
@@ -8904,13 +8966,43 @@ class Player:
             gain = max(16, int(BASE_MAX_HP * 0.16))
             self.max_hp += gain
             self.hp = min(self.max_hp, self.hp + gain)
-        elif key == "r_mag": self.run_pickup_mult += 0.20
+        elif key == "r_mag":
+            # DOYAN KİTAP (v3.22). Toplama yarıçapı 84'ten 336'ya çıkıyordu;
+            # ekran yüksekliği 634 piksel, yani yarıçap ekranın %53'ü.
+            # Lv.5'te (168 px) oyuncunun çevresindeki her şey zaten
+            # kendiliğinden geliyor: 6-15. seviyeler ölçülebilir hiçbir şey
+            # vermiyordu. Artık yarıçap azalan getiriyle büyüyor — Lv.1 116 px,
+            # Lv.5 153 px, Lv.15 170 px: yani kitap ilk seviyelerde neredeyse
+            # tam değerini veriyor ve tam da "her şey kendiliğinden geliyor"
+            # eşiğinde duruyor, ekranın yarısına yayılmıyor. Lv.5'ten sonra
+            # kitap "topladığını daha değerli yapar"a dönüşüyor.
+            # run_pickup_mult'a skinler de += ile yazıyor (7645/7748):
+            # atama değil, o seviyenin payı kadar ekleme.
+            self.run_pickup_mult += (stack_bonus(0.58, lvl, soft=2.0)
+                                     - stack_bonus(0.58, lvl - 1, soft=2.0))
+            if lvl > 5:
+                self.run_coin_mult += 0.03
         elif key == "r_armor":
             self.run_armor_bonus += 0.025
             self.max_hp += 10
             self.hp = min(self.max_hp, self.hp + 10)
         elif key == "r_coin": self.run_coin_mult += 0.15
-        elif key == "r_xp": self.run_xp_mult += 0.15
+        elif key == "r_xp":
+            # BİLEŞİK KİTAP (v3.22). Diğer 26 kitap doğrudan güç verir; bu
+            # kitap DAHA FAZLA KİTAP verir, yani erken alınan seviyeleri
+            # sonraki bütün seviyeleri finanse eder. Ölçüm: 15 seviyede
+            # çarpan x3.25 oluyordu ve aynı ham tecrübeyle oyuncu 41 yerine
+            # 55 seviye atlıyordu — 14 fazla kart, yani dört kitabı birden
+            # 15'e çıkarmak için gereken 60 seviyenin %23'ü bedava. Üstünde
+            # hiç azalan getiri yoktu. Artık var: Lv.1 +%16, Lv.5 +%37,
+            # Lv.15 +%47 (x3.25 yerine x1.47). İlk seviyeler neredeyse tam
+            # değeri verdiği için kart erken oyunda hâlâ çekici.
+            # ÇARPAN PAYLAŞIMLI: run_xp_mult'a skinler ve perkler de
+            # += ile yazıyor (bkz. 7642/7703/7712/7747/7769). Bu yüzden
+            # ATAMA yapılamaz, yoksa onların payı silinir; o seviyenin
+            # payı kadar EKLENİR.
+            self.run_xp_mult += (stack_bonus(0.22, lvl, soft=2.5)
+                                 - stack_bonus(0.22, lvl - 1, soft=2.5))
         elif key == "r_regen": self.run_regen_bonus += 0.45
         elif key == "r_crit": self.run_crit_bonus += 0.035
         elif key == "r_critd": self.run_critdmg_bonus += 0.14
@@ -8932,11 +9024,24 @@ class Player:
         elif key == "r_echo": self.echo_level += 1
         elif key == "r_roar": self.roar_level += 1
         elif key == "r_hp_big":
-            self.max_hp = int(self.max_hp * 1.40)
-            self.hp = min(self.max_hp, self.hp + self.max_hp * 0.40)
+            # DİKKAT (v3.22): burada da r_hp'nin aynı hatası vardı — O ANKİ
+            # azami can çarpılıyordu, oysa canı artıran her şey (r_hp, market
+            # core_vitality, kostüm/pet) TOPLAMSAL. Sonuç: aynı kitap, aynı
+            # koşuda ne zaman alındığına göre farklı değer veriyordu. Ölçüm:
+            # r_hp_big ÖNCE alınınca azami can 530, SONRA alınınca 686 — %29
+            # fark, hem de oyuncuya hiçbir yerde söylenmeden. Optimal oynayış
+            # "nadir kitabı mümkün olduğunca geç al" oluyordu. Artık TABAN
+            # cana göre sabit: sıradan bağımsız +120 can.
+            gain = int(BASE_MAX_HP * 1.20)
+            self.max_hp += gain
+            self.hp = min(self.max_hp, self.hp + gain)
             self.base_speed = max(60, self.base_speed - 18)
         elif key == "r_multi": self.multishot_level += 1
         elif key == "r_pierce":
+            # v3.22: artık 5 seviyede duruyor (bkz. BOOKS satırındaki "max").
+            # 16 delme ölçüldü ve arenada tek bir mermi hattında 16 yaratığın
+            # dizilmesi pratikte hiç olmuyordu: son 10 seviye hiçbir şey
+            # yapmadan oyuncunun seviye bütçesini yakıyordu.
             # v3.17: kart ne diyorsa o olsun — her seviyede +1 delme.
             # (Delme hasarı artırmaz, yalnızca merminin kaç düşmanı birden
             # geçeceğini belirler; üstelik tek-atma freni her vuruşa ayrı ayrı
@@ -8966,7 +9071,7 @@ class Player:
                 return 0
             top = 1
         else:
-            top = BOOK_MAX_LEVEL
+            top = book_max_level(key)
             if cur == 0 and self.normal_book_count() >= MAX_RUN_BOOKS:
                 return 0
         if cur >= top:
@@ -17033,7 +17138,12 @@ class RunState:
         if burn > 0 and hasattr(e, "apply_burn"):
             e.apply_burn(burn, 1.4)
         if p.vamp_level > 0:
-            p.lifesteal(dmg * 0.01 * p.vamp_level)
+            # v3.22: burası eskiden 0.01 kullanıyordu, yani KAN EMİCİ aynı
+            # koşuda hangi silahla vurduğuna göre iki kat fark yapıyordu ve
+            # kart "%2" diyordu. Alan hasarının saniyede birkaç kez vurması
+            # artık saniye tavanıyla (vamp_rate_cap) frenlendiği için oranı
+            # ayrıca yarıya indirmeye gerek yok.
+            p.lifesteal(dmg * 0.02 * p.vamp_level)
         if died:
             self.on_enemy_killed(e)
         return died
@@ -18378,7 +18488,7 @@ class RunState:
             "kind": "book", "key": bk["key"], "book": bk, "lvl": lvl, "new": is_new,
             "name": bk_name(bk), "color": tuple(bk["color"]), "icon": bk.get("icon", "star"),
             "desc": bk_desc(bk), "rare": rare,
-            "max": 1 if rare else BOOK_MAX_LEVEL,
+            "max": book_max_level(bk),
         }
 
     # ---------------- GİZLİ DENGE (anti-meta) ----------------
@@ -18506,7 +18616,7 @@ class RunState:
                 # atlarken gerçekten "silah mı, kitap mı?" diye düşünsün.
                 offers.append(self._book_offer(bk, 1, True))
                 weights.append(self._meta_weight(key, 17))
-            elif cur < BOOK_MAX_LEVEL:
+            elif cur < book_max_level(bk):
                 offers.append(self._book_offer(bk, cur + 1, False))
                 weights.append(self._meta_weight(key, 12))
         return offers, weights
@@ -20155,7 +20265,7 @@ def draw_book_slots(surf, run, t):
         bk = BOOK_BY_KEY[key]
         lvl = p.books[key]
         col = tuple(bk["color"])
-        maxed = lvl >= (1 if rare_slot else BOOK_MAX_LEVEL)
+        maxed = lvl >= book_max_level(bk)
         pulse = 0.5 + 0.5 * math.sin(t * 2.4 + i * 0.8)
 
         add_glow(surf, r.centerx, r.centery, cell * 0.9, col, 0.16 + 0.10 * pulse)
@@ -21567,7 +21677,7 @@ class LevelUpOverlay:
 
             # ---- yükseltmelerde mevcut seviye çubuğu (silah ve kitap) ----
             if not ch.get("new"):
-                mx = weapon_max_level(ch["w"]) if is_weapon else ch.get("max", BOOK_MAX_LEVEL)
+                mx = weapon_max_level(ch["w"]) if is_weapon else ch.get("max", BOOK_MAX_LEVEL)  # kart zaten book_max_level ile doldu
                 pb = pygame.Rect(r2.x + 30, r2.bottom - 66, r2.w - 60, 8)
                 draw_bar(surf, pb, clamp(ch["lvl"] / max(1, mx), 0, 1), col, radius=4)
                 draw_text(surf, L("ui.lvl_arrow", ch["lvl"] - 1, ch["lvl"], mx),
@@ -25820,7 +25930,7 @@ class App:
         draw_icon(canvas, 30, 30, "book", (186, 150, 255), 13)
         draw_text(canvas, L("ui.books"), (52, 18), 26, (186, 150, 255), bold=True)
         draw_text(canvas,
-                  L("ui.books_sub", MAX_MUTED_BOOKS),
+                  L("ui.books_sub", MAX_MUTED_BOOKS, MAX_MUTED_RARE_BOOKS),
                   (52, 48), 11, TEXT_DIM, shadow=False)
         draw_text(canvas,
                   L("ui.books_rule", MAX_RUN_BOOKS, BOOK_MAX_LEVEL, MAX_RUN_RARE_BOOKS),
@@ -25950,7 +26060,7 @@ class App:
                       bold=True, center=True, shadow=False)
             hint = ("Bir koşuda yalnızca BİR nadir kitap alabilirsin."
                     if rare else
-                    f"Seviye atladıkça Lv.{BOOK_MAX_LEVEL}'e kadar büyür.")
+                    f"Seviye atladıkça Lv.{book_max_level(bk)}'e kadar büyür.")
             draw_text(canvas, hint, (left.centerx, sy + 22), 11,
                       (108, 100, 84), center=True, shadow=False)
         else:
@@ -25968,7 +26078,7 @@ class App:
                  ("Temel Kitap" if bk.get("basic") else "Standart Kitap")),
                 ("NEREDE ÇIKAR", "Seviye atlama ekranı"),
                 ("KOŞU İÇİ TAVAN", "1 seviye — tek hak" if rare
-                 else f"Lv.{BOOK_MAX_LEVEL}"),
+                 else f"Lv.{book_max_level(bk)}"),
                 ("YUVA", f"Nadir yuvası (1 adet)" if rare
                  else f"Kitap yuvası ({MAX_RUN_BOOKS} adet)"),
                 ("GÖREV SAYISI", f"{cur} / {need} tamam")]
