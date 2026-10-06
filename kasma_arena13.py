@@ -1673,15 +1673,15 @@ STRINGS.update({
     "b.r_multi.name": _T("Çoğalma Kitabı", "Book of Multiplicity", "Libro de la Multiplicidad", "Buch der Vervielfachung", "Книга Умножения"),
     "b.r_multi.desc": _T("Her atışında bir mermi daha çıkar", "Adds one more projectile to every shot", "Añade un proyectil más a cada disparo", "Fügt jedem Schuss ein Geschoss hinzu", "Добавляет ещё один снаряд к выстрелу"),
     "b.r_killheal.name": _T("Kan Kitabı", "Book of Blood", "Libro de la Sangre", "Buch des Blutes", "Книга Крови"),
-    "b.r_killheal.desc": _T("Öldürdüğün her düşman sana 3 can verir", "Every kill restores 3 health", "Cada muerte te da 3 de vida", "Jeder Kill gibt 3 Leben", "Каждое убийство даёт 3 здоровья"),
+    "b.r_killheal.desc": _T("Öldürdüğün her düşman azami canının %3'ü kadar can verir", "Every kill restores 3% of your max health", "Cada muerte restaura el 3% de tu vida máxima", "Jeder Kill heilt 3% deines max. Lebens", "Каждое убийство восстанавливает 3% макс. здоровья"),
     "b.r_rage.name": _T("Öfke Kitabı", "Book of Rage", "Libro de la Ira", "Buch des Zorns", "Книга Ярости"),
     "b.r_rage.desc": _T("Canın yarısının altındayken hasarın %35 artar", "+35% damage while below half health", "+35% de daño con menos de media vida", "+35% Schaden unter halbem Leben", "+35% урона при здоровье ниже половины"),
     "b.r_execute.name": _T("İnfaz Kitabı", "Book of Execution", "Libro de la Ejecución", "Buch der Hinrichtung", "Книга Казни"),
     "b.r_execute.desc": _T("Canı %18'in altına düşen sıradan düşmanlar anında ölür", "Ordinary enemies below 18% health die instantly", "Los enemigos normales bajo el 18% mueren al instante", "Gewöhnliche Gegner unter 18% Leben sterben sofort", "Обычные враги ниже 18% здоровья умирают мгновенно"),
     "b.r_roar.name": _T("Kükreme Kitabı", "Book of the Roar", "Libro del Rugido", "Buch des Brüllens", "Книга Рыка"),
-    "b.r_roar.desc": _T("BONK'ladığın düşmanlar korkup senden kaçar", "Enemies you BONK panic and flee", "Los enemigos golpeados huyen aterrados", "Von BONK getroffene Gegner fliehen panisch", "Враги после БОНК в панике убегают"),
+    "b.r_roar.desc": _T("BONK'ladığın düşmanlar korkup kaçar ve korkarken %30 fazla hasar alır", "Enemies you BONK panic and flee, taking 30% more damage while afraid", "Los enemigos golpeados huyen y reciben 30% más daño mientras temen", "Von BONK getroffene Gegner fliehen und erleiden dabei 30% mehr Schaden", "Враги после БОНК убегают и получают на 30% больше урона, пока в страхе"),
     "b.r_dashslow.name": _T("Zaman Kitabı", "Book of Time", "Libro del Tiempo", "Buch der Zeit", "Книга Времени"),
-    "b.r_dashslow.desc": _T("Dash attığında çevrendeki düşmanlar yavaşlar", "Dashing slows nearby enemies", "Al impulsarte, los enemigos cercanos se ralentizan", "Ein Dash verlangsamt nahe Gegner", "Рывок замедляет врагов вокруг"),
+    "b.r_dashslow.desc": _T("Dash attığında çevrendeki düşmanlar yavaşlar; yavaşlamış düşman sana %20 az hasar verir", "Dashing slows nearby enemies; slowed enemies deal 20% less damage to you", "Al impulsarte los enemigos se ralentizan; los ralentizados te hacen 20% menos daño", "Ein Dash verlangsamt nahe Gegner; verlangsamte Gegner verursachen 20% weniger Schaden", "Рывок замедляет врагов; замедлённые наносят на 20% меньше урона"),
     "b.r_second_wind.name": _T("İkinci Nefes Kitabı", "Book of Second Wind", "Libro del Segundo Aliento", "Buch des zweiten Atems", "Книга Второго Дыхания"),
     "b.r_second_wind.desc": _T("Öldüğünde bir kez yarı canla ayağa kalkarsın", "Revives you once at half health", "Te levanta una vez con media vida", "Richtet dich einmal mit halbem Leben wieder auf", "Один раз поднимает с половиной здоровья"),
     "b.r_lasthope.name": _T("Son Umut Kitabı", "Book of Last Hope", "Libro de la Última Esperanza", "Buch der letzten Hoffnung", "Книга Последней Надежды"),
@@ -8048,7 +8048,7 @@ BOOKS = [
                     reqs=[rq_ach("wave15", "«Arena Ustası» başarımını aç"),
                           rq_stat("total_shots", 120000, "Toplam 120.000 mermi at")])},
     {"key": "r_killheal", "name": "Kan Kitabı",
-     "desc": "Öldürdüğün her düşman sana 3 can verir",
+     "desc": "Öldürdüğün her düşman azami canının %3'ü kadar can verir",
      "color": (220, 60, 90), "icon": "heart", "rare": True,
      "unlock": dict(text="Kan Emici'yi tavana çıkar ve 30.000 can çal",
                     reqs=[rq_shop("vampiric", 5, "Kan Emici'yi markette Lv.5'e (tavan) çıkar"),
@@ -8066,14 +8066,14 @@ BOOKS = [
                     reqs=[rq_ach("wave20", "«Efsane» başarımını aç"),
                           rq_stat("total_kills", 8000, "Toplam 8.000 düşman öldür")])},
     {"key": "r_roar", "name": "Kükreme Kitabı",
-     "desc": "BONK'ladığın düşmanlar korkup senden kaçar",
+     "desc": "BONK'ladığın düşmanlar korkup kaçar ve korkarken %30 fazla hasar alır",
      "color": (235, 140, 60), "icon": "skull", "rare": True,
      "unlock": dict(text="Arena senin kükremeni tanısın",
                     reqs=[rq_stat("total_bonks", 1500, "Toplam 1.500 kez BONK at"),
                           rq_stat("total_bonk_hits", 9000, "BONK ile toplam 9.000 düşmana vur"),
                           rq_book("r_bonk", "Önce BONK Kitabı'nı aç")])},
     {"key": "r_dashslow", "name": "Zaman Kitabı",
-     "desc": "Dash attığında çevrendeki düşmanlar yavaşlar",
+     "desc": "Dash attığında çevrendeki düşmanlar yavaşlar; yavaşlamış düşman sana %20 az hasar verir",
      "color": (150, 200, 255), "icon": "snow", "rare": True,
      "unlock": dict(text="Zamanla yarış",
                     reqs=[rq_stat("best_wave", 14, "14. dalgaya ulaş"),
@@ -8563,7 +8563,8 @@ class Player:
         self.ice_level = 0
         self.poison_level = 0
         # --- kitaplara özel (markette SATILMAYAN) etkiler ---
-        self.kill_heal = 0.0        # düşman öldürünce kazanılan can
+        self.kill_heal = 0.0        # düşman öldürünce kazanılan SABİT can
+        self.kill_heal_level = 0    # KAN KİTABI seviyesi (oransal iyileşme)
         self.rage_level = 0         # canın yarısı altındayken hasar bonusu
         self.lowhp_armor = 0.0      # canın %30'u altındayken ek hasar azaltma
         self.dash_slow_level = 0    # dash atınca çevredekileri yavaşlatır
@@ -8775,6 +8776,16 @@ class Player:
         if self.lowhp_armor > 0 and self.max_hp > 0 and self.hp < self.max_hp * 0.3:
             a += self.lowhp_armor
         return clamp(a, 0, 0.6)
+
+    def kill_heal_amount(self):
+        """KAN KİTABI'nın öldürme başına verdiği can.
+
+        Sabit sayı yerine azami canın payı: 100 canlı oyuncuda +4, 460 canlı
+        oyuncuda +14. Böylece kitap koşunun sonunda da bir şey ifade eder.
+        """
+        if self.kill_heal_level <= 0:
+            return 0.0
+        return max(4.0, self.max_hp * 0.03)
 
     def boss_hunter_bonus(self):
         """PATRON AVCISI kitabının hasar bonusu (azalan getirili).
@@ -9015,7 +9026,14 @@ class Player:
         elif key == "r_fireshot": self.fire_level += 1
         elif key == "r_iceshot": self.ice_level += 1
         elif key == "r_poison": self.poison_level += 1
-        elif key == "r_killheal": self.kill_heal += 3.0
+        elif key == "r_killheal":
+            # v3.22: eskiden sabit +3 candi. Azami can bir koşuda 100'den
+            # 460'a çıktığı için 20. dalgada öldürme başına 3 can hiçbir şey
+            # ifade etmiyordu: kitap ölçümde tam x1.000 veriyordu, yani
+            # nadir yuvasını çöpe atmak demekti. Artık ORANSAL (bkz.
+            # kill_heal_amount): canın yüzdesi olarak iyileştirir, böylece
+            # dayanıklılık arttıkça iyileşme de artar.
+            self.kill_heal_level += 1
         elif key == "r_rage": self.rage_level += 1
         elif key == "r_lasthope": self.lowhp_armor += 0.20
         elif key == "r_dashslow": self.dash_slow_level += 1
@@ -12346,7 +12364,12 @@ ENEMY_DEFS = {
     # Canı ve hasarı BİLEREK düşük: bu bir güç sınavı değil, bir BULMACA.
     # Zorluğu kendi canından değil, onu çevreleyen SİPERCİ'lerden geliyor;
     # onlar yaşadığı sürece sancaktara giden hasarın neredeyse hepsi emiliyor.
-    "herald":    {"hp": 190, "speed": 52,  "dmg": 8,  "radius": 24, "coin": 26, "xp": 30, "score": 120, "contact_dps": 11},
+    # SANCAKTAR hizi 52 -> 130 (v3.22). Tasarimi "mesafesini korur" diyordu ama
+    # 14. dalgada hizi 61 px/sn oluyordu, oyuncu ise 225 px/sn: kacma davranisi
+    # hic devreye girmiyordu, oyuncu dogrudan ustune yuruyup kalkan halkasinin
+    # ICINE giriyordu (olculdu: mesafe 32 px, hedeflenen bant 250-340 px).
+    # 130, oyuncunun ~%58'i: kacma isliyor ama oyuncu yine de yetisebiliyor.
+    "herald":    {"hp": 190, "speed": 130, "dmg": 8,  "radius": 24, "coin": 26, "xp": 30, "score": 120, "contact_dps": 11},
     # SİPERCİ: kalın kalkanı ve zırhı var ama HİÇ HASAR VERMEZ. Tek işi
     # sancaktarın önüne geçmek. Oyuncu ona vurmak zorunda değil — etrafından
     # dolanabilir de.
@@ -12532,6 +12555,7 @@ class Enemy:
         self.walk = random.uniform(0, math.tau)
         # KÜKREME KİTABI: korkan düşman bir süre oyuncudan kaçar.
         self.fear_timer = 0.0
+        self.fear_vuln = 0.0        # KÜKREME: korkmuşken aldığı fazla hasar oranı
         # --- gövde önbelleği (bkz. draw) ---
         self._spr = None            # son çizilmiş gövde yüzeyi
         self._spr_key = None        # o yüzeyin ait olduğu görünüş anahtarı
@@ -12664,6 +12688,21 @@ class Enemy:
                 self.block_flash = max(0.0, self.block_flash - dt)
             if self.hit_flash > 0:
                 self.hit_flash -= dt
+            # GÖVDE İTMESİ (v3.22): siperci hasar vermez (tasarım öyle) ama
+            # GEÇİRMEMELİ de — oyuncu içinden yürüyüp sancaktara dayanınca
+            # "önce kalkanlıları kır" bulmacası hiç kurulmuyordu. Oyuncu
+            # sipercinin gövdesine girdiyse dışarı itilir.
+            if player.alive:
+                pd = dist(self.x, self.y, player.x, player.y)
+                need = self.hit_r + player.radius
+                if 0.001 < pd < need:
+                    pdx, pdy = (player.x - self.x) / pd, (player.y - self.y) / pd
+                    player.x = clamp(self.x + pdx * need,
+                                     ARENA_RECT.left + player.radius,
+                                     ARENA_RECT.right - player.radius)
+                    player.y = clamp(self.y + pdy * need,
+                                     ARENA_RECT.top + player.radius,
+                                     ARENA_RECT.bottom - player.radius)
             return                     # SİPERCİ oyuncuya DOKUNARAK HASAR VERMEZ
         else:
             dx, dy = norm_dir(self.x, self.y, player.x, player.y)
@@ -12733,7 +12772,17 @@ class Enemy:
             d = dist(self.x, self.y, player.x, player.y)
             if d < self.hit_r + player.radius - 2 and self.touch_cd <= 0:
                 self.touch_cd = 0.12
-                dealt = player.take_damage(self.contact_dps * 0.12 * 6, fx, self.x, self.y, self.disp_name)
+                # ZAMAN KİTABI (v3.22): yavaşlatılmış yaratık hem geç geliyor
+                # hem de daha zayıf vuruyor. Kitap eskiden yalnızca
+                # yavaşlatıyordu ve ölçümde tam x1.000 veriyordu — nadir
+                # yuvasını çöpe atmak demekti. Kesinti KİTABA bağlı: kitap
+                # yoksa hiç yok, yani BUZ İZİ gibi yavaşlatan silahlar
+                # bedavaya güçlenmiyor. Kitap varsa her yavaşlatma kaynağıyla
+                # birlikte çalışır (Lv.1 -%20, Lv.5 -%40).
+                tmp = self.contact_dps * 0.12 * 6
+                if self.slow_timer > 0 and player.dash_slow_level > 0:
+                    tmp *= (1.0 - min(0.45, 0.15 + 0.05 * player.dash_slow_level))
+                dealt = player.take_damage(tmp, fx, self.x, self.y, self.disp_name)
                 if dealt > 0 and player.thorns_level > 0:
                     reflect = dealt * 0.35 * player.thorns_level
                     died = self.take_damage(reflect, False, fx)
@@ -12767,6 +12816,15 @@ class Enemy:
                     if not quiet and soaked > 0:
                         fx.popup(gg.x, gg.y - gg.radius - 6, "EMİLDİ",
                                  (150, 200, 250), 13, life=0.45)
+        # KÜKREME KİTABI (v3.22): korkmuş yaratık arkasını dönüp kaçtığı için
+        # SAVUNMASIZDIR, daha ağır hasar alır. Kitap eskiden yalnızca kaçırıyordu
+        # ve ölçümde tam x1.000 veriyordu — yani nadir yuvasını çöpe atmak
+        # demekti. Artık korkutmanın ölçülebilir bir karşılığı var. Oran
+        # yaratığın üstünde taşınır (fear_vuln), çünkü burada oyuncu nesnesi
+        # yok ve korkunun BAŞKA kaynakları da var — bonus yalnızca KÜKREME'nin
+        # korkuttuğu yaratığa işler.
+        if self.fear_timer > 0 and self.fear_vuln > 0:
+            amount *= (1.0 + self.fear_vuln)
         # 25. dalgadan sonraki arena yaratıklarının zırhı gelen hasarı keser.
         if self.armor > 0:
             amount *= (1.0 - self.armor)
@@ -14774,6 +14832,19 @@ class Boss:
     def _start_attack(self, player, fx):
         bi = self.boss_index
         if self.kind == "warlord":
+            # İKİNCİ SALDIRI (v3.22) — KILIÇ KASIRGASI. SAVAŞ LORDU oyuncunun
+            # KARŞILAŞTIĞI İLK PATRON (10. dalga) ve en tek düzesiydi: 90
+            # saniyede 58 saldırının 51'i aynı ışın yelpazesiydi (%88 tek tür),
+            # oysa diğer beş patronun hepsinde 2-3 ana saldırı var. Yeni kod
+            # gerekmedi: "hazard_ring" zaten hem telgrafı hem etkisi yazılı
+            # ama HİÇBİR PATRON kullanmıyordu — ölü koddu. Lordun çevresine
+            # kapanan kılıç halkası, oyuncuyu "dibine girip ateş et"ten
+            # çıkarıp geri çekilmeye zorluyor.
+            if bi >= 2 and random.random() < 0.38:
+                self._set_telegraph("hazard_ring", 0, 0, 0,
+                                    0.48 if self.enraged else 0.60)
+                fx.ring(self.x, self.y, self.color, n=20, speed=180, life=0.45, r=3)
+                return
             n = 9 if self.enraged else 5
             n += min(4, bi - 1)          # geç patron daha geniş yelpaze açar
             spread = 0.30 if self.enraged else 0.38
@@ -17610,6 +17681,9 @@ class RunState:
                 # KÜKREME KİTABI: BONK yiyen sıradan düşmanlar korkup kaçar
                 if p.roar_level > 0 and not getattr(e, "is_boss", False) and hasattr(e, "fear_timer"):
                     e.fear_timer = max(e.fear_timer, 1.0 + 0.6 * p.roar_level)
+                    # Korkan yaratık savunmasız kalır: Lv.1 +%30, Lv.5 +%50.
+                    e.fear_vuln = max(e.fear_vuln,
+                                      min(0.60, 0.25 + 0.05 * p.roar_level))
                 if p.vamp_level > 0:
                     p.lifesteal(final_dmg * 0.02 * p.vamp_level)
                 if died:
@@ -18075,9 +18149,11 @@ class RunState:
         p = self.player
         self.kills += 1
         self.combo.add_kill()
-        # KAN KİTABI: her öldürmede bir miktar can geri kazanılır.
-        if p.kill_heal > 0:
-            p.heal(p.kill_heal)
+        # KAN KİTABI: her öldürmede bir miktar can geri kazanılır. Sabit pay
+        # (perk/eşya kaynaklı) ve oransal pay (kitap) birlikte işler.
+        heal = p.kill_heal + p.kill_heal_amount()
+        if heal > 0:
+            p.heal(heal)
         # RUH HASADI (cehennem eşyası): can + yığılan hasar bonusu
         if p.soul_harvest > 0:
             p.heal(2.0 * p.soul_harvest)
