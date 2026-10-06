@@ -1597,16 +1597,16 @@ STRINGS.update({
                        "Реликвия достаётся тем, кто научился ломать броню: победи 6 боссов и убей 1 000 тварей."),
 
     "w.cloak.name": _T("PELERİN", "CLOAK", "CAPA", "UMHANG", "ПЛАЩ"),
-    "w.cloak.desc": _T("Görünmezlik pelerini: her dakika 5 saniye kaybolursun. Sıradan yaratıklar oldukları yerde kalakalır — ama PATRONLAR seni görür.",
-                       "Cloak of invisibility: you vanish for 5 seconds every minute. Ordinary creatures freeze where they stand — but BOSSES still see you.",
-                       "Capa de invisibilidad: desapareces 5 segundos cada minuto. Las criaturas se quedan quietas — pero los JEFES te ven.",
-                       "Tarnumhang: Du verschwindest alle 60 Sekunden für 5 Sekunden. Gewöhnliche Kreaturen erstarren — BOSSE sehen dich trotzdem.",
-                       "Плащ невидимости: раз в минуту исчезаешь на 5 секунд. Обычные твари застывают — но БОССЫ тебя видят."),
-    "w.cloak.up": _T("pelerin daha sık sarar — bekleme süresi 3 saniye kısalır",
-                     "the cloak wraps more often — cooldown drops by 3 seconds",
-                     "la capa actúa más seguido — 3 segundos menos de espera",
-                     "der Umhang wirkt öfter — 3 Sekunden kürzere Abklingzeit",
-                     "плащ срабатывает чаще — откат короче на 3 секунды"),
+    "w.cloak.desc": _T("Görünmezlik pelerini: her dakika 5 saniye kaybolursun. Sıradan yaratıklar oldukları yerde kalakalır — ama PATRONLAR seni görür. Görünmezken vuruşların %35 daha ağır: saklanma değil PUSU penceresi.",
+                       "Cloak of invisibility: you vanish for 5 seconds every minute. Ordinary creatures freeze where they stand — but BOSSES still see you. While invisible you hit 35% harder: an AMBUSH window, not a hiding spot.",
+                       "Capa de invisibilidad: desapareces 5 segundos cada minuto. Las criaturas se quedan quietas — pero los JEFES te ven. Invisible golpeas un 35% más fuerte: una EMBOSCADA, no un escondite.",
+                       "Tarnumhang: Du verschwindest alle 60 Sekunden für 5 Sekunden. Gewöhnliche Kreaturen erstarren — BOSSE sehen dich trotzdem. Unsichtbar triffst du 35% härter: ein HINTERHALT, kein Versteck.",
+                       "Плащ невидимости: раз в минуту исчезаешь на 5 секунд. Обычные твари застывают — но БОССЫ тебя видят. В невидимости удары на 35% сильнее: это ЗАСАДА, а не укрытие."),
+    "w.cloak.up": _T("pelerin daha sık sarar, daha uzun tutar ve pusu hasarı artar",
+                     "the cloak wraps more often, lasts longer and the ambush hits harder",
+                     "la capa actúa más seguido, dura más y la emboscada pega más",
+                     "der Umhang wirkt öfter, hält länger und der Hinterhalt trifft härter",
+                     "плащ срабатывает чаще, держится дольше и засада бьёт сильнее"),
     "w.cloak.how": _T("Gölgede yaşamayı öğren: 12. dalgaya ulaş ve toplam 800 dash at.",
                       "Learn to live in the shadows: reach wave 12 and dash 800 times in total.",
                       "Aprende a vivir en las sombras: llega a la oleada 12 y haz 800 impulsos.",
@@ -8696,6 +8696,9 @@ class Player:
         # ÖFKE KİTABI: canın yarısının altındayken hasar belirgin artar.
         if self.rage_level > 0 and self.max_hp > 0 and self.hp < self.max_hp * 0.5:
             d *= (1.0 + self.rage_bonus())
+        # PELERİN: görünmezken vuruşlar daha ağır (bkz. cloak_ambush_bonus).
+        if self.invis_t > 0:
+            d *= (1.0 + cloak_ambush_bonus(self.weapons.get("cloak", 0)))
         return d
 
     def eff_atk_cd(self):
@@ -11500,9 +11503,10 @@ BOSS_WEAPONS = [
     # süresi vardır ve silah yuvasında geri sayar (bkz. timed=True).
     dict(key="cloak", name="PELERİN", icon="ghost", color=CLOAK_COLOR,
          cd=0.0, dmg=0.0, style=None, passive=True, timed=True,
-         up="pelerin daha sık sarar — bekleme süresi 3 saniye kısalır",
+         up="pelerin daha sık sarar, daha uzun tutar ve pusu hasarı artar",
          desc="Görünmezlik pelerini: her dakika 5 saniye kaybolursun. Sıradan "
-              "yaratıklar oldukları yerde kalakalır — ama PATRONLAR seni görür.",
+              "yaratıklar oldukları yerde kalakalır — ama PATRONLAR seni görür. "
+              "Görünmezken vuruşların %35 daha ağır: saklanma değil PUSU penceresi.",
          how="Gölgede yaşamayı öğren: 12. dalgaya ulaş ve toplam 800 dash at.",
          unlock=dict(text="12. dalgaya ulaş ve toplam 800 dash at",
                      reqs=[rq_stat("best_wave", 12, "12. dalgaya ulaş"),
@@ -11789,6 +11793,27 @@ def cloak_cooldown(lvl):
 def cloak_duration(lvl):
     """Görünmez kalma süresi."""
     return CLOAK_DUR + CLOAK_DUR_PER_LEVEL * weapon_growth(lvl)
+
+
+# PUSU HASARI (v3.22). PELERİN, oyunda HİÇ hasara katkısı olmayan tek
+# silahtı: gerçek koşuda ölçüldüğünde hem kalabalığa hem patrona 0.0 DPS
+# veriyordu, ama dört silah yuvasından birini tutuyordu. İşi (sıradan
+# yaratıkları dondurmak) savunma tarafında gerçekten güçlü, o yüzden
+# kaldırmak yerine kendi fantezisine uygun bir ödül eklendi: görünmezken
+# vuruşların daha ağır. Böylece pelerin "saklanma düğmesi" değil, "pusu
+# penceresi" oluyor — oyuncu o saniyelerde kaçmak yerine saldırıyor.
+#   1. sv +%35 ... 25. sv +%95 (açık kalma oranı %8.3 -> %20.6 olduğu için
+#   ortalamaya katkısı +%3 ile +%19 arası; yuvayı hak edecek kadar, dengeyi
+#   bozmayacak kadar).
+CLOAK_AMBUSH_BASE = 0.35
+CLOAK_AMBUSH_PER_LEVEL = 0.025
+
+
+def cloak_ambush_bonus(lvl):
+    """Görünmezken hasara eklenen oran (0.35 = +%35)."""
+    if lvl <= 0:
+        return 0.0
+    return CLOAK_AMBUSH_BASE + CLOAK_AMBUSH_PER_LEVEL * weapon_growth(lvl)
 
 
 def book_slot_pos(p, i, n_book):
