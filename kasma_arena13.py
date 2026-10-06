@@ -929,6 +929,35 @@ STRINGS = {
     "en.healer":    _T("Şifacı", "Healer", "Sanador", "Heiler", "Целитель"),
     "en.herald":    _T("Sancaktar", "Herald", "Heraldo", "Herold", "Герольд"),
     "en.shieldman": _T("Siperci", "Shieldman", "Escudero", "Schildträger", "Щитоносец"),
+    # ---- TUŞ ATAMA ----
+    "ui.keybinds":   _T("TUŞLAR", "CONTROLS", "CONTROLES", "TASTEN", "УПРАВЛЕНИЕ"),
+    "ui.keys_sub":   _T("Bir satıra tıkla, sonra yeni tuşa bas. ESC vazgeçer.",
+                        "Click a row, then press the new key. ESC cancels.",
+                        "Haz clic en una fila y pulsa la nueva tecla. ESC cancela.",
+                        "Klicke eine Zeile an und drücke die neue Taste. ESC bricht ab.",
+                        "Нажми на строку, затем нажми новую клавишу. ESC — отмена."),
+    "ui.keys_press": _T("yeni tuşa bas...", "press a key...", "pulsa una tecla...",
+                        "Taste drücken...", "нажми клавишу..."),
+    "ui.keys_reset": _T("VARSAYILANA DÖN", "RESET TO DEFAULT", "RESTAURAR",
+                        "ZURÜCKSETZEN", "СБРОСИТЬ"),
+    "ui.keys_locked": _T("ESC, F11 ve F3 değiştirilemez.",
+                         "ESC, F11 and F3 cannot be changed.",
+                         "ESC, F11 y F3 no se pueden cambiar.",
+                         "ESC, F11 und F3 sind fest.",
+                         "ESC, F11 и F3 изменить нельзя."),
+    "ui.keys_taken": _T("bu tuş {0} için kullanılıyor", "that key is used by {0}",
+                        "esa tecla la usa {0}", "diese Taste nutzt {0}",
+                        "эта клавиша занята: {0}"),
+    "key.up":    _T("YUKARI", "UP", "ARRIBA", "HOCH", "ВВЕРХ"),
+    "key.down":  _T("AŞAĞI", "DOWN", "ABAJO", "RUNTER", "ВНИЗ"),
+    "key.left":  _T("SOL", "LEFT", "IZQUIERDA", "LINKS", "ВЛЕВО"),
+    "key.right": _T("SAĞ", "RIGHT", "DERECHA", "RECHTS", "ВПРАВО"),
+    "key.bonk":  _T("BONK", "BONK", "BONK", "BONK", "БОНК"),
+    "key.dash":  _T("DASH", "DASH", "IMPULSO", "DASH", "РЫВОК"),
+    "key.use":   _T("EŞYA KULLAN", "USE ITEM", "USAR OBJETO", "GEGENSTAND", "ПРЕДМЕТ"),
+    "key.stats": _T("İSTATİSTİKLER", "STATS", "ESTADÍSTICAS", "STATISTIKEN", "СТАТИСТИКА"),
+    "key.map":   _T("HARİTA", "MAP", "MAPA", "KARTE", "КАРТА"),
+    "key.shop":  _T("MARKET", "SHOP", "TIENDA", "LADEN", "МАГАЗИН"),
     "ui.daily":      _T("GÜNLÜK", "DAILY", "DIARIO", "TÄGLICH", "ЕЖЕДНЕВНО"),
     "ui.daily_streak": _T("{0} gün üst üste", "{0} day streak", "racha de {0} días",
                           "{0} Tage in Folge", "{0} дней подряд"),
@@ -2151,7 +2180,74 @@ OUTLINE     = (10, 10, 16)
 # çizilir. Skin'in verdiği bonuslar aynen devam eder — yalnızca görünüm kapanır.
 CFG = {"shake": True, "dmg": True, "fps": False, "plain_skin": False,
        "fps_cap": 60, "weapon_fx": WEAPON_FX_DEFAULT, "pet_show": True,
-       "lang": DEFAULT_LANG}
+       "lang": DEFAULT_LANG, "keys": {}}
+
+# =====================================================================
+# TUŞ ATAMA  (v3.22)
+# ---------------------------------------------------------------------
+# Tuşlar sabit kodluydu: solak oyuncu, AZERTY/QWERTZ klavye kullanan oyuncu
+# ya da tek elle oynayan biri hiçbir şey değiştiremiyordu. Steam/Epic'te
+# tuş ataması bir erişilebilirlik GEREKLİLİĞİDİR, süs değil.
+#
+# Her eylemin BİRDEN FAZLA tuşu olabilir (W ve YUKARI OK gibi). Kayda
+# pygame sabiti değil TUŞ ADI yazılır (pygame.key.name): sayılar pygame
+# sürümleri arasında değişebilir, adlar değişmez.
+KEY_ACTIONS = ("up", "down", "left", "right", "bonk", "dash", "use",
+               "stats", "map", "shop")
+DEFAULT_KEYS = {
+    "up":    ["w", "up"],
+    "down":  ["s", "down"],
+    "left":  ["a", "left"],
+    "right": ["d", "right"],
+    "bonk":  ["space"],
+    "dash":  ["left shift", "right shift"],
+    "use":   ["e"],
+    "stats": ["tab"],
+    "map":   ["m"],
+    "shop":  ["b"],
+}
+# ESC (duraklat), F11 (tam ekran) ve F3 (kare sayacı) BİLEREK sabittir:
+# oyuncu kendini oyundan çıkamaz hâle getiremesin.
+KEY_LOCKED = ("escape", "f11", "f3")
+_KEYCODE_CACHE = {}
+
+
+def key_codes(action):
+    """Eylemin pygame tuş kodları. Kayıttaki adlar bir kez çözülüp saklanır."""
+    names = (CFG.get("keys") or {}).get(action) or DEFAULT_KEYS.get(action, [])
+    out = []
+    for nm in names:
+        c = _KEYCODE_CACHE.get(nm)
+        if c is None:
+            try:
+                c = pygame.key.key_code(nm)
+            except Exception:
+                c = -1
+            _KEYCODE_CACHE[nm] = c
+        if c >= 0:
+            out.append(c)
+    return out
+
+
+def key_hit(action, keycode):
+    """Basılan tuş bu eylemin tuşu mu?"""
+    return keycode in key_codes(action)
+
+def key_held(action, pressed):
+    """Eylemin tuşlarından biri BASILI mı? (pygame.key.get_pressed sonucu)"""
+    for c in key_codes(action):
+        try:
+            if pressed[c]:
+                return True
+        except IndexError:
+            pass
+    return False
+
+
+def key_label(action):
+    """Ekranda gösterilecek tuş yazısı: "W / YUKARI" gibi."""
+    names = (CFG.get("keys") or {}).get(action) or DEFAULT_KEYS.get(action, [])
+    return " / ".join(n.upper() for n in names) if names else "—"
 
 random.seed()
 
@@ -3506,6 +3602,19 @@ class SaveManager:
         CFG["weapon_fx"] = int(clamp(fxm, 0, 100))
         st["weapon_fx"] = CFG["weapon_fx"]
         CFG["pet_show"] = bool(st.get("pet_show", True))
+        # TUŞ ATAMA: yalnızca tanınan eylemler ve metin olan adlar alınır;
+        # bozuk bir kayıt oyunu tuşsuz bırakmasın.
+        ks = st.get("keys") or {}
+        temiz = {}
+        if isinstance(ks, dict):
+            for a in KEY_ACTIONS:
+                v = ks.get(a)
+                if isinstance(v, list) and v:
+                    ad = [str(x)[:24] for x in v[:3] if isinstance(x, str) and x]
+                    if ad:
+                        temiz[a] = ad
+        CFG["keys"] = temiz
+        _KEYCODE_CACHE.clear()
         set_lang(st.get("lang", DEFAULT_LANG))
 
     # ---- elmas ----
@@ -21198,6 +21307,12 @@ def draw_skill_bar(surf, run, t):
         # KONTROLCÜ etkinse tuş yerine PAD DÜĞMESİ yazar: oyuncu elindeki
         # alete bakıp "SPACE" görmesin.
         klabel = PAD_LABELS.get(sk.get("pad", ""), "") if PAD_ACTIVE[0] else ""
+        if not klabel:
+            # TUŞ ATAMA: şerit, oyuncunun KENDİ tuşunu yazar. Sabit "SPACE"
+            # yazmak, tuşunu değiştiren oyuncuya yalan söylemek olurdu.
+            eylem = sk.get("pad", "")
+            if eylem in KEY_ACTIONS:
+                klabel = key_label(eylem)
         draw_text(surf, klabel or LX("key." + str(sk["key"]), sk["key"]), kb.center,
                   max(6, int(9 * k)), TEXT if not locked else (110, 114, 136),
                   bold=True, center=True, shadow=False)
@@ -22993,6 +23108,7 @@ STATE_ACHIEVEMENTS = "achievements"
 STATE_GEM_STORE = "gem_store"
 STATE_LOGIN = "login"
 STATE_MASTERY = "mastery"
+STATE_KEYS = "keys"
 
 DIFF_ORDER = ["normal", "hard", "nightmare"]
 DIFF_LABEL = {"normal": "NORMAL", "hard": "ZOR", "nightmare": "KABUS"}
@@ -23174,6 +23290,8 @@ class App:
         self.online = OnlineClient(ONLINE_API_URL)
         # ---- HESAP ----
         self.account = AccountClient(ONLINE_API_URL, self.save)
+        self.key_waiting = None       # TUŞ ATAMA: hangi eylem tuş bekliyor
+        self.key_error = ""           # "bu tuş zaten kullanılıyor" gibi
         self.login_mode = "in"        # "in" = giriş, "up" = kayıt
         self.login_fields = {"user": "", "password": "", "email": "", "newpw": ""}
         self.login_focus = "user"     # odaklı kutu
@@ -23327,11 +23445,13 @@ class App:
         # Sohbet kutusu açıkken WASD yazıya gider, yürüyüşe gitmez.
         if self.chat.open:
             return {"left": 0, "right": 0, "up": 0, "down": 0}
+        # Tuşlar artık sabit kodlu değil: oyuncunun kendi ataması okunur
+        # (bkz. KEY_ACTIONS / DEFAULT_KEYS).
         out = {
-            "left": 1 if (keys_pressed[pygame.K_a] or keys_pressed[pygame.K_LEFT]) else 0,
-            "right": 1 if (keys_pressed[pygame.K_d] or keys_pressed[pygame.K_RIGHT]) else 0,
-            "up": 1 if (keys_pressed[pygame.K_w] or keys_pressed[pygame.K_UP]) else 0,
-            "down": 1 if (keys_pressed[pygame.K_s] or keys_pressed[pygame.K_DOWN]) else 0,
+            "left": 1 if key_held("left", keys_pressed) else 0,
+            "right": 1 if key_held("right", keys_pressed) else 0,
+            "up": 1 if key_held("up", keys_pressed) else 0,
+            "down": 1 if key_held("down", keys_pressed) else 0,
         }
         # KONTROLCÜ: sol çubuk. Değerler oyuncunun hareket kodunda zaten
         # normalleniyor (mx = right - left), o yüzden kesirli değer sorun
@@ -23442,29 +23562,35 @@ class App:
                     if event.key == pygame.K_l and self._chat_can_open():
                         self.chat.open_box()
                         sfx("click", 0.5, 0.0)
+                    elif self.state == STATE_KEYS and getattr(self, "key_waiting", None):
+                        # TUŞ ATAMA bekliyorsa basılan tuş ÖNCE buraya gelir:
+                        # ESC'ten de önce, yoksa ESC'i atamaya çalışan oyuncu
+                        # ekrandan çıkmış olurdu (ESC zaten kilitli ama
+                        # vazgeçme yolu da burada).
+                        self.handle_keybind_key(event)
                     elif event.key == pygame.K_F11:
                         self.display.toggle_fullscreen()
                     elif event.key == pygame.K_F3:
                         CFG["fps"] = not CFG["fps"]
                     elif event.key == pygame.K_ESCAPE:
                         self.handle_escape()
-                    elif event.key == pygame.K_SPACE and self.state == STATE_PLAY:
+                    elif self.state == STATE_PLAY and key_hit("bonk", event.key):
                         bonk_pressed = True
-                    elif event.key in (pygame.K_LSHIFT, pygame.K_RSHIFT) and self.state == STATE_PLAY:
+                    elif self.state == STATE_PLAY and key_hit("dash", event.key):
                         dash_pressed = True
-                    elif event.key == pygame.K_e and self.state == STATE_PLAY:
+                    elif self.state == STATE_PLAY and key_hit("use", event.key):
                         use_pressed = True
-                    elif event.key == pygame.K_TAB and self.state == STATE_PLAY:
+                    elif self.state == STATE_PLAY and key_hit("stats", event.key):
                         stats_pressed = True
-                    elif event.key == pygame.K_m and self.state == STATE_PLAY:
+                    elif self.state == STATE_PLAY and key_hit("map", event.key):
                         # BÜYÜK HARİTA aç/kapa. Oyun durmaz; harita yarı
                         # saydam bir karartmanın üstünde durur.
                         self.run.show_map = not self.run.show_map
                         sfx("click", 0.5, 0.0)
-                    elif event.key == pygame.K_b and self.state == STATE_PLAY:
+                    elif self.state == STATE_PLAY and key_hit("shop", event.key):
                         self.run.open_shop()
                         self.state = STATE_RUN_SHOP
-                    elif event.key == pygame.K_b and self.state == STATE_RUN_SHOP:
+                    elif self.state == STATE_RUN_SHOP and key_hit("shop", event.key):
                         self.state = STATE_PLAY
                     elif self.state == STATE_LOGIN:
                         self.handle_login_key(event)
@@ -23567,6 +23693,7 @@ class App:
             elif self.state == STATE_GEM_STORE: self.update_gem_store(dt, mouse_pos, clicked)
             elif self.state == STATE_LOGIN: self.update_login(dt, mouse_pos, clicked)
             elif self.state == STATE_MASTERY: self.update_mastery(dt, mouse_pos, clicked)
+            elif self.state == STATE_KEYS: self.update_keys(dt, mouse_pos, clicked)
 
             # Sohbet en üstte durur: hangi ekranda olursak olalım aynı yerde,
             # sol altta görünsün.
@@ -25200,6 +25327,112 @@ class App:
             draw_text(canvas, acc.ok_msg, (cx, y), 13, GREEN, bold=True,
                       center=True, shadow=False)
 
+    def update_keys(self, dt, mouse_pos, clicked):
+        """TUŞ ATAMA ekranı.
+
+        Tuşlar sabit kodluydu: solak oyuncu, AZERTY/QWERTZ klavye kullanan
+        ya da tek elle oynayan biri hiçbir şey değiştiremiyordu. Steam/Epic'te
+        tuş ataması bir erişilebilirlik GEREKLİLİĞİDİR.
+        """
+        canvas = self.display.canvas
+        self.bg.update(dt * 0.2)
+        self.bg.draw(canvas)
+        pr = pygame.Rect(0, 0, 640, 620)
+        pr.center = (VIRTUAL_W / 2, VIRTUAL_H / 2 - 10)
+        panel(canvas, pr, alpha=246)
+        cx = pr.centerx
+        draw_text(canvas, L("ui.keybinds"), (cx, pr.y + 22), 28, CYAN, bold=True,
+                  center=True)
+        draw_text(canvas, L("ui.keys_sub"), (cx, pr.y + 60), 11, TEXT_DIM,
+                  center=True, shadow=False)
+
+        bekleyen = getattr(self, "key_waiting", None)
+        y = pr.y + 88
+        for a in KEY_ACTIONS:
+            r = pygame.Rect(pr.x + 34, y, pr.w - 68, 38)
+            hov = r.collidepoint(mouse_pos)
+            secili = (bekleyen == a)
+            panel(canvas, r, bg=(34, 38, 58) if (hov or secili) else (21, 23, 37),
+                  edge=CYAN if secili else ((80, 86, 118) if hov else (52, 56, 80)),
+                  alpha=240, radius=8, edge_w=2)
+            draw_text(canvas, LX("key." + a, a), (r.x + 16, r.y + 11), 14, TEXT,
+                      bold=True, shadow=False)
+            if secili:
+                draw_text(canvas, L("ui.keys_press"), (r.right - 16, r.y + 12), 13,
+                          GOLD, bold=True, right=True, shadow=False)
+            else:
+                draw_text(canvas, key_label(a), (r.right - 16, r.y + 11), 13,
+                          (150, 200, 230), bold=True, right=True, shadow=False)
+            if clicked and hov:
+                self.key_waiting = a
+                self.key_error = ""
+                sfx("click", 0.5, 0.0)
+            y += 42
+
+        if getattr(self, "key_error", ""):
+            draw_text(canvas, self.key_error, (cx, y + 2), 11, (235, 150, 150),
+                      center=True, shadow=False)
+        draw_text(canvas, L("ui.keys_locked"), (cx, pr.bottom - 108), 10,
+                  (118, 124, 150), center=True, shadow=False)
+
+        for b in (Button((pr.x + 34, pr.bottom - 86, 260, 42), L("ui.keys_reset"),
+                         self._keys_reset, color=(110, 70, 62),
+                         hover_color=(148, 95, 84), text_size=14),
+                  Button((pr.right - 294, pr.bottom - 86, 260, 42), L("ui.back"),
+                         lambda: self.goto(STATE_SETTINGS), text_size=15)):
+            b.update(mouse_pos, dt)
+            b.draw(canvas)
+            if clicked:
+                b.click(mouse_pos)
+
+    def _keys_reset(self):
+        """Bütün tuşları varsayılana döndürür."""
+        CFG["keys"] = {}
+        _KEYCODE_CACHE.clear()
+        self.key_waiting = None
+        self.key_error = ""
+        self.save.data.setdefault("settings", {})["keys"] = {}
+        self.save.save()
+        sfx("click", 0.6, 0.0)
+
+    def handle_keybind_key(self, event):
+        """Tuş atama ekranında basılan tuşu ilgili eyleme yazar.
+
+        ESC vazgeçer. Kilitli tuşlar (ESC/F11/F3) ve BAŞKA bir eyleme ait
+        tuşlar kabul edilmez — yoksa oyuncu iki eylemi aynı tuşa bağlayıp
+        birini kullanılamaz hâle getirebilirdi.
+        """
+        a = getattr(self, "key_waiting", None)
+        if not a:
+            return False
+        if event.key == pygame.K_ESCAPE:
+            self.key_waiting = None
+            self.key_error = ""
+            return True
+        try:
+            ad = pygame.key.name(event.key)
+        except Exception:
+            ad = ""
+        if not ad or ad in KEY_LOCKED:
+            self.key_error = L("ui.keys_locked")
+            return True
+        for other in KEY_ACTIONS:
+            if other == a:
+                continue
+            if ad in ((CFG.get("keys") or {}).get(other) or DEFAULT_KEYS.get(other, [])):
+                self.key_error = L("ui.keys_taken", LX("key." + other, other))
+                return True
+        ks = dict(CFG.get("keys") or {})
+        ks[a] = [ad]
+        CFG["keys"] = ks
+        _KEYCODE_CACHE.clear()
+        self.key_waiting = None
+        self.key_error = ""
+        self.save.data.setdefault("settings", {})["keys"] = ks
+        self.save.save()
+        sfx("click", 0.6, 0.0)
+        return True
+
     def update_mastery(self, dt, mouse_pos, clicked):
         """ARENA USTALIĞI ekranı: elmasla alınan KALICI yükseltmeler.
 
@@ -25806,9 +26039,12 @@ class App:
         # ---- alt düğmeler ----
         by = pr.bottom - 58
         btns = [
-            Button((pr.centerx - 236, by, 228, 44), L("ui.howto"),
+            Button((pr.centerx - 356, by, 228, 44), L("ui.howto"),
                    lambda: self.goto(STATE_HOW_TO), text_size=16),
-            Button((pr.centerx + 8, by, 228, 44), L("ui.back"),
+            Button((pr.centerx - 114, by, 228, 44), L("ui.keybinds"),
+                   lambda: self.goto(STATE_KEYS),
+                   color=(62, 84, 116), hover_color=(88, 118, 160), text_size=16),
+            Button((pr.centerx + 128, by, 228, 44), L("ui.back"),
                    lambda: self.set_state(STATE_MENU), text_size=16),
         ]
         for b in btns:
