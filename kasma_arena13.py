@@ -584,7 +584,7 @@ WEAPON_FX_DEFAULT = 100           # yeni oyuncunun başlangıç değeri (%)
 # Eski üç kademeli ayarın sayısal karşılıkları (kayıt göçü için).
 WEAPON_FX_LEGACY = {"full": 100, "dim": 32, "off": 0}
 GAME_TITLE = "ARENA SAVAŞI"
-GAME_VERSION = "3.21"
+GAME_VERSION = "3.22"
 
 
 # =====================================================================
@@ -913,6 +913,49 @@ STRINGS = {
     "ults.immortal_merc": _T("KURŞUN", "BULLETS", "BALAS", "KUGELN", "ПУЛИ"),
     "ult.pink_dream": _T("RÜYA PATLAMASI", "DREAM BURST", "ESTALLIDO ONÍRICO", "TRAUMSTOSS", "ВЗРЫВ ГРЁЗ"),
     "ults.pink_dream": _T("RÜYA", "DREAM", "SUEÑO", "TRAUM", "ГРЁЗА"),
+    # ---- ARENA USTALIĞI ----
+    "ui.mastery":    _T("ARENA USTALIĞI", "ARENA MASTERY", "MAESTRÍA DE ARENA",
+                        "ARENA-MEISTERSCHAFT", "МАСТЕРСТВО АРЕНЫ"),
+    "ui.mastery_sub": _T("Elmasla alınan KALICI yükseltmeler — her koşuda, baştan itibaren yanındalar.",
+                         "PERMANENT upgrades bought with gems — they are with you from the start of every run.",
+                         "Mejoras PERMANENTES compradas con gemas — te acompañan desde el inicio de cada partida.",
+                         "DAUERHAFTE Upgrades für Edelsteine — ab dem Start jedes Laufs dabei.",
+                         "ПОСТОЯННЫЕ улучшения за алмазы — они с тобой с начала каждого забега."),
+    "ui.mastery_tier": _T("Kademe {0}", "Tier {0}", "Nivel {0}", "Stufe {0}", "Ступень {0}"),
+    "ui.mastery_prestige": _T("PRESTİJ {0}", "PRESTIGE {0}", "PRESTIGIO {0}",
+                              "PRESTIGE {0}", "ПРЕСТИЖ {0}"),
+    "ui.mastery_spent": _T("ustalığa yatırılan: {0}", "invested in mastery: {0}",
+                           "invertido en maestría: {0}", "in Meisterschaft investiert: {0}",
+                           "вложено в мастерство: {0}"),
+    "ui.mastery_hint": _T("5. kademeden sonra PRESTİJ başlar: sonsuza kadar yükseltebilirsin, ama her kademe daha az katar.",
+                          "After tier 5 PRESTIGE begins: you can keep upgrading forever, but each tier adds less.",
+                          "Tras el nivel 5 empieza el PRESTIGIO: puedes seguir mejorando siempre, pero cada nivel aporta menos.",
+                          "Ab Stufe 5 beginnt PRESTIGE: du kannst ewig aufrüsten, aber jede Stufe bringt weniger.",
+                          "После 5-й ступени начинается ПРЕСТИЖ: улучшать можно вечно, но каждая ступень даёт меньше."),
+    "mastery.m_dmg.name": _T("GÜÇ", "POWER", "POTENCIA", "KRAFT", "СИЛА"),
+    "mastery.m_dmg.desc": _T("Bütün hasarın artar", "All your damage increases",
+                             "Todo tu daño aumenta", "Dein gesamter Schaden steigt",
+                             "Весь твой урон растёт"),
+    "mastery.m_hp.name": _T("DAYANIKLILIK", "VITALITY", "VITALIDAD", "VITALITÄT", "ЖИВУЧЕСТЬ"),
+    "mastery.m_hp.desc": _T("Azami canın artar", "Max health increases",
+                            "Tu vida máxima aumenta", "Max. Leben steigt",
+                            "Макс. здоровье растёт"),
+    "mastery.m_armor.name": _T("ZIRH", "ARMOR", "ARMADURA", "RÜSTUNG", "БРОНЯ"),
+    "mastery.m_armor.desc": _T("Aldığın hasar azalır", "You take less damage",
+                               "Recibes menos daño", "Du erleidest weniger Schaden",
+                               "Ты получаешь меньше урона"),
+    "mastery.m_speed.name": _T("ÇEVİKLİK", "AGILITY", "AGILIDAD", "BEWEGLICHKEIT", "ЛОВКОСТЬ"),
+    "mastery.m_speed.desc": _T("Daha hızlı koşarsın", "You move faster",
+                               "Te mueves más rápido", "Du bewegst dich schneller",
+                               "Ты двигаешься быстрее"),
+    "mastery.m_gem.name": _T("HAZİNE", "FORTUNE", "FORTUNA", "REICHTUM", "СОКРОВИЩЕ"),
+    "mastery.m_gem.desc": _T("Koşu sonunda daha çok elmas", "More gems at the end of a run",
+                             "Más gemas al final de la partida", "Mehr Edelsteine am Ende eines Laufs",
+                             "Больше алмазов в конце забега"),
+    "mastery.m_xp.name": _T("BİLGİ", "INSIGHT", "SABIDURÍA", "WISSEN", "ПОЗНАНИЕ"),
+    "mastery.m_xp.desc": _T("Daha hızlı seviye atlarsın", "You level up faster",
+                            "Subes de nivel más rápido", "Du steigst schneller auf",
+                            "Ты быстрее повышаешь уровень"),
     "ui.pb_banner":  _T("KİŞİSEL REKOR!", "PERSONAL BEST!", "¡RÉCORD PERSONAL!",
                         "PERSÖNLICHER REKORD!", "ЛИЧНЫЙ РЕКОРД!"),
     "ui.pb_up":      _T("eski rekorun {0} — {1} daha iyi",
@@ -3098,6 +3141,7 @@ class SaveManager:
                      "skill_scale": 0.85, "plain_skin": False,
                      "fps_cap": 60, "weapon_fx": WEAPON_FX_DEFAULT, "pet_show": True,
                      "lang": DEFAULT_LANG},
+        "mastery": {},
         "stats": {"runs": 0, "best_score": 0, "total_kills": 0, "total_time": 0.0,
                   "bosses": 0, "best_wave": 0, "total_shots": 0, "total_lifesteal": 0.0,
                   "total_gold": 0, "best_run_gold": 0, "best_run_dashes": 0,
@@ -3114,7 +3158,7 @@ class SaveManager:
     # ayarlar, dil, ses, tam ekran, oturum jetonu — bunlar hesap değişince
     # değişmez, çünkü onlar oyuncunun değil bilgisayarın tercihleri.
     PROFILE_KEYS = (
-        "gems", "gems_earned", "gems_spent",
+        "gems", "gems_earned", "gems_spent", "mastery",
         "skins_owned", "equipped_skin",
         "cosmetics_owned", "equipped_cosmetics",
         "books_owned", "weapons_owned", "weapons_muted", "books_muted",
@@ -3319,6 +3363,16 @@ class SaveManager:
                 for ak, av in v.items():
                     cur.setdefault(ak, av)
                 self.data[k] = cur
+            elif k == "mastery" and isinstance(v, dict):
+                # ARENA USTALIĞI kademesi GERİ GİTMEZ: başka bir bilgisayarda
+                # alınan kademe buraya iner, buradaki de orada kaybolmaz.
+                cur = dict(self.data.get(k) or {})
+                for mk, mv in v.items():
+                    try:
+                        cur[mk] = max(int(cur.get(mk, 0) or 0), int(mv or 0))
+                    except (TypeError, ValueError):
+                        pass
+                self.data[k] = cur
             elif k in ("gems", "gems_earned", "gems_spent"):
                 continue        # aşağıda defter olarak birlikte işlenir
             else:
@@ -3442,6 +3496,41 @@ class SaveManager:
 
     def get_gems(self):
         return self.data.get("gems", 0)
+
+    # ---- ARENA USTALIĞI (koşular arası kalıcı yükseltme) ----
+    def mastery_level(self, key):
+        try:
+            return max(0, int((self.data.get("mastery") or {}).get(key, 0)))
+        except (TypeError, ValueError):
+            return 0
+
+    def mastery_next_cost(self, key):
+        m = MASTERY_BY_KEY.get(key)
+        return mastery_cost(m, self.mastery_level(key)) if m else 0
+
+    def buy_mastery(self, key):
+        """Bir ustalık kademesi alır. Dönüş: alındı mı?"""
+        m = MASTERY_BY_KEY.get(key)
+        if not m or not self.can_spend():
+            return False
+        cost = self.mastery_next_cost(key)
+        if self.get_gems() < cost:
+            return False
+        self.add_gems(-cost)
+        mt = self.data.setdefault("mastery", {})
+        mt[key] = self.mastery_level(key) + 1
+        self.progress_changed()
+        return True
+
+    def mastery_spent(self):
+        """Ustalığa yatırılmış TOPLAM elmas (ekranda gösterilir)."""
+        mt = self.data.get("mastery") or {}
+        return sum(mastery_total_cost(k, v) for k, v in mt.items())
+
+    def mastery_bonus(self, key):
+        """Kademenin verdiği bonus (0 ise ustalık alınmamış)."""
+        m = MASTERY_BY_KEY.get(key)
+        return mastery_bonus(m, self.mastery_level(key)) if m else 0.0
 
     # ---- skinler ----
     def owns_skin(self, skin_id):
@@ -8583,6 +8672,101 @@ def screen_to_world(x, y, cam):
 # Oyuncunun TABAN istatistikleri tek bir yerde durur. Hem Player.__init__
 # hem de İSTATİSTİK paneli (yüzdeleri buna göre hesaplar) aynı değerleri
 # kullansın diye sabit olarak çıkarıldı.
+
+# =====================================================================
+# ARENA USTALIĞI  (v3.22) — KOŞULAR ARASI KALICI İLERLEME
+# ---------------------------------------------------------------------
+# Oyunda ölünce elinde elmas dışında HİÇBİR kalıcı kazanç kalmıyordu:
+# yeni oyuncu her koşuya aynı güçle başlıyor, yüzüncü koşusunda da aynı
+# güçle başlıyordu. Bu türün (Steam/Epic'teki hayatta kalma-roguelite)
+# olmazsa olmazı, koşular arası büyüyen kalıcı bir yükseltme ağacıdır:
+# "bu koşu kötü geçti ama bir şey kazandım" duygusu oyunu açık tutan şey.
+#
+# İKİNCİ İŞİ: ELMAS EKONOMİSİNİ AÇIK TUTMAK. Elmasın toplam harcama yeri
+# sonluydu (20 skin + 48 kostüm + 8 pet = 31.120 elmas); her şey alındıktan
+# sonra koşmanın karşılığı kalmıyordu. Ustalığın PRESTİJ kademeleri
+# sonsuzdur: elmas her zaman bir işe yarar.
+#
+# DENGE: güç SINIRLI kalır. İlk 5 kademe doğrusal, sonrası AZALAN GETİRİ
+# (stack_bonus) ile bir tavana yaklaşır — yani oyuncu sonsuza kadar
+# harcayabilir ama sonsuza kadar güçlenemez. Tam dolu bir ağaç kabaca
+# +%35 hasar / +85 can verir; bu, sunucudaki makullük denetimlerinin
+# (score_is_plausible) çok altında kalır.
+MASTERY_TIERS = 5               # doğrusal kademe sayısı (sonrası prestij)
+
+
+MASTERY = [
+    dict(key="m_dmg", icon="sword", color=(240, 120, 90),
+         cost=120, growth=1.60, per=0.03, soft=0.012, cap_soft=20.0),
+    dict(key="m_hp", icon="heart", color=(235, 110, 140),
+         cost=110, growth=1.60, per=8.0, soft=3.0, cap_soft=20.0),
+    dict(key="m_armor", icon="shield", color=(150, 180, 225),
+         cost=140, growth=1.65, per=0.015, soft=0.005, cap_soft=16.0),
+    dict(key="m_speed", icon="dash", color=(150, 220, 180),
+         cost=120, growth=1.60, per=0.02, soft=0.007, cap_soft=18.0),
+    dict(key="m_gem", icon="gem", color=(120, 210, 255),
+         cost=150, growth=1.70, per=0.06, soft=0.02, cap_soft=22.0),
+    dict(key="m_xp", icon="star", color=(200, 170, 255),
+         cost=130, growth=1.65, per=0.05, soft=0.018, cap_soft=20.0),
+]
+MASTERY_BY_KEY = {m["key"]: m for m in MASTERY}
+
+# Player, kaydı parametre olarak almıyor (yüzlerce çağrı yeri var). Oyun
+# açılırken SaveManager kendini buraya yazar; Player ustalığı buradan okur.
+# Test/araç gibi kayıtsız kullanımda None kalır ve ustalık hiç uygulanmaz.
+MASTERY_SAVE = [None]
+
+
+def mastery_cost(m, lvl):
+    """`lvl` kademesinden `lvl+1`'e geçmenin elmas bedeli.
+
+    İlk MASTERY_TIERS kademe satırdaki growth ile büyür. Sonrası PRESTİJ:
+    sabit bir taban ve daha sert bir büyüme — oyuncu istediği kadar
+    harcayabilir ama her kademe belirgin biçimde pahalılaşır.
+    """
+    lvl = max(0, int(lvl))
+    if lvl < MASTERY_TIERS:
+        return int(round(m["cost"] * (m["growth"] ** lvl)))
+    # PRESTİJ, son doğrusal kademenin ÜSTÜNDEN devam eder. Sabit bir tabandan
+    # başlasa (eski hâli) 5. kademeden sonra bedel DÜŞÜYORDU: son doğrusal
+    # kademe 786 elmasken ilk prestij 400 oluyordu, yani eğri geri gidiyordu.
+    son = m["cost"] * (m["growth"] ** (MASTERY_TIERS - 1))
+    n = lvl - MASTERY_TIERS
+    return int(round(son * (1.35 ** (n + 1))))
+
+
+def mastery_total_cost(key, lvl):
+    """0'dan `lvl` kademesine kadar ödenen TOPLAM elmas.
+
+    Sunucu bunu doğrulama için kullanır: iddia edilen ustalık, harcanmış
+    elmasla karşılanabiliyor mu?
+    """
+    m = MASTERY_BY_KEY.get(key)
+    if not m:
+        return 0
+    return sum(mastery_cost(m, i) for i in range(max(0, int(lvl))))
+
+
+def mastery_bonus(m, lvl):
+    """Kademenin verdiği TOPLAM bonus (doğrusal kısım + prestij kısmı).
+
+    Doğrusal kısım ilk MASTERY_TIERS kademede `per` kadar artar. Prestij
+    kısmı stack_bonus ile azalan getirilidir: sonsuz harcama, sonlu güç.
+    """
+    lvl = max(0, int(lvl))
+    taban = m["per"] * min(lvl, MASTERY_TIERS)
+    if lvl <= MASTERY_TIERS:
+        return taban
+    return taban + stack_bonus(m["soft"], lvl - MASTERY_TIERS, soft=m["cap_soft"])
+
+
+def mastery_name(m):
+    return LX("mastery.%s.name" % m["key"], m["key"])
+
+
+def mastery_desc(m):
+    return LX("mastery.%s.desc" % m["key"], "")
+
 BASE_SPEED = 215
 BASE_MAX_HP = 100
 BASE_DMG = 17
@@ -8681,6 +8865,7 @@ class Player:
         self.base_regen = 0.0
         self.coin_mult = 1.0
         self.xp_mult = 1.0
+        self.gem_mult = 1.0         # ARENA USTALIĞI: elmas kazancı çarpanı
         self.crit_chance = 0.05
         self.crit_dmg_mult = 1.6
         self.bonk_mult = 1.0
@@ -8818,6 +9003,12 @@ class Player:
         for attr, val in self.skin.get("perk_set", {}).items():
             setattr(self, attr, val)
 
+        # --- ARENA USTALIĞI (koşular arası kalıcı yükseltme) ---
+        # Skin perk'lerinden SONRA, türetilmiş değerlerden (max_hp, hp)
+        # ÖNCE: ustalık TABAN istatistikleri büyütür, yani skinin verdiğiyle
+        # çarpışmaz, üstüne biner.
+        self.apply_mastery(MASTERY_SAVE[0])
+
         self._cosmetic_perks_applied = False
 
         self.max_hp = self.base_max_hp
@@ -8921,6 +9112,28 @@ class Player:
         if self.lowhp_armor > 0 and self.max_hp > 0 and self.hp < self.max_hp * 0.3:
             a += self.lowhp_armor
         return clamp(a, 0, 0.6)
+
+    def apply_mastery(self, save):
+        """ARENA USTALIĞI'nın kalıcı bonuslarını oyuncuya işler.
+
+        Oyun açılırken kurulan tek kayıt üzerinden okunur (MASTERY_SAVE).
+        Kayıt yoksa (test/araç) hiçbir şey yapmaz, yani oyun ustalıksız da
+        çalışır.
+        """
+        if save is None:
+            return
+        try:
+            self.base_dmg *= (1.0 + save.mastery_bonus("m_dmg"))
+            self.base_max_hp += save.mastery_bonus("m_hp")
+            self.base_armor = min(0.55, self.base_armor
+                                  + save.mastery_bonus("m_armor"))
+            self.base_speed *= (1.0 + save.mastery_bonus("m_speed"))
+            self.gem_mult = 1.0 + save.mastery_bonus("m_gem")
+            self.xp_mult *= (1.0 + save.mastery_bonus("m_xp"))
+        except Exception:
+            # Ustalık bir yan sistemdir: bozuk bir değer oyunu açılmaz
+            # hâle getirmesin.
+            pass
 
     def kill_heal_amount(self):
         """KAN KİTABI'nın öldürme başına verdiği can.
@@ -18996,7 +19209,9 @@ class RunState:
             self.cheat_flag = "skor"
         # Hileli koşu elmas da kazandırmaz; yoksa "hile yap, elması al,
         # sıralamaya girme" diye bir yol açık kalırdı.
-        gems = int(self.gem_coins * 0.12) if self.run_is_clean() else 0
+        # ARENA USTALIĞI "HAZİNE" dalı elmas kazancını büyütür.
+        gems = (int(self.gem_coins * 0.12 * getattr(self.player, "gem_mult", 1.0))
+                if self.run_is_clean() else 0)
         self.save.add_gems(gems)
         st = self.save.data["stats"]
         st["runs"] = st.get("runs", 0) + 1
@@ -22379,6 +22594,7 @@ STATE_SETTINGS = "settings"
 STATE_ACHIEVEMENTS = "achievements"
 STATE_GEM_STORE = "gem_store"
 STATE_LOGIN = "login"
+STATE_MASTERY = "mastery"
 
 DIFF_ORDER = ["normal", "hard", "nightmare"]
 DIFF_LABEL = {"normal": "NORMAL", "hard": "ZOR", "nightmare": "KABUS"}
@@ -22532,6 +22748,7 @@ class App:
     def __init__(self):
         pygame.init()
         self.save = SaveManager()
+        MASTERY_SAVE[0] = self.save      # Player ustalığı buradan okur
         global audio
         audio = AudioManager(self.save.data["settings"])
         self.steam = SteamBridge()
@@ -22644,6 +22861,12 @@ class App:
                    text_size=19),
             Button((cx - cw / 2, y_dunya, cw, alt_h), L("ui.world_lb"), lambda: self.goto(STATE_WORLD_LB),
                    color=(50, 80, 120), hover_color=(70, 110, 160), text_size=19),
+            # ARENA USTALIĞI: koşular arası kalıcı yükseltme. Orta sütunun
+            # DÖRDÜNCÜ satırı — yan sütunlar ilk üç satıra hizalı kaldığı
+            # için menünün simetrisi bozulmuyor, yeni sistem de göze çarpıyor.
+            Button((cx - cw / 2, center_bottom + 16, cw, alt_h), L("ui.mastery"),
+                   lambda: self.goto(STATE_MASTERY),
+                   color=(116, 86, 40), hover_color=(156, 118, 56), text_size=18),
 
             # SOL SÜTUNUN ÜSTÜ: silahların kilitleri, ne işe yaradıkları ve
             # istenmeyenleri kapatma ekranı. Sağdaki KİTAPLIK ile aynı ölçüde
@@ -22945,6 +23168,7 @@ class App:
             elif self.state == STATE_ACHIEVEMENTS: self.update_achievements(dt, mouse_pos, clicked, wheel_y)
             elif self.state == STATE_GEM_STORE: self.update_gem_store(dt, mouse_pos, clicked)
             elif self.state == STATE_LOGIN: self.update_login(dt, mouse_pos, clicked)
+            elif self.state == STATE_MASTERY: self.update_mastery(dt, mouse_pos, clicked)
 
             # Sohbet en üstte durur: hangi ekranda olursak olalım aynı yerde,
             # sol altta görünsün.
@@ -24501,6 +24725,110 @@ class App:
         elif acc.ok_msg:
             draw_text(canvas, acc.ok_msg, (cx, y), 13, GREEN, bold=True,
                       center=True, shadow=False)
+
+    def update_mastery(self, dt, mouse_pos, clicked):
+        """ARENA USTALIĞI ekranı: elmasla alınan KALICI yükseltmeler.
+
+        Altı dal, iki sütun. Her kartta kademe, şu anki toplam bonus ve bir
+        sonraki kademenin bedeli yazar. İlk 5 kademe doğrusal; sonrası
+        PRESTİJ (sonsuz, azalan getirili) — elmas ekonomisi hiç doymasın.
+        """
+        canvas = self.display.canvas
+        self.bg.update(dt * 0.2)
+        self.bg.draw(canvas)
+        pr = pygame.Rect(0, 0, 940, 600)
+        pr.center = (VIRTUAL_W / 2, VIRTUAL_H / 2 - 10)
+        panel(canvas, pr, alpha=246)
+        cx = pr.centerx
+        draw_text(canvas, L("ui.mastery"), (cx, pr.y + 22), 30, GOLD, bold=True,
+                  center=True)
+        for i, ln in enumerate(wrap_text(L("ui.mastery_sub"), 12, pr.w - 120)[:2]):
+            draw_text(canvas, ln, (cx, pr.y + 62 + i * 15), 12, TEXT_DIM,
+                      center=True, shadow=False)
+
+        # elmas kesesi ve ustalığa yatırılan toplam
+        gem = self.save.get_gems()
+        draw_icon(canvas, pr.right - 150, pr.y + 34, "gem", GEM_COLOR, 9)
+        draw_text(canvas, fmt_num(gem), (pr.right - 34, pr.y + 24), 20, GEM_COLOR,
+                  bold=True, right=True)
+        draw_text(canvas, L("ui.mastery_spent", fmt_num(self.save.mastery_spent())),
+                  (pr.x + 34, pr.y + 28), 11, (130, 136, 162), shadow=False)
+
+        kart_w, kart_h = 410, 112
+        gx0 = cx - kart_w - 12
+        gy0 = pr.y + 102
+        for i, m in enumerate(MASTERY):
+            col, row = i % 2, i // 2
+            r = pygame.Rect(gx0 + col * (kart_w + 24), gy0 + row * (kart_h + 14),
+                            kart_w, kart_h)
+            lvl = self.save.mastery_level(m["key"])
+            cost = self.save.mastery_next_cost(m["key"])
+            alinabilir = gem >= cost and self.save.can_spend()
+            hov = r.collidepoint(mouse_pos)
+            renk = tuple(m["color"])
+            panel(canvas, r, bg=(30, 32, 50) if hov else (21, 23, 37),
+                  edge=renk if (hov and alinabilir) else (56, 60, 86),
+                  alpha=242, radius=12, edge_w=2)
+            add_glow(canvas, r.x + 42, r.centery, 34, renk, 0.16 if lvl else 0.07)
+            draw_icon(canvas, r.x + 42, r.centery - 8, m["icon"], renk, 17)
+
+            draw_text(canvas, mastery_name(m), (r.x + 78, r.y + 12), 18, renk,
+                      bold=True, shadow=False)
+            draw_text(canvas, mastery_desc(m), (r.x + 78, r.y + 36), 11, TEXT_DIM,
+                      shadow=False)
+
+            # kademe etiketi: 5'e kadar "Kademe N", sonrası "PRESTİJ N"
+            if lvl > MASTERY_TIERS:
+                etiket = L("ui.mastery_prestige", lvl - MASTERY_TIERS)
+                et_col = (255, 196, 90)
+            else:
+                etiket = L("ui.mastery_tier", lvl)
+                et_col = TEXT if lvl else (110, 114, 140)
+            draw_text(canvas, etiket, (r.x + 78, r.y + 56), 12, et_col, bold=True,
+                      shadow=False)
+
+            # şu anki toplam bonus
+            b = mastery_bonus(m, lvl)
+            if m["key"] == "m_hp":
+                b_txt = "+%d" % round(b)
+            else:
+                b_txt = fmt_pct(b * 100)
+            draw_text(canvas, b_txt, (r.right - 16, r.y + 52), 20,
+                      renk if lvl else (92, 96, 120), bold=True, right=True)
+
+            # kademe çubuğu (doğrusal kısım dolunca prestij rengine döner)
+            # Çubuk satın alma düğmesinin soluna sığsın (düğme r.right-150'de
+            # başlıyor): 150 piksel genişlik tam oturuyor.
+            bar = pygame.Rect(r.x + 78, r.y + 80, 150, 8)
+            dolu = (min(lvl, MASTERY_TIERS) / float(MASTERY_TIERS)) if lvl <= MASTERY_TIERS else 1.0
+            draw_bar(canvas, bar, dolu, renk, radius=4)
+
+            # satın alma düğmesi
+            br = pygame.Rect(r.right - 150, r.bottom - 36, 134, 28)
+            bcol = (56, 112, 78) if alinabilir else (44, 46, 62)
+            pygame.draw.rect(canvas, bcol if not (hov and alinabilir) else (74, 148, 102),
+                             br, border_radius=7)
+            pygame.draw.rect(canvas, (90, 160, 115) if alinabilir else (62, 66, 88),
+                             br, width=1, border_radius=7)
+            draw_icon(canvas, br.x + 18, br.centery, "gem",
+                      GEM_COLOR if alinabilir else (96, 104, 128), 6)
+            draw_text(canvas, fmt_num(cost), (br.x + 32, br.centery - 8), 14,
+                      WHITE if alinabilir else (110, 116, 142), bold=True,
+                      shadow=False)
+            if clicked and br.collidepoint(mouse_pos):
+                if self.save.buy_mastery(m["key"]):
+                    sfx("buy", 0.7, 0.0)
+                else:
+                    sfx("error", 0.5, 0.0)
+
+        draw_text(canvas, L("ui.mastery_hint"), (cx, pr.bottom - 92), 11,
+                  (124, 130, 156), center=True, shadow=False)
+        b = Button((cx - 150, pr.bottom - 66, 300, 46), L("ui.back_menu"),
+                   lambda: self.set_state(STATE_MENU), text_size=17)
+        b.update(mouse_pos, dt)
+        b.draw(canvas)
+        if clicked:
+            b.click(mouse_pos)
 
     def update_login(self, dt, mouse_pos, clicked):
         canvas = self.display.canvas

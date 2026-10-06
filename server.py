@@ -699,6 +699,66 @@ def auth_set_username():
 # kısıtlamak değil, "tek istekle 1.000.000 elmas" yolunu kapatmak.
 GEM_GAIN_CAP_PER_PUSH = 4000
 PROGRESS_LISTS = ("skins_owned", "cosmetics_owned", "books_owned", "weapons_owned")
+
+# ---- ARENA USTALIĞI (koşular arası kalıcı yükseltme) ----
+# Oyundaki MASTERY tablosuyla BİREBİR aynı olmalı: sunucu, iddia edilen
+# ustalığın GERÇEKTEN ödenmiş olup olmadığını buradan hesaplıyor.
+MASTERY_TIERS = 5
+MASTERY_COSTS = {
+    "m_dmg": (120, 1.60), "m_hp": (110, 1.60), "m_armor": (140, 1.65),
+    "m_speed": (120, 1.60), "m_gem": (150, 1.70), "m_xp": (130, 1.65),
+}
+# Kurcalanmış bir istemcinin "kademe 10^9" yazıp sayıyla oynamasını
+# engeller; gerçek oyuncu bu sayıya hiçbir zaman yaklaşamaz (prestij
+# bedeli üstel).
+MASTERY_LEVEL_CAP = 60
+
+
+def _mastery_cost(key, lvl):
+    """lvl -> lvl+1 bedeli (oyundaki mastery_cost ile birebir)."""
+    base, growth = MASTERY_COSTS[key]
+    if lvl < MASTERY_TIERS:
+        return int(round(base * (growth ** lvl)))
+    son = base * (growth ** (MASTERY_TIERS - 1))
+    return int(round(son * (1.35 ** (lvl - MASTERY_TIERS + 1))))
+
+
+def _mastery_total(key, lvl):
+    """0'dan lvl'e toplam bedel."""
+    if key not in MASTERY_COSTS:
+        return 0
+    return sum(_mastery_cost(key, i) for i in range(max(0, int(lvl))))
+
+
+def _merge_mastery(old, new, gems_spent):
+    """Ustalığı birleştirir ve ÖDENEBİLİR olduğunu doğrular.
+
+    Ustalık istemcide tutulduğu için "kademe 99" yazan bir kayıt sunucuya
+    gelebilir. İki fren var:
+      1) Kademe hiç geri gitmez ama MASTERY_LEVEL_CAP'i de aşamaz.
+      2) İddia edilen ustalığın TOPLAM BEDELİ, oyuncunun harcadığı elması
+         (gems_spent) aşamaz. Aşıyorsa fazlalık kademe kademe geri alınır.
+    Böylece ustalık, elmas defterinin doğruladığı bir şeye bağlanmış olur.
+    """
+    out = {}
+    for key in MASTERY_COSTS:
+        try:
+            a = int((old or {}).get(key, 0) or 0)
+        except (TypeError, ValueError):
+            a = 0
+        try:
+            b = int((new or {}).get(key, 0) or 0)
+        except (TypeError, ValueError):
+            b = 0
+        out[key] = max(0, min(MASTERY_LEVEL_CAP, max(a, b)))
+    # Ödenebilirlik: en pahalı daldan başlayarak kırp.
+    butce = max(0, int(gems_spent or 0))
+    while sum(_mastery_total(k, v) for k, v in out.items()) > butce:
+        k = max(out, key=lambda k: out[k] and _mastery_cost(k, out[k] - 1) or 0)
+        if out[k] <= 0:
+            break
+        out[k] -= 1
+    return out
 PROGRESS_STATS = ("runs", "best_score", "total_kills", "total_time", "bosses",
                   "best_wave", "total_shots", "total_gold", "total_lifesteal",
                   "best_run_gold", "best_run_dashes", "best_run_shots",
@@ -718,7 +778,7 @@ def _blank_progress():
         "skins_owned": ["default"], "equipped_skin": "default",
         "cosmetics_owned": [], "equipped_cosmetics": {},
         "books_owned": [], "weapons_owned": [],
-        "achievements": {}, "stats": {},
+        "achievements": {}, "stats": {}, "mastery": {},
     }
 
 
@@ -778,6 +838,10 @@ def _merge_progress(old, new):
         except Exception:
             pass
     out["stats"] = st_old
+    # ustalık: kademe geri gitmez, tavanı var ve ÖDENMİŞ olmalı
+    out["mastery"] = _merge_mastery(old.get("mastery"), new.get("mastery"),
+                                    max(int(old.get("gems_spent", 0) or 0),
+                                        int(new.get("gems_spent", 0) or 0)))
     ach = dict(old.get("achievements") or {})
     for k, v in list((new.get("achievements") or {}).items())[:400]:
         ach.setdefault(str(k)[:40], v)
