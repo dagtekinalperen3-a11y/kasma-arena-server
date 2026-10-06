@@ -552,6 +552,7 @@ from array import array
 import hmac
 import hashlib
 import base64
+import secrets
 import http.server
 import webbrowser
 import urllib.parse
@@ -912,6 +913,31 @@ STRINGS = {
     "ults.immortal_merc": _T("KURŞUN", "BULLETS", "BALAS", "KUGELN", "ПУЛИ"),
     "ult.pink_dream": _T("RÜYA PATLAMASI", "DREAM BURST", "ESTALLIDO ONÍRICO", "TRAUMSTOSS", "ВЗРЫВ ГРЁЗ"),
     "ults.pink_dream": _T("RÜYA", "DREAM", "SUEÑO", "TRAUM", "ГРЁЗА"),
+    "ui.acc_change_pw": _T("ŞİFREYİ DEĞİŞTİR", "CHANGE PASSWORD", "CAMBIAR CONTRASEÑA",
+                           "PASSWORT ÄNDERN", "СМЕНИТЬ ПАРОЛЬ"),
+    "ui.acc_set_pw":  _T("ŞİFRE BELİRLE", "SET PASSWORD", "ESTABLECER CONTRASEÑA",
+                         "PASSWORT SETZEN", "ЗАДАТЬ ПАРОЛЬ"),
+    "ui.acc_pw_cur":  _T("MEVCUT ŞİFRE", "CURRENT PASSWORD", "CONTRASEÑA ACTUAL",
+                         "AKTUELLES PASSWORT", "ТЕКУЩИЙ ПАРОЛЬ"),
+    "ui.acc_pw_new":  _T("YENİ ŞİFRE", "NEW PASSWORD", "NUEVA CONTRASEÑA",
+                         "NEUES PASSWORT", "НОВЫЙ ПАРОЛЬ"),
+    "ui.acc_pw_why":  _T("Şifreni değiştirince bütün cihazlardaki oturumlar kapanır — şifren sızdıysa tam olarak bunu istersin.",
+                         "Changing your password signs you out everywhere — exactly what you want if it leaked.",
+                         "Al cambiar la contraseña se cierran todas las sesiones — justo lo que quieres si se filtró.",
+                         "Mit dem Passwortwechsel werden alle Sitzungen beendet — genau richtig, wenn es geleakt ist.",
+                         "Смена пароля закрывает все сессии — именно это нужно, если пароль утёк."),
+    "ui.acc_pw_google": _T("Google ile girdin; buradan hesabına bir şifre de kurabilirsin.",
+                           "You signed in with Google; you can also set a password here.",
+                           "Entraste con Google; aquí puedes añadir una contraseña.",
+                           "Du bist mit Google angemeldet; hier kannst du ein Passwort setzen.",
+                           "Вы вошли через Google; здесь можно задать и пароль."),
+    "ui.acc_pw_done": _T("şifre değişti", "password changed", "contraseña cambiada",
+                         "Passwort geändert", "пароль изменён"),
+    "ui.acc_logout_all": _T("TÜM CİHAZLARDAN ÇIK", "SIGN OUT EVERYWHERE",
+                            "CERRAR EN TODOS", "ÜBERALL ABMELDEN", "ВЫЙТИ ВСЮДУ"),
+    "ui.acc_logout_all_done": _T("bütün oturumlar kapatıldı", "signed out everywhere",
+                                 "sesiones cerradas", "überall abgemeldet",
+                                 "выход выполнен всюду"),
     "ui.sync_busy":   _T("ilerleme sunucuya yazılıyor...", "saving progress...",
                          "guardando progreso...", "Fortschritt wird gespeichert...",
                          "сохранение прогресса..."),
@@ -2812,12 +2838,70 @@ def check_username(u):
     return True, ""
 
 
-def device_id():
-    """BU BİLGİSAYARIN takma kimliği (hesap oturumunu makineye bağlar).
+# KURULUM KİMLİĞİ (v3.22) — cihaz kimliğinin ENTROPİSİ.
+# ---------------------------------------------------------------------
+# device_id() eskiden doğrudan _machine_salt()'tan türüyordu, yani
+# "kullanıcıadı@makineadı" özetiydi. O girdi GİZLİ BİR SIR DEĞİL: iki
+# tahmin edilebilir metin. Kurbanın kullanıcı adı ve makine adı bir ekran
+# görüntüsünden, bir hata kaydından ya da paylaşılan bir dosyadan
+# öğrenilebiliyor; öğrenen kişi cihaz kimliğini yeniden üretip, eline
+# geçmiş bir jetonla oturumu devralabiliyordu.
+#
+# _machine_salt()'ın KENDİSİ değiştirilemez: kayıt imzası ve kayıt
+# şifrelemesi de ondan besleniyor, değiştirilse herkesin kaydı geçersiz
+# olurdu. Bu yüzden cihaz kimliğine AYRI ve RASTGELE bir kurulum kimliği
+# eklendi; ilk çalıştırmada üretilip oyuncunun veri klasörüne yazılır.
+INSTALL_ID_FILE = os.path.join(get_save_dir(), "install_id")
+_INSTALL_ID = [None]
 
-    Gerçek kullanıcı adı / makine adı SUNUCUYA GİTMEZ: yalnızca bunların
-    geri çevrilemez özeti gider. Sunucu oturumu bu kimliğe bağlar; kayıt
-    dosyası çalınıp başka bilgisayara taşınsa bile jeton orada çalışmaz.
+
+def _install_id():
+    """Bu kuruluma özel, TAHMİN EDİLEMEZ kimlik. İlk çağrıda üretilir."""
+    if _INSTALL_ID[0]:
+        return _INSTALL_ID[0]
+    try:
+        with open(INSTALL_ID_FILE, "r", encoding="utf-8") as fh:
+            v = fh.read().strip()
+        if len(v) >= 24:
+            _INSTALL_ID[0] = v
+            return v
+    except Exception:
+        pass
+    v = secrets.token_hex(16)
+    try:
+        d = os.path.dirname(INSTALL_ID_FILE)
+        if d:
+            os.makedirs(d, exist_ok=True)
+        with open(INSTALL_ID_FILE, "w", encoding="utf-8") as fh:
+            fh.write(v)
+    except Exception:
+        # Yazılamadıysa (salt-okunur klasör) kimlik yine çalışır, yalnızca
+        # her açılışta değişir — o durumda oyuncu yeniden giriş yapar.
+        pass
+    _INSTALL_ID[0] = v
+    return v
+
+
+def device_id():
+    """BU KURULUMUN takma kimliği (hesap oturumunu makineye bağlar).
+
+    Gerçek kullanıcı adı / makine adı SUNUCUYA GİTMEZ. Sunucu oturumu bu
+    kimliğe bağlar; kayıt dosyası çalınıp başka bilgisayara taşınsa bile
+    jeton orada çalışmaz.
+    """
+    h = hashlib.sha256(b"kasma-device-v2|"
+                       + _install_id().encode("utf-8")).hexdigest()
+    return h[:32]
+
+
+def device_id_legacy():
+    """ESKİ (v1) cihaz kimliği — yalnızca GEÇİŞ için.
+
+    Bu güncellemeden önce açılmış oturumlar eski kimliğe bağlı. Oyun ikisini
+    birden gönderiyor, sunucu ikisinden birini kabul ediyor; böylece kimse
+    güncelleme yüzünden oturumundan düşmüyor. Yeni oturumlar yalnızca YENİ
+    kimliğe bağlanır, yani eski yol oyuncular doğal olarak yeniden giriş
+    yaptıkça kendiliğinden kapanır.
     """
     h = hashlib.sha256(b"kasma-device-v1|" + _machine_salt()).hexdigest()
     return h[:32]
@@ -4235,7 +4319,8 @@ class AccountClient:
         if not tok:
             return
         try:
-            res = self._post("/auth/me", {"token": tok, "device": device_id()})
+            res = self._post("/auth/me", {"token": tok, "device": device_id(),
+                                          "device_legacy": device_id_legacy()})
         except Exception:
             return          # ağ yoksa jetonu silme: sonra yeniden denenir
         if self.token != tok:
@@ -4307,7 +4392,9 @@ class AccountClient:
             return
         try:
             res = self._post("/player/load", {"token": self.token,
-                                              "device": device_id()}, timeout=15)
+                                              "device": device_id(),
+                                              "device_legacy": device_id_legacy()},
+                                             timeout=15)
         except Exception as e:
             # Ağ yoksa yereldeki kopya kullanılmaya devam eder — ama sessiz
             # kalmıyoruz, hesap ekranı durumu gösteriyor.
@@ -4337,6 +4424,7 @@ class AccountClient:
             try:
                 res = self._post("/player/save", {
                     "token": self.token, "device": device_id(),
+                    "device_legacy": device_id_legacy(),
                     "progress": prog}, timeout=20)
                 if res.get("success") and isinstance(res.get("progress"), dict):
                     # Sunucu düzelttiyse (örn. elmas sınırı) onunki geçerli.
@@ -4366,6 +4454,7 @@ class AccountClient:
         def fn():
             res = self._post("/auth/username", {
                 "token": self.token, "device": device_id(),
+                    "device_legacy": device_id_legacy(),
                 "username": username})
             if res.get("success"):
                 self.account = res["account"]
@@ -4377,10 +4466,49 @@ class AccountClient:
                 self.status = str(res.get("error", ""))
         self._run(fn)
 
+    def change_password(self, current, new):
+        """Şifreyi değiştirir (ya da Google hesabına ilk şifreyi kurar).
+
+        Sunucu değişiklikte O HESABIN BÜTÜN oturumlarını kesip yeni bir
+        jeton veriyor — şifre neden değiştiriliyorsa (sızıntı) o oturumlar
+        da gitmeli. Yeni jeton burada kaydedilir, yoksa oyuncu kendi
+        değişikliğiyle oturumundan düşer.
+        """
+        def fn():
+            res = self._post("/auth/password", {
+                "token": self.token, "device": device_id(),
+                "device_legacy": device_id_legacy(),
+                "password": current, "new_password": new})
+            if res.get("success"):
+                if res.get("token"):
+                    self.token = res["token"]
+                    self.save.data["account_token"] = seal_token(res["token"])
+                    self.save.save()
+                self.ok_msg = L("ui.acc_pw_done")
+                self.status = ""
+            else:
+                self.status = str(res.get("error", ""))
+        self._run(fn)
+
+    def logout_all(self):
+        """BÜTÜN cihazlardan çıkar. Jetonu çalınan oyuncunun tek çaresi."""
+        def fn():
+            res = self._post("/auth/logout_all", {
+                "token": self.token, "device": device_id(),
+                "device_legacy": device_id_legacy()})
+            if res.get("success"):
+                self._forget()
+                self.ok_msg = L("ui.acc_logout_all_done")
+                self.status = ""
+            else:
+                self.status = str(res.get("error", ""))
+        self._run(fn)
+
     def _auth_call(self, path, payload):
         # Oturum BU CİHAZA bağlanır: jeton kopyalanıp başka bilgisayarda
         # kullanılamasın (sunucu da ayrıca denetler).
-        payload = dict(payload, device=device_id())
+        payload = dict(payload, device=device_id(),
+                       device_legacy=device_id_legacy())
         res = self._post(path, payload)
         if res.get("success"):
             self._remember(res["token"], res["account"])
@@ -4479,7 +4607,8 @@ class AccountClient:
         self.status = L("ui.acc_checking")
         out = self._post("/auth/google", {
             "code": res["code"], "code_verifier": verifier,
-            "redirect_uri": redirect_uri, "device": device_id()})
+            "redirect_uri": redirect_uri, "device": device_id(),
+             "device_legacy": device_id_legacy()})
         if out.get("success"):
             self._remember(out["token"], out["account"])
             self.ok_msg = L("ui.acc_welcome", out["account"].get("name", ""))
@@ -22402,7 +22531,7 @@ class App:
         # ---- HESAP ----
         self.account = AccountClient(ONLINE_API_URL, self.save)
         self.login_mode = "in"        # "in" = giriş, "up" = kayıt
-        self.login_fields = {"user": "", "password": "", "email": ""}
+        self.login_fields = {"user": "", "password": "", "email": "", "newpw": ""}
         self.login_focus = "user"     # odaklı kutu
         self.login_caret = 0.0
         self.running = True
@@ -23216,6 +23345,7 @@ class App:
         if self.account.token:
             payload["token"] = self.account.token
             payload["device"] = device_id()
+            payload["device_legacy"] = device_id_legacy()
         self.online.submit_score_async(payload, on_done=on_done)
 
     def update_gameover(self, dt, mouse_pos, clicked):
@@ -24099,12 +24229,19 @@ class App:
     # Girişte üstteki kutuya kullanıcı adı DA e-posta DA yazılabilir.
     LOGIN_FIELDS_IN = ("user", "password")
     LOGIN_FIELDS_UP = ("user", "password", "email")
+    LOGIN_FIELDS_PW = ("password", "newpw")
 
     def _login_field_order(self):
         if self.login_mode == "up":
             return self.LOGIN_FIELDS_UP
         if self.login_mode == "pick":
             return ("user",)
+        if self.login_mode == "pw":
+            # Google hesabında mevcut şifre yok: tek kutu.
+            a = self.account.account or {}
+            if a.get("provider") == "google" and not a.get("has_password"):
+                return ("newpw",)
+            return self.LOGIN_FIELDS_PW
         return self.LOGIN_FIELDS_IN
 
     def handle_login_key(self, event):
@@ -24129,7 +24266,8 @@ class App:
         ch = event.unicode
         if not ch or not ch.isprintable():
             return
-        limit = {"user": 64, "password": 64, "email": 96}[self.login_focus]
+        limit = {"user": 64, "password": 64, "email": 96,
+                 "newpw": 64}[self.login_focus]
         if self.login_focus == "user" and self.login_mode in ("up", "pick"):
             # Kullanıcı adında boşluk ve noktalama yok: sıralamada
             # "KASMACI " gibi taklit adlar üretilemesin.
@@ -24142,6 +24280,14 @@ class App:
     def _login_submit(self):
         f = self.login_fields
         acc = self.account
+        if self.login_mode == "pw":
+            if len(f["newpw"]) < PASSWORD_MIN:
+                acc.status = L("ui.acc_short_pw", PASSWORD_MIN)
+                return
+            acc.change_password(f["password"], f["newpw"])
+            # Şifreler bellekte kalmasın.
+            f["password"] = f["newpw"] = ""
+            return
         if self.login_mode == "pick":
             ok, why = check_username(f["user"])
             if not ok:
@@ -24164,6 +24310,28 @@ class App:
         else:
             acc.login(f["user"].strip(), f["password"])
         f["password"] = ""
+
+    def _login_set_mode(self, mode):
+        """Hesap ekranının alt sayfasını değiştirir ve kutuları temizler.
+
+        Şifre kutuları özellikle temizleniyor: oyuncu sayfadan çıkıp geri
+        gelince eski şifresi kutuda beklemesin.
+        """
+        self.login_mode = mode
+        self.login_fields["password"] = ""
+        self.login_fields["newpw"] = ""
+        self.account.status = ""
+        self.account.ok_msg = ""
+        order = self._login_field_order()
+        self.login_focus = order[0] if order else "user"
+
+    def _login_logout_all(self):
+        """Bütün cihazlardan çıkar; kutuları da temizler."""
+        self.account.logout_all()
+        self.login_mode = "in"
+        for k in self.login_fields:
+            self.login_fields[k] = ""
+        self.login_focus = "user"
 
     def _login_logout(self):
         """Çıkışta yazılanlar da gitsin: bilgisayarı paylaşan biri
@@ -24291,33 +24459,71 @@ class App:
                 b2.click(mouse_pos)
             return
 
+        # ---- ŞİFRE DEĞİŞTİRME ----
+        if acc.logged_in() and self.login_mode == "pw":
+            a = acc.account or {}
+            google_only = (a.get("provider") == "google"
+                           and not a.get("has_password"))
+            draw_text(canvas, L("ui.acc_set_pw" if google_only
+                                else "ui.acc_change_pw"),
+                      (cx, pr.y + 66), 17, GOLD, bold=True, center=True)
+            why = L("ui.acc_pw_google" if google_only else "ui.acc_pw_why")
+            oy = pr.y + 94
+            for ln in wrap_text(why, 11, pr.w - 70)[:3]:
+                draw_text(canvas, ln, (cx, oy), 11, TEXT_DIM, center=True, shadow=False)
+                oy += 14
+            by = pr.y + 150
+            if not google_only:
+                self._login_box(canvas, pygame.Rect(cx - 170, by, 340, 46),
+                                L("ui.acc_pw_cur"), "password", mouse_pos, clicked,
+                                secret=True)
+                by += 56
+            self._login_box(canvas, pygame.Rect(cx - 170, by, 340, 46),
+                            L("ui.acc_pw_new"), "newpw", mouse_pos, clicked,
+                            secret=True)
+            by += 66
+            for b in (Button((cx - 170, by, 340, 46), L("ui.save"),
+                             self._login_submit, color=(60, 130, 90),
+                             hover_color=(80, 170, 115), text_size=17,
+                             enabled=not acc.busy),
+                      Button((cx - 170, pr.bottom - 62, 340, 44), L("ui.back"),
+                             lambda: self._login_set_mode("in"), text_size=16)):
+                b.update(mouse_pos, dt)
+                b.draw(canvas)
+                if clicked:
+                    b.click(mouse_pos)
+            self._login_status(canvas, cx, by + 58, pr)
+            return
+
         # ---- GİRİŞ YAPILMIŞ ----
         if acc.logged_in():
             a = acc.account
-            draw_text(canvas, L("ui.acc_signed"), (cx, pr.y + 70), 14, GREEN,
+            # YERLEŞİM: şifre ve oturum düğmeleri eklenince bilgi bloğu
+            # düğmelerin altına kaçıyordu; satırlar sıkıştırıldı.
+            draw_text(canvas, L("ui.acc_signed"), (cx, pr.y + 60), 14, GREEN,
                       bold=True, center=True, shadow=False)
-            cc = (cx, pr.y + 132)
-            add_glow(canvas, cc[0], cc[1], 58, GOLD, 0.22)
-            circle_aa(canvas, cc[0], cc[1], 34, (24, 26, 40))
-            ring_aa(canvas, cc[0], cc[1], 34, GOLD, 2)
-            draw_text(canvas, (acc.display_name() or "?")[:1].upper(), cc, 32, GOLD,
+            cc = (cx, pr.y + 116)
+            add_glow(canvas, cc[0], cc[1], 52, GOLD, 0.22)
+            circle_aa(canvas, cc[0], cc[1], 30, (24, 26, 40))
+            ring_aa(canvas, cc[0], cc[1], 30, GOLD, 2)
+            draw_text(canvas, (acc.display_name() or "?")[:1].upper(), cc, 28, GOLD,
                       bold=True, center=True)
-            draw_text(canvas, acc.display_name(), (cx, pr.y + 182), 24, TEXT,
+            draw_text(canvas, acc.display_name(), (cx, pr.y + 160), 22, TEXT,
                       bold=True, center=True)
-            draw_text(canvas, L("ui.name_locked"), (cx, pr.y + 212), 10, TEXT_DIM,
+            draw_text(canvas, L("ui.name_locked"), (cx, pr.y + 188), 10, TEXT_DIM,
                       center=True, shadow=False)
             # Gmail ile girenin e-postası da görünür (veritabanında da ikisi
             # birden duruyor: hesap kime ait, bir bakışta belli olsun).
             if a.get("email"):
-                draw_text(canvas, _fit_text(a["email"], 13, pr.w - 80),
-                          (cx, pr.y + 240), 13, TEXT_DIM, center=True, shadow=False)
+                draw_text(canvas, _fit_text(a["email"], 12, pr.w - 80),
+                          (cx, pr.y + 208), 12, TEXT_DIM, center=True, shadow=False)
             prov = a.get("provider", "password")
             draw_text(canvas, "Google" if prov == "google" else L("ui.username"),
-                      (cx, pr.y + 264), 11, (150, 180, 230), center=True, shadow=False)
+                      (cx, pr.y + 228), 11, (150, 180, 230), center=True, shadow=False)
             # ---- İLERLEME EŞİTLEMESİ ----
             # Elmas/skin sunucuya yazılabiliyor mu? Sessiz kalmıyoruz:
             # bir şey ters giderse oyuncu (ve geliştirici) burada görüyor.
-            sy = pr.y + 292
+            sy = pr.y + 250
             if acc.sync_busy:
                 draw_text(canvas, L("ui.sync_busy"), (cx, sy), 11, CYAN,
                           center=True, shadow=False)
@@ -24331,16 +24537,29 @@ class App:
                 draw_text(canvas, L("ui.sync_ok", time.strftime(
                     "%H:%M:%S", time.localtime(acc.sync_at))),
                     (cx, sy), 11, GREEN, center=True, shadow=False)
-            for b in (Button((cx - 150, pr.bottom - 118, 300, 44), L("ui.sign_out"),
+            # ŞİFRE ve OTURUM YÖNETİMİ. Bunlar yoksa şifresi sızan ya da
+            # jetonu çalınan oyuncunun yapabileceği hiçbir şey kalmıyor.
+            for b in (Button((cx - 150, pr.bottom - 200, 300, 40),
+                             L("ui.acc_set_pw" if (a.get("provider") == "google"
+                                                   and not a.get("has_password"))
+                               else "ui.acc_change_pw"),
+                             lambda: self._login_set_mode("pw"),
+                             color=(62, 86, 130), hover_color=(86, 116, 170),
+                             text_size=15),
+                      Button((cx - 150, pr.bottom - 156, 300, 40),
+                             L("ui.acc_logout_all"), self._login_logout_all,
+                             color=(120, 86, 56), hover_color=(158, 114, 76),
+                             text_size=15, enabled=not acc.busy),
+                      Button((cx - 150, pr.bottom - 110, 300, 44), L("ui.sign_out"),
                              self._login_logout, color=(130, 70, 70),
                              hover_color=(170, 95, 95), text_size=17),
-                      Button((cx - 150, pr.bottom - 66, 300, 44), L("ui.back_menu"),
+                      Button((cx - 150, pr.bottom - 60, 300, 44), L("ui.back_menu"),
                              lambda: self.set_state(STATE_MENU), text_size=17)):
                 b.update(mouse_pos, dt)
                 b.draw(canvas)
                 if clicked:
                     b.click(mouse_pos)
-            self._login_status(canvas, cx, pr.bottom - 142, pr)
+            self._login_status(canvas, cx, pr.bottom - 228, pr)
             return
 
         # ---- SUNUCU KAPALI ----

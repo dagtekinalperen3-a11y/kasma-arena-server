@@ -232,12 +232,33 @@ def _new_session(account_id, device=""):
     return tok
 
 
-def _account_by_session(tok, device=None):
+def _acct(data, check_device=True):
+    """İstek gövdesinden hesabı çözer (cihaz denetimi dahil).
+
+    Beş uç aynı üç alanı aynı sırayla geçiriyordu; tek yerde toplandı ki
+    ileride bir alan eklenince bir uç geride kalmasın.
+    """
+    data = data or {}
+    if not check_device:
+        return _account_by_session(str(data.get("token", "")))
+    return _account_by_session(str(data.get("token", "")),
+                               data.get("device", ""),
+                               data.get("device_legacy", ""))
+
+
+def _account_by_session(tok, device=None, device_legacy=None):
     """Jetondan hesabı bulur. Süresi dolmuşsa ya da CİHAZ tutmuyorsa None.
 
     device=None geçilirse cihaz denetimi YAPILMAZ; bu yalnızca skor
     gönderimi gibi, jetonun tek işinin "adı sahiplenmek" olduğu yerler
     için. Hesabı okuyan/değiştiren uçlar cihazı mutlaka geçirir.
+
+    device_legacy, v3.22 GEÇİŞİ içindir: o güncellemeden önce açılmış
+    oturumlar ESKİ (tahmin edilebilir) cihaz kimliğine bağlıydı. Oyun
+    ikisini birden gönderiyor; burada ikisinden biri tutarsa oturum kabul
+    edilir, böylece kimse güncelleme yüzünden oturumundan düşmüyor. Yeni
+    oturumlar yalnızca YENİ kimliğe bağlandığı için bu yol oyuncular
+    yeniden giriş yaptıkça kendiliğinden kapanır.
     """
     if not tok or not supabase:
         return None
@@ -255,9 +276,15 @@ def _account_by_session(tok, device=None):
         return None
     if device is not None:
         want = str(sess.get("device_hash") or "")
-        # Eski oturumlarda device_hash boş olabilir: onları kırmıyoruz,
-        # yalnızca İKİSİ de doluyken eşitlik arıyoruz.
-        if want and _clean_device(device) != want:
+        # BOŞ device_hash ARTIK KABUL EDİLMİYOR (v3.22). Eskiden "eski
+        # oturumları kırmayalım" diye boş device_hash cihaz denetimini
+        # TAMAMEN atlıyordu, yani o satırlar için cihaz bağı hiç yoktu.
+        if not want:
+            return None
+        ok_dev = _clean_device(device) == want
+        if not ok_dev and device_legacy:
+            ok_dev = _clean_device(device_legacy) == want
+        if not ok_dev:
             return None
     # DİKKAT: sütunları TEK TEK saymıyoruz. Daha önce burada sabit bir
     # liste vardı ve "username" o listede yoktu; sonucu şuydu: oyun yeniden
@@ -281,6 +308,10 @@ def _public_account(acc):
         "provider": acc.get("provider", "password"),
         # Kullanıcı adı henüz seçilmemişse oyun bir kereye mahsus seçtirir.
         "needs_username": not bool(acc.get("username")),
+        # ŞİFRE ÖZETİ DEĞİL, yalnızca "var mı?": Google ile gelen hesapta
+        # şifre olmayabilir, oyun o zaman "mevcut şifre" kutusunu hiç
+        # göstermez ve ekranda "ŞİFRE BELİRLE" yazar.
+        "has_password": bool(acc.get("password_hash")),
     }
 
 
@@ -617,7 +648,7 @@ def auth_me():
     if not _accounts_enabled():
         return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
     data = request.json or {}
-    acc = _account_by_session(str(data.get("token", "")), data.get("device", ""))
+    acc = _acct(data)
     if not acc:
         return jsonify({"success": False, "error": "oturum geçersiz"}), 401
     return jsonify({"success": True, "account": _public_account(acc)})
@@ -635,7 +666,7 @@ def auth_set_username():
     if not _accounts_enabled():
         return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
     data = request.json or {}
-    acc = _account_by_session(str(data.get("token", "")), data.get("device", ""))
+    acc = _acct(data)
     if not acc:
         return jsonify({"success": False, "error": "oturum geçersiz"}), 401
     if acc.get("username"):
@@ -770,7 +801,7 @@ def player_load():
     if not _accounts_enabled():
         return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
     data = request.json or {}
-    acc = _account_by_session(str(data.get("token", "")), data.get("device", ""))
+    acc = _acct(data)
     if not acc:
         return jsonify({"success": False, "error": "oturum geçersiz"}), 401
     return jsonify({"success": True, "progress": _stored_progress(_player_row(acc["id"]))})
@@ -804,7 +835,7 @@ def player_save():
     if not _accounts_enabled():
         return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
     data = request.json or {}
-    acc = _account_by_session(str(data.get("token", "")), data.get("device", ""))
+    acc = _acct(data)
     if not acc:
         return jsonify({"success": False, "error": "oturum geçersiz"}), 401
     incoming = data.get("progress")
@@ -880,6 +911,71 @@ def auth_logout():
         except Exception:
             pass
     return jsonify({"success": True})
+
+
+@app.route("/auth/logout_all", methods=["POST"])
+def auth_logout_all():
+    """BÜTÜN cihazlardan çıkış.
+
+    Eskiden yoktu: /auth/logout yalnızca GÖNDERİLEN jetonu siliyordu, yani
+    jetonu bir kez ele geçiren biri oturum ömrü (SESSION_TTL) boyunca
+    içeride kalabiliyordu ve oyuncunun onu atacak hiçbir yolu yoktu.
+    """
+    if not _accounts_enabled():
+        return jsonify({"success": True})
+    data = request.json or {}
+    acc = _acct(data)
+    if not acc:
+        return jsonify({"success": False, "error": "oturum geçersiz"}), 401
+    try:
+        supabase.table("sessions").delete().eq("account_id", acc["id"]).execute()
+    except Exception as e:
+        return _oops(e)
+    return jsonify({"success": True})
+
+
+@app.route("/auth/password", methods=["POST"])
+def auth_password():
+    """ŞİFRE DEĞİŞTİRME.
+
+    Eskiden hiç yoktu: şifresi sızan oyuncunun yapabileceği HİÇBİR ŞEY
+    yoktu. Kurallar:
+      - Oturum jetonu + cihaz zorunlu (yani şifreyi yalnızca o an giriş
+        yapmış cihaz değiştirebilir).
+      - MEVCUT şifre de istenir; jetonu çalan biri şifreyi değiştirip
+        hesabı tamamen devralamasın.
+      - Değişiklikte O HESABIN BÜTÜN oturumları silinir ve çağırana yeni
+        bir jeton verilir: şifre neden değiştiriliyorsa (sızıntı) o
+        oturumlar da gitmeli.
+      - Google ile açılmış, şifresi olmayan hesaplarda şifre KURMAYA da
+        yarar; o durumda mevcut şifre istenmez.
+    """
+    if not _accounts_enabled():
+        return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
+    if not _rate_ok("pw:" + _client_ip()):
+        return jsonify({"success": False, "error": "çok fazla deneme"}), 429
+    data = request.json or {}
+    acc = _acct(data)
+    if not acc:
+        return jsonify({"success": False, "error": "oturum geçersiz"}), 401
+    new_pw = str(data.get("new_password", ""))
+    if len(new_pw) < PW_MIN_LEN:
+        return jsonify({"success": False,
+                        "error": f"şifre en az {PW_MIN_LEN} karakter olmalı"}), 400
+    cur_hash = str(acc.get("password_hash") or "")
+    if cur_hash:
+        if not _verify_password(str(data.get("password", "")), cur_hash):
+            _login_failed(str(acc.get("username") or "").lower())
+            return jsonify({"success": False, "error": "mevcut şifre hatalı"}), 403
+    try:
+        supabase.table("accounts").update(
+            {"password_hash": _hash_password(new_pw)}).eq("id", acc["id"]).execute()
+        # Bütün oturumları kes, sonra çağırana yeni bir tane ver.
+        supabase.table("sessions").delete().eq("account_id", acc["id"]).execute()
+        tok = _new_session(acc["id"], data.get("device"))
+    except Exception as e:
+        return _oops(e)
+    return jsonify({"success": True, "token": tok})
 
 
 # =====================================================================
@@ -1202,7 +1298,7 @@ def add_score():
         # hileci bir hesapla birlikte engellenebilsin. Girişsiz oynayan
         # oyuncu oyunun tamamını oynar, skoru yalnızca KENDİ bilgisayarındaki
         # yerel tabloya yazılır (oyun bunu sonuç ekranında söylüyor).
-        acc = _account_by_session(str(data.get("token", "")), data.get("device", ""))
+        acc = _acct(data)
         if not acc:
             return jsonify({"success": False,
                             "error": "dünya sıralaması için giriş gerekli"}), 401
