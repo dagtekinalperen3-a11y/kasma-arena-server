@@ -1,5 +1,6 @@
 import os
 import json
+import math
 import time
 import uuid
 import hmac
@@ -9,11 +10,71 @@ import urllib.parse
 import urllib.request
 from collections import defaultdict, deque
 from flask import Flask, jsonify, request, send_from_directory
-from flask_cors import CORS
+from werkzeug.middleware.proxy_fix import ProxyFix
 from supabase import create_client, Client
 
 app = Flask(__name__, static_folder=".")
-CORS(app)  # CORS sorunlarını önlemek için
+
+# CORS KALDIRILDI (v3.22). Eskiden `CORS(app)` vardı ve HİÇBİR kısıtlama
+# verilmediği için /auth/login, /player/save, /submit, /diag dahil BÜTÜN
+# uçları her web sitesine açıyordu: herhangi bir sayfa, ziyaretçilerinin
+# tarayıcısını kullanarak bu uçlara istek atabiliyordu. Oyun bir MASAÜSTÜ
+# uygulaması; CORS'a tabi değil, yani hiç gerek yoktu. İleride bir web
+# paneli eklenirse SADECE onun kökeni ve SADECE gereken uçlar açılmalı.
+
+# GÖVDE BOYUTU: sınırsız gövde, tek istekle belleği doldurmaya izin
+# veriyordu. Oyunun en büyük isteği (/player/save, bütün ilerleme) birkaç
+# on kilobayt; 256 KB bol bol yeter.
+app.config["MAX_CONTENT_LENGTH"] = 256 * 1024
+
+# GERÇEK İSTEMCİ IP'Sİ (v3.22) — hız sınırının temeli.
+# Eskiden her uç `request.headers.get("X-Forwarded-For", ...)`'ın İLK
+# değerini anahtar yapıyordu. O başlığı İSTEMCİ yazar: her istekte farklı
+# bir değer yazan biri her istek için yeni bir kova açıyordu, yani hız
+# sınırı tamamen devre dışıydı (ve _rate_hits sözlüğü sınırsız büyüyordu).
+# ProxyFix, x_for=1 ile başlığın SONDAN BİRİNCİ girdisini alır; onu
+# istemci değil, önündeki tek vekil (Render) yazar — taklit edilemez.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+
+def _client_ip():
+    """Hız sınırı anahtarı: vekilin doğruladığı gerçek istemci adresi."""
+    return request.remote_addr or "?"
+
+
+def _oops(e, msg="sunucu hatası", code=500):
+    """Hatayı SUNUCU GÜNLÜĞÜNE yazar, oyuncuya sabit bir metin + iz kimliği döner.
+
+    Eskiden neredeyse her uçta `return jsonify({"error": str(e)})` vardı.
+    Supabase/PostgREST hataları sütun adlarını, kısıt adlarını, tablo
+    adlarını ve bazen sorgu parçalarını içerir ("column accounts.foo does
+    not exist", "duplicate key value violates unique constraint
+    accounts_username_uidx"). Yani uydurma istek atan biri veritabanı
+    şemasını satır satır öğrenebiliyordu. Artık ayrıntı yalnızca Render
+    günlüğünde; oyuncu bir iz kimliği görür ve onu bildirebilir.
+    """
+    ref = uuid.uuid4().hex[:8]
+    try:
+        app.logger.exception("[%s] %s", ref, msg)
+    except Exception:
+        pass
+    return jsonify({"success": False, "error": msg, "ref": ref}), code
+
+
+@app.errorhandler(Exception)
+def _any_error(e):
+    """YAKALANMAMIŞ her istisna da aynı süzgeçten geçer.
+
+    Uçların try bloklarını tek tek sarmak yetmiyordu: try'dan ÖNCE çağrılan
+    bir şey (örn. _account_by_session) patlarsa Flask'ın kendi işleyicisine
+    düşüyor ve DEBUG açıkken ham izleme kaydı dışarı çıkıyordu. Bu kanca
+    o deliği kapatır.
+    """
+    from werkzeug.exceptions import HTTPException
+    if isinstance(e, HTTPException):
+        # 404/405/413 gibi normal HTTP yanıtları olduğu gibi kalsın.
+        return e
+    return _oops(e)
 
 # Supabase bağlantı bilgileri (Render Environment değişkenlerinden alınır)
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
@@ -132,6 +193,12 @@ def _verify_password(password, stored):
         return False
 
 
+# KUKLA ÖZET: giriş denemesinde hesap bulunamasa da aynı scrypt maliyetini
+# harcamak için. Uygulama açılışında BİR KEZ üretilir; yoksa her başarısız
+# denemede yeni bir özet üretmek kendi başına bir DoS olurdu.
+_DUMMY_HASH = _hash_password(secrets.token_hex(16))
+
+
 def _token_hash(tok):
     return hashlib.sha256(tok.encode("utf-8")).hexdigest()
 
@@ -165,12 +232,33 @@ def _new_session(account_id, device=""):
     return tok
 
 
-def _account_by_session(tok, device=None):
+def _acct(data, check_device=True):
+    """İstek gövdesinden hesabı çözer (cihaz denetimi dahil).
+
+    Beş uç aynı üç alanı aynı sırayla geçiriyordu; tek yerde toplandı ki
+    ileride bir alan eklenince bir uç geride kalmasın.
+    """
+    data = data or {}
+    if not check_device:
+        return _account_by_session(str(data.get("token", "")))
+    return _account_by_session(str(data.get("token", "")),
+                               data.get("device", ""),
+                               data.get("device_legacy", ""))
+
+
+def _account_by_session(tok, device=None, device_legacy=None):
     """Jetondan hesabı bulur. Süresi dolmuşsa ya da CİHAZ tutmuyorsa None.
 
     device=None geçilirse cihaz denetimi YAPILMAZ; bu yalnızca skor
     gönderimi gibi, jetonun tek işinin "adı sahiplenmek" olduğu yerler
     için. Hesabı okuyan/değiştiren uçlar cihazı mutlaka geçirir.
+
+    device_legacy, v3.22 GEÇİŞİ içindir: o güncellemeden önce açılmış
+    oturumlar ESKİ (tahmin edilebilir) cihaz kimliğine bağlıydı. Oyun
+    ikisini birden gönderiyor; burada ikisinden biri tutarsa oturum kabul
+    edilir, böylece kimse güncelleme yüzünden oturumundan düşmüyor. Yeni
+    oturumlar yalnızca YENİ kimliğe bağlandığı için bu yol oyuncular
+    yeniden giriş yaptıkça kendiliğinden kapanır.
     """
     if not tok or not supabase:
         return None
@@ -188,9 +276,15 @@ def _account_by_session(tok, device=None):
         return None
     if device is not None:
         want = str(sess.get("device_hash") or "")
-        # Eski oturumlarda device_hash boş olabilir: onları kırmıyoruz,
-        # yalnızca İKİSİ de doluyken eşitlik arıyoruz.
-        if want and _clean_device(device) != want:
+        # BOŞ device_hash ARTIK KABUL EDİLMİYOR (v3.22). Eskiden "eski
+        # oturumları kırmayalım" diye boş device_hash cihaz denetimini
+        # TAMAMEN atlıyordu, yani o satırlar için cihaz bağı hiç yoktu.
+        if not want:
+            return None
+        ok_dev = _clean_device(device) == want
+        if not ok_dev and device_legacy:
+            ok_dev = _clean_device(device_legacy) == want
+        if not ok_dev:
             return None
     # DİKKAT: sütunları TEK TEK saymıyoruz. Daha önce burada sabit bir
     # liste vardı ve "username" o listede yoktu; sonucu şuydu: oyun yeniden
@@ -214,6 +308,10 @@ def _public_account(acc):
         "provider": acc.get("provider", "password"),
         # Kullanıcı adı henüz seçilmemişse oyun bir kereye mahsus seçtirir.
         "needs_username": not bool(acc.get("username")),
+        # ŞİFRE ÖZETİ DEĞİL, yalnızca "var mı?": Google ile gelen hesapta
+        # şifre olmayabilir, oyun o zaman "mevcut şifre" kutusunu hiç
+        # göstermez ve ekranda "ŞİFRE BELİRLE" yazar.
+        "has_password": bool(acc.get("password_hash")),
     }
 
 
@@ -305,7 +403,19 @@ def diag():
 
     Eksik bir tablo ya da sütun yüzünden ilerleme sessizce yazılamıyorsa
     burada görünür. Hiçbir oyuncu verisi döndürmez — yalnızca "var / yok".
+
+    JETON GEREKİR (v3.22). Eskiden uç herkese açıktı ve 5 tablonun, 30'a
+    yakın sütunun tam listesini, hangilerinin eksik olduğunu ve Supabase'in
+    HAM hata metinlerini döküyordu: saldırgan için hazır bir şema haritası.
+    Artık Render'da DIAG_TOKEN ayarlanmış olmalı ve ?key=... ya da
+    X-Diag-Key başlığıyla gönderilmeli. DIAG_TOKEN yoksa uç tamamen kapalı.
     """
+    want = os.environ.get("DIAG_TOKEN", "")
+    got = request.args.get("key") or request.headers.get("X-Diag-Key") or ""
+    if not want or not hmac.compare_digest(want, got):
+        if not _rate_ok("diag:" + _client_ip()):
+            return jsonify({"error": "cok fazla istek"}), 429
+        return jsonify({"error": "DIAG_TOKEN gerekli"}), 404
     out = {"supabase": bool(supabase), "google": _google_enabled(),
            "tables": {}, "ok": True, "yapilacak": []}
     if not supabase:
@@ -331,7 +441,13 @@ def diag():
             supabase.table(tbl).select("*").limit(1).execute()
             info["var"] = True
         except Exception as e:
-            info["hata"] = str(e)[:160]
+            # Ham Supabase metni DEĞİL: yalnızca "yok" bilgisi. Ayrıntı
+            # Render günlüğünde.
+            try:
+                app.logger.exception("diag %s", tbl)
+            except Exception:
+                pass
+            info["var"] = False
             out["ok"] = False
             out["yapilacak"].append(f"'{tbl}' tablosu yok — VERITABANI.sql'i çalıştır")
             out["tables"][tbl] = info
@@ -368,7 +484,7 @@ def auth_status():
 def auth_register():
     if not _accounts_enabled():
         return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
-    src = (request.headers.get("X-Forwarded-For", request.remote_addr or "?")).split(",")[0].strip()
+    src = _client_ip()
     if not _rate_ok("auth:" + src):
         return jsonify({"success": False, "error": "çok fazla deneme"}), 429
     data = request.json or {}
@@ -405,14 +521,14 @@ def auth_register():
         tok = _new_session(acc["id"], data.get("device"))
         return jsonify({"success": True, "token": tok, "account": _public_account(acc)})
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+        return _oops(e)
 
 
 @app.route("/auth/login", methods=["POST"])
 def auth_login():
     if not _accounts_enabled():
         return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
-    src = (request.headers.get("X-Forwarded-For", request.remote_addr or "?")).split(",")[0].strip()
+    src = _client_ip()
     if not _rate_ok("auth:" + src):
         return jsonify({"success": False, "error": "çok fazla deneme"}), 429
     data = request.json or {}
@@ -420,6 +536,12 @@ def auth_login():
     # kutudan gelir (bkz. oyundaki giriş ekranı).
     who = str(data.get("username") or data.get("email") or "").strip()
     password = str(data.get("password", ""))
+    # HESAP BAZLI KİLİT: belirli bir hesabı deneme yanılma ile kırmaya
+    # çalışan biri IP değiştirerek IP sınırını atlatabilir; bu sayaç
+    # kullanıcı adına baktığı için atlatılamaz.
+    if _login_locked(who.lower()):
+        return jsonify({"success": False,
+                        "error": "çok fazla hatalı deneme, biraz bekle"}), 429
     try:
         acc = None
         if "@" in who:
@@ -434,15 +556,24 @@ def auth_login():
                     acc = rrow
                     break
         # "Kullanıcı yok" ile "şifre yanlış" AYNI hatayı döndürür: saldırgan
-        # hangi adların kayıtlı olduğunu öğrenemesin.
-        if not acc or not acc.get("password_hash") or \
-                not _verify_password(password, acc["password_hash"]):
+        # hangi adların kayıtlı olduğunu öğrenemesin. METİN aynıydı ama ZAMAN
+        # sızdırıyordu: hesap yoksa scrypt hiç çalışmıyor (hızlı yanıt),
+        # varsa ~32 MB'lık scrypt çalışıyordu (belirgin yavaş yanıt). Artık
+        # hesap bulunamasa da aynı maliyet harcanıyor.
+        if not acc or not acc.get("password_hash"):
+            _verify_password(password, _DUMMY_HASH)
+            _login_failed(who.lower())
             return jsonify({"success": False,
                             "error": "kullanıcı adı ya da şifre hatalı"}), 401
+        if not _verify_password(password, acc["password_hash"]):
+            _login_failed(who.lower())
+            return jsonify({"success": False,
+                            "error": "kullanıcı adı ya da şifre hatalı"}), 401
+        _login_ok(who.lower())
         tok = _new_session(acc["id"], data.get("device"))
         return jsonify({"success": True, "token": tok, "account": _public_account(acc)})
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+        return _oops(e)
 
 
 class _GoogleError(Exception):
@@ -484,7 +615,7 @@ def auth_google():
     if not _google_enabled():
         return jsonify({"success": False,
                         "error": "Google girişi yapılandırılmamış"}), 503
-    src = (request.headers.get("X-Forwarded-For", request.remote_addr or "?")).split(",")[0].strip()
+    src = _client_ip()
     if not _rate_ok("auth:" + src):
         return jsonify({"success": False, "error": "çok fazla deneme"}), 429
     data = request.json or {}
@@ -500,7 +631,7 @@ def auth_google():
         payload = _exchange_google_code(code, verifier, redirect_uri)
     except _GoogleError as e:
         # Google'ın hata gövdesini oyuncuya aynen yansıtmıyoruz.
-        return jsonify({"success": False, "error": str(e)}), 401
+        return _oops(e, "giriş doğrulanamadı", 401)
     try:
         acc, created = _find_or_create_account(
             payload["email"], payload.get("name") or payload.get("given_name", ""),
@@ -509,7 +640,7 @@ def auth_google():
         return jsonify({"success": True, "token": tok, "new": created,
                         "account": _public_account(acc)})
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+        return _oops(e)
 
 
 @app.route("/auth/me", methods=["POST"])
@@ -517,7 +648,7 @@ def auth_me():
     if not _accounts_enabled():
         return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
     data = request.json or {}
-    acc = _account_by_session(str(data.get("token", "")), data.get("device", ""))
+    acc = _acct(data)
     if not acc:
         return jsonify({"success": False, "error": "oturum geçersiz"}), 401
     return jsonify({"success": True, "account": _public_account(acc)})
@@ -535,7 +666,7 @@ def auth_set_username():
     if not _accounts_enabled():
         return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
     data = request.json or {}
-    acc = _account_by_session(str(data.get("token", "")), data.get("device", ""))
+    acc = _acct(data)
     if not acc:
         return jsonify({"success": False, "error": "oturum geçersiz"}), 401
     if acc.get("username"):
@@ -568,10 +699,71 @@ def auth_set_username():
 # kısıtlamak değil, "tek istekle 1.000.000 elmas" yolunu kapatmak.
 GEM_GAIN_CAP_PER_PUSH = 4000
 PROGRESS_LISTS = ("skins_owned", "cosmetics_owned", "books_owned", "weapons_owned")
+
+# ---- ARENA USTALIĞI (koşular arası kalıcı yükseltme) ----
+# Oyundaki MASTERY tablosuyla BİREBİR aynı olmalı: sunucu, iddia edilen
+# ustalığın GERÇEKTEN ödenmiş olup olmadığını buradan hesaplıyor.
+MASTERY_TIERS = 5
+MASTERY_COSTS = {
+    "m_dmg": (120, 1.60), "m_hp": (110, 1.60), "m_armor": (140, 1.65),
+    "m_speed": (120, 1.60), "m_gem": (150, 1.70), "m_xp": (130, 1.65),
+}
+# Kurcalanmış bir istemcinin "kademe 10^9" yazıp sayıyla oynamasını
+# engeller; gerçek oyuncu bu sayıya hiçbir zaman yaklaşamaz (prestij
+# bedeli üstel).
+MASTERY_LEVEL_CAP = 60
+
+
+def _mastery_cost(key, lvl):
+    """lvl -> lvl+1 bedeli (oyundaki mastery_cost ile birebir)."""
+    base, growth = MASTERY_COSTS[key]
+    if lvl < MASTERY_TIERS:
+        return int(round(base * (growth ** lvl)))
+    son = base * (growth ** (MASTERY_TIERS - 1))
+    return int(round(son * (1.35 ** (lvl - MASTERY_TIERS + 1))))
+
+
+def _mastery_total(key, lvl):
+    """0'dan lvl'e toplam bedel."""
+    if key not in MASTERY_COSTS:
+        return 0
+    return sum(_mastery_cost(key, i) for i in range(max(0, int(lvl))))
+
+
+def _merge_mastery(old, new, gems_spent):
+    """Ustalığı birleştirir ve ÖDENEBİLİR olduğunu doğrular.
+
+    Ustalık istemcide tutulduğu için "kademe 99" yazan bir kayıt sunucuya
+    gelebilir. İki fren var:
+      1) Kademe hiç geri gitmez ama MASTERY_LEVEL_CAP'i de aşamaz.
+      2) İddia edilen ustalığın TOPLAM BEDELİ, oyuncunun harcadığı elması
+         (gems_spent) aşamaz. Aşıyorsa fazlalık kademe kademe geri alınır.
+    Böylece ustalık, elmas defterinin doğruladığı bir şeye bağlanmış olur.
+    """
+    out = {}
+    for key in MASTERY_COSTS:
+        try:
+            a = int((old or {}).get(key, 0) or 0)
+        except (TypeError, ValueError):
+            a = 0
+        try:
+            b = int((new or {}).get(key, 0) or 0)
+        except (TypeError, ValueError):
+            b = 0
+        out[key] = max(0, min(MASTERY_LEVEL_CAP, max(a, b)))
+    # Ödenebilirlik: en pahalı daldan başlayarak kırp.
+    butce = max(0, int(gems_spent or 0))
+    while sum(_mastery_total(k, v) for k, v in out.items()) > butce:
+        k = max(out, key=lambda k: out[k] and _mastery_cost(k, out[k] - 1) or 0)
+        if out[k] <= 0:
+            break
+        out[k] -= 1
+    return out
 PROGRESS_STATS = ("runs", "best_score", "total_kills", "total_time", "bosses",
                   "best_wave", "total_shots", "total_gold", "total_lifesteal",
                   "best_run_gold", "best_run_dashes", "best_run_shots",
                   "total_bonk_hits")
+
 
 
 def _player_row(account_id):
@@ -586,7 +778,7 @@ def _blank_progress():
         "skins_owned": ["default"], "equipped_skin": "default",
         "cosmetics_owned": [], "equipped_cosmetics": {},
         "books_owned": [], "weapons_owned": [],
-        "achievements": {}, "stats": {},
+        "achievements": {}, "stats": {}, "mastery": {},
     }
 
 
@@ -630,10 +822,26 @@ def _merge_progress(old, new):
     st_new = new.get("stats") or {}
     for k in PROGRESS_STATS:
         try:
-            st_old[k] = max(float(st_old.get(k, 0) or 0), float(st_new.get(k, 0) or 0))
+            cur = float(st_old.get(k, 0) or 0)
+            inc = float(st_new.get(k, 0) or 0)
+            # SONLU OLMAYAN DEĞERİ REDDET. Python'un json.loads'u Infinity,
+            # -Infinity ve NaN değişmezlerini KABUL eder, dolayısıyla
+            # request.json da eder. inf buradan sorunsuz geçiyor, sonra
+            # int(float('inf')) OverflowError atıp /player/save'i 500'le
+            # çökertiyordu — tek bir istekle o hesabın ilerlemesi hiç
+            # kaydedilemez hâle geliyordu.
+            if not math.isfinite(inc):
+                inc = 0.0
+            if not math.isfinite(cur):
+                cur = 0.0
+            st_old[k] = min(max(cur, inc), STAT_CAP.get(k, STAT_CAP_DEFAULT))
         except Exception:
             pass
     out["stats"] = st_old
+    # ustalık: kademe geri gitmez, tavanı var ve ÖDENMİŞ olmalı
+    out["mastery"] = _merge_mastery(old.get("mastery"), new.get("mastery"),
+                                    max(int(old.get("gems_spent", 0) or 0),
+                                        int(new.get("gems_spent", 0) or 0)))
     ach = dict(old.get("achievements") or {})
     for k, v in list((new.get("achievements") or {}).items())[:400]:
         ach.setdefault(str(k)[:40], v)
@@ -657,7 +865,7 @@ def player_load():
     if not _accounts_enabled():
         return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
     data = request.json or {}
-    acc = _account_by_session(str(data.get("token", "")), data.get("device", ""))
+    acc = _acct(data)
     if not acc:
         return jsonify({"success": False, "error": "oturum geçersiz"}), 401
     return jsonify({"success": True, "progress": _stored_progress(_player_row(acc["id"]))})
@@ -691,7 +899,7 @@ def player_save():
     if not _accounts_enabled():
         return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
     data = request.json or {}
-    acc = _account_by_session(str(data.get("token", "")), data.get("device", ""))
+    acc = _acct(data)
     if not acc:
         return jsonify({"success": False, "error": "oturum geçersiz"}), 401
     incoming = data.get("progress")
@@ -727,11 +935,11 @@ def player_save():
         else:
             supabase.table("player_data").insert(payload).execute()
     except Exception as e:
-        # HATAYI YUTMUYORUZ. Eksik bir sütun yüzünden ilerleme sessizce
-        # yazılmazsa oyuncu "elmasım artmıyor" diye bakakalır; oyun bu
-        # metni hesap ekranında gösteriyor.
-        return jsonify({"success": False,
-                        "error": "ilerleme yazılamadı: " + str(e)[:200]}), 500
+        # HATAYI YUTMUYORUZ (oyuncu "elmasım artmıyor" diye bakakalmasın;
+        # oyun bu metni hesap ekranında gösteriyor) ama HAM METNİ de
+        # vermiyoruz: şema sızdırıyordu. Ayrıntı Render günlüğünde, oyuncuda
+        # bildirebileceği bir iz kimliği var; eksik sütunu /diag söyler.
+        return _oops(e, "ilerleme yazılamadı")
 
     # ---- OLAY GÜNLÜĞÜ ----
     d_gem = int(merged["gems_earned"]) - int(before.get("gems_earned", 0) or 0)
@@ -767,6 +975,71 @@ def auth_logout():
         except Exception:
             pass
     return jsonify({"success": True})
+
+
+@app.route("/auth/logout_all", methods=["POST"])
+def auth_logout_all():
+    """BÜTÜN cihazlardan çıkış.
+
+    Eskiden yoktu: /auth/logout yalnızca GÖNDERİLEN jetonu siliyordu, yani
+    jetonu bir kez ele geçiren biri oturum ömrü (SESSION_TTL) boyunca
+    içeride kalabiliyordu ve oyuncunun onu atacak hiçbir yolu yoktu.
+    """
+    if not _accounts_enabled():
+        return jsonify({"success": True})
+    data = request.json or {}
+    acc = _acct(data)
+    if not acc:
+        return jsonify({"success": False, "error": "oturum geçersiz"}), 401
+    try:
+        supabase.table("sessions").delete().eq("account_id", acc["id"]).execute()
+    except Exception as e:
+        return _oops(e)
+    return jsonify({"success": True})
+
+
+@app.route("/auth/password", methods=["POST"])
+def auth_password():
+    """ŞİFRE DEĞİŞTİRME.
+
+    Eskiden hiç yoktu: şifresi sızan oyuncunun yapabileceği HİÇBİR ŞEY
+    yoktu. Kurallar:
+      - Oturum jetonu + cihaz zorunlu (yani şifreyi yalnızca o an giriş
+        yapmış cihaz değiştirebilir).
+      - MEVCUT şifre de istenir; jetonu çalan biri şifreyi değiştirip
+        hesabı tamamen devralamasın.
+      - Değişiklikte O HESABIN BÜTÜN oturumları silinir ve çağırana yeni
+        bir jeton verilir: şifre neden değiştiriliyorsa (sızıntı) o
+        oturumlar da gitmeli.
+      - Google ile açılmış, şifresi olmayan hesaplarda şifre KURMAYA da
+        yarar; o durumda mevcut şifre istenmez.
+    """
+    if not _accounts_enabled():
+        return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
+    if not _rate_ok("pw:" + _client_ip()):
+        return jsonify({"success": False, "error": "çok fazla deneme"}), 429
+    data = request.json or {}
+    acc = _acct(data)
+    if not acc:
+        return jsonify({"success": False, "error": "oturum geçersiz"}), 401
+    new_pw = str(data.get("new_password", ""))
+    if len(new_pw) < PW_MIN_LEN:
+        return jsonify({"success": False,
+                        "error": f"şifre en az {PW_MIN_LEN} karakter olmalı"}), 400
+    cur_hash = str(acc.get("password_hash") or "")
+    if cur_hash:
+        if not _verify_password(str(data.get("password", "")), cur_hash):
+            _login_failed(str(acc.get("username") or "").lower())
+            return jsonify({"success": False, "error": "mevcut şifre hatalı"}), 403
+    try:
+        supabase.table("accounts").update(
+            {"password_hash": _hash_password(new_pw)}).eq("id", acc["id"]).execute()
+        # Bütün oturumları kes, sonra çağırana yeni bir tane ver.
+        supabase.table("sessions").delete().eq("account_id", acc["id"]).execute()
+        tok = _new_session(acc["id"], data.get("device"))
+    except Exception as e:
+        return _oops(e)
+    return jsonify({"success": True, "token": tok})
 
 
 # =====================================================================
@@ -807,6 +1080,21 @@ MIN_RUN_TIME = 5.0             # bundan kısa bir koşu skor üretemez
 MAX_RUN_TIME = 6 * 3600.0      # 6 saatten uzun koşu kabul edilmez
 MAX_WAVE = 400
 MAX_SCORE = 500_000_000
+# İSTATİSTİK TAVANLARI (v3.22). İki işe yarar: (1) sonsuz/anlamsız bir
+# değer veritabanına ve oradan player_overview görünümüne yazılamaz;
+# (2) kurcalanmış bir istemci "toplam 10^18 öldürme" yazıp istatistik
+# tablolarını okunamaz hâle getiremez. Değerler GERÇEKÇİ üst sınırlar:
+# en hızlı oyuncu bile bunlara yaklaşamaz.
+STAT_CAP_DEFAULT = 10 ** 9
+STAT_CAP = {
+    "runs": 1_000_000,
+    "best_score": MAX_SCORE,
+    "best_wave": MAX_WAVE,
+    "total_kills": 100_000_000,
+    "total_time": 10 * 365 * 24 * 3600,     # on yıllık oynanış
+    "bosses": 1_000_000,
+    "total_shots": 1_000_000_000,
+}
 SCORE_FLOOR = 6000.0           # bu skorun altında makullük aranmaz
 
 # --- HIZ SINIRI ---
@@ -814,6 +1102,48 @@ RATE_WINDOW = 300.0            # saniye
 RATE_MAX = 12                  # bu pencerede aynı kaynaktan en çok kaç gönderi
 _rate_hits = defaultdict(deque)
 _rate_lock = threading.Lock()
+
+
+# HESAP BAZLI GİRİŞ KİLİDİ (v3.22). IP tabanlı hız sınırı vekile güvenir;
+# bir dağıtım yanlışlıkla vekilsiz açılırsa ya da saldırgan çok sayıda IP
+# kullanırsa tek başına yetmez. Bu sayaç KULLANICI ADINA bakar, yani belirli
+# bir hesabı deneme yanılma ile kırmaya çalışan biri IP değiştirse de durur.
+LOGIN_FAIL_MAX = 10            # bu kadar yanlış denemeden sonra
+LOGIN_LOCK_SECS = 60.0         # bu kadar saniye kilitli
+_login_fails = defaultdict(deque)
+_login_lock = threading.Lock()
+
+
+def _login_locked(who):
+    """Bu hesap şu an kilitli mi?"""
+    if not who:
+        return False
+    now = time.time()
+    with _login_lock:
+        dq = _login_fails[who]
+        while dq and now - dq[0] > LOGIN_LOCK_SECS:
+            dq.popleft()
+        return len(dq) >= LOGIN_FAIL_MAX
+
+
+def _login_failed(who):
+    """Yanlış denemeyi kaydet."""
+    if not who:
+        return
+    now = time.time()
+    with _login_lock:
+        _login_fails[who].append(now)
+        if len(_login_fails) > 4096:
+            for k in [k for k, v in _login_fails.items()
+                      if not v or now - v[-1] > LOGIN_LOCK_SECS]:
+                _login_fails.pop(k, None)
+
+
+def _login_ok(who):
+    """Doğru girişte sayaç sıfırlanır."""
+    if who:
+        with _login_lock:
+            _login_fails.pop(who, None)
 
 
 def _rate_ok(key):
@@ -825,17 +1155,75 @@ def _rate_ok(key):
         if len(dq) >= RATE_MAX:
             return False
         dq.append(now)
-        # Sözlük sonsuza kadar büyümesin: boşalan anahtarları at.
+        # TEMİZLİK (v3.22). Eskiden yalnızca BOŞ kuyruklar atılıyordu, ama
+        # bir anahtarın kuyruğu ancak O ANAHTARA tekrar istek gelince
+        # kırpılıyordu: tek damgalı binlerce anahtar hiç boşalmıyor ve
+        # sözlük sınırsız büyüyordu. Artık ZAMANA bakılıyor (penceresi
+        # geçmiş her anahtar silinir) ve kesin bir üst sınır var.
         if len(_rate_hits) > 4096:
-            for k in [k for k, v in _rate_hits.items() if not v]:
+            for k in [k for k, v in _rate_hits.items()
+                      if not v or now - v[-1] > RATE_WINDOW]:
                 _rate_hits.pop(k, None)
+            # Hâlâ büyükse en eski dokunulanları at: bellek her şeyden önce.
+            if len(_rate_hits) > 8192:
+                for k in sorted(_rate_hits,
+                                key=lambda k: _rate_hits[k][-1]
+                                )[:len(_rate_hits) - 4096]:
+                    _rate_hits.pop(k, None)
         return True
+
+
+# Oyundaki SUBMIT_SIG_FIELDS ile BİREBİR aynı olmalı.
+SUBMIT_SIG_FIELDS = ("name", "score", "kills", "wave", "run_time", "created_at", "diff")
+
+# Gönderinin created_at'i sunucu saatinden bu kadar sapabilir (saniye).
+# Oyuncunun saati biraz kaymış olabilir ve ağ gecikmesi vardır; 10 dakika
+# bol bol yeter ama yıllar öncesine/sonrasına yazmayı engeller.
+SUBMIT_TIME_WINDOW = 600.0
+# Görülen imzalar: aynı gönderi iki kez sayılmasın. Pencere zaten
+# created_at ile sınırlı olduğu için kısa süre tutmak yeterli.
+_seen_sigs = {}
+_seen_lock = threading.Lock()
+
+
+def _submit_once(sig):
+    """Bu imza ilk kez mi görülüyor? Tekrar oynatma kalkanı.
+
+    İmza alanları determinist olduğu için GEÇERLİ bir gönderi aynen tekrar
+    atılabiliyordu ve sunucuda ne nonce ne tekilleştirme vardı: aynı skor
+    tabloya istenildiği kadar yazılıyordu.
+    """
+    if not sig:
+        return True
+    now = time.time()
+    with _seen_lock:
+        for k, t in [(k, t) for k, t in _seen_sigs.items()
+                     if now - t > SUBMIT_TIME_WINDOW * 2]:
+            _seen_sigs.pop(k, None)
+        if sig in _seen_sigs:
+            return False
+        if len(_seen_sigs) > 20000:          # bellek freni
+            _seen_sigs.clear()
+        _seen_sigs[sig] = now
+        return True
+
+
+SCORE_PUBLIC_FIELDS = ("name", "score", "kills", "wave", "run_time", "diff",
+                       "created_at")
+
+
+def _public_score(row):
+    """Sıralama satırının DIŞARI çıkabilen alanları.
+
+    _public_account ile aynı mantık: ileride scores tablosuna yeni bir
+    sütun eklenirse kendiliğinden sızmasın.
+    """
+    return {k: row.get(k) for k in SCORE_PUBLIC_FIELDS if k in row}
 
 
 def _expected_sig(payload):
     """İmza, istemcideki sign_submit() ile BİREBİR aynı sırayı kullanır."""
-    msg = "|".join(str(payload.get(k, "")) for k in
-                   ("name", "score", "kills", "wave", "run_time", "created_at"))
+    msg = "|".join(str(payload.get(k, "")) for k in SUBMIT_SIG_FIELDS)
     return hmac.new(SUBMIT_SECRET.encode("utf-8"), msg.encode("utf-8"),
                     hashlib.sha256).hexdigest()
 
@@ -866,19 +1254,25 @@ def score_is_plausible(name, score, kills, wave, run_time):
         return False, "dalga aralık dışı"
     if not (0 < run_time <= MAX_RUN_TIME):
         return False, "süre aralık dışı"
-    if score < SCORE_FLOOR:
-        return True, ""
+    # TEMEL TUTARLILIK HER GÖNDERİDE ARANIR (v3.22). Eskiden SCORE_FLOOR'un
+    # altındaki her gönderi kills/wave/run_time ilişkisine HİÇ bakılmadan
+    # geçiyordu: run_time=0.0001 ile 5.999 skor, 2.000.000 öldürme ve dalga
+    # 400 yazdırılabiliyordu. Skor tablosu skora göre sıralandığı için bu
+    # satır listeye düşmüyordu ama veritabanına ve istatistiklere giriyordu.
     if run_time < MIN_RUN_TIME:
-        return False, "koşu süresi skora göre çok kısa"
+        return False, "koşu süresi çok kısa"
     if kills > MAX_KILLS_PER_SEC * run_time + 50:
         return False, "öldürme sayısı süreye göre imkânsız"
     if score > MAX_SCORE_PER_KILL * (kills + 10):
         return False, "skor öldürme sayısına göre imkânsız"
     if score / run_time > MAX_SCORE_PER_SEC:
         return False, "saniyelik skor imkânsız"
-    goal_sum = sum(_wave_goal(w) for w in range(1, int(wave) + 2))
-    if score > goal_sum * 2.5 + SCORE_FLOOR:
-        return False, "skor ulaşılan dalgaya göre imkânsız"
+    # Dalga-hedefi denetimi YALNIZCA yüksek skorlarda: ilk dalgalarda
+    # hedefler küçük olduğu için bu denetim yanlış pozitif verebiliyor.
+    if score >= SCORE_FLOOR:
+        goal_sum = sum(_wave_goal(w) for w in range(1, int(wave) + 2))
+        if score > goal_sum * 2.5 + SCORE_FLOOR:
+            return False, "skor ulaşılan dalgaya göre imkânsız"
     return True, ""
 
 
@@ -889,10 +1283,17 @@ def get_scores():
     if not supabase:
         return jsonify({"error": "Supabase bağlantısı yapılandırılmamış!"}), 500
     try:
-        response = supabase.table("scores").select("*").order("score", desc=True).limit(10).execute()
-        return jsonify(response.data)
+        # YALNIZCA GEREKEN SÜTUNLAR (v3.22). select("*") scores tablosunun
+        # BÜTÜN sütunlarını döndürüyordu; içinde account_id ve id gibi iç
+        # alanlar vardı. account_id'nin sızması hesap numaralarını
+        # numaralandırmayı ve hangi hesabın hangi adla eşleştiğini öğrenmeyi
+        # kolaylaştırıyordu. Oyun bu altı alandan fazlasını kullanmıyor.
+        response = supabase.table("scores").select(
+            "name,score,kills,wave,run_time,diff,created_at"
+        ).order("score", desc=True).limit(10).execute()
+        return jsonify([_public_score(r) for r in (response.data or [])])
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _oops(e)
 
 @app.route("/submit", methods=["POST"])
 def add_score():
@@ -906,24 +1307,51 @@ def add_score():
         wave = int(data.get("wave", 0))
         run_time = float(data.get("run_time", 0))
         created_at = float(data.get("created_at", 0))
+        # ZORLUK: sıralamada görünür, o yüzden imzanın içinde. Bilinmeyen bir
+        # değer gelirse "normal" sayılır (uydurma etiket yazılamasın).
+        diff = str(data.get("diff", "normal"))
+        if diff not in ("normal", "hard", "nightmare"):
+            diff = "normal"
 
         # ---- SÜZGEÇ 3: HIZ SINIRI ----
-        src = request.headers.get("X-Forwarded-For", request.remote_addr or "?")
+        src = _client_ip()
         src = src.split(",")[0].strip()
         if not _rate_ok(src):
             return jsonify({"success": False, "error": "çok sık gönderim"}), 429
 
         # ---- SÜZGEÇ 1: İMZA ----
+        sig = str(data.get("sig") or "")
         if REQUIRE_SIGNATURE:
-            sig = str(data.get("sig") or "")
             want = _expected_sig({
                 "name": name, "score": score, "kills": kills, "wave": wave,
                 "run_time": run_time, "created_at": created_at,
+                "diff": str(data.get("diff", "normal")),
             })
             if not sig or not hmac.compare_digest(sig, want):
                 return jsonify({"success": False, "error": "imza doğrulanamadı"}), 403
 
-        # ---- SÜZGEÇ 2: MAKULLÜK ----
+        # ---- SÜZGEÇ 2a: TARİH ----
+        # created_at istemciden geliyor ve İMZANIN İÇİNDE, o yüzden imza
+        # doğrulaması için gerekli; ama veritabanına YAZILMAZ. Eskiden
+        # yazılıyordu: 0, geçmiş ya da yıllar sonrası bir tarih
+        # gönderilebiliyor, sıralamanın tarih gösterimi bozuluyordu.
+        # Ayrıca pencere dışı bir tarih, eski bir gönderinin yeniden
+        # oynatıldığının en açık işareti.
+        now = time.time()
+        if abs(now - created_at) > SUBMIT_TIME_WINDOW:
+            return jsonify({"success": False,
+                            "error": "gönderi zamanı geçersiz"}), 422
+
+        # ---- SÜZGEÇ 2b: TEKRAR OYNATMA ----
+        # İmza alanları determinist olduğu için GEÇERLİ bir gönderi aynen
+        # tekrar tekrar atılabiliyordu: ne nonce ne tekilleştirme vardı,
+        # aynı skor tabloya istenildiği kadar yazılıyordu. Görülen imzalar
+        # kısa süre akılda tutuluyor (pencere zaten created_at ile sınırlı).
+        if REQUIRE_SIGNATURE and not _submit_once(sig):
+            return jsonify({"success": False,
+                            "error": "bu gönderi zaten alındı"}), 409
+
+        # ---- SÜZGEÇ 2c: MAKULLÜK ----
         ok, why = score_is_plausible(name, score, kills, wave, run_time)
         if not ok:
             return jsonify({"success": False, "error": f"skor reddedildi: {why}"}), 422
@@ -934,7 +1362,7 @@ def add_score():
         # hileci bir hesapla birlikte engellenebilsin. Girişsiz oynayan
         # oyuncu oyunun tamamını oynar, skoru yalnızca KENDİ bilgisayarındaki
         # yerel tabloya yazılır (oyun bunu sonuç ekranında söylüyor).
-        acc = _account_by_session(str(data.get("token", "")), data.get("device", ""))
+        acc = _acct(data)
         if not acc:
             return jsonify({"success": False,
                             "error": "dünya sıralaması için giriş gerekli"}), 401
@@ -952,7 +1380,10 @@ def add_score():
             "kills": kills,
             "wave": wave,
             "run_time": run_time,
-            "created_at": created_at
+            # Tarihi SUNUCU koyar; istemciden gelen değer yalnızca imza
+            # doğrulamasında kullanıldı.
+            "created_at": now,
+            "diff": diff,
         }
         if account_id is not None:
             payload["account_id"] = account_id
@@ -960,7 +1391,7 @@ def add_score():
         response = supabase.table("scores").insert(payload).execute()
         return jsonify({"success": True, "data": response.data})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _oops(e)
 
 
 # --- 2. STEAM OYUNCU & İLERLEME ENDPOINT'LERİ (Gems, Skinler vb.) ---
@@ -994,7 +1425,7 @@ def get_player():
             ins_res = supabase.table("players").insert(new_player).execute()
             return jsonify({"success": True, "data": ins_res.data[0]})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _oops(e)
 
 @app.route("/update_player", methods=["POST"])
 def update_player():
@@ -1033,7 +1464,7 @@ def update_player():
         response = supabase.table("players").update(payload).eq("steam_id", steam_id).execute()
         return jsonify({"success": True, "data": response.data})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _oops(e)
 
 
 # =====================================================================
@@ -1114,7 +1545,7 @@ def begin_purchase():
                                                                   "Steam işlemi reddetti.")),
         })
     except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
+        return _oops(e)
 
 @app.route("/finalize_purchase", methods=["POST"])
 def finalize_purchase():
@@ -1151,7 +1582,7 @@ def finalize_purchase():
         return jsonify({"success": True, "gems": cur + gems,
                         "message": f"{gems} elmas hesabına eklendi."})
     except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
+        return _oops(e)
 
 @app.route("/purchase_status", methods=["GET"])
 def purchase_status():
