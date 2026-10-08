@@ -779,6 +779,9 @@ def _blank_progress():
         "cosmetics_owned": [], "equipped_cosmetics": {},
         "books_owned": [], "weapons_owned": [],
         "achievements": {}, "stats": {}, "mastery": {},
+        # KALICI DÜNYA SIRALAMASI YASAĞI (v3.24). Bir kez True olunca hiçbir
+        # yerde False'a dönmez; oyun da sunucu da aynı bayrağı taşır.
+        "board_banned": False, "ban_reasons": [],
     }
 
 
@@ -795,6 +798,58 @@ def _stored_progress(row):
     out["gems_earned"] = int(row.get("gems_earned", 0) or 0)
     out["gems_spent"] = int(row.get("gems_spent", 0) or 0)
     return out
+
+
+def _is_banned(account_id):
+    """Bu hesap dünya sıralamasından KALICI olarak çıkarılmış mı?"""
+    try:
+        return bool(_stored_progress(_player_row(account_id)).get("board_banned"))
+    except Exception:
+        return False
+
+
+def _wipe_scores(account_id):
+    """Hesabın sıralamadaki BÜTÜN skorlarını siler. Geri alınmaz."""
+    try:
+        supabase.table("scores").delete().eq("account_id", account_id).execute()
+    except Exception:
+        pass
+
+
+def _ban_account(account_id, reason):
+    """Hesabı KALICI olarak sıralama dışına alır ve skorlarını siler.
+
+    Oyuncunun ilerlemesine (elmas, skin, istatistik) dokunulmaz: ceza
+    yalnızca DÜNYA SIRALAMASI'na. Oyun bu bayrağı /player/load ile
+    öğrenip arayüzde "sıralamadan çıkarıldın" yazıyor.
+    """
+    try:
+        row = _player_row(account_id)
+        prog = _stored_progress(row)
+        rs = list(prog.get("ban_reasons") or [])
+        if reason not in rs:
+            rs.append(str(reason)[:24])
+        prog["board_banned"] = True
+        prog["ban_reasons"] = rs[:8]
+        payload = {
+            "account_id": account_id,
+            "data": {k: v for k, v in prog.items()
+                     if k not in ("gems", "gems_earned", "gems_spent")},
+            "updated_at": time.time(),
+        }
+        if row:
+            supabase.table("player_data").update(payload).eq(
+                "account_id", account_id).execute()
+        else:
+            payload.update(gems=0, gems_earned=0, gems_spent=0)
+            supabase.table("player_data").insert(payload).execute()
+    except Exception:
+        pass
+    _wipe_scores(account_id)
+    try:
+        _log_event(account_id, "yasak", 0, 0, str(reason)[:120])
+    except Exception:
+        pass
 
 
 def _merge_progress(old, new):
@@ -842,6 +897,20 @@ def _merge_progress(old, new):
     out["mastery"] = _merge_mastery(old.get("mastery"), new.get("mastery"),
                                     max(int(old.get("gems_spent", 0) or 0),
                                         int(new.get("gems_spent", 0) or 0)))
+    # ---- KALICI SIRALAMA YASAĞI ----
+    # TEK YÖNLÜ: ya sunucu ya oyun "yasaklı" dediyse yasaklı kalır. Oyundan
+    # "yasak kalktı" diye bir bilgi KABUL EDİLMEZ; hileci dosyasını
+    # temizleyerek sıralamaya dönemesin.
+    out["board_banned"] = bool(old.get("board_banned")) or bool(new.get("board_banned"))
+    if out["board_banned"]:
+        rs = list(old.get("ban_reasons") or [])
+        for r in (new.get("ban_reasons") or [])[:8]:
+            r = str(r)[:24]
+            if r not in rs:
+                rs.append(r)
+        out["ban_reasons"] = rs[:8]
+    else:
+        out["ban_reasons"] = []
     ach = dict(old.get("achievements") or {})
     for k, v in list((new.get("achievements") or {}).items())[:400]:
         ach.setdefault(str(k)[:40], v)
@@ -908,6 +977,11 @@ def player_save():
     row = _player_row(acc["id"])
     before = _stored_progress(row)
     merged = _merge_progress(before, incoming)
+    # OYUN HİLE BİLDİRDİ: yasak ilk kez burada öğrenildiyse, o hesabın
+    # tablodaki eski skorları da ŞİMDİ silinir (v3.24).
+    if merged.get("board_banned") and not before.get("board_banned"):
+        _wipe_scores(acc["id"])
+        _log_event(acc["id"], "yasak", 0, 0, "oyun bildirdi")
     st = merged.get("stats") or {}
     st_before = before.get("stats") or {}
     payload = {
@@ -1352,9 +1426,18 @@ def add_score():
                             "error": "bu gönderi zaten alındı"}), 409
 
         # ---- SÜZGEÇ 2c: MAKULLÜK ----
+        # Buradaki denetimler "oyunun ÜRETEMEYECEĞİ sayı" denetimleri. İmza
+        # geçtiği hâlde bunlara takılan bir gönderi, oyunun kendi sayılarının
+        # değiştirildiği anlamına gelir. O yüzden yalnızca reddedilmiyor:
+        # hesap KALICI olarak sıralama dışına alınıyor ve oradaki eski
+        # skorları da siliniyor (v3.24).
         ok, why = score_is_plausible(name, score, kills, wave, run_time)
         if not ok:
-            return jsonify({"success": False, "error": f"skor reddedildi: {why}"}), 422
+            bad_acc = _acct(data)
+            if bad_acc:
+                _ban_account(bad_acc.get("id"), f"imkansiz_skor:{why}"[:24])
+            return jsonify({"success": False, "error": f"skor reddedildi: {why}",
+                            "banned": bool(bad_acc)}), 422
 
         # ---- HESAP ZORUNLU ----
         # DÜNYA SIRALAMASI yalnızca giriş yapmış oyunculara açık. Sebebi
@@ -1370,6 +1453,26 @@ def add_score():
             return jsonify({"success": False,
                             "error": "önce kullanıcı adı seçmelisin"}), 409
         account_id = acc.get("id")
+
+        # ---- KALICI SIRALAMA YASAĞI ----
+        # Hilesi yakalanmış hesap bir daha ASLA tabloya yazılmaz. Üstelik
+        # her denemede eski satırları da yeniden siliniyor: yasak konmadan
+        # önce girmiş bir skor varsa o da gider.
+        if _is_banned(account_id):
+            _wipe_scores(account_id)
+            return jsonify({"success": False, "banned": True,
+                            "error": "bu hesap dünya sıralamasından "
+                                     "kalıcı olarak çıkarıldı"}), 403
+
+        # Oyun kendi denetiminde hile yakaladıysa bunu dürüstçe bildirir.
+        # Suçun İTİRAFINA güveniriz, masumiyet iddiasına değil: "tainted"
+        # gelirse yasaklarız, gelmemesi hiçbir şeyi aklamaz.
+        if data.get("tainted") or data.get("board_banned"):
+            _ban_account(account_id, "oyun_hile_bildirdi")
+            return jsonify({"success": False, "banned": True,
+                            "error": "bu hesap dünya sıralamasından "
+                                     "kalıcı olarak çıkarıldı"}), 403
+
         # Ad SUNUCUDAN gelir, istemciden değil: kimse başkasının adıyla
         # skor gönderemez.
         name = str(acc.get("username"))[:14]
@@ -1595,4 +1698,3 @@ def purchase_status():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
