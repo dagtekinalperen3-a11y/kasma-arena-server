@@ -584,7 +584,7 @@ WEAPON_FX_DEFAULT = 100           # yeni oyuncunun başlangıç değeri (%)
 # Eski üç kademeli ayarın sayısal karşılıkları (kayıt göçü için).
 WEAPON_FX_LEGACY = {"full": 100, "dim": 32, "off": 0}
 GAME_TITLE = "ARENA SAVAŞI"
-GAME_VERSION = "3.22"
+GAME_VERSION = "3.23"
 
 
 # =====================================================================
@@ -926,6 +926,8 @@ STRINGS = {
     "en.brute":     _T("Kaba Kuvvet", "Brute", "Bruto", "Schläger", "Громила"),
     "en.elite":     _T("Elit", "Elite", "Élite", "Elite", "Элита"),
     "en.bomber":    _T("Bombacı", "Bomber", "Bombardero", "Bomber", "Бомбардир"),
+    "en.wizard":    _T("Büyücü", "Wizard", "Hechicero", "Hexer", "Колдун"),
+    "en.stinger":   _T("Arı", "Stinger", "Avispa", "Stachler", "Жало"),
     "en.healer":    _T("Şifacı", "Healer", "Sanador", "Heiler", "Целитель"),
     "en.herald":    _T("Sancaktar", "Herald", "Heraldo", "Herold", "Герольд"),
     "en.shieldman": _T("Siperci", "Shieldman", "Escudero", "Schildträger", "Щитоносец"),
@@ -958,43 +960,6 @@ STRINGS = {
     "key.stats": _T("İSTATİSTİKLER", "STATS", "ESTADÍSTICAS", "STATISTIKEN", "СТАТИСТИКА"),
     "key.map":   _T("HARİTA", "MAP", "MAPA", "KARTE", "КАРТА"),
     "key.shop":  _T("MARKET", "SHOP", "TIENDA", "LADEN", "МАГАЗИН"),
-    "ui.daily":      _T("GÜNLÜK", "DAILY", "DIARIO", "TÄGLICH", "ЕЖЕДНЕВНО"),
-    "ui.daily_streak": _T("{0} gün üst üste", "{0} day streak", "racha de {0} días",
-                          "{0} Tage in Folge", "{0} дней подряд"),
-    "ui.daily_login": _T("GÜNÜN ÖDÜLÜ", "DAILY REWARD", "RECOMPENSA DIARIA",
-                         "TAGESBELOHNUNG", "НАГРАДА ДНЯ"),
-    "ui.daily_claim": _T("AL", "CLAIM", "RECOGER", "ABHOLEN", "ЗАБРАТЬ"),
-    "ui.daily_done": _T("hepsi alındı — yarın yeni görevler",
-                        "all claimed — new quests tomorrow",
-                        "todo recogido — nuevas misiones mañana",
-                        "alles abgeholt — morgen neue Aufgaben",
-                        "всё получено — завтра новые задания"),
-    "daily.kills":   _T("Bir günde 400 yaratık öldür", "Kill 400 creatures in a day",
-                        "Mata 400 criaturas en un día", "Töte 400 Kreaturen an einem Tag",
-                        "Убей 400 тварей за день"),
-    "daily.kills_big": _T("Bir günde 900 yaratık öldür", "Kill 900 creatures in a day",
-                          "Mata 900 criaturas en un día", "Töte 900 Kreaturen an einem Tag",
-                          "Убей 900 тварей за день"),
-    "daily.wave":    _T("12. dalgaya ulaş", "Reach wave 12", "Llega a la oleada 12",
-                        "Erreiche Welle 12", "Дойди до 12-й волны"),
-    "daily.wave_big": _T("18. dalgaya ulaş", "Reach wave 18", "Llega a la oleada 18",
-                         "Erreiche Welle 18", "Дойди до 18-й волны"),
-    "daily.boss":    _T("2 patron devir", "Defeat 2 bosses", "Derrota a 2 jefes",
-                        "Besiege 2 Bosse", "Победи 2 боссов"),
-    "daily.gold":    _T("Bir günde 1.200 altın topla", "Collect 1,200 gold in a day",
-                        "Reúne 1.200 de oro en un día", "Sammle an einem Tag 1.200 Gold",
-                        "Собери 1 200 золота за день"),
-    "daily.time":    _T("Toplam 10 dakika hayatta kal", "Survive 10 minutes in total",
-                        "Sobrevive 10 minutos en total", "Überlebe insgesamt 10 Minuten",
-                        "Выживи в сумме 10 минут"),
-    "daily.combo":   _T("40'lık bir kombo yap", "Hit a 40 combo", "Consigue un combo de 40",
-                        "Erreiche eine 40er-Kombo", "Сделай комбо из 40"),
-    "daily.dash":    _T("Bir günde 60 dash at", "Dash 60 times in a day",
-                        "Haz 60 impulsos en un día", "Dashe an einem Tag 60 Mal",
-                        "Сделай 60 рывков за день"),
-    "daily.bonk":    _T("Bir günde 40 BONK vur", "Land 40 BONKs in a day",
-                        "Golpea 40 BONK en un día", "Lande an einem Tag 40 BONKs",
-                        "Нанеси 40 БОНК за день"),
     "ui.mastery":    _T("ARENA USTALIĞI", "ARENA MASTERY", "MAESTRÍA DE ARENA",
                         "ARENA-MEISTERSCHAFT", "МАСТЕРСТВО АРЕНЫ"),
     "ui.mastery_sub": _T("Elmasla alınan KALICI yükseltmeler — her koşuda, baştan itibaren yanındalar.",
@@ -1127,6 +1092,11 @@ STRINGS = {
                          "se ajusta en el juego con ESC — el daño no cambia",
                          "im Spiel mit ESC einstellbar — Schaden bleibt gleich",
                          "настраивается в игре по ESC — урон не меняется"),
+    "ui.note_fx":     _T("EŞYA EFEKTİ yalnızca görüntüyü soluklaştırır — hasar hiç değişmez. Oyun içinde ESC ile de ayarlanır.",
+                          "ITEM EFFECTS only dims the visuals — damage never changes. Also adjustable in-game with ESC.",
+                          "EFECTOS DE OBJETOS solo atenúa los visuales: el daño nunca cambia. También se ajusta en partida con ESC.",
+                          "ITEM-EFFEKTE dämpft nur die Optik — der Schaden ändert sich nie. Auch im Spiel mit ESC einstellbar.",
+                          "ЭФФЕКТЫ ПРЕДМЕТОВ лишь приглушают картинку — урон не меняется. Также настраивается в игре по ESC."),
     "ui.note_fps":    _T("FPS sınırı: ekranının yenileme hızından fazlası görünmez. 240 için güçlü bir PC gerekir.",
                          "FPS limit: anything above your monitor's refresh rate is invisible. 240 needs a strong PC.",
                          "Límite de FPS: por encima de tu monitor no se nota. 240 exige un PC potente.",
@@ -1462,7 +1432,7 @@ STRINGS = {
                           "Schnelles Tempo. Viel mehr Gegner — du erreichst dieselben Wellen früher.",
                           "Быстрый темп. Врагов гораздо больше — до тех же волн доходишь быстрее."),
     "ui.n_gem_packs":  _T("{0} elmas paketi", "{0} gem packs", "{0} packs de gemas", "{0} Edelsteinpakete", "{0} наборов кристаллов"),
-    "ui.n_prem_pets":  _T("{0} premium skin  ·  {1} pet", "{0} premium skins  ·  {1} pets",
+    "ui.n_prem_pets":  _T("{0} skin  ·  {1} pet", "{0} skins  ·  {1} pets",
                           "{0} skins premium  ·  {1} mascotas", "{0} Premium-Skins  ·  {1} Haustiere",
                           "{0} премиум-скинов  ·  {1} питомцев"),
     "ui.hell_market":  _T("CEHENNEM MARKETİ", "HELL MARKET", "MERCADO INFERNAL", "HÖLLENMARKT", "АДСКИЙ РЫНОК"),
@@ -2160,7 +2130,7 @@ BG_BOTTOM   = (18, 20, 36)
 PANEL_BG    = (20, 23, 38)
 PANEL_EDGE  = (60, 70, 110)
 TEXT        = (232, 234, 244)
-TEXT_DIM    = (150, 155, 178)
+TEXT_DIM    = (178, 184, 206)   # v3.23: eski (150,155,178) koyu panelde okunmuyordu
 GOLD        = (232, 186, 90)
 GOLD_DIM    = (150, 120, 65)
 RED         = (232, 90, 100)
@@ -2248,6 +2218,22 @@ def key_label(action):
     """Ekranda gösterilecek tuş yazısı: "W / YUKARI" gibi."""
     names = (CFG.get("keys") or {}).get(action) or DEFAULT_KEYS.get(action, [])
     return " / ".join(n.upper() for n in names) if names else "—"
+
+
+def key_label_short(action):
+    """Dar yerler için YALNIZCA İLK tuş: "SHIFT / RIGHT" değil, "SHIFT".
+
+    Yetenek çubuğundaki tuş rozeti 46 piksel; iki tuşu yan yana yazınca
+    yazı kutudan taşıp komşu yuvanın üstüne biniyordu.
+    """
+    names = (CFG.get("keys") or {}).get(action) or DEFAULT_KEYS.get(action, [])
+    if not names:
+        return "—"
+    ad = str(names[0])
+    for on_ek in ("left ", "right "):
+        if ad.startswith(on_ek) and ad[len(on_ek):] in ("shift", "ctrl", "alt"):
+            ad = ad[len(on_ek):]
+    return ad.upper()
 
 random.seed()
 
@@ -2342,6 +2328,29 @@ _font_cache = {}
 _text_cache = {}
 
 
+# =====================================================================
+# OKUNABİLİRLİK TABANI  (v3.23)
+# ---------------------------------------------------------------------
+# Oyuncu: "bazı yazılar okunmuyor, bunun gibi çok yazı var." Haklıydı:
+# 407 yazı çağrısının 152'si 11 puntonun altındaydı, 84'ü 10 ve altı.
+# 1280x720'lik sanal tuvalde 9-10 punto, pencere küçükken gerçekten
+# kayboluyor. Artık TEK BİR KAPIDAN geçiyor: draw_text ve text_width bu
+# tabanın altına inmiyor, yani ÖLÇÜ ile ÇİZİM her zaman aynı puntoyu
+# kullanıyor (ortalama ve satır kaydırma kaymıyor).
+#
+# tiny=True isteyen yerler tabanı atlar — dünyada uçuşan hasar sayıları
+# gibi, küçüklüğü bilerek seçilmiş birkaç yer için.
+UI_MIN_FONT = 12
+
+
+def ui_font_size(size, tiny=False):
+    """Yazı puntosunu okunabilirlik tabanına yükseltir."""
+    size = int(size)
+    if tiny or size >= UI_MIN_FONT:
+        return size
+    return UI_MIN_FONT
+
+
 def get_font(size, bold=False):
     size = int(size)
     key = (size, bold)
@@ -2367,8 +2376,8 @@ def _render(text, size, bold, color):
 
 
 def draw_text(surf, text, pos, size=20, color=TEXT, bold=False,
-              center=False, shadow=True, alpha=255, right=False):
-    size = int(size)
+              center=False, shadow=True, alpha=255, right=False, tiny=False):
+    size = ui_font_size(size, tiny)
     color = (int(color[0]), int(color[1]), int(color[2]))
     alpha = int(clamp(alpha, 0, 255))
     img = _render(text, size, bold, color)
@@ -2389,8 +2398,13 @@ def draw_text(surf, text, pos, size=20, color=TEXT, bold=False,
     return r
 
 
-def text_width(text, size=20, bold=False):
-    return get_font(size, bold).size(text)[0]
+def text_width(text, size=20, bold=False, tiny=False):
+    return get_font(ui_font_size(size, tiny), bold).size(text)[0]
+
+
+def text_height(size, bold=False, tiny=False):
+    """Bir satırın kapladığı yükseklik — satır aralığı hesapları için."""
+    return get_font(ui_font_size(size, tiny), bold).get_height()
 
 
 def wrap_text(text, size, max_w, bold=False):
@@ -2406,6 +2420,25 @@ def wrap_text(text, size, max_w, bold=False):
     if line:
         lines.append(line)
     return lines
+
+
+def wrap_clip(text, size, max_w, lines, bold=False):
+    """Satırlara böler, en çok `lines` satır döndürür ve KESİLDİĞİNİ belli eder.
+
+    Eskiden fazlası sessizce atılıyordu: kart "...birkaç seviyede" diye
+    cümlenin ortasında bitiyor, oyuncu yazının bozuk olduğunu sanıyordu.
+    Artık son satır "…" ile biter — devamı olduğu anlaşılır (tamamı ayrıntı
+    ekranında zaten yazıyor).
+    """
+    out = wrap_text(text, size, max_w, bold)
+    if len(out) <= lines:
+        return out
+    out = out[:lines]
+    son = out[-1]
+    while son and text_width(son + "…", size, bold) > max_w:
+        son = son[:-1]
+    out[-1] = son.rstrip() + "…"
+    return out
 
 
 # =====================================================================
@@ -3063,18 +3096,34 @@ _INSTALL_ID = [None]
 
 
 def _install_id():
-    """Bu kuruluma özel, TAHMİN EDİLEMEZ kimlik. İlk çağrıda üretilir."""
+    """Bu kuruluma özel kimlik. İlk çağrıda üretilir.
+
+    DİKKAT — GERİYE UYUMLULUK: bu dosya YOKSA ve ortada ZATEN BİR KAYIT
+    varsa, oyuncu bu güncellemeden ÖNCE oynamaya başlamış demektir. Onun
+    sunucudaki oturumu ESKİ (makine adından türeyen) cihaz kimliğine bağlı;
+    yeni rastgele bir kimlik üretirsek sunucu oturumu tanımaz ve oyuncu HER
+    AÇILIŞTA hesabından düşer. O yüzden böyle bir kuruluma "legacy" yazılır
+    ve device_id() eski değeri döndürmeye devam eder.
+
+    SIFIRDAN kurulumlarda rastgele kimlik üretilir: tahmin edilemezlik
+    kazancı yeni oyuncuların hepsinde geçerli, kimse de oturumundan olmaz.
+    """
     if _INSTALL_ID[0]:
         return _INSTALL_ID[0]
     try:
         with open(INSTALL_ID_FILE, "r", encoding="utf-8") as fh:
             v = fh.read().strip()
-        if len(v) >= 24:
+        if v == "legacy" or len(v) >= 24:
             _INSTALL_ID[0] = v
             return v
     except Exception:
         pass
-    v = secrets.token_hex(16)
+    eski_oyuncu = False
+    try:
+        eski_oyuncu = os.path.exists(SAVE_FILE) or os.path.exists(LEGACY_SAVE)
+    except Exception:
+        pass
+    v = "legacy" if eski_oyuncu else secrets.token_hex(16)
     try:
         d = os.path.dirname(INSTALL_ID_FILE)
         if d:
@@ -3096,8 +3145,13 @@ def device_id():
     kimliğe bağlar; kayıt dosyası çalınıp başka bilgisayara taşınsa bile
     jeton orada çalışmaz.
     """
-    h = hashlib.sha256(b"kasma-device-v2|"
-                       + _install_id().encode("utf-8")).hexdigest()
+    v = _install_id()
+    if v == "legacy":
+        # Güncellemeden ÖNCE oynamaya başlamış kurulum: eski kimlik korunur,
+        # yoksa oyuncu her açılışta hesabından düşer (sunucu eski kimliği
+        # saklıyor ve sunucu güncellenmemiş bile olabilir).
+        return device_id_legacy()
+    h = hashlib.sha256(b"kasma-device-v2|" + v.encode("utf-8")).hexdigest()
     return h[:32]
 
 
@@ -3290,7 +3344,6 @@ class SaveManager:
                      "fps_cap": 60, "weapon_fx": WEAPON_FX_DEFAULT, "pet_show": True,
                      "lang": DEFAULT_LANG},
         "mastery": {},
-        "daily": {},
         "stats": {"runs": 0, "best_score": 0, "total_kills": 0, "total_time": 0.0,
                   "bosses": 0, "best_wave": 0, "total_shots": 0, "total_lifesteal": 0.0,
                   "total_gold": 0, "best_run_gold": 0, "best_run_dashes": 0,
@@ -3307,7 +3360,7 @@ class SaveManager:
     # ayarlar, dil, ses, tam ekran, oturum jetonu — bunlar hesap değişince
     # değişmez, çünkü onlar oyuncunun değil bilgisayarın tercihleri.
     PROFILE_KEYS = (
-        "gems", "gems_earned", "gems_spent", "mastery", "daily",
+        "gems", "gems_earned", "gems_spent", "mastery",
         "skins_owned", "equipped_skin",
         "cosmetics_owned", "equipped_cosmetics",
         "books_owned", "weapons_owned", "weapons_muted", "books_muted",
@@ -3688,84 +3741,6 @@ class SaveManager:
         """Ustalığa yatırılmış TOPLAM elmas (ekranda gösterilir)."""
         mt = self.data.get("mastery") or {}
         return sum(mastery_total_cost(k, v) for k, v in mt.items())
-
-    # ---- GÜNLÜK DÖNGÜ ----
-    def daily(self):
-        """Bugünün görev defteri. Gün değiştiyse kendiliğinden yenilenir."""
-        d = self.data.setdefault("daily", {})
-        bugun = today_key()
-        if d.get("day") != bugun:
-            # GİRİŞ SERİSİ: dün oynadıysa seri büyür, araya gün girdiyse
-            # baştan başlar. (İlk kez açanda 1'den başlar.)
-            dun = time.strftime("%Y-%m-%d",
-                                time.localtime(time.time() - 86400))
-            d["streak"] = (int(d.get("streak", 0)) + 1) if d.get("day") == dun else 1
-            d["day"] = bugun
-            d["progress"] = {}
-            d["claimed"] = []
-            d["login_claimed"] = False
-        return d
-
-    def daily_quests(self):
-        """Bugünün üç görevi, ilerleme ve ödül durumuyla birlikte."""
-        d = self.daily()
-        prog = d.get("progress") or {}
-        alinan = set(d.get("claimed") or [])
-        out = []
-        for q in daily_quests_for(d["day"]):
-            cur = float(prog.get(q["stat"], 0) or 0)
-            out.append(dict(q, cur=min(cur, q["goal"]),
-                            done=cur >= q["goal"], claimed=q["key"] in alinan))
-        return out
-
-    def daily_login_bonus(self):
-        """Günün ilk ödülü: seriye göre elmas. Zaten alındıysa 0."""
-        d = self.daily()
-        if d.get("login_claimed"):
-            return 0
-        n = max(1, int(d.get("streak", 1)))
-        return LOGIN_STREAK_GEMS[min(n, len(LOGIN_STREAK_GEMS)) - 1]
-
-    def claim_daily_login(self):
-        """Günün giriş ödülünü verir. Dönüş: verilen elmas (0 = zaten alınmış)."""
-        d = self.daily()
-        gem = self.daily_login_bonus()
-        if gem <= 0:
-            return 0
-        d["login_claimed"] = True
-        self.add_gems(gem)
-        self.progress_changed()
-        return gem
-
-    def claim_daily_quest(self, key):
-        """Tamamlanmış bir görevin ödülünü verir. Dönüş: verilen elmas."""
-        d = self.daily()
-        for q in self.daily_quests():
-            if q["key"] == key and q["done"] and not q["claimed"]:
-                d.setdefault("claimed", []).append(key)
-                self.add_gems(q["gem"])
-                self.progress_changed()
-                return q["gem"]
-        return 0
-
-    def daily_track(self, **kw):
-        """Koşu bitince görev ilerlemesini işler.
-
-        BİRİKEN alanlar (öldürme, altın, süre, dash, BONK) toplanır; EN İYİ
-        alanlar (dalga, kombo) en yükseğinde kalır. Patron sayısı birikir.
-        """
-        d = self.daily()
-        prog = d.setdefault("progress", {})
-        for k, v in kw.items():
-            try:
-                v = float(v or 0)
-            except (TypeError, ValueError):
-                continue
-            if k in ("wave", "combo"):
-                prog[k] = max(float(prog.get(k, 0) or 0), v)
-            else:
-                prog[k] = float(prog.get(k, 0) or 0) + v
-        self.progress_changed()
 
     def mastery_bonus(self, key):
         """Kademenin verdiği bonus (0 ise ustalık alınmamış)."""
@@ -4735,8 +4710,9 @@ class AccountClient:
         """
         if not self.token:
             return
+        tok = self.token          # istek BU hesabın adına gidiyor
         try:
-            res = self._post("/player/load", {"token": self.token,
+            res = self._post("/player/load", {"token": tok,
                                               "device": device_id(),
                                               "device_legacy": device_id_legacy()},
                                              timeout=15)
@@ -4744,6 +4720,11 @@ class AccountClient:
             # Ağ yoksa yereldeki kopya kullanılmaya devam eder — ama sessiz
             # kalmıyoruz, hesap ekranı durumu gösteriyor.
             self.sync_error = self._err_text(e)
+            return
+        if tok != self.token:
+            # HESAP DEĞİŞTİ (cevap gelene kadar çıkış yapılıp başka hesaba
+            # girilmiş). Bu ilerleme ARTIK BAŞKA BİRİNİN; uygulanırsa iki
+            # hesap birbirine karışır. Sessizce at.
             return
         if res.get("success") and isinstance(res.get("progress"), dict):
             self.save.import_progress(res["progress"])
@@ -4763,14 +4744,21 @@ class AccountClient:
         if not self.token or not self.logged_in():
             return
         prog = self.save.export_progress()
+        tok = self.token          # ANLIK GÖRÜNTÜ İLE JETON BİRBİRİNE BAĞLI
         self.sync_busy = True
 
         def worker():
             try:
+                # Jetonu burada YENİDEN OKUMUYORUZ. Okusaydık: oyuncu çıkıp
+                # başka hesaba girdiğinde, önceki hesabın ilerlemesi YENİ
+                # hesabın jetonuyla gönderilir ve iki hesap birbirine
+                # karışırdı ("arena ustalığı her hesapta aynı ilerliyor").
                 res = self._post("/player/save", {
-                    "token": self.token, "device": device_id(),
+                    "token": tok, "device": device_id(),
                     "device_legacy": device_id_legacy(),
                     "progress": prog}, timeout=20)
+                if tok != self.token:
+                    return      # arada hesap değişti: cevabı uygulama
                 if res.get("success") and isinstance(res.get("progress"), dict):
                     # Sunucu düzelttiyse (örn. elmas sınırı) onunki geçerli.
                     self.save.import_progress(res["progress"])
@@ -9008,68 +8996,6 @@ def mastery_desc(m):
     return LX("mastery.%s.desc" % m["key"], "")
 
 
-# =====================================================================
-# GÜNLÜK DÖNGÜ  (v3.22) — GÖREVLER ve GİRİŞ SERİSİ
-# ---------------------------------------------------------------------
-# Oyuncuyu ERTESİ GÜN geri getiren hiçbir şey yoktu: oyun açıldığında
-# "bugün şunu yap" diyen bir hedef, art arda oynamayı ödüllendiren bir
-# seri, kaçırılacak bir şey yoktu. Steam/Epic'teki bu türün oyunlarında
-# günlük döngü, oturum sayısını en çok artıran tek sistemdir.
-#
-# TASARIM: hiçbir sunucu işi YOK. Görevler GÜNÜN TARİHİNDEN deterministik
-# olarak seçilir (aynı gün herkeste aynı üç görev çıkar), ilerleme koşu
-# bittiğinde yerel kayda yazılır. Ödül elmastır ve normal elmas defterinden
-# (gems_earned/gems_spent) geçer; yani sunucunun elmas denetimi bunu da
-# kapsar.
-DAILY_QUESTS = [
-    dict(key="kills", goal=400, gem=70, stat="kills"),
-    dict(key="kills_big", goal=900, gem=120, stat="kills"),
-    dict(key="wave", goal=12, gem=90, stat="wave"),
-    dict(key="wave_big", goal=18, gem=150, stat="wave"),
-    dict(key="boss", goal=2, gem=100, stat="bosses"),
-    dict(key="gold", goal=1200, gem=80, stat="gold"),
-    dict(key="time", goal=600, gem=70, stat="time"),
-    dict(key="combo", goal=40, gem=90, stat="combo"),
-    dict(key="dash", goal=60, gem=60, stat="dashes"),
-    dict(key="bonk", goal=40, gem=60, stat="bonks"),
-]
-DAILY_COUNT = 3                 # günde kaç görev
-# Giriş serisi ödülü: 1. gün 50, sonra artar, 7. günden sonra sabitlenir.
-LOGIN_STREAK_GEMS = (50, 70, 90, 120, 150, 200, 250)
-
-
-def today_key(now=None):
-    """Bugünün anahtarı (YYYY-MM-DD, yerel saat).
-
-    Görevler bundan türüyor; oyuncunun saat dilimi ne olursa olsun kendi
-    gününü yaşıyor.
-    """
-    return time.strftime("%Y-%m-%d", time.localtime(now if now else time.time()))
-
-
-def daily_quests_for(day_key):
-    """O günün ÜÇ görevi — tarihten deterministik seçilir.
-
-    Aynı gün aynı üç görev: oyuncular birbirine "bugünkü görev şu" diyebilir
-    ve kayıt dosyasını kurcalayıp kolay görev seçmek işe yaramaz.
-    """
-    h = hashlib.sha256(("kasma-daily-v1|" + str(day_key)).encode("utf-8")).digest()
-    secili, kullanilan = [], set()
-    for i in range(DAILY_COUNT):
-        # Her görev için havuzdan ÇAKIŞMAYAN bir seçim yap.
-        for adim in range(len(DAILY_QUESTS)):
-            idx = (h[i * 3] * 256 + h[i * 3 + 1] + adim) % len(DAILY_QUESTS)
-            q = DAILY_QUESTS[idx]
-            if q["stat"] not in kullanilan:
-                kullanilan.add(q["stat"])
-                secili.append(q)
-                break
-    return secili
-
-
-def daily_quest_text(q):
-    return LX("daily.%s" % q["key"], "%s: %s" % (q["stat"], q["goal"]))
-
 BASE_SPEED = 215
 BASE_MAX_HP = 100
 BASE_DMG = 17
@@ -9104,7 +9030,10 @@ XP_BASE_NEED = 22
 # eğrinin ŞEKLİNİ değiştirmek istersen dokun.
 # v3.18: seviye atlama %10 hızlandırıldı ("xp çok yavaş geliyor"). Bantlara
 # dokunulmadı — eğrinin ŞEKLİ aynı, yalnızca akan tecrübe %10 arttı.
-XP_GAIN_SCALE = 1.10
+# v3.23: 1.10 -> 1.40. "Seviye atlayamıyoruz, xp çok yavaş" geri bildirimi.
+# Bantlara (eğrinin ŞEKLİNE) yine dokunulmadı; yalnızca akan tecrübe arttı,
+# yani ilk seviyeler de son seviyeler de aynı oranda hızlandı.
+XP_GAIN_SCALE = 1.40
 XP_CURVE_BANDS = (
     (6,    1.240, 8),
     (12,   1.190, 50),
@@ -10035,6 +9964,17 @@ class Player:
         # MELEK KANADI: dash sonrası dokunulmazlık belirgin biçimde uzar.
         self.invuln = max(self.invuln, 0.26 + 0.45 * self.angel_wing)
         self.dash_count += 1
+        # SAYAÇ CANLI İŞLER (v3.23). Eskiden total_dashes yalnızca koşu
+        # BİTİNCE işleniyordu: oyuncu 40 dash atıp SİLAHLIK'a bakınca hâlâ
+        # "0/40" görüyor ve "sayılmıyor" sanıyordu. Artık anında artıyor;
+        # koşu sonunda bir daha eklenmiyor (bkz. finish_run).
+        sv = MASTERY_SAVE[0]
+        if sv is not None:
+            try:
+                st = sv.data.setdefault("stats", {})
+                st["total_dashes"] = int(st.get("total_dashes", 0) or 0) + 1
+            except Exception:
+                pass
         fx.burst(self.x, self.y, self.skin["accent"], n=10, speed=150, life=0.3, r=3)
         sfx("dash", 1.0, 0.05)
         return True
@@ -10199,10 +10139,13 @@ class Player:
 
 class EnemyProjectile:
     def __init__(self, x, y, vx, vy, dmg, color=(235, 210, 70), r=6, life=4.0,
-                 target=None, turn=0.0, accel=0.0, owner=None):
+                 target=None, turn=0.0, accel=0.0, owner=None, poison=0.0):
         self.x, self.y = x, y
         self.vx, self.vy = vx, vy
         self.dmg = dmg
+        # BÜYÜCÜ'nün zehir oku: isabet edince oyuncuyu bir süre zehirler.
+        # 0 ise sıradan mermi.
+        self.poison = poison
         self.color = color
         self.r = r
         self.life = life
@@ -10564,7 +10507,10 @@ class PlayerProjectile:
 # para pratikte "dalganın sonunda toplarım" diyecek kadar duruyor; birikme
 # tehlikesine karşı ise yığınlar daha cömertçe BİRLEŞİYOR
 # (bkz. COIN_MERGE_MAX_AGE): tek bir yığın 20 parayı taşıyabiliyor.
-COIN_LIFE = 45.0
+# v3.23: 45 -> 60 saniye. Oyuncu kalabalıkla uğraşırken yere düşen altını
+# toplamaya yetişemiyordu; bir dalga ortalama bundan kısa sürüyor, yani
+# artık bir dalga boyunca düşen altın o dalga içinde toplanabiliyor.
+COIN_LIFE = 60.0
 COIN_WARN = 8.0                 # son bu kadar saniye yanıp söner
 # Bir para en fazla bu kadar yaşlı bir yığına eklenebilir. Amaç: oyuncunun
 # gözüyle "o yığın hemen gitmeyecek" olması. 45 saniyelik ömürde 8 saniyelik
@@ -11205,6 +11151,80 @@ class MagnetDrop:
 
 ZEMZEM_COLOR = (96, 198, 255)
 ZEMZEM_COLOR2 = (208, 246, 255)
+
+
+# =====================================================================
+# SEVİYE TAŞI  (v3.23) — mor, anında bir seviye verir
+# ---------------------------------------------------------------------
+# MIKNATIS'la AYNI şansla düşer (aynı eğri, ayrı sayaç): yani ikisi
+# birbirinin şansını yemez, ama aynı nadirlikte kalırlar. Toplandığı anda
+# otomatik olarak BİR SEVİYE verir — kart ekranı normal seviye atlamada
+# olduğu gibi açılır.
+LEVEL_COLOR = (178, 110, 255)
+LEVEL_COLOR2 = (236, 214, 255)
+
+
+class LevelDrop:
+    """Yerde duran mor SEVİYE TAŞI. Toplanınca anında bir seviye verir.
+
+    MagnetDrop ile aynı toplama davranışı (cömert menzil, asla kaybolmaz);
+    yalnızca görünüşü ve etkisi başka.
+    """
+
+    def __init__(self, x, y):
+        self.x = clamp(x, ARENA_RECT.left + 30, ARENA_RECT.right - 30)
+        self.y = clamp(y, ARENA_RECT.top + 30, ARENA_RECT.bottom - 30)
+        self.t = random.uniform(0, math.tau)
+        self.collected = False
+        self.alive = True
+
+    def update(self, dt, player):
+        self.t += dt
+        if not player.alive:
+            return
+        pr = max(46.0, player.eff_pickup() * 1.3)
+        d = dist(self.x, self.y, player.x, player.y)
+        if d < pr:
+            pull = clamp(1 - d / pr, 0, 1) ** 0.5
+            dx, dy = norm_dir(self.x, self.y, player.x, player.y)
+            spd = lerp(120, 900, pull)
+            self.x += dx * spd * dt
+            self.y += dy * spd * dt
+        if d < 26:
+            self.collected = True
+            self.alive = False
+
+    def draw(self, surf, t):
+        """Yukarı uzanan ışık sütunlu mor kristal."""
+        bob = math.sin(self.t * 3.0) * 4.5
+        x, y = self.x, self.y + bob
+        pulse = 0.5 + 0.5 * math.sin(self.t * 5.0)
+        # ışık sütunu
+        for i in range(7):
+            k = i / 6.0
+            py = y - 16 - k * 46
+            rr = max(1, int(5 * (1 - k) + 1))
+            a = int(140 * (1 - k) * (0.55 + 0.45 * pulse))
+            blit_disc(surf, x, py, rr, LEVEL_COLOR2 if i < 2 else LEVEL_COLOR, a)
+        add_glow(surf, x, y, 54 + pulse * 18, LEVEL_COLOR, 0.38 + 0.30 * pulse)
+        add_glow(surf, x, y, 26, LEVEL_COLOR2, 0.18 + 0.18 * pulse)
+        # dönen üç kıvılcım
+        for i in range(3):
+            a = self.t * 2.2 + i * math.tau / 3
+            px, py = x + math.cos(a) * 26, y + math.sin(a) * 26 * 0.6
+            pygame.draw.circle(surf, LEVEL_COLOR2, (int(px), int(py)), 3)
+        # kristal gövde (sivri altıgen)
+        R = 15.0
+        pts = [(x, y - R * 1.5), (x + R * 0.8, y - R * 0.3),
+               (x + R * 0.55, y + R * 1.1), (x - R * 0.55, y + R * 1.1),
+               (x - R * 0.8, y - R * 0.3)]
+        pygame.draw.polygon(surf, OUTLINE, [(px, py + 2) for px, py in pts])
+        pygame.draw.polygon(surf, LEVEL_COLOR, pts)
+        pygame.draw.polygon(surf, lighten(LEVEL_COLOR, 0.45), pts, 2)
+        # iç parıltı
+        pygame.draw.polygon(surf, lighten(LEVEL_COLOR, 0.65),
+                            [(x, y - R * 1.1), (x + R * 0.3, y - R * 0.1),
+                             (x, y + R * 0.5), (x - R * 0.3, y - R * 0.1)])
 
 
 class WaterZone:
@@ -12845,6 +12865,7 @@ ENEMY_WEIGHT_CLASS = {
     "blue": "frail", "sprinter": "frail", "imp": "frail",
     "red": "normal", "yellow": "normal", "hound": "normal",
     "bomber": "frail", "healer": "normal",
+    "wizard": "normal", "stinger": "frail",
     "seer": "normal", "reaver": "normal",
     "tank": "tough", "brute": "tough", "elite": "tough",
     "shieldman": "tough", "herald": "tough",
@@ -13038,6 +13059,8 @@ ENEMY_COLORS = {
     # oyuncuya "önce hangisini öldüreyim?" sorusunu sordurmuyordu.
     "bomber": (255, 128, 52),       # BOMBACI — öldüğü yerde patlar
     "healer": (120, 224, 140),      # ŞİFACI — çevresindekileri iyileştirir
+    "wizard": (156, 108, 236),      # BÜYÜCÜ — uzaktan zehir oku atar
+    "stinger":(255, 214, 96),       # ARI — çok hızlı, hasarı küçük
     # --- YARI PATRON ve KORUMALARI ---
     "herald":    (246, 214, 120),   # SANCAKTAR — sandığı taşıyan yarı patron
     "shieldman": (128, 168, 214),   # SİPERCİ — onu koruyan kalkanlı
@@ -13059,6 +13082,34 @@ HEALER_TICK = 1.15              # iyileştirme aralığı (saniye)
 HEALER_FRAC = 0.055             # her tikte azami canın bu oranı kadar
 HEALER_MAX_TARGETS = 6          # bir tikte en çok kaç yaratık (kare hızı)
 
+# --- BÜYÜCÜ (v3.23) ---
+# 15. dalgadan sonra seyrek gelir. Yakın dövüşe hiç girmez: uzakta durup
+# zehir oku atar. Oku AZ vurur, zehri UZUN sürer — yani oyuncu onu
+# görmezden gelemez, üstüne gitmek zorunda kalır.
+WIZARD_KEEP = 330               # oyuncuya bundan yakın durmaz
+WIZARD_SHOOT_CD = (2.1, 3.0)    # iki ok arası
+WIZARD_SHOT_SPEED = 215
+WIZARD_POISON_MULT = 0.55       # zehrin saniyelik hasarı = dmg * bu
+WIZARD_POISON_TIME = 4.0        # zehrin süresi (saniye)
+
+# --- ARI (v3.23) ---
+# Oyunun en hızlısı ama vuruşu KÜÇÜK ve neredeyse SABİT. Dalga çarpanı
+# ikisine de serbest işlese 40. dalgada hem en hızlı hem en vurucu yaratık
+# olurdu; iki tavan bunu engeller.
+STINGER_SPEED_CAP = 1.6         # oyuncunun taban hızının en çok bu katı
+STINGER_DMG_CAP = 2.0           # kendi taban hasarının en çok bu katı
+
+# =====================================================================
+# GENEL ZORLUK DÜĞMESİ  (v3.23)
+# ---------------------------------------------------------------------
+# "Oyun çok zor olmuş, birazcık basitleştirelim ama çok değil." İki sayı
+# bütün yaratıkların canını ve hasarını birden ölçekler — dalga eğrilerine,
+# zırha, patronlara ve CEHENNEM'e hiç dokunulmadı, yani oyunun ŞEKLİ aynı
+# kaldı, yalnızca yaratıklar %10 yumuşadı. Zorluk yine artıyor, sadece
+# biraz daha geç.
+ENEMY_HP_TUNE = 0.90
+ENEMY_DMG_TUNE = 0.90
+
 ENEMY_DEFS = {
     "red":      {"hp": 30,  "speed": 100, "dmg": 10, "radius": 14, "coin": 5,  "xp": 4,  "score": 12,  "contact_dps": 17},
     "blue":     {"hp": 14,  "speed": 194, "dmg": 6,  "radius": 10, "coin": 1,  "xp": 2,  "score": 6,   "contact_dps": 10},
@@ -13074,6 +13125,12 @@ ENEMY_DEFS = {
     # iyileştirir. Oyuncuyu "önce hangisini öldüreyim?" diye düşündürür:
     # şifacı yaşadığı sürece kalabalık erimiyor.
     "healer":   {"hp": 62,  "speed": 96,  "dmg": 0,  "radius": 14, "coin": 7,  "xp": 9,  "score": 26,  "contact_dps": 0},
+    # BÜYÜCÜ (15. dalgadan sonra, SEYREK): uzaktan durur, zehir oku atar.
+    # Oku az vurur ama zehri uzun sürer — oyuncuyu üstüne gitmeye zorlar.
+    "wizard":   {"hp": 74,  "speed": 86,  "dmg": 7,  "radius": 15, "coin": 9,  "xp": 12, "score": 34,  "contact_dps": 8},
+    # ARI (25. dalgadan sonra): oyunun en hızlısı ama vuruşu küçük ve SABİT.
+    # Tehdidi tek vuruşu değil, üstüne yığılması.
+    "stinger":  {"hp": 26,  "speed": 330, "dmg": 3,  "radius": 10, "coin": 4,  "xp": 5,  "score": 18,  "contact_dps": 6},
     # --- YARI PATRON ---
     # Canı ve hasarı BİLEREK düşük: bu bir güç sınavı değil, bir BULMACA.
     # Zorluğu kendi canından değil, onu çevreleyen SİPERCİ'lerden geliyor;
@@ -13197,7 +13254,8 @@ class Enemy:
         # çizdirmiyor: kanıtlanmış gövdeleri RENK ve DAVRANIŞ farkıyla
         # yeniden kullanıyorlar. Oyuncu onları renginden ve ne yaptığından
         # tanıyor; yeni bir çizim yolu eklemek görsel tutarlılığı bozardı.
-        SHAPE_ALIAS = {"bomber": "brute", "healer": "yellow"}
+        SHAPE_ALIAS = {"bomber": "brute", "healer": "yellow",
+                       "wizard": "yellow", "stinger": "sprinter"}
         self.shape = (var["shape"] if var
                       else SHAPE_ALIAS.get(kind, kind))      # çizim biçimi
         # Ölüm nedeni / arayüz adı. Cehennem yaratığının adı kendi satırında
@@ -13220,11 +13278,12 @@ class Enemy:
         hp_var = var["hp"] if var else 1.0
         dmg_var = var["dmg"] if var else 1.0
 
-        self.max_hp = d["hp"] * wave_mult * hp_var * pr_hp
+        self.max_hp = d["hp"] * wave_mult * hp_var * pr_hp * ENEMY_HP_TUNE
         self.hp = self.max_hp
         self.speed = d["speed"] * wave_speed_mult(spd_wave) * pr_spd
         dmg_mult = late_wave_dmg_mult(dmg_wave)
-        self.dmg = d["dmg"] * dmg_mult * diff_mult * dmg_var * pr_dmg
+        self.dmg = (d["dmg"] * dmg_mult * diff_mult * dmg_var * pr_dmg
+                    * ENEMY_DMG_TUNE)
         # Zırh: gelen hasarın sabit bir yüzdesini keser. 25. dalgadan sonra
         # arena yaratıkları zırhlanır; CEHENNEM'de ise (v3.13) her yaratığın
         # baştan zırhı vardır ve dalga başına açılır — yoksa cehennem, zırhlı
@@ -13234,7 +13293,19 @@ class Enemy:
         self.coin = d["coin"]
         self.xp = d["xp"]
         self.score = d["score"]
-        self.contact_dps = d["contact_dps"] * dmg_mult * diff_mult * dmg_var * pr_dmg
+        self.contact_dps = (d["contact_dps"] * dmg_mult * diff_mult * dmg_var
+                            * pr_dmg * ENEMY_DMG_TUNE)
+        # ARI (v3.23): "hızlıca koşsun ama hasarı 3 3 3 3 3 olsun".
+        # Dalga çarpanı ona DA işlese 40. dalgada 972 px/sn hız ve 1.834
+        # hasara çıkıyordu — yani oyunun en hızlısı AYNI ZAMANDA en vurucusu
+        # oluyordu. İkisi de kendi tavanında tutulur: hızı oyuncunun ~1.6
+        # katını geçmez (yakalanabilir kalsın), vuruşu da küçük kalır.
+        # Tehdidi tek vuruşu değil, üstüne YIĞILMASI.
+        if kind == "stinger":
+            self.speed = min(self.speed, BASE_SPEED * STINGER_SPEED_CAP)
+            self.dmg = min(self.dmg, d["dmg"] * STINGER_DMG_CAP)
+            self.contact_dps = min(self.contact_dps,
+                                   d["contact_dps"] * STINGER_DMG_CAP)
         # Kırmızı toplar (temel düşman) ne kadar güçlüyse görsel olarak o kadar
         # doygun/canlı kırmızı olsun — oyuncu tehlikeyi bir bakışta anlasın.
         if self.shape == "red":
@@ -13470,7 +13541,28 @@ class Enemy:
                         player.take_damage(self.contact_dps * 0.12 * 6, fx,
                                            self.x, self.y, self.disp_name)
                 return
-            if self.kind == "healer":
+            if self.kind == "wizard":
+                # BÜYÜCÜ: oyuncunun üstüne gitmez, uzaktan ZEHİR OKU atar.
+                # Oku az vurur ama zehri uzun sürer; oyuncu ya üstüne gider
+                # ya da sürekli can kaybeder.
+                d = dist(self.x, self.y, player.x, player.y)
+                if d < WIZARD_KEEP:
+                    dx, dy = -dx, -dy
+                elif d < WIZARD_KEEP + 110:
+                    dx, dy = -dy, dx
+                self.shoot_cd -= dt
+                if self.shoot_cd <= 0 and self.spawn_t > 0.6:
+                    self.shoot_cd = random.uniform(*WIZARD_SHOOT_CD)
+                    pdx, pdy = norm_dir(self.x, self.y, player.x, player.y)
+                    projectiles.append(EnemyProjectile(
+                        self.x, self.y, pdx * WIZARD_SHOT_SPEED,
+                        pdy * WIZARD_SHOT_SPEED, self.dmg,
+                        color=ENEMY_COLORS["wizard"], r=7,
+                        poison=self.dmg * WIZARD_POISON_MULT))
+                    fx.ring(self.x, self.y, ENEMY_COLORS["wizard"], n=10,
+                            speed=130, life=0.3, r=2.5)
+                    sfx("shoot_c", 0.32, 0.08)
+            elif self.kind == "healer":
                 # ŞİFACI: oyuncuya hiç saldırmaz, mesafesini korur ve
                 # çevresindeki yaratıkları iyileştirir. Oyuncuyu "önce
                 # hangisini öldüreyim?" diye düşündürmek için var: şifacı
@@ -16953,6 +17045,12 @@ class WaveManager:
             # öğrensin, sonra "hedef seçme" sorusuyla tanışsın.
             "bomber": max(0, min(w - 6, 5)),
             "healer": max(0, min((w - 8) // 2, 3)),
+            # BÜYÜCÜ 15. dalgada girer ve SEYREK kalır (tavan 3): tehdidi
+            # sayısı değil, uzaktan sürekli zehirlemesi.
+            "wizard": max(0, min((w - 14), 3)) if w >= 15 else 0,
+            # ARI 25. dalgada girer; hızlı ama vuruşu küçük olduğu için
+            # kalabalık gelebilir.
+            "stinger": max(0, min((w - 24) * 2, 10)) if w >= 25 else 0,
         }
         kinds = list(weights.keys())
         wts = list(weights.values())
@@ -17494,6 +17592,8 @@ class RunState:
         self.penta_inside = set()
         # --- MIKNATIS ---
         self.magnets = []           # yerde duran mıknatıslar
+        self.level_drops = []       # yerde duran SEVİYE TAŞLARI (mor)
+        self.level_kills = 0        # son seviye taşından bu yana öldürme
         self.magnet_kills = 0       # son mıknatıstan bu yana yapılan öldürme
         self.magnets_taken = 0      # bu koşuda toplanan mıknatıs sayısı
         # Koşu bitince doldurulur: bu koşuda kilidi açılan silah ve kitaplar.
@@ -17724,6 +17824,9 @@ class RunState:
         # yüzünden yok olmasın, oyuncunun ayağının dibine taşınır.
         for mg in self.magnets:
             mg.x, mg.y = ARENA_RECT.centerx + random.uniform(-70, 70), \
+                ARENA_RECT.centery + random.uniform(60, 120)
+        for lv in self.level_drops:
+            lv.x, lv.y = ARENA_RECT.centerx + random.uniform(-70, 70), \
                 ARENA_RECT.centery + random.uniform(60, 120)
         self.time_stop = 0.0
         # Arenadan kalan yanık/zehir/yavaşlatma cehenneme taşınmasın.
@@ -18302,6 +18405,29 @@ class RunState:
             if mg.collected:
                 self.collect_magnet(mg)
         self.magnets = [m for m in self.magnets if m.alive]
+        for lv in list(self.level_drops):
+            lv.update(dt, p)
+            if lv.collected:
+                self.collect_level_drop(lv)
+        self.level_drops = [m for m in self.level_drops if m.alive]
+
+    def collect_level_drop(self, lv):
+        """SEVİYE TAŞI toplandı: anında BİR seviye. Kart ekranı açılır."""
+        p = self.player
+        p.level += 1
+        p.xp_to_next = xp_next_need(p.xp_to_next, p.level)
+        self.pending_levelups += 1
+        self.fx.popup(p.x, p.y - 74, "SEVİYE TAŞI!", LEVEL_COLOR, 34, life=1.8)
+        self.fx.popup(p.x, p.y - 44, "+1 SEVİYE", LEVEL_COLOR2, 18, life=1.6)
+        self.fx.do_flash(LEVEL_COLOR, 0.42)
+        self.fx.shake(6, 0.24)
+        for i, rr in enumerate((240, 460)):
+            self.fx.shockwave(p.x, p.y, rr,
+                              LEVEL_COLOR if i % 2 == 0 else LEVEL_COLOR2,
+                              0.55 + i * 0.15, 5)
+        sfx("levelup", 1.0, 0.0)
+        if p.level >= 10 and self.ach:
+            self.ach.unlock("lvl10")
 
     def collect_magnet(self, mg):
         """MIKNATIS toplandı: haritadaki BÜTÜN altın ve tecrübe oyuncuya uçar."""
@@ -19024,6 +19150,18 @@ class RunState:
             self.pickups.append(Pickup(e.x, e.y, "heart", 26))
         # MIKNATIS: binde 2.5 düşer (kötü şansa karşı kademeli garanti için
         # bkz. magnet_drop_chance). Aynı anda yerde birden fazla durmasın.
+        # SEVİYE TAŞI: mıknatısla AYNI şans eğrisi, AYRI sayaç — ikisi
+        # birbirinin şansını yemesin ama aynı nadirlikte kalsınlar.
+        self.level_kills += 1
+        if (not self.level_drops
+                and random.random() < magnet_drop_chance(self.level_kills)):
+            self.level_kills = 0
+            self.level_drops.append(LevelDrop(e.x, e.y))
+            self.fx.popup(e.x, e.y - 58, "SEVİYE TAŞI!", LEVEL_COLOR, 26, life=2.2)
+            self.fx.ring(e.x, e.y, LEVEL_COLOR, n=30, speed=300, life=0.8, r=4)
+            self.fx.shockwave(e.x, e.y, 160, LEVEL_COLOR2, 0.5, 5)
+            self.fx.do_flash(LEVEL_COLOR, 0.30)
+            sfx("levelup", 0.8, 0.0)
         self.magnet_kills += 1
         if not self.magnets and random.random() < magnet_drop_chance(self.magnet_kills):
             self.magnet_kills = 0
@@ -19227,12 +19365,16 @@ class RunState:
             self.reposition_stragglers(dt)
         # Patron sandıkları ve sandıktan çıkan otomatik silahlar
         self.update_chests(dt)
-        if not frozen:
-            self.update_boss_weapons(dt)
-            # SÜREKLİ silahlar (kalkan / pentagram / papuç / pelerin)
-            self.update_passive_weapons(dt)
-            # Su birikintileri, ateş halkaları, hortumlar, uçan baltalar, kırbaçlar
-            self.update_weapon_objects(dt)
+        # OYUNCUNUN SİLAHLARI ZAMAN DURUNCA DA ÇALIŞIR (v3.23).
+        # Eskiden bunlar da `frozen` kapısının arkasındaydı: zamanı durduran
+        # yetenek, oyuncunun kendi silahlarını da durduruyordu — yani
+        # "zamanı durdurdum" ödülü aslında bir CEZAYDI. Donan yalnızca
+        # yaratıklar, mermileri ve tuzakları olmalı.
+        self.update_boss_weapons(dt)
+        # SÜREKLİ silahlar (kalkan / pentagram / papuç / pelerin)
+        self.update_passive_weapons(dt)
+        # Su birikintileri, ateş halkaları, hortumlar, uçan baltalar, kırbaçlar
+        self.update_weapon_objects(dt)
         self.update_magnets(dt)
 
         for proj in list(self.enemy_projectiles):
@@ -19250,6 +19392,10 @@ class RunState:
                         owner.hit_player(p, proj.dmg, self.fx, proj.x, proj.y)
                     else:
                         p.take_damage(proj.dmg, self.fx, proj.x, proj.y, "mermi")
+                        # BÜYÜCÜ'nün zehir oku: hasarın yanında zehir bırakır.
+                        if getattr(proj, "poison", 0.0) > 0:
+                            p.apply_poison(proj.poison, WIZARD_POISON_TIME,
+                                           LX("en.wizard", "Büyücü"))
                     proj.alive = False
         self.enemy_projectiles = [pr for pr in self.enemy_projectiles if pr.alive]
 
@@ -19723,22 +19869,14 @@ class RunState:
         st["best_run_heal"] = max(st.get("best_run_heal", 0.0), float(p.run_healed))
         st["total_crits"] = st.get("total_crits", 0) + int(p.run_crits)
         st["total_bonks"] = st.get("total_bonks", 0) + int(p.run_bonks)
-        st["total_dashes"] = st.get("total_dashes", 0) + int(p.dash_count)
+        # total_dashes ARTIK CANLI işleniyor (bkz. Player.try_dash); burada
+        # bir daha eklenirse koşu başına iki kat sayılırdı.
+        st["best_run_dashes"] = max(st.get("best_run_dashes", 0), int(p.dash_count))
         st["best_combo"] = max(st.get("best_combo", 0), int(self.combo.best))
         st["best_run_dashes"] = max(st.get("best_run_dashes", 0), int(p.dash_count))
         st["total_shots"] = st.get("total_shots", 0) + int(p.run_shots)
         st["best_run_shots"] = max(st.get("best_run_shots", 0), int(p.run_shots))
         st["total_lifesteal"] = st.get("total_lifesteal", 0.0) + float(p.run_lifesteal)
-        # GÜNLÜK GÖREVLER: koşunun sayıları buradan işleniyor. Hileli koşu
-        # günlük görevi de ilerletmez — yoksa "hile yap, görevi al" diye bir
-        # yol açık kalırdı.
-        if self.run_is_clean():
-            self.save.daily_track(
-                kills=int(self.kills), wave=int(self.waves.wave),
-                bosses=int(getattr(self, "bosses_killed", 0)),
-                gold=int(self.coins_earned), time=float(self.run_time),
-                combo=int(self.combo.best), dashes=int(p.dash_count),
-                bonks=int(p.run_bonks))
         st["total_gold"] = st.get("total_gold", 0) + int(self.coins_earned)
         st["best_run_gold"] = max(st.get("best_run_gold", 0), int(self.coins_earned))
         st["total_bonk_hits"] = st.get("total_bonk_hits", 0) + int(self.bonk_hits)
@@ -20766,6 +20904,12 @@ def draw_minimap(surf, run, t, big=False):
         pulse = 0.5 + 0.5 * math.sin(t * 7)
         add_glow(surf, px, py, (16 + pulse * 8) * k, MAGNET_COLOR, 0.45 + pulse * 0.35)
         pygame.draw.circle(surf, MAGNET_COLOR, (int(px), int(py)), max(2, int(k * (4 + pulse * 2))))
+    # SEVİYE TAŞI — mıknatıs kadar nadir, aynı biçimde göze sokulur
+    for lv in run.level_drops:
+        px, py = mp(lv.x, lv.y)
+        pulse = 0.5 + 0.5 * math.sin(t * 7)
+        add_glow(surf, px, py, (16 + pulse * 8) * k, LEVEL_COLOR, 0.45 + pulse * 0.35)
+        pygame.draw.circle(surf, LEVEL_COLOR, (int(px), int(py)), max(2, int(k * (4 + pulse * 2))))
         pygame.draw.circle(surf, MAGNET_COLOR2, (int(px), int(py)), max(1, int(k * 2)))
 
     # hortum (küçük haritada dönen halka)
@@ -20846,6 +20990,8 @@ def draw_offscreen_markers(surf, run, cam, t):
     # MIKNATIS ekran dışında kalırsa kenarda oku görünsün.
     for mg in run.magnets:
         marks.append((mg.x, mg.y, MAGNET_COLOR, "magnet"))
+    for lv in run.level_drops:
+        marks.append((lv.x, lv.y, LEVEL_COLOR, "star"))
     for (wx, wy, col, icon) in marks:
         if cam.collidepoint(wx, wy):
             continue
@@ -20960,6 +21106,22 @@ def _fit_text(txt, size, max_w, bold=False):
     return txt[:1]
 
 
+def _fit_size(txt, size, max_w, bold=False, min_size=9):
+    """Metni KÜÇÜLTEREK sığdırır; en küçük boyda da sığmazsa kısaltır.
+
+    Okunabilirlik tabanı (UI_MIN_FONT) gövde metni içindir. Yetenek
+    çubuğundaki tuş rozeti gibi 40-50 piksellik kutularda "SOL TIK" 12
+    puntoyla sığmıyor; orada kırpıp "SOL TI." yazmaktansa bir-iki punto
+    küçültmek daha okunur. min_size bunun dibidir — eski 6-7 puntoya asla
+    inilmez.
+    """
+    size = int(size)
+    for sz in range(max(size, UI_MIN_FONT), int(min_size) - 1, -1):
+        if text_width(txt, sz, bold, tiny=True) <= max_w:
+            return txt, sz
+    return _fit_text(txt, min_size, max_w, bold), int(min_size)
+
+
 def _slot_strip(w, h):
     """Yatay yuva şeridinin arka paneli (degrade + çerçeve) — önbellekli."""
     key = (w, h)
@@ -21030,9 +21192,12 @@ def _level_badge(surf, cx, cy, lvl, col, maxed=False, h=18):
 # şeritleri birbiriyle HİZALI kalsın (eskiden yuvalar sol kenarda dikey bir
 # sütundu ve canın altındaki alanı boydan boya kapatıyordu).
 HUD_STRIP_X = 18
-WSLOT_CELL = 48
+# v3.23: yazı tabanı 12 puntoya çıkınca 48/38 piksellik hücrelerin altındaki
+# adlar ("KALKAN", "HORTUM") kısalıyordu. Hücreler büyüdü — hem adlar sığıyor
+# hem de simgeler uzaktan daha net.
+WSLOT_CELL = 54
 WSLOT_GAP = 8
-BSLOT_CELL = 38
+BSLOT_CELL = 48
 BSLOT_GAP = 7
 HUD_WEAPON_Y = 96        # silah şeridinin üst kenarı
 HUD_BOOK_Y = HUD_WEAPON_Y + WSLOT_CELL + 35   # kitap şeridinin üst kenarı
@@ -21130,7 +21295,9 @@ def draw_weapon_slots(surf, run, t):
         _level_badge(surf, r.right - 1, r.y + 1, lvl, col,
                      maxed=lvl >= weapon_max_level(w), h=17)
         # yuvanın ALTINDA kısa ad; sığmazsa kısaltılır
-        name = _fit_text(w_name(w), 8, cell + gap - 1, bold=True)
+        # Aralarında en az 6 piksel boşluk kalsın: yazılar büyüdüğü için
+        # eski 1 piksellik pay komşu adla birleşik görünüyordu.
+        name = _fit_text(w_name(w), 8, cell + gap - 7, bold=True)
         ncol = (CLOAK_COLOR2 if invis_now else
                 (lighten(col, 0.25) if ready else (118, 124, 148)))
         draw_text(surf, name, (r.centerx, r.bottom + 3), 8, ncol, bold=True,
@@ -21233,7 +21400,7 @@ def draw_book_slots(surf, run, t):
                          width=3 if rare_slot else 2, border_radius=8)
         draw_icon(surf, r.centerx, r.centery - 1, bk.get("icon", "star"), col, cell * 0.26)
         _level_badge(surf, r.right - 1, r.y + 1, lvl, col, maxed=maxed, h=15)
-        name = _fit_text(bk_short(bk), 8, cell + gap - 1, bold=True)
+        name = _fit_text(bk_short(bk), 8, cell + gap - 7, bold=True)
         draw_text(surf, name, (r.centerx, r.bottom + 3), 8, lighten(col, 0.2),
                   bold=True, center=True, shadow=False)
 
@@ -21312,15 +21479,22 @@ def draw_skill_bar(surf, run, t):
             # yazmak, tuşunu değiştiren oyuncuya yalan söylemek olurdu.
             eylem = sk.get("pad", "")
             if eylem in KEY_ACTIONS:
-                klabel = key_label(eylem)
-        draw_text(surf, klabel or LX("key." + str(sk["key"]), sk["key"]), kb.center,
-                  max(6, int(9 * k)), TEXT if not locked else (110, 114, 136),
-                  bold=True, center=True, shadow=False)
+                klabel = key_label_short(eylem)
+        ktxt = klabel or LX("key." + str(sk["key"]), sk["key"])
+        ktxt, ksize = _fit_size(ktxt, max(6, int(9 * k)), kb.w - 4,
+                                bold=True, min_size=9)
+        draw_text(surf, ktxt, kb.center, ksize,
+                  TEXT if not locked else (110, 114, 136),
+                  bold=True, center=True, shadow=False, tiny=True)
 
-        # yuva adı
-        draw_text(surf, LX("slot." + str(sk.get("name", "")), sk.get("name", "")),
-                  (r.centerx, r.bottom + 4 * k), max(7, int(10 * k)),
-                  TEXT_DIM if not locked else (92, 96, 118), center=True, shadow=False)
+        # yuva adı — yuvadan taşmasın, komşusuna binmesin
+        nsize = max(7, int(10 * k))
+        sname = LX("slot." + str(sk.get("name", "")), sk.get("name", ""))
+        sname, nsize = _fit_size(sname, nsize, sw + gap - 6, min_size=10)
+        draw_text(surf, sname,
+                  (r.centerx, r.bottom + 4 * k), nsize,
+                  TEXT_DIM if not locked else (92, 96, 118), center=True,
+                  shadow=False, tiny=True)
 
         if locked:
             pygame.draw.line(surf, (140, 100, 110), (r.x + 8, r.y + 8), (r.right - 8, r.bottom - 8), 2)
@@ -21828,6 +22002,9 @@ def draw_run(surf, run, t, aim_pos=None):
     for mg in run.magnets:
         if vis_far.collidepoint(mg.x, mg.y):
             mg.draw(world, t)
+    for lv in run.level_drops:
+        if vis_far.collidepoint(lv.x, lv.y):
+            lv.draw(world, t)
     for ch in run.chests:
         ch.draw(world, t)
     # Kalkan kitaplarının yörüngesinin ARKA yarısı oyuncudan önce çizilir.
@@ -24321,7 +24498,7 @@ class App:
         draw_text(canvas, L("ui.enter_name"), (panel_rect.centerx, panel_rect.y + 120), 16, TEXT_DIM, center=True)
         for i, ln in enumerate(wrap_text(L("ui.world_needs_login"), 11,
                                          panel_rect.w - 80)[:2]):
-            draw_text(canvas, ln, (panel_rect.centerx, panel_rect.y + 186 + i * 14),
+            draw_text(canvas, ln, (panel_rect.centerx, panel_rect.y + 192 + i * 16),
                       11, (196, 160, 110), center=True, shadow=False)
         box = pygame.Rect(0, 0, 320, 46)
         box.center = (panel_rect.centerx, panel_rect.y + 156)
@@ -24337,81 +24514,6 @@ class App:
             btn.click(mouse_pos)
 
     # ---------------- ANA MENÜ ----------------
-    def _draw_daily_panel(self, canvas, dt, mouse_pos, clicked):
-        """Ana menünün altındaki GÜNLÜK şeridi.
-
-        Oyuncuyu ERTESİ GÜN geri getiren tek şey: bugünün üç görevi, giriş
-        serisi ve günün ödülü. Görevler tarihten deterministik seçiliyor,
-        yani aynı gün herkeste aynı — sunucuya hiç iş düşmüyor.
-        """
-        sv = self.save
-        d = sv.daily()
-        r = pygame.Rect(300, 596, 680, 100)
-        panel(canvas, r, bg=(20, 22, 36), edge=(62, 66, 94), alpha=238, radius=12,
-              edge_w=2)
-        draw_text(canvas, L("ui.daily"), (r.x + 18, r.y + 10), 15, GOLD, bold=True,
-                  shadow=False)
-        draw_text(canvas, L("ui.daily_streak", int(d.get("streak", 1))),
-                  (r.x + 18, r.y + 30), 11, (150, 156, 184), shadow=False)
-
-        # ---- GÜNÜN ÖDÜLÜ ----
-        bonus = sv.daily_login_bonus()
-        lr = pygame.Rect(r.x + 16, r.y + 52, 150, 32)
-        if bonus > 0:
-            hov = lr.collidepoint(mouse_pos)
-            pygame.draw.rect(canvas, (74, 148, 102) if hov else (56, 112, 78), lr,
-                             border_radius=7)
-            pygame.draw.rect(canvas, (96, 170, 122), lr, width=1, border_radius=7)
-            draw_icon(canvas, lr.x + 18, lr.centery, "gem", GEM_COLOR, 7)
-            draw_text(canvas, "+" + fmt_num(bonus), (lr.x + 32, lr.centery - 9), 15,
-                      WHITE, bold=True, shadow=False)
-            draw_text(canvas, L("ui.daily_claim"), (lr.right - 14, lr.centery - 8), 12,
-                      (210, 240, 220), bold=True, right=True, shadow=False)
-            if clicked and hov:
-                if sv.claim_daily_login():
-                    sfx("buy", 0.8, 0.0)
-        else:
-            draw_text(canvas, L("ui.daily_login"), (lr.x, lr.y + 2), 11,
-                      (108, 114, 140), shadow=False)
-            draw_text(canvas, "✓", (lr.x, lr.y + 16), 14, GREEN, bold=True,
-                      shadow=False)
-
-        # ---- ÜÇ GÖREV ----
-        qs = sv.daily_quests()
-        gx = r.x + 182
-        gw = (r.right - 16 - gx) // max(1, len(qs))
-        for i, q in enumerate(qs):
-            qr = pygame.Rect(gx + i * gw, r.y + 10, gw - 10, 80)
-            bitti = q["done"]
-            alindi = q["claimed"]
-            col = (120, 200, 140) if bitti else (150, 156, 184)
-            draw_text(canvas, _fit_text(daily_quest_text(q), 11, qr.w - 6),
-                      (qr.x, qr.y + 2), 11, col, shadow=False)
-            bar = pygame.Rect(qr.x, qr.y + 22, qr.w - 6, 7)
-            draw_bar(canvas, bar, clamp(q["cur"] / max(1.0, q["goal"]), 0, 1),
-                     col, radius=3)
-            draw_text(canvas, "%d / %d" % (int(q["cur"]), int(q["goal"])),
-                      (qr.x, qr.y + 33), 10, (122, 128, 154), shadow=False)
-            br = pygame.Rect(qr.x, qr.y + 50, 112, 26)
-            if alindi:
-                draw_icon(canvas, br.x + 10, br.centery, "star", (110, 170, 125), 6)
-                draw_text(canvas, "+" + fmt_num(q["gem"]), (br.x + 24, br.centery - 7),
-                          12, (110, 170, 125), bold=True, shadow=False)
-            elif bitti:
-                hov = br.collidepoint(mouse_pos)
-                pygame.draw.rect(canvas, (74, 148, 102) if hov else (56, 112, 78), br,
-                                 border_radius=6)
-                draw_icon(canvas, br.x + 14, br.centery, "gem", GEM_COLOR, 6)
-                draw_text(canvas, "+" + fmt_num(q["gem"]), (br.x + 28, br.centery - 7),
-                          12, WHITE, bold=True, shadow=False)
-                if clicked and hov:
-                    if sv.claim_daily_quest(q["key"]):
-                        sfx("buy", 0.8, 0.0)
-            else:
-                draw_icon(canvas, br.x + 10, br.centery, "gem", (88, 96, 124), 6)
-                draw_text(canvas, "+" + fmt_num(q["gem"]), (br.x + 24, br.centery - 7),
-                          12, (108, 114, 140), bold=True, shadow=False)
-
     def _draw_loadout_panel(self, canvas, dt, mouse_pos, clicked):
         """Ana menüdeki sol panel: kuşanılmış karakterin canlı önizlemesi.
 
@@ -24459,7 +24561,7 @@ class App:
         # --- kuşanılmış parçalar: 3 küçük yuva ---
         eq = self.save.equipped_cosmetics()
         slots = [(sl, L("ui.slot_" + sl)) for sl in ("hat", "eyewear", "cape")]
-        sw = 56
+        sw = 60          # v3.23: 56'da PELERİN/GÖZLÜK kutu çizgisine giriyordu
         sx0 = rect.centerx - (len(slots) * sw) / 2
         for i, (slot, label) in enumerate(slots):
             sr = pygame.Rect(int(sx0 + i * sw + 3), rect.y + 150, sw - 6, 32)
@@ -24542,10 +24644,9 @@ class App:
         draw_text(canvas, L("ui.difficulty", LX("diff." + self.diff, DIFF_LABEL[self.diff])), dr.center, 15, PURPLE, bold=True, center=True, shadow=False)
         if clicked and hover:
             self.cycle_diff()
-        draw_text(canvas, LX("diffd." + self.diff, DIFF_DESC[self.diff]), (VIRTUAL_W / 2, 274), 11, TEXT_DIM, center=True, shadow=False)
+        draw_text(canvas, LX("diffd." + self.diff, DIFF_DESC[self.diff]), (VIRTUAL_W / 2, 280), 11, TEXT_DIM, center=True, shadow=False)
 
         self._draw_loadout_panel(canvas, dt, mouse_pos, clicked)
-        self._draw_daily_panel(canvas, dt, mouse_pos, clicked)
 
         for b in self.menu_buttons:
             b.update(mouse_pos, dt)
@@ -24721,7 +24822,7 @@ class App:
         draw_text(canvas, L("ui.bonus_pct", best["bonus"]), (pl, rect.y + 108), 10, GOLD,
                   bold=True, shadow=False)
         draw_text(canvas, _fit_text(L("ui.biggest_pack") + "  ·  "
-                                    + L("ui.gems_n", fmt_num(gem_pack_total(best))),
+                                    + fmt_num(gem_pack_total(best)),
                                     9, pr_ - pl),
                   (pl, rect.y + 120), 9, TEXT_DIM, shadow=False)
 
@@ -25369,11 +25470,13 @@ class App:
                 sfx("click", 0.5, 0.0)
             y += 42
 
+        # Hata mesajı ile "ESC/F11/F3 değiştirilemez" notu neredeyse aynı
+        # satırdaydı; hata çıkınca ikisi üst üste biniyordu (v3.23).
         if getattr(self, "key_error", ""):
-            draw_text(canvas, self.key_error, (cx, y + 2), 11, (235, 150, 150),
-                      center=True, shadow=False)
-        draw_text(canvas, L("ui.keys_locked"), (cx, pr.bottom - 108), 10,
-                  (118, 124, 150), center=True, shadow=False)
+            draw_text(canvas, self.key_error, (cx, pr.bottom - 128), 11,
+                      (235, 150, 150), center=True, shadow=False)
+        draw_text(canvas, L("ui.keys_locked"), (cx, pr.bottom - 106), 10,
+                  TEXT_DIM, center=True, shadow=False)
 
         for b in (Button((pr.x + 34, pr.bottom - 86, 260, 42), L("ui.keys_reset"),
                          self._keys_reset, color=(110, 70, 62),
@@ -25490,7 +25593,7 @@ class App:
                 et_col = (255, 196, 90)
             else:
                 etiket = L("ui.mastery_tier", lvl)
-                et_col = TEXT if lvl else (110, 114, 140)
+                et_col = TEXT if lvl else TEXT_DIM
             draw_text(canvas, etiket, (r.x + 78, r.y + 56), 12, et_col, bold=True,
                       shadow=False)
 
@@ -25501,7 +25604,7 @@ class App:
             else:
                 b_txt = fmt_pct(b * 100)
             draw_text(canvas, b_txt, (r.right - 16, r.y + 52), 20,
-                      renk if lvl else (92, 96, 120), bold=True, right=True)
+                      renk if lvl else (138, 144, 172), bold=True, right=True)
 
             # kademe çubuğu (doğrusal kısım dolunca prestij rengine döner)
             # Çubuk satın alma düğmesinin soluna sığsın (düğme r.right-150'de
@@ -25579,16 +25682,19 @@ class App:
             self._login_box(canvas, pygame.Rect(cx - 170, pr.y + 130, 340, 46),
                             L("ui.username"), "user", mouse_pos, clicked,
                             hint=L("ui.username_hint"))
-            draw_text(canvas, L("ui.name_locked"), (cx, pr.y + 182), 10, ORANGE,
+            # DÜZELTİLDİ (v3.23): bu uyarı kutunun alt kenarına biniyor,
+            # yarısı çerçevenin içinde kalıyordu. Artık kutudan 16 piksel
+            # ayrı duruyor ve KAYDET düğmesi de aşağı kaydı.
+            draw_text(canvas, L("ui.name_locked"), (cx, pr.y + 194), 12, ORANGE,
                       center=True, shadow=False)
-            b = Button((cx - 170, pr.y + 204, 340, 46), L("ui.save"),
+            b = Button((cx - 170, pr.y + 216, 340, 46), L("ui.save"),
                        self._login_submit, color=(60, 130, 90),
                        hover_color=(80, 170, 115), text_size=17, enabled=not acc.busy)
             b.update(mouse_pos, dt)
             b.draw(canvas)
             if clicked:
                 b.click(mouse_pos)
-            self._login_status(canvas, cx, pr.y + 262, pr)
+            self._login_status(canvas, cx, pr.y + 276, pr)
             b2 = Button((cx - 150, pr.bottom - 56, 300, 42), L("ui.sign_out"),
                         self._login_logout, color=(110, 62, 62),
                         hover_color=(150, 85, 85), text_size=15)
@@ -25610,7 +25716,7 @@ class App:
             oy = pr.y + 94
             for ln in wrap_text(why, 11, pr.w - 70)[:3]:
                 draw_text(canvas, ln, (cx, oy), 11, TEXT_DIM, center=True, shadow=False)
-                oy += 14
+                oy += 17
             by = pr.y + 150
             if not google_only:
                 self._login_box(canvas, pygame.Rect(cx - 170, by, 340, 46),
@@ -25649,7 +25755,7 @@ class App:
                       bold=True, center=True)
             draw_text(canvas, acc.display_name(), (cx, pr.y + 160), 22, TEXT,
                       bold=True, center=True)
-            draw_text(canvas, L("ui.name_locked"), (cx, pr.y + 188), 10, TEXT_DIM,
+            draw_text(canvas, L("ui.name_locked"), (cx, pr.y + 188), 12, TEXT_DIM,
                       center=True, shadow=False)
             # Gmail ile girenin e-postası da görünür (veritabanında da ikisi
             # birden duruyor: hesap kime ait, bir bakışta belli olsun).
@@ -25710,7 +25816,7 @@ class App:
             oy += 10
             for ln in wrap_text(L("ui.acc_why"), 11, pr.w - 80)[:3]:
                 draw_text(canvas, ln, (cx, oy), 11, TEXT_DIM, center=True, shadow=False)
-                oy += 14
+                oy += 17
             b = Button((cx - 150, pr.bottom - 62, 300, 44), L("ui.back_menu"),
                        lambda: self.set_state(STATE_MENU), text_size=17)
             b.update(mouse_pos, dt)
@@ -25723,7 +25829,7 @@ class App:
         wy = pr.y + 58
         for ln in wrap_text(L("ui.acc_why"), 11, pr.w - 90)[:2]:
             draw_text(canvas, ln, (cx, wy), 11, TEXT_DIM, center=True, shadow=False)
-            wy += 14
+            wy += 17
 
         # ---- 1) GOOGLE (üstte) ----
         self._login_google_button(canvas, pygame.Rect(cx - 190, pr.y + 96, 380, 48),
@@ -25780,7 +25886,7 @@ class App:
         draw_text(canvas, L("ui.tab_hint"), (cx, pr.bottom - 82), 10, (104, 110, 136),
                   center=True, shadow=False)
         for i, ln in enumerate(wrap_text(L("ui.acc_safe"), 10, pr.w - 70)[:2]):
-            draw_text(canvas, ln, (cx, pr.bottom - 68 + i * 12), 10, TEXT_DIM,
+            draw_text(canvas, ln, (cx, pr.bottom - 72 + i * 16), 10, TEXT_DIM,
                       center=True, shadow=False)
         b = Button((cx - 150, pr.bottom - 44, 300, 36), L("ui.back_menu"),
                    lambda: self.set_state(STATE_MENU), text_size=15)
@@ -25825,8 +25931,8 @@ class App:
              f"{MAX_RUN_WEAPONS} silah  ·  {MAX_RUN_BOOKS} kitap (Lv.{BOOK_MAX_LEVEL}'e kadar)"
              f"  ·  {MAX_RUN_RARE_BOOKS} nadir kitap"),
             ("NADİR KİTAP TEK HAK", "Bir nadir kitap seçince o koşuda başka nadir kitap hiç çıkmaz"),
-            ("HİÇBİR EŞYA TEK ATMAZ", "Tanklar hiçbir seviyede tek vuruşta ölmez; küçükler 10. seviyeden sonra ölür"),
-            ("HER KOŞU FARKLI", "Her koşuda bazı silah ve kitaplar sessizce havuzdan çıkar — aynı kombo her sefer kurulmaz"),
+            ("HİÇBİR EŞYA TEK ATMAZ", "Hiçbir tank tek vuruşta ölmez; küçükler 10. seviyeden sonra ölür"),
+            ("HER KOŞU FARKLI", "Her koşuda bazı silah ve kitaplar havuzdan çıkar — kombo hep değişir"),
             ("KAÇARKEN DİKKAT", "Arkanda kalan yaratıklar kaçtığın yöne, yani önüne ışınlanır"),
             ("KIYAFET MARKET", "Şapka, gözlük ve pelerinlerin her biri küçük kalıcı bonus verir"),
             ("ÖLÜRSEN", "O koşuda market'ten aldıkların silinir — baştan başlarsın"),
@@ -25837,8 +25943,8 @@ class App:
             ("25'TEN SONRA ARENA", "Yeni patron gelmez; arena her dalgada daha da azar"),
             ("CEHENNEM MARKETİ", "Kızıl market: yalnızca cehennemde açılan 14 ayrı eşya (2 sayfa)"),
             ("ALTINI TOPLAMAN LAZIM", "Para yaklaşınca sana akar — tecrübe taşından biraz daha yakından"),
-            ("ALTININ 45 SANİYESİ VAR", "Yerde kalan para 45 saniye sonra kaybolur (her paranın kendi sayacı)"),
-            ("EMANET (KILIÇ)", "Saniyede bir yay çizer; zırhlı ve kalkanlı düşmanları zırhını saymadan keser"),
+            ("ALTIN 1 DAKİKA DURUR", f"Yerde kalan para {int(COIN_LIFE)} saniye sonra kaybolur"),
+            ("EMANET (KILIÇ)", "Saniyede bir yay çizer; zırhlı ve kalkanlıyı zırhını saymadan keser"),
             ("GÖRÜNMEZLİK PELERİNİ", "Her dakika 5 saniye kaybolursun — patronlar hariç kimse göremez"),
             ("KİTAPLARI DA KAPATABİLİRSİN",
              f"Kitaplıkta en fazla {MAX_MUTED_BOOKS} kitabı kapat; kapalı kitap seviye atlarken çıkmaz"),
@@ -25848,8 +25954,11 @@ class App:
             ("KİTAPLIK", "Kitapların hepsi kilitli — her birinin kendi görevleri var"),
             ("BAŞARIMLAR", "Başarıma tıkla: nasıl kazanılır, ne kadar kaldı, ödülü ne"),
             ("AYARLAR", "Ana menüden: ses, FPS sınırı (240'a kadar), görünüm seçenekleri"),
-            ("ESC  ·  EŞYA EFEKTİ", "Oyunun içinde ESC: efekt yoğunluğunu %0-%100 ayarla (hasar değişmez)"),
+            ("ESC  ·  EŞYA EFEKTİ", "AYARLAR'dan ya da ESC ile: efekt %0-%100 (hasar değişmez)"),
             ("PETLER", "MAĞAZA'dan alınır, Kıyafet Market > PET'ten kuşanılır; sadece görünüş"),
+            ("MOR SEVİYE TAŞI", "Mıknatıs kadar nadir — aldığın anda bir seviye atlarsın"),
+            ("BÜYÜCÜ  ·  15. DALGA", "Uzaktan zehirli ok atar, yaklaşmaz — önce onu temizle"),
+            ("ARI  ·  25. DALGA", "Çok hızlı koşar ama vuruşu çok hafif; panik yapma"),
         ]
         # Maddeler ÜÇ SÜTUNA bölünür; satır aralığı sütun başına düşen madde
         # sayısına göre hesaplanır, böylece yeni madde eklenince yazılar
@@ -26008,25 +26117,21 @@ class App:
             st["skill_scale"] = CFG["skill_scale"]
             self.save.save()
 
-        # ---- TAM GENİŞLİKTE BİLGİ ŞERİDİ: EŞYA EFEKTİ ----
-        # Ayar artık OYUN İÇİNDEN (ESC) yapılıyor; burada yalnızca son değeri
-        # gösteren, tıklanamayan bir şerit var.
+        # ---- TAM GENİŞLİKTE: EŞYA EFEKTİ KAYDIRICISI ----
+        # DÜZELTİLDİ (v3.23): burası eskiden yalnızca son değeri gösteren,
+        # TIKLANAMAYAN bir şeritti; oyuncu AYARLAR'da çubuğu sürüklüyor ama
+        # yüzde kıpırdamıyordu ("azalıp artmıyor"). Artık oyun içindeki (ESC)
+        # kaydırıcının aynısı: aynı yardımcıyı çağırıyor, yani iki ekran
+        # birbiriyle her zaman aynı değeri gösteriyor.
         iy = col_bottom + 18
-        ir = pygame.Rect(lx, iy, rx + cw - lx, 48)
-        fx_pct = weapon_fx_pct()
-        fx_col = GREEN if fx_pct >= 70 else (ORANGE if fx_pct >= 25 else RED)
-        panel(canvas, ir, bg=(20, 22, 36), edge=(52, 58, 84), alpha=235, radius=10, edge_w=2)
-        draw_text(canvas, L("ui.fx_level"), (ir.x + 16, ir.y + 7), 12, TEXT_DIM, shadow=False)
-        draw_text(canvas, fmt_pct(fx_pct), (ir.x + 16, ir.y + 23), 17, fx_col, bold=True,
-                  shadow=False)
-        bar = pygame.Rect(ir.x + 92, ir.centery - 5, 240, 10)
-        draw_bar(canvas, bar, fx_pct / 100.0, fx_col, radius=5)
-        draw_text(canvas, L("ui.fx_in_game"),
-                  (ir.right - 16, ir.centery - 7), 12, TEXT_DIM, right=True, shadow=False)
+        ir = pygame.Rect(lx, iy, rx + cw - lx, 50)
+        self._fx_slider(canvas, ir, mouse_pos, down)
+        if getattr(self, "_fx_dirty", False):
+            self._set_dirty = True      # bırakılınca CFG de diske yazılsın
 
         # ---- kısa notlar ----
         ny = ir.bottom + 12
-        notes = [L("ui.note_fps"), L("ui.note_pet")]
+        notes = [L("ui.note_fx"), L("ui.note_fps"), L("ui.note_pet")]
         for ln in notes:
             draw_text(canvas, ln, (pr.centerx, ny), 10, TEXT_DIM, center=True, shadow=False)
             ny += 14
@@ -26162,7 +26267,7 @@ class App:
             # kademe rozeti (sağ üst)
             tier = ACH_TIERS.get(a.get("tier", "bronz"), ACH_TIERS["bronz"])
             draw_text(canvas, tier["label"], (rect.right - 16, rect.y + 17), 10,
-                      tcol if got else scale_col(tcol, 0.55), bold=True, right=True, shadow=False)
+                      tcol if got else scale_col(tcol, 0.85), bold=True, right=True, shadow=False)
 
             for j, ln in enumerate(wrap_text(ach_desc(a), 11, rect.w - 108)[:2]):
                 draw_text(canvas, ln, (tx, rect.y + 40 + j * 14), 11, TEXT_DIM,
@@ -26220,7 +26325,7 @@ class App:
                   (70, 67), 11, GEM_COLOR, bold=True, shadow=False)
 
         pbw = 250
-        pbx = VIRTUAL_W - pbw - 40
+        pbx = VIRTUAL_W - pbw - 80   # yüzde yazısına yer (v3.23)
         all_done = got_n >= total_n
         draw_text(canvas, L("ui.ach_count", got_n, total_n), (pbx, 20), 12,
                   GOLD if all_done else TEXT, bold=True, shadow=False)
@@ -26920,11 +27025,13 @@ class App:
             pygame.draw.rect(strip, (*edge, 200), strip.get_rect(), border_radius=2)
             canvas.blit(strip, (rect.x + 13, rect.y + 7))
             if w.get("timed"):
-                draw_text(canvas, L("ui.cycle"), (rect.right - 56, rect.y + 16), 10,
-                          (160, 150, 230) if owned else (92, 90, 116), bold=True, shadow=False)
+                draw_text(canvas, L("ui.cycle"), (rect.right - 13, rect.y + 16), 10,
+                          (160, 150, 230) if owned else (92, 90, 116), bold=True,
+                          right=True, shadow=False)
             elif w.get("passive"):
-                draw_text(canvas, L("ui.passive"), (rect.right - 60, rect.y + 16), 10,
-                          (120, 180, 140) if owned else (86, 100, 92), bold=True, shadow=False)
+                draw_text(canvas, L("ui.passive"), (rect.right - 13, rect.y + 16), 10,
+                          (120, 180, 140) if owned else (86, 100, 92), bold=True,
+                          right=True, shadow=False)
             if is_muted:
                 draw_text(canvas, L("ui.off"), (rect.x + 17, rect.y + 16), 10, (232, 130, 130),
                           bold=True, shadow=False)
@@ -26938,8 +27045,8 @@ class App:
 
             draw_text(canvas, w_name(w), (rect.centerx, rect.y + 124), 16,
                       TEXT if owned else (140, 138, 160), bold=True, center=True)
-            for j, ln in enumerate(wrap_text(w_desc(w), 10, rect.w - 26)[:2]):
-                draw_text(canvas, ln, (rect.centerx, rect.y + 146 + j * 13), 10,
+            for j, ln in enumerate(wrap_clip(w_desc(w), 10, rect.w - 26, 3)):
+                draw_text(canvas, ln, (rect.centerx, rect.y + 144 + j * 16), 10,
                           TEXT_DIM, center=True, shadow=False)
 
             # ---- alt bölüm ----
@@ -27011,7 +27118,7 @@ class App:
                   (52, 50), 11, TEXT_DIM, shadow=False)
 
         pbw = 250
-        pbx = VIRTUAL_W - pbw - 40
+        pbx = VIRTUAL_W - pbw - 80   # yüzde yazısına yer (v3.23)
         draw_text(canvas, L("ui.weapons_open", owned_n, total), (pbx, 20), 12,
                   GOLD if owned_n >= total else TEXT, bold=True, shadow=False)
         draw_bar(canvas, pygame.Rect(pbx, 40, pbw, 10), owned_n / max(1, total),
@@ -27296,8 +27403,8 @@ class App:
 
             draw_text(canvas, bk_name(bk), (rect.centerx, rect.y + 138), 15, TEXT,
                       bold=True, center=True)
-            for j, ln in enumerate(wrap_text(bk_desc(bk), 10, rect.w - 26)[:2]):
-                draw_text(canvas, ln, (rect.centerx, rect.y + 159 + j * 13), 10,
+            for j, ln in enumerate(wrap_clip(bk_desc(bk), 10, rect.w - 26, 3)):
+                draw_text(canvas, ln, (rect.centerx, rect.y + 157 + j * 16), 10,
                           TEXT_DIM, center=True, shadow=False)
 
             # ---- alt bölüm: görev durumu (çok şartlı) ----
@@ -27379,7 +27486,7 @@ class App:
 
         # sağ üst: genel ilerleme çubuğu
         pbw = 250
-        pbx = VIRTUAL_W - pbw - 40
+        pbx = VIRTUAL_W - pbw - 80   # yüzde yazısına yer (v3.23)
         draw_text(canvas, L("ui.books_open", owned_n, len(BOOKS)), (pbx, 20), 12,
                   GOLD if owned_n >= len(BOOKS) else TEXT, bold=True, shadow=False)
         draw_bar(canvas, pygame.Rect(pbx, 40, pbw, 10), owned_n / max(1, len(BOOKS)),
@@ -27865,7 +27972,7 @@ class App:
                       (panel_rect.centerx, y), 12, TEXT_DIM, center=True, shadow=False)
             y += 27
 
-        btn_w, btn_h, gap = 150, 46, 14
+        btn_w, btn_h, gap = 170, 46, 14   # v3.23: KUŞANILDI 150'ye sığmıyordu
         by = panel_rect.bottom - 66
         if owned:
             play_btn = Button((panel_rect.centerx - btn_w - gap / 2, by, btn_w, btn_h), L("ui.play"),
@@ -28050,13 +28157,18 @@ class App:
             self._cosmetic_preview(canvas, cc[0], cc[1], 26, item["slot"], item["id"], self.t)
 
             draw_text(canvas, cos_name(item), (rect.centerx, rect.y + 100), 15, TEXT, bold=True, center=True)
-            desc_lines = wrap_text(cos_desc(item), 10, rect.w - 24)[:1]
+            # v3.23: açıklama tek satıra kırpılınca cümlenin ortasında
+            # kesiliyordu. İki satır sığıyor (alt yazı rect.bottom-18'de).
+            desc_lines = wrap_clip(cos_desc(item), 10, rect.w - 24, 2)
             for j, ln in enumerate(desc_lines):
-                draw_text(canvas, ln, (rect.centerx, rect.y + 120 + j * 13), 10, TEXT_DIM, center=True, shadow=False)
+                draw_text(canvas, ln, (rect.centerx, rect.y + 118 + j * 16), 10, TEXT_DIM, center=True, shadow=False)
             perk_txt = item.get("perk_text")
             if perk_txt:
-                draw_icon(canvas, rect.centerx - text_width(perk_txt, 11, True) / 2 - 12, rect.y + 137, "star", item["color"], 6)
-                draw_text(canvas, perk_txt, (rect.centerx, rect.y + 137), 11, item["color"], bold=True, center=True)
+                # Parçanın kendi rengi koyu olabiliyor (Ninja, Silindir Şapka):
+                # kart zeminiyle aynı tona düşüp okunmaz oluyordu.
+                pcol = lighten(item["color"], .55)
+                draw_icon(canvas, rect.centerx - text_width(perk_txt, 11, True) / 2 - 12, rect.y + 154, "star", pcol, 6)
+                draw_text(canvas, perk_txt, (rect.centerx, rect.y + 154), 11, pcol, bold=True, center=True)
 
             if is_equipped:
                 draw_text(canvas, L("ui.equipped_off"), (rect.centerx, rect.bottom - 18), 10, CYAN, bold=True, center=True)
