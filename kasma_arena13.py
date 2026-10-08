@@ -26,9 +26,15 @@
      7 günlük hediye serisi, başarım ödülleri. Premium skin ve PET'ler
      yalnızca GERÇEK PARAYLA satılır (elmasla satılmaz).
    * ÖDÜLLER HESABA ÖZEL: reklam ve günlük hediye sayaçları aktif profile
-     ait (misafir ayrı, her hesap ayrı) ve hesaptakiler sunucuda da
-     tutuluyor (server.py _merge_rewards) — başka bilgisayardan girip aynı
-     günün hakkı ikinci kez kullanılamaz.
+     ait (misafir ayrı, her hesap ayrı). Hesapta ödülü SUNUCU verir, kendi
+     saatiyle (server.py /rewards/claim): bilgisayarın saatini oynatmak ya
+     da sayaçları sıfırlamak işe yaramaz, reklam ödülü biletle ve film
+     bittikten sonra verilir. Misafirde saat geri alınırsa ödül kapanır.
+   * HİLE KORUMASI: kurcalanmış kayıt sunucuya hiç gönderilmez, hesaba
+     girilince sunucudaki temiz ilerleme aynen alınır; sunucu elması
+     zamana bağlı bir "kova"yla sınırlar ve parayla satılan skin/PET'i
+     oyunun "bende var" demesiyle vermez. Profil değişince önceki
+     kullanıcının hiçbir verisi sızmaz (tests/e2e_accounts.py).
    * 30 SANİYELİK TANITIM FİLMİ (reklam): GERÇEK oyun motoruyla, otomatik
      pilotun oynadığı koşular — gerçek mermiler, BONK, dash, silahlar,
      patron — ardından SİLAHLIK geçidi, KİTAPLIK + seviye atlama kartları,
@@ -42,7 +48,14 @@
      ışınlar, kartın üstünden geçen parıltı, kupa salonu arka planı.
    * SİLAHLIK: taş duvarlı silah deposu, iki yanda yanan meşaleler,
      kıvılcımlar, perçinli metal kart çerçeveleri.
-   * DENGE: seviye için gereken XP %15 arttı (XP_NEED_BUFF). İlk 10
+   * NADİR KİTAPLAR artık normal oyunla açılıyor (500.000 mermi -> 30.000,
+     30.000 can çalma -> 6.000, 40.000 can yenileme -> 8.000...). Sülük,
+     Tempo, Delgi ve Mıknatıs kitaplarının görevleri de yumuşadı.
+   * ZEMZEM yalnızca EKRANDA görünen yere dökülür. PATRON VARKEN oyun
+     durmaz: yaratıklar yarı hızda gelmeye devam eder (BOSS_SPAWN_RATE).
+   * YENİ REKOR: kişisel rekor geçildiği an ve oyun sonunda büyük damga.
+   * DENGE: akan XP önce %15, sonra %20 arttı (XP_GAIN_BUFFS); yerdeki
+     altın %25 arttı (GOLD_GAIN_BUFF). İlk 10
      dalgada yarasa (mavi, çevik) doğumu %10 azaldı (EARLY_BAT_NERF).
 
  v3.21 ile gelenler (HESAP HATALARI DÜZELTİLDİ):
@@ -1296,6 +1309,16 @@ STRINGS = {
     "ui.unlocked_weapon": _T("YENİ SİLAH: ", "NEW WEAPON: ", "ARMA NUEVA: ", "NEUE WAFFE: ", "НОВОЕ ОРУЖИЕ: "),
     "ui.unlocked_book": _T("YENİ KİTAP: ", "NEW BOOK: ", "LIBRO NUEVO: ", "NEUES BUCH: ", "НОВАЯ КНИГА: "),
     "ui.play_again":  _T("TEKRAR OYNA", "PLAY AGAIN", "JUGAR OTRA VEZ", "NOCHMAL SPIELEN", "ИГРАТЬ СНОВА"),
+    "ui.reward_clock": _T("Bilgisayarın saati geri alınmış görünüyor — ödül verilemedi.",
+                          "Your PC clock seems to have been turned back — no reward.",
+                          "El reloj del PC parece atrasado: sin premio.",
+                          "Die PC-Uhr wurde wohl zurückgestellt — keine Belohnung.",
+                          "Часы ПК переведены назад — награды нет."),
+    "ui.reward_no_ticket": _T("Reklam sunucuya kaydedilemedi — ödül verilemedi. İnterneti kontrol et.",
+                              "The ad couldn't be registered with the server — no reward. Check your internet.",
+                              "No se pudo registrar el anuncio: sin premio. Revisa tu internet.",
+                              "Werbung nicht beim Server registriert — keine Belohnung.",
+                              "Реклама не зарегистрирована на сервере — награды нет."),
     "ui.new_record":  _T("YENİ REKOR!", "NEW RECORD!", "¡NUEVO RÉCORD!", "NEUER REKORD!", "НОВЫЙ РЕКОРД!"),
     "ui.score_is":    _T("Skor: {0}", "Score: {0}", "Puntos: {0}", "Punkte: {0}", "Счёт: {0}"),
     "ui.enter_name":  _T("İsmini yaz:", "Enter your name:", "Escribe tu nombre:", "Gib deinen Namen ein:", "Введи имя:"),
@@ -3546,6 +3569,13 @@ class SaveManager:
         # doğruladığı sayılardır; yerel dosyanın geçmişi anlamını yitirir.
         if bad_sig:
             self._mark_tainted_dict(merged, "signature")
+            # Dosyanın TAMAMI güvenilmez: içinde saklanan diğer profillerin
+            # (misafir / öteki hesaplar) kopyaları da şaibeli sayılır. Yoksa
+            # kurcalanmış bir HESAP kopyası, o hesaba girilince temiz diye
+            # açılıp sunucuya gönderilebilirdi.
+            for snap in (merged.get("profiles") or {}).values():
+                if isinstance(snap, dict):
+                    self._mark_tainted_dict(snap, "signature")
         return merged
 
     # =================================================================
@@ -3651,9 +3681,14 @@ class SaveManager:
             return False
         self.data.setdefault("profiles", {})[cur] = self._snapshot_profile()
         incoming = self.data["profiles"].get(pid) or self.blank_profile()
+        blank = self.blank_profile()
         for k in self.PROFILE_KEYS:
-            if k in incoming:
-                self.data[k] = json.loads(json.dumps(incoming[k]))
+            # v3.26: profil kopyasında OLMAYAN alan (eski sürümde kaydedilmiş
+            # bir profil) bir önceki kullanıcıdan KALMASIN: varsayılana döner.
+            # Eskiden olduğu gibi bırakılıyordu ve önceki hesabın verisi
+            # (örn. ödül sayaçları) yeni hesaba sızıyordu.
+            src = incoming[k] if k in incoming else blank.get(k)
+            self.data[k] = json.loads(json.dumps(src))
         self.data["profiles"].pop(pid, None)
         self.data["active_profile"] = pid
         if "default" not in self.data.get("skins_owned", []):
@@ -3688,13 +3723,44 @@ class SaveManager:
         """
         if not isinstance(prog, dict):
             return
+        if self.is_tainted():
+            # ŞAİBELİ YEREL KAYIT (v3.26): yereldeki sayılara hiç güvenilmez;
+            # sunucudaki ilerleme OLDUĞU GİBİ alınır. Eskiden burada da
+            # "büyüğü al" kuralı işliyordu: kurcalanmış yerel elmas sunucunun
+            # değerini ezip sonra sunucuya geri gönderilebiliyordu.
+            blank = self.blank_profile()
+            was_banned = bool(self.data.get("board_banned"))
+            for k in self.PROFILE_KEYS:
+                if k in ("tainted", "taint_reasons"):
+                    continue
+                src = prog[k] if prog.get(k) is not None else blank.get(k)
+                self.data[k] = json.loads(json.dumps(src))
+            self.data["gems_spent"] = min(int(self.data.get("gems_spent", 0) or 0),
+                                          int(self.data.get("gems_earned", 0) or 0))
+            self.data["gems"] = max(0, int(self.data.get("gems_earned", 0) or 0)
+                                    - self.data["gems_spent"])
+            rw = self.data.get("rewards")
+            self.data["rewards"] = dict(rw) if isinstance(rw, dict) else {}
+            self.data["rewards"]["pid"] = self.profile_id()
+            self.data["tainted"] = False
+            self.data["taint_reasons"] = []
+            # Yasak hiçbir yerde kalkmaz (bkz. BAN_REASONS).
+            self.data["board_banned"] = was_banned or bool(prog.get("board_banned"))
+            if "default" not in self.data.get("skins_owned", []):
+                self.data.setdefault("skins_owned", []).append("default")
+            self.save()
+            return
         for k in self.PROFILE_KEYS:
             if k not in prog or prog[k] is None:
                 continue
             v = json.loads(json.dumps(prog[k]))
             if k in self.MERGE_LISTS and isinstance(v, list):
                 cur = self.data.get(k) or []
-                self.data[k] = cur + [x for x in v if x not in cur]
+                merged_l = cur + [x for x in v if x not in cur]
+                # PARALI İÇERİK (premium skin, PET) SUNUCUNUNDUR: sunucunun
+                # listesinde olmayan paralı öğe yerelde de tutulmaz (bkz.
+                # server.py PAID_SKINS / _is_paid).
+                self.data[k] = [x for x in merged_l if not _is_paid_item(k, x) or x in v]
             elif k == "stats" and isinstance(v, dict):
                 cur = dict(self.data.get(k) or {})
                 for sk, sv in v.items():
@@ -3724,11 +3790,12 @@ class SaveManager:
                         pass
                 self.data[k] = cur
             elif k == "rewards":
-                # Reklam/hediye sayaçları GERİ GİTMEZ: başka bilgisayarda
-                # alınan hediye burada da "alındı" görünür.
-                merged_rw = merge_rewards(self.data.get("rewards"), v)
-                merged_rw["pid"] = self.profile_id()
-                self.data[k] = merged_rw
+                # Hesabın reklam/hediye sayaçları SUNUCUNUNDUR (sunucu
+                # saatiyle işler, bkz. server.py /rewards/claim): olduğu
+                # gibi alınır.
+                rw = dict(v) if isinstance(v, dict) else {}
+                rw["pid"] = self.profile_id()
+                self.data[k] = rw
             elif k in ("gems", "gems_earned", "gems_spent"):
                 continue        # aşağıda defter olarak birlikte işlenir
             else:
@@ -4463,54 +4530,47 @@ def fmt_clock(sec):
     return f"{h:d}:{m:02d}:{s_:02d}" if h else f"{m:d}:{s_:02d}"
 
 
-def merge_rewards(a, b):
-    """İki ödül sayacını birleştirir; sayaçlar GERİ GİTMEZ (server.py'de aynısı).
-
-    Aynı gün için büyük sayı, farklı günlerde yeni gün kazanır. Böylece
-    hesaba başka bilgisayardan girilse bile o günün hakkı ikinci kez
-    kullanılamaz.
-    """
-    a = a if isinstance(a, dict) else {}
-    b = b if isinstance(b, dict) else {}
-
-    def _i(v):
-        try:
-            return int(v or 0)
-        except (TypeError, ValueError):
-            return 0
-
-    def _f(v):
-        try:
-            x = float(v or 0)
-            return x if math.isfinite(x) else 0.0
-        except (TypeError, ValueError):
-            return 0.0
-
-    out = {}
-    ka_ = lambda d: (str(d.get("ad_day") or "")[:10], _i(d.get("ad_count")))
-    src = a if ka_(a) >= ka_(b) else b
-    if src.get("ad_day"):
-        out["ad_day"], out["ad_count"] = ka_(src)
-    out["ad_last"] = max(_f(a.get("ad_last")), _f(b.get("ad_last")))
-    out["ad_total"] = max(_i(a.get("ad_total")), _i(b.get("ad_total")))
-    kg_ = lambda d: (str(d.get("gift_day") or "")[:10], _i(d.get("gift_streak")))
-    src = a if kg_(a) >= kg_(b) else b
-    if src.get("gift_day"):
-        out["gift_day"], out["gift_streak"] = kg_(src)
-    return out
+def _is_paid_item(list_key, item):
+    """Gerçek parayla satılan içerik mi? (server.py _is_paid ile aynı kural)"""
+    if list_key == "skins_owned":
+        return bool(get_skin(item).get("premium")) and item in SKIN_BY_ID
+    if list_key == "cosmetics_owned":
+        return str(item).startswith("pet_")
+    return False
 
 
 class RewardCenter:
-    """Reklam ödülü ve günlük hediye sayaçları (bkz. yukarıdaki not).
+    """Reklam ödülü ve günlük hediye.
 
-    v3.26 DÜZELTME — HESABA ÖZEL: sayaçlar artık oyuncunun AKTİF PROFİLİNE
-    ait (misafir ayrı, her hesap ayrı) ve hesaptakiler sunucuya da yazılıyor.
-    Eskiden bilgisayar başınaydı: misafirken alınan hediye, hesaba girince
-    "alındı" görünüyordu.
+    HESABA ÖZEL (v3.26): sayaçlar oyuncunun AKTİF PROFİLİNE aittir (misafir
+    ayrı, her hesap ayrı).
+
+    GİRİŞ YAPMIŞ OYUNCU: ödül SUNUCUDAN istenir ve sunucunun saatiyle
+    sayılır (server.py /rewards/...). Bilgisayarın tarihini değiştirmek ya
+    da kayıttaki sayaçları kurcalamak işe yaramaz; sayaçlar her bilgisayarda
+    aynıdır. Sunucuya ulaşılamazsa ödül VERİLMEZ (sonra tekrar denenir).
+
+    MİSAFİR: ödül yerelde verilir (misafir ilerlemesi hesaba ve dünya
+    sıralamasına geçmez). Saat geri alınmışsa ödül verilmez.
     """
 
-    def __init__(self, save):
+    CLOCK_SLACK = 600.0          # saat bu kadar geri giderse "geri alınmış" sayılır
+
+    def __init__(self, save, account=None):
         self.save = save
+        self.account = account
+        self.busy = False
+        self.ticket = None
+        self.ticket_pending = False
+
+    # ---- kim, nerede ----
+    def online_mode(self):
+        acc = self.account
+        try:
+            return bool(acc is not None and getattr(acc, "enabled", False)
+                        and acc.logged_in() and getattr(acc, "token", ""))
+        except Exception:
+            return False
 
     def _st(self):
         pid = self.save.profile_id()
@@ -4522,10 +4582,25 @@ class RewardCenter:
             self.save.data["rewards"] = st
         return st
 
+    def clock_ok(self):
+        """Misafirde saat geri alınmış mı? (Hesapta sunucu saati geçerli.)"""
+        if self.online_mode():
+            return True
+        hw = float(self._st().get("hw", 0) or 0)
+        return time.time() + self.CLOCK_SLACK >= hw
+
+    def _touch_clock(self, st):
+        st["hw"] = max(float(st.get("hw", 0) or 0), time.time())
+
     # ---- reklam ----
     def ads_used(self):
         st = self._st()
-        return int(st.get("ad_count", 0) or 0) if st.get("ad_day") == _day_key() else 0
+        day, today = str(st.get("ad_day") or ""), _day_key()
+        if day == today:
+            return int(st.get("ad_count", 0) or 0)
+        if day > today:                 # kayıt "gelecekte": saat geri alınmış
+            return AD_DAILY_LIMIT
+        return 0
 
     def ads_left(self):
         return max(0, AD_DAILY_LIMIT - self.ads_used())
@@ -4536,25 +4611,56 @@ class RewardCenter:
         return clamp(last + AD_COOLDOWN - time.time(), 0.0, AD_COOLDOWN)
 
     def ad_ready(self):
-        return self.ads_left() > 0 and self.ad_cooldown() <= 0
+        return (not self.busy and self.clock_ok() and self.ads_left() > 0
+                and self.ad_cooldown() <= 0)
 
-    def grant_ad(self):
-        """Reklam SONUNA kadar izlendi: ödülü yaz. Verilen elmas sayısını döndürür."""
+    def begin_ad(self):
+        """Reklam başladı. Hesapta sunucudan bir 'reklam bileti' alınır."""
+        self.ticket = None
+        if not self.online_mode():
+            return
+        self.ticket_pending = True
+
+        def done(ok, err, res):
+            self.ticket_pending = False
+            if ok and res:
+                self.ticket = res.get("ticket")
+        self.account.reward_call("/rewards/ad_start", {}, done)
+
+    def grant_ad(self, on_done):
+        """Reklam SONUNA kadar izlendi. on_done(verilen_elmas, hata_metni)."""
+        if self.online_mode():
+            if not self.ticket:
+                on_done(0, L("ui.reward_no_ticket"))
+                return
+            self.busy = True
+
+            def done(ok, err, res):
+                self.busy = False
+                on_done(int((res or {}).get("amount", 0) or 0) if ok else 0,
+                        "" if ok else (err or L("ui.acc_neterr")))
+            self.account.reward_call("/rewards/claim", {"kind": "ad", "ticket": self.ticket}, done)
+            self.ticket = None
+            return
         if not self.ad_ready():
-            return 0
+            on_done(0, L("ui.reward_clock") if not self.clock_ok() else "")
+            return
         st = self._st()
         day = _day_key()
         st["ad_count"] = (int(st.get("ad_count", 0) or 0) + 1) if st.get("ad_day") == day else 1
         st["ad_day"] = day
         st["ad_last"] = time.time()
         st["ad_total"] = int(st.get("ad_total", 0) or 0) + 1
+        self._touch_clock(st)
         self.save.add_gems(AD_REWARD_GEMS)
         self.save.progress_changed()
-        return AD_REWARD_GEMS
+        on_done(AD_REWARD_GEMS, "")
 
     # ---- günlük hediye ----
     def gift_ready(self):
-        return self._st().get("gift_day") != _day_key()
+        if self.busy or not self.clock_ok():
+            return False
+        return str(self._st().get("gift_day") or "") < _day_key()
 
     def gift_day_index(self):
         """Bugün alınacak hediyenin serideki sırası (0..6)."""
@@ -4569,17 +4675,29 @@ class RewardCenter:
     def gift_amount(self):
         return DAILY_GIFT_GEMS[self.gift_day_index()]
 
-    def claim_gift(self):
+    def claim_gift(self, on_done):
+        """Günlük hediyeyi alır. on_done(verilen_elmas, hata_metni)."""
+        if self.online_mode():
+            self.busy = True
+
+            def done(ok, err, res):
+                self.busy = False
+                on_done(int((res or {}).get("amount", 0) or 0) if ok else 0,
+                        "" if ok else (err or L("ui.acc_neterr")))
+            self.account.reward_call("/rewards/claim", {"kind": "gift"}, done)
+            return
         if not self.gift_ready():
-            return 0
+            on_done(0, L("ui.reward_clock") if not self.clock_ok() else "")
+            return
         st = self._st()
         idx = self.gift_day_index()
         amount = DAILY_GIFT_GEMS[idx]
         st["gift_streak"] = idx + 1
         st["gift_day"] = _day_key()
+        self._touch_clock(st)
         self.save.add_gems(amount)
         self.save.progress_changed()
-        return amount
+        on_done(amount, "")
 
     def anything_ready(self):
         return self.ad_ready() or self.gift_ready()
@@ -5165,6 +5283,11 @@ class AccountClient:
         """
         if not self.token or not self.logged_in():
             return
+        if self.save.is_tainted():
+            # Şaibeli yerel kayıt sunucuya GÖNDERİLMEZ; tersine sunucudaki
+            # temiz ilerleme indirilir (import_progress onu aynen alır).
+            threading.Thread(target=self.pull_progress, daemon=True).start()
+            return
         prog = self.save.export_progress()
         tok = self.token          # ANLIK GÖRÜNTÜ İLE JETON BİRBİRİNE BAĞLI
         self.sync_busy = True
@@ -5192,6 +5315,35 @@ class AccountClient:
                 self.sync_error = self._err_text(e)
             finally:
                 self.sync_busy = False
+        threading.Thread(target=worker, daemon=True).start()
+
+    # ---------- ÜCRETSİZ ELMAS (sunucu hakem) ----------
+    def reward_call(self, path, extra, on_done):
+        """Ödül isteği (arka planda). on_done(ok, hata_metni, cevap).
+        Başarılıysa sunucunun döndürdüğü ilerleme (yeni elmas ve sayaçlar)
+        hemen uygulanır."""
+        tok = self.token
+        if not tok:
+            on_done(False, L("ui.world_needs_login"), None)
+            return
+
+        def worker():
+            try:
+                payload = {"token": tok, "device": device_id(),
+                           "device_legacy": device_id_legacy()}
+                payload.update(extra or {})
+                res = self._post(path, payload, timeout=15)
+            except Exception as e:
+                on_done(False, self._err_text(e), None)
+                return
+            if tok != self.token:
+                on_done(False, "", None)          # arada hesap değişti
+                return
+            ok = bool(res.get("success"))
+            if ok and isinstance(res.get("progress"), dict):
+                self.save.import_progress(res["progress"])
+                self.sync_at = time.time()
+            on_done(ok, "" if ok else str(res.get("error") or ""), res)
         threading.Thread(target=worker, daemon=True).start()
 
     # ---------- kullanıcı adı / şifre ----------
@@ -8879,8 +9031,8 @@ BOOKS = [
     {"key": "r_aspd", "name": "Tempo Kitabı",
      "desc": "Atış hızını %6 artırır",
      "color": (150, 210, 255), "icon": "target", "rare": False,
-     "unlock": dict(text="Tetiği bırakma: 25.000 mermi at",
-                    reqs=[rq_stat("total_shots", 25000, "Toplam 25.000 mermi at")])},
+     "unlock": dict(text="Tetiği bırakma: 12.000 mermi at",
+                    reqs=[rq_stat("total_shots", 12000, "Toplam 12.000 mermi at")])},
     {"key": "r_crit", "name": "Kritik Kitabı",
      "desc": "Kritik vuruş şansını %3,5 artırır",
      "color": (140, 230, 120), "icon": "clover", "rare": False,
@@ -8915,13 +9067,13 @@ BOOKS = [
     {"key": "r_mag", "name": "Mıknatıs Kitabı",
      "desc": "Toplama menzilini %20 artırır",
      "color": (150, 220, 255), "icon": "magnet", "rare": False,
-     "unlock": dict(text="Yerdekini bırakma: toplam 20.000 altın topla",
-                    reqs=[rq_stat("total_gold", 20000, "Toplam 20.000 altın topla")])},
+     "unlock": dict(text="Yerdekini bırakma: toplam 12.000 altın topla",
+                    reqs=[rq_stat("total_gold", 12000, "Toplam 12.000 altın topla")])},
     {"key": "r_vamp", "name": "Sülük Kitabı",
      "desc": "Verdiğin hasarın %2'si kadar can çalarsın",
      "color": (210, 70, 100), "icon": "drop", "rare": False,
-     "unlock": dict(text="Kanla beslen: toplam 10.000 can çal",
-                    reqs=[rq_ach("leech10k", "«Sülük» başarımını aç")])},
+     "unlock": dict(text="Kanla beslen: toplam 4.000 can çal",
+                    reqs=[rq_stat("total_lifesteal", 4000, "Kan Emici ile toplam 4.000 can çal")])},
     # max=5: doyan kitap. 15 seviyede 16 delmeye çıkıyordu ama arenada tek
     # bir mermi hattında 16 yaratığın dizilmesi pratikte hiç olmuyor.
     {"key": "r_pierce", "name": "Delgi Kitabı", "max": 5,
@@ -8929,7 +9081,7 @@ BOOKS = [
      "color": (220, 140, 90), "icon": "sword", "rare": False,
      "unlock": dict(text="Sırayı dizip tek mermiyle biç: 8. dalgaya ulaş",
                     reqs=[rq_stat("best_wave", 8, "8. dalgaya ulaş"),
-                          rq_stat("total_shots", 60000, "Toplam 60.000 mermi at")])},
+                          rq_stat("total_shots", 15000, "Toplam 15.000 mermi at")])},
     {"key": "r_bonk", "name": "BONK Kitabı",
      "desc": "BONK hasarını %14, vuruş alanını %7 büyütür",
      "color": (240, 120, 60), "icon": "fist", "rare": False,
@@ -8956,72 +9108,70 @@ BOOKS = [
      "desc": "Vurduğun düşmanı ÖLENE KADAR zehirler — zehir üst üste birikir",
      "color": (120, 225, 90), "icon": "drop", "rare": True,
      "unlock": dict(text="Binlerce düşmanı devir, birini bile kaçırma",
-                    reqs=[rq_stat("total_kills", 5000, "Toplam 5.000 düşman öldür"),
-                          rq_stat("best_run_kills", 300, "Tek koşuda 300 düşman öldür"),
-                          rq_ach("hunter", "«Usta Avcı» başarımını aç")])},
+                    reqs=[rq_stat("total_kills", 4000, "Toplam 4.000 düşman öldür"),
+                          rq_stat("best_run_kills", 300, "Tek koşuda 300 düşman öldür")])},
     {"key": "r_echo", "name": "Yankı Kitabı",
      "desc": "Her 4. atışın ÇİFT hasar vurur",
      "color": (255, 225, 140), "icon": "bolt", "rare": True,
-     "unlock": dict(text="Tetiği bırakma: yarım milyon mermi",
-                    reqs=[rq_stat("total_shots", 500000, "Toplam 500.000 mermi at"),
-                          rq_ach("shots50k", "«Mermi Fabrikası» başarımını aç")])},
+     "unlock": dict(text="Tetiği bırakma: 30.000 mermi at",
+                    reqs=[rq_stat("total_shots", 30000, "Toplam 30.000 mermi at"),
+                          rq_stat("best_wave", 10, "10. dalgaya ulaş")])},
     {"key": "r_multi", "name": "Çoğalma Kitabı",
      "desc": "Her atışında bir mermi daha çıkar",
      "color": (175, 140, 255), "icon": "star", "rare": True,
-     "unlock": dict(text="Tek namludan fazlasını hak et: 15. dalgaya ulaş",
-                    reqs=[rq_ach("wave15", "«Arena Ustası» başarımını aç"),
-                          rq_stat("total_shots", 120000, "Toplam 120.000 mermi at")])},
+     "unlock": dict(text="Tek namludan fazlasını hak et: 13. dalgaya ulaş",
+                    reqs=[rq_stat("best_wave", 13, "13. dalgaya ulaş"),
+                          rq_stat("total_shots", 20000, "Toplam 20.000 mermi at")])},
     {"key": "r_killheal", "name": "Kan Kitabı",
      "desc": "Öldürdüğün her düşman azami canının %3'ü kadar can verir",
      "color": (220, 60, 90), "icon": "heart", "rare": True,
-     "unlock": dict(text="Kan Emici'yi tavana çıkar ve 30.000 can çal",
-                    reqs=[rq_shop("vampiric", 5, "Kan Emici'yi markette Lv.5'e (tavan) çıkar"),
-                          rq_stat("total_lifesteal", 30000, "Kan Emici ile toplam 30.000 can çal")])},
+     "unlock": dict(text="Kan Emici'yi Lv.4'e çıkar ve 6.000 can çal",
+                    reqs=[rq_shop("vampiric", 4, "Kan Emici'yi markette Lv.4'e çıkar"),
+                          rq_stat("total_lifesteal", 6000, "Kan Emici ile toplam 6.000 can çal")])},
     {"key": "r_rage", "name": "Öfke Kitabı",
      "desc": "Canın yarısının altındayken hasarın %35 artar",
      "color": (250, 70, 50), "icon": "flame", "rare": True,
      "unlock": dict(text="Patronların kâbusu ol",
-                    reqs=[rq_stat("bosses", 12, "12 patron devir"),
-                          rq_stat("best_run_kills", 400, "Tek koşuda 400 düşman öldür")])},
+                    reqs=[rq_stat("bosses", 6, "6 patron devir"),
+                          rq_stat("best_run_kills", 350, "Tek koşuda 350 düşman öldür")])},
     {"key": "r_execute", "name": "İnfaz Kitabı",
      "desc": "Canı %18'in altına düşen sıradan düşmanlar anında ölür",
      "color": (255, 160, 60), "icon": "skull", "rare": True,
-     "unlock": dict(text="Bitirmeyi öğren: 20. dalgaya ulaş",
-                    reqs=[rq_ach("wave20", "«Efsane» başarımını aç"),
-                          rq_stat("total_kills", 8000, "Toplam 8.000 düşman öldür")])},
+     "unlock": dict(text="Bitirmeyi öğren: 16. dalgaya ulaş",
+                    reqs=[rq_stat("best_wave", 16, "16. dalgaya ulaş"),
+                          rq_stat("total_kills", 5000, "Toplam 5.000 düşman öldür")])},
     {"key": "r_roar", "name": "Kükreme Kitabı",
      "desc": "BONK'ladığın düşmanlar korkup kaçar ve korkarken %30 fazla hasar alır",
      "color": (235, 140, 60), "icon": "skull", "rare": True,
      "unlock": dict(text="Arena senin kükremeni tanısın",
-                    reqs=[rq_stat("total_bonks", 1500, "Toplam 1.500 kez BONK at"),
-                          rq_stat("total_bonk_hits", 9000, "BONK ile toplam 9.000 düşmana vur"),
+                    reqs=[rq_stat("total_bonks", 700, "Toplam 700 kez BONK at"),
+                          rq_stat("total_bonk_hits", 3500, "BONK ile toplam 3.500 düşmana vur"),
                           rq_book("r_bonk", "Önce BONK Kitabı'nı aç")])},
     {"key": "r_dashslow", "name": "Zaman Kitabı",
      "desc": "Dash attığında çevrendeki düşmanlar yavaşlar; yavaşlamış düşman sana %20 az hasar verir",
      "color": (150, 200, 255), "icon": "snow", "rare": True,
      "unlock": dict(text="Zamanla yarış",
-                    reqs=[rq_stat("best_wave", 14, "14. dalgaya ulaş"),
-                          rq_stat("total_dashes", 1500, "Toplam 1.500 kez dash at"),
+                    reqs=[rq_stat("best_wave", 11, "11. dalgaya ulaş"),
+                          rq_stat("total_dashes", 600, "Toplam 600 kez dash at"),
                           rq_book("r_spd", "Önce Rüzgâr Kitabı'nı aç")])},
     {"key": "r_second_wind", "name": "İkinci Nefes Kitabı",
      "desc": "Öldüğünde bir kez yarı canla ayağa kalkarsın",
      "color": (255, 240, 180), "icon": "cross", "rare": True,
-     "unlock": dict(text="Bir kez daha kalk: 18. dalgaya ulaş",
-                    reqs=[rq_stat("best_wave", 18, "18. dalgaya ulaş"),
-                          rq_stat("total_healed", 40000, "Toplam 40.000 can yenile")])},
+     "unlock": dict(text="Bir kez daha kalk: 14. dalgaya ulaş",
+                    reqs=[rq_stat("best_wave", 14, "14. dalgaya ulaş"),
+                          rq_stat("total_healed", 8000, "Toplam 8.000 can yenile")])},
     {"key": "r_lasthope", "name": "Son Umut Kitabı",
      "desc": "Canın %30'unun altındayken aldığın hasar %20 azalır",
      "color": (255, 215, 120), "icon": "shield", "rare": True,
      "unlock": dict(text="Ölümün kıyısında ayakta kal",
-                    reqs=[rq_stat("best_wave", 18, "18. dalgaya ulaş"),
-                          rq_ach("wave15", "«Arena Ustası» başarımını aç"),
-                          rq_shop("shield", 6, "Kalkan'ı markette Lv.6'ya çıkar")])},
+                    reqs=[rq_stat("best_wave", 14, "14. dalgaya ulaş"),
+                          rq_shop("shield", 5, "Kalkan'ı markette Lv.5'e çıkar")])},
     {"key": "r_hp_big", "name": "Dev Kitabı",
      "desc": "Azami canın +120 artar ama biraz yavaşlarsın",
      "color": (200, 140, 90), "icon": "skull", "rare": True,
      "unlock": dict(text="Devleşecek kadar dayan",
-                    reqs=[rq_stat("best_combo", 45, "45'lik bir kombo yap"),
-                          rq_stat("total_healed", 25000, "Toplam 25.000 can yenile"),
+                    reqs=[rq_stat("best_combo", 40, "40'lık bir kombo yap"),
+                          rq_stat("total_healed", 5000, "Toplam 5.000 can yenile"),
                           rq_ach("wave10", "«Hayatta Kalan» başarımını aç")])},
 ]
 BOOK_BY_KEY = {b["key"]: b for b in BOOKS}
@@ -9495,11 +9645,11 @@ XP_BASE_NEED = 22
 # v3.23: 1.10 -> 1.40. "Seviye atlayamıyoruz, xp çok yavaş" geri bildirimi.
 # Bantlara (eğrinin ŞEKLİNE) yine dokunulmadı; yalnızca akan tecrübe arttı,
 # yani ilk seviyeler de son seviyeler de aynı oranda hızlandı.
-# v3.26: "lvl için alınan xp hâlâ kolay geliyor" -> seviye için gereken
-# tecrübe %15 arttı. Bantlara yine dokunulmadı: akan tecrübe 1.15'e
-# bölündü, yani her seviye eskisinden tam %15 daha fazla XP istiyor.
-XP_NEED_BUFF = 1.15
-XP_GAIN_SCALE = 1.40 / XP_NEED_BUFF
+# v3.26: "seviye atlamak hâlâ az" -> akan tecrübe önce %15, sonra bir %20
+# daha arttı (1.40 x 1.15 x 1.20). Bantlara (eğrinin ŞEKLİNE) dokunulmadı;
+# ilk seviyeler de son seviyeler de aynı oranda hızlandı.
+XP_GAIN_BUFFS = (1.15, 1.20)
+XP_GAIN_SCALE = 1.40 * XP_GAIN_BUFFS[0] * XP_GAIN_BUFFS[1]
 XP_CURVE_BANDS = (
     (6,    1.240, 8),
     (12,   1.190, 50),
@@ -13619,8 +13769,11 @@ ENEMY_DEFS = {
 # Yere düşen her altın bu çarpanla küçülür. Kesirli kısım ŞANSLA yuvarlanır
 # (ortalama korunur, mavi küçüklerden 0 altın çıkmaz gibi bir hata olmaz).
 # ELMAS kazancı bundan etkilenmez: run.gem_coins eski birimle sayılır.
-COIN_DROP_SCALE = 0.50
-COIN_DROP_SCALE_HELL = 0.70
+# v3.26: altın %25 arttı ("altını da fazlalaştır"). ELMAS bundan etkilenmez
+# (gem_coins bu ölçeğe bölünerek sayılıyor).
+GOLD_GAIN_BUFF = 1.25
+COIN_DROP_SCALE = 0.50 * GOLD_GAIN_BUFF
+COIN_DROP_SCALE_HELL = 0.70 * GOLD_GAIN_BUFF
 
 
 def coin_drop_scale(biome):
@@ -17431,6 +17584,11 @@ def max_alive_enemies(wave):
     return int(min(175, 70 + wave * 4))
 
 
+# Patron varken yaratık doğumu (bkz. WaveManager.update): normal hızın bu
+# kadarı ve normal kalabalık tavanının bu kadarı.
+BOSS_SPAWN_RATE = 0.5
+BOSS_CROWD_SHARE = 0.5
+
 # İlk dalgalardaki yarasa (mavi, çevik) yoğunluğu freni — bkz. pick_kind.
 EARLY_BAT_WAVES = 10
 EARLY_BAT_NERF = 0.10
@@ -17592,8 +17750,12 @@ class WaveManager:
                 else:
                     self.announce_text = L("ui.ann_surge", self.wave)
 
-        if boss_active or self.boss_pending:
-            return wave_changed
+        # PATRON VARKEN OYUN DURMAZ (v3.26). Eskiden patron gelince yaratık
+        # doğumu tamamen kesiliyordu; artık sürüyor ama YAVAŞ: doğum hızı
+        # BOSS_SPAWN_RATE (yarı hız), her doğumda daha az yaratık ve daha
+        # düşük bir kalabalık tavanı. Patron zaten zor; amaç arenanın boş
+        # kalmaması, oyuncuyu boğmak değil.
+        boss_time = boss_active or self.boss_pending
 
         # Zorluk artık düşman istatistiklerini değil yalnızca TEMPOyu (pace)
         # etkiler — spawn hızı tamamen self.pace üzerinden belirlenir.
@@ -17604,15 +17766,22 @@ class WaveManager:
         # kalıyor (yaratıklar hızlı doğuyor ama hızlı da ölüyor).
         # Sükûnet önce tükenir, yoğunluk penceresi ondan sonra işlemeye başlar.
         base_interval = max(0.20, 1.15 - self.wave * 0.035) / self.pace
-        # DALGA İÇİ HIZLANMA: aynı dalgada bile tempo sürekli artar.
-        base_interval /= (1.0 + min(WAVE_ACCEL_MAX, self.wave_time * WAVE_ACCEL_RATE))
-        if self.surge_active():
-            base_interval *= SURGE_RATE
+        if boss_time:
+            # patron dövüşü uzasa da tempo artmaz; yalnızca yarı hız
+            base_interval /= BOSS_SPAWN_RATE
+        else:
+            # DALGA İÇİ HIZLANMA: aynı dalgada bile tempo sürekli artar.
+            base_interval /= (1.0 + min(WAVE_ACCEL_MAX, self.wave_time * WAVE_ACCEL_RATE))
+            if self.surge_active():
+                base_interval *= SURGE_RATE
         self.spawn_timer -= dt
         if self.spawn_timer <= 0:
             self.spawn_timer = base_interval
             # Kalabalık tavanı: arena tıkanmışsa bu turda yeni düşman doğmaz.
-            if len(enemies) >= max_alive_enemies(self.wave):
+            cap = max_alive_enemies(self.wave)
+            if boss_time:
+                cap = max(6, int(cap * BOSS_CROWD_SHARE))
+            if len(enemies) >= cap:
                 return wave_changed
             # Geç dalgalarda yalnızca hasar değil, düşman YOĞUNLUĞU da artar —
             # maksimum eşyalı bir oyuncu bile kalabalığa yenik düşebilsin.
@@ -17628,9 +17797,12 @@ class WaveManager:
                 count = 5
             # Dalga uzadıkça kalabalık da büyür (dalga içi hızlanmanın
             # ikinci ayağı) — oyuncu oyalanırsa baskı gerçekten artar.
-            count += int(self.wave_time // WAVE_ACCEL_EXTRA_AFTER)
-            if self.surge_active():
-                count += SURGE_EXTRA
+            if boss_time:
+                count = max(1, int(round(count * BOSS_SPAWN_RATE)))
+            else:
+                count += int(self.wave_time // WAVE_ACCEL_EXTRA_AFTER)
+                if self.surge_active():
+                    count += SURGE_EXTRA
             hell = self.biome == "hell"
             for _ in range(count):
                 kind = self.pick_kind()
@@ -17643,7 +17815,7 @@ class WaveManager:
             elite_chance = 0.12 + min(0.28, self.wave * 0.008)
             if self.surge_active():
                 elite_chance += 0.10
-            if self.wave % 5 == 0 and random.random() < elite_chance:
+            if not boss_time and self.wave % 5 == 0 and random.random() < elite_chance:
                 x, y = self.spawn_pos()
                 if hell:
                     enemies.append(Enemy(None, x, y, wave_mult_fn(self.wave) * 1.1, 1.0,
@@ -18064,6 +18236,11 @@ class RunState:
         self.want_open_shop = False
         self.bonk8_check = False
         self.gems_earned = 0
+        # YENİ REKOR (v3.26): koşu başındaki kişisel rekor; geçildiği an
+        # ekranda büyük bir "YENİ REKOR!" çıkar (bkz. update / App._draw_run_frame).
+        self.best_at_start = int(save.data.get("stats", {}).get("best_score", 0) or 0)
+        self.record_beaten = False
+        self.record_flash = -1.0       # >= 0: damga gösteriliyor (geçen süre)
         self.death_cause = ""
         # Sağ üstteki "⋮" istatistik paneli açık mı?
         self.show_stats = False
@@ -19069,19 +19246,30 @@ class RunState:
             n = 1 + (1 if lvl >= 6 else 0) + (1 if lvl >= 13 else 0) \
                   + (1 if lvl >= 20 else 0)
             rad = ZEMZEM_BASE_R + ZEMZEM_R_PER_LEVEL * weapon_growth(lvl)
+            # v3.26: su YALNIZCA EKRANDA görünen yere dökülür. Eskiden hedef
+            # 620 px menzildeki herhangi bir yaratıktı; ekran dikeyde ~320 px
+            # olduğu için su çoğu zaman görünmeyen bir yere düşüyordu.
+            vis = self.cam_rect().inflate(-60, -60)
             spots = []
-            pool = list(targets)
-            random.shuffle(pool)
+            pool = [e for e in targets if vis.collidepoint(e.x, e.y)]
+            # Önce oyuncuya yakın olanlar (yakındaki kalabalık en tehlikelisi),
+            # ama her seferinde aynı yere dökülmesin diye biraz karıştırılır.
+            pool.sort(key=lambda e: dist(p.x, p.y, e.x, e.y) * random.uniform(0.7, 1.3))
             for e in pool:
                 # Birikintiler üst üste binmesin: aralarında en az bir yarıçap olsun.
                 if all(dist(e.x, e.y, sx, sy) > rad * 1.15 for (sx, sy) in spots):
                     spots.append((e.x, e.y))
                 if len(spots) >= n:
                     break
-            while len(spots) < n:
+            tries = 0
+            while len(spots) < n and tries < 40:
+                tries += 1
                 a = random.uniform(0, math.tau)
                 r2 = random.uniform(ZEMZEM_THROW * 0.35, ZEMZEM_THROW)
-                spots.append((p.x + math.cos(a) * r2, p.y + math.sin(a) * r2))
+                sx = clamp(p.x + math.cos(a) * r2, vis.left, vis.right)
+                sy = clamp(p.y + math.sin(a) * r2, vis.top, vis.bottom)
+                if all(dist(sx, sy, ox, oy) > rad * 0.9 for (ox, oy) in spots) or tries > 30:
+                    spots.append((sx, sy))
             for (sx, sy) in spots:
                 self.water_zones.append(WaterZone(sx, sy, rad, dmg, ZEMZEM_LIFE, lvl=lvl))
                 self.fx.burst(sx, sy, ZEMZEM_COLOR2, n=16, speed=210, life=0.45, r=3.0)
@@ -19981,6 +20169,19 @@ class RunState:
                     sfx("coin", 0.4, 0.02)
         self.pickups = [pu for pu in self.pickups if not (pu.collected or pu.dead)]
 
+        # ---- YENİ REKOR ----
+        if self.record_flash >= 0:
+            self.record_flash += dt
+            if self.record_flash > 2.6:
+                self.record_flash = -1.0
+        if (not self.record_beaten and self.best_at_start > 0
+                and self.score > self.best_at_start):
+            self.record_beaten = True
+            self.record_flash = 0.0
+            self.fx.do_flash(GOLD, 0.30)
+            self.fx.ring(p.x, p.y, GOLD, n=30, speed=320, life=0.8, r=4)
+            sfx("levelup", 1.0, 0.0)
+
         wave_changed = self.waves.update(0.0 if frozen else dt, self.enemies, self.wave_hp_mult,
                                          self.waves.boss_active, total_score=self.score)
         if wave_changed:
@@ -20707,6 +20908,7 @@ PAD_ACTIVE = [False]
 
 # ---- v3.26: mağaza / ücretsiz elmas / yılbaşı / açılış metinleri ----
 STRINGS.update({
+    "ui.new_record":  _T("YENİ REKOR!", "NEW HIGH SCORE!", "¡NUEVO RÉCORD!", "NEUER REKORD!", "НОВЫЙ РЕКОРД!"),
     "ui.tab_free":    _T("ÜCRETSİZ", "FREE", "GRATIS", "GRATIS", "БЕСПЛАТНО"),
     "ui.tab_gems":    _T("ELMAS PAKETLERİ", "GEM PACKS", "PACKS DE GEMAS", "EDELSTEINPAKETE", "НАБОРЫ КРИСТАЛЛОВ"),
     "ui.tab_pets":    _T("PETLER", "PETS", "MASCOTAS", "HAUSTIERE", "ПИТОМЦЫ"),
@@ -25197,6 +25399,25 @@ class HouseAd:
 #  cehennem patronu > EJDERHA ve yenilgi > DÜNYA SIRALAMASINDA 1.lik >
 #  PET'ler > 3B dönen SKİN geçidi > ŞİMDİ OYNA
 # =====================================================================
+def draw_stamp(surf, text, st, col, y=360, life=2.2):
+    """Ekranın ortasına 'pat' diye inen büyük yazı şeridi (YENİ REKOR! gibi).
+    st: gösterim başladığından beri geçen süre (sn)."""
+    if st < 0 or st > life:
+        return
+    k = ease_out_cubic(min(1.0, st / 0.25))
+    size = int(64 + 40 * (1 - k))
+    a = min(1.0, (life - st) / 0.4)
+    band = pygame.Surface((VIRTUAL_W, 118), pygame.SRCALPHA)
+    band.fill((8, 6, 14, int(200 * a * k)))
+    surf.blit(band, (0, int(y - 59)))
+    for sgn in (-1, 1):
+        pygame.draw.line(surf, scale_col(col, 0.7 * a + 0.1), (0, int(y + sgn * 59)),
+                         (VIRTUAL_W, int(y + sgn * 59)), 2)
+    add_glow(surf, VIRTUAL_W / 2, y, 260, col, 0.25 * k)
+    draw_text(surf, text, (VIRTUAL_W / 2, y), size, col, bold=True, center=True,
+              alpha=int(255 * a))
+
+
 def _tc(tr, en):
     """Tur yazıları: Türkçe oyuncuya Türkçe, diğer dillere İngilizce."""
     return tr if lang() == "tr" else en
@@ -25404,21 +25625,7 @@ class GameTour:
             draw_text(c, sub, (int(x) + 32, y + 58), 21, (236, 232, 244), bold=True)
 
     def stamp(self, text, st, col, y=150):
-        """Ekranın ortasına 'pat' diye inen büyük yazı (YENİ REKOR! gibi)."""
-        if st < 0 or st > 2.2:
-            return
-        c = self.sh.display.canvas
-        k = ease_out_cubic(min(1.0, st / 0.25))
-        size = int(64 + 40 * (1 - k))
-        a = min(1.0, (2.2 - st) / 0.4)
-        band = pygame.Surface((VIRTUAL_W, 118), pygame.SRCALPHA)
-        band.fill((8, 6, 14, int(200 * a * k)))
-        c.blit(band, (0, int(y - 59)))
-        for sgn in (-1, 1):
-            pygame.draw.line(c, scale_col(col, 0.7 * a + 0.1), (0, int(y + sgn * 59)),
-                             (VIRTUAL_W, int(y + sgn * 59)), 2)
-        add_glow(c, VIRTUAL_W / 2, y, 260, col, 0.25 * k)
-        draw_text(c, text, (VIRTUAL_W / 2, y), size, col, bold=True, center=True, alpha=int(255 * a))
+        draw_stamp(self.sh.display.canvas, text, st, col, y)
 
     def cursor(self, pos, kind="ui"):
         draw_cursor(self.sh.display.canvas, pos, kind, self.sh.t, hot=(kind == "aim"))
@@ -26107,7 +26314,7 @@ class App:
         self.gem_msg_ok = True
         self.store_tab = "free"       # MAĞAZA sekmesi: free | gems | skins | pets
         # ---- v3.26: ücretsiz elmas (reklam + günlük hediye) ----
-        self.rewards = RewardCenter(self.save)
+        self.rewards = RewardCenter(self.save, self.account)
         self.ads = AdBridge()
         self.ad_play = None           # oynayan reklamın geçen süresi (sn) ya da None
         self.ad_done = False          # reklam sonuna kadar izlendi mi
@@ -26576,6 +26783,9 @@ class App:
                 if rr[2] > 0 and rr[3] > 0:
                     canvas.blit(bgf, rr[:2], rr)
         draw_run(canvas, self.run, self.t, aim_pos=aim_pos, shake=(ox, oy))
+        rf = getattr(self.run, "record_flash", -1.0)
+        if rf >= 0:
+            draw_stamp(canvas, L("ui.new_record"), rf, GOLD, y=190, life=2.6)
 
     def update_play(self, dt, keys, mouse_pos, mouse_down, bonk_pressed, dash_pressed,
                     use_pressed=False, clicked=False, stats_pressed=False):
@@ -26974,19 +27184,25 @@ class App:
         # oyuncuda o ekran hiç açılmıyor.
         pb = getattr(r, "prev_best", None) or {}
         rekor = r.run_is_clean() and int(r.score) > int(pb.get("score", 0))
+        if getattr(self, "_go_run", None) is not r:
+            self._go_run = r
+            self.gameover_t = 0.0
+        self.gameover_t = getattr(self, "gameover_t", 0.0) + dt
         if rekor:
-            bar = pygame.Rect(panel_rect.x + 30, panel_rect.y + 84,
-                              panel_rect.w - 60, 34)
+            # İki satır da şeridin İÇİNDE: eskiden başlık üst kenara, alt
+            # satır alt kenara biniyordu.
+            bar = pygame.Rect(panel_rect.x + 30, panel_rect.y + 82,
+                              panel_rect.w - 60, 46)
             add_glow(canvas, bar.centerx, bar.centery, bar.w * 0.45, GOLD, 0.18)
             panel(canvas, bar, bg=(44, 36, 16), edge=GOLD, alpha=238, radius=8,
                   edge_w=2)
-            draw_text(canvas, L("ui.pb_banner"), (bar.centerx, bar.centery - 10), 18,
+            draw_text(canvas, L("ui.pb_banner"), (bar.centerx, bar.y + 15), 18,
                       GOLD, bold=True, center=True)
             eski = int(pb.get("score", 0))
             alt = (L("ui.pb_first") if eski <= 0 else
                    L("ui.pb_up", fmt_num(eski), "%%%d" % max(1, round(
                        (int(r.score) / max(1, eski) - 1.0) * 100))))
-            draw_text(canvas, alt, (bar.centerx, bar.bottom + 5), 11, (214, 190, 130),
+            draw_text(canvas, alt, (bar.centerx, bar.y + 34), 11, (214, 190, 130),
                       center=True, shadow=False)
 
         def _best_txt(key, cur, bicim):
@@ -27131,6 +27347,9 @@ class App:
             b.draw(canvas)
             if clicked:
                 b.click(mouse_pos)
+        # v3.26: kişisel rekor kırıldıysa (ilk koşu hariç) büyük damga
+        if rekor and int(pb.get("score", 0)) > 0:
+            draw_stamp(canvas, L("ui.new_record"), self.gameover_t - 0.35, GOLD, y=360, life=2.4)
 
     # ---------------- İSİM GİRİŞİ ----------------
     def handle_name_entry_key(self, event):
@@ -27848,6 +28067,7 @@ class App:
     def _ad_start(self):
         if self.ad_play is not None or not self.rewards.ad_ready():
             return False
+        self.rewards.begin_ad()
         try:
             # v3.26: reklam = 90 sn'lik OYUN TURU (izleyen oyunu öğrenir).
             self.house_ad = GameTour(self)
@@ -27863,20 +28083,27 @@ class App:
         """Reklamı kapatır. reward=True ve sonuna kadar izlendiyse ödül verilir."""
         if self.ad_play is None:
             return
-        got = self.rewards.grant_ad() if (reward and self.ad_done) else 0
+        if reward and self.ad_done:
+            self.rewards.grant_ad(lambda amt, err: self._reward_result(
+                amt, err, VIRTUAL_W / 2, VIRTUAL_H / 2))
         self.ad_play = None
         self.ad_done = False
         ad = getattr(self, "house_ad", None)
         if ad is not None and hasattr(ad, "close"):
             ad.close()
         self.house_ad = None            # gölge oyun bellekten atılsın
-        if got:
-            self._spawn_reward_fx(VIRTUAL_W / 2, VIRTUAL_H / 2, got)
 
     def _claim_gift(self, x, y):
-        got = self.rewards.claim_gift()
-        if got:
-            self._spawn_reward_fx(x, y, got)
+        self.rewards.claim_gift(lambda amt, err: self._reward_result(amt, err, x, y))
+
+    def _reward_result(self, amount, err, x, y):
+        """Ödül sonucu (sunucudan gelebilir — arka plandaki iş parçacığından
+        çağrılır; yalnızca listeye ekler, çizim ana döngüde)."""
+        if amount:
+            self._spawn_reward_fx(x, y, amount)
+        elif err:
+            self.reward_fx.append([x, y, 0.0, 0, str(err)])
+            sfx("error", 0.6, 0.0)
 
     def _spawn_reward_fx(self, x, y, amount):
         self.reward_fx.append([x, y, 0.0, int(amount)])
@@ -27885,9 +28112,23 @@ class App:
     def _draw_reward_fx(self, canvas, dt):
         """"+50 ELMAS!" yazısı ve dört bir yana saçılan elmaslar."""
         alive = []
-        for fx in self.reward_fx:
+        for fx in list(self.reward_fx):
             fx[2] += dt
-            x, y, t, amount = fx
+            x, y, t, amount = fx[:4]
+            if len(fx) > 4:                 # hata bildirimi (ödül verilmedi)
+                if t > 3.0:
+                    continue
+                alive.append(fx)
+                a_ = int(255 * clamp((3.0 - t) / 0.5, 0.0, 1.0))
+                msg = _fit_text(fx[4], 16, 760, bold=True)
+                r_ = pygame.Rect(0, 0, int(text_width(msg, 16, True) + 40), 40)
+                r_.center = (int(VIRTUAL_W / 2), int(VIRTUAL_H / 2 + 120))
+                bs = pygame.Surface(r_.size, pygame.SRCALPHA)
+                pygame.draw.rect(bs, (60, 18, 24, int(230 * a_ / 255)), bs.get_rect(), border_radius=10)
+                canvas.blit(bs, r_.topleft)
+                draw_text(canvas, msg, r_.center, 16, (255, 170, 170), bold=True, center=True,
+                          alpha=a_)
+                continue
             if t > 1.9:
                 continue
             alive.append(fx)
@@ -27904,7 +28145,10 @@ class App:
             a_ = int(255 * clamp((1.9 - t) / 0.5, 0.0, 1.0))
             draw_text(canvas, L("ui.gems_plus", amount), (x, ty_), int(26 * pop), GEM_COLOR,
                       bold=True, center=True, alpha=a_)
-        self.reward_fx = alive
+        # Yerinde temizle: sunucu cevabı arka plandan bu sırada yeni bir
+        # kayıt eklemiş olabilir; listeyi baştan atamak onu kaybettirirdi.
+        keep = set(id(f) for f in alive)
+        self.reward_fx[:] = [f for f in self.reward_fx if id(f) in keep or f[2] == 0.0]
 
     def _draw_ad_overlay(self, canvas, dt, mouse_pos, clicked):
         """Ödüllü reklam penceresi. Sağlayıcı yoksa ev reklamı oynar."""
