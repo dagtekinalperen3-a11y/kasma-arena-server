@@ -897,20 +897,27 @@ def _merge_progress(old, new):
     out["mastery"] = _merge_mastery(old.get("mastery"), new.get("mastery"),
                                     max(int(old.get("gems_spent", 0) or 0),
                                         int(new.get("gems_spent", 0) or 0)))
-    # ---- KALICI SIRALAMA YASAĞI ----
-    # TEK YÖNLÜ: ya sunucu ya oyun "yasaklı" dediyse yasaklı kalır. Oyundan
-    # "yasak kalktı" diye bir bilgi KABUL EDİLMEZ; hileci dosyasını
-    # temizleyerek sıralamaya dönemesin.
-    out["board_banned"] = bool(old.get("board_banned")) or bool(new.get("board_banned"))
-    if out["board_banned"]:
-        rs = list(old.get("ban_reasons") or [])
-        for r in (new.get("ban_reasons") or [])[:8]:
-            r = str(r)[:24]
-            if r not in rs:
-                rs.append(r)
-        out["ban_reasons"] = rs[:8]
-    else:
-        out["ban_reasons"] = []
+    # ---- KALICI SIRALAMA YASAĞI (v3.25 — BAŞKA HESABA SIZAN YASAK) ----
+    # ESKİDEN: new.get("board_banned") de buraya karışıyordu — yani BU
+    # UÇTAN (/player/save), oyuncunun kendi İMZASIZ/doğrulanmamış yerel
+    # kaydında ne yazıyorsa sunucu ona güveniyordu. Bu alan her ufak
+    # değişiklikte (skin kuşanma, elmas kazanma...) otomatik gönderiliyor;
+    # yani yerel kayıttaki board_banned bir şekilde YANLIŞ profile
+    # karışırsa (bkz. kasma_arena13.py _remember notu), o hesap BİR DAHA
+    # AÇILMAYACAK şekilde yanlışlıkla yasaklanabiliyordu — tam da oyuncunun
+    # bildirdiği hata buydu: "alp hesabını yasakladım, başka hesapla
+    # girince o da yasaklı görünüyor."
+    #
+    # ARTIK: bu uçtan YENİ bir yasak hiç konmuz. Var olan yasak (old) aynen
+    # KORUNUR — hileci dosyasını temizleyip geri dönemez — ama YENİ bir
+    # yasak yalnızca sunucunun KENDİ doğruladığı yoldan gelir: /submit'teki
+    # imzalı skor-makullük denetimi (bkz. score_is_plausible → _ban_account)
+    # ya da elle (admin) müdahale. Oyunun kendi hile tespiti (hile kodu vb.)
+    # yine ÇALIŞIR: o oyuncu dünya sıralamasına skor göndermeye kalkışınca
+    # /submit zaten kendi makullük denetiminden geçirip gerçek bir yasak
+    # koyar — yalnızca rutin otomatik kayıt artık bunu tek başına yapamaz.
+    out["board_banned"] = bool(old.get("board_banned"))
+    out["ban_reasons"] = list(old.get("ban_reasons") or [])[:8] if out["board_banned"] else []
     ach = dict(old.get("achievements") or {})
     for k, v in list((new.get("achievements") or {}).items())[:400]:
         ach.setdefault(str(k)[:40], v)
@@ -1466,7 +1473,12 @@ def add_score():
 
         # Oyun kendi denetiminde hile yakaladıysa bunu dürüstçe bildirir.
         # Suçun İTİRAFINA güveniriz, masumiyet iddiasına değil: "tainted"
-        # gelirse yasaklarız, gelmemesi hiçbir şeyi aklamaz.
+        # gelirse yasaklarız, gelmemesi hiçbir şeyi aklamaz. BU KANAL
+        # /player/save'deki genel senkronizasyondan FARKLI ve GÜVENLİDİR:
+        # account_id burada da az önce _acct(data) ile, yani BU isteğin
+        # KENDİ geçerli oturum jetonundan çözüldü — biri yalnızca KENDİ
+        # hesabını "itiraf" edebilir, başkasınınkini asla (bkz. yukarıdaki
+        # _merge_progress notu: oradaki genel kanal artık bunu yapamıyor).
         if data.get("tainted") or data.get("board_banned"):
             _ban_account(account_id, "oyun_hile_bildirdi")
             return jsonify({"success": False, "banned": True,
