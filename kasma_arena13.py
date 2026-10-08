@@ -23,10 +23,21 @@
    * MAĞAZA YENİLENDİ. Ana menüdeki kart uzadı: dönen vitrin (premium
      skin / PET / elmas paketi), buradan doğrudan REKLAM İZLE (+50 elmas)
      ve GÜNLÜK HEDİYE. Mağazada yeni ÜCRETSİZ sekmesi: reklam (günde 5),
-     7 günlük hediye serisi, başarım ödülleri.
-   * P2W DEĞİL: premium skinler ve PET'ler artık ELMASLA da alınıyor;
-     elmas oynayarak (başarım, reklam, günlük hediye, koşu) kazanılıyor.
-     Gerçek para yalnızca kısayol (sunucu bağlanınca açılır).
+     7 günlük hediye serisi, başarım ödülleri. Premium skin ve PET'ler
+     yalnızca GERÇEK PARAYLA satılır (elmasla satılmaz).
+   * ÖDÜLLER HESABA ÖZEL: reklam ve günlük hediye sayaçları aktif profile
+     ait (misafir ayrı, her hesap ayrı) ve hesaptakiler sunucuda da
+     tutuluyor (server.py _merge_rewards) — başka bilgisayardan girip aynı
+     günün hakkı ikinci kez kullanılamaz.
+   * 30 SANİYELİK TANITIM FİLMİ (reklam): GERÇEK oyun motoruyla, otomatik
+     pilotun oynadığı koşular — gerçek mermiler, BONK, dash, silahlar,
+     patron — ardından SİLAHLIK geçidi, KİTAPLIK + seviye atlama kartları,
+     skin/PET geçidi ve kapanış. Kayda hiçbir şey yazmaz (bkz. HouseAd).
+   * PERFORMANS: yoğun dalgada kare süresi ~yarıya indi. Oyun sırasında
+     görünmeyen hareketli menü zemini artık çizilmiyor, koşu her karede
+     tam ekran saydam bir ara yüzeye çizilip kopyalanmıyor, yaratık
+     gövdelerinin yeniden çizimine kare başı bütçe kondu, HUD'daki boş
+     yuvalar önbellekte. Varsayılan FPS sınırı 60 -> 120.
    * BAŞARIMLAR: kademe renginde metal madalyonlar, defne dalları, dönen
      ışınlar, kartın üstünden geçen parıltı, kupa salonu arka planı.
    * SİLAHLIK: taş duvarlı silah deposu, iki yanda yanan meşaleler,
@@ -3424,9 +3435,11 @@ class SaveManager:
         "settings": {"fullscreen": False, "player_name": "", "music_vol": 0.5, "sfx_vol": 0.7,
                      "shake": True, "dmg": True, "fps": False, "difficulty": "normal",
                      "skill_scale": 0.85, "plain_skin": False,
-                     "fps_cap": 60, "weapon_fx": WEAPON_FX_DEFAULT, "pet_show": True,
+                     "fps_cap": 120, "weapon_fx": WEAPON_FX_DEFAULT, "pet_show": True,
                      "lang": DEFAULT_LANG},
         "mastery": {},
+        # ücretsiz elmas sayaçları (reklam + günlük hediye) — PROFİLE ait
+        "rewards": {},
         "stats": {"runs": 0, "best_score": 0, "total_kills": 0, "total_time": 0.0,
                   "bosses": 0, "best_wave": 0, "total_shots": 0, "total_lifesteal": 0.0,
                   "total_gold": 0, "best_run_gold": 0, "best_run_dashes": 0,
@@ -3450,6 +3463,7 @@ class SaveManager:
         "achievements", "stats", "leaderboard",
         "tainted", "taint_reasons",
         "board_banned", "ban_reasons",
+        "rewards",
     )
 
     def __init__(self):
@@ -3709,6 +3723,12 @@ class SaveManager:
                     except (TypeError, ValueError):
                         pass
                 self.data[k] = cur
+            elif k == "rewards":
+                # Reklam/hediye sayaçları GERİ GİTMEZ: başka bilgisayarda
+                # alınan hediye burada da "alındı" görünür.
+                merged_rw = merge_rewards(self.data.get("rewards"), v)
+                merged_rw["pid"] = self.profile_id()
+                self.data[k] = merged_rw
             elif k in ("gems", "gems_earned", "gems_spent"):
                 continue        # aşağıda defter olarak birlikte işlenir
             else:
@@ -3784,8 +3804,14 @@ class SaveManager:
         CFG["fps"] = bool(st.get("fps", False))
         CFG["skill_scale"] = float(st.get("skill_scale", 0.85))
         CFG["plain_skin"] = bool(st.get("plain_skin", False))
-        cap = st.get("fps_cap", 60)
-        CFG["fps_cap"] = cap if cap in FPS_CHOICES else 60
+        # v3.26: varsayılan FPS sınırı 60 -> 120. Eski kayıtlarda kalan 60'ı
+        # bir kereliğine 120'ye çekiyoruz (oyuncu sonra yine seçebilir).
+        if not st.get("fps_v326"):
+            st["fps_v326"] = True
+            if st.get("fps_cap", 60) == 60:
+                st["fps_cap"] = 120
+        cap = st.get("fps_cap", 120)
+        CFG["fps_cap"] = cap if cap in FPS_CHOICES else 120
         # EŞYA EFEKTİ artık %0-100 arası bir sayı. Eski kayıtlarda metin
         # ("full"/"dim"/"off") duruyor olabilir; onu sayıya çeviriyoruz.
         fxm = st.get("weapon_fx", WEAPON_FX_DEFAULT)
@@ -3901,16 +3927,6 @@ class SaveManager:
         if self.owns_skin(skin_id) or self.get_gems() < cost or not self.can_spend():
             return False
         self.add_gems(-cost)
-        self.data.setdefault("skins_owned", ["default"]).append(skin_id)
-        self.data["equipped_skin"] = skin_id
-        self.progress_changed()
-        return True
-
-    def buy_premium_with_gems(self, skin_id, cost):
-        """Premium skini ELMASLA alır (v3.26 — P2W olmasın diye)."""
-        if self.owns_skin(skin_id) or self.get_gems() < cost or not self.can_spend():
-            return False
-        self.add_gems(-int(cost))
         self.data.setdefault("skins_owned", ["default"]).append(skin_id)
         self.data["equipped_skin"] = skin_id
         self.progress_changed()
@@ -4408,14 +4424,12 @@ class PurchaseBridge:
 # =====================================================================
 # ÜCRETSİZ ELMAS: ÖDÜLLÜ REKLAM + GÜNLÜK HEDİYE  (v3.26)
 # ---------------------------------------------------------------------
-# "Oyun P2W olmasın, parası olan kazanmasın." Bu yüzden mağazada satılan
-# her şey OYNAYARAK da kazanılır:
+# Elması yalnızca parayla değil OYNAYARAK da kazanmanın yolları:
 #   * REKLAM İZLE  -> +50 elmas (günde en çok AD_DAILY_LIMIT kez, iki
 #                     reklam arasında AD_COOLDOWN saniye)
 #   * GÜNLÜK HEDİYE -> her gün bir kez; arka arkaya gelinen her gün biraz
 #                     daha büyür (7 günlük seri, sonra başa döner)
-#   * PREMİUM SKİN ve PET'ler artık ELMASLA DA alınır (bkz.
-#     PREMIUM_GEM_PRICE / pet_gem_price). Gerçek para yalnızca kısayoldur.
+#   (PREMİUM SKİN ve PET'ler yine yalnızca GERÇEK PARAYLA satılır.)
 #
 # REKLAM SAĞLAYICI: masaüstü pygame'de hazır bir reklam ağı (AdMob vb.)
 # yok. AD_PROVIDER boşken oyun kendi "ev reklamını" (Arena Bonk tanıtımı)
@@ -4431,25 +4445,8 @@ AD_PROVIDER = ""             # boş = ev reklamı
 AD_REWARD_GEMS = 50
 AD_DAILY_LIMIT = 5
 AD_COOLDOWN = 90.0           # iki reklam arası (sn)
-AD_LENGTH = 15.0             # ev reklamının süresi (sn)
+AD_LENGTH = 30.0             # ev reklamının (tanıtım filmi) süresi (sn) — bkz. HouseAd
 DAILY_GIFT_GEMS = (20, 25, 30, 35, 40, 50, 75)
-
-# Premium skinlerin ELMAS fiyatı (gerçek para fiyatı price_hint'te kalır).
-PREMIUM_GEM_PRICE = {
-    "web_master": 1800,
-    "ash_warrior": 1800,
-    "green_titan": 2200,
-    "immortal_merc": 2000,
-}
-
-
-def premium_gem_price(sk):
-    return int(PREMIUM_GEM_PRICE.get(sk.get("id"), 2000))
-
-
-def pet_gem_price(pet):
-    return int(pet.get("cost") or 300)
-
 
 def _day_key(offset_days=0):
     return time.strftime("%Y-%m-%d", time.localtime(time.time() + offset_days * 86400))
@@ -4466,16 +4463,62 @@ def fmt_clock(sec):
     return f"{h:d}:{m:02d}:{s_:02d}" if h else f"{m:d}:{s_:02d}"
 
 
+def merge_rewards(a, b):
+    """İki ödül sayacını birleştirir; sayaçlar GERİ GİTMEZ (server.py'de aynısı).
+
+    Aynı gün için büyük sayı, farklı günlerde yeni gün kazanır. Böylece
+    hesaba başka bilgisayardan girilse bile o günün hakkı ikinci kez
+    kullanılamaz.
+    """
+    a = a if isinstance(a, dict) else {}
+    b = b if isinstance(b, dict) else {}
+
+    def _i(v):
+        try:
+            return int(v or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    def _f(v):
+        try:
+            x = float(v or 0)
+            return x if math.isfinite(x) else 0.0
+        except (TypeError, ValueError):
+            return 0.0
+
+    out = {}
+    ka_ = lambda d: (str(d.get("ad_day") or "")[:10], _i(d.get("ad_count")))
+    src = a if ka_(a) >= ka_(b) else b
+    if src.get("ad_day"):
+        out["ad_day"], out["ad_count"] = ka_(src)
+    out["ad_last"] = max(_f(a.get("ad_last")), _f(b.get("ad_last")))
+    out["ad_total"] = max(_i(a.get("ad_total")), _i(b.get("ad_total")))
+    kg_ = lambda d: (str(d.get("gift_day") or "")[:10], _i(d.get("gift_streak")))
+    src = a if kg_(a) >= kg_(b) else b
+    if src.get("gift_day"):
+        out["gift_day"], out["gift_streak"] = kg_(src)
+    return out
+
+
 class RewardCenter:
-    """Reklam ödülü ve günlük hediye sayaçları (bkz. yukarıdaki not)."""
+    """Reklam ödülü ve günlük hediye sayaçları (bkz. yukarıdaki not).
+
+    v3.26 DÜZELTME — HESABA ÖZEL: sayaçlar artık oyuncunun AKTİF PROFİLİNE
+    ait (misafir ayrı, her hesap ayrı) ve hesaptakiler sunucuya da yazılıyor.
+    Eskiden bilgisayar başınaydı: misafirken alınan hediye, hesaba girince
+    "alındı" görünüyordu.
+    """
 
     def __init__(self, save):
         self.save = save
 
     def _st(self):
+        pid = self.save.profile_id()
         st = self.save.data.get("rewards")
-        if not isinstance(st, dict):
-            st = {}
+        # "pid" yoksa bu, sayaçların bilgisayara ait olduğu ilk sürümden
+        # kalmadır ve misafirken doldurulmuştur.
+        if not isinstance(st, dict) or st.get("pid", "guest") != pid:
+            st = {"pid": pid}
             self.save.data["rewards"] = st
         return st
 
@@ -10392,7 +10435,8 @@ class Player:
         # "0/40" görüyor ve "sayılmıyor" sanıyordu. Artık anında artıyor;
         # koşu sonunda bir daha eklenmiyor (bkz. finish_run).
         sv = MASTERY_SAVE[0]
-        if sv is not None:
+        # no_stats: reklam filmindeki otomatik pilot (bkz. HouseAd) sayılmaz.
+        if sv is not None and not getattr(self, "no_stats", False):
             try:
                 st = sv.data.setdefault("stats", {})
                 st["total_dashes"] = int(st.get("total_dashes", 0) or 0) + 1
@@ -14513,7 +14557,14 @@ class Enemy:
     # göz kırptı...) sprite yeniden çiziliyor.
     SPR_FACE_STEPS = 24          # yön kaç dilime bölünüyor
     SPR_WALK_STEP = 0.26         # yürüyüş fazı adımı (radyan)
-    SPR_TIME_HZ = 14.0           # zamana bağlı titreşimlerin tazelenme hızı
+    SPR_TIME_HZ = 10.0           # zamana bağlı titreşimlerin tazelenme hızı
+    # KARE BAŞINA YENİDEN ÇİZİM BÜTÇESİ (v3.26). 110 yaratıklı bir dalgada
+    # her karede ~70 gövde baştan çiziliyordu (kare süresinin dörtte biri).
+    # Bütçe dolunca yaratık bir kare daha ESKİ görüntüsüyle basılır — göz
+    # bunu fark etmez. Hasar parlaması, boy değişimi ve ilk çizim bütçeye
+    # takılmaz.
+    SPR_BUDGET = 22
+    _spr_frame = [None, 0]       # [t, bu karede yapılan yeniden çizim]
 
     def _blink_at(self, t):
         """Göz kırpma katsayısı (1.0 = tam açık). ~4 saniyede bir, her
@@ -14562,6 +14613,16 @@ class Enemy:
 
         blink = self._blink_at(t)
         key = self._body_key(t, r, blink)
+        if self._spr is not None and self._spr_key != key:
+            fr = Enemy._spr_frame
+            if fr[0] != t:
+                fr[0], fr[1] = t, 0
+            old = self._spr_key
+            urgent = old[3] != key[3] or old[4] != key[4]      # boy / hasar parlaması
+            if not urgent and fr[1] >= self.SPR_BUDGET:
+                key = old                                     # bütçe doldu: eskisini bas
+            else:
+                fr[1] += 1
         if self._spr is None or self._spr_key != key:
             # Ölçüm: hiçbir şeklin çizimi r*2.1'i geçmiyor (en genişi
             # WARDEN, r*1.9). Yüzey ne kadar küçükse blit o kadar ucuz.
@@ -20427,13 +20488,7 @@ class Background:
             tw = 0.35 + 0.65 * (0.5 + 0.5 * math.sin(self.t * ssp + sph))
             blit_disc(surf, sx, sy, sr * (0.7 + 0.5 * tw), (210, 224, 255),
                       int(150 * tw))
-        step = 64
-        grid_surf = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
-        for x in range(0, VIRTUAL_W, step):
-            pygame.draw.line(grid_surf, (255, 255, 255, 6), (x, 0), (x, VIRTUAL_H))
-        for y in range(0, VIRTUAL_H, step):
-            pygame.draw.line(grid_surf, (255, 255, 255, 6), (0, y), (VIRTUAL_W, y))
-        surf.blit(grid_surf, (0, 0))
+        surf.blit(self._grid(), (0, 0))
         for d in self.dust:
             a = int(d["a"] * (0.6 + 0.4 * math.sin(self.t * 2 + d["phase"])))
             blit_disc(surf, d["x"], d["y"], d["r"], (150, 180, 255), max(0, a))
@@ -20441,10 +20496,48 @@ class Background:
         for s in self.snow:
             tw = 0.75 + 0.25 * math.sin(self.t * 3 + s["phase"])
             blit_disc(surf, s["x"], s["y"], s["r"], (255, 255, 255), int(s["a"] * tw))
-        vg = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
-        pygame.draw.rect(vg, (0, 0, 0, 90), vg.get_rect())
-        pygame.draw.rect(vg, (0, 0, 0, 0), vg.get_rect().inflate(-220, -160), border_radius=140)
-        surf.blit(vg, (0, 0), special_flags=pygame.BLEND_RGBA_SUB)
+        surf.blit(self._vignette(), (0, 0), special_flags=pygame.BLEND_RGBA_SUB)
+
+    # ---- PERFORMANS (v3.26) ----
+    # Izgara ve kenar karartması eskiden HER KAREDE tam ekran saydam yüzey
+    # olarak yeniden ayrılıp çiziliyordu; artık bir kez hazırlanıyor.
+    def _grid(self):
+        g = getattr(self, "_grid_surf", None)
+        if g is None:
+            g = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+            for x in range(0, VIRTUAL_W, 64):
+                pygame.draw.line(g, (255, 255, 255, 6), (x, 0), (x, VIRTUAL_H))
+            for y in range(0, VIRTUAL_H, 64):
+                pygame.draw.line(g, (255, 255, 255, 6), (0, y), (VIRTUAL_W, y))
+            self._grid_surf = g
+        return g
+
+    def _vignette(self):
+        v = getattr(self, "_vig_surf", None)
+        if v is None:
+            v = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+            pygame.draw.rect(v, (0, 0, 0, 90), v.get_rect())
+            pygame.draw.rect(v, (0, 0, 0, 0), v.get_rect().inflate(-220, -160), border_radius=140)
+            self._vig_surf = v
+        return v
+
+    def static_frame(self):
+        """Oyun sırasında kullanılan DONUK zemin (tek blit).
+
+        Koşu sırasında zeminin yalnızca HUD'un arkasındaki ince kenarları
+        görünüyor; oraya her karede 300'ü aşkın yıldız/toz/kar tanesi ve
+        dört sis hâlesi çizmek kare süresinin ~%20'sini yiyordu.
+        """
+        f = getattr(self, "_static", None)
+        if f is None:
+            f = pygame.Surface((VIRTUAL_W, VIRTUAL_H)).convert()
+            snow, self.snow = self.snow, []
+            try:
+                self.draw(f)
+            finally:
+                self.snow = snow
+            self._static = f
+        return f
 
 
 # =====================================================================
@@ -20639,36 +20732,56 @@ STRINGS.update({
     "ui.ach_pending": _T("{0} elmas seni bekliyor", "{0} gems are waiting", "{0} gemas te esperan",
                          "{0} Edelsteine warten", "Тебя ждут {0} кристаллов"),
     "ui.go_ach":      _T("BAŞARIMLARA GİT", "GO TO ACHIEVEMENTS", "IR A LOGROS", "ZU DEN ERFOLGEN", "К ДОСТИЖЕНИЯМ"),
-    "ui.no_p2w":      _T("Mağazada GÜÇ satılmaz: premium skin ve PET'ler elmasla da alınır, elmas oynayarak kazanılır.",
-                         "No pay-to-win: premium skins and pets can be bought with gems, and gems are earned by playing.",
-                         "Nada de pagar para ganar: skins premium y mascotas también se compran con gemas.",
-                         "Kein Pay-to-win: Premium-Skins und Haustiere gibt es auch für Edelsteine.",
-                         "Никакого pay-to-win: премиум-скины и питомцы покупаются и за кристаллы."),
-    "ui.buy_with":    _T("{0} İLE AL", "BUY FOR {0}", "COMPRAR {0}", "FÜR {0} KAUFEN", "КУПИТЬ ЗА {0}"),
-    "ui.or_money":    _T("ya da {0}", "or {0}", "o {0}", "oder {0}", "или {0}"),
-    "ui.need_gems":   _T("{0} elmas daha lazım", "{0} more gems needed", "Faltan {0} gemas",
-                         "Noch {0} Edelsteine nötig", "Нужно ещё {0} кристаллов"),
-    "ui.bought_eq":   _T("{0} açıldı ve kuşanıldı!", "{0} unlocked and equipped!", "¡{0} desbloqueado y equipado!",
-                         "{0} freigeschaltet und ausgerüstet!", "{0} открыт и надет!"),
+    "ui.free_note":   _T("Bedava elmasla skin, kıyafet ve ARENA USTALIĞI alabilirsin. Premium skin ve PET'ler gerçek parayla satılır.",
+                         "Spend free gems on skins, outfits and ARENA MASTERY. Premium skins and pets are sold for real money.",
+                         "Usa las gemas gratis en skins, ropa y MAESTRÍA. Skins premium y mascotas se venden con dinero real.",
+                         "Gratis-Edelsteine für Skins, Outfits und ARENA-MEISTERSCHAFT. Premium-Skins und Haustiere gibt es für Echtgeld.",
+                         "Бесплатные кристаллы — на скины, одежду и МАСТЕРСТВО. Премиум-скины и питомцы продаются за деньги."),
     "ui.ad_label":    _T("REKLAM", "AD", "ANUNCIO", "WERBUNG", "РЕКЛАМА"),
     "ui.ad_reward_in": _T("Ödüle {0} sn", "Reward in {0}s", "Premio en {0} s", "Belohnung in {0} s", "Награда через {0} с"),
     "ui.ad_forfeit":  _T("KAPAT (ödülsüz)", "CLOSE (no reward)", "CERRAR (sin premio)", "SCHLIESSEN (ohne Belohnung)",
                          "ЗАКРЫТЬ (без награды)"),
     "ui.ad_claim":    _T("ÖDÜLÜ AL  +{0}", "CLAIM REWARD  +{0}", "RECLAMAR  +{0}", "BELOHNUNG  +{0}", "ЗАБРАТЬ  +{0}"),
     "ui.gems_plus":   _T("+{0} ELMAS!", "+{0} GEMS!", "¡+{0} GEMAS!", "+{0} EDELSTEINE!", "+{0} КРИСТАЛЛОВ!"),
-    "ui.promo_1":     _T("Hayatta kal. Vur. BONKla.", "Survive. Shoot. BONK.", "Sobrevive. Dispara. BONK.",
-                         "Überleben. Schießen. BONK.", "Выживи. Стреляй. БОНК."),
-    "ui.promo_2":     _T("Arkadaşını çağır: kim daha uzun dayanacak?", "Bring a friend: who lasts longer?",
-                         "Trae a un amigo: ¿quién aguanta más?", "Hol deine Freunde: Wer hält länger durch?",
-                         "Позови друга: кто продержится дольше?"),
-    "ui.promo_3":     _T("Dünya sıralamasında adını en tepeye yazdır!", "Put your name on top of the world ranking!",
-                         "¡Pon tu nombre en lo más alto del ranking!", "Bring deinen Namen an die Weltspitze!",
-                         "Впиши своё имя на вершину мирового рейтинга!"),
-    "ui.store_sub2":  _T("Elmas, premium skin ve PET — hepsi oynayarak da kazanılır, parayla güç satılmaz.",
-                         "Gems, premium skins and pets — all earnable by playing; power is never for sale.",
-                         "Gemas, skins premium y mascotas: todo se gana jugando; el poder no se vende.",
-                         "Edelsteine, Premium-Skins, Haustiere — alles erspielbar; Stärke ist nicht käuflich.",
-                         "Кристаллы, премиум-скины и питомцы — всё можно заработать игрой; силу не продают."),
+    # ---- 30 sn'lik tanıtım filmi (HouseAd) ----
+    "ad.tag":        _T("Bir BONK, bin yaratık.", "One BONK. A thousand monsters.", "Un BONK. Mil monstruos.",
+                        "Ein BONK. Tausend Monster.", "Один БОНК. Тысяча монстров."),
+    "ad.fight1":     _T("DALGA DALGA YARATIK!", "ENDLESS WAVES!", "¡OLEADAS SIN FIN!", "ENDLOSE WELLEN!", "БЕСКОНЕЧНЫЕ ВОЛНЫ!"),
+    "ad.fight1s":    _T("Her dalga daha kalabalık, daha hızlı.", "Every wave is bigger and faster.",
+                        "Cada oleada, más grande y rápida.", "Jede Welle größer und schneller.",
+                        "Каждая волна больше и быстрее."),
+    "ad.fight2":     _T("ATEŞ ET • DASH AT • BONK'LA!", "SHOOT • DASH • BONK!", "¡DISPARA • ESQUIVA • BONK!",
+                        "SCHIESS • DASH • BONK!", "СТРЕЛЯЙ • РЫВОК • БОНК!"),
+    "ad.fight2s":    _T("Kalabalığın ortasına dal, hepsini tek darbede savur.", "Dive into the crowd and send them flying.",
+                        "Lánzate a la multitud y mándalos a volar.", "Spring in die Menge und schleudere sie weg.",
+                        "Влетай в толпу и раскидывай всех одним ударом."),
+    "ad.arsenal":    _T("PATRONLARI DEVİR!", "TAKE DOWN BOSSES!", "¡DERROTA JEFES!", "BESIEGE BOSSE!", "ПОБЕЖДАЙ БОССОВ!"),
+    "ad.arsenal_s":  _T("Balta, Pentagram, Kırbaç, Hortum... Patron devir, kilidi aç!",
+                        "Axe, Pentagram, Whip, Tornado... beat bosses to unlock!",
+                        "Hacha, Pentagrama, Látigo, Tornado... ¡vence jefes!",
+                        "Axt, Pentagramm, Peitsche, Tornado... besiege Bosse!",
+                        "Топор, Пентаграмма, Кнут, Смерч... побеждай боссов!"),
+    "ad.n_weapons":  _T("{0} EFSANE SİLAH", "{0} LEGENDARY WEAPONS", "{0} ARMAS LEGENDARIAS", "{0} LEGENDÄRE WAFFEN",
+                        "{0} ЛЕГЕНДАРНЫХ ОРУЖИЙ"),
+    "ad.active":     _T("SALDIRI", "ATTACK", "ATAQUE", "ANGRIFF", "АТАКА"),
+    "ad.n_books":    _T("{0} GÜÇ KİTABI", "{0} POWER BOOKS", "{0} LIBROS DE PODER", "{0} MACHTBÜCHER", "{0} КНИГ СИЛЫ"),
+    "ad.levelup":    _T("SEVİYE ATLADIN!", "LEVEL UP!", "¡SUBISTE DE NIVEL!", "LEVEL UP!", "НОВЫЙ УРОВЕНЬ!"),
+    "ad.picked":     _T("SEÇİLDİ!", "PICKED!", "¡ELEGIDO!", "GEWÄHLT!", "ВЫБРАНО!"),
+    "ad.books":      _T("KİTAPLIK", "LIBRARY", "BIBLIOTECA", "BIBLIOTHEK", "БИБЛИОТЕКА"),
+    "ad.books_s":    _T("Her seviyede gücünü sen seç — her koşu farklı!", "Pick your power every level — every run is different!",
+                        "Elige tu poder en cada nivel: ¡cada partida es distinta!",
+                        "Wähle jede Stufe deine Kraft — jeder Lauf ist anders!",
+                        "Выбирай силу на каждом уровне — каждый забег другой!"),
+    "ad.style":      _T("SKİNLER • PET'LER", "SKINS • PETS", "SKINS • MASCOTAS", "SKINS • HAUSTIERE", "СКИНЫ • ПИТОМЦЫ"),
+    "ad.style_s":    _T("Her skinin kendi silahı ve özel yeteneği var.", "Every skin has its own weapon and special ability.",
+                        "Cada skin tiene su arma y habilidad especial.", "Jeder Skin hat eigene Waffe und Spezialfähigkeit.",
+                        "У каждого скина своё оружие и особая способность."),
+    "ad.play_now":   _T("ŞİMDİ OYNA!", "PLAY NOW!", "¡JUEGA YA!", "JETZT SPIELEN!", "ИГРАЙ СЕЙЧАС!"),
+    "ad.outro_s":    _T("Arkadaşlarınla yarış — dünya sıralamasında zirveye çık!",
+                        "Race your friends — climb the world ranking!",
+                        "Compite con tus amigos y sube en el ranking mundial.",
+                        "Tritt gegen Freunde an — erklimm die Weltrangliste!",
+                        "Соревнуйся с друзьями — поднимайся в мировом рейтинге!"),
     "ui.store_card_sub": _T("Elmas · Skin · Pet", "Gems · Skins · Pets", "Gemas · Skins · Mascotas",
                             "Steine · Skins · Tiere", "Кристаллы · Скины · Питомцы"),
     "ui.new_tag":     _T("YENİ", "NEW", "NUEVO", "NEU", "НОВОЕ"),
@@ -21748,9 +21861,30 @@ def _slot_strip(w, h):
     return bs
 
 
+_EMPTY_SLOT_CACHE = {}
+
+
 def _empty_slot(surf, r, t, i, radius=10):
-    """BOŞ YUVA: nefes alan kesik çizgili çerçeve + soluk artı."""
+    """BOŞ YUVA: nefes alan kesik çizgili çerçeve + soluk artı.
+
+    v3.26: "nefes" 10 kademeye bölünüp her kademe bir kez çizilip saklanıyor
+    (HUD'da her karede 9 yuvanın kesik çizgilerini tek tek çizmek pahalıydı).
+    """
     breathe = 0.5 + 0.5 * math.sin(t * 1.6 + i * 0.7)
+    lvl = int(breathe * 9 + 0.5)
+    key = (r.w, r.h, radius, lvl)
+    img = _EMPTY_SLOT_CACHE.get(key)
+    if img is None:
+        if len(_EMPTY_SLOT_CACHE) > 400:
+            _EMPTY_SLOT_CACHE.clear()
+        img = _build_empty_slot(r.w, r.h, radius, lvl / 9.0)
+        _EMPTY_SLOT_CACHE[key] = img
+    surf.blit(img, r.topleft)
+
+
+def _build_empty_slot(w, h, radius, breathe):
+    surf = pygame.Surface((w, h), pygame.SRCALPHA)
+    r = pygame.Rect(0, 0, w, h)
     pygame.draw.rect(surf, (15, 16, 25), r, border_radius=radius)
     dash_col = tuple(int(lerp(40, 68, breathe)) for _ in range(3))
     dr = r.inflate(-3, -3)
@@ -21776,7 +21910,8 @@ def _empty_slot(surf, r, t, i, radius=10):
     arm = max(4, r.w * 0.13)
     pygame.draw.line(ps, (140, 150, 190, a_), (r.w / 2 - arm, r.h / 2), (r.w / 2 + arm, r.h / 2), 2)
     pygame.draw.line(ps, (140, 150, 190, a_), (r.w / 2, r.h / 2 - arm), (r.w / 2, r.h / 2 + arm), 2)
-    surf.blit(ps, r.topleft)
+    surf.blit(ps, (0, 0))
+    return surf
 
 
 def _level_badge(surf, cx, cy, lvl, col, maxed=False, h=18):
@@ -22560,7 +22695,7 @@ def _lb_diff_badge(surf, cx, y, diff):
     draw_text(surf, txt, r.center, 9, fg, bold=True, center=True, shadow=False)
 
 
-def draw_run(surf, run, t, aim_pos=None):
+def draw_run(surf, run, t, aim_pos=None, shake=(0, 0)):
     """Koşuyu çizer.
 
     Bütün dünya nesneleri DÜNYA yüzeyine kendi dünya koordinatlarıyla çizilir;
@@ -22664,7 +22799,9 @@ def draw_run(surf, run, t, aim_pos=None):
     run.fx.draw_texts(world)          # hasar sayıları da dünya koordinatında
     world.set_clip(prev_clip)
 
-    surf.blit(world, VIEW_RECT.topleft, cam)
+    # Ekran sarsıntısı yalnızca DÜNYAYI kaydırır; HUD yerinde durur
+    # (v3.26 — eskiden bütün kare ayrı bir yüzeye çizilip kaydırılıyordu).
+    surf.blit(world, (VIEW_RECT.x + int(shake[0]), VIEW_RECT.y + int(shake[1])), cam)
 
     # (v3.17: kenar karartması kaldırıldı — bkz. view_vignette)
 
@@ -24557,6 +24694,394 @@ def draw_armory_bg(surf, t):
         blit_disc(surf, x, y, 1.0 + 1.4 * k, (255, 170 + int(60 * k), 80), int(220 * k))
 
 
+# =====================================================================
+# 30 SANİYELİK TANITIM FİLMİ ("ev reklamı")  (v3.26)
+# ---------------------------------------------------------------------
+# Ödüllü reklamın içeriği. Sahneler ÇİZİM TAKLİDİ DEĞİL: savaş sahneleri
+# oyunun GERÇEK motoruyla oynanıyor — gerçek RunState, gerçek mermiler,
+# gerçek silahlar, gerçek BONK — ve bir otomatik pilot oynuyor. Koşular
+# oyuncunun kaydının KOPYASIYLA (bkz. _AdSave) kuruluyor; reklam bitince
+# atılıyor, gerçek kayda hiçbir şey yazılmıyor (elmas, istatistik,
+# başarım...).
+#
+#   0.0 -  3.5  GİRİŞ     logo, ışınlar, BONK dalgası
+#   3.5 - 11.0  SAVAŞ     gerçek koşu: ateş et, dash at, BONK'la
+#  11.0 - 17.5  SİLAHLIK  4 silahlı gerçek koşu + soldan akan 10 silah
+#  17.5 - 22.5  KİTAPLIK  kitap rafı + SEVİYE ATLADIN kart seçimi
+#  22.5 - 26.5  TARZ      skin geçidi, PET'ler, dünya sıralaması kürsüsü
+#  26.5 - 30.0  KAPANIŞ   logo + ŞİMDİ OYNA
+# Her şey 1280x720'lik bir kareye çizilir, sonra reklam penceresine
+# küçültülerek basılır (oyunun kendi çizim kodu olduğu gibi kullanılsın).
+# =====================================================================
+class _AdSave(SaveManager):
+    """Reklam koşuları için kaydın KOPYASI. Diske/sunucuya hiç yazmaz."""
+
+    def __init__(self, data):
+        self.data = json.loads(json.dumps(data))
+
+    def save(self):
+        pass
+
+    def progress_changed(self):
+        pass
+
+    def mark_tainted(self, reason):
+        pass
+
+
+class _AdAch:
+    """Reklam koşularında başarım açılmasın, bildirim de çizilmesin: her
+    çağrı (unlock, has, update, draw, check_stats...) sessizce boşa düşer."""
+
+    def __getattr__(self, _name):
+        return lambda *_a, **_k: None
+
+
+class HouseAd:
+    LENGTH = 30.0
+    SCENES = ((0.0, "intro"), (3.5, "fight"), (11.0, "arsenal"), (17.5, "books"),
+              (22.5, "style"), (26.5, "outro"))
+    WIPE = 0.32
+
+    def __init__(self, save):
+        self.save = save
+        self.t = 0.0
+        self.frame = pygame.Surface((VIRTUAL_W, VIRTUAL_H)).convert()
+        self._bg = {}
+        self.runs = {}
+        self.ai = {}
+        self._sfx_marks = set()
+        try:
+            self.skin_id = save.equipped_skin_id()
+        except Exception:
+            self.skin_id = "default"
+        floor_surface("arena")           # zemin ilk kez burada çizilsin (sahne ortasında takılmasın)
+        # İki koşu baştan kurulur ve giriş sahnesi sürerken arkada ısınır:
+        # sahne açıldığında ekran zaten kalabalık olsun.
+        self._make_run("fight", weapons={}, books={"r_dmg": 3, "r_aspd": 2}, wave=6, crowd=34)
+        self._make_run("arsenal", weapons={"axe": 5, "pentagram": 5, "whip": 4, "tornado": 4},
+                       books={"r_dmg": 4, "r_crit": 3, "r_vamp": 2}, wave=9, crowd=46)
+
+    # ------------------------------------------------------------------
+    def scene(self, t=None):
+        t = self.t if t is None else t
+        name, start, end = "intro", 0.0, self.LENGTH
+        for i, (st, nm) in enumerate(self.SCENES):
+            if t >= st:
+                name, start = nm, st
+                end = self.SCENES[i + 1][0] if i + 1 < len(self.SCENES) else self.LENGTH
+        return name, t - start, end - start
+
+    def _make_run(self, key, weapons, books, wave, crowd):
+        sb = _AdSave(self.save.data)
+        run = RunState(sb, self.skin_id, "normal", ach=_AdAch())
+        p = run.player
+        p.no_stats = True                # gerçek kayda dash sayılmasın
+        p.weapons = dict(weapons)
+        p.books = dict(books)
+        p.level = 6 + len(weapons) * 3
+        run.waves.wave = wave
+        for _ in range(crowd // 2):
+            self._spawn(run)
+        self.runs[key] = run
+        self.ai[key] = {"ang": random.uniform(0, math.tau), "cx": p.x, "cy": p.y,
+                        "bonk": 0.6, "dash": 1.8, "crowd": crowd}
+        for _ in range(45):              # yarım saniyelik ısınma
+            self._step(key, 1 / 90.0)
+
+    def _spawn(self, run):
+        x, y = run.near_camera_point()
+        kind = random.choice(("red", "red", "blue", "yellow", "tank", "sprinter", "brute"))
+        run.enemies.append(Enemy(kind, x, y, run.wave_hp_mult(run.waves.wave), 1.0,
+                                 wave=run.waves.wave))
+
+    def _step(self, key, dt):
+        """Otomatik pilot: düşmanların çevresinde dolanır, en yakına ateş
+        eder, kalabalık yaklaşınca BONK atar, sıkışınca dash atar."""
+        run, ai = self.runs[key], self.ai[key]
+        p = run.player
+        p.hp = p.max_hp
+        run.pending_levelups = 0
+        run.levelup_choices = []
+        run.want_open_shop = False
+        while len(run.enemies) < ai["crowd"]:
+            self._spawn(run)
+        ai["ang"] += dt * 0.55
+        tx = ai["cx"] + math.cos(ai["ang"]) * 210
+        ty = ai["cy"] + math.sin(ai["ang"]) * 130
+        mx, my = tx - p.x, ty - p.y
+        near, nd, close = None, 1e9, 0
+        for e in run.enemies:
+            if not e.alive:
+                continue
+            d = (e.x - p.x) ** 2 + (e.y - p.y) ** 2
+            if d < nd:
+                near, nd = e, d
+            if d < 150 * 150:
+                close += 1
+                if d < 95 * 95:              # çok yakına geleni savuştur
+                    k = 1.0 / max(20.0, math.sqrt(d))
+                    mx -= (e.x - p.x) * k * 160
+                    my -= (e.y - p.y) * k * 160
+        ln = math.hypot(mx, my) or 1.0
+        mx, my = mx / ln, my / ln
+        inp = {"left": max(0.0, -mx), "right": max(0.0, mx), "up": max(0.0, -my),
+               "down": max(0.0, my), "mouse_down": near is not None, "use_pressed": False}
+        if near is not None:
+            inp["aim_x"], inp["aim_y"] = near.x, near.y
+        ai["bonk"] -= dt
+        ai["dash"] -= dt
+        inp["bonk_pressed"] = close >= 4 and ai["bonk"] <= 0
+        if inp["bonk_pressed"]:
+            ai["bonk"] = 1.6
+        inp["dash_pressed"] = close >= 7 and ai["dash"] <= 0
+        if inp["dash_pressed"]:
+            ai["dash"] = 2.4
+        run.update(dt, inp)
+
+    # ------------------------------------------------------------------
+    def update(self, dt):
+        self.t = min(self.LENGTH, self.t + dt)
+        name, st, _ln = self.scene()
+        dt = min(dt, 1 / 30.0)
+        if name in ("intro", "fight"):
+            self._step("fight", dt)
+        if name in ("fight", "arsenal") or (name == "intro" and self.t > 2.0):
+            self._step("arsenal", dt)
+        # sahneye özel ses vuruşları (her biri bir kez)
+        for mark, at, snd in (("bonk", 1.1, "bonk"), ("lvl", 19.6, "levelup"),
+                              ("buy", 27.0, "buy")):
+            if self.t >= at and mark not in self._sfx_marks:
+                self._sfx_marks.add(mark)
+                sfx(snd, 0.8, 0.0)
+
+    def _grad(self, key, top, bot):
+        img = self._bg.get(key)
+        if img is None:
+            img = pygame.Surface((VIRTUAL_W, VIRTUAL_H)).convert()
+            for y in range(VIRTUAL_H):
+                pygame.draw.line(img, mix_col(top, bot, y / VIRTUAL_H), (0, y), (VIRTUAL_W, y))
+            self._bg[key] = img
+        return img
+
+    def _rays(self, surf, cx, cy, t, col, n=18, alpha=40, rlen=900):
+        lay = self._bg.get("rays_lay")
+        if lay is None:
+            lay = self._bg["rays_lay"] = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+        lay.fill((0, 0, 0, 0))
+        for i in range(n):
+            a = t * 0.25 + i * math.tau / n
+            w = 0.05
+            pygame.draw.polygon(lay, (*col, alpha), [(cx, cy),
+                                (cx + math.cos(a - w) * rlen, cy + math.sin(a - w) * rlen),
+                                (cx + math.cos(a + w) * rlen, cy + math.sin(a + w) * rlen)])
+        surf.blit(lay, (0, 0))
+
+    def _caption(self, surf, text, sub, st, y=600, col=(255, 214, 120), x0=0):
+        """Alt yazı şeridi: soldan kayarak girer."""
+        k = ease_out_cubic(min(1.0, st / 0.45))
+        tw = max(text_width(text, 40, True), text_width(sub, 22, True) if sub else 0) + 90
+        x = x0 - tw + (tw + 60) * k
+        h = 98 if sub else 70
+        bar = pygame.Surface((int(tw), h), pygame.SRCALPHA)
+        bar.fill((10, 8, 18, 215))
+        surf.blit(bar, (int(x), y))
+        pygame.draw.rect(surf, col, pygame.Rect(int(x + tw - 10), y, 10, h))
+        draw_text(surf, text, (int(x) + 30, y + 10), 40, col, bold=True)
+        if sub:
+            draw_text(surf, sub, (int(x) + 32, y + 60), 22, (236, 232, 244), bold=True)
+
+    def _run_shot(self, surf, key, zoom):
+        """Gerçek koşuyu çizer; hafif bir 'kamera yaklaşması' ile."""
+        run = self.runs[key]
+        draw_run(self.frame, run, self.t + 100.0)
+        if zoom <= 1.001:
+            surf.blit(self.frame, (0, 0))
+            return
+        w, h = int(VIRTUAL_W / zoom), int(VIRTUAL_H / zoom)
+        px, py = run.world_to_screen(run.player.x, run.player.y)
+        x = int(clamp(px - w / 2, 0, VIRTUAL_W - w))
+        y = int(clamp(py - h / 2, 0, VIRTUAL_H - h))
+        sub = self.frame.subsurface(pygame.Rect(x, y, w, h))
+        surf.blit(pygame.transform.smoothscale(sub, (VIRTUAL_W, VIRTUAL_H)), (0, 0))
+
+    # ------------------------------------------------------------------
+    def render(self):
+        """Şu anki sahneyi self.frame boyutunda bir yüzeye çizer ve döndürür."""
+        out = self._bg.get("out")
+        if out is None:
+            out = self._bg["out"] = pygame.Surface((VIRTUAL_W, VIRTUAL_H)).convert()
+        name, st, ln = self.scene()
+        getattr(self, "_s_" + name)(out, st, ln)
+        # sahne geçişi: çapraz altın perde
+        if st < self.WIPE and self.t > self.WIPE:
+            k = st / self.WIPE
+            x0 = -200 + (VIRTUAL_W + 400) * k
+            pygame.draw.polygon(out, (236, 186, 92), [(x0, 0), (x0 + 260, 0), (x0 + 60, VIRTUAL_H),
+                                                     (x0 - 200, VIRTUAL_H)])
+            pygame.draw.polygon(out, (255, 240, 200), [(x0 + 200, 0), (x0 + 260, 0),
+                                                      (x0 + 60, VIRTUAL_H), (x0, VIRTUAL_H)])
+        # sinema bantları
+        pygame.draw.rect(out, (0, 0, 0), pygame.Rect(0, 0, VIRTUAL_W, 18))
+        pygame.draw.rect(out, (0, 0, 0), pygame.Rect(0, VIRTUAL_H - 18, VIRTUAL_W, 18))
+        return out
+
+    def _s_intro(self, surf, st, ln):
+        surf.blit(self._grad("intro", (54, 30, 80), (12, 8, 24)), (0, 0))
+        cx, cy = VIRTUAL_W / 2, VIRTUAL_H / 2 - 30
+        self._rays(surf, cx, cy, self.t, (236, 186, 92), alpha=34)
+        add_glow(surf, cx, cy, 460, (210, 150, 60), 0.35)
+        k = min(1.0, st / 0.7)
+        bounce = 1.0 + 0.10 * math.sin(min(1.0, k) * math.pi) * (1 - k)
+        logo = brand_scaled("logo", w=820)
+        if logo is not None:
+            s_ = (0.55 + 0.45 * ease_out_cubic(k)) * bounce
+            img = pygame.transform.smoothscale(logo, (int(logo.get_width() * s_),
+                                                      int(logo.get_height() * s_)))
+            surf.blit(img, (cx - img.get_width() / 2, cy - img.get_height() / 2))
+        if st > 1.1:                       # BONK dalgası
+            q = min(1.0, (st - 1.1) / 0.6)
+            ring_aa(surf, cx, cy, 120 + 520 * q, (255, 230, 170), max(1, int(10 * (1 - q))))
+        if st > 1.5:
+            a = int(255 * min(1.0, (st - 1.5) / 0.4))
+            draw_text(surf, L("ad.tag"), (cx, cy + 210), 30, (255, 236, 182), bold=True,
+                      center=True, alpha=a)
+
+    def _s_fight(self, surf, st, ln):
+        self._run_shot(surf, "fight", 1.0 + 0.10 * (st / ln))
+        if st < ln / 2:
+            self._caption(surf, L("ad.fight1"), L("ad.fight1s"), st)
+        else:
+            self._caption(surf, L("ad.fight2"), L("ad.fight2s"), st - ln / 2, col=(140, 230, 170))
+
+    def _s_arsenal(self, surf, st, ln):
+        self._run_shot(surf, "arsenal", 1.04)
+        # soldan akan silah geçidi
+        side = pygame.Surface((300, VIRTUAL_H), pygame.SRCALPHA)
+        side.fill((10, 8, 18, 210))
+        surf.blit(side, (0, 0))
+        pygame.draw.rect(surf, (238, 150, 100), pygame.Rect(298, 0, 3, VIRTUAL_H))
+        step = 118
+        off = (st * 140) % (step * len(BOSS_WEAPONS))
+        prev = surf.get_clip()
+        surf.set_clip(pygame.Rect(0, 128, 298, VIRTUAL_H - 146))
+        for i in range(len(BOSS_WEAPONS) + 6):
+            w = BOSS_WEAPONS[i % len(BOSS_WEAPONS)]
+            y = 196 + i * step - off
+            if y < 70 or y > VIRTUAL_H + 60:
+                continue
+            draw_weapon_emblem(surf, 92, y, 84, w, self.t, locked=False, glow=True)
+            draw_text(surf, w_name(w), (150, y - 16), 20, tuple(w["color"]), bold=True)
+            draw_text(surf, L("ui.passive") if w.get("passive") else L("ad.active"),
+                      (150, y + 10), 13, TEXT_DIM, bold=True)
+        surf.set_clip(prev)
+        draw_text(surf, L("ui.codex"), (150, 52), 34, (238, 150, 100), bold=True, center=True)
+        draw_text(surf, L("ad.n_weapons", len(BOSS_WEAPONS)), (150, 94), 18, TEXT, bold=True,
+                  center=True)
+        pygame.draw.line(surf, (110, 70, 50), (24, 120), (274, 120), 2)
+        self._caption(surf, L("ad.arsenal"), L("ad.arsenal_s"), st, y=590, x0=301)
+
+    def _s_books(self, surf, st, ln):
+        surf.blit(self._grad("books", (44, 28, 22), (14, 10, 12)), (0, 0))
+        # raf tahtaları
+        for sy in (250, 470):
+            pygame.draw.rect(surf, (92, 60, 36), pygame.Rect(0, sy, VIRTUAL_W, 22))
+            pygame.draw.rect(surf, (128, 86, 52), pygame.Rect(0, sy, VIRTUAL_W, 5))
+            pygame.draw.rect(surf, (30, 20, 14), pygame.Rect(0, sy + 22, VIRTUAL_W, 10))
+        books = [b for b in BOOKS][:22]
+        if st < 2.2:
+            # kitaplar rafa dizilir
+            for i, bk in enumerate(books):
+                row, col = divmod(i, 11)
+                k = ease_out_cubic(clamp((st - i * 0.06) / 0.5, 0.0, 1.0))
+                x = 90 + col * 110
+                y = (176 if row == 0 else 396) - (1 - k) * 260
+                if k > 0:
+                    draw_book(surf, x, y, 120, bk, self.t, locked=False, glow=k >= 1.0)
+            draw_text(surf, L("ui.books"), (VIRTUAL_W / 2, 560), 44, (196, 150, 255), bold=True,
+                      center=True)
+            draw_text(surf, L("ad.n_books", len(BOOKS)), (VIRTUAL_W / 2, 612), 24, TEXT, bold=True,
+                      center=True)
+        else:
+            # SEVİYE ATLADIN: üç kart gelir, biri seçilir
+            q = st - 2.2
+            dim = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+            dim.fill((8, 6, 14, 190))
+            surf.blit(dim, (0, 0))
+            draw_text(surf, L("ad.levelup"), (VIRTUAL_W / 2, 92), 52, GOLD, bold=True, center=True)
+            picks = [BOOK_BY_KEY.get(k) for k in ("r_dmg", "r_crit", "r_vamp")]
+            for i, bk in enumerate(p for p in picks if p):
+                k = ease_out_cubic(clamp((q - i * 0.15) / 0.45, 0.0, 1.0))
+                cx = VIRTUAL_W / 2 + (i - 1) * 320
+                r = pygame.Rect(0, 0, 270, 360)
+                r.center = (int(cx), int(370 + (1 - k) * 420))
+                chosen = i == 1 and q > 1.4
+                if chosen:
+                    add_glow(surf, r.centerx, r.centery, 260, GOLD, 0.35)
+                    r = r.inflate(18, 18)
+                panel(surf, r, bg=(30, 24, 44), edge=GOLD if chosen else (120, 100, 170),
+                      alpha=250, radius=18, edge_w=4 if chosen else 2)
+                draw_book(surf, r.centerx, r.y + 120, 150, bk, self.t)
+                draw_text(surf, bk_name(bk), (r.centerx, r.y + 230), 24, TEXT, bold=True, center=True)
+                for j, lnx in enumerate(wrap_text(bk_desc(bk), 15, r.w - 30)[:3]):
+                    draw_text(surf, lnx, (r.centerx, r.y + 266 + j * 20), 15, TEXT_DIM, center=True)
+                if chosen:
+                    draw_text(surf, L("ad.picked"), (r.centerx, r.bottom - 28), 18, GREEN,
+                              bold=True, center=True)
+            self._caption(surf, L("ad.books"), L("ad.books_s"), q, y=596, col=(196, 150, 255))
+
+    def _s_style(self, surf, st, ln):
+        surf.blit(self._grad("style", (24, 30, 60), (10, 10, 22)), (0, 0))
+        self._rays(surf, VIRTUAL_W / 2, 330, self.t, (120, 160, 255), alpha=22)
+        sk_list = [s for s in SKINS if not s.get("premium")][2:7] + \
+                  [s for s in SKINS if s.get("premium")][:3]
+        n = len(sk_list)
+        # döner geçit
+        for i, sk in enumerate(sk_list):
+            a = st * 0.9 + i * math.tau / n
+            depth = (math.sin(a) + 1) / 2          # 0 arka, 1 ön
+            x = VIRTUAL_W / 2 + math.cos(a) * 420
+            y = 300 + depth * 70
+            r = int(22 + 26 * depth)
+            add_glow(surf, x, y, r * 3, sk["color"], 0.12 + 0.2 * depth)
+            surf.blit(shadow_sprite(r * 2 + 10), (int(x - r - 5), int(y + r - 4)))
+            draw_skin_preview(surf, sk, x, y, self.t, r=r)
+            if depth > 0.8:
+                draw_text(surf, skin_name(sk), (x, y + r + 22), 22, sk["color"], bold=True,
+                          center=True)
+                if sk.get("premium"):
+                    draw_text(surf, L("ui.premium"), (x, y - r - 30), 15, PURPLE, bold=True,
+                              center=True)
+        # PET'ler önde koşturur
+        for i, pet in enumerate(PETS[:5]):
+            x = (st * 160 + i * 230) % (VIRTUAL_W + 200) - 100
+            draw_pet(surf, pet["kind"], x, 470 + math.sin(self.t * 8 + i) * 4, 16, self.t, face=1,
+                     moving=True, col=pet["color"], acc=pet["accent"])
+        self._caption(surf, L("ad.style"), L("ad.style_s"), st, y=560, col=(130, 200, 255))
+
+    def _s_outro(self, surf, st, ln):
+        surf.blit(self._grad("intro", (54, 30, 80), (12, 8, 24)), (0, 0))
+        cx, cy = VIRTUAL_W / 2, 270
+        self._rays(surf, cx, cy, self.t, (236, 186, 92), alpha=40)
+        add_glow(surf, cx, cy, 480, (210, 150, 60), 0.32)
+        logo = brand_scaled("logo", w=760)
+        if logo is not None:
+            surf.blit(logo, (cx - logo.get_width() / 2, cy - logo.get_height() / 2))
+        k = 0.5 + 0.5 * math.sin(self.t * 5)
+        b = pygame.Rect(0, 0, 420, 86)
+        b.center = (int(cx), 520)
+        add_glow(surf, b.centerx, b.centery, 260, GREEN, 0.18 + 0.12 * k)
+        surf.blit(_button_body(b.w, b.h, (60, 150, 92), k, 22), b.topleft)
+        pygame.draw.rect(surf, (190, 255, 210), b, width=3, border_radius=22)
+        draw_text(surf, L("ad.play_now"), b.center, int(40 + 3 * k), WHITE, bold=True, center=True)
+        draw_text(surf, L("ad.outro_s"), (cx, 610), 22, (236, 222, 196), bold=True, center=True)
+        if NEW_YEAR_THEME:
+            for i in range(40):
+                x = (i * 131.3 + math.sin(self.t + i) * 20) % VIRTUAL_W
+                y = (self.t * (40 + i % 5 * 12) + i * 57) % VIRTUAL_H
+                blit_disc(surf, x, y, 2 + i % 3, (255, 255, 255), 200)
+
+
 class App:
     def __init__(self):
         pygame.init()
@@ -25078,6 +25603,29 @@ class App:
             pass
 
     # ---------------- OYNANIŞ ----------------
+    def _draw_run_frame(self, canvas, aim_pos=None, offset=(0, 0)):
+        """Koşuyu ekrana çizer (v3.26 — PERFORMANS).
+
+        Eskiden her karede 1280x720'lik SAYDAM bir ara yüzey ayrılıyor, koşu
+        ona çiziliyor, sonra alfa karışımıyla ekrana basılıyordu; arkasına da
+        oyun sırasında hiç görünmeyen hareketli menü zemini çiziliyordu.
+        Artık: donuk zemin (tek blit) + koşu DOĞRUDAN tuvale. Yalnızca ekran
+        sarsılırken koşu kalıcı, opak bir katmana çizilip kaydırılarak basılır.
+        """
+        bgf = self.bg.static_frame()
+        ox, oy = (int(offset[0]), int(offset[1])) if offset else (0, 0)
+        if ox or oy:
+            canvas.blit(bgf, (0, 0))          # sarsıntıda kenarlar açılır
+        else:
+            # Dünya VIEW_RECT'i tamamen kaplıyor: zeminden yalnızca kenar
+            # şeritleri basılır.
+            v = VIEW_RECT
+            for rr in ((0, 0, VIRTUAL_W, v.y), (0, v.bottom, VIRTUAL_W, VIRTUAL_H - v.bottom),
+                       (0, v.y, v.x, v.h), (v.right, v.y, VIRTUAL_W - v.right, v.h)):
+                if rr[2] > 0 and rr[3] > 0:
+                    canvas.blit(bgf, rr[:2], rr)
+        draw_run(canvas, self.run, self.t, aim_pos=aim_pos, shake=(ox, oy))
+
     def update_play(self, dt, keys, mouse_pos, mouse_down, bonk_pressed, dash_pressed,
                     use_pressed=False, clicked=False, stats_pressed=False):
         # --- İSTATİSTİK paneli (sağ üstteki "⋮") ---
@@ -25131,10 +25679,7 @@ class App:
 
         offset = self.run.fx.get_shake_offset()
         canvas = self.display.canvas
-        self.bg.draw(canvas)
-        tmp = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
-        draw_run(tmp, self.run, self.t, aim_pos=mouse_pos)
-        canvas.blit(tmp, offset)
+        self._draw_run_frame(canvas, aim_pos=mouse_pos, offset=offset)
 
         if self.run.want_open_shop:
             self.run.want_open_shop = False
@@ -25172,10 +25717,7 @@ class App:
 
     def update_levelup(self, dt, mouse_pos, clicked):
         canvas = self.display.canvas
-        self.bg.draw(canvas)
-        tmp = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
-        draw_run(tmp, self.run, self.t)
-        canvas.blit(tmp, (0, 0))
+        self._draw_run_frame(canvas)
         self.levelup_ui.rebuild(self.run.levelup_choices)
         act = self.levelup_ui.draw_and_handle(canvas, self.run, mouse_pos, clicked, self.t)
         if act:
@@ -25197,10 +25739,7 @@ class App:
 
     def update_run_shop(self, dt, mouse_pos, clicked):
         canvas = self.display.canvas
-        self.bg.draw(canvas)
-        tmp = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
-        draw_run(tmp, self.run, self.t)
-        canvas.blit(tmp, (0, 0))
+        self._draw_run_frame(canvas)
         close = self.shop_ui.draw_and_handle(canvas, self.run, mouse_pos, clicked, self.t)
         if close:
             self.state = STATE_PLAY
@@ -25241,9 +25780,7 @@ class App:
         görünüm ayarları (EŞYA EFEKTİ, YETENEK ÇUBUĞU, SKİN GÖRÜNÜMÜ) burada.
         """
         canvas = self.display.canvas
-        tmp = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
-        draw_run(tmp, self.run, self.t)
-        canvas.blit(tmp, (0, 0))
+        self._draw_run_frame(canvas)
         overlay = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
         pygame.draw.rect(overlay, (5, 6, 12, 206), overlay.get_rect())
         canvas.blit(overlay, (0, 0))
@@ -26243,12 +26780,12 @@ class App:
         cy_ = sc.y + 50 + math.sin(self.t * 2) * 2
         if kind == "skin":
             draw_skin_preview(canvas, it, sc.centerx, cy_, self.t, r=int(16 + 4 * fade))
-            tag, price = L("ui.showcase_premium"), premium_gem_price(it)
+            tag, price = L("ui.showcase_premium"), None
             name = skin_name(it)
         elif kind == "pet":
             draw_pet(canvas, it["kind"], sc.centerx, cy_ + 4, int(10 + 5 * fade), self.t, face=1,
                      moving=True, col=it["color"], acc=it["accent"])
-            tag, price = L("ui.showcase_pet"), pet_gem_price(it)
+            tag, price = L("ui.showcase_pet"), None
             name = it["name"]
         else:
             for j in range(4):
@@ -26360,6 +26897,11 @@ class App:
     def _ad_start(self):
         if self.ad_play is not None or not self.rewards.ad_ready():
             return False
+        try:
+            self.house_ad = HouseAd(self.save)
+        except Exception as e:          # film kurulamazsa ödül yine verilebilsin
+            print("Reklam filmi kurulamadı:", e)
+            self.house_ad = None
         self.ad_play = 0.0
         self.ad_done = False
         sfx("click", 0.6, 0.0)
@@ -26372,6 +26914,7 @@ class App:
         got = self.rewards.grant_ad() if (reward and self.ad_done) else 0
         self.ad_play = None
         self.ad_done = False
+        self.house_ad = None            # sahte koşular bellekten atılsın
         if got:
             self._spawn_reward_fx(VIRTUAL_W / 2, VIRTUAL_H / 2, got)
 
@@ -26419,13 +26962,18 @@ class App:
         ov = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
         ov.fill((4, 4, 10, int(235 * min(1.0, t / 0.25))))
         canvas.blit(ov, (0, 0))
-        vid = pygame.Rect(0, 0, 820, 462)
-        vid.center = (VIRTUAL_W // 2, VIRTUAL_H // 2 - 26)
+        vid = pygame.Rect(0, 0, 960, 540)
+        vid.center = (VIRTUAL_W // 2, VIRTUAL_H // 2 - 40)
         pygame.draw.rect(canvas, (0, 0, 0), vid.inflate(8, 8), border_radius=14)
-        prev = canvas.get_clip()
-        canvas.set_clip(vid)
-        self._draw_house_ad(canvas, vid, min(t, AD_LENGTH))
-        canvas.set_clip(prev)
+        ad = getattr(self, "house_ad", None)
+        if ad is not None:
+            try:
+                ad.update(dt)
+                frame = ad.render()
+                canvas.blit(pygame.transform.smoothscale(frame, vid.size), vid.topleft)
+            except Exception as e:      # film bozulursa pencere boş kalsın, oyun çökmesin
+                print("Reklam filmi hatası:", e)
+                self.house_ad = None
         pygame.draw.rect(canvas, (70, 76, 104), vid.inflate(8, 8), width=2, border_radius=14)
         # üst köşeler: REKLAM etiketi + geri sayım
         lab = L("ui.ad_label")
@@ -26448,7 +26996,7 @@ class App:
         pygame.draw.rect(canvas, (30, 30, 40), pygame.Rect(vid.x, vid.bottom - 5, vid.w, 5))
         pygame.draw.rect(canvas, (250, 200, 60), pygame.Rect(vid.x, vid.bottom - 5, int(vid.w * frac), 5))
 
-        by = vid.bottom + 22
+        by = vid.bottom + 20
         if self.ad_done:
             b = pygame.Rect(0, 0, 300, 46)
             b.center = (VIRTUAL_W // 2, by + 14)
@@ -26472,95 +27020,6 @@ class App:
             if clicked and hov:
                 self._ad_finish(False)
                 sfx("click", 0.5, 0.0)
-
-    def _draw_house_ad(self, canvas, vid, t):
-        """EV REKLAMI: 3 sahnelik kısa Arena Bonk tanıtımı (her biri ~5 sn)."""
-        # zemin
-        bg = getattr(self, "_ad_bg", None)
-        if bg is None or bg.get_size() != vid.size:
-            bg = pygame.Surface(vid.size).convert()
-            for y in range(vid.h):
-                f = y / vid.h
-                pygame.draw.line(bg, mix_col((48, 30, 70), (14, 10, 26), f), (0, y), (vid.w, y))
-            self._ad_bg = bg
-        canvas.blit(bg, vid.topleft)
-        cx, cy = vid.centerx, vid.centery
-        scene_len = AD_LENGTH / 3.0
-        sc = min(2, int(t / scene_len))
-        st = t - sc * scene_len
-        # sahne geçişinde kısa beyaz parlama
-        flash = max(0.0, 1.0 - st / 0.18) if sc > 0 else 0.0
-        if sc == 0:
-            # 1) logo + ışınlar
-            rays = self._logo_rays()
-            rays.set_alpha(150)
-            canvas.blit(rays, (cx - rays.get_width() / 2, cy - 40 - rays.get_height() / 2))
-            k = ease_out_cubic(min(1.0, st / 0.8))
-            logo = brand_scaled("logo", w=560)
-            if logo is not None:
-                s_ = 0.7 + 0.3 * k
-                img = pygame.transform.smoothscale(
-                    logo, (int(logo.get_width() * s_), int(logo.get_height() * s_)))
-                canvas.blit(img, (cx - img.get_width() / 2, cy - 40 - img.get_height() / 2))
-            draw_text(canvas, L("ui.promo_1"), (cx, vid.bottom - 70), 26, (255, 236, 182),
-                      bold=True, center=True, alpha=int(255 * clamp((st - 0.6) / 0.5, 0, 1)))
-        elif sc == 1:
-            # 2) minik arena: ortada oyuncu, dört bir yandan gelen yaratıklar
-            fl = pygame.Rect(vid.x + 40, vid.y + 40, vid.w - 80, vid.h - 130)
-            pygame.draw.rect(canvas, (24, 30, 40), fl, border_radius=16)
-            for gx in range(fl.x, fl.right, 40):
-                pygame.draw.line(canvas, (32, 40, 54), (gx, fl.y), (gx, fl.bottom))
-            for gy in range(fl.y, fl.bottom, 40):
-                pygame.draw.line(canvas, (32, 40, 54), (fl.x, gy), (fl.right, gy))
-            px, py = fl.centerx, fl.centery
-            for i in range(7):
-                period = 1.7 + (i % 3) * 0.35
-                ph = (st + i * 0.53) % period / period
-                a = i * 2.39 + int((st + i * 0.53) / period) * 1.3
-                d = lerp(230, 30, ph)
-                ex, ey = px + math.cos(a) * d, py + math.sin(a) * d * 0.62
-                if ph < 0.86:
-                    col = ((232, 90, 100), (78, 150, 232), (240, 200, 80))[i % 3]
-                    circle_aa(canvas, ex, ey + 3, 11, (10, 10, 16))
-                    circle_aa(canvas, ex, ey, 11, col)
-                    circle_aa(canvas, ex - 3, ey - 3, 3, lighten(col, 0.6))
-                    if ph > 0.45:
-                        thick_line(canvas, (px, py), (ex, ey), 2.2, (255, 240, 170))
-                else:
-                    k = (ph - 0.86) / 0.14
-                    ring_aa(canvas, ex, ey, 10 + 26 * k, (255, 220, 140), 3)
-                    draw_text(canvas, "BONK!", (ex, ey - 22 - 10 * k), 13, (255, 220, 140),
-                              bold=True, center=True, alpha=int(255 * (1 - k)))
-            draw_skin_preview(canvas, get_skin("default"), px, py, self.t, r=20)
-            draw_text(canvas, L("ui.promo_2"), (cx, vid.bottom - 56), 22, (255, 236, 182),
-                      bold=True, center=True)
-        else:
-            # 3) kürsü: premium skinler + çağrı
-            prem = [s for s in SKINS if s.get("premium")][:3]
-            podium = ((cx - 150, 60), (cx, 92), (cx + 150, 44))
-            for i, sk in enumerate(prem):
-                x, hgt = podium[i]
-                base_y = vid.y + 330
-                pr = pygame.Rect(int(x - 56), int(base_y - hgt), 112, int(hgt))
-                pygame.draw.rect(canvas, (60, 46, 88), pr, border_radius=8)
-                pygame.draw.rect(canvas, GOLD if i == 1 else (120, 100, 160), pr, width=2,
-                                 border_radius=8)
-                draw_text(canvas, str((2, 1, 3)[i]), pr.center, 24, GOLD if i == 1 else TEXT,
-                          bold=True, center=True)
-                bob = math.sin(self.t * 2 + i) * 3
-                add_glow(canvas, x, base_y - hgt - 40, 60, sk["color"], 0.25)
-                draw_skin_preview(canvas, sk, x, base_y - hgt - 38 + bob, self.t, r=22)
-            if st > 0.4:
-                draw_icon(canvas, cx, vid.y + 70, "star", GOLD, 18)
-            draw_text(canvas, L("ui.promo_3"), (cx, vid.bottom - 84), 22, (255, 236, 182),
-                      bold=True, center=True)
-            k = 0.5 + 0.5 * math.sin(self.t * 5)
-            draw_text(canvas, L("ui.play") + "!", (cx, vid.bottom - 44), int(24 + 3 * k), GREEN,
-                      bold=True, center=True)
-        if flash > 0:
-            fs = pygame.Surface(vid.size, pygame.SRCALPHA)
-            fs.fill((255, 255, 255, int(180 * flash)))
-            canvas.blit(fs, vid.topleft)
 
     # ---------------- ELMAS MARKETİ (satın alma ekranı) ----------------
     def _buy_gem_pack(self, pack):
@@ -26922,21 +27381,26 @@ class App:
             if owned:
                 draw_text(canvas, L("ui.own_costume"), (rect.centerx, rect.bottom - 72),
                           10, TEXT_DIM, center=True, shadow=False)
+            else:
+                draw_text(canvas, sk.get("price_hint", ""), (rect.centerx, rect.bottom - 74),
+                          19, TEXT, bold=True, center=True)
+
+            if owned:
                 btn = Button((rect.x + 18, rect.bottom - 46, rect.w - 36, 34),
                              L("ui.equipped") if is_eq else L("ui.equip"),
                              lambda s=sk: self._equip_premium(s),
                              color=(60, 130, 90) if not is_eq else (38, 40, 54),
                              hover_color=(80, 170, 115), enabled=not is_eq, text_size=14)
-                btn.update(mouse_pos, dt)
-                btn.draw(canvas)
-                if clicked:
-                    btn.click(mouse_pos)
             else:
-                # v3.26: premium skin ELMASLA da alınır (P2W olmasın diye).
-                gp = premium_gem_price(sk)
-                self._gem_buy_row(canvas, rect, gp, sk.get("price_hint", ""), can_buy, mouse_pos,
-                                  clicked, lambda s=sk, c=gp: self._buy_premium_gems(s, c),
-                                  lambda s=sk: self._buy_premium_skin(s))
+                btn = Button((rect.x + 18, rect.bottom - 46, rect.w - 36, 34),
+                             L("ui.buy_now") if can_buy else L("ui.soon"),
+                             lambda s=sk: self._buy_premium_skin(s),
+                             color=(120, 60, 150) if can_buy else (38, 40, 54),
+                             hover_color=(160, 90, 200), enabled=can_buy, text_size=14)
+            btn.update(mouse_pos, dt)
+            btn.draw(canvas)
+            if clicked:
+                btn.click(mouse_pos)
 
     def _draw_store_pets(self, canvas, dt, mouse_pos, clicked, can_buy):
         """MAĞAZA > PETLER sekmesi.
@@ -26993,68 +27457,17 @@ class App:
                              color=(38, 40, 54) if is_eq else (60, 130, 90),
                              hover_color=(80, 170, 115), enabled=not is_eq, text_size=13)
             else:
-                gp = pet_gem_price(pet)
-                self._gem_buy_row(canvas, rect, gp, pet.get("price_hint", ""), can_buy, mouse_pos,
-                                  clicked, lambda pt=pet, c=gp: self._buy_pet_gems(pt, c),
-                                  lambda pt=pet: self._buy_store_pet(pt), compact=True)
-                continue
+                draw_text(canvas, pet.get("price_hint", ""),
+                          (rect.centerx, rect.bottom - 54), 17, TEXT, bold=True, center=True)
+                btn = Button((rect.x + 18, rect.bottom - 40, rect.w - 36, 30),
+                             L("ui.buy_now") if can_buy else L("ui.soon"),
+                             lambda pt=pet: self._buy_store_pet(pt),
+                             color=(120, 60, 150) if can_buy else (38, 40, 54),
+                             hover_color=(160, 90, 200), enabled=can_buy, text_size=13)
             btn.update(mouse_pos, dt)
             btn.draw(canvas)
             if clicked:
                 btn.click(mouse_pos)
-
-    def _gem_buy_row(self, canvas, rect, gem_cost, money_hint, can_buy, mouse_pos, clicked,
-                     on_gems, on_money, compact=False):
-        """Kartın altı: ELMAS fiyatı + ELMASLA AL (gerçek para açıksa yanında ₺)."""
-        gems = self.save.get_gems()
-        afford = gems >= gem_cost and self.save.can_spend()
-        price_y = rect.bottom - (54 if compact else 66)
-        draw_coin_label(canvas, rect.centerx, price_y, fmt_num(gem_cost), GEM_COLOR,
-                        16 if compact else 19, icon="gem", icon_r=8 if compact else 10, gap=6)
-        bh_ = 30 if compact else 34
-        b = pygame.Rect(rect.x + 18, rect.bottom - (40 if compact else 46), rect.w - 36, bh_)
-        if can_buy and money_hint:
-            mb = pygame.Rect(b.right - 78, b.y, 78, bh_)
-            b.w -= 84
-            mh = mb.collidepoint(mouse_pos)
-            self._mini_button(canvas, mb, money_hint, (120, 60, 150), mh)
-            if clicked and mh:
-                on_money()
-        hov = b.collidepoint(mouse_pos)
-        if afford:
-            self._mini_button(canvas, b, L("ui.buy_with", fmt_num(gem_cost)), (40, 110, 160), hov,
-                              icon="gem")
-        else:
-            self._mini_button(canvas, b, L("ui.need_gems", fmt_num(max(0, gem_cost - gems))),
-                              (40, 110, 160), False, enabled=False)
-        if clicked and hov:
-            if afford:
-                on_gems()
-            else:
-                sfx("error", 0.5, 0.0)
-
-    def _store_msg(self, ok, msg):
-        self.gem_msg = msg
-        self.gem_msg_ok = ok
-        self.gem_msg_timer = 2.6
-
-    def _buy_premium_gems(self, sk, cost):
-        if self.save.buy_premium_with_gems(sk["id"], cost):
-            self.selected_skin = sk["id"]
-            self.ach.unlock("fashion")
-            self._store_msg(True, L("ui.bought_eq", skin_name(sk)))
-            sfx("buy", 1.0, 0.0)
-        else:
-            sfx("error", 0.5, 0.0)
-
-    def _buy_pet_gems(self, pet, cost):
-        if self.save.buy_cosmetic(pet["id"], cost):
-            self.save.equip_cosmetic("pet", pet["id"])
-            self.save.save()
-            self._store_msg(True, L("ui.bought_eq", pet["name"]))
-            sfx("buy", 1.0, 0.0)
-        else:
-            sfx("error", 0.5, 0.0)
 
     def _equip_store_pet(self, pet):
         self.save.equip_cosmetic("pet", pet["id"])
@@ -27105,7 +27518,7 @@ class App:
         pygame.draw.line(canvas, (48, 108, 150), (0, 76), (VIRTUAL_W, 76), 2)
         draw_icon(canvas, 34, 30, "gem", GEM_COLOR, 13)
         draw_text(canvas, L("ui.store"), (56, 16), 26, GEM_COLOR, bold=True)
-        draw_text(canvas, L("ui.store_sub2"),
+        draw_text(canvas, L("ui.store_sub"),
                   (56, 48), 11, TEXT_DIM, shadow=False)
         gem_txt = fmt_num(self.save.get_gems())
         gw_ = coin_label_width(gem_txt, 20, 10, gap=8)
@@ -27128,11 +27541,10 @@ class App:
         info_y = 500 if self.store_tab == "pets" else 440
         info = pygame.Rect(120, info_y, VIRTUAL_W - 240, 90)
         panel(canvas, info, bg=(18, 19, 30), edge=(64, 70, 96), alpha=235, radius=12, edge_w=1)
-        if self.store_tab in ("free", "skins", "pets"):
-            # Bu sekmelerde her şey ELMASLA alınabiliyor: oyuncuya P2W
-            # olmadığını ve elması nereden bulacağını söyle.
-            draw_icon(canvas, info.x + 34, info.centery, "shield", GREEN, 12)
-            for j, ln in enumerate(wrap_text(L("ui.no_p2w"), 13, info.w - 90)[:2]):
+        if self.store_tab == "free":
+            # Elmasın nerede işe yaradığını söyle.
+            draw_icon(canvas, info.x + 34, info.centery, "gem", GEM_COLOR, 12)
+            for j, ln in enumerate(wrap_text(L("ui.free_note"), 13, info.w - 90)[:2]):
                 draw_text(canvas, ln, (info.x + 60, info.y + 22 + j * 20), 13,
                           (196, 230, 204) if j == 0 else TEXT_DIM, bold=(j == 0), shadow=False)
         elif FAKE_PURCHASE:

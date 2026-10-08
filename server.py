@@ -852,6 +852,38 @@ def _ban_account(account_id, reason):
         pass
 
 
+def _merge_rewards(a, b):
+    """Oyundaki merge_rewards ile AYNI kural (bkz. kasma_arena13.py)."""
+    a = a if isinstance(a, dict) else {}
+    b = b if isinstance(b, dict) else {}
+
+    def _i(v):
+        try:
+            return max(0, min(int(v or 0), 10 ** 6))
+        except (TypeError, ValueError):
+            return 0
+
+    def _f(v):
+        try:
+            x = float(v or 0)
+            return x if math.isfinite(x) else 0.0
+        except (TypeError, ValueError):
+            return 0.0
+
+    out = {}
+    ka = lambda d: (str(d.get("ad_day") or "")[:10], _i(d.get("ad_count")))
+    src = a if ka(a) >= ka(b) else b
+    if src.get("ad_day"):
+        out["ad_day"], out["ad_count"] = ka(src)
+    out["ad_last"] = max(_f(a.get("ad_last")), _f(b.get("ad_last")))
+    out["ad_total"] = max(_i(a.get("ad_total")), _i(b.get("ad_total")))
+    kg = lambda d: (str(d.get("gift_day") or "")[:10], _i(d.get("gift_streak")))
+    src = a if kg(a) >= kg(b) else b
+    if src.get("gift_day"):
+        out["gift_day"], out["gift_streak"] = kg(src)
+    return out
+
+
 def _merge_progress(old, new):
     """Sunucudaki ilerlemeyi oyundan geleniyle birleştirir.
 
@@ -918,6 +950,10 @@ def _merge_progress(old, new):
     # koyar — yalnızca rutin otomatik kayıt artık bunu tek başına yapamaz.
     out["board_banned"] = bool(old.get("board_banned"))
     out["ban_reasons"] = list(old.get("ban_reasons") or [])[:8] if out["board_banned"] else []
+    # ÜCRETSİZ ELMAS SAYAÇLARI (v3.26): reklam ve günlük hediye hesaba ait;
+    # sayaçlar geri gitmez, yani aynı günün hakkı başka bilgisayardan ikinci
+    # kez kullanılamaz.
+    out["rewards"] = _merge_rewards(old.get("rewards"), new.get("rewards"))
     ach = dict(old.get("achievements") or {})
     for k, v in list((new.get("achievements") or {}).items())[:400]:
         ach.setdefault(str(k)[:40], v)
