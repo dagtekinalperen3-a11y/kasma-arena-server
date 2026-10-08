@@ -584,7 +584,7 @@ WEAPON_FX_DEFAULT = 100           # yeni oyuncunun başlangıç değeri (%)
 # Eski üç kademeli ayarın sayısal karşılıkları (kayıt göçü için).
 WEAPON_FX_LEGACY = {"full": 100, "dim": 32, "off": 0}
 GAME_TITLE = "ARENA SAVAŞI"
-GAME_VERSION = "3.23"
+GAME_VERSION = "3.24"
 
 
 # =====================================================================
@@ -1496,6 +1496,31 @@ STRINGS = {
                           "Браузер открыт — выбери аккаунт Google."),
     "ui.acc_nobrowser": _T("Tarayıcı açılamadı.", "Could not open a browser.", "No se pudo abrir el navegador.",
                            "Browser konnte nicht geöffnet werden.", "Не удалось открыть браузер."),
+    "ui.acc_checking_session": _T("Hesabın kontrol ediliyor...", "Checking your account...",
+                          "Comprobando tu cuenta...", "Dein Konto wird geprüft...",
+                          "Проверяем твой аккаунт..."),
+    "ui.acc_wait_login": _T("Önce bu bitsin — sonra giriş yapabilirsin.",
+                          "Let this finish first — then you can sign in.",
+                          "Deja que termine y luego inicia sesión.",
+                          "Erst abwarten, dann anmelden.",
+                          "Сначала дождись, потом войдёшь."),
+    "ui.acc_retry":    _T("YENİDEN DENE", "RETRY", "REINTENTAR", "ERNEUT VERSUCHEN", "ПОВТОРИТЬ"),
+    "ui.acc_giveup":   _T("VAZGEÇ", "CANCEL", "CANCELAR", "ABBRECHEN", "ОТМЕНА"),
+    "ui.connecting":   _T("BAĞLANIYOR", "CONNECTING", "CONECTANDO", "VERBINDE", "ПОДКЛЮЧЕНИЕ"),
+    "ui.acc_offline_chip": _T("SUNUCU KAPALI", "SERVER DOWN", "SERVIDOR CAÍDO",
+                          "SERVER AUS", "СЕРВЕР НЕДОСТУПЕН"),
+    "ui.banned_title": _T("DÜNYA SIRALAMASINDAN ÇIKARILDIN",
+                          "REMOVED FROM THE WORLD RANKING",
+                          "EXPULSADO DEL RANKING MUNDIAL",
+                          "AUS DER WELTRANGLISTE ENTFERNT",
+                          "ИСКЛЮЧЁН ИЗ МИРОВОГО РЕЙТИНГА"),
+    "ui.banned_body":  _T("Bu hesap KALICI olarak dünya sıralamasının dışında. Skorların sunucuya hiç gönderilmiyor, gönderilenler de silindi. Oynamaya devam edebilirsin; skorların yalnızca kendi tablonda görünür.",
+                          "This account is PERMANENTLY out of the world ranking. Your scores are never sent to the server, and the ones already there were deleted. You can keep playing; your scores show only in your own table.",
+                          "Esta cuenta está PERMANENTEMENTE fuera del ranking mundial. Tus puntuaciones no se envían y las que había fueron borradas. Puedes seguir jugando; solo aparecerán en tu tabla local.",
+                          "Dieses Konto ist DAUERHAFT aus der Weltrangliste. Deine Punkte werden nie gesendet, vorhandene wurden gelöscht. Du kannst weiterspielen; die Punkte erscheinen nur in deiner eigenen Tabelle.",
+                          "Этот аккаунт НАВСЕГДА вне мирового рейтинга. Твои очки не отправляются, а прежние удалены. Играть можно; очки видны только в твоей таблице."),
+    "ui.banned_why":   _T("sebep: {0}", "reason: {0}", "motivo: {0}", "Grund: {0}", "причина: {0}"),
+    "ui.banned_short": _T("SIRALAMA DIŞI", "BANNED", "EXPULSADO", "GESPERRT", "ВНЕ РЕЙТИНГА"),
     "ui.acc_checking": _T("Doğrulanıyor...", "Verifying...", "Verificando...", "Wird geprüft...", "Проверка..."),
     "ui.acc_timeout":  _T("Süre doldu, tekrar dene.", "Timed out, try again.", "Tiempo agotado, inténtalo de nuevo.",
                           "Zeit abgelaufen, versuch es erneut.", "Время вышло, попробуй снова."),
@@ -3333,6 +3358,9 @@ class SaveManager:
         # gems_earned / gems_spent : ELMAS DEFTERİ. gems bu ikisini tutmalı.
         "tainted": False,
         "taint_reasons": [],
+        # KALICI dünya sıralaması yasağı — bir kez konunca hiç kalkmaz.
+        "board_banned": False,
+        "ban_reasons": [],
         "gems_earned": 0,
         "gems_spent": 0,
         "equipped_cosmetics": {"hat": None, "eyewear": None, "cape": None, "pet": None},
@@ -3366,6 +3394,7 @@ class SaveManager:
         "books_owned", "weapons_owned", "weapons_muted", "books_muted",
         "achievements", "stats", "leaderboard",
         "tainted", "taint_reasons",
+        "board_banned", "ban_reasons",
     )
 
     def __init__(self):
@@ -3434,6 +3463,25 @@ class SaveManager:
             self._mark_tainted_dict(merged, "signature")
         return merged
 
+    # =================================================================
+    # DÜNYA SIRALAMASINDAN KALICI ÇIKARMA  (v3.24)
+    # -----------------------------------------------------------------
+    # Şaibe damgası iki ayrı şey yapıyor olmalı:
+    #
+    #   tainted      : "bu koşuyu sıralamaya gönderme" — GEÇİCİ olabilir.
+    #                  Tek sebebi "signature" ise masum bir açıklaması var:
+    #                  kayıt imzası BİLGİSAYARIN ADINA bağlı, adamın
+    #                  kullanıcı adını değiştirmesi bile imzayı bozuyor.
+    #                  Hesabına girince sunucudan gelen ilerleme damgayı
+    #                  düşürüyor (bkz. import_progress).
+    #
+    #   board_banned : "bu hesap bir daha ASLA dünya sıralamasına girmez"
+    #                  — KALICI. Yalnızca masum açıklaması OLMAYAN
+    #                  sebeplerle konur ve hiçbir yerde silinmez; sunucuya
+    #                  da ilerlemeyle birlikte gider, sunucu da oradaki
+    #                  skorları siler (bkz. server.py /submit).
+    BAN_REASONS = ("cheat_code", "gems", "stats", "run")
+
     @staticmethod
     def _mark_tainted_dict(data, reason):
         """Kayıt sözlüğüne ŞAİBE damgası vurur. Damga asla silinmez."""
@@ -3441,6 +3489,11 @@ class SaveManager:
         reasons = data.setdefault("taint_reasons", [])
         if reason not in reasons:
             reasons.append(reason)
+        if reason in SaveManager.BAN_REASONS:
+            data["board_banned"] = True
+            bans = data.setdefault("ban_reasons", [])
+            if reason not in bans:
+                bans.append(reason)
 
     # ---- HİLE KORUMASI: dışarıya açık yüzey ----
     def mark_tainted(self, reason):
@@ -3449,6 +3502,16 @@ class SaveManager:
 
     def is_tainted(self):
         return bool(self.data.get("tainted"))
+
+    def is_board_banned(self):
+        """Dünya sıralamasından KALICI olarak çıkarıldı mı?"""
+        return bool(self.data.get("board_banned"))
+
+    def ban_text(self):
+        rs = self.data.get("ban_reasons") or self.data.get("taint_reasons") or []
+        if not rs:
+            return LX("ui.taint_save", "kayıt doğrulanamadı")
+        return " · ".join(TAINT_REASONS.get(r, r) for r in rs)
 
     def taint_text(self):
         """Oyuncuya gösterilecek kısa açıklama."""
@@ -3595,6 +3658,15 @@ class SaveManager:
         # ilerlemeyi geri gönderiyor.
         self.data["tainted"] = False
         self.data["taint_reasons"] = []
+        # YASAK AYRI: sunucu da biz de bir kez "yasaklı" dediysek öyle kalır.
+        # İkisinden biri yeterli; hiçbir yerde False'a dönmez.
+        self.data["board_banned"] = bool(self.data.get("board_banned")) or \
+            bool(prog.get("board_banned"))
+        if self.data["board_banned"]:
+            bans = self.data.setdefault("ban_reasons", [])
+            for r in (prog.get("ban_reasons") or []):
+                if r not in bans:
+                    bans.append(str(r)[:24])
         if "default" not in self.data.get("skins_owned", []):
             self.data.setdefault("skins_owned", []).append("default")
         self.save()
@@ -4530,6 +4602,26 @@ WORLD_LB_SIZE = 10
 
 ACCOUNT_SCOPES = "openid email profile"
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+# Tarayıcıyı kapatıp oyuna dönen oyuncu bu kadar saniye sonra beklemeden
+# çıkar (bkz. AccountClient._google_worker).
+GOOGLE_REFOCUS_GRACE = 5.0
+
+# Pygame sürümüne göre pencere odağı farklı olaylarla gelir: SDL2'de
+# WINDOWFOCUSGAINED, eski yapılarda ACTIVEEVENT. İkisini de dinliyoruz;
+# yoksa (çok eski pygame) liste boş kalır ve yalnızca VAZGEÇ düğmesi çalışır.
+_FOCUS_EVENTS = tuple(
+    e for e in (getattr(pygame, "WINDOWFOCUSGAINED", None),
+                getattr(pygame, "WINDOWFOCUSLOST", None),
+                getattr(pygame, "ACTIVEEVENT", None)) if e is not None)
+
+
+def _focus_gained(event):
+    """Olay 'pencere öne geldi' anlamına mı geliyor?"""
+    if event.type == getattr(pygame, "WINDOWFOCUSGAINED", -1):
+        return True
+    if event.type == getattr(pygame, "ACTIVEEVENT", -1):
+        return bool(getattr(event, "gain", 0))
+    return False
 
 
 def _pkce_pair():
@@ -4581,7 +4673,17 @@ class AccountClient:
     def __init__(self, base_url, save):
         self.base_url = (base_url or "").rstrip("/")
         self.save = save
+        # AYRIM (v3.24). Eskiden tek bir `enabled` iki ayrı soruya birden
+        # cevap veriyordu: "hesap sistemi KURULU mu" ve "sunucuya ŞU AN
+        # ULAŞILIYOR mu". Sunucu kapalıyken ikincisi False olunca menüdeki
+        # GİRİŞ YAP çipi bile KAYBOLUYORDU; oyuncu hesabı olduğunu bile
+        # göremiyordu. Artık:
+        #   enabled   : sunucu adresi var mı (kurulum)       -> çip hep durur
+        #   server_ok : sunucu cevap verdi mi (None = henüz bilinmiyor)
+        #   booting   : açılış yoklaması sürüyor mu
         self.enabled = bool(self.base_url)
+        self.server_ok = None if self.base_url else False
+        self.booting = bool(self.base_url)
         self.account = None          # {"name","email","provider","gems"}
         # Jeton kayıtta MAKİNEYE BAĞLI sarılı durur; başka bilgisayarda
         # açılmaz. Sunucu ayrıca oturumu cihaz kimliğine bağlar.
@@ -4591,6 +4693,15 @@ class AccountClient:
         self.ok_msg = ""
         self.google_ready = False
         self.client_id = ""
+        # GOOGLE BEKLEMESİ (v3.24). Tarayıcı penceresini kapatan oyuncunun
+        # ekranında dakikalarca "bekleniyor" yazıyordu. Pencereyi kapandı
+        # diye doğrudan göremiyoruz ama ŞUNU görebiliyoruz: oyun penceresi
+        # yeniden ÖNE geldi. Tarayıcı kapanınca olan tam olarak budur.
+        # Önce gelişinden GOOGLE_REFOCUS_GRACE saniye sonra hâlâ kod
+        # gelmediyse bekleme biter.
+        self.google_wait = False       # tarayıcı cevabı bekleniyor mu
+        self.google_cancel = False     # oyuncu VAZGEÇ'e bastı
+        self.google_back_at = 0.0      # oyun penceresi öne geldiği an
         # --- ilerleme eşitlemesi ---
         self.sync_error = ""        # son yazma hatası (hesap ekranında görünür)
         self.sync_at = 0.0          # son BAŞARILI yazmanın zamanı
@@ -4622,27 +4733,43 @@ class AccountClient:
         return L("ui.acc_neterr")
 
     def _boot(self):
-        """Açılışta: sunucu hangi giriş yollarını açmış, oturumum geçerli mi?"""
+        """Açılışta: sunucu hangi giriş yollarını açmış, oturumum geçerli mi?
+
+        BİTENE KADAR `booting` True kalır ve giriş ekranı hiçbir düğmeyi
+        açmaz. Sebebi (v3.24): Alt+F4'ten sonra hemen açılan oyunda bu
+        yoklama 2-3 saniye sürüyor, o arada ekran "GİRİŞ YAP" gösteriyordu.
+        Oyuncu Google'a basıyor, tam o sırada eski oturum geri geliyor ve
+        iki giriş birbirine karışıyordu. Artık oyuncu ya eski hesabıyla
+        açılmış oluyor ya da temiz bir giriş ekranı görüyor — arası yok.
+        """
         try:
             with urllib.request.urlopen(self.base_url + "/auth/status", timeout=12) as r:
                 st = json.loads(r.read().decode("utf-8"))
             self.google_ready = bool(st.get("google"))
             self.client_id = st.get("client_id", "")
-            self.enabled = bool(st.get("accounts"))
+            self.server_ok = bool(st.get("accounts"))
         except Exception:
-            self.enabled = False
+            self.server_ok = False
+            self.booting = False
+            return
+        if not self.server_ok:
+            self.booting = False
             return
         # Açılışta saklanan oturum hâlâ geçerli mi? Bu iş ARKA PLANDA dönüyor
         # ve sunucu yavaşsa saniyeler sürebilir. Bu sırada oyuncu giriş
         # ekranından YENİ bir oturum açmış olabilir.
         tok = self.token
         if not tok:
+            self.booting = False
             return
         try:
             res = self._post("/auth/me", {"token": tok, "device": device_id(),
                                           "device_legacy": device_id_legacy()})
         except Exception:
+            self.booting = False
             return          # ağ yoksa jetonu silme: sonra yeniden denenir
+        finally:
+            self.booting = False
         if self.token != tok:
             # Biz sorarken oyuncu giriş yaptı/çıktı. Elimizdeki cevap ESKİ
             # jetona ait; yeni oturumu onun yüzünden silmeyelim.
@@ -4651,6 +4778,16 @@ class AccountClient:
             self.account = res["account"]
         else:
             self._forget()
+
+    def retry_connect(self):
+        """Sunucu kapalıyken 'YENİDEN DENE' düğmesi. Açılıştaki yoklamayı
+        baştan çalıştırır; oyunu bekletmez."""
+        if self.booting or not self.base_url:
+            return
+        self.booting = True
+        self.server_ok = None
+        self.status = ""
+        threading.Thread(target=self._boot, daemon=True).start()
 
     # ---------- kayıt ----------
     def _remember(self, token, account):
@@ -4884,10 +5021,35 @@ class AccountClient:
         Bütün akış ayrı bir iş parçacığında döner; oyuncu bu sırada oyunu
         kullanmaya devam edebilir, ekranda "bekleniyor" yazar.
         """
+        if self.booting:
+            self.status = L("ui.acc_checking_session")
+            return
         if not self.google_ready:
             self.status = L("ui.acc_google_off")
             return
+        self.google_cancel = False
+        self.google_back_at = 0.0
         self._run(self._google_worker)
+
+    def google_abort(self):
+        """VAZGEÇ: beklemeyi hemen bitirir."""
+        self.google_cancel = True
+
+    def note_window_focus(self, gained=True):
+        """Oyun penceresinin odağı değişti.
+
+        ÖNE GELDİ ve Google beklemesi varsa saat başlar. ARKAYA GİTTİ ise
+        saat sıfırlanır: oyuncu tarayıcıya geri dönmüş demektir, iptal
+        etmeyiz. Yani yalnızca oyunda KESİNTİSİZ 5 saniye kalmak beklemeyi
+        bitirir.
+        """
+        if not self.google_wait:
+            return
+        if gained:
+            if not self.google_back_at:
+                self.google_back_at = time.time()
+        else:
+            self.google_back_at = 0.0
 
     def _google_worker(self):
         verifier, challenge = _pkce_pair()
@@ -4917,18 +5079,33 @@ class AccountClient:
             self.status = L("ui.acc_nobrowser")
             srv.server_close()
             return
-        # En çok 3 dakika bekle; oyuncu vazgeçerse sessizce kapanır.
+        # En çok 3 dakika bekle. ERKEN ÇIKIŞ İKİ YOLDAN olur: oyuncu
+        # VAZGEÇ'e basar, ya da tarayıcıyı kapatıp oyuna döner (pencere öne
+        # gelir) ve GOOGLE_REFOCUS_GRACE saniye boyunca kod gelmez.
+        self.google_wait = True
+        self.google_back_at = 0.0
+        vazgecti = False
         deadline = time.time() + 180
-        while time.time() < deadline and _OAuthCatcher.result is None:
-            try:
-                srv.handle_request()
-            except Exception:
-                break
-        srv.server_close()
+        try:
+            while time.time() < deadline and _OAuthCatcher.result is None:
+                if self.google_cancel:
+                    vazgecti = True
+                    break
+                if (self.google_back_at and
+                        time.time() - self.google_back_at > GOOGLE_REFOCUS_GRACE):
+                    vazgecti = True
+                    break
+                try:
+                    srv.handle_request()     # srv.timeout = 1 sn
+                except Exception:
+                    break
+        finally:
+            self.google_wait = False
+            srv.server_close()
         res = _OAuthCatcher.result
         _OAuthCatcher.result = None
         if not res:
-            self.status = L("ui.acc_timeout")
+            self.status = L("ui.acc_cancel") if vazgecti else L("ui.acc_timeout")
             return
         if res.get("state") != state:
             # Beklediğimiz istek değil: başlatmadığımız bir giriş denemesi.
@@ -19850,6 +20027,12 @@ class RunState:
         # Koşu bitti: skor; öldürme, dalga ve süreyle tutarlı mı?
         if not self.cheat_flag and not run_score_plausible(self):
             self.cheat_flag = "skor"
+        # KOŞU DENETİMİ TAKILDIYSA HESAP KALICI OLARAK SIRALAMA DIŞI (v3.24).
+        # Buradaki denetimler "oyunun üretemeyeceği sayı" denetimleri; dürüst
+        # bir koşu hiçbirine takılmıyor (bkz. falsepos testi). Eskiden yalnız
+        # O KOŞU gönderilmiyordu, bir sonraki koşu yine gidiyordu.
+        if self.cheat_flag:
+            self.save.mark_tainted("run")
         # Hileli koşu elmas da kazandırmaz; yoksa "hile yap, elması al,
         # sıralamaya girme" diye bir yol açık kalırdı.
         # ARENA USTALIĞI "HAZİNE" dalı elmas kazancını büyütür.
@@ -21625,9 +21808,9 @@ def player_stat_groups(p, run):
         hayat.append((L("st.thorns"), f"{p.thorns_level}", (170, 125, 90)))
 
     hasar = [
-        (L("st.dmg"), _mult(dmg_r), (245, 120, 110)),
+        (L("st.dmg"), _pct(dmg_r), (245, 120, 110)),
         (L("st.crit"), _pct(p.eff_crit_chance()), (230, 220, 120)),
-        (L("st.critd"), _mult(p.eff_crit_dmg()), (255, 210, 130)),
+        (L("st.critd"), _pct(p.eff_crit_dmg()), (255, 210, 130)),
         (L("st.aspd"), _pct(aspd_r), (150, 210, 255)),
         (L("st.dps"), _pct(p.estimated_dps() / max(1e-6, base_dps)), (255, 190, 90)),
         (L("st.multi"), f"{1 + p.multishot_level}", PURPLE),
@@ -21650,9 +21833,9 @@ def player_stat_groups(p, run):
         (L("st.xp"), _pct(p.eff_xp_mult()), PURPLE),
     ]
     if p.frenzy_stacks:
-        kazanc.append((L("st.frenzy"), f"x{p.frenzy_stacks}", (255, 200, 80)))
+        kazanc.append((L("st.frenzy"), f"{p.frenzy_stacks}", (255, 200, 80)))
     if p.soul_stacks:
-        kazanc.append((L("st.souls"), f"x{p.soul_stacks}", (200, 120, 255)))
+        kazanc.append((L("st.souls"), f"{p.soul_stacks}", (200, 120, 255)))
 
     return [(L("st.g_life"), hayat), (L("st.g_dmg"), hasar),
             (L("st.g_move"), hareket), (L("st.g_gain"), kazanc)]
@@ -23724,6 +23907,13 @@ class App:
                 self.pad.handle_event(event)      # takma/çıkarma
                 if event.type == pygame.QUIT:
                     self.running = False
+                elif event.type in _FOCUS_EVENTS:
+                    # OYUN PENCERESİ ÖNE GELDİ. Google girişini bekliyorsak
+                    # bu, tarayıcının kapandığının en güçlü işaretidir:
+                    # birkaç saniye içinde kod gelmezse bekleme biter
+                    # (bkz. AccountClient._google_worker). Geri tarayıcıya
+                    # geçerse saat sıfırlanır.
+                    self.account.note_window_focus(_focus_gained(event))
                 elif event.type == pygame.VIDEORESIZE:
                     self.display.handle_resize(event.size)
                 elif event.type == pygame.MOUSEWHEEL:
@@ -23911,12 +24101,22 @@ class App:
             self.ach_detail = None
         elif self.state == STATE_HOW_TO and self.prev_state == STATE_SETTINGS:
             self.state = STATE_SETTINGS         # Ayarlar > Nasıl Oynanır'dan geri dön
+        elif self.state == STATE_KEYS:
+            # TUŞLAR ekranı AYARLAR'dan açılıyor: ESC oraya döner.
+            self.state = STATE_SETTINGS
         elif self.state in (STATE_SKIN_MARKET, STATE_COSMETIC_MARKET, STATE_BOOK_MARKET,
                             STATE_WEAPON_CODEX,
                             STATE_LEADERBOARD, STATE_WORLD_LB, STATE_GEM_STORE,
                             STATE_HOW_TO, STATE_ACHIEVEMENTS, STATE_SETTINGS,
-                            STATE_LOGIN):
+                            STATE_MASTERY, STATE_LOGIN):
             self.state = STATE_MENU
+        elif self.state == STATE_NAME_ENTRY:
+            # ESC = "adı böyle bırak, devam et". Oyuncuyu bu ekranda
+            # kilitli tutmuyoruz; ad boşsa zaten "İsimsiz" yazılıyor.
+            if self.run is not None:
+                self.confirm_name_entry()
+            else:
+                self.state = STATE_MENU
         elif self.state == STATE_GAMEOVER:
             pass
 
@@ -24238,16 +24438,22 @@ class App:
     def world_block_reason(self):
         """Bu koşu DÜNYA SIRALAMASINA neden giremiyor? (None = girebilir)
 
-        Üç kapı var: GİRİŞ yapılmadıysa, KAYIT şaibeliyse (dosya
-        kurcalanmış, elmas defteri tutmuyor ya da hile kodu kullanılmış)
-        ve KOŞU denetimi takıldıysa.
+        Dört kapı var: KALICI YASAK, GİRİŞ yapılmadıysa, KAYIT şaibeliyse
+        (dosya kurcalanmış, elmas defteri tutmuyor ya da hile kodu
+        kullanılmış) ve KOŞU denetimi takıldıysa.
+
+        KALICI YASAK en başta duruyor: bir kez hile yakalanan hesap, giriş
+        yapsa da yapmasa da, kaydı sonradan temizlense de bir daha dünya
+        sıralamasına gönderilmez.
         """
+        if self.save.is_board_banned():
+            return L("ui.banned_title")
         if not self.account.logged_in():
             return L("ui.world_needs_login")
         if self.account.needs_username():
             return L("ui.pick_name_why")
         if self.save.is_tainted():
-            return "kayıt şaibeli — " + self.save.taint_text()
+            return L("ui.taint_prefix", self.save.taint_text())
         if self.run is not None and not self.run.run_is_clean():
             return f"koşu doğrulanamadı ({self.run.cheat_flag})"
         return None
@@ -24369,6 +24575,20 @@ class App:
             y += 29
         draw_text(canvas, L("ui.shop_lost"), (panel_rect.centerx, y + 4), 12, TEXT_DIM, center=True, shadow=False)
         y += 26
+        # ---- KALICI SIRALAMA YASAĞI ----
+        # Hile yakalanan hesap bunu her koşu sonunda görür; "neden
+        # sıralamada yokum" diye aramak zorunda kalmaz.
+        if self.save.is_board_banned():
+            bar = pygame.Rect(panel_rect.x + 26, y - 4, panel_rect.w - 52, 30)
+            panel(canvas, bar, bg=(50, 20, 24), edge=(190, 70, 80), alpha=240,
+                  radius=8, edge_w=2)
+            draw_text(canvas, L("ui.banned_title"), bar.center, 14, (255, 150, 150),
+                      bold=True, center=True, shadow=False)
+            y += 34
+            draw_text(canvas, L("ui.banned_why", self.save.ban_text()),
+                      (panel_rect.centerx, y), 11, (210, 140, 140),
+                      center=True, shadow=False)
+            y += 20
         if not r.run_is_clean():
             draw_text(canvas, L("ui.run_invalid"), (panel_rect.centerx, y), 17,
                       RED, bold=True, center=True)
@@ -24688,16 +24908,34 @@ class App:
         göstermek.
         """
         acc = self.account
+        # ÇİP HEP DURUR (v3.24). Eskiden sunucuya ulaşılamayınca bu çip
+        # tamamen kayboluyordu: oyuncu "hesabım nerede" diye bakakalıyor,
+        # sunucu geri gelse bile tıklayacak bir yer bulamıyordu. Artık
+        # yalnızca sunucu adresi HİÇ ayarlanmamışsa gizleniyor; kapalıysa
+        # "SUNUCU KAPALI" yazıp hesap ekranını (ve YENİDEN DENE'yi) açıyor.
         if not acc.enabled:
             return
         inn = acc.logged_in()
         pick = acc.needs_username()
-        label = (L("ui.pick_name") if pick else acc.display_name()) if inn \
-            else L("ui.sign_in")
+        if inn:
+            label = L("ui.pick_name") if pick else acc.display_name()
+        elif acc.booting:
+            label = L("ui.connecting")
+        elif not acc.server_ok:
+            label = L("ui.acc_offline_chip")
+        else:
+            label = L("ui.sign_in")
         w = max(150, int(text_width(label, 14, True)) + 62)
         rect = pygame.Rect(VIRTUAL_W - 20 - w, 18, w, 40)
         hover = rect.collidepoint(mouse_pos)
-        accent = (ORANGE if pick else GREEN) if inn else CYAN
+        if inn:
+            accent = ORANGE if pick else GREEN
+        elif acc.booting:
+            accent = (150, 160, 200)
+        elif not acc.server_ok:
+            accent = (210, 130, 90)
+        else:
+            accent = CYAN
         panel(canvas, rect, bg=(24, 32, 44) if hover else (17, 21, 31),
               edge=accent if hover else (62, 70, 100), alpha=236, radius=20, edge_w=2)
         ax = rect.x + 24
@@ -25414,11 +25652,23 @@ class App:
         if clicked and hov:
             self.account.google_login()
 
-    def _login_status(self, canvas, cx, y, pr):
+    def _login_status(self, canvas, cx, y, pr, mouse_pos=(0, 0), clicked=False,
+                      dt=0.0):
         acc = self.account
         if acc.busy:
             draw_text(canvas, acc.status or L("ui.acc_working"), (cx, y), 13, CYAN,
                       bold=True, center=True, shadow=False)
+            # GOOGLE BEKLEMESİ: oyuncu tarayıcıyı kapattıysa burada
+            # takılı kalmasın. (Pencere öne gelince zaten 5 saniyede
+            # kendiliğinden biter; bu, hemen çıkmak isteyen için.)
+            if acc.google_wait:
+                gb = Button((cx - 90, y + 24, 180, 34), L("ui.acc_giveup"),
+                            acc.google_abort, color=(96, 60, 64),
+                            hover_color=(136, 86, 90), text_size=14)
+                gb.update(mouse_pos, dt)
+                gb.draw(canvas)
+                if clicked:
+                    gb.click(mouse_pos)
             return
         if acc.status:
             for ln in wrap_text(acc.status, 12, pr.w - 70)[:2]:
@@ -25657,8 +25907,10 @@ class App:
             ph = 470
         elif acc.logged_in():
             ph = 400                       # kullanıcı adı seçme
-        elif not acc.enabled:
-            ph = 300
+        elif acc.booting:
+            ph = 260                       # hesabın kontrol ediliyor
+        elif not acc.server_ok:
+            ph = 340
         else:
             ph = 560 if self.login_mode == "up" else 500
         pr = pygame.Rect(0, 0, 560, ph)
@@ -25694,7 +25946,7 @@ class App:
             b.draw(canvas)
             if clicked:
                 b.click(mouse_pos)
-            self._login_status(canvas, cx, pr.y + 276, pr)
+            self._login_status(canvas, cx, pr.y + 276, pr, mouse_pos, clicked, dt)
             b2 = Button((cx - 150, pr.bottom - 56, 300, 42), L("ui.sign_out"),
                         self._login_logout, color=(110, 62, 62),
                         hover_color=(150, 85, 85), text_size=15)
@@ -25737,7 +25989,7 @@ class App:
                 b.draw(canvas)
                 if clicked:
                     b.click(mouse_pos)
-            self._login_status(canvas, cx, by + 58, pr)
+            self._login_status(canvas, cx, by + 58, pr, mouse_pos, clicked, dt)
             return
 
         # ---- GİRİŞ YAPILMIŞ ----
@@ -25804,11 +26056,34 @@ class App:
                 b.draw(canvas)
                 if clicked:
                     b.click(mouse_pos)
-            self._login_status(canvas, cx, pr.bottom - 228, pr)
+            self._login_status(canvas, cx, pr.bottom - 228, pr, mouse_pos, clicked, dt)
+            return
+
+        # ---- AÇILIŞ YOKLAMASI SÜRÜYOR ----
+        # Oyuncu burada HİÇBİR giriş düğmesi göremez (v3.24): Alt+F4'ten
+        # sonra eski oturum 2-3 saniyede geri geliyor; o arada Google'a
+        # basılırsa iki giriş çakışıyordu.
+        if acc.booting:
+            draw_text(canvas, L("ui.acc_checking_session"), (cx, pr.y + 96), 16, CYAN,
+                      bold=True, center=True, shadow=False)
+            draw_text(canvas, L("ui.acc_wait_login"), (cx, pr.y + 126), 12, TEXT_DIM,
+                      center=True, shadow=False)
+            # dönen nokta kuşağı: ekran donmadı, bekliyoruz
+            for i in range(8):
+                a = self.t * 3.0 + i * math.tau / 8
+                rr = 3.0 if i else 4.5
+                circle_aa(canvas, cx + math.cos(a) * 26, pr.y + 172 + math.sin(a) * 26,
+                          rr, scale_col(CYAN, 0.35 + 0.65 * (i / 8.0)))
+            b = Button((cx - 150, pr.bottom - 56, 300, 42), L("ui.back_menu"),
+                       lambda: self.set_state(STATE_MENU), text_size=16)
+            b.update(mouse_pos, dt)
+            b.draw(canvas)
+            if clicked:
+                b.click(mouse_pos)
             return
 
         # ---- SUNUCU KAPALI ----
-        if not acc.enabled:
+        if not acc.server_ok:
             oy = pr.y + 80
             for ln in wrap_text(L("ui.acc_off"), 13, pr.w - 80)[:2]:
                 draw_text(canvas, ln, (cx, oy), 13, ORANGE, center=True, shadow=False)
@@ -25817,11 +26092,18 @@ class App:
             for ln in wrap_text(L("ui.acc_why"), 11, pr.w - 80)[:3]:
                 draw_text(canvas, ln, (cx, oy), 11, TEXT_DIM, center=True, shadow=False)
                 oy += 17
+            # YENİDEN DENE: sunucu geri gelince oyunu kapatmaya gerek yok.
+            rb = Button((cx - 150, pr.bottom - 116, 300, 44), L("ui.acc_retry"),
+                        acc.retry_connect, color=(48, 92, 120),
+                        hover_color=(70, 130, 168), text_size=17)
+            rb.update(mouse_pos, dt)
+            rb.draw(canvas)
             b = Button((cx - 150, pr.bottom - 62, 300, 44), L("ui.back_menu"),
                        lambda: self.set_state(STATE_MENU), text_size=17)
             b.update(mouse_pos, dt)
             b.draw(canvas)
             if clicked:
+                rb.click(mouse_pos)
                 b.click(mouse_pos)
             return
 
@@ -25881,7 +26163,7 @@ class App:
             acc.status = ""
             sfx("click", 0.5, 0.0)
 
-        self._login_status(canvas, cx, y + 30, pr)
+        self._login_status(canvas, cx, y + 30, pr, mouse_pos, clicked, dt)
 
         draw_text(canvas, L("ui.tab_hint"), (cx, pr.bottom - 82), 10, (104, 110, 136),
                   center=True, shadow=False)
@@ -26706,8 +26988,12 @@ class App:
         t = self.t
         # "SEN" rozetinin eşleştiği ad: girişliyse HESABIN adı, değilse
         # oyuncunun kendi yazdığı ad. Sunucu da skoru hesap adıyla yazıyor.
-        my_name = (self.account.display_name() if self.account.logged_in()
-                   else self.save.data.get("settings", {}).get("player_name") or "")
+        # DÜZELTİLDİ (v3.24): çıkış yapınca da "SEN" rozeti duruyordu.
+        # Sebep: girişsizken YEREL ada düşülüyordu, o ad da hesabın adıyla
+        # aynı olduğu için satır hâlâ "benim" sanılıyordu. DÜNYA tablosundaki
+        # satırlar HESAPLARA ait; girişli değilsen orada senin satırın yok.
+        my_name = (self.account.display_name()
+                   if self.account.logged_in() else "")
         my_name = my_name.strip().lower()
         # Ekrana her girişte liste sırayla belirsin diye küçük bir sayaç.
         self.world_lb_t = min(3.0, getattr(self, "world_lb_t", 0.0) + dt)
@@ -26754,6 +27040,23 @@ class App:
                        2.6, 0.5, (96, 158, 235))
 
         body_top = panel_rect.y + 96
+
+        # ---- KALICI SIRALAMA YASAĞI ----
+        # Hileci bu ekranı açtığında kendi adını aramakla uğraşmasın:
+        # neden orada olmadığı en üstte, kırmızı kırmızı yazıyor.
+        if self.save.is_board_banned():
+            bb = pygame.Rect(panel_rect.x + 24, body_top, panel_rect.w - 48, 86)
+            add_glow(canvas, bb.centerx, bb.centery, bb.w * 0.4, (190, 60, 70), 0.16)
+            panel(canvas, bb, bg=(48, 18, 22), edge=(200, 74, 84), alpha=244,
+                  radius=10, edge_w=2)
+            draw_text(canvas, L("ui.banned_title"), (bb.centerx, bb.y + 12), 17,
+                      (255, 150, 150), bold=True, center=True, shadow=False)
+            yy = bb.y + 36
+            for ln in wrap_clip(L("ui.banned_body"), 11, bb.w - 36, 3):
+                draw_text(canvas, ln, (bb.centerx, yy), 11, (226, 176, 176),
+                          center=True, shadow=False)
+                yy += 15
+            body_top = bb.bottom + 10
 
         if self.online.loading:
             for k in range(10):
