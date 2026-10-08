@@ -698,7 +698,26 @@ def auth_set_username():
 # Bir koşudan kazanılabilecek elmas için CÖMERT bir üst sınır. Amaç oyunu
 # kısıtlamak değil, "tek istekle 1.000.000 elmas" yolunu kapatmak.
 GEM_GAIN_CAP_PER_PUSH = 4000
+# ZAMANA BAĞLI ELMAS BÜTÇESİ (v3.26). Tek istek sınırı tek başına yetmiyordu:
+# değiştirilmiş bir oyun aynı isteği art arda atıp her seferinde +4000
+# alabilirdi. Artık hesabın bir "elmas kovası" var: en fazla GEM_BURST dolar,
+# saatte GEM_RATE_PER_HOUR kadar yeniden dolar. Normal oyun bunun çok
+# altında kalır (bir koşu ~100-400 elmas, başarımlar arada bir).
+GEM_BURST = 4000
+GEM_RATE_PER_HOUR = 3000
 PROGRESS_LISTS = ("skins_owned", "cosmetics_owned", "books_owned", "weapons_owned")
+# GERÇEK PARAYLA satılan içerik (v3.26): oyunun gönderdiği listeye YENİ
+# eklenmişse kabul edilmez. Sahiplik yalnızca sunucunun kendi kaydından
+# (satın alma onayı) gelir; daha önce sahip olunanlar aynen korunur.
+PAID_SKINS = {"web_master", "ash_warrior", "green_titan", "immortal_merc"}
+
+
+def _is_paid(list_key, item):
+    if list_key == "skins_owned":
+        return item in PAID_SKINS
+    if list_key == "cosmetics_owned":
+        return str(item).startswith("pet_")
+    return False
 
 # ---- ARENA USTALIĞI (koşular arası kalıcı yükseltme) ----
 # Oyundaki MASTERY tablosuyla BİREBİR aynı olmalı: sunucu, iddia edilen
@@ -852,7 +871,32 @@ def _ban_account(account_id, reason):
         pass
 
 
-def _merge_progress(old, new):
+# HESAP KİLİDİ (v3.26): aynı hesaba aynı anda gelen iki istek (ör. otomatik
+# kayıt + hediye) birbirinin yazdığını ezmesin diye okuma-birleştirme-yazma
+# tek seferde yapılır. Sabit sayıda kilit: bellek büyümez. (Kilit süreç
+# içindedir; gunicorn birden çok işçiyle -w>1 çalıştırılırsa işçi başınadır.)
+_ACCT_LOCKS = [threading.Lock() for _ in range(64)]
+
+
+def _acct_lock(account_id):
+    return _ACCT_LOCKS[int(hashlib.sha1(str(account_id).encode()).hexdigest()[:8], 16) % 64]
+
+
+def _gem_allowance(prog, now=None):
+    """Hesabın elmas kovasında şu an kaç elmaslık yer var?"""
+    now = time.time() if now is None else now
+    clk = prog.get("_gem_clock") or {}
+    try:
+        t = float(clk.get("t") or 0)
+        left = float(clk.get("left", GEM_BURST))
+    except (TypeError, ValueError):
+        t, left = 0.0, float(GEM_BURST)
+    if t <= 0 or not math.isfinite(t) or not math.isfinite(left):
+        return float(GEM_BURST)
+    return max(0.0, min(float(GEM_BURST), left + max(0.0, now - t) * GEM_RATE_PER_HOUR / 3600.0))
+
+
+def _merge_progress(old, new, gem_cap=GEM_GAIN_CAP_PER_PUSH):
     """Sunucudaki ilerlemeyi oyundan geleniyle birleştirir.
 
     KURAL: ilerleme GERİ GİTMEZ, ve elmas defteri bir seferde en fazla
@@ -863,7 +907,7 @@ def _merge_progress(old, new):
     for k in PROGRESS_LISTS:
         merged = list(old.get(k) or [])
         for v in (new.get(k) or []):
-            if isinstance(v, str) and v not in merged:
+            if isinstance(v, str) and v not in merged and not _is_paid(k, v):
                 merged.append(v)
         out[k] = merged[:400]
     for k in ("equipped_skin",):
@@ -918,6 +962,12 @@ def _merge_progress(old, new):
     # koyar — yalnızca rutin otomatik kayıt artık bunu tek başına yapamaz.
     out["board_banned"] = bool(old.get("board_banned"))
     out["ban_reasons"] = list(old.get("ban_reasons") or [])[:8] if out["board_banned"] else []
+    # ÜCRETSİZ ELMAS SAYAÇLARI (v3.26): reklam ve günlük hediye hesaplarda
+    # YALNIZCA SUNUCUDA işler (bkz. /rewards/claim, sunucu saatiyle). Oyunun
+    # gönderdiği sayaçlar YOK SAYILIR: bilgisayarın saatini değiştiren ya da
+    # sayaçları sıfırlayan biri aynı günün hakkını ikinci kez alamaz.
+    out["rewards"] = dict(old.get("rewards") or {})
+    out["_gem_clock"] = dict(old.get("_gem_clock") or {})
     ach = dict(old.get("achievements") or {})
     for k, v in list((new.get("achievements") or {}).items())[:400]:
         ach.setdefault(str(k)[:40], v)
@@ -927,7 +977,8 @@ def _merge_progress(old, new):
     spent_old = int(old.get("gems_spent", 0) or 0)
     earned_new = int(new.get("gems_earned", 0) or 0)
     spent_new = int(new.get("gems_spent", 0) or 0)
-    earned = max(earned_old, min(earned_new, earned_old + GEM_GAIN_CAP_PER_PUSH))
+    cap = int(max(0, min(GEM_GAIN_CAP_PER_PUSH, gem_cap)))
+    earned = max(earned_old, min(earned_new, earned_old + cap))
     spent = max(spent_old, spent_new)
     out["gems_earned"] = earned
     out["gems_spent"] = min(spent, earned)
@@ -944,7 +995,7 @@ def player_load():
     acc = _acct(data)
     if not acc:
         return jsonify({"success": False, "error": "oturum geçersiz"}), 401
-    return jsonify({"success": True, "progress": _stored_progress(_player_row(acc["id"]))})
+    return jsonify({"success": True, "progress": _public_progress(_stored_progress(_player_row(acc["id"])))})
 
 
 def _log_event(account_id, kind, delta, total, note=""):
@@ -969,30 +1020,30 @@ def _log_event(account_id, kind, delta, total, note=""):
         pass
 
 
-@app.route("/player/save", methods=["POST"])
-def player_save():
-    """Oyundaki ilerlemeyi hesaba yazar (birleştirerek)."""
-    if not _accounts_enabled():
-        return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
-    data = request.json or {}
-    acc = _acct(data)
-    if not acc:
-        return jsonify({"success": False, "error": "oturum geçersiz"}), 401
-    incoming = data.get("progress")
-    if not isinstance(incoming, dict):
-        return jsonify({"success": False, "error": "ilerleme verisi yok"}), 400
-    row = _player_row(acc["id"])
-    before = _stored_progress(row)
-    merged = _merge_progress(before, incoming)
+def _public_progress(prog):
+    """Oyuna giden ilerleme: sunucunun iç alanları (elmas kovası, reklam
+    bileti) çıkarılır."""
+    out = dict(prog)
+    out.pop("_gem_clock", None)
+    rw = dict(out.get("rewards") or {})
+    rw.pop("ad_nonce", None)
+    rw.pop("ad_started", None)
+    out["rewards"] = rw
+    return out
+
+
+def _store_progress(account_id, row, before, merged):
+    """Birleştirilmiş ilerlemeyi yazar ve olay günlüğünü tutar.
+    Hata olursa bir Flask cevabı, yoksa None döndürür."""
     # OYUN HİLE BİLDİRDİ: yasak ilk kez burada öğrenildiyse, o hesabın
     # tablodaki eski skorları da ŞİMDİ silinir (v3.24).
     if merged.get("board_banned") and not before.get("board_banned"):
-        _wipe_scores(acc["id"])
-        _log_event(acc["id"], "yasak", 0, 0, "oyun bildirdi")
+        _wipe_scores(account_id)
+        _log_event(account_id, "yasak", 0, 0, "oyun bildirdi")
     st = merged.get("stats") or {}
     st_before = before.get("stats") or {}
     payload = {
-        "account_id": acc["id"],
+        "account_id": account_id,
         "gems": int(merged["gems"]),
         "gems_earned": int(merged["gems_earned"]),
         "gems_spent": int(merged["gems_spent"]),
@@ -1012,7 +1063,7 @@ def player_save():
     try:
         if row:
             supabase.table("player_data").update(payload).eq(
-                "account_id", acc["id"]).execute()
+                "account_id", account_id).execute()
         else:
             supabase.table("player_data").insert(payload).execute()
     except Exception as e:
@@ -1025,23 +1076,181 @@ def player_save():
     # ---- OLAY GÜNLÜĞÜ ----
     d_gem = int(merged["gems_earned"]) - int(before.get("gems_earned", 0) or 0)
     if d_gem:
-        _log_event(acc["id"], "gem", d_gem, merged["gems"], "kazanıldı")
+        _log_event(account_id, "gem", d_gem, merged["gems"], "kazanıldı")
     d_spent = int(merged["gems_spent"]) - int(before.get("gems_spent", 0) or 0)
     if d_spent:
-        _log_event(acc["id"], "gem", -d_spent, merged["gems"], "harcandı")
+        _log_event(account_id, "gem", -d_spent, merged["gems"], "harcandı")
     new_skins = [x for x in (merged.get("skins_owned") or [])
                  if x not in (before.get("skins_owned") or [])]
     for sk in new_skins[:20]:
-        _log_event(acc["id"], "skin", 1, len(merged.get("skins_owned") or []), sk)
+        _log_event(account_id, "skin", 1, len(merged.get("skins_owned") or []), sk)
     new_cos = [x for x in (merged.get("cosmetics_owned") or [])
                if x not in (before.get("cosmetics_owned") or [])]
     for cs in new_cos[:20]:
-        _log_event(acc["id"], "kostum", 1, len(merged.get("cosmetics_owned") or []), cs)
+        _log_event(account_id, "kostum", 1, len(merged.get("cosmetics_owned") or []), cs)
     d_runs = int(st.get("runs", 0) or 0) - int(st_before.get("runs", 0) or 0)
     if d_runs > 0:
-        _log_event(acc["id"], "kosu", d_runs, int(st.get("runs", 0) or 0),
+        _log_event(account_id, "kosu", d_runs, int(st.get("runs", 0) or 0),
                    "en iyi skor %d" % int(st.get("best_score", 0) or 0))
-    return jsonify({"success": True, "progress": merged})
+    return None
+
+
+@app.route("/player/save", methods=["POST"])
+def player_save():
+    """Oyundaki ilerlemeyi hesaba yazar (birleştirerek)."""
+    if not _accounts_enabled():
+        return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
+    data = request.json or {}
+    acc = _acct(data)
+    if not acc:
+        return jsonify({"success": False, "error": "oturum geçersiz"}), 401
+    incoming = data.get("progress")
+    if not isinstance(incoming, dict):
+        return jsonify({"success": False, "error": "ilerleme verisi yok"}), 400
+    with _acct_lock(acc["id"]):
+        row = _player_row(acc["id"])
+        before = _stored_progress(row)
+        now = time.time()
+        allow = _gem_allowance(before, now)
+        merged = _merge_progress(before, incoming, gem_cap=allow)
+        gained = int(merged["gems_earned"]) - int(before.get("gems_earned", 0) or 0)
+        merged["_gem_clock"] = {"t": now, "left": max(0.0, allow - max(0, gained))}
+        err = _store_progress(acc["id"], row, before, merged)
+    if err is not None:
+        return err
+    return jsonify({"success": True, "progress": _public_progress(merged)})
+
+
+# =====================================================================
+# ÜCRETSİZ ELMAS: GÜNLÜK HEDİYE + REKLAM  (v3.26 — SUNUCU HAKEMDİR)
+# ---------------------------------------------------------------------
+# Hesaplı oyuncunun ödülleri YALNIZCA burada verilir ve SUNUCUNUN saatiyle
+# sayılır (Türkiye saati). Bilgisayarın tarihini ileri-geri alan biri aynı
+# günün hakkını ikinci kez alamaz; hediye/reklam sayaçları hesaba aittir,
+# başka bilgisayardan girince de aynıdır.
+#
+# REKLAM: oyun reklamı başlatırken /rewards/ad_start ile bir bilet alır;
+# ödül ancak biletle ve reklam süresi (AD_MIN_WATCH) dolduktan sonra
+# verilir. Her bilet bir kez kullanılır.
+# Değerler oyundakilerle (AD_REWARD_GEMS, AD_DAILY_LIMIT, AD_COOLDOWN,
+# DAILY_GIFT_GEMS) BİREBİR aynı olmalı.
+# =====================================================================
+REWARD_TZ_OFFSET = 3 * 3600          # Türkiye (UTC+3)
+AD_REWARD_GEMS = 50
+AD_DAILY_LIMIT = 5
+AD_COOLDOWN = 90.0
+AD_MIN_WATCH = 80.0                  # oyundaki tanıtım filmi ~91 sn
+DAILY_GIFT_GEMS = (20, 25, 30, 35, 40, 50, 75)
+
+
+def _server_day(offset_days=0):
+    return time.strftime("%Y-%m-%d", time.gmtime(time.time() + REWARD_TZ_OFFSET
+                                                 + offset_days * 86400))
+
+
+def _reward_ctx():
+    """Ortak giriş denetimi: (hesap, istek verisi) ya da hata."""
+    if not _accounts_enabled():
+        return None, (jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503)
+    data = request.json or {}
+    acc = _acct(data)
+    if not acc:
+        return None, (jsonify({"success": False, "error": "oturum geçersiz"}), 401)
+    if not _rate_ok("rw:" + str(acc["id"])):
+        return None, (jsonify({"success": False, "error": "çok sık deneme, biraz bekle"}), 429)
+    return (acc, data), None
+
+
+def _reward_row(account_id):
+    """(satır, ilerleme, ödül sözlüğü) — _acct_lock İÇİNDE çağrılmalı."""
+    row = _player_row(account_id)
+    before = _stored_progress(row)
+    return row, before, dict(before.get("rewards") or {})
+
+
+def _ads_used_today(rw):
+    return int(rw.get("ad_count", 0) or 0) if rw.get("ad_day") == _server_day() else 0
+
+
+@app.route("/rewards/ad_start", methods=["POST"])
+def rewards_ad_start():
+    ctx, err = _reward_ctx()
+    if err:
+        return err
+    acc, _data = ctx
+    with _acct_lock(acc["id"]):
+        return _ad_start_locked(acc)
+
+
+def _ad_start_locked(acc):
+    row, before, rw = _reward_row(acc["id"])
+    if _ads_used_today(rw) >= AD_DAILY_LIMIT:
+        return jsonify({"success": False, "error": "bugünkü reklam hakkın bitti"}), 429
+    if time.time() - float(rw.get("ad_last", 0) or 0) < AD_COOLDOWN - 2:
+        return jsonify({"success": False, "error": "bir sonraki reklam için biraz bekle"}), 429
+    nonce = secrets.token_hex(12)
+    rw["ad_nonce"] = nonce
+    rw["ad_started"] = time.time()
+    merged = dict(before)
+    merged["rewards"] = rw
+    e = _store_progress(acc["id"], row, before, merged)
+    if e is not None:
+        return e
+    return jsonify({"success": True, "ticket": nonce})
+
+
+@app.route("/rewards/claim", methods=["POST"])
+def rewards_claim():
+    ctx, err = _reward_ctx()
+    if err:
+        return err
+    acc, data = ctx
+    with _acct_lock(acc["id"]):
+        return _claim_locked(acc, data)
+
+
+def _claim_locked(acc, data):
+    row, before, rw = _reward_row(acc["id"])
+    kind = str(data.get("kind") or "")
+    now = time.time()
+    today = _server_day()
+    if kind == "gift":
+        if rw.get("gift_day") == today:
+            return jsonify({"success": False, "error": "bugünün hediyesini zaten aldın"}), 409
+        streak = int(rw.get("gift_streak", 0) or 0)
+        idx = (streak % len(DAILY_GIFT_GEMS)) if rw.get("gift_day") == _server_day(-1) else 0
+        amount = DAILY_GIFT_GEMS[idx]
+        rw["gift_day"] = today
+        rw["gift_streak"] = idx + 1
+        note = "günlük hediye"
+    elif kind == "ad":
+        ticket = str(data.get("ticket") or "")
+        if not ticket or not hmac.compare_digest(ticket, str(rw.get("ad_nonce") or "")):
+            return jsonify({"success": False, "error": "reklam bileti geçersiz"}), 403
+        if now - float(rw.get("ad_started", 0) or 0) < AD_MIN_WATCH:
+            return jsonify({"success": False, "error": "reklam sonuna kadar izlenmedi"}), 403
+        if _ads_used_today(rw) >= AD_DAILY_LIMIT:
+            return jsonify({"success": False, "error": "bugünkü reklam hakkın bitti"}), 429
+        rw["ad_count"] = _ads_used_today(rw) + 1
+        rw["ad_day"] = today
+        rw["ad_last"] = now
+        rw["ad_total"] = int(rw.get("ad_total", 0) or 0) + 1
+        rw.pop("ad_nonce", None)        # bilet bir kez kullanılır
+        rw.pop("ad_started", None)
+        amount = AD_REWARD_GEMS
+        note = "reklam"
+    else:
+        return jsonify({"success": False, "error": "bilinmeyen ödül"}), 400
+    merged = dict(before)
+    merged["rewards"] = rw
+    merged["gems_earned"] = int(before.get("gems_earned", 0) or 0) + amount
+    merged["gems"] = max(0, merged["gems_earned"] - int(before.get("gems_spent", 0) or 0))
+    e = _store_progress(acc["id"], row, before, merged)
+    if e is not None:
+        return e
+    # (elmas artışı _store_progress'te "gem / kazanıldı" olarak zaten günlüğe yazıldı)
+    return jsonify({"success": True, "amount": amount, "note": note,
+                    "progress": _public_progress(merged)})
 
 
 @app.route("/auth/logout", methods=["POST"])
