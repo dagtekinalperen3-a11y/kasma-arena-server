@@ -252,6 +252,19 @@ def main():
         app.update_menu(DT, (-100, -100), False)
     check("menü açıldı", app.state == ka.STATE_MENU)
 
+    # ---- cehennemde ölen dürüst oyuncu hileci sayılmamalı ----
+    app.start_run()
+    r0 = app.run
+    r0.biome, r0.arena_waves = "hell", 26
+    r0.waves.wave, r0.score, r0.kills, r0.run_time = 8, 214000, 5400, 2100.0
+    check("cehennemde ölen dürüst koşu skor denetiminden geçer", ka.run_score_plausible(r0),
+          "toplam dalga %d" % r0.total_wave())
+    r0.biome = "arena"
+    r0.waves.wave = 8
+    check("arenada 8. dalgada 214.000 skor hâlâ yakalanır", not ka.run_score_plausible(r0))
+    app.run = None
+    app.state = ka.STATE_MENU
+
     # ---- KOŞU 1: arena 1 -> 25 + cehennem ----
     sv.data["stats"]["best_score"] = 400      # rekor kolayca geçilsin
     app.start_run()
@@ -269,9 +282,9 @@ def main():
     if st is None:
         return 1
     run = app.run
-    print("    süre %.0f sn, %d kare, dalga %d (%s), seviye %d, ölüm=%s" % (
+    print("    süre %.0f sn, %d kare, dalga %d (%s), seviye %d, ölüm=%s, denetim=%r" % (
         time.time() - t0, st["frames"], run.waves.wave, run.biome, run.player.level,
-        not run.player.alive))
+        not run.player.alive, run.cheat_flag))
     check("seviye kartları seçildi", st["levelups"] >= 10, st["levelups"])
     check("koşu marketi açıldı", st["shop_opens"] >= 1, st["shop_opens"])
     check("patron dövüşü oldu", st["boss_frames"] > 0, st["boss_frames"])

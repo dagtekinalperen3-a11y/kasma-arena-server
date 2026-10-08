@@ -35,6 +35,10 @@
      zamana bağlı bir "kova"yla sınırlar ve parayla satılan skin/PET'i
      oyunun "bende var" demesiyle vermez. Profil değişince önceki
      kullanıcının hiçbir verisi sızmaz (tests/e2e_accounts.py).
+   * YANLIŞ ALARM DÜZELTİLDİ: cehenneme girip orada ölen DÜRÜST oyuncu
+     skor denetiminde hileci sayılıp sıralamadan yasaklanıyordu (cehennemde
+     dalga 1'den başlıyor, skor arenadan geliyor). Artık TOPLAM dalga
+     sayılır (RunState.total_wave) ve sıralamaya da o gönderilir.
    * 30 SANİYELİK TANITIM FİLMİ (reklam): GERÇEK oyun motoruyla, otomatik
      pilotun oynadığı koşular — gerçek mermiler, BONK, dash, silahlar,
      patron — ardından SİLAHLIK geçidi, KİTAPLIK + seviye atlama kartları,
@@ -18153,7 +18157,9 @@ def run_score_plausible(run):
     if score < RUNCHK_SCORE_FLOOR:
         return True
     kills = max(0, int(getattr(run, "kills", 0)))
-    wave = max(1, int(getattr(run.waves, "wave", 1)))
+    # Cehennemde arenada geçilen dalgalar da sayılır (bkz. total_wave).
+    wave = max(1, int(run.total_wave() if hasattr(run, "total_wave")
+                      else getattr(run.waves, "wave", 1)))
     rt = max(1.0, float(getattr(run, "run_time", 1.0)))
     # 1) Öldürme başına düşen skorun tavanı var.
     if score > RUNCHK_SCORE_PER_KILL * (kills + 10):
@@ -18218,6 +18224,8 @@ class RunState:
         # düzelmez — hile yapılıp geri alınan bir koşu da geçersizdir.
         self.cheat_flag = ""        # boş = temiz, dolu = takılan denetim
         self.integrity_timer = 0.0
+        # Cehenneme girerken arenada ulaşılan dalga (bkz. total_wave).
+        self.arena_waves = 0
         self.pending_levelups = 0
         self.levelup_choices = []
         # --- SEVİYE ATLAMA: YENİLEME ve PAS ---
@@ -18507,7 +18515,9 @@ class RunState:
         # Arenadan kalan yanık/zehir/yavaşlatma cehenneme taşınmasın.
         p.clear_status()
 
-        # Dalga düzeni baştan başlar (1. haritadaki gibi).
+        # Dalga düzeni baştan başlar (1. haritadaki gibi). Arenada geçilen
+        # dalgalar total_wave() için saklanır.
+        self.arena_waves = int(self.waves.wave)
         self.waves = WaveManager(self.diff, biome="hell")
         self.waves.spawn_pos_fn = self.near_camera_point
         self.waves.wave_start_score = self.score
@@ -20530,6 +20540,17 @@ class RunState:
     def run_is_clean(self):
         """Bu koşu sıralamalara yazılabilir mi? (bkz. run_integrity_check)"""
         return not self.cheat_flag
+
+    def total_wave(self):
+        """Bu koşuda geçilen TOPLAM dalga: cehennemde arenadakiler de sayılır.
+
+        Cehennemde dalga sayacı 1'den başlıyor ama skor arenadan taşınıyor;
+        skor denetimi yalnızca cehennem dalgasına bakınca, cehenneme girip
+        orada ölen DÜRÜST oyuncu "skor dalgaya göre imkânsız" diye hileci
+        sayılıp sıralamadan kalıcı yasaklanıyordu (v3.26 düzeltmesi).
+        """
+        w = int(self.waves.wave)
+        return w + int(self.arena_waves) if self.biome == "hell" else w
 
     def finish_run(self):
         self.game_over = True
@@ -27147,7 +27168,9 @@ class App:
             "name": name[:14],
             "score": int(self.run.score),
             "kills": int(self.run.kills),
-            "wave": int(self.run.waves.wave),
+            # Cehennemde TOPLAM dalga (arena + cehennem): sunucunun skor
+            # denetimi de dalgaya bakıyor (bkz. RunState.total_wave).
+            "wave": int(self.run.total_wave()),
             "run_time": float(self.run.run_time),
             "created_at": time.time(),
             "diff": self.run.diff,
