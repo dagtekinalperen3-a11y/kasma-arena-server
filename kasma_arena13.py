@@ -4445,7 +4445,7 @@ AD_PROVIDER = ""             # boş = ev reklamı
 AD_REWARD_GEMS = 50
 AD_DAILY_LIMIT = 5
 AD_COOLDOWN = 90.0           # iki reklam arası (sn)
-AD_LENGTH = 30.0             # ev reklamının (tanıtım filmi) süresi (sn) — bkz. HouseAd
+AD_LENGTH = 91.2             # reklamın süresi — asıl değer GameTour.LENGTH (bkz. App'in üstü)
 DAILY_GIFT_GEMS = (20, 25, 30, 35, 40, 50, 75)
 
 def _day_key(offset_days=0):
@@ -24713,6 +24713,103 @@ def draw_armory_bg(surf, t):
 # Her şey 1280x720'lik bir kareye çizilir, sonra reklam penceresine
 # küçültülerek basılır (oyunun kendi çizim kodu olduğu gibi kullanılsın).
 # =====================================================================
+class _NullSteam:
+    """Gölge oyunda Steam yok."""
+    ok = False
+
+    def __getattr__(self, _n):
+        return lambda *_a, **_k: None
+
+
+class _NullPad:
+    ok = False
+    active = False
+    cursor = [0.0, 0.0]
+
+    def __getattr__(self, _n):
+        return lambda *_a, **_k: (0.0, 0.0)
+
+
+class _NoKeys:
+    """Gölge oyunun klavyesi: hiçbir tuş basılı değil (gerçek klavye sızmasın)."""
+
+    def __getitem__(self, _k):
+        return False
+
+
+class _TourDisplay:
+    """Gölge oyunun ekranı: yalnızca ekran dışı bir tuval."""
+
+    def __init__(self):
+        self.canvas = pygame.Surface((VIRTUAL_W, VIRTUAL_H)).convert()
+        self.pad_cursor = None
+        self.scale, self.offset, self.out_size = 1.0, (0, 0), (VIRTUAL_W, VIRTUAL_H)
+
+    def __getattr__(self, _n):
+        return lambda *_a, **_k: None
+
+
+class _TourOnline:
+    """Gölge oyunun 'sunucusu': dünya sıralaması tur tarafından doldurulur."""
+
+    def __init__(self):
+        self.enabled = True
+        self.world_scores = []
+        self.world_error = None
+        self.loading = False
+
+    def fetch_world_scores_async(self):
+        pass
+
+    def submit_score_async(self, payload, on_done=None):
+        if on_done:
+            try:
+                on_done(True, "")
+            except Exception:
+                pass
+
+    def __getattr__(self, _n):
+        return lambda *_a, **_k: None
+
+
+class _TourAccount:
+    """Gölge oyunun hesabı: tur 'kayıt ol' dediğinde giriş yapmış olur."""
+
+    def __init__(self):
+        self.enabled = True
+        self.server_ok = True
+        self.booting = False
+        self.account = None
+        self.token = ""
+        self.busy = False
+        self.status = ""
+        self.ok_msg = ""
+        self.google_ready = True
+        self.google_wait = False
+        self.sync_busy = False
+        self.sync_error = ""
+        self.sync_at = 0.0
+
+    def logged_in(self):
+        return self.account is not None
+
+    def needs_username(self):
+        return False
+
+    def display_name(self):
+        return (self.account or {}).get("username", "")
+
+    def sign_in(self, name, email=""):
+        self.account = {"username": name, "name": name, "email": email, "provider": "password"}
+        self.sync_at = time.time()
+
+    def get(self, *_a, **_k):
+        return None
+
+    def __getattr__(self, _n):
+        return lambda *_a, **_k: None
+
+
 class _AdSave(SaveManager):
     """Reklam koşuları için kaydın KOPYASI. Diske/sunucuya hiç yazmaz."""
 
@@ -25082,25 +25179,877 @@ class HouseAd:
                 blit_disc(surf, x, y, 2 + i % 3, (255, 255, 255), 200)
 
 
+# =====================================================================
+# OYUN TURU — 90 SANİYELİK TANITIM FİLMİ  (v3.26)
+# ---------------------------------------------------------------------
+# Ödüllü reklamın içeriği: izleyen hem OYUNU ÖĞRENİR hem elmas kazanır.
+# Her şey oyunun GERÇEK ekranları ve GERÇEK motorudur: gerçek oyunun
+# yanında, kaydın KOPYASIYLA çalışan bir "gölge oyun" (App(shadow_of=...))
+# açılır; bir sanal imleç onun menülerinde gezinip tıklar, savaşları bir
+# otomatik pilot oynar. Gölge oyun ekran açmaz, gerçek kayda, hesaba ve
+# sunucuya hiçbir şey yazmaz. Aynı film tools/make_tour_video.py ile MP4'e
+# de çevrilir.
+#
+#  HESAP AÇ > SİLAHLIK (Kırbaç kapatılır) > KİTAPLIK (kitap kapatılır,
+#  kilitli kitabın görevi) > BAŞARIM detayı > OYNA > 1. dalga > 5. dalga >
+#  SEVİYE ATLA (Hortum alınır) > MARKET > 10. ve 15. dalga PATRONLARI >
+#  MIKNATIS > MOR SEVİYE TAŞI > CEHENNEM KAPISI > cehennem 1. ve 5. dalga >
+#  cehennem patronu > EJDERHA ve yenilgi > DÜNYA SIRALAMASINDA 1.lik >
+#  PET'ler > 3B dönen SKİN geçidi > ŞİMDİ OYNA
+# =====================================================================
+def _tc(tr, en):
+    """Tur yazıları: Türkçe oyuncuya Türkçe, diğer dillere İngilizce."""
+    return tr if lang() == "tr" else en
+
+
+class _TourPilot:
+    """Turun savaş sahnelerini oynayan otomatik pilot."""
+
+    def __init__(self, run, crowd=0):
+        self.run = run
+        p = run.player
+        self.cx, self.cy = p.x, p.y
+        self.ang = random.uniform(0, math.tau)
+        self.bonk, self.dash = 0.5, 1.6
+        self.crowd = crowd
+        self.target = None
+        self.use = False
+        self.keep_hp = True
+        self.aim = (VIRTUAL_W / 2, VIRTUAL_H / 2)
+
+    def spawn(self):
+        run = self.run
+        x, y = run.near_camera_point()
+        w = run.waves.wave
+        if run.biome == "hell":
+            run.enemies.append(Enemy(None, x, y, run.wave_hp_mult(w), 1.0, wave=w,
+                                     variant=hell_pick_kind(w), biome="hell"))
+        else:
+            kind = random.choice(("red", "red", "blue", "yellow", "tank", "sprinter", "brute"))
+            run.enemies.append(Enemy(kind, x, y, run.wave_hp_mult(w), 1.0, wave=w))
+
+    def step(self, dt):
+        run = self.run
+        p = run.player
+        if self.keep_hp and p.alive:
+            p.hp = p.max_hp
+        run.pending_levelups = 0
+        run.levelup_choices = []
+        run.want_open_shop = False
+        run.cheat_flag = ""             # tur dalga atlıyor; koşu denetimi sussun
+        run.integrity_timer = 99.0
+        while len(run.enemies) < self.crowd:
+            self.spawn()
+        self.ang += dt * 0.55
+        if self.target is not None:
+            tx, ty = self.target
+        else:
+            tx = self.cx + math.cos(self.ang) * 230
+            ty = self.cy + math.sin(self.ang) * 140
+        mx, my = tx - p.x, ty - p.y
+        near, nd, close = None, 1e18, 0
+        for e in [e for e in run.enemies if e.alive] + [b for b in run.bosses if b.alive]:
+            d = (e.x - p.x) ** 2 + (e.y - p.y) ** 2
+            if d < nd:
+                near, nd = e, d
+            if d < 150 * 150:
+                close += 1
+                if d < 95 * 95 and self.target is None:
+                    k = 1.0 / max(20.0, math.sqrt(d))
+                    mx -= (e.x - p.x) * k * 160
+                    my -= (e.y - p.y) * k * 160
+        ln = math.hypot(mx, my)
+        if ln < 10 and self.target is not None:
+            mx = my = 0.0
+        else:
+            ln = ln or 1.0
+            mx, my = mx / ln, my / ln
+        inp = {"left": max(0.0, -mx), "right": max(0.0, mx), "up": max(0.0, -my),
+               "down": max(0.0, my), "mouse_down": near is not None, "use_pressed": self.use}
+        if near is not None:
+            inp["aim_x"], inp["aim_y"] = near.x, near.y
+            sx, sy = run.world_to_screen(near.x, near.y)
+            self.aim = (clamp(sx, 20, VIRTUAL_W - 20), clamp(sy, 90, VIRTUAL_H - 20))
+        self.bonk -= dt
+        self.dash -= dt
+        inp["bonk_pressed"] = close >= 4 and self.bonk <= 0
+        if inp["bonk_pressed"]:
+            self.bonk = 1.5
+        inp["dash_pressed"] = close >= 7 and self.dash <= 0 and self.target is None
+        if inp["dash_pressed"]:
+            self.dash = 2.2
+        run.update(dt, inp)
+
+
+class GameTour:
+    # (ad, süre, sahne başında geçiş perdesi)
+    SCENES = (
+        ("intro", 4.0, False), ("login", 6.0, True), ("codex", 7.0, True), ("books", 6.0, True),
+        ("ach", 4.0, True), ("toplay", 1.2, True), ("wave1", 4.0, False), ("wave5", 4.0, True),
+        ("levelup", 3.0, False), ("market", 3.0, False), ("boss1", 4.5, True), ("boss2", 4.5, True),
+        ("magnet", 4.5, True), ("portal", 3.0, True), ("hell1", 3.0, False), ("hell5", 3.0, True),
+        ("hellboss", 4.0, True), ("dragon", 3.0, False), ("gameover", 3.0, False),
+        ("worldlb", 5.0, True), ("pets", 3.0, True), ("skins", 5.5, True), ("outro", 3.0, True),
+    )
+    LENGTH = sum(d for _n, d, _w in SCENES)
+    NAME = "Kanka"
+
+    def __init__(self, real_app):
+        self.sh = sh = App(shadow_of=real_app)
+        sh.splash_t = 99.0
+        self.t = 0.0
+        self.scene_i = -1
+        self.prev = -1.0
+        self.clicks = []
+        self.pilot = None
+        self.music = [(0.0, "menu")]     # MP4 aracı için müzik geçişleri
+        self.flags = set()
+        self._bg = None
+        self._setup_save()
+        sh.build_menu_buttons()
+        # Arena ve cehennem zeminleri ilk kez çizilirken ~0.5 sn sürüyor:
+        # filmin ortasında takılmasın diye şimdi hazırlanır.
+        for biome in ("arena", "hell"):
+            try:
+                floor_surface(biome)
+            except Exception:
+                pass
+        world_surface()
+        self._grad_bg()
+
+    # ------------------------------------------------------------------
+    def _setup_save(self):
+        """Vitrin kaydı: bir kısmı açık, bir kısmı kilitli, öğretici."""
+        d = self.sh.save.data
+        d["tainted"] = False
+        d["taint_reasons"] = []
+        d["board_banned"] = False
+        d["ban_reasons"] = []
+        d["books_owned"] = [b["key"] for b in BOOKS if not b.get("rare")][:10]
+        d["books_muted"] = []
+        d["weapons_owned"] = ["axe", "book", "pentagram", "whip", "tornado"]
+        d["weapons_muted"] = []
+        d["stats"] = {"runs": 9, "best_score": 21450, "total_kills": 940, "total_time": 3100.0,
+                      "bosses": 2, "best_wave": 8, "total_shots": 6200, "total_lifesteal": 0.0,
+                      "total_gold": 3800, "best_run_gold": 820, "best_run_dashes": 22,
+                      "best_combo": 24, "best_run_kills": 160, "total_dashes": 160,
+                      "total_bonks": 40, "total_bonk_hits": 150}
+        d["achievements"] = {a["id"]: "24.12.2026" for a in ACHIEVEMENTS[:6]}
+        d["skins_owned"] = ["default", "ranger", "crimson", "royal", "inferno"]
+        d["equipped_skin"] = "inferno"
+        d["cosmetics_owned"] = ["pet_dragon"]
+        d.setdefault("equipped_cosmetics", {})
+        d["equipped_cosmetics"] = {"hat": None, "eyewear": None, "cape": None, "pet": "pet_dragon"}
+        d["gems"] = d["gems_earned"] = 640
+        d["gems_spent"] = 0
+        d["rewards"] = {"pid": self.sh.save.profile_id()}
+        self.sh.selected_skin = "inferno"
+        self.sh.diff = "normal"
+        self.sh.online.world_scores = self._world_rows()
+
+    def _world_rows(self):
+        names = ("Kanka", "ZeyNo", "BonkUstası", "Ayaz_41", "KralMert", "Efe_TR", "Duru",
+                 "Selin07", "Ozi", "Kuzey")
+        rows = []
+        score = 152340
+        for i, nm in enumerate(names):
+            rows.append({"name": nm, "score": score, "wave": max(12, 41 - i * 3),
+                         "kills": 5200 - i * 430, "diff": "kabus" if i in (0, 3, 6) else "normal",
+                         "run_time": 1500 - i * 80})
+            score = int(score * (0.86 if i else 0.79))
+        return rows
+
+    # ------------------------------------------------------------------
+    def _scene(self):
+        t = self.t
+        acc = 0.0
+        for i, (nm, dur, wipe) in enumerate(self.SCENES):
+            if t < acc + dur or i == len(self.SCENES) - 1:
+                return i, nm, t - acc, dur, wipe
+            acc += dur
+
+    def at(self, st, x):
+        """Bu karede x saniyesi geçildi mi? (tek seferlik olaylar)"""
+        return self.prev < x <= st
+
+    def path(self, keys, st):
+        if st <= keys[0][0]:
+            return keys[0][1]
+        for (t0, p0), (t1, p1) in zip(keys, keys[1:]):
+            if t0 <= st <= t1:
+                k = (st - t0) / max(1e-6, t1 - t0)
+                k = k * k * (3 - 2 * k)
+                return (p0[0] + (p1[0] - p0[0]) * k, p0[1] + (p1[1] - p0[1]) * k)
+        return keys[-1][1]
+
+    def click(self, pos):
+        self.clicks.append((pos, self.t))
+        sfx("click", 0.6, 0.0)
+
+    def cap(self, text, sub, st, dur, y=600, col=(255, 214, 120), x0=0):
+        """Alt yazı şeridi: soldan kayarak girer, sağa doğru söner."""
+        if st < 0 or st > dur:
+            return
+        c = self.sh.display.canvas
+        k = min(ease_out_cubic(st / 0.4), ease_out_cubic((dur - st) / 0.3))
+        tw = max(text_width(text, 38, True), text_width(sub, 21, True) if sub else 0) + 90
+        x = x0 - tw + (tw + 50) * k
+        h = 94 if sub else 66
+        bar = pygame.Surface((int(tw), h), pygame.SRCALPHA)
+        bar.fill((10, 8, 18, 222))
+        c.blit(bar, (int(x), y))
+        pygame.draw.rect(c, col, pygame.Rect(int(x + tw - 10), y, 10, h))
+        draw_text(c, text, (int(x) + 30, y + 9), 38, col, bold=True)
+        if sub:
+            draw_text(c, sub, (int(x) + 32, y + 58), 21, (236, 232, 244), bold=True)
+
+    def stamp(self, text, st, col, y=150):
+        """Ekranın ortasına 'pat' diye inen büyük yazı (YENİ REKOR! gibi)."""
+        if st < 0 or st > 2.2:
+            return
+        c = self.sh.display.canvas
+        k = ease_out_cubic(min(1.0, st / 0.25))
+        size = int(64 + 40 * (1 - k))
+        a = min(1.0, (2.2 - st) / 0.4)
+        band = pygame.Surface((VIRTUAL_W, 118), pygame.SRCALPHA)
+        band.fill((8, 6, 14, int(200 * a * k)))
+        c.blit(band, (0, int(y - 59)))
+        for sgn in (-1, 1):
+            pygame.draw.line(c, scale_col(col, 0.7 * a + 0.1), (0, int(y + sgn * 59)),
+                             (VIRTUAL_W, int(y + sgn * 59)), 2)
+        add_glow(c, VIRTUAL_W / 2, y, 260, col, 0.25 * k)
+        draw_text(c, text, (VIRTUAL_W / 2, y), size, col, bold=True, center=True, alpha=int(255 * a))
+
+    def cursor(self, pos, kind="ui"):
+        draw_cursor(self.sh.display.canvas, pos, kind, self.sh.t, hot=(kind == "aim"))
+
+    # ------------------------------------------------------------------
+    def update(self, dt):
+        dt = min(dt, 1 / 20.0)
+        self.t = min(self.LENGTH, self.t + dt)
+        self.sh.t += dt
+        i, name, st, dur, wipe = self._scene()
+        first = i != self.scene_i
+        if first:
+            self.scene_i = i
+            self.prev = -1.0
+        getattr(self, "_s_" + name)(st, dt, first)
+        c = self.sh.display.canvas
+        for (pos, t0) in self.clicks:
+            k = (self.t - t0) / 0.45
+            if 0 <= k <= 1:
+                ring_aa(c, pos[0], pos[1], 8 + 34 * k, (255, 236, 170), max(1, int(5 * (1 - k))))
+        if name in ("wave1", "wave5", "boss1", "boss2", "magnet", "portal", "hell1", "hell5",
+                    "hellboss", "dragon"):
+            logo = brand_scaled("logo", h=54)
+            if logo is not None:
+                c.blit(logo, (VIRTUAL_W - logo.get_width() - 16, VIRTUAL_H - logo.get_height() - 12))
+        if wipe and st < 0.32 and self.t > 0.5:
+            k = st / 0.32
+            x0 = -260 + (VIRTUAL_W + 520) * k
+            pygame.draw.polygon(c, (236, 186, 92), [(x0, 0), (x0 + 300, 0), (x0 + 80, VIRTUAL_H),
+                                                   (x0 - 220, VIRTUAL_H)])
+            pygame.draw.polygon(c, (255, 242, 205), [(x0 + 230, 0), (x0 + 300, 0),
+                                                    (x0 + 80, VIRTUAL_H), (x0 + 10, VIRTUAL_H)])
+        self.prev = st
+
+    def render(self):
+        return self.sh.display.canvas
+
+    def close(self):
+        """Tur kapanırken gölge oyunun çaldırdığı savaş müziğini geri al."""
+        try:
+            audio.set_music("menu")
+        except Exception:
+            pass
+
+    # ------------------------------------------------------------------
+    # yardımcı: savaş karesi
+    def _play(self, dt, step=True):
+        sh = self.sh
+        if step and self.pilot is not None and sh.state == STATE_PLAY:
+            self.pilot.step(dt)
+        if sh.state == STATE_PLAY and sh.run.game_over:
+            # ölüm: oyunun kendi akışı sonuç ekranına geçirsin
+            sh.run.run_is_clean = lambda: True
+            sh.update_play(0.0, _NoKeys(), self.pilot.aim, False, False, False)
+            return
+        sh._draw_run_frame(sh.display.canvas, aim_pos=self.pilot.aim,
+                           offset=sh.run.fx.get_shake_offset())
+        self.cursor(self.pilot.aim, "aim")
+
+    def _grad_bg(self):
+        if self._bg is None:
+            self._bg = pygame.Surface((VIRTUAL_W, VIRTUAL_H)).convert()
+            for y in range(VIRTUAL_H):
+                pygame.draw.line(self._bg, mix_col((54, 30, 80), (10, 6, 20), y / VIRTUAL_H),
+                                 (0, y), (VIRTUAL_W, y))
+        return self._bg
+
+    def _rays(self, c, cx, cy, st, alpha=30):
+        lay = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+        for i in range(22):
+            a = st * 0.22 + i * math.tau / 22
+            pygame.draw.polygon(lay, (236, 186, 92, alpha),
+                                [(cx, cy), (cx + math.cos(a - .05) * 1000, cy + math.sin(a - .05) * 1000),
+                                 (cx + math.cos(a + .05) * 1000, cy + math.sin(a + .05) * 1000)])
+        c.blit(lay, (0, 0))
+
+    # ==================================================================
+    # SAHNELER
+    # ==================================================================
+    def _s_intro(self, st, dt, first):
+        c = self.sh.display.canvas
+        c.blit(self._grad_bg(), (0, 0))
+        cx, cy = VIRTUAL_W / 2, VIRTUAL_H / 2 - 30
+        self._rays(c, cx, cy, st)
+        add_glow(c, cx, cy, 480, (210, 150, 60), 0.30)
+        if st < 1.4:
+            badge = brand_scaled("badge", h=260)
+            if badge is not None:
+                k = ease_out_cubic(st / 0.55)
+                s_ = 0.3 + 0.7 * k + 0.08 * math.sin(min(1.0, st / 0.55) * math.pi)
+                img = pygame.transform.smoothscale(badge, (int(260 * s_), int(260 * s_)))
+                c.blit(img, (cx - img.get_width() / 2, cy - img.get_height() / 2))
+            if st > 0.5:
+                q = min(1.0, (st - 0.5) / 0.6)
+                ring_aa(c, cx, cy, 140 + 500 * q, (255, 230, 170), max(1, int(12 * (1 - q))))
+            if self.at(st, 0.5):
+                sfx("bonk", 1.0, 0.0)
+        else:
+            logo = brand_scaled("logo", w=880)
+            if logo is not None:
+                k = ease_out_cubic((st - 1.4) / 0.5)
+                s_ = 0.8 + 0.2 * k
+                img = pygame.transform.smoothscale(logo, (int(logo.get_width() * s_),
+                                                          int(logo.get_height() * s_)))
+                img.set_alpha(int(255 * k))
+                c.blit(img, (cx - img.get_width() / 2, cy - img.get_height() / 2))
+            if st > 2.2:
+                a = int(255 * min(1.0, (st - 2.2) / 0.4))
+                draw_text(c, _tc("Oyunu 90 saniyede öğren!", "Learn the game in 90 seconds!"),
+                          (cx, cy + 210), 32, (255, 236, 182), bold=True, center=True, alpha=a)
+
+    def _s_login(self, st, dt, first):
+        sh = self.sh
+        if first:
+            sh.state = STATE_LOGIN
+            sh.login_mode = "up"
+            sh.login_fields = {"user": "", "password": "", "email": "", "newpw": ""}
+            sh.login_focus = "user"
+            sh.account.account = None
+        name, pw = self.NAME, "bonkbonk"
+        if st < 1.8:
+            sh.login_fields["user"] = name[:max(0, int((st - 0.7) / 0.18))]
+        else:
+            sh.login_fields["user"] = name
+            sh.login_focus = "password"
+            sh.login_fields["password"] = pw[:max(0, int((st - 1.9) / 0.1))]
+        for k in range(len(name)):
+            if self.at(st, 0.7 + k * 0.18):
+                sfx("hover", 0.5, 0.0)
+        m = self.path([(0.0, (640, 640)), (0.6, (640, 281)), (1.8, (640, 281)), (2.0, (640, 337)),
+                       (2.9, (640, 337)), (3.4, (640, 452)), (6.0, (640, 452))], st)
+        if self.at(st, 3.6):
+            self.click(m)
+            sh.account.sign_in(name, "kanka@mail.com")
+            sh.login_mode = "in"
+            sfx("levelup", 0.7, 0.0)
+        sh.update_login(dt, m, False)
+        self.cursor(m)
+        self.cap(_tc("HESAP AÇ", "CREATE AN ACCOUNT"),
+                 _tc("Kullanıcı adı + şifre, ya da tek tıkla Google.", "Username + password, or one click with Google."),
+                 st - 0.3, 3.3)
+        self.cap(_tc("GİRİŞ YAPILDI!", "YOU'RE IN!"),
+                 _tc("İlerlemen hesabında — her bilgisayarda seninle.", "Your progress lives in your account, on any PC."),
+                 st - 3.8, 2.2, col=(140, 230, 170))
+
+    def _s_codex(self, st, dt, first):
+        sh = self.sh
+        if first:
+            sh.state = STATE_MENU
+        if st < 1.5:
+            m = self.path([(0.0, (1100, 60)), (1.0, (342, 340))], st)
+            if self.at(st, 1.15):
+                self.click(m)
+            sh.update_menu(dt, m, False)
+            self.cursor(m)
+            self.cap(_tc("ANA MENÜ", "MAIN MENU"), _tc("Önce silahlarına bir bakalım...", "First, a look at your weapons..."),
+                     st - 0.1, 1.4, col=(130, 200, 255))
+            return
+        if self.at(st, 1.5) or sh.state != STATE_WEAPON_CODEX:
+            sh.goto(STATE_WEAPON_CODEX)
+        m = self.path([(1.5, (342, 340)), (2.4, (211, 470)), (3.6, (211, 470)), (4.3, (1069, 371)),
+                       (7.0, (1069, 371))], st)
+        clicked = self.at(st, 4.6)
+        if clicked:
+            self.clicks.append((m, self.t))
+        sh.update_weapon_codex(dt, m, clicked, 0)
+        self.cursor(m)
+        self.cap(_tc("SİLAHLIK", "ARMORY"),
+                 _tc("Silahlar GÖREVLE açılır: kilitli kartta görevi yazar.", "Weapons unlock through QUESTS: the locked card tells you how."),
+                 st - 1.7, 2.8, col=(238, 150, 100))
+        self.cap(_tc("KIRBAÇ KAPATILDI", "WHIP TURNED OFF"),
+                 _tc("Sevmediğin silahı kapat: seviye atlarken artık çıkmaz.", "Turn off what you don't like: it won't be offered again."),
+                 st - 4.7, 2.3, col=(232, 130, 130))
+
+    def _s_books(self, st, dt, first):
+        sh = self.sh
+        if first:
+            sh.goto(STATE_BOOK_MARKET)
+            sh.book_filter = "all"
+        if st > 2.6:
+            sh.book_scroll = 280 * ease_out_cubic((st - 2.6) / 1.2)
+        m = self.path([(0.0, (1069, 371)), (1.2, (783, 371)), (2.6, (783, 371)), (4.0, (1069, 560)),
+                       (6.0, (1069, 560))], st)
+        clicked = self.at(st, 1.5)
+        if clicked:
+            self.clicks.append((m, self.t))
+        sh.update_book_market(dt, m, clicked, 0)
+        self.cursor(m)
+        self.cap(_tc("KİTAPLIK: 27 GÜÇ KİTABI", "LIBRARY: 27 POWER BOOKS"),
+                 _tc("Seviye atlayınca kitap seç; koşu boyunca büyüt.", "Pick books as you level up and grow them all run."),
+                 st - 0.1, 1.5, col=(196, 150, 255))
+        self.cap(_tc("ZIRH KİTABI KAPATILDI", "ARMOR BOOK OFF"),
+                 _tc("Kitapları da kapatabilirsin — destene sen karar ver.", "Books can be turned off too — build your own deck."),
+                 st - 1.7, 2.1, col=(232, 130, 130))
+        self.cap(_tc("KİLİTLİ KİTAPLAR", "LOCKED BOOKS"),
+                 _tc("Görevi yazıyor: tamamla, kitap senin!", "The quest is written on it: finish it, it's yours!"),
+                 st - 4.0, 2.0, col=(232, 186, 90))
+
+    def _s_ach(self, st, dt, first):
+        sh = self.sh
+        if first:
+            sh.goto(STATE_ACHIEVEMENTS)
+        m = self.path([(0.0, (783, 560)), (0.8, (640, 520)), (4.0, (640, 520))], st)
+        clicked = self.at(st, 1.0)
+        if clicked:
+            self.clicks.append((m, self.t))
+        sh.update_achievements(dt, m, clicked, 0)
+        self.cursor(m)
+        self.cap(_tc("BAŞARIMLAR", "ACHIEVEMENTS"),
+                 _tc("Her biri elmas kazandırır — tıkla, nasıl alınacağını gör.", "Each one pays gems — click to see how to earn it."),
+                 st - 1.3, 2.6, y=620)
+
+    def _s_toplay(self, st, dt, first):
+        sh = self.sh
+        if first:
+            sh.ach_detail = None
+            sh.state = STATE_MENU
+        m = self.path([(0.0, (640, 560)), (0.7, (640, 340)), (1.2, (640, 340))], st)
+        if self.at(st, 0.85):
+            self.click(m)
+        sh.update_menu(dt, m, False)
+        self.cursor(m)
+
+    def _s_wave1(self, st, dt, first):
+        sh = self.sh
+        if first:
+            sh.start_run()
+            self.music.append((self.t, "battle"))
+            run = sh.run
+            run.player.no_stats = True
+            self.pilot = _TourPilot(run, crowd=7)
+        self._play(dt)
+        self.cap(_tc("1. DALGA", "WAVE 1"),
+                 _tc("WASD ile koş, fareyle nişan al, sol tıkla ateş et!", "Run with WASD, aim with the mouse, left-click to shoot!"),
+                 st - 0.3, 3.5, col=(140, 230, 170))
+
+    def _s_wave5(self, st, dt, first):
+        sh = self.sh
+        run = sh.run
+        if first:
+            run.waves._begin_wave(5, run.score)
+            run.waves.announce_text = L("ui.ann_surge", 5)
+            run.player.level = max(run.player.level, 6)
+            self.pilot.crowd = 30
+        self._play(dt)
+        self.cap(_tc("5. DALGA", "WAVE 5"),
+                 _tc("SPACE: BONK — kalabalığı savur!  SHIFT: dash at!", "SPACE: BONK the crowd away!  SHIFT: dash!"),
+                 st - 0.4, 3.4)
+
+    def _s_levelup(self, st, dt, first):
+        sh = self.sh
+        run = sh.run
+        if first:
+            try:
+                run.levelup_choices = [
+                    run._book_offer(BOOK_BY_KEY["r_crit"], run.player.books.get("r_crit", 0) + 1, True),
+                    run._weapon_offer(WEAPON_BY_KEY["tornado"], 1, True),
+                    run._book_offer(BOOK_BY_KEY["r_hp"], run.player.books.get("r_hp", 0) + 1, True),
+                ]
+                run.pending_levelups = 1
+                sh.state = STATE_LEVELUP
+                sfx("levelup", 1.0, 0.0)
+            except Exception:
+                sh.state = STATE_PLAY
+        if sh.state == STATE_LEVELUP:
+            cards = [r.center for (r, _c, _i) in sh.levelup_ui.cards] or [(640, 360)] * 3
+            m = self.path([(0.0, (640, 640)), (0.6, cards[0]), (1.2, cards[1]), (3.0, cards[1])], st)
+            clicked = self.at(st, 1.8)
+            if clicked:
+                self.clicks.append((m, self.t))
+            sh.update_levelup(dt, m, clicked)
+            self.cursor(m)
+        else:
+            self._play(dt)
+        self.cap(_tc("SEVİYE ATLADIN!", "LEVEL UP!"),
+                 _tc("Kırbaç kapalı → yerine HORTUM geldi. Al bakalım!", "Whip is off → TORNADO showed up instead. Take it!"),
+                 st - 0.2, 2.8, y=612, col=(232, 186, 90))
+
+    def _s_market(self, st, dt, first):
+        sh = self.sh
+        run = sh.run
+        if first:
+            run.gold_wallet = max(run.gold_wallet, 900)
+            run.open_shop()
+            sh.state = STATE_RUN_SHOP
+        m = self.path([(0.0, (640, 600)), (0.7, (183, 250)), (1.6, (183, 250)), (2.2, (640, 688)),
+                       (3.0, (640, 688))], st)
+        clicked = False
+        for x in (0.95, 1.35, 2.4):
+            if self.at(st, x):
+                clicked = True
+                self.clicks.append((m, self.t))
+        if sh.state == STATE_RUN_SHOP:
+            sh.update_run_shop(dt, m, clicked)
+            self.cursor(m)
+        else:
+            self._play(dt)
+        self.cap(_tc("MARKET  (B)", "SHOP  (B)"),
+                 _tc("Topladığın altınla anında güçlen.", "Spend the gold you pick up — power up on the spot."),
+                 st - 0.3, 2.6, y=612)
+
+    def _boss_scene(self, st, dt, first, wave, title, sub, col):
+        sh = self.sh
+        run = sh.run
+        if first:
+            sh.state = STATE_PLAY
+            p = run.player
+            p.weapons.setdefault("axe", 3)
+            p.weapons.setdefault("pentagram", 3)
+            p.weapons.setdefault("tornado", 2)
+            p.level = max(p.level, 12 if wave == 10 else 16)
+            run.chests.clear()
+            run.waves.wave = wave
+            # 10. dalga Savaş Lordu, 15. dalga Cadı (BOSS_ORDER sırası)
+            run.waves.boss_idx = 0 if wave == 10 else 1
+            run.waves.boss_pending = True
+            self.pilot.crowd = 12
+            self.pilot.target = None
+        if st > 3.3:
+            for b in list(run.bosses):
+                if b.alive:
+                    b.take_damage(b.hp + 50, True, run.fx)
+        self.pilot.target = (run.chests[0].x, run.chests[0].y) if run.chests else None
+        self._play(dt)
+        self.cap(title, sub, st - 0.5, 3.8, col=col)
+
+    def _s_boss1(self, st, dt, first):
+        self._boss_scene(st, dt, first, 10, _tc("10. DALGA: PATRON!", "WAVE 10: BOSS!"),
+                         _tc("Devir, düşürdüğü sandığı kap: silahın güçlenir.", "Take it down and grab its chest: your weapon levels up."),
+                         (255, 110, 90))
+
+    def _s_boss2(self, st, dt, first):
+        self._boss_scene(st, dt, first, 15, _tc("15. DALGA: YENİ PATRON!", "WAVE 15: NEW BOSS!"),
+                         _tc("Her patron başka saldırır. Kaç, vur, devir!", "Every boss fights differently. Dodge, hit, win!"),
+                         (255, 150, 90))
+
+    def _s_magnet(self, st, dt, first):
+        sh = self.sh
+        run = sh.run
+        p = run.player
+        if first:
+            run.chests.clear()
+            run.enemies[:] = run.enemies[:5]
+            self.pilot.crowd = 5
+            for i in range(70):
+                a = i * 2.39
+                d = 160 + (i % 9) * 40
+                run.drop_pickup(p.x + math.cos(a) * d, p.y + math.sin(a) * d * 0.7,
+                                "xp" if i % 3 else "coin", 3)
+            run.magnets.append(MagnetDrop(p.x + 190, p.y - 20))
+        if not run.magnets and "stone" not in self.flags:
+            self.flags.add("stone")
+            run.level_drops.append(LevelDrop(p.x - 200, p.y + 40))
+        if run.magnets:
+            self.pilot.target = (run.magnets[0].x, run.magnets[0].y)
+        elif run.level_drops and st > 2.3:
+            self.pilot.target = (run.level_drops[0].x, run.level_drops[0].y)
+        else:
+            self.pilot.target = None
+        self._play(dt)
+        self.cap(_tc("MIKNATIS", "MAGNET"),
+                 _tc("Yerdeki bütün tecrübe ve altını tek seferde çeker!", "Pulls in every XP orb and coin on the floor!"),
+                 st - 0.2, 2.1, col=(120, 200, 255))
+        self.cap(_tc("MOR SEVİYE TAŞI", "PURPLE LEVEL STONE"),
+                 _tc("Topla, anında bir seviye atla!", "Grab it and level up instantly!"),
+                 st - 2.4, 2.0, col=(196, 120, 255))
+
+    def _s_portal(self, st, dt, first):
+        sh = self.sh
+        run = sh.run
+        if first:
+            self.pilot.target = None
+            self.pilot.crowd = 0
+            run.enemies[:] = run.enemies[:4]
+            run.level_drops.clear()
+            run.open_hell_portal()
+        hp = run.hell_portal
+        if hp is not None and st > 0.8:
+            self.pilot.target = (hp.x, hp.y)
+            self.pilot.use = st > 1.6
+        self._play(dt)
+        if run.biome == "hell":
+            self.pilot.use = False
+            self.pilot.target = None
+        self.cap(_tc("CEHENNEM KAPISI", "HELL GATE"),
+                 _tc("25. dalganın patronundan sonra açılır. E ile gir!", "Opens after the wave-25 boss. Press E to enter!"),
+                 st - 0.3, 2.6, col=(200, 110, 255))
+
+    def _s_hell1(self, st, dt, first):
+        run = self.sh.run
+        if first:
+            if run.biome != "hell":
+                run.enter_hell()
+            self.pilot.use = False
+            self.pilot.target = None
+            self.pilot.crowd = 16
+            self.pilot.cx, self.pilot.cy = run.player.x, run.player.y
+        self._play(dt)
+        self.cap(_tc("CEHENNEM — 1. DALGA", "HELL — WAVE 1"),
+                 _tc("İkinci harita: lav, alev, çok daha sert yaratıklar.", "The second map: lava, fire, much tougher monsters."),
+                 st - 0.3, 2.6, col=(255, 120, 60))
+
+    def _s_hell5(self, st, dt, first):
+        run = self.sh.run
+        if first:
+            run.waves._begin_wave(5, run.score)
+            run.waves.announce_text = L("ui.ann_hell", 5)
+            self.pilot.crowd = 32
+        self._play(dt)
+        self.cap(_tc("CEHENNEM — 5. DALGA", "HELL — WAVE 5"), _tc("Kalabalık kızışıyor...", "It's heating up..."),
+                 st - 0.3, 2.6, col=(255, 120, 60))
+
+    def _s_hellboss(self, st, dt, first):
+        run = self.sh.run
+        if first:
+            run.waves.wave = 10
+            run.waves.boss_idx = 1
+            run.waves.boss_pending = True
+            self.pilot.crowd = 16
+        if st > 3.0:
+            for b in list(run.bosses):
+                if b.alive:
+                    b.take_damage(b.hp + 50, True, run.fx)
+        self._play(dt)
+        self.cap(_tc("10. DALGA: CEHENNEM PATRONU", "WAVE 10: HELL BOSS"),
+                 _tc("Cehennemin patronları ateşle saldırır.", "Hell's bosses fight with fire."),
+                 st - 0.3, 3.4, col=(255, 80, 80))
+
+    def _s_dragon(self, st, dt, first):
+        sh = self.sh
+        run = sh.run
+        p = run.player
+        if first:
+            run.chests.clear()
+            cam = run.cam_rect()
+            dg = Boss("dragon", cam.centerx + 260, cam.centery - 120, 1.0, 1.0, run.waves.wave,
+                      hellish=True)
+            run.bosses.append(dg)
+            scale_bosses_to_player(run.bosses, p)
+            run.waves.boss_active = True
+            self.pilot.crowd = 14
+            sfx("boss", 1.0, 0.0)
+        if st > 0.9:
+            self.pilot.keep_hp = False
+            if p.alive and int(st / 0.3) != int(self.prev / 0.3):
+                p.invuln = 0.0
+                p.take_damage(p.max_hp * 0.3, run.fx, src="boss")
+        self._play(dt)
+        self.cap(_tc("EJDERHA UYANDI!", "THE DRAGON AWAKENS!"),
+                 _tc("...ve bu sefer kaybettin. Bir dahakine!", "...and this time you lost. Next time!"),
+                 st - 0.2, 2.8, col=(255, 90, 60))
+
+    def _s_gameover(self, st, dt, first):
+        sh = self.sh
+        if first:
+            self.music.append((self.t, "menu"))
+            if sh.state == STATE_PLAY and sh.run is not None:
+                sh.run.player.alive = False
+                sh.run.game_over = True
+                sh.run.run_is_clean = lambda: True
+                sh.update_play(0.0, _NoKeys(), (640, 360), False, False, False)
+            if sh.state == STATE_NAME_ENTRY:
+                sh.confirm_name_entry()
+            sh.online_submit_status = "gönderildi"
+            sh.online_block_text = ""
+        m = (640 + math.sin(st) * 40, 520)
+        if sh.state == STATE_GAMEOVER:
+            sh.update_gameover(dt, m, False)
+        else:
+            self._play(dt, step=False)
+        self.cursor(m)
+        self.stamp(_tc("YENİ REKOR!", "NEW HIGH SCORE!"), st - 0.4, GOLD, y=360)
+        self.cap(_tc("SKORUN DÜNYAYA GİDER", "YOUR SCORE GOES GLOBAL"),
+                 _tc("Hesabınla oynadıysan skorun dünya sıralamasına yazılır.", "Signed in? Your score lands on the world ranking."),
+                 st - 0.6, 2.4)
+
+    def _s_worldlb(self, st, dt, first):
+        sh = self.sh
+        if first:
+            sh.state = STATE_MENU
+            sh.online.world_scores = self._world_rows()
+        if st < 1.3:
+            m = self.path([(0.0, (640, 600)), (0.9, (640, 487)), (1.3, (640, 487))], st)
+            if self.at(st, 1.0):
+                self.click(m)
+            sh.update_menu(dt, m, False)
+            self.cursor(m)
+            return
+        if sh.state != STATE_WORLD_LB:
+            sh.goto(STATE_WORLD_LB)
+        m = self.path([(1.3, (640, 487)), (2.2, (980, 200)), (5.0, (980, 200))], st)
+        sh.update_world_leaderboard(dt, m, False)
+        c = sh.display.canvas
+        if st > 1.4:                       # altın konfeti
+            for i in range(70):
+                x = (i * 97.7 + math.sin(st * 2 + i) * 30) % VIRTUAL_W
+                y = ((st - 1.4) * (160 + (i % 7) * 30) + i * 23) % (VIRTUAL_H + 40) - 20
+                col = ((255, 214, 110), (255, 120, 140), (120, 210, 255), (150, 240, 160))[i % 4]
+                pygame.draw.rect(c, col, pygame.Rect(int(x), int(y), 6, 10))
+        if self.at(st, 1.4):
+            sfx("buy", 1.0, 0.0)
+        self.cursor(m)
+        self.stamp(_tc("1. SENSİN!", "YOU'RE #1!"), st - 1.4, GOLD, y=360)
+        self.cap(_tc("DÜNYA SIRALAMASI", "WORLD RANKING"),
+                 _tc("Zirvede SEN varsın. Arkadaşların seni geçebilecek mi?", "YOU are on top. Can your friends beat you?"),
+                 st - 2.0, 3.0, col=(130, 200, 255))
+
+    def _s_pets(self, st, dt, first):
+        sh = self.sh
+        if first:
+            sh.state = STATE_GEM_STORE
+            sh.store_tab = "pets"
+        m = self.path([(0.0, (640, 600)), (1.0, (896, 230)), (2.0, (1150, 400)), (3.0, (400, 420))], st)
+        sh.update_gem_store(dt, m, False)
+        self.cursor(m)
+        self.cap(_tc("PET'LER", "PETS"),
+                 _tc("Kedi, köpek, ejderha, drone... Yanında koşan sadık dostlar.", "Cat, dog, dragon, drone... loyal buddies by your side."),
+                 st - 0.2, 2.7, y=612, col=(255, 170, 200))
+
+    def _s_skins(self, st, dt, first):
+        sh = self.sh
+        c = sh.display.canvas
+        if first:
+            sh.state = STATE_MENU
+        c.blit(self._grad_bg(), (0, 0))
+        cx, cy = VIRTUAL_W / 2, 330
+        self._rays(c, cx, cy - 40, st, alpha=18)
+        # parlak zemin (döner sahne)
+        pygame.draw.ellipse(c, (40, 26, 66), pygame.Rect(cx - 470, cy + 40, 940, 150))
+        pygame.draw.ellipse(c, (120, 90, 180), pygame.Rect(cx - 470, cy + 40, 940, 150), 2)
+        add_glow(c, cx, cy + 110, 360, (160, 110, 255), 0.18)
+        picks = ["default", "crimson", "royal", "inferno", "frost_witch", "storm_bringer",
+                 "prism", "web_master", "green_titan", "immortal_merc"]
+        sks = [SKIN_BY_ID[k] for k in picks if k in SKIN_BY_ID]
+        n = len(sks)
+        rot = st * 0.85
+        items = []
+        for i, sk in enumerate(sks):
+            a = rot + i * math.tau / n
+            depth = (math.sin(a) + 1) / 2              # 0 = arka, 1 = ön
+            items.append((depth, a, sk))
+        items.sort(key=lambda it: it[0])
+        front = items[-1][2]
+        for depth, a, sk in items:
+            x = cx + math.cos(a) * 430
+            y = cy + 60 + depth * 70
+            r = int(18 + 42 * depth ** 1.4)
+            add_glow(c, x, y, r * 3, sk["color"], 0.08 + 0.25 * depth)
+            c.blit(shadow_sprite(r * 2 + 12), (int(x - r - 6), int(y + r - 6)))
+            draw_skin_preview(c, sk, x, y, sh.t, r=r)
+        # öndeki skinin künyesi
+        nm = skin_name(front)
+        add_glow(c, cx, 92, 220, front["color"], 0.18)
+        draw_text(c, nm, (cx, 86), 46, front["color"], bold=True, center=True)
+        u = get_skin_ult(front["id"]) or {}
+        if u.get("name"):
+            draw_text(c, _tc("ÖZEL YETENEK: ", "SPECIAL: ") + str(u.get("name")), (cx, 132), 20,
+                      (236, 232, 244), bold=True, center=True)
+        if front.get("premium"):
+            tag, tcol = _tc("PREMİUM  ·  ", "PREMIUM  ·  ") + front.get("price_hint", ""), PURPLE
+            draw_text(c, tag, (cx, 162), 18, tcol, bold=True, center=True)
+        elif not front.get("cost"):
+            draw_text(c, _tc("BAŞLANGIÇ SKİNİ — bedava", "STARTER SKIN — free"), (cx, 162), 18,
+                      GREEN, bold=True, center=True)
+        else:
+            draw_coin_label(c, cx, 172, _tc("{0} elmas", "{0} gems").format(fmt_num(front["cost"])),
+                            GEM_COLOR, 18, icon="gem", icon_r=9, gap=7)
+        self.cap(_tc("24 SKİN", "24 SKINS"),
+                 _tc("Her skinin kendi silahı ve ÖZEL YETENEĞİ var. Elmasla aç!", "Each skin has its own weapon and SPECIAL ABILITY."),
+                 st - 0.3, 5.0, y=604, col=(255, 205, 110))
+
+    def _s_outro(self, st, dt, first):
+        c = self.sh.display.canvas
+        c.blit(self._grad_bg(), (0, 0))
+        cx, cy = VIRTUAL_W / 2, 250
+        self._rays(c, cx, cy, st, alpha=34)
+        add_glow(c, cx, cy, 480, (210, 150, 60), 0.32)
+        logo = brand_scaled("logo", w=780)
+        if logo is not None:
+            c.blit(logo, (cx - logo.get_width() / 2, cy - logo.get_height() / 2))
+        q = 0.5 + 0.5 * math.sin(st * 5)
+        b = pygame.Rect(0, 0, 440, 88)
+        b.center = (int(cx), 500)
+        add_glow(c, b.centerx, b.centery, 260, GREEN, 0.18 + 0.12 * q)
+        c.blit(_button_body(b.w, b.h, (60, 150, 92), q, 22), b.topleft)
+        pygame.draw.rect(c, (190, 255, 210), b, width=3, border_radius=22)
+        draw_text(c, _tc("ŞİMDİ SIRA SENDE!", "YOUR TURN NOW!"), b.center, int(36 + 3 * q), WHITE,
+                  bold=True, center=True)
+        draw_text(c, _tc("Hayatta kal. Vur. BONKla.", "Survive. Shoot. BONK."), (cx, 590), 24,
+                  (236, 222, 196), bold=True, center=True)
+        for i in range(50):
+            x = (i * 131.3 + math.sin(st + i) * 20) % VIRTUAL_W
+            y = (st * (40 + i % 5 * 12) + i * 57) % VIRTUAL_H
+            blit_disc(c, x, y, 1.5 + i % 3, (255, 255, 255), 190)
+
+
+# Reklamın süresi turun süresidir (sayaç, ödül ve ilerleme çubuğu buna bakar).
+AD_LENGTH = GameTour.LENGTH
+
+
 class App:
-    def __init__(self):
-        pygame.init()
-        self.save = SaveManager()
-        MASTERY_SAVE[0] = self.save      # Player ustalığı buradan okur
-        global audio
-        audio = AudioManager(self.save.data["settings"])
-        self.steam = SteamBridge()
+    def __init__(self, shadow_of=None):
+        # GÖLGE KİP (v3.26): shadow_of verilirse bu App gerçek oyunun
+        # YANINDA çalışan ikinci bir örnektir (bkz. GameTour — oyun turu
+        # reklamı). Kaydın KOPYASIYLA çalışır; ekran açmaz, sesi/müziği
+        # yeniden kurmaz, gerçek hesaba ve sunucuya dokunmaz.
+        self.shadow = shadow_of is not None
+        if not self.shadow:
+            pygame.init()
+            self.save = SaveManager()
+            MASTERY_SAVE[0] = self.save      # Player ustalığı buradan okur
+            global audio
+            audio = AudioManager(self.save.data["settings"])
+            self.steam = SteamBridge()
+        else:
+            self.save = _AdSave(shadow_of.save.data)
+            self.steam = _NullSteam()
         self.ach = AchievementManager(self.save, self.steam)
         # Eski kayıtlarda hak edilmiş ama hiç açılmamış başarımları aç.
         self.ach.check_stats()
-        self.display = Display(self.save)
-        # WINDOWS İMLECİ GİZLİ: oyun kendi nişangahını/okunu çiziyor
-        # (bkz. draw_cursor). Sistem imleci açık kalsaydı nişangahın yanında
-        # ikinci bir ok görünürdü.
-        try:
-            pygame.mouse.set_visible(False)
-        except Exception:
-            pass
+        if not self.shadow:
+            self.display = Display(self.save)
+            # WINDOWS İMLECİ GİZLİ: oyun kendi nişangahını/okunu çiziyor
+            # (bkz. draw_cursor). Sistem imleci açık kalsaydı nişangahın
+            # yanında ikinci bir ok görünürdü.
+            try:
+                pygame.mouse.set_visible(False)
+            except Exception:
+                pass
+        else:
+            self.display = _TourDisplay()
         self.clock = pygame.time.Clock()
         self.bg = Background()
         self.t = 0.0
@@ -25111,9 +26060,10 @@ class App:
         self.shop_ui = RunShopOverlay()
         # L ile açılan sol alt sohbet/komut kutusu (hile kodu da buradan).
         self.chat = ChatConsole()
-        self.online = OnlineClient(ONLINE_API_URL)
+        self.online = OnlineClient(ONLINE_API_URL) if not self.shadow else _TourOnline()
         # ---- HESAP ----
-        self.account = AccountClient(ONLINE_API_URL, self.save)
+        self.account = (AccountClient(ONLINE_API_URL, self.save) if not self.shadow
+                        else _TourAccount())
         self.key_waiting = None       # TUŞ ATAMA: hangi eylem tuş bekliyor
         self.key_error = ""           # "bu tuş zaten kullanılıyor" gibi
         self.login_mode = "in"        # "in" = giriş, "up" = kayıt
@@ -25169,11 +26119,12 @@ class App:
         self.world_lb_t = 0.0         # DÜNYA SIRALAMASI beliriş animasyonu
         # KONTROLCÜ: pad takılıysa menülerde sanal imleç sürer, oyunda
         # çift çubukla oynatır (bkz. Gamepad).
-        self.pad = Gamepad()
+        self.pad = Gamepad() if not self.shadow else _NullPad()
         self._mouse_prev = pygame.mouse.get_pos()
         self.menu_buttons = []
         self.build_menu_buttons()
-        audio.set_music("menu")
+        if not self.shadow:
+            audio.set_music("menu")
 
     def build_menu_buttons(self):
         cx = VIRTUAL_W / 2
@@ -26898,7 +27849,8 @@ class App:
         if self.ad_play is not None or not self.rewards.ad_ready():
             return False
         try:
-            self.house_ad = HouseAd(self.save)
+            # v3.26: reklam = 90 sn'lik OYUN TURU (izleyen oyunu öğrenir).
+            self.house_ad = GameTour(self)
         except Exception as e:          # film kurulamazsa ödül yine verilebilsin
             print("Reklam filmi kurulamadı:", e)
             self.house_ad = None
@@ -26914,7 +27866,10 @@ class App:
         got = self.rewards.grant_ad() if (reward and self.ad_done) else 0
         self.ad_play = None
         self.ad_done = False
-        self.house_ad = None            # sahte koşular bellekten atılsın
+        ad = getattr(self, "house_ad", None)
+        if ad is not None and hasattr(ad, "close"):
+            ad.close()
+        self.house_ad = None            # gölge oyun bellekten atılsın
         if got:
             self._spawn_reward_fx(VIRTUAL_W / 2, VIRTUAL_H / 2, got)
 
