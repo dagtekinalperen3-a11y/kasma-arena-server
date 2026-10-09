@@ -21,8 +21,16 @@
      dalgaya ~12, 25. dalgaya ~15 dakikada gelinir (eskiden 5 dakikada 17).
      Oyuncu dalgalara daha yüksek seviyeyle varır; 13+ dalga hasarı biraz
      yumuşadı (LATE_DMG_COEF).
-   * BİLGELİK KİTABI kartında yazdığı gibi HER SEVİYEDE +%15 (Lv.15 +%225).
-     50. seviyeden sonraki üssel XP duvarı kalktı.
+   * SEVİYE / ALTIN DENGESİ ("20. dalgada 100 level olmasın"): 1-15. dalgada
+     tecrübe %45, altın %30 az (seviye sayısı ~%30 düşer); 16-20. dalgada
+     kısıntı yavaşça %20'ye iner; CEHENNEMDE tecrübe %35 BONUSLU
+     (econ_wave_factor). Bilgelik kitabı seviye başı +%8, Altın kitabı
+     +%7; açgözlülük/erişim çekirdekleri azalan getiriyle artar.
+   * SEVİYE TAŞI artık mıknatıstan FAZLA düşemez (en fazla mıknatıs kadar).
+   * KIRBAÇ alanı küçüldü, büyümesi geç seviyelere kaydı (whip_growth,
+     WHIP_COUNT_STEPS); tüm silahların büyümesi daha doğrusal — 15+ silah
+     seviyesi cehennemde güç verir (WEAPON_GROWTH_FLOOR/EXP).
+   * 50. seviyeden sonraki üssel XP duvarı kalktı.
    * NADİR KİTAP: nadir kitap alınana kadar her 5 seviyede elde garanti bir
      nadir kart; koşu başına yine 1 nadir kitap.
    * ALTIN ve TECRÜBE ARTIK HİÇ KAYBOLMAZ (cehenneme geçerken de cebe yazılır).
@@ -1975,9 +1983,9 @@ STRINGS.update({
     "b.r_regen.name": _T("Şifa Kitabı", "Book of Healing", "Libro de Sanación", "Buch der Heilung", "Книга Исцеления"),
     "b.r_regen.desc": _T("Saniyede 0,45 can yeniler", "Regenerates 0.45 health per second", "Regenera 0,45 de vida por segundo", "Regeneriert 0,45 Leben pro Sekunde", "Восстанавливает 0,45 здоровья в секунду"),
     "b.r_coin.name": _T("Altın Kitabı", "Book of Gold", "Libro del Oro", "Buch des Goldes", "Книга Золота"),
-    "b.r_coin.desc": _T("Topladığın altını %15 artırır", "Increases gold you pick up by 15%", "Aumenta el oro recogido un 15%", "Erhöht aufgesammeltes Gold um 15%", "Увеличивает собранное золото на 15%"),
+    "b.r_coin.desc": _T("Her seviyede topladığın altını +%7 artırır", "Each level: +7% gold picked up", "Cada nivel: +7% de oro recogido", "Jede Stufe: +7% aufgesammeltes Gold", "Каждый уровень: +7% к собранному золоту"),
     "b.r_xp.name": _T("Bilgelik Kitabı", "Book of Wisdom", "Libro de la Sabiduría", "Buch der Weisheit", "Книга Мудрости"),
-    "b.r_xp.desc": _T("Her seviyede kazandığın tecrübeyi +%15 artırır", "Each level: +15% experience gained", "Cada nivel: +15% de experiencia", "Jede Stufe: +15% Erfahrung", "Каждый уровень: +15% к опыту"),
+    "b.r_xp.desc": _T("Her seviyede kazandığın tecrübeyi +%8 artırır", "Each level: +8% experience gained", "Cada nivel: +8% de experiencia", "Jede Stufe: +8% Erfahrung", "Каждый уровень: +8% к опыту"),
     "b.r_mag.name": _T("Mıknatıs Kitabı", "Book of Magnetism", "Libro del Imán", "Buch des Magneten", "Книга Магнита"),
     "b.r_mag.desc": _T("Toplama menzilini %20 artırır", "Increases pickup range by 20%", "Aumenta el radio de recogida un 20%", "Erhöht die Aufsammelreichweite um 20%", "Увеличивает радиус подбора на 20%"),
     "b.r_vamp.name": _T("Sülük Kitabı", "Book of Leeching", "Libro de la Sanguijuela", "Buch des Blutegels", "Книга Пиявки"),
@@ -2028,7 +2036,7 @@ STRINGS.update({
  "s.core_guard.name": _T("Koruma Çekirdeği","Guard Core","Núcleo de Guardia","Schutzkern","Ядро Защиты"),
  "s.core_guard.desc": _T("Zırh +%2 (tavanı yok — zırh üst sınırına kadar)","Armour +2% (no cap — up to the armour ceiling)","Armadura +2% (sin tope — hasta el límite)","Rüstung +2% (kein Limit — bis zur Obergrenze)","Броня +2% (без предела — до потолка брони)"),
  "s.core_greed.name": _T("Talan Çekirdeği","Greed Core","Núcleo de Codicia","Gierkern","Ядро Жадности"),
- "s.core_greed.desc": _T("Altın +%12, deneyim +%8 (tavanı yok)","Gold +12%, XP +8% (no cap)","Oro +12%, XP +8% (sin tope)","Gold +12%, EP +8% (kein Limit)","Золото +12%, опыт +8% (без предела)"),
+ "s.core_greed.desc": _T("Altın +%12, deneyim +%8 (her alımda biraz azalır)","Gold +12%, XP +8% (diminishing)","Oro +12%, XP +8% (decreciente)","Gold +12%, EP +8% (abnehmend)","Золото +12%, опыт +8% (убывает)"),
  "s.core_reach.name": _T("Mıknatıs Çekirdeği","Magnet Core","Núcleo Imán","Magnetkern","Ядро Магнита"),
  "s.core_reach.desc": _T("Toplama menzili +%14, deneyim +%6 (tavanı yok)","Pickup range +14%, XP +6% (no cap)","Radio de recogida +14%, XP +6% (sin tope)","Aufsammelreichweite +14%, EP +6% (kein Limit)","Радиус подбора +14%, опыт +6% (без предела)"),
  "s.quickdraw.name": _T("Seri El","Quickdraw","Mano Rápida","Schnellzug","Быстрая Рука"),
@@ -9794,9 +9802,9 @@ SHOP_ITEMS = [
      "cost": 85,  "cost_mult": 1.29, "max": 999, "endless": True, "icon": "clover", "color": (230, 220, 120), "tier": 1, "cat": "core"},
     {"key": "core_guard",    "name": "Koruma Çekirdeği",    "desc": "Zırh +%2 (tavanı yok — zırh üst sınırına kadar)",
      "cost": 90,  "cost_mult": 1.32, "max": 999, "endless": True, "icon": "shield", "color": (160, 180, 220), "tier": 1, "cat": "core"},
-    {"key": "core_greed",    "name": "Talan Çekirdeği",     "desc": "Altın +%12, deneyim +%8 (tavanı yok)",
+    {"key": "core_greed",    "name": "Talan Çekirdeği",     "desc": "Altın +%12, deneyim +%8 (her alımda biraz azalır)",
      "cost": 65,  "cost_mult": 1.25, "max": 999, "endless": True, "icon": "coin",   "color": (235, 195, 95),  "tier": 1, "cat": "core"},
-    {"key": "core_reach",    "name": "Mıknatıs Çekirdeği",  "desc": "Toplama menzili +%14, deneyim +%6 (tavanı yok)",
+    {"key": "core_reach",    "name": "Mıknatıs Çekirdeği",  "desc": "Toplama menzili +%14, deneyim +%6 (deneyim payı azalır)",
      "cost": 70,  "cost_mult": 1.26, "max": 999, "endless": True, "icon": "magnet", "color": (150, 220, 255), "tier": 1, "cat": "core"},
 
     # ---- ARENA GENİŞLEMESİ ---------------------------------------------
@@ -9997,12 +10005,18 @@ def apply_shop_item(player, key):
         player.base_armor = clamp(player.base_armor + 0.02, 0, 0.5)
         return
     if key == "core_greed":
-        player.run_coin_mult += 0.12
-        player.run_xp_mult += 0.08
+        # v3.28b: AZALAN GETİRİ. "Tavanı yok" olduğu için altın kitabıyla
+        # birlikte kartopu gibi büyüyordu (altın -> daha çok çekirdek -> daha
+        # çok altın ve tecrübe). İlk alımlar neredeyse tam değeri verir,
+        # toplam altın +%48'e, tecrübe +%32'ye yaklaşır ama geçemez.
+        lv = max(1, int(player.shop_levels.get("core_greed", 1)))
+        player.run_coin_mult += stack_bonus(0.12, lv, 4.0) - stack_bonus(0.12, lv - 1, 4.0)
+        player.run_xp_mult += stack_bonus(0.08, lv, 4.0) - stack_bonus(0.08, lv - 1, 4.0)
         return
     if key == "core_reach":
+        lv = max(1, int(player.shop_levels.get("core_reach", 1)))
         player.run_pickup_mult += 0.14
-        player.run_xp_mult += 0.06
+        player.run_xp_mult += stack_bonus(0.06, lv, 4.0) - stack_bonus(0.06, lv - 1, 4.0)
         return
     if key == "fire":
         player.fire_level += 1
@@ -10310,12 +10324,12 @@ BOOKS = [
     # --- YENİ (v3.16): kazanç kitapları. Oyuncu artık seviye atlama ekranında
     #     "güç mü, ekonomi mi?" diye düşünüyor; ikisi de aynı karttan geliyor.
     {"key": "r_coin", "name": "Altın Kitabı",
-     "desc": "Topladığın altını %15 artırır",
+     "desc": "Her seviyede topladığın altını +%7 artırır",
      "color": GOLD, "icon": "coin", "rare": False,
      "unlock": dict(text="Kasanı doldur: tek koşuda 1.500 altın",
                     reqs=[rq_stat("best_run_gold", 1500, "Tek koşuda 1.500 altın kazan")])},
     {"key": "r_xp", "name": "Bilgelik Kitabı",
-     "desc": "Her seviyede kazandığın tecrübeyi +%15 artırır",
+     "desc": "Her seviyede kazandığın tecrübeyi +%8 artırır",
      "color": PURPLE, "icon": "gem", "rare": False,
      "unlock": dict(text="Tecrübeyle büyü: bir koşuda 10. seviyeye çık",
                     reqs=[rq_ach("lvl10", "«Tecrübeli» başarımını aç"),
@@ -10931,7 +10945,45 @@ XP_CURVE_BANDS = (
     (None, 1.012, 40),
 )
 # BİLGELİK KİTABI: her seviyede tecrübe kazancına eklenen pay (bkz. r_xp).
-WISDOM_XP_PER_LEVEL = 0.15
+# v3.28b: 0.15 -> 0.08. "20. dalgada 100. seviye oldum; adam kitabı fulleyip
+# 100 seviyeyle cehenneme girmesin." Lv.15'te +%225 yerine +%120.
+WISDOM_XP_PER_LEVEL = 0.08
+# ALTIN KİTABI: her seviyede altın kazancına eklenen pay (bkz. r_coin).
+# v3.28b: 0.15 -> 0.07 ("altın kitabıyla bir anda zengin oluyorum").
+GOLD_BOOK_PER_LEVEL = 0.07
+
+# DALGAYA GÖRE TECRÜBE ve ALTIN (v3.28b — "ilk 15 dalga için %30 nerfle").
+# Dalgaların asgari süresi geldiğinden beri (wave_min_time) oyuncu her dalgada
+# eskisinden çok daha fazla kesiyor; seviye ve altın oyunun akışını geçmişti
+# (20. dalgada 100. seviye). Hedef SEVİYENİN %30 düşmesi: ilk seviyeler ucuz
+# olduğu için tecrübeyi %30 kısmak seviyeyi yalnızca ~%13 düşürüyordu
+# (başsız bot, 15. dalga: 30 -> 26). Seviyenin gerçekten %30 düşmesi için
+# akan tecrübe %45 kısılır. Yaratıktan düşen tecrübe ve altın:
+#   1-15. dalga  : tecrübe %45, altın %30 az (ECON_*_EARLY)
+#   16-20. dalga : kısıntı yavaşça %20'ye iner (ECON_LATE) — geç dalgalarda
+#                  zaten kesmek zor, ikinci bir duvar olmasın
+#   CEHENNEM     : tecrübe BONUSLU (ECON_HELL_XP) — silahlar orada 15'ten
+#                  25'e büyüsün, oyuncu cehennemde güçlensin; altın tam
+# Seviye taşı (anında bir seviye) bundan etkilenmez; ELMAS kazancı da
+# etkilenmez (bkz. gem_coins).
+ECON_XP_EARLY = 0.55
+ECON_GOLD_EARLY = 0.70
+ECON_LATE = 0.80
+ECON_HELL_XP = 1.35
+ECON_EARLY_UNTIL = 15
+ECON_RAMP_WAVES = 5
+
+
+def econ_wave_factor(wave, biome="arena", kind="gold"):
+    """O dalgada yaratıktan düşen tecrübe ("xp") / altın ("gold") çarpanı."""
+    if biome == "hell":
+        return ECON_HELL_XP if kind == "xp" else 1.0
+    early = ECON_XP_EARLY if kind == "xp" else ECON_GOLD_EARLY
+    w = int(wave)
+    if w <= ECON_EARLY_UNTIL:
+        return early
+    k = clamp((w - ECON_EARLY_UNTIL) / float(ECON_RAMP_WAVES), 0.0, 1.0)
+    return early + (ECON_LATE - early) * k
 
 
 def stack_bonus(per, lvl, soft=4.0):
@@ -11477,7 +11529,7 @@ class Player:
             self.run_armor_bonus += 0.025
             self.max_hp += 10
             self.hp = min(self.max_hp, self.hp + 10)
-        elif key == "r_coin": self.run_coin_mult += 0.15
+        elif key == "r_coin": self.run_coin_mult += GOLD_BOOK_PER_LEVEL
         elif key == "r_xp":
             # BİLEŞİK KİTAP (v3.22). Diğer 26 kitap doğrudan güç verir; bu
             # kitap DAHA FAZLA KİTAP verir, yani erken alınan seviyeleri
@@ -11492,13 +11544,10 @@ class Player:
             # += ile yazıyor (bkz. 7642/7703/7712/7747/7769). Bu yüzden
             # ATAMA yapılamaz, yoksa onların payı silinir; o seviyenin
             # payı kadar EKLENİR.
-            # v3.28 — "Bilgelik kitabı çalışmıyor mu? %250 yaptım, yine az
-            # seviye atlıyorum." Kitap, kartında yazanı (+%15) yalnızca ilk
-            # seviyede veriyordu; azalan getiri yüzünden 5. seviyeden sonra
-            # her seviye +%1-2 ediyordu, yani kart neredeyse boştu. Artık
-            # kartın dediği gibi HER SEVİYEDE +%15 (Lv.15'te +%225). Asıl
-            # duvar da kalktı: 50. seviyeden sonraki eğri artık üssel değil
-            # (bkz. XP_CURVE_BANDS), yani çarpan geç seviyelerde de işliyor.
+            # v3.28 — "Bilgelik kitabı çalışmıyor mu?" Kitap, kartında yazanı
+            # yalnızca ilk seviyede veriyordu (azalan getiri). Artık kartın
+            # dediği gibi HER SEVİYEDE aynı pay (WISDOM_XP_PER_LEVEL).
+            # v3.28b: pay %15 -> %8 ("kitabı fulleyip 100 seviyeyle girmesin").
             self.run_xp_mult += WISDOM_XP_PER_LEVEL
         elif key == "r_regen": self.run_regen_bonus += 0.45
         elif key == "r_crit": self.run_crit_bonus += 0.035
@@ -14310,13 +14359,20 @@ WEAPON_COUNT_STEPS = (1, 2, 3, 3, 4, 4, 4, 5, 5, 5,
 # tek hedef DPS 5.95'ten 17.84'e sıçrıyordu (x3), hem de tam son seviyede.
 # 8 parçada aralık 45 derece, yani yarım açıdan (41) büyük: binme yok.
 WHIP_COUNT_MAX = 8
+# v3.28b: kırbaç SAYISI ayrı ve yavaş artar. Eskiden 3. seviyede 3 kırbaç
+# vardı ve oyuncunun çevresi daha ilk dakikalarda tamamen taranıyordu.
+# 8. seviyede 4, 15. seviyede 6, 25. seviyede 8 (tavan).
+WHIP_COUNT_STEPS = (1, 1, 2, 2, 3, 3, 4, 4, 4, 4,
+                    5, 5, 5, 5, 6, 6, 6, 6, 6, 7,
+                    7, 7, 8, 8, 8)
 
 
 def weapon_count(lvl, key=None):
     """Silahın o seviyede kaç parça çıkardığı (bkz. WEAPON_COUNT_STEPS)."""
-    n = WEAPON_COUNT_STEPS[clamp(int(lvl) - 1, 0, len(WEAPON_COUNT_STEPS) - 1)]
     if key == "whip":
-        n = min(n, WHIP_COUNT_MAX)
+        n = WHIP_COUNT_STEPS[clamp(int(lvl) - 1, 0, len(WHIP_COUNT_STEPS) - 1)]
+        return min(n, WHIP_COUNT_MAX)
+    n = WEAPON_COUNT_STEPS[clamp(int(lvl) - 1, 0, len(WEAPON_COUNT_STEPS) - 1)]
     return n
 
 
@@ -14340,8 +14396,14 @@ def weapon_count(lvl, key=None):
 # payını korur (growth(8): 11.54 -> 11.23, farkı hissedilmez) ama son beş
 # seviye artık +%2.0, +%1.9, +%1.7, +%1.5, +%1.4 verir: eğim sabit. Toplam
 # (growth(25) = 24) değişmediği için hiçbir silah topluca güçlenmez.
-WEAPON_GROWTH_EXP = 2.4
-WEAPON_GROWTH_FLOOR = 0.35      # her seviyenin doğrusal olarak aldığı pay
+# v3.28b — "CEHENNEMDE GÜÇLÜ OLMAMIZ LAZIM". Eğri fazla ÖNDEN yüklüydü:
+# 15. seviyede büyümenin %77'si alınmış oluyordu, yani oyuncu cehenneme
+# (silahlar ~15. seviyedeyken) girdiğinde 15 -> 25 arası yalnızca %23 güç
+# veriyordu. Doğrusal pay artırıldı: 15. seviyede %69, son on seviye %31.
+# İlk seviyeler biraz yavaşladı (seviye eğrisi de zaten yavaşladı), büyüme
+# cehenneme kaydı. Toplam (growth(25) = 24) aynı.
+WEAPON_GROWTH_EXP = 2.2
+WEAPON_GROWTH_FLOOR = 0.60      # her seviyenin doğrusal olarak aldığı pay
 
 
 def weapon_growth(lvl):
@@ -14427,12 +14489,22 @@ SHOE_LIFE_PER_LEVEL = 0.06      # 5. seviyeden sonra her seviyede eklenen saniye
 # mesafesi artsın" dedi; eski eğride 1. seviye zaten uzundu ve 25 seviye boyunca
 # ancak %48 uzuyordu. Yeni eğride 1. seviye %18 daha kısa, 25. seviye ise iki
 # katından fazla: 158 -> ~350 px.
-WHIP_LEN = 158.0                # 1. seviyedeki erişim
-WHIP_LEN_PER_LEVEL = 8.0        # 25. seviyede ~350 px
-# Taradığı yarım açı da artık seviyeyle açılıyor: dar başlar, genişler.
-WHIP_ARC = 0.50                 # 1. seviyedeki yarım açı (radyan)
-WHIP_ARC_PER_LEVEL = 0.009      # 25. seviyede ~0.72 rad (~82 derecelik koni)
-WHIP_ARC_MAX = 0.74
+# v3.28b — "KIRBAÇ ÇOK GÜÇLÜ, ALANINI KÜÇÜLT; BÜYÜME CEHENNEMDE OLSUN".
+# Alan üç yerden büyüyordu ve üçü de ÖNDEN yüklüydü: erişim (158 -> 350),
+# koni (~57 -> ~82 derece) ve kırbaç SAYISI (3. seviyede 3 kırbaç = etrafın
+# tamamı). Artık:
+#   * erişim 155'ten başlar, 15. seviyede ~240, 25'te ~320 px,
+#   * koni ~54 dereceden başlar, 25'te ~82 derece,
+#   * kırbaç sayısı yavaş artar (bkz. WHIP_COUNT_STEPS),
+#   * erişim ve koni GEÇ büyür (whip_growth): asıl alan 15. seviyeden sonra,
+#     yani cehennemde açılır.
+# Toplam taranan alan eskisinin: 8. sv %40, 15. sv %55, 20. sv %70, 25. sv %86.
+WHIP_LEN = 155.0                # 1. seviyedeki erişim
+WHIP_LEN_PER_LEVEL = 7.0        # whip_growth puanı başına (25. sv: ~320 px)
+WHIP_ARC = 0.47                 # 1. seviyedeki yarım açı (radyan)
+WHIP_ARC_PER_LEVEL = 0.0105     # 25. seviyede ~0.72 rad (~82 derecelik koni)
+WHIP_ARC_MAX = 0.72
+WHIP_GROWTH_EXP = 1.3           # >1: büyüme geç seviyelere yüklenir
 WHIP_KB = 540.0                 # savurma kuvveti
 # Kırbaç artık baktığın yöne doğru SALLANARAK atılıyor. Ucu, hedef açının
 # bir yanından öbürüne WHIP_SWING kadar savrulur; bu değer bilerek
@@ -14464,14 +14536,24 @@ CLOAK_DUR = 5.0                 # görünmez kalma süresi (saniye)
 CLOAK_DUR_PER_LEVEL = 0.10      # her seviyede süreye eklenen saniye
 
 
+def whip_growth(lvl):
+    """Kırbacın ALAN büyüme puanı (0 .. 24): GEÇ yüklü (v3.28b).
+
+    15. seviyede ~12, 20'de ~17.7, 25'te 24 — alanın çoğu cehennemde açılır.
+    (Hasar ortak weapon_growth ile büyümeye devam eder.)"""
+    top = float(WEAPON_MAX_LEVEL - 1)
+    x = clamp((float(lvl) - 1.0) / top, 0.0, 1.0)
+    return top * x ** WHIP_GROWTH_EXP
+
+
 def whip_arc(lvl):
-    """KIRBACIN taradığı yarım açı — dar başlar, seviyeyle genişler."""
-    return min(WHIP_ARC_MAX, WHIP_ARC + WHIP_ARC_PER_LEVEL * weapon_growth(lvl))
+    """KIRBACIN taradığı yarım açı — dar başlar, geç seviyelerde genişler."""
+    return min(WHIP_ARC_MAX, WHIP_ARC + WHIP_ARC_PER_LEVEL * whip_growth(lvl))
 
 
 def whip_reach(lvl):
-    """KIRBACIN erişimi — seviyeyle belirgin biçimde uzar."""
-    return WHIP_LEN + WHIP_LEN_PER_LEVEL * weapon_growth(lvl)
+    """KIRBACIN erişimi — geç seviyelerde belirgin biçimde uzar."""
+    return WHIP_LEN + WHIP_LEN_PER_LEVEL * whip_growth(lvl)
 
 
 def emanet_radius(lvl):
@@ -19643,6 +19725,8 @@ class RunState:
         self.level_kills = 0        # son seviye taşından bu yana öldürme
         self.magnet_kills = 0       # son mıknatıstan bu yana yapılan öldürme
         self.magnets_taken = 0      # bu koşuda toplanan mıknatıs sayısı
+        self.magnets_dropped = 0    # bu koşuda düşen mıknatıs (seviye taşı bunu geçemez)
+        self.level_drops_total = 0  # bu koşuda düşen seviye taşı
         # Koşu bitince doldurulur: bu koşuda kilidi açılan silah ve kitaplar.
         self.new_weapons = []
         self.new_books = []
@@ -20498,7 +20582,8 @@ class RunState:
                     self.pending_levelups += lv
             elif pu.kind == "coin":
                 self.coins_earned += pu.value
-                self.gem_coins += pu.value / coin_drop_scale(self.biome)
+                self.gem_coins += pu.value / (coin_drop_scale(self.biome)
+                                              * econ_wave_factor(self.waves.wave, self.biome))
                 self.gold_wallet += pu.value
             pu.collected = True
 
@@ -21223,8 +21308,10 @@ class RunState:
             p.soul_timer = 5.0
         p.register_kill_for_frenzy()
         combo_mult = self.combo.multiplier()
-        coin_gain = scaled_coin_gain(e.coin, p.eff_coin_mult(), self.biome)
-        xp_gain = e.xp
+        coin_gain = scaled_coin_gain(e.coin, p.eff_coin_mult()
+                                     * econ_wave_factor(self.waves.wave, self.biome, "gold"),
+                                     self.biome)
+        xp_gain = e.xp * econ_wave_factor(self.waves.wave, self.biome, "xp")
         # Altın ARTIK ölüm anında verilmiyor: yere düşen parayı toplaman gerek.
         # (Kazanç, Pickup "coin" toplandığında işleniyor.)
         self.score += int(e.score * combo_mult)
@@ -21236,10 +21323,18 @@ class RunState:
         # bkz. magnet_drop_chance). Aynı anda yerde birden fazla durmasın.
         # SEVİYE TAŞI: mıknatısla AYNI şans eğrisi, AYRI sayaç — ikisi
         # birbirinin şansını yemesin ama aynı nadirlikte kalsınlar.
-        self.level_kills += 1
-        if (not self.level_drops
+        # v3.28b: "çok XP (seviye) taşı düşüyor, mıknatısla aynı olsun".
+        # Şans eğrisi zaten aynıydı ama ölçümde taş mıknatıstan ~%27 SIK
+        # düşüyordu (mıknatıs yerde daha uzun kalıyor, o arada yenisi
+        # düşemiyor). Artık bir koşuda düşen taş sayısı düşen mıknatıs
+        # sayısını GEÇEMEZ; sınırdayken taşın sayacı da işlemez.
+        can_stone = self.level_drops_total < self.magnets_dropped
+        if can_stone:
+            self.level_kills += 1
+        if (can_stone and not self.level_drops
                 and random.random() < magnet_drop_chance(self.level_kills)):
             self.level_kills = 0
+            self.level_drops_total += 1
             self.level_drops.append(LevelDrop(e.x, e.y))
             self.fx.popup(e.x, e.y - 58, "SEVİYE TAŞI!", LEVEL_COLOR, 26, life=2.2)
             self.fx.ring(e.x, e.y, LEVEL_COLOR, n=30, speed=300, life=0.8, r=4)
@@ -21249,6 +21344,7 @@ class RunState:
         self.magnet_kills += 1
         if not self.magnets and random.random() < magnet_drop_chance(self.magnet_kills):
             self.magnet_kills = 0
+            self.magnets_dropped += 1
             self.magnets.append(MagnetDrop(e.x, e.y))
             self.fx.popup(e.x, e.y - 58, "MIKNATIS DÜŞTÜ!", MAGNET_COLOR, 26, life=2.2)
             self.fx.ring(e.x, e.y, MAGNET_COLOR, n=30, speed=300, life=0.8, r=4)
@@ -21565,7 +21661,9 @@ class RunState:
                 else:
                     # Altın yalnızca burada, yani parayı gerçekten TOPLAYINCA kazanılır.
                     self.coins_earned += pu.value
-                    self.gem_coins += pu.value / coin_drop_scale(self.biome)
+                    # elmas, dalga kısıntısından ETKİLENMEZ (bkz. econ_wave_factor)
+                    self.gem_coins += pu.value / (coin_drop_scale(self.biome)
+                                                  * econ_wave_factor(self.waves.wave, self.biome))
                     self.gold_wallet += pu.value
                     self.fx.popup(pu.x, pu.y - 10, f"+{pu.value}", GOLD, 14, life=0.5)
                     sfx("coin", 0.4, 0.02)
