@@ -9962,13 +9962,23 @@ XP_BASE_NEED = 22
 # ilk seviyeler de son seviyeler de aynı oranda hızlandı.
 XP_GAIN_BUFFS = (1.15, 1.20)
 XP_GAIN_SCALE = 1.40 * XP_GAIN_BUFFS[0] * XP_GAIN_BUFFS[1]
+# v3.27 — 15. SEVİYEDEN SONRA KİLİT KALKTI. "15'ten sonra çok yavaşlıyor,
+# xp'yi %200 yapsak da atlayamıyoruz; 25. dalgada 50. seviye civarı olayım."
+# Ölçüm (başsız bot, tools/combo_sim.py, 4 farklı takım): 25. dalgaya kadar
+# toplanan tecrübe ~48-57 bin. Eski bantlarda bu ~31. seviye ediyordu, çünkü
+# 13-50 arası her seviye bir öncekinin %5,5-11,5 fazlasını istiyordu (50.
+# seviye toplam ~500 bin). XP çarpanını büyütmek bunu çözmüyordu: üssel
+# eğride her %100 ek tecrübe yalnızca birkaç seviye ediyor.
+# Artık 13-50 arası DOĞRUSAL: her seviye bir öncekinden yalnızca 34 tecrübe
+# fazla ister (13. sv ~875, 50. sv ~2.130). 50. seviyenin toplamı ~58 bin
+# (seviye gelince oyuncu güçlenip daha çok kestiği için 25. dalgadaki
+# tecrübe de ~58 bine çıkıyor) — yani 25. dalga civarı 50. seviye. İlk 12 seviye (açılış) AYNEN kaldı. 50'den sonrası yine
+# sertleşir ama eskisi kadar duvar değil (cehennemde seviye gelmeye devam eder).
 XP_CURVE_BANDS = (
     (6,    1.240, 8),
     (12,   1.190, 50),
-    (20,   1.115, 110),
-    (30,   1.080, 180),
-    (50,   1.055, 300),
-    (None, 1.185, 700),
+    (50,   1.000, 34),
+    (None, 1.100, 300),
 )
 
 
