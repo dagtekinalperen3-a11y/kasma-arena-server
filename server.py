@@ -735,6 +735,7 @@ MASTERY_TIERS = 5
 MASTERY_COSTS = {
     "m_dmg": (120, 1.60), "m_hp": (110, 1.60), "m_armor": (140, 1.65),
     "m_speed": (120, 1.60), "m_gem": (150, 1.70), "m_xp": (130, 1.65),
+    "m_luck": (130, 1.65),      # v3.29 UĞUR (kalıcı şans)
 }
 # Kurcalanmış bir istemcinin "kademe 10^9" yazıp sayıyla oynamasını
 # engeller; gerçek oyuncu bu sayıya hiçbir zaman yaklaşamaz (prestij
@@ -790,7 +791,7 @@ def _merge_mastery(old, new, gems_spent):
 PROGRESS_STATS = ("runs", "best_score", "total_kills", "total_time", "bosses",
                   "best_wave", "total_shots", "total_gold", "total_lifesteal",
                   "best_run_gold", "best_run_dashes", "best_run_shots",
-                  "total_bonk_hits")
+                  "total_bonk_hits", "total_chests")
 
 
 
