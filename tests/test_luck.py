@@ -90,9 +90,11 @@ def test_weapon_boost_damage():
     p = K.Player("default")
     w = K.WEAPON_BY_KEY["axe"]
     d0 = K.weapon_damage(p, w, 3)
-    p.add_weapon_boost("axe", K.rarity_boost(3))         # Epik: +%19,95
+    p.add_weapon_boost("axe", K.rarity_boost(3, "card"))  # Epik kart: +%10
     d1 = K.weapon_damage(p, w, 3)
-    assert abs(d1 / d0 - (1 + 0.07 * 2.85)) < 1e-6
+    assert abs(d1 / d0 - (1 + K.CARD_RARITY_BONUS[3])) < 1e-6
+    assert K.rarity_boost(0, "card") == 0.0                 # Yaygın kart: yalnızca seviye
+    assert K.rarity_boost(4, "chest") > K.rarity_boost(4, "card")
     for _ in range(40):
         p.add_weapon_boost("axe", K.rarity_boost(4))
     assert abs(p.weapon_boost["axe"] - K.WEAPON_BOOST_CAP) < 1e-9
@@ -141,17 +143,18 @@ def test_levelup_flow():
         run.start_levelup_choice()
         assert run.levelup_choices, "el boş"
         for c in run.levelup_choices:
-            if c["kind"] == "weapon" and not c["new"]:
-                assert "rarity" in c and abs(c["boost"] - K.rarity_boost(c["rarity"])) < 1e-9
+            if c["kind"] == "weapon":
+                # v3.30: YENİ silah kartı da kendi kademesini çeker
+                assert "rarity" in c and abs(c["boost"] - K.rarity_boost(c["rarity"], "card")) < 1e-9
                 seen_tiers.add(c["rarity"])
-            if c["kind"] == "weapon" and c["new"]:
-                assert "rarity" not in c
+            else:
+                assert "rarity" not in c                     # kitaplarda kademe yok
         # varsa yükseltme kartını seç
         idx = next((i for i, c in enumerate(run.levelup_choices)
                     if c["kind"] == "weapon" and not c["new"]), 0)
         run.choose_levelup(idx)
     assert len(seen_tiers) >= 2
-    assert p.weapon_boost.get("axe", 0) > 0
+    assert sum(p.weapon_boost.values()) > 0
     # çizim çökmesin (rozet + şans göstergesi)
     run.pending_levelups = 1
     run.start_levelup_choice()
@@ -226,7 +229,13 @@ def test_luck_content():
         s.shop_levels[key] = s.shop_levels.get(key, 0) + 1
         K.apply_shop_item(s, key)
     assert abs(s.eff_luck() - (0.08 + 0.10 + 0.25)) < 1e-9
-    assert K.SHOP_BY_KEY["core_luck"]["max"] == 5
+    # v3.30: Şans Çekirdeği tavansız ama azalan getirili (toplam +%56'ya yaklaşır)
+    assert K.SHOP_BY_KEY["core_luck"]["max"] >= 999
+    c = K.Player("default")
+    for i in range(60):
+        c.shop_levels["core_luck"] = i + 1
+        K.apply_shop_item(c, "core_luck")
+    assert 0.45 < c.eff_luck() < 0.56
     # ustalık
     sv = _save(mastery={"m_luck": 5})
     K.MASTERY_SAVE[0] = sv
