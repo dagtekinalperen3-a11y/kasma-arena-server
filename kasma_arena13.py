@@ -23,8 +23,8 @@
      yumuşadı (LATE_DMG_COEF).
    * BİLGELİK KİTABI kartında yazdığı gibi HER SEVİYEDE +%15 (Lv.15 +%225).
      50. seviyeden sonraki üssel XP duvarı kalktı.
-   * NADİR KİTAP: her 5 seviyede elde garanti bir nadir kart; koşu başına
-     3 nadir kitap.
+   * NADİR KİTAP: nadir kitap alınana kadar her 5 seviyede elde garanti bir
+     nadir kart; koşu başına yine 1 nadir kitap.
    * ALTIN ve TECRÜBE ARTIK HİÇ KAYBOLMAZ (cehenneme geçerken de cebe yazılır).
    * PELERİNLER artık titremiyor, yumuşakça dalgalanıyor (_cape_motion).
    * OTOMATİK PİLOT İNSAN GİBİ NİŞAN ALIYOR (reklam filmi ve tanıtım videosu):
@@ -10229,12 +10229,12 @@ def rq_weapon(weapon_key, text=None):
 # Bir koşuda taşınabilecek en fazla NORMAL kitap.
 MAX_RUN_BOOKS = 4
 # Bir koşuda alınabilecek en fazla NADİR kitap (dolunca havuz kapanır).
-# v3.28: 1 -> 3. "Nadir kitap hiç gelmiyor, her 5 seviyede gelsin." Nadir
-# kartın ağırlığı (5) normal kartların (11-18) yanında çok küçüktü ve kader
-# kilidi bir-ikisini de kapatıyordu: oyuncu çoğu koşuda hiç nadir kart
-# görmüyordu. Artık her RARE_BOOK_EVERY seviyede elde GARANTİ bir nadir kart
-# var (bkz. start_levelup_choice) ve koşu başına 3 nadir kitap alınabilir.
-MAX_RUN_RARE_BOOKS = 3
+# v3.28: "Nadir kitap hiç gelmiyor, her 5 seviyede gelsin." Nadir kartın
+# ağırlığı (5) normal kartların (11-18) yanında çok küçüktü ve kader kilidi
+# bir-ikisini de kapatıyordu: oyuncu çoğu koşuda hiç nadir kart görmüyordu.
+# Artık nadir kitap alınana kadar her RARE_BOOK_EVERY seviyede elde GARANTİ
+# bir nadir kart var (bkz. start_levelup_choice). Koşu başına sınır 1 kaldı.
+MAX_RUN_RARE_BOOKS = 1
 RARE_BOOK_EVERY = 5
 # Normal kitapların çıkabileceği en yüksek seviye.
 BOOK_MAX_LEVEL = 15
