@@ -1,6 +1,6 @@
 """
 =====================================================================
- ARENA BONK  —  v3.28   (eski adı: KASMA ARENA)
+ ARENA BONK  —  v3.29   (eski adı: KASMA ARENA)
  2D Top-Down Hayatta Kalma / Skor-Rekor Oyunu
  ---------------------------------------------------------------------
  Dalgalar halinde gelen düşmanlara karşı hayatta kal, nişan al, ateş et,
@@ -8,6 +8,31 @@
  patronları yen, rekorunu kır. Kaybedersen o koşuda aldıkların silinir.
  Elmasla kalıcı SKIN'ler al (her skinin kendi silahı, mermisi, efekti ve
  ÖZEL YETENEĞİ var).
+
+ v3.29 — ŞANS SİSTEMİ:
+   * YENİ STAT: ŞANS (kritik şansından AYRI). Seviye atlarken ve sandıklardan
+     daha yüksek KADEMELİ ödül çıkma ihtimalini artırır. Statlar panelinde
+     "Şans" satırı. Beş kademe: Yaygın x1 · Sıradışı x1,5 · Nadir x2 ·
+     Epik x2,85 · Efsanevi x4 (roll_rarity; Efsanevi en fazla %10).
+   * SANDIK: silah yine +1 seviye; ayrıca kademe çekilir ve silah KALICI
+     hasar kazanır (Yaygın +%7 ... Efsanevi +%28, silah başına en fazla
+     +%120). Efsanevi sandık silaha bir seviye daha verir. Kademeye göre
+     büyüyen gösteri ("EPİK • BALTA +%20 HASAR").
+   * SEVİYE ATLAMA: silah YÜKSELTME kartları kademe rozeti ve renkli kenarla
+     gelir (+%14 hasar gibi). Şans nadir kitap ağırlığını büyütür; bedava hak
+     bitse de şansla yenileme bedava olabilir. Ekranda "Şans: %X".
+   * ŞANSI BÜYÜTENLER: Şans Kitabı (Lv.10, seviye başı +%7,5), Dört Yapraklı
+     Yonca (nadir: +%40 ve her seviyede +%1,5), Şans Çekirdeği (market,
+     +%8 x5), Uğurlu Akçe'ye +%10, Kumarbazın Zarı (efsanevi: +%25, hız -%5),
+     UĞUR ustalığı (kalıcı), Çiçek Tacı / Kalp Gözlük / Orman Pelerini (+%5),
+     KURNAZ TİLKİ skini (+%5, her seviyede +%1). Şans mıknatısı da biraz
+     sıklaştırır (garanti eğrisi aynı).
+   * KİTAPLAR: İkinci Nefes Kitabı KALDIRILDI. Zaman Kitabı (dash -%10,
+     %45 yavaşlatma, -%35 hasar) ve Son Umut Kitabı (%40 canın altında -%35
+     hasar, +2 can/sn) güçlendi. Dev Kitabı azami can +250.
+   * İNFAZ DÜZELTMESİ: silah vuruşlarında tek-atma freni ve geç dalga/cehennem
+     zırhı infazı engelliyordu; artık her yerde çalışıyor ("İNFAZ!").
+   * Mıknatıs (~1/555 öldürme) ve seviye taşı (mıknatısın %70'i) daha seyrek.
 
  v3.28 ile gelenler (TL MAĞAZA, KENDİ PET'İN, TEMPO, PELERİN):
    * MAĞAZADA GERÇEK PARA (TL): elmas paketleri, premium skinler ve PET'ler
@@ -714,7 +739,7 @@ WEAPON_FX_LEGACY = {"full": 100, "dim": 32, "off": 0}
 # v3.26: oyunun adı ARENA BONK. (Kayıt klasörü "KasmaArena" olarak KALIYOR:
 # adı değiştirmek oyuncuların ilerlemesini kaybettirirdi; bkz. get_save_dir.)
 GAME_TITLE = "ARENA BONK"
-GAME_VERSION = "3.28"
+GAME_VERSION = "3.29"
 
 
 # =====================================================================
@@ -896,6 +921,11 @@ def cos_name(c):
     return LX(f"c.{c['id']}.name", c["name"])
 
 
+def perk_tr(txt):
+    """Skin/kıyafet perk satırı: çevirisi varsa ("perk.<metin>") onu verir."""
+    return LX("perk." + str(txt), txt)
+
+
 def cos_desc(c):
     return LX(f"c.{c['id']}.desc", c.get("desc", ""))
 
@@ -1015,6 +1045,8 @@ STRINGS = {
     "ult.inferno": _T("ALEV HALKASI", "FLAME RING", "ANILLO DE FUEGO", "FLAMMENRING", "ОГНЕННОЕ КОЛЬЦО"),
     "ults.inferno": _T("ALEV", "FLAME", "FUEGO", "FLAMME", "ОГОНЬ"),
     "ult.gold": _T("ALTIN DOKUNUŞ", "GOLDEN TOUCH", "TOQUE DORADO", "GOLDENE HAND", "ЗОЛОТОЕ КАСАНИЕ"),
+    "ult.lucky_fox": _T("TİLKİ KURNAZLIĞI", "FOX CUNNING", "ASTUCIA DE ZORRO", "FUCHSLIST", "ЛИСЬЯ ХИТРОСТЬ"),
+    "ults.lucky_fox": _T("TİLKİ", "FOX", "ZORRO", "FUCHS", "ЛИСА"),
     "ults.gold": _T("ALTIN", "GOLD", "ORO", "GOLD", "ЗОЛОТО"),
     "ult.prism": _T("PRİZMA PATLAMASI", "PRISM BURST", "ESTALLIDO PRISMA", "PRISMENSTOSS", "ПРИЗМЕННЫЙ ВЗРЫВ"),
     "ults.prism": _T("PRİZMA", "PRISM", "PRISMA", "PRISMA", "ПРИЗМА"),
@@ -1131,6 +1163,12 @@ STRINGS = {
     "mastery.m_gem.desc": _T("Koşu sonunda daha çok elmas", "More gems at the end of a run",
                              "Más gemas al final de la partida", "Mehr Edelsteine am Ende eines Laufs",
                              "Больше алмазов в конце забега"),
+    "mastery.m_luck.name": _T("UĞUR", "FORTUNE'S FAVOR", "BUENA ESTRELLA", "GLÜCKSSTERN", "ВЕЗЕНИЕ"),
+    "mastery.m_luck.desc": _T("Kalıcı Şans: daha yüksek kademeli kartlar ve sandıklar",
+                              "Permanent Luck: higher-tier cards and chests",
+                              "Suerte permanente: cartas y cofres de mayor rango",
+                              "Dauerhaftes Glück: hochstufigere Karten und Truhen",
+                              "Постоянная удача: карты и сундуки выше рангом"),
     "mastery.m_xp.name": _T("BİLGİ", "INSIGHT", "SABIDURÍA", "WISSEN", "ПОЗНАНИЕ"),
     "mastery.m_xp.desc": _T("Daha hızlı seviye atlarsın", "You level up faster",
                             "Subes de nivel más rápido", "Du steigst schneller auf",
@@ -2013,13 +2051,61 @@ STRINGS.update({
     "b.r_roar.name": _T("Kükreme Kitabı", "Book of the Roar", "Libro del Rugido", "Buch des Brüllens", "Книга Рыка"),
     "b.r_roar.desc": _T("BONK'ladığın düşmanlar korkup kaçar ve korkarken %30 fazla hasar alır", "Enemies you BONK panic and flee, taking 30% more damage while afraid", "Los enemigos golpeados huyen y reciben 30% más daño mientras temen", "Von BONK getroffene Gegner fliehen und erleiden dabei 30% mehr Schaden", "Враги после БОНК убегают и получают на 30% больше урона, пока в страхе"),
     "b.r_dashslow.name": _T("Zaman Kitabı", "Book of Time", "Libro del Tiempo", "Buch der Zeit", "Книга Времени"),
-    "b.r_dashslow.desc": _T("Dash attığında çevrendeki düşmanlar yavaşlar; yavaşlamış düşman sana %20 az hasar verir", "Dashing slows nearby enemies; slowed enemies deal 20% less damage to you", "Al impulsarte los enemigos se ralentizan; los ralentizados te hacen 20% menos daño", "Ein Dash verlangsamt nahe Gegner; verlangsamte Gegner verursachen 20% weniger Schaden", "Рывок замедляет врагов; замедлённые наносят на 20% меньше урона"),
-    "b.r_second_wind.name": _T("İkinci Nefes Kitabı", "Book of Second Wind", "Libro del Segundo Aliento", "Buch des zweiten Atems", "Книга Второго Дыхания"),
-    "b.r_second_wind.desc": _T("Öldüğünde bir kez yarı canla ayağa kalkarsın", "Revives you once at half health", "Te levanta una vez con media vida", "Richtet dich einmal mit halbem Leben wieder auf", "Один раз поднимает с половиной здоровья"),
+    "b.r_dashslow.desc": _T("Dash bekleme -%10; dash attığında çevrendeki düşmanlar %45 yavaşlar ve sana %35 az hasar verir", "Dash cooldown -10%; dashing slows nearby enemies by 45% and they deal 35% less damage to you", "Recarga del impulso -10%; al impulsarte los enemigos cercanos se ralentizan un 45% y te hacen 35% menos daño", "Dash-Abklingzeit -10%; ein Dash verlangsamt nahe Gegner um 45%, sie verursachen 35% weniger Schaden", "Перезарядка рывка -10%; рывок замедляет врагов на 45%, они наносят на 35% меньше урона"),
     "b.r_lasthope.name": _T("Son Umut Kitabı", "Book of Last Hope", "Libro de la Última Esperanza", "Buch der letzten Hoffnung", "Книга Последней Надежды"),
-    "b.r_lasthope.desc": _T("Canın %30'unun altındayken aldığın hasar %20 azalır", "Take 20% less damage below 30% health", "Recibes 20% menos de daño bajo el 30% de vida", "20% weniger Schaden unter 30% Leben", "На 20% меньше урона при здоровье ниже 30%"),
+    "b.r_lasthope.desc": _T("Canın %40'ının altındayken aldığın hasar %35 azalır ve saniyede +2 can yenilersin", "Below 40% health: take 35% less damage and regenerate +2 HP/s", "Bajo el 40% de vida: recibes 35% menos de daño y regeneras +2 de vida/s", "Unter 40% Leben: 35% weniger Schaden und +2 Leben/s Regeneration", "Ниже 40% здоровья: на 35% меньше урона и +2 здоровья/с"),
     "b.r_hp_big.name": _T("Dev Kitabı", "Book of the Giant", "Libro del Gigante", "Buch des Riesen", "Книга Великана"),
-    "b.r_hp_big.desc": _T("Azami canın +120 artar ama biraz yavaşlarsın", "Max health +120, but you move a little slower", "Vida máxima +120, pero te mueves más lento", "Max. Leben +120, aber etwas langsamer", "Макс. здоровье +120, но ты чуть медленнее"),
+    "b.r_hp_big.desc": _T("Azami canın +250 artar ama biraz yavaşlarsın", "Max health +250, but you move a little slower", "Vida máxima +250, pero te mueves más lento", "Max. Leben +250, aber etwas langsamer", "Макс. здоровье +250, но ты чуть медленнее"),
+    "b.r_luck.name": _T("Şans Kitabı", "Book of Luck", "Libro de la Suerte", "Buch des Glücks", "Книга Удачи"),
+    "b.r_luck.desc": _T("Her seviyede Şans +%7,5 — kartlar ve sandıklar daha yüksek kademeli çıkar", "Luck +7.5% per level — cards and chests roll higher tiers", "Suerte +7,5% por nivel — cartas y cofres salen de mayor rango", "Glück +7,5% pro Stufe — Karten und Truhen fallen hochstufiger aus", "Удача +7,5% за уровень — карты и сундуки выпадают более высокого ранга"),
+    "b.r_clover.name": _T("Dört Yapraklı Yonca Kitabı", "Book of the Four-Leaf Clover", "Libro del Trébol de Cuatro Hojas", "Buch des vierblättrigen Klees", "Книга Четырёхлистного Клевера"),
+    "b.r_clover.desc": _T("Şans +%40 ve bundan sonra her seviye atladığında Şans +%1,5", "Luck +40%, then +1.5% Luck every time you level up", "Suerte +40% y después +1,5% de suerte cada vez que subes de nivel", "Glück +40%, danach +1,5% Glück bei jedem Stufenaufstieg", "Удача +40%, затем +1,5% удачи за каждый новый уровень"),
+})
+
+
+# ---- ŞANS SİSTEMİ (v3.29) ----
+STRINGS.update({
+    "rar.0": _T("YAYGIN", "COMMON", "COMÚN", "GEWÖHNLICH", "ОБЫЧНЫЙ"),
+    "rar.1": _T("SIRADIŞI", "UNCOMMON", "POCO COMÚN", "UNGEWÖHNLICH", "НЕОБЫЧНЫЙ"),
+    "rar.2": _T("NADİR", "RARE", "RARO", "SELTEN", "РЕДКИЙ"),
+    "rar.3": _T("EPİK", "EPIC", "ÉPICO", "EPISCH", "ЭПИЧЕСКИЙ"),
+    "rar.4": _T("EFSANEVİ", "LEGENDARY", "LEGENDARIO", "LEGENDÄR", "ЛЕГЕНДАРНЫЙ"),
+    "st.luck": _T("Şans", "Luck", "Suerte", "Glück", "Удача"),
+    "fx.execute": _T("İNFAZ!", "EXECUTE!", "¡EJECUCIÓN!", "HINRICHTUNG!", "КАЗНЬ!"),
+    "ui.luck_label": _T("Şans: {}", "Luck: {}", "Suerte: {}", "Glück: {}", "Удача: {}"),
+    "ui.luck_tip": _T("Şans, seviye atlarken ve sandıklardan daha yüksek kademeli teklifler alma ihtimalini artırır.",
+                      "Luck raises the chance of higher-tier offers when levelling up and from chests.",
+                      "La suerte aumenta la probabilidad de ofertas de mayor rango al subir de nivel y en los cofres.",
+                      "Glück erhöht die Chance auf hochstufigere Angebote beim Stufenaufstieg und aus Truhen.",
+                      "Удача повышает шанс предложений более высокого ранга при повышении уровня и в сундуках."),
+    "ui.luck_free": _T("Şans yüzünden bedava!", "Free thanks to Luck!", "¡Gratis gracias a la suerte!",
+                       "Gratis dank Glück!", "Бесплатно благодаря удаче!"),
+    "ui.boost_dmg": _T("+{} hasar", "+{} damage", "+{} de daño", "+{} Schaden", "+{} урона"),
+    "ui.chest_boost": _T("{0} • {1} +{2} HASAR", "{0} • {1} +{2} DAMAGE", "{0} • {1} +{2} DAÑO",
+                         "{0} • {1} +{2} SCHADEN", "{0} • {1} +{2} УРОНА"),
+    "ui.chest_level": _T("{0} SEVİYE {1}", "{0} LEVEL {1}", "{0} NIVEL {1}", "{0} STUFE {1}", "{0} УРОВЕНЬ {1}"),
+    "ui.chest_legend_extra": _T("EFSANEVİ: +1 SEVİYE DAHA!", "LEGENDARY: +1 MORE LEVEL!",
+                                "LEGENDARIO: ¡+1 NIVEL MÁS!", "LEGENDÄR: +1 WEITERE STUFE!",
+                                "ЛЕГЕНДАРНЫЙ: ЕЩЁ +1 УРОВЕНЬ!"),
+    "ui.boost_capped": _T("bonus tavanda", "bonus maxed", "bono al máximo", "Bonus am Limit", "бонус на пределе"),
+    # skin / kıyafet perk satırları (perk_tr)
+    "perk.Şans +%5 ile başlar": _T("Şans +%5 ile başlar", "Starts with Luck +5%", "Empieza con Suerte +5%",
+                                   "Startet mit Glück +5%", "Начинает с удачей +5%"),
+    "perk.Her seviye atladığında Şans +%1": _T("Her seviye atladığında Şans +%1", "Luck +1% every level up",
+                                               "Suerte +1% en cada subida de nivel", "Glück +1% bei jedem Stufenaufstieg",
+                                               "Удача +1% за каждый уровень"),
+    "perk.Can Yenilenmesi +0.2/sn, Şans +%5": _T("Can Yenilenmesi +0.2/sn, Şans +%5", "Health Regen +0.2/s, Luck +5%",
+                                                 "Regeneración +0.2/s, Suerte +5%", "Regeneration +0.2/s, Glück +5%",
+                                                 "Регенерация +0.2/с, удача +5%"),
+    "perk.Altın Kazancı +%3, Şans +%5": _T("Altın Kazancı +%3, Şans +%5", "Gold Gain +3%, Luck +5%",
+                                           "Oro +3%, Suerte +5%", "Goldgewinn +3%, Glück +5%",
+                                           "Золото +3%, удача +5%"),
+    "sk.lucky_fox.name": _T("Kurnaz Tilki", "Lucky Fox", "Zorro Astuto", "Schlauer Fuchs", "Хитрый Лис"),
+    "sk.lucky_fox.desc": _T("Kuyruğunda uğur taşıyan kurnaz bir tilki: seviye atladıkça şansı da büyür.",
+                            "A cunning fox with luck in its tail: its Luck grows with every level.",
+                            "Un zorro astuto con la suerte en la cola: su suerte crece con cada nivel.",
+                            "Ein schlauer Fuchs mit Glück im Schweif: sein Glück wächst mit jeder Stufe.",
+                            "Хитрый лис с удачей в хвосте: его удача растёт с каждым уровнем."),
 })
 
 
@@ -2044,7 +2130,11 @@ STRINGS.update({
  "s.bandage.name": _T("Sargı Bezi","Bandage","Vendaje","Verband","Бинт"),
  "s.bandage.desc": _T("Saniyede +0.6 can yenilenmesi ve +12 azami can","+0.6 health regen per second and +12 max health","+0,6 de regeneración por segundo y +12 de vida máx","+0,6 Leben pro Sekunde und +12 max. Leben","+0,6 здоровья в секунду и +12 к максимуму"),
  "s.lucky_coin.name": _T("Uğurlu Akçe","Lucky Coin","Moneda de la Suerte","Glücksmünze","Счастливая Монета"),
- "s.lucky_coin.desc": _T("Altın +%15 ve kritik şans +%2","Gold +15% and crit chance +2%","Oro +15% y prob. crítica +2%","Gold +15% und Kritchance +2%","Золото +15% и шанс крита +2%"),
+ "s.lucky_coin.desc": _T("Altın +%15, kritik şans +%2 ve Şans +%10","Gold +15%, crit chance +2% and Luck +10%","Oro +15%, prob. crítica +2% y Suerte +10%","Gold +15%, Kritchance +2% und Glück +10%","Золото +15%, шанс крита +2% и Удача +10%"),
+ "s.core_luck.name": _T("Şans Çekirdeği","Luck Core","Núcleo de Suerte","Glückskern","Ядро Удачи"),
+ "s.core_luck.desc": _T("Şans +%8 (en fazla 5 seviye)","Luck +8% (up to 5 levels)","Suerte +8% (hasta 5 niveles)","Glück +8% (bis zu 5 Stufen)","Удача +8% (до 5 уровней)"),
+ "s.gambler_dice.name": _T("Kumarbazın Zarı","Gambler's Dice","Dados del Apostador","Spielerwürfel","Кости Игрока"),
+ "s.gambler_dice.desc": _T("Şans +%25 ama hareket hızı -%5","Luck +25% but movement speed -5%","Suerte +25% pero velocidad -5%","Glück +25%, aber Bewegungstempo -5%","Удача +25%, но скорость передвижения -5%"),
  "s.gale_boots.name": _T("Rüzgâr Çizmesi","Gale Boots","Botas de Vendaval","Sturmstiefel","Штормовые Сапоги"),
  "s.gale_boots.desc": _T("Hareket hızı +%8 ve dash mesafesi +%12","Move speed +8% and dash distance +12%","Velocidad +8% y distancia de impulso +12%","Tempo +8% und Dash-Weite +12%","Скорость +8% и дальность рывка +12%"),
  "s.war_drum.name": _T("Savaş Davulu","War Drum","Tambor de Guerra","Kriegstrommel","Боевой Барабан"),
@@ -4164,6 +4254,9 @@ class SaveManager:
         en az bir kitap kalmalı, yoksa seviye atlama ekranı hiç kitap öneremez.
         """
         muted = self.data.setdefault("books_muted", [])
+        # v3.29: oyundan kaldırılmış kitapların (İkinci Nefes) eski kapatma
+        # kaydı bir hak yemesin.
+        muted[:] = [k for k in muted if k in BOOK_BY_KEY]
         if key in muted:
             muted.remove(key)
             self.save()
@@ -4199,7 +4292,7 @@ class SaveManager:
         bir kayıt (ya da kayıt dosyasını kurcalayan biri) sömürüyü sürdürür.
         Fazla nadir kapatmalar listedeki sıraya göre yok sayılır.
         """
-        muted = list(self.data.get("books_muted", []))
+        muted = [k for k in self.data.get("books_muted", []) if k in BOOK_BY_KEY]
         out, n_rare = [], 0
         for k in muted:
             if BOOK_BY_KEY.get(k, {}).get("rare"):
@@ -6038,6 +6131,8 @@ ICON_METRICS = {
     "snow":   (0.74, 0.67, -0.03),
     "book":   (0.60, 0.70, -0.11),
     "ghost":  (0.66, 0.87, -0.04),
+    "horseshoe": (0.68, 0.70, -0.02),   # v3.29 ŞANS KİTABI
+    "clover4": (0.66, 0.74, -0.04),     # v3.29 DÖRT YAPRAKLI YONCA
 }
 # Bütün simgelerin oturduğu ortak kutunun yarı ölçüsü (r'nin katı).
 ICON_FIT = 0.74
@@ -6114,6 +6209,33 @@ def draw_icon(surf, cx, cy, kind, color, r=13):
         for ang in (0, math.pi/2, math.pi, math.pi*1.5):
             ox, oy = math.cos(ang)*r*0.35, math.sin(ang)*r*0.35
             pygame.draw.circle(surf, color, (cx + ox, cy + oy), r*0.38)
+    elif kind == "horseshoe":
+        # ŞANS: ters U nal + çivi delikleri (Kritik'in yoncasıyla karışmasın).
+        wd = max(3, int(r * 0.30))
+        rr = r * 0.62
+        rect = pygame.Rect(0, 0, int(rr * 2), int(rr * 2))
+        rect.center = (int(cx), int(cy - r * 0.02))
+        pygame.draw.arc(surf, color, rect, 0.0, math.pi, wd)
+        for sx in (-1, 1):
+            pygame.draw.line(surf, color, (cx + sx * (rr - wd * 0.5), cy - r * 0.02),
+                             (cx + sx * (rr - wd * 0.3), cy + r * 0.66), wd)
+            pygame.draw.circle(surf, (14, 14, 22), (cx + sx * (rr - wd * 0.5), cy + r * 0.30),
+                               max(1, r * 0.07))
+        pygame.draw.circle(surf, (14, 14, 22), (cx, cy - rr + wd * 0.5), max(1, r * 0.07))
+    elif kind == "clover4":
+        # DÖRT YAPRAKLI YONCA: çapraz dört yaprak + sap.
+        pygame.draw.line(surf, color, (cx, cy), (cx + r * 0.30, cy + r * 0.78),
+                         max(2, int(r * 0.14)))
+        for k in range(4):
+            ang = math.pi / 4 + k * math.pi / 2
+            ux, uy = math.cos(ang), math.sin(ang)
+            vx, vy = -uy, ux
+            for s in (-1, 1):
+                pygame.draw.circle(surf, color,
+                                   (cx + ux * r * 0.36 + vx * s * r * 0.13,
+                                    cy + uy * r * 0.36 + vy * s * r * 0.13 - r * 0.08),
+                                   r * 0.24)
+        pygame.draw.circle(surf, (14, 14, 22), (cx, cy - r * 0.08), max(1, r * 0.08))
     elif kind == "gem":
         pts = [(cx, cy - r*0.8), (cx + r*0.7, cy - r*0.15), (cx + r*0.4, cy + r*0.75),
                (cx - r*0.4, cy + r*0.75), (cx - r*0.7, cy - r*0.15)]
@@ -6356,6 +6478,13 @@ SKINS = [
               "Pembe şapka, gözlük ve pelerinle tamamla.",
          perks=["Can Yenilenmesi +0.6/sn", "Kritik Şans +%10", "Toplama Menzili +25"],
          perk_add=dict(base_regen=0.6, crit_chance=0.10, base_pickup=25)),
+
+    # v3.29 ŞANS SKİNİ (Megabonk'taki Tilki gibi): şansı seviyeyle büyür.
+    dict(id="lucky_fox", name="Kurnaz Tilki", color=(240, 140, 60), accent=(255, 236, 214), cost=900,
+         weapon="crossbow", proj="feather", aura="stars", sfx="b", wlen=27,
+         desc="Kuyruğunda uğur taşıyan kurnaz bir tilki: seviye atladıkça şansı da büyür.",
+         perks=["Şans +%5 ile başlar", "Her seviye atladığında Şans +%1"],
+         perk_add=dict(luck=0.05, luck_per_level=0.01)),
 ]
 SKIN_BY_ID = {s["id"]: s for s in SKINS}
 
@@ -6465,6 +6594,9 @@ SKIN_ULTS = {
     "immortal_merc": dict(name="KURŞUN YAĞMURU", icon="target", color=(230, 90, 100), cd=18.0,
                           kind="nova", mode="auto", n=22, mult=0.7,
                           desc="İki namludan 22 kurşunu her yöne boşaltır."),
+    "lucky_fox": dict(name="TİLKİ KURNAZLIĞI", icon="coin", color=(255, 170, 90), cd=24.0,
+                      kind="midas", mode="auto", radius=320,
+                      desc="Çevredeki düşmanlara hasar verir ve her birinden fazladan altın düşürür."),
     "pink_dream": dict(name="RÜYA PATLAMASI", icon="heart", color=(255, 140, 210), cd=20.0,
                        kind="dream", mode="auto", radius=300, duration=6.0,
                        desc="Azami canının %25'ini yeniler, 6 saniye kritik şansın %25 artar ve "
@@ -6522,7 +6654,7 @@ COSMETICS = [
     dict(id="flower_crown", slot="hat", name="Çiçek Tacı", cost=260,
          color=(240, 170, 200), accent=(255, 240, 200),
          desc="Rengarenk küçük çiçeklerden örülmüş bir taç.",
-         perk_text="Can Yenilenmesi +0.2/sn", perk_add=dict(base_regen=0.2)),
+         perk_text="Can Yenilenmesi +0.2/sn, Şans +%5", perk_add=dict(base_regen=0.2, luck=0.05)),
     dict(id="top_hat", slot="hat", name="Silindir Şapka", cost=380,
          color=(24, 24, 30), accent=(232, 186, 90),
          desc="Şık, kurdeleli klasik bir silindir şapka.",
@@ -6564,7 +6696,7 @@ COSMETICS = [
     dict(id="heart_glasses", slot="eyewear", name="Kalp Gözlük", cost=200,
          color=(230, 60, 110), accent=(255, 200, 215),
          desc="Camları kalp şeklinde, sevimli bir gözlük.",
-         perk_text="Altın Kazancı +%3", perk_add=dict(coin_mult=0.03)),
+         perk_text="Altın Kazancı +%3, Şans +%5", perk_add=dict(coin_mult=0.03, luck=0.05)),
     dict(id="steampunk_goggles", slot="eyewear", name="Steampunk Gözlük", cost=310,
          color=(150, 110, 55), accent=(255, 200, 110),
          desc="Pirinç detaylı, dişlilerle süslü bir gözlük.",
@@ -6610,7 +6742,7 @@ COSMETICS = [
     dict(id="cape_forest", slot="cape", name="Orman Pelerini", cost=150,
          color=(60, 130, 75), accent=(200, 240, 190),
          desc="Yapraklarla işlenmiş doğal, sessiz bir pelerin.",
-         perk_text="Can Yenilenmesi +0.2/sn", perk_add=dict(base_regen=0.2)),
+         perk_text="Can Yenilenmesi +0.2/sn, Şans +%5", perk_add=dict(base_regen=0.2, luck=0.05)),
     dict(id="cape_ice", slot="cape", name="Buz Pelerini", cost=300,
          color=(150, 210, 245), accent=(255, 255, 255),
          desc="Kenarları donmuş, soğuk buhar saçan bir pelerin.",
@@ -9806,6 +9938,9 @@ SHOP_ITEMS = [
      "cost": 65,  "cost_mult": 1.25, "max": 999, "endless": True, "icon": "coin",   "color": (235, 195, 95),  "tier": 1, "cat": "core"},
     {"key": "core_reach",    "name": "Mıknatıs Çekirdeği",  "desc": "Toplama menzili +%14, deneyim +%6 (deneyim payı azalır)",
      "cost": 70,  "cost_mult": 1.26, "max": 999, "endless": True, "icon": "magnet", "color": (150, 220, 255), "tier": 1, "cat": "core"},
+    # v3.29 ŞANS ÇEKİRDEĞİ: tavanlı (5 seviye) — şans sonsuza dek yığılmasın.
+    {"key": "core_luck",     "name": "Şans Çekirdeği",      "desc": "Şans +%8 (en fazla 5 seviye)",
+     "cost": 75,  "cost_mult": 1.45, "max": 5, "icon": "horseshoe", "color": (110, 225, 130), "tier": 1, "cat": "core"},
 
     # ---- ARENA GENİŞLEMESİ ---------------------------------------------
     # Market arenada cehenneme göre çok dardı: birkaç dalga sonra elde
@@ -9821,7 +9956,7 @@ SHOP_ITEMS = [
      "cost": 45, "cost_mult": 1.45, "max": 6, "icon": "cross", "color": (140, 225, 175),
      "tier": 1, "cat": "defense"},
     {"key": "lucky_coin", "name": "Uğurlu Akçe",
-     "desc": "Altın +%15 ve kritik şans +%2",
+     "desc": "Altın +%15, kritik şans +%2 ve Şans +%10",
      "cost": 50, "cost_mult": 1.48, "max": 5, "icon": "clover", "color": (240, 205, 110),
      "tier": 1, "cat": "utility"},
     {"key": "gale_boots", "name": "Rüzgâr Çizmesi",
@@ -9892,6 +10027,8 @@ SHOP_ITEMS = [
     {"key": "overcharge", "name": "Aşırı Yük",      "desc": "BONK hasarı ve alanı çok büyük ölçüde artar", "cost": 240, "cost_mult": 2.2, "max": 4, "icon": "fist", "color": GOLD, "tier": 4, "cat": "legendary", "legendary": True},
     {"key": "execute_edge", "name": "İnfaz Kenarı", "desc": "Canı çok azalan düşmanları anında infaz eder", "cost": 240, "cost_mult": 2.2, "max": 3, "icon": "sword", "color": GOLD, "tier": 4, "cat": "legendary", "legendary": True},
     {"key": "titan_shield", "name": "Titan Kalkanı", "desc": "+2 kalkan yükü ve kalıcı zırh (bu koşu)", "cost": 240, "cost_mult": 2.2, "max": 4, "icon": "shield", "color": GOLD, "tier": 4, "cat": "legendary", "legendary": True},
+    # v3.29 KUMARBAZIN ZARI: büyük şans, küçük ceza (hareket hızı -%5).
+    {"key": "gambler_dice", "name": "Kumarbazın Zarı", "desc": "Şans +%25 ama hareket hızı -%5", "cost": 200, "cost_mult": 2.1, "max": 2, "icon": "horseshoe", "color": GOLD, "tier": 4, "cat": "legendary", "legendary": True},
 
     # ---- KADEME 5 · CEHENNEM (yalnızca 2. haritada açılır) --------------
     # Cehennem yaratıkları arenanın 25. dalgası kadar canlı ve vurucu geldiği
@@ -10051,6 +10188,12 @@ def apply_shop_item(player, key):
     elif key == "lucky_coin":
         player.run_coin_mult += 0.15
         player.run_crit_bonus += 0.02
+        player.run_luck_bonus += LUCKY_COIN_LUCK      # v3.29
+    elif key == "core_luck":
+        player.run_luck_bonus += CORE_LUCK_PER_LEVEL
+    elif key == "gambler_dice":
+        player.run_luck_bonus += GAMBLER_DICE_LUCK
+        player.run_spd_mult = max(0.5, player.run_spd_mult - 0.05)
     elif key == "gale_boots":
         player.run_spd_mult += 0.08
         player.dash_dist_mult += 0.12
@@ -10370,6 +10513,13 @@ BOOKS = [
      "unlock": dict(text="Patron avına çık",
                     reqs=[rq_stat("bosses", 6, "6 patron devir"),
                           rq_ach("boss", "«Dev Avcısı» başarımını aç")])},
+    # v3.29 ŞANS KİTABI: daha yüksek kademeli kart ve sandık (bkz. roll_rarity).
+    {"key": "r_luck", "name": "Şans Kitabı", "max": 10,
+     "desc": "Her seviyede Şans +%7,5 — kartlar ve sandıklar daha yüksek kademeli çıkar",
+     "color": (110, 225, 130), "icon": "horseshoe", "rare": False,
+     "unlock": dict(text="Sandıkların tadına bak: 10 patron sandığı aç",
+                    reqs=[rq_stat("total_chests", 10, "Toplam 10 patron sandığı aç"),
+                          rq_stat("best_wave", 9, "9. dalgaya ulaş")])},
 
     # ---- NADİR KİTAPLAR: bir koşuda YALNIZCA BİR TANE ----
     # Alındığı anda bütün nadir kitaplar havuzdan çıkar. Hepsi tek seferlik
@@ -10418,26 +10568,29 @@ BOOKS = [
                           rq_stat("total_bonk_hits", 3500, "BONK ile toplam 3.500 düşmana vur"),
                           rq_book("r_bonk", "Önce BONK Kitabı'nı aç")])},
     {"key": "r_dashslow", "name": "Zaman Kitabı",
-     "desc": "Dash attığında çevrendeki düşmanlar yavaşlar; yavaşlamış düşman sana %20 az hasar verir",
+     "desc": "Dash bekleme -%10; dash attığında çevrendeki düşmanlar %45 yavaşlar ve sana %35 az hasar verir",
      "color": (150, 200, 255), "icon": "snow", "rare": True,
      "unlock": dict(text="Zamanla yarış",
                     reqs=[rq_stat("best_wave", 11, "11. dalgaya ulaş"),
                           rq_stat("total_dashes", 600, "Toplam 600 kez dash at"),
                           rq_book("r_spd", "Önce Rüzgâr Kitabı'nı aç")])},
-    {"key": "r_second_wind", "name": "İkinci Nefes Kitabı",
-     "desc": "Öldüğünde bir kez yarı canla ayağa kalkarsın",
-     "color": (255, 240, 180), "icon": "cross", "rare": True,
-     "unlock": dict(text="Bir kez daha kalk: 14. dalgaya ulaş",
-                    reqs=[rq_stat("best_wave", 14, "14. dalgaya ulaş"),
-                          rq_stat("total_healed", 8000, "Toplam 8.000 can yenile")])},
+    # v3.29: İKİNCİ NEFES KİTABI oyundan KALDIRILDI (dirilme artık yalnızca
+    # markette: İkinci Nefes / Anka Külü). Eski kayıtlardaki anahtarı zararsız.
     {"key": "r_lasthope", "name": "Son Umut Kitabı",
-     "desc": "Canın %30'unun altındayken aldığın hasar %20 azalır",
+     "desc": "Canın %40'ının altındayken aldığın hasar %35 azalır ve saniyede +2 can yenilersin",
      "color": (255, 215, 120), "icon": "shield", "rare": True,
      "unlock": dict(text="Ölümün kıyısında ayakta kal",
                     reqs=[rq_stat("best_wave", 14, "14. dalgaya ulaş"),
                           rq_shop("shield", 5, "Kalkan'ı markette Lv.5'e çıkar")])},
+    {"key": "r_clover", "name": "Dört Yapraklı Yonca Kitabı",
+     "desc": "Şans +%40 ve bundan sonra her seviye atladığında Şans +%1,5",
+     "color": (90, 235, 120), "icon": "clover4", "rare": True,
+     "unlock": dict(text="Şansın kendisi ol",
+                    reqs=[rq_book("r_luck", "Önce Şans Kitabı'nı aç"),
+                          rq_stat("total_chests", 30, "Toplam 30 patron sandığı aç"),
+                          rq_stat("best_wave", 15, "15. dalgaya ulaş")])},
     {"key": "r_hp_big", "name": "Dev Kitabı",
-     "desc": "Azami canın +120 artar ama biraz yavaşlarsın",
+     "desc": "Azami canın +250 artar ama biraz yavaşlarsın",
      "color": (200, 140, 90), "icon": "skull", "rare": True,
      "unlock": dict(text="Devleşecek kadar dayan",
                     reqs=[rq_stat("best_combo", 40, "40'lık bir kombo yap"),
@@ -10818,6 +10971,10 @@ MASTERY = [
          cost=150, growth=1.70, per=0.06, soft=0.02, cap_soft=22.0),
     dict(key="m_xp", icon="star", color=(200, 170, 255),
          cost=130, growth=1.65, per=0.05, soft=0.018, cap_soft=20.0),
+    # v3.29 UĞUR: kalıcı taban ŞANS (5 kademede +%15, prestij azalan getirili).
+    # Sunucudaki MASTERY_COSTS'a da eklendi (server.py).
+    dict(key="m_luck", icon="horseshoe", color=(110, 225, 130),
+         cost=130, growth=1.65, per=0.03, soft=0.01, cap_soft=18.0),
 ]
 MASTERY_BY_KEY = {m["key"]: m for m in MASTERY}
 
@@ -11018,6 +11175,94 @@ def xp_next_need(need, level):
     return max(1, int(need * XP_CURVE_BANDS[-1][1] + XP_CURVE_BANDS[-1][2]))
 
 
+# =====================================================================
+# ŞANS SİSTEMİ (v3.29)
+# ---------------------------------------------------------------------
+# Şans KRİTİK ŞANSI DEĞİLDİR. Şans, seviye atlarken ve sandıklardan daha
+# YÜKSEK KADEMELİ ödül çıkma ihtimalini artırır. Beş kademe var:
+#   Yaygın x1.0 · Sıradışı x1.5 · Nadir x2.0 · Epik x2.85 · Efsanevi x4.0
+# Kademe çarpanı, tek bir yükseltme adımının değerine uygulanır: temel adım
+# %7 hasar ise Yaygın +%7, Epik +%20, Efsanevi +%28.
+#
+# Olasılık (roll_rarity):  w_i = taban_i * (1 + şans) ** (RARITY_LUCK_EXP * i)
+# Efsanevi hiçbir şansta %10'u geçmez (RARITY_LEGEND_CAP).
+# =====================================================================
+RARITY_COUNT = 5
+RARITY_BASE_WEIGHTS = (70.0, 23.0, 6.0, 1.0, 0.15)
+RARITY_LUCK_EXP = 0.95          # 0.9 önerilmişti; 0.95 hedef tabloya daha yakın
+RARITY_LEGEND_CAP = 0.10        # Efsanevi payının tavanı
+RARITY_MULTS = (1.0, 1.5, 2.0, 2.85, 4.0)
+RARITY_COLORS = ((200, 200, 210), GREEN, BLUE, PURPLE, GOLD)
+# Silah nadirlik bonusu: sandık ya da seviye kartı silaha KALICI hasar ekler.
+WEAPON_BOOST_STEP = 0.07        # Yaygın kademenin verdiği pay (+%7)
+WEAPON_BOOST_CAP = 1.20         # silah başına en fazla +%120
+# Efsanevi sandık silaha bir seviye DAHA verir (tavan izin veriyorsa).
+LEGEND_CHEST_EXTRA_LEVEL = True
+LUCK_BOOK_PER_LEVEL = 0.075     # ŞANS KİTABI: seviye başı +%7,5
+CLOVER_LUCK_ON_TAKE = 0.40      # DÖRT YAPRAKLI YONCA: alınınca +%40
+CLOVER_LUCK_PER_LEVEL = 0.015   # ... ve sonraki her seviyede +%1,5
+CORE_LUCK_PER_LEVEL = 0.08      # ŞANS ÇEKİRDEĞİ (market): seviye başı +%8
+LUCKY_COIN_LUCK = 0.10          # UĞURLU AKÇE: ek +%10 şans
+GAMBLER_DICE_LUCK = 0.25        # KUMARBAZIN ZARI: +%25 şans
+LUCK_FREE_REROLL_K = 0.20       # şanslı yenileme olasılığı = şans * K ...
+LUCK_FREE_REROLL_MAX = 0.35     # ... en fazla %35
+LUCK_RARE_BOOK_K = 0.5          # nadir kitap ağırlığı * (1 + K * şans)
+LUCK_MAGNET_K = 0.5             # mıknatıs şansı * (1 + K * şans)
+# Kitap ayarları (v3.29)
+DEV_BOOK_HP = 250               # DEV KİTABI azami can (eskiden 120)
+LASTHOPE_HP_FRAC = 0.40         # SON UMUT eşiği (eskiden %30)
+LASTHOPE_DR = 0.35              # SON UMUT hasar kesintisi (eskiden %20)
+LASTHOPE_REGEN = 2.0            # SON UMUT eşiğin altında can/sn
+
+
+def rarity_weights(luck):
+    """Şansa göre beş kademenin ağırlıkları (Efsanevi tavanı uygulanmış)."""
+    f = 1.0 + max(0.0, float(luck))
+    w = [RARITY_BASE_WEIGHTS[i] * f ** (RARITY_LUCK_EXP * i)
+         for i in range(RARITY_COUNT)]
+    rest = sum(w[:-1])
+    top = rest * RARITY_LEGEND_CAP / (1.0 - RARITY_LEGEND_CAP)
+    if w[-1] > top:
+        w[-1] = top
+    return w
+
+
+def roll_rarity(luck, rnd=random):
+    """Şansa göre bir nadirlik kademesi çeker: 0 (Yaygın) .. 4 (Efsanevi)."""
+    return rnd.choices(range(RARITY_COUNT), weights=rarity_weights(luck), k=1)[0]
+
+
+def rarity_name(tier):
+    return L("rar.%d" % clamp(int(tier), 0, RARITY_COUNT - 1))
+
+
+def rarity_color(tier):
+    return RARITY_COLORS[clamp(int(tier), 0, RARITY_COUNT - 1)]
+
+
+def rarity_boost(tier):
+    """Bu kademenin silaha eklediği hasar payı (0.07 * kademe çarpanı)."""
+    return WEAPON_BOOST_STEP * RARITY_MULTS[clamp(int(tier), 0, RARITY_COUNT - 1)]
+
+
+def rarity_table(luck, n=20000, seed=1):
+    """Doğrulama: n çekilişte kademelerin yüzdesi."""
+    rnd = random.Random(seed)
+    cnt = [0] * RARITY_COUNT
+    for _ in range(n):
+        cnt[roll_rarity(luck, rnd)] += 1
+    return [100.0 * c / n for c in cnt]
+
+
+def fmt_pct1(v):
+    """Oranı bir ondalıklı yüzde yazar: 0.075 -> "%7,5" (TR) / "7.5%"."""
+    x = round(float(v) * 100.0, 1)
+    t = ("%d" % int(round(x))) if abs(x - round(x)) < 0.05 else ("%.1f" % x)
+    if lang() == "tr":
+        return "%" + t.replace(".", ",")
+    return t + "%"
+
+
 class Player:
     def __init__(self, skin_id="default"):
         self.skin = get_skin(skin_id)
@@ -11044,6 +11289,11 @@ class Player:
         self.crit_dmg_mult = 1.6
         self.bonk_mult = 1.0
         self.bonk_radius_mult = 1.0
+        # ŞANS (v3.29): kalıcı taban — skin/kozmetik perk_add ile eklenir.
+        # Kritik şansıyla İLGİSİ YOK; bkz. eff_luck / roll_rarity.
+        self.luck = 0.0
+        # Seviye atladıkça kazanılan şans (TİLKİ skini: luck_per_level).
+        self.luck_per_level = 0.0
 
         # --- run-içi (geçici) ---
         self.run_dmg_mult = 1.0
@@ -11056,6 +11306,11 @@ class Player:
         self.run_regen_bonus = 0.0
         self.run_crit_bonus = 0.0
         self.run_critdmg_bonus = 0.0
+        self.run_luck_bonus = 0.0   # koşu içi şans (kitap / market / eşya)
+        self.clover_level = 0       # DÖRT YAPRAKLI YONCA: seviye başı şans
+        # Silah NADİRLİK bonusu: {silah_anahtarı: ek hasar payı}. Sandık ve
+        # seviye kartlarındaki kademe buraya yazılır (bkz. add_weapon_boost).
+        self.weapon_boost = {}
         self.dmg_taken_mult = 1.0
         self.enemy_hp_curse = 0.0
         self.dash_cd_mult = 1.0
@@ -11282,10 +11537,20 @@ class Player:
 
     def eff_armor(self):
         a = self.base_armor + self.run_armor_bonus
-        # SON UMUT KİTABI: canın %30'unun altındayken ek hasar azaltma.
-        if self.lowhp_armor > 0 and self.max_hp > 0 and self.hp < self.max_hp * 0.3:
-            a += self.lowhp_armor
+        # SON UMUT KİTABI artık zırha eklenmiyor (v3.29): ayrı çarpan, bkz.
+        # lowhp_factor. Zırh tavanı 0.60 ve hile denetimi aynen kalır.
         return clamp(a, 0, 0.6)
+
+    def lowhp_active(self):
+        """SON UMUT: can eşiğin altında mı?"""
+        return (self.lowhp_armor > 0 and self.max_hp > 0
+                and self.hp < self.max_hp * LASTHOPE_HP_FRAC)
+
+    def lowhp_factor(self):
+        """SON UMUT KİTABI'nın gelen hasar çarpanı (1.0 = etkisiz)."""
+        if not self.lowhp_active():
+            return 1.0
+        return max(0.40, 1.0 - self.lowhp_armor)
 
     def apply_mastery(self, save):
         """ARENA USTALIĞI'nın kalıcı bonuslarını oyuncuya işler.
@@ -11304,6 +11569,7 @@ class Player:
             self.base_speed *= (1.0 + save.mastery_bonus("m_speed"))
             self.gem_mult = 1.0 + save.mastery_bonus("m_gem")
             self.xp_mult *= (1.0 + save.mastery_bonus("m_xp"))
+            self.luck += save.mastery_bonus("m_luck")
         except Exception:
             # Ustalık bir yan sistemdir: bozuk bir değer oyunu açılmaz
             # hâle getirmesin.
@@ -11354,7 +11620,10 @@ class Player:
         return sum(1 for k in self.books if BOOK_BY_KEY.get(k, {}).get("rare"))
 
     def eff_regen(self):
-        return self.base_regen + self.run_regen_bonus
+        r = self.base_regen + self.run_regen_bonus
+        if self.lowhp_active():
+            r += LASTHOPE_REGEN
+        return r
 
     def eff_coin_mult(self):
         return self.coin_mult * self.run_coin_mult
@@ -11447,6 +11716,27 @@ class Player:
     def eff_crit_dmg(self):
         return self.crit_dmg_mult + self.run_critdmg_bonus
 
+    def eff_luck(self):
+        """ŞANS (v3.29). Kritik şansından AYRI bir stat: yalnızca ödül
+        kademesini (roll_rarity) ve birkaç küçük olasılığı etkiler."""
+        return max(0.0, self.luck + self.run_luck_bonus)
+
+    def add_weapon_boost(self, key, amount):
+        """Silaha kalıcı nadirlik bonusu ekler (tavanlı). Dönüş: eklenen pay."""
+        cur = float(self.weapon_boost.get(key, 0.0))
+        new = min(WEAPON_BOOST_CAP, cur + max(0.0, float(amount)))
+        self.weapon_boost[key] = new
+        return new - cur
+
+    def on_level_up(self, n=1):
+        """Her seviye atlamada çalışan küçük kancalar (şans büyümesi)."""
+        if n <= 0:
+            return
+        if self.clover_level > 0:
+            self.run_luck_bonus += CLOVER_LUCK_PER_LEVEL * n
+        if self.luck_per_level > 0:
+            self.luck += self.luck_per_level * n
+
     def eff_pierce_hits(self):
         return 1 + self.pierce_bonus
 
@@ -11481,7 +11771,7 @@ class Player:
     # sayaçları paylaşsın diye eşleştirme burada tutulur.
     RUN_TO_SHOP_KEY = {
         "r_fireshot": "fire", "r_iceshot": "ice", "r_multi": "multishot",
-        "r_pierce": "pierce", "r_vamp": "vampiric", "r_second_wind": "second_wind",
+        "r_pierce": "pierce", "r_vamp": "vampiric",
         "r_storm": "storm",
     }
 
@@ -11570,8 +11860,19 @@ class Player:
             # dayanıklılık arttıkça iyileşme de artar.
             self.kill_heal_level += 1
         elif key == "r_rage": self.rage_level += 1
-        elif key == "r_lasthope": self.lowhp_armor += 0.20
-        elif key == "r_dashslow": self.dash_slow_level += 1
+        elif key == "r_lasthope":
+            # v3.29 GÜÇLENDİ: %30 -> %40 can eşiği, -%20 -> -%35 hasar ve
+            # eşiğin altında +2 can/sn. Kesinti ZIRHTAN AYRI işler (bkz.
+            # lowhp_factor): zırh tavanını (0.60) ve hile denetimini zorlamaz.
+            self.lowhp_armor += LASTHOPE_DR
+        elif key == "r_dashslow":
+            # v3.29 GÜÇLENDİ: daha geniş/uzun/sert yavaşlatma ve dash -%10.
+            self.dash_slow_level += 1
+            self.dash_cd_mult = max(0.35, self.dash_cd_mult - 0.10)
+        elif key == "r_luck": self.run_luck_bonus += LUCK_BOOK_PER_LEVEL
+        elif key == "r_clover":
+            self.run_luck_bonus += CLOVER_LUCK_ON_TAKE
+            self.clover_level += 1
         elif key == "r_bosshunter": self.boss_hunter += 1
         elif key == "r_swarm": self.swarm_level += 1
         elif key == "r_echo": self.echo_level += 1
@@ -11585,7 +11886,8 @@ class Player:
             # fark, hem de oyuncuya hiçbir yerde söylenmeden. Optimal oynayış
             # "nadir kitabı mümkün olduğunca geç al" oluyordu. Artık TABAN
             # cana göre sabit: sıradan bağımsız +120 can.
-            gain = int(BASE_MAX_HP * 1.20)
+            # v3.29: +120 -> +250 (DEV_BOOK_HP).
+            gain = DEV_BOOK_HP
             self.max_hp += gain
             self.hp = min(self.max_hp, self.hp + gain)
             self.base_speed = max(60, self.base_speed - 18)
@@ -11603,7 +11905,6 @@ class Player:
             self.pierce_bonus += 1
         elif key == "r_vamp": self.vamp_level += 1
         elif key == "r_execute": self.execute_threshold = min(0.35, self.execute_threshold + 0.18)
-        elif key == "r_second_wind": self.second_wind_charges += 1
         elif key == "r_storm": self.storm_level += 1
         # MARKET'teki karşılığı varsa (örn. Yıldırım -> Fırtına), o sayaç da
         # birlikte artsın; market ekranı gerçek seviyeyi doğru göstersin.
@@ -11643,6 +11944,7 @@ class Player:
             self.level += 1
             self.xp_to_next = xp_next_need(self.xp_to_next, self.level)
             leveled += 1
+        self.on_level_up(leveled)
         return leveled
 
     def take_damage(self, amount, fx, sx=None, sy=None, src=""):
@@ -11661,7 +11963,7 @@ class Player:
             fx.popup(self.x, self.y - 34, "KALKAN!", (160, 200, 255), 18, life=0.6)
             sfx("shield", 1.0, 0.05)
             return 0
-        dmg = amount * (1 - self.eff_armor()) * self.dmg_taken_mult
+        dmg = amount * (1 - self.eff_armor()) * self.dmg_taken_mult * self.lowhp_factor()
         self.hp -= dmg
         self.hit_flash = 0.3
         self.hurt_vig = min(1.0, self.hurt_vig + dmg / 45.0)
@@ -11764,7 +12066,7 @@ class Player:
         """
         if not self.alive or amount <= 0 or self.invuln > 0:
             return
-        dmg = amount * (1 - self.eff_armor()) * self.dmg_taken_mult
+        dmg = amount * (1 - self.eff_armor()) * self.dmg_taken_mult * self.lowhp_factor()
         self.hp -= dmg
         self.last_hit_by = src
         self.hurt_vig = min(1.0, self.hurt_vig + dmg / 90.0)
@@ -12962,22 +13264,30 @@ class Hazard:
 # v3.11: binde bir çok seyrekti — uzun bir koşuda bile mıknatıs bir kez ya da
 # hiç görünmüyordu. Şans 2.5 katına çıktı (ortalama ~1/400 öldürme) ve
 # garanti eğrisi de aynı oranda öne alındı.
-MAGNET_DROP_CHANCE = 0.0025     # öldürme başına temel düşme şansı
+# v3.29: "xp taşını ve mıknatıs çıkma oranını düşür" — 0.0025 -> 0.0018
+# (ortalama ~555 öldürmede bir), garanti eğrisi de aynı oranda geri çekildi.
+MAGNET_DROP_CHANCE = 0.0018     # öldürme başına temel düşme şansı
 # Garanti eğrisi SADECE aşırı kötü şansı kurtarır: temel şansın ortalamasının
 # (~400 öldürme) belirgin üstünde başlar, böylece koşuların çoğunda hiç
 # devreye girmez ve eşyanın nadirliği şansla belirlenmeye devam eder.
-MAGNET_PITY_FROM = 1000         # bu öldürmeden sonra şans yükselmeye başlar
-MAGNET_PITY_TO = 1700           # bu öldürmede kesin düşer
+MAGNET_PITY_FROM = 1350         # bu öldürmeden sonra şans yükselmeye başlar
+MAGNET_PITY_TO = 2300           # bu öldürmede kesin düşer
+# SEVİYE TAŞI mıknatıstan da seyrek: aynı eğrinin bu katı (ve hâlâ en fazla
+# düşen mıknatıs kadar).
+LEVEL_STONE_RATE = 0.70
 MAGNET_COLOR = (255, 84, 96)
 MAGNET_COLOR2 = (232, 240, 255)
 
 
-def magnet_drop_chance(kills_since):
-    """Son mıknatıstan bu yana yapılan öldürme sayısına göre düşme şansı."""
+def magnet_drop_chance(kills_since, luck=0.0):
+    """Son mıknatıstan bu yana yapılan öldürme sayısına göre düşme şansı.
+
+    ŞANS (v3.29) yalnızca TEMEL şansı hafifçe büyütür (1 + 0.5 * şans);
+    garanti eğrisi (MAGNET_PITY_*) aynen kalır."""
     if kills_since >= MAGNET_PITY_TO:
         return 1.0
     if kills_since <= MAGNET_PITY_FROM:
-        return MAGNET_DROP_CHANCE
+        return MAGNET_DROP_CHANCE * (1.0 + LUCK_MAGNET_K * max(0.0, float(luck)))
     # MAGNET_PITY_FROM ile MAGNET_PITY_TO arasında doğrusal olarak 1'e çıkar.
     k = (kills_since - MAGNET_PITY_FROM) / float(MAGNET_PITY_TO - MAGNET_PITY_FROM)
     return MAGNET_DROP_CHANCE + (1.0 - MAGNET_DROP_CHANCE) * k
@@ -14800,8 +15110,11 @@ def weapon_damage(player, w, level):
     kılıyordu.
     """
     dpl = float(w.get("dpl", WEAPON_DMG_PER_LEVEL))
+    # ŞANS (v3.29): silahın NADİRLİK bonusu (sandık / seviye kartı). Tek-atma
+    # freni (cap_oneshot) vuruşta ayrıca uygulanır; bonus onu atlamaz.
+    boost = 1.0 + float(getattr(player, "weapon_boost", {}).get(w["key"], 0.0))
     return (player.eff_dmg() * w["dmg"] * WEAPON_DMG_GLOBAL
-            * (1.0 + dpl * WEAPON_DPL_SCALE * weapon_growth(level)))
+            * (1.0 + dpl * WEAPON_DPL_SCALE * weapon_growth(level)) * boost)
 
 
 # =====================================================================
@@ -15620,7 +15933,7 @@ class Enemy:
                 # birlikte çalışır (Lv.1 -%20, Lv.5 -%40).
                 tmp = self.contact_dps * 0.12 * 6
                 if self.slow_timer > 0 and player.dash_slow_level > 0:
-                    tmp *= (1.0 - min(0.45, 0.15 + 0.05 * player.dash_slow_level))
+                    tmp *= (1.0 - min(0.50, 0.30 + 0.05 * player.dash_slow_level))
                 dealt = player.take_damage(tmp, fx, self.x, self.y, self.disp_name)
                 if dealt > 0 and player.thorns_level > 0:
                     reflect = dealt * 0.35 * player.thorns_level
@@ -19727,6 +20040,7 @@ class RunState:
         self.magnets_taken = 0      # bu koşuda toplanan mıknatıs sayısı
         self.magnets_dropped = 0    # bu koşuda düşen mıknatıs (seviye taşı bunu geçemez)
         self.level_drops_total = 0  # bu koşuda düşen seviye taşı
+        self.chests_opened = 0      # v3.29: açılan patron sandığı (ŞANS KİTABI görevi)
         # Koşu bitince doldurulur: bu koşuda kilidi açılan silah ve kitaplar.
         self.new_weapons = []
         self.new_books = []
@@ -20070,9 +20384,24 @@ class RunState:
         sfx("explosion", 1.0, 0.0)
 
     def _apply_execute(self, p, e, dmg):
-        if p.execute_threshold > 0 and not getattr(e, "is_boss", False) and e.kind != "elite" and e.hp > 0:
-            if (e.hp - dmg) / e.max_hp <= p.execute_threshold and e.hp > dmg:
-                return e.hp + 1
+        """İNFAZ (İnfaz Kitabı, İnfaz Kenarı, Zırh Kırıcı).
+
+        v3.29 DÜZELTME — infaz iki yerde sessizce ÇALIŞMIYORDU:
+          1) SİLAH vuruşlarında infazdan SONRA tek-atma freni geliyordu ve
+             "can + 1" hasarını yeniden kırpıyordu: yaratık %18'in altında
+             kalıp ölmüyordu. Artık infaz frenden SONRA uygulanır (bkz.
+             _weapon_hit / _field_damage).
+          2) 25. dalgadan sonra ve cehennemde yaratıkların ZIRHI vardı;
+             "can + 1" zırhtan geçince canın altında kalıyordu. Artık hasar
+             zırhı da karşılayacak kadar büyük.
+        """
+        if (p.execute_threshold > 0 and not getattr(e, "is_boss", False)
+                and getattr(e, "kind", "") != "elite" and e.hp > 0):
+            if (e.hp - dmg) / max(1e-6, e.max_hp) <= p.execute_threshold and e.hp > dmg:
+                arm = clamp(float(getattr(e, "armor", 0.0) or 0.0), 0.0, 0.95)
+                self.fx.popup(e.x, e.y - getattr(e, "radius", 14) - 18, L("fx.execute"),
+                              (255, 170, 80), 14, life=0.5)
+                return (e.hp + 1.0) / (1.0 - arm)
         return dmg
 
     def _explosion_splash(self, cx, cy, base_dmg, exclude_id=None):
@@ -20156,6 +20485,7 @@ class RunState:
         güçlendiren bir ödüle dönüşür.
         """
         p = self.player
+        self.chests_opened += 1
         # Yükseltilebilecek silahlar: oyuncunun taşıdığı ve tavana ulaşmamış.
         can_up = [k for k, lvl in p.weapons.items()
                   if k in WEAPON_BY_KEY and lvl < weapon_max_level(WEAPON_BY_KEY[k])]
@@ -20178,13 +20508,49 @@ class RunState:
         key = random.choice([k for k in can_up if p.weapons[k] == low])
         w = WEAPON_BY_KEY[key]
         p.weapons[key] += 1
-        head = f"{w['name']} SEVİYE {p.weapons[key]}"
-        sub = w_up(w) or L("ui.weapon_up_generic")
-        self.fx.popup(chest.x, chest.y - 74, head, w["color"], 28, life=1.8)
-        self.fx.popup(chest.x, chest.y - 46, sub, TEXT, 14, life=1.8)
-        self.fx.do_flash(w["color"], 0.35)
-        self.fx.ring(chest.x, chest.y, w["color"], n=26, speed=280, life=0.6, r=4)
+        # ŞANS (v3.29): sandık bir NADİRLİK kademesi çeker; silah kademe
+        # çarpanı kadar KALICI hasar kazanır (bkz. weapon_damage).
+        tier = roll_rarity(p.eff_luck())
+        gained = p.add_weapon_boost(key, rarity_boost(tier))
+        extra = False
+        if (tier >= RARITY_COUNT - 1 and LEGEND_CHEST_EXTRA_LEVEL
+                and p.weapons[key] < weapon_max_level(w)):
+            p.weapons[key] += 1
+            extra = True
+        self._chest_rarity_fx(chest, w, tier, gained, extra)
+
+    def _chest_rarity_fx(self, chest, w, tier, gained, extra):
+        """Sandık açılış gösterisi: kademe yükseldikçe daha büyük ve parlak."""
+        p = self.player
+        rc = rarity_color(tier)
+        lvl = p.weapons.get(w["key"], 1)
+        if gained > 0:
+            # "EPİK • BALTA +%20 HASAR" (yüzde işaretinin yeri dile göre)
+            head = L("ui.chest_boost", rarity_name(tier), w_name(w).upper(), fmt_pct1(gained))
+        else:
+            head = "%s • %s (%s)" % (rarity_name(tier), w_name(w).upper(), L("ui.boost_capped"))
+        sub = L("ui.chest_level", w_name(w), lvl)
+        size = 26 + 2 * tier
+        self.fx.popup(chest.x, chest.y - 80, head, rc, size, life=1.9 + 0.25 * tier)
+        self.fx.popup(chest.x, chest.y - 50, sub, w["color"], 15, life=1.9)
+        if extra:
+            self.fx.popup(chest.x, chest.y - 28, L("ui.chest_legend_extra"), GOLD, 16, life=2.2)
+        self.fx.do_flash(rc, 0.30 + 0.08 * tier)
+        for k in range(1 + tier):
+            self.fx.ring(chest.x, chest.y, rc, n=22 + 8 * tier, speed=240 + 60 * k,
+                         life=0.55 + 0.08 * k, r=3 + 0.5 * tier)
+        if tier >= 2:
+            self.fx.shockwave(chest.x, chest.y, 140 + 70 * tier, rc, 0.45, 4 + tier)
+        if tier >= 3:
+            self.fx.burst(chest.x, chest.y, rc, n=20 + 14 * tier, speed=300, life=0.8, r=4)
+            self.fx.shake(4 + 3 * (tier - 2), 0.25)
+        if tier >= 4:
+            self.fx.burst(chest.x, chest.y, WHITE, n=40, speed=420, life=1.0, r=5)
+            for k in range(3):
+                self.fx.shockwave(chest.x, chest.y, 260 + 160 * k, GOLD, 0.6, 7 - k)
         sfx("levelup", 1.0, 0.0)
+        if tier >= 3:
+            sfx("second", 0.8, 0.0)
 
     def update_chests(self, dt):
         for ch in list(self.chests):
@@ -20252,8 +20618,8 @@ class RunState:
             dmg *= p.eff_crit_dmg()
         if p.boss_hunter > 0 and (getattr(e, "is_boss", False) or getattr(e, "kind", "") == "elite"):
             dmg *= (1.0 + p.boss_hunter_bonus())
-        dmg = self._apply_execute(p, e, dmg)
         dmg = cap_oneshot(e, dmg, wlvl)
+        dmg = self._apply_execute(p, e, dmg)     # frenden SONRA (v3.29)
         kx, ky = norm_dir(p.x, p.y, e.x, e.y)
         real_kb = 12 if getattr(e, "is_boss", False) else kb
         died = e.take_damage(dmg, crit, self.fx, kx * real_kb, ky * real_kb)
@@ -20285,8 +20651,8 @@ class RunState:
         p = self.player
         if p.boss_hunter > 0 and (getattr(e, "is_boss", False) or getattr(e, "kind", "") == "elite"):
             dmg *= (1.0 + p.boss_hunter_bonus())
-        dmg = self._apply_execute(p, e, dmg)
         dmg = cap_oneshot(e, dmg, wlvl)
+        dmg = self._apply_execute(p, e, dmg)     # frenden SONRA (v3.29)
         died = e.take_damage(dmg, False, self.fx, quiet=True)
         if burn > 0 and hasattr(e, "apply_burn"):
             e.apply_burn(burn, 1.4)
@@ -20553,6 +20919,7 @@ class RunState:
         p = self.player
         p.level += 1
         p.xp_to_next = xp_next_need(p.xp_to_next, p.level)
+        p.on_level_up(1)
         self.pending_levelups += 1
         self.fx.popup(p.x, p.y - 74, "SEVİYE TAŞI!", LEVEL_COLOR, 34, life=1.8)
         self.fx.popup(p.x, p.y - 44, "+1 SEVİYE", LEVEL_COLOR2, 18, life=1.6)
@@ -21332,7 +21699,7 @@ class RunState:
         if can_stone:
             self.level_kills += 1
         if (can_stone and not self.level_drops
-                and random.random() < magnet_drop_chance(self.level_kills)):
+                and random.random() < magnet_drop_chance(self.level_kills) * LEVEL_STONE_RATE):
             self.level_kills = 0
             self.level_drops_total += 1
             self.level_drops.append(LevelDrop(e.x, e.y))
@@ -21342,7 +21709,8 @@ class RunState:
             self.fx.do_flash(LEVEL_COLOR, 0.30)
             sfx("levelup", 0.8, 0.0)
         self.magnet_kills += 1
-        if not self.magnets and random.random() < magnet_drop_chance(self.magnet_kills):
+        if not self.magnets and random.random() < magnet_drop_chance(self.magnet_kills,
+                                                                     p.eff_luck()):
             self.magnet_kills = 0
             self.magnets_dropped += 1
             self.magnets.append(MagnetDrop(e.x, e.y))
@@ -21424,9 +21792,10 @@ class RunState:
         if input_state.get("dash_pressed"):
             if p.try_dash(self.fx) and p.dash_slow_level > 0:
                 # ZAMAN KİTABI: dash çevredeki düşmanları kısa süre yavaşlatır.
-                rad = 150 + 30 * p.dash_slow_level
-                dur = 1.4 + 0.6 * p.dash_slow_level
-                mult = max(0.35, 1.0 - 0.25 * p.dash_slow_level)
+                # v3.29 GÜÇLENDİ: 180 px / 2,0 sn / %25 -> 230 px / 2,8 sn / %45
+                rad = 200 + 30 * p.dash_slow_level
+                dur = 2.0 + 0.8 * p.dash_slow_level
+                mult = max(0.30, 0.70 - 0.15 * p.dash_slow_level)
                 for e in self.enemies:
                     if e.alive and dist(e.x, e.y, p.x, p.y) < rad and hasattr(e, "apply_slow"):
                         e.apply_slow(mult, dur)
@@ -21750,12 +22119,22 @@ class RunState:
         return max(0, self.SKIP_FREE - self.skip_used)
 
     def _weapon_offer(self, w, lvl, is_new):
-        """Seviye atlama kartı için SİLAH teklifi."""
-        return {
+        """Seviye atlama kartı için SİLAH teklifi.
+
+        ŞANS (v3.29): YÜKSELTME kartları (yeni silah kartları değil) bir
+        nadirlik kademesi taşır; seçilince silaha kademe çarpanı kadar kalıcı
+        hasar eklenir. Kademe her el açılışında (ve yenilemede) yeniden çekilir.
+        """
+        off = {
             "kind": "weapon", "key": w["key"], "w": w, "lvl": lvl, "new": is_new,
             "name": w_name(w), "color": tuple(w["color"]), "icon": w["icon"],
             "desc": w_desc(w) if is_new else (w_up(w) or L("ui.weapon_up_short")),
         }
+        if not is_new:
+            tier = roll_rarity(self.player.eff_luck())
+            off["rarity"] = tier
+            off["boost"] = rarity_boost(tier)
+        return off
 
     def _book_offer(self, bk, lvl, is_new):
         """Seviye atlama kartı için KİTAP teklifi."""
@@ -21883,7 +22262,9 @@ class RunState:
                 if cur > 0 or not rare_room:
                     continue
                 offers.append(self._book_offer(bk, 1, True))
-                weights.append(self._meta_weight(key, 8))
+                # ŞANS (v3.29): gizli frenlerden SONRA nadir kitap ağırlığı büyür.
+                weights.append(self._meta_weight(key, 8)
+                               * (1.0 + LUCK_RARE_BOOK_K * p.eff_luck()))
                 continue
             if cur <= 0:
                 if not book_room:
@@ -22039,6 +22420,18 @@ class RunState:
             self.fx.popup(p.x, p.y - 64,
                           f"{w['name']}" + ("" if first else f" SEVİYE {p.weapons[key]}"),
                           col, 24, life=1.4)
+            # ŞANS (v3.29): yükseltme kartının nadirlik bonusu.
+            if not first and ch.get("boost"):
+                gained = p.add_weapon_boost(key, ch["boost"])
+                tier = int(ch.get("rarity", 0))
+                if gained > 0:
+                    rc = rarity_color(tier)
+                    self.fx.popup(p.x, p.y - 40, "%s  %s" % (
+                        rarity_name(tier), L("ui.boost_dmg", fmt_pct1(gained))),
+                        rc, 15 + tier, life=1.4)
+                    if tier >= 3:
+                        self.fx.ring(p.x, p.y, rc, n=24 + 6 * tier, speed=260, life=0.55, r=3.5)
+                        self.fx.do_flash(rc, 0.2 + 0.05 * tier)
         self.pending_levelups -= 1
         self.fx.ring(p.x, p.y, col, n=16, speed=190, life=0.45, r=3)
         sfx("buy", 0.8, 0.0)
@@ -22053,11 +22446,21 @@ class RunState:
     def reroll_levelup(self):
         """Eli yeniler. Dönüş: (oldu_mu, mesaj)."""
         cost = self.reroll_cost()
+        lucky = False
+        if cost > 0:
+            # ŞANSLI YENİLEME (v3.29): bedava hak bitmiş olsa bile şans * 0.20
+            # (en fazla %35) olasılıkla yenileme bedava olur ve sayaca da
+            # yazılmaz — sonraki yenilemenin fiyatı artmaz.
+            if random.random() < min(LUCK_FREE_REROLL_MAX,
+                                     self.player.eff_luck() * LUCK_FREE_REROLL_K):
+                lucky = True
+                cost = 0
         if cost > self.gold_wallet:
             return False, f"{cost} altın gerek"
         if cost:
             self.gold_wallet -= cost
-        self.reroll_used += 1
+        if not lucky:
+            self.reroll_used += 1
         prev = [(c["kind"], c["key"]) for c in self.levelup_choices]
         # Yeni el eskisinin aynısı çıkmasın diye birkaç deneme yapılır.
         for _ in range(6):
@@ -22065,6 +22468,10 @@ class RunState:
             if [(c["kind"], c["key"]) for c in self.levelup_choices] != prev:
                 break
         sfx("click", 0.7, 0.0)
+        if lucky:
+            p = self.player
+            self.fx.popup(p.x, p.y - 90, L("ui.luck_free"), GREEN, 18, life=1.4)
+            return True, L("ui.luck_free")
         return True, ("bedava yenileme" if cost == 0 else f"-{cost} altın")
 
     def skip_levelup(self):
@@ -22149,6 +22556,8 @@ class RunState:
         st["total_gold"] = st.get("total_gold", 0) + int(self.coins_earned)
         st["best_run_gold"] = max(st.get("best_run_gold", 0), int(self.coins_earned))
         st["total_bonk_hits"] = st.get("total_bonk_hits", 0) + int(self.bonk_hits)
+        # v3.29: ŞANS KİTABI görevi. Eski kayıtta alan yoksa 0'dan başlar.
+        st["total_chests"] = int(st.get("total_chests", 0) or 0) + int(getattr(self, "chests_opened", 0))
         # Koşu içi markette hangi eşyanın kaç seviyeye kadar çıkarıldığı: bazı
         # kitaplar "şu eşyayı tavana kadar yükselt" görevini bunun üzerinden ölçer.
         shop_max = st.setdefault("shop_max", {})
@@ -24152,6 +24561,8 @@ def player_stat_groups(p, run):
     kazanc = [
         (L("st.gold"), _pct(p.eff_coin_mult()), GOLD),
         (L("st.xp"), _pct(p.eff_xp_mult()), PURPLE),
+        # ŞANS (v3.29): 0 iken de görünür — oyuncu statın var olduğunu bilsin.
+        (L("st.luck"), fmt_pct1(p.eff_luck()), GREEN),
     ]
     if p.frenzy_stacks:
         kazanc.append((L("st.frenzy"), f"{p.frenzy_stacks}", (255, 200, 80)))
@@ -25284,6 +25695,15 @@ class LevelUpOverlay:
         # cepteki altın: yenileme/pas bedelleri buradan ödenir
         draw_coin_label(surf, VIRTUAL_W / 2, top - 11, fmt_num(run.gold_wallet),
                         GOLD, 17, icon_r=8)
+        # ŞANS göstergesi (v3.29): şans > 0 ise küçük yazı + üstüne gelince ipucu
+        luck_tip_rect = None
+        if p.eff_luck() > 0:
+            ltxt = L("ui.luck_label", fmt_pct1(p.eff_luck()))
+            # alt başlık satırının sağında (kartların üstüne binmesin)
+            lx = VIRTUAL_W / 2 + text_width(sub, 16) / 2 + 40
+            draw_icon(surf, lx - 12, top - 40, "horseshoe", GREEN, 7)
+            draw_text(surf, ltxt, (lx, top - 48), 15, GREEN, bold=True, shadow=False)
+            luck_tip_rect = pygame.Rect(lx - 22, top - 51, text_width(ltxt, 15, True) + 28, 22)
 
         result = None
         for rect, ch, idx in self.cards:
@@ -25297,9 +25717,22 @@ class LevelUpOverlay:
                 bg = (40, 34, 20) if rare else ((30, 40, 54) if is_weapon else (34, 38, 60))
             else:
                 bg = (22, 24, 40)
-            panel(surf, r2, bg=bg,
-                  edge=(col if hover else (GOLD_DIM if rare else PANEL_EDGE)),
-                  alpha=245, radius=18, edge_w=3)
+            tier = ch.get("rarity") if is_weapon else None
+            edge = col if hover else (GOLD_DIM if rare else PANEL_EDGE)
+            if tier:
+                # nadirlik kademesinin kenar rengi (Yaygın kenarı değiştirmez)
+                edge = lighten(rarity_color(tier), 0.15) if hover else rarity_color(tier)
+                add_glow(surf, r2.centerx, r2.centery, r2.w * 0.62, rarity_color(tier),
+                         0.06 + 0.04 * tier)
+            panel(surf, r2, bg=bg, edge=edge, alpha=245, radius=18, edge_w=3)
+            if tier is not None:
+                # sağ üstte kademe rozeti
+                rname = rarity_name(tier)
+                bw_ = text_width(rname, 10, True) + 14
+                br_ = pygame.Rect(r2.right - bw_ - 10, r2.y - 9, bw_, 18)
+                pygame.draw.rect(surf, rarity_color(tier), br_, border_radius=9)
+                draw_text(surf, rname, br_.center, 10, (12, 12, 18), bold=True,
+                          center=True, shadow=False)
 
             # ---- üst etiket: SİLAH / YÜKSELTME / NADİR KİTAP / KİTAP ----
             if is_weapon:
@@ -25329,9 +25762,18 @@ class LevelUpOverlay:
 
             draw_text(surf, ch["name"], (r2.centerx, r2.y + 152), 20, TEXT,
                       bold=True, center=True)
-            for i, ln in enumerate(wrap_text(ch["desc"], 14, r2.w - 40)[:4]):
+            n_desc = 3 if tier is not None else 4
+            for i, ln in enumerate(wrap_text(ch["desc"], 14, r2.w - 40)[:n_desc]):
                 draw_text(surf, ln, (r2.centerx, r2.y + 188 + i * 19), 14, TEXT_DIM,
                           center=True, shadow=False)
+            if tier is not None and ch.get("boost"):
+                left = WEAPON_BOOST_CAP - float(p.weapon_boost.get(ch["key"], 0.0))
+                gain = max(0.0, min(ch["boost"], left))
+                btxt = (L("ui.boost_dmg", fmt_pct1(gain)) if gain > 0
+                        else L("ui.boost_capped"))
+                draw_text(surf, btxt, (r2.centerx, r2.bottom - 88), 15,
+                          lighten(rarity_color(tier), 0.1), bold=True, center=True,
+                          shadow=False)
 
             # ---- yükseltmelerde mevcut seviye çubuğu (silah ve kitap) ----
             if not ch.get("new"):
@@ -25370,6 +25812,17 @@ class LevelUpOverlay:
                 result = ("reroll", None)
             elif hov_s:
                 result = ("skip", None)
+
+        # ---- şans ipucu ----
+        if luck_tip_rect is not None and luck_tip_rect.collidepoint(mouse_pos):
+            lines = wrap_text(L("ui.luck_tip"), 12, 300)[:4]
+            tr_ = pygame.Rect(0, 0, 324, 16 + 17 * len(lines))
+            tr_.midtop = (luck_tip_rect.centerx, luck_tip_rect.bottom + 6)
+            tr_.right = min(tr_.right, VIRTUAL_W - 8)
+            panel(surf, tr_, bg=(16, 22, 20), edge=GREEN, alpha=248, radius=8, edge_w=1)
+            for i, ln in enumerate(lines):
+                draw_text(surf, ln, (tr_.x + 12, tr_.y + 8 + i * 17), 12, TEXT,
+                          shadow=False)
 
         # ---- kısa bilgi yazısı (yetersiz altın vb.) ----
         if self.toast_t > 0:
@@ -30306,7 +30759,7 @@ class App:
             for perk in sk.get("perks", []):
                 if yy >= perk_limit:
                     break
-                for j, ln in enumerate(wrap_text(perk, 10, rect.w - 34)[:2]):
+                for j, ln in enumerate(wrap_text(perk_tr(perk), 10, rect.w - 34)[:2]):
                     if yy >= perk_limit:
                         break
                     draw_text(canvas, ("• " if j == 0 else "   ") + ln,
@@ -31490,8 +31943,10 @@ class App:
         canvas = self.display.canvas
         self.bg.update(dt * 0.2)
         self.bg.draw(canvas)
-        pr = pygame.Rect(0, 0, 940, 600)
-        pr.center = (VIRTUAL_W / 2, VIRTUAL_H / 2 - 10)
+        # v3.29: 7. kart (UĞUR) için panel 4 satıra büyüdü.
+        n_rows = (len(MASTERY) + 1) // 2
+        pr = pygame.Rect(0, 0, 940, 600 if n_rows <= 3 else 690)
+        pr.center = (VIRTUAL_W / 2, VIRTUAL_H / 2 - (10 if n_rows <= 3 else 0))
         panel(canvas, pr, alpha=246)
         cx = pr.centerx
         draw_text(canvas, L("ui.mastery"), (cx, pr.y + 22), 30, GOLD, bold=True,
@@ -31510,11 +31965,14 @@ class App:
 
         kart_w, kart_h = 410, 112
         gx0 = cx - kart_w - 12
-        gy0 = pr.y + 102
+        gy0 = pr.y + (102 if n_rows <= 3 else 96)
+        gap_y = 14 if n_rows <= 3 else 8
         for i, m in enumerate(MASTERY):
             col, row = i % 2, i // 2
-            r = pygame.Rect(gx0 + col * (kart_w + 24), gy0 + row * (kart_h + 14),
+            r = pygame.Rect(gx0 + col * (kart_w + 24), gy0 + row * (kart_h + gap_y),
                             kart_w, kart_h)
+            if len(MASTERY) % 2 and i == len(MASTERY) - 1:
+                r.centerx = cx                  # tek kalan kart ortada
             lvl = self.save.mastery_level(m["key"])
             cost = self.save.mastery_next_cost(m["key"])
             alinabilir = gem >= cost and self.save.can_spend()
@@ -34082,7 +34540,7 @@ class App:
         if perks:
             for perk in perks:
                 draw_icon(canvas, panel_rect.x + 50, y + 7, "star", sk["color"], 8)
-                draw_text(canvas, perk, (panel_rect.x + 68, y), 14, TEXT, shadow=False)
+                draw_text(canvas, perk_tr(perk), (panel_rect.x + 68, y), 14, TEXT, shadow=False)
                 y += 27
         else:
             draw_text(canvas, L("ui.no_ult"),
@@ -34283,7 +34741,7 @@ class App:
             desc_lines = wrap_clip(cos_desc(item), 10, rect.w - 24, 2)
             for j, ln in enumerate(desc_lines):
                 draw_text(canvas, ln, (rect.centerx, rect.y + 118 + j * 16), 10, TEXT_DIM, center=True, shadow=False)
-            perk_txt = item.get("perk_text")
+            perk_txt = perk_tr(item.get("perk_text")) if item.get("perk_text") else ""
             if perk_txt:
                 # Parçanın kendi rengi koyu olabiliyor (Ninja, Silindir Şapka):
                 # kart zeminiyle aynı tona düşüp okunmaz oluyordu.
