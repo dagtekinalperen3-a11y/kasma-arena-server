@@ -27,6 +27,11 @@
      3 nadir kitap.
    * ALTIN ve TECRÜBE ARTIK HİÇ KAYBOLMAZ (cehenneme geçerken de cebe yazılır).
    * PELERİNLER artık titremiyor, yumuşakça dalgalanıyor (_cape_motion).
+   * OTOMATİK PİLOT İNSAN GİBİ NİŞAN ALIYOR (reklam filmi ve tanıtım videosu):
+     tepki gecikmesi, yaylı imleç, el titremesi, hedefte kalma — artık
+     "aimbot" gibi hedeften hedefe ışınlanmıyor (_TourPilot).
+   * tools/make_trailer.py: oyunun gerçek motoruyla 2 dakikalık tanıtım
+     filmi (MP4, 1080p60, fragman müziği + oyunun kendi efektleri).
    * tools/pace_sim.py: başsız tempo/denge botu. tests/test_shop.py: mağaza testleri.
 
  v3.27 ile gelenler (DENGE + PELERİNLER):
@@ -26851,8 +26856,35 @@ def _tc(tr, en):
     return tr if lang() == "tr" else en
 
 
+def tour_kill_boss(b, fx):
+    """Turda patronu TEK vuruşta devirir. Patronun saniyelik hasar tavanı
+    (BOSS_MIN_FIGHT_TIME) yüzünden düz take_damage turun "devir" anında
+    patronu öldüremiyor, patron sonraki sahneye taşıyordu (v3.28)."""
+    if not b.alive:
+        return
+    b.intake_budget = 1e18
+    b.armor = 0.0
+    b.take_damage(b.hp + 50, True, fx)
+
+
 class _TourPilot:
-    """Turun savaş sahnelerini oynayan otomatik pilot."""
+    """Turun savaş sahnelerini oynayan otomatik pilot.
+
+    v3.28 — "OTOMATİK KİLİTLENME GİBİ DEĞİL, NORMAL BİR OYUNCU GİBİ".
+    Eskiden nişan her karede en yakın yaratığın TAM üstüne ışınlanıyordu:
+    imleç hedeften hedefe zıplıyor, hiç ıskalamıyor, oyuncunun eli değil bir
+    aimbot gibi görünüyordu. Artık imleç bir insan eli gibi davranır:
+      * HEDEFE TEPKİ GECİKMESİ: yeni hedefe 0.12-0.30 sn sonra döner,
+      * YAYLI HAREKET: imleç hedefe yaklaşırken hafifçe taşar ve geri oturur,
+      * EL TİTREMESİ: birkaç piksellik yavaş dalgalanma,
+      * HEDEFTE KALMA: hedef ölmeden ya da belirgin şekilde daha yakın bir
+        tehdit çıkmadan başka yaratığa geçmez,
+      * ATEŞ: imleç hedefe yakınken basılı tutar (uzaktayken ıskalayabilir),
+      * KLAVYE GİBİ YÜRÜME: 8 yönlü, kısa tepki aralıklarıyla değişen yön.
+    """
+
+    AIM_W = 15.0          # yay sertliği (rad/sn): büyük = daha çevik el
+    AIM_ZETA = 0.62       # sönüm: < 1 hafif taşma demek
 
     def __init__(self, run, crowd=0):
         self.run = run
@@ -26864,7 +26896,15 @@ class _TourPilot:
         self.target = None
         self.use = False
         self.keep_hp = True
-        self.aim = (VIRTUAL_W / 2, VIRTUAL_H / 2)
+        self.cur = [VIRTUAL_W / 2 + 90.0, VIRTUAL_H / 2 - 30.0]   # ekrandaki imleç
+        self.vel = [0.0, 0.0]
+        self.aim = tuple(self.cur)
+        self.tgt = None           # nişan alınan yaratık
+        self.react = 0.0          # yeni hedefe dönmeden önceki tepki süresi
+        self.recheck = 0.0
+        self.move = (0.0, 0.0)
+        self.move_t = 0.0
+        self.nt = random.uniform(0.0, 100.0)
 
     def spawn(self):
         run = self.run
@@ -26876,6 +26916,56 @@ class _TourPilot:
         else:
             kind = random.choice(("red", "red", "blue", "yellow", "tank", "sprinter", "brute"))
             run.enemies.append(Enemy(kind, x, y, run.wave_hp_mult(w), 1.0, wave=w))
+
+    def _aim_update(self, dt, cands, p):
+        run = self.run
+        if self.tgt is not None and (not getattr(self.tgt, "alive", False) or self.tgt not in cands):
+            self.tgt = None
+            self.react = random.uniform(0.12, 0.30)
+        self.react -= dt
+        self.recheck -= dt
+        if cands and self.react <= 0:
+            by_d = sorted(cands, key=lambda e: (e.x - p.x) ** 2 + (e.y - p.y) ** 2)
+            if self.tgt is None:
+                # çoğu zaman en yakını, bazen ikinci en yakını (insan seçimi)
+                self.tgt = by_d[0] if (len(by_d) < 2 or random.random() < 0.75) else by_d[1]
+            elif self.recheck <= 0:
+                self.recheck = random.uniform(0.45, 0.9)
+                cur_d = math.hypot(self.tgt.x - p.x, self.tgt.y - p.y)
+                near = by_d[0]
+                if near is not self.tgt and math.hypot(near.x - p.x, near.y - p.y) < cur_d * 0.55:
+                    self.tgt = None                      # daha yakın tehdit: tepkiyle dön
+                    self.react = random.uniform(0.10, 0.22)
+        # hedef noktası (ekranda)
+        if self.tgt is not None:
+            gx, gy = run.world_to_screen(self.tgt.x, self.tgt.y)
+        else:
+            # hedef yokken el, gidilen yöne doğru gevşekçe durur
+            px, py = run.world_to_screen(p.x, p.y)
+            gx = px + self.move[0] * 150 + 60
+            gy = py + self.move[1] * 110 - 20
+        self.nt += dt
+        jx = (math.sin(self.nt * 2.3) + 0.6 * math.sin(self.nt * 5.7 + 1.1)) * 3.2
+        jy = (math.sin(self.nt * 2.9 + 0.7) + 0.6 * math.sin(self.nt * 6.1 + 2.0)) * 3.2
+        gx, gy = gx + jx, gy + jy
+        w, z = self.AIM_W, self.AIM_ZETA
+        h = 1.0 / 240.0
+        n = max(1, int(math.ceil(dt / h)))
+        h = dt / n
+        for _ in range(n):           # yayı küçük adımlarla çöz (kararlı)
+            ax = w * w * (gx - self.cur[0]) - 2 * z * w * self.vel[0]
+            ay = w * w * (gy - self.cur[1]) - 2 * z * w * self.vel[1]
+            self.vel[0] += ax * h
+            self.vel[1] += ay * h
+            self.cur[0] += self.vel[0] * h
+            self.cur[1] += self.vel[1] * h
+        self.cur[0] = clamp(self.cur[0], 20, VIRTUAL_W - 20)
+        self.cur[1] = clamp(self.cur[1], 90, VIRTUAL_H - 20)
+        self.aim = (self.cur[0], self.cur[1])
+        if self.tgt is None:
+            return False
+        tx, ty = run.world_to_screen(self.tgt.x, self.tgt.y)
+        return math.hypot(tx - self.cur[0], ty - self.cur[1]) < 140
 
     def step(self, dt):
         run = self.run
@@ -26896,11 +26986,10 @@ class _TourPilot:
             tx = self.cx + math.cos(self.ang) * 230
             ty = self.cy + math.sin(self.ang) * 140
         mx, my = tx - p.x, ty - p.y
-        near, nd, close = None, 1e18, 0
-        for e in [e for e in run.enemies if e.alive] + [b for b in run.bosses if b.alive]:
+        cands = [e for e in run.enemies if e.alive] + [b for b in run.bosses if b.alive]
+        close = 0
+        for e in cands:
             d = (e.x - p.x) ** 2 + (e.y - p.y) ** 2
-            if d < nd:
-                near, nd = e, d
             if d < 150 * 150:
                 close += 1
                 if d < 95 * 95 and self.target is None:
@@ -26908,25 +26997,31 @@ class _TourPilot:
                     mx -= (e.x - p.x) * k * 160
                     my -= (e.y - p.y) * k * 160
         ln = math.hypot(mx, my)
-        if ln < 10 and self.target is not None:
-            mx = my = 0.0
-        else:
-            ln = ln or 1.0
-            mx, my = mx / ln, my / ln
-        inp = {"left": max(0.0, -mx), "right": max(0.0, mx), "up": max(0.0, -my),
-               "down": max(0.0, my), "mouse_down": near is not None, "use_pressed": self.use}
-        if near is not None:
-            inp["aim_x"], inp["aim_y"] = near.x, near.y
-            sx, sy = run.world_to_screen(near.x, near.y)
-            self.aim = (clamp(sx, 20, VIRTUAL_W - 20), clamp(sy, 90, VIRTUAL_H - 20))
+        # KLAVYE GİBİ: 8 yön, yön kısa aralıklarla güncellenir
+        self.move_t -= dt
+        if self.move_t <= 0 or (ln < 10 and self.target is not None):
+            if ln < 10 and self.target is not None:
+                self.move = (0.0, 0.0)
+            else:
+                a = math.atan2(my, mx)
+                a = round(a / (math.pi / 4)) * (math.pi / 4)
+                self.move = (round(math.cos(a), 3), round(math.sin(a), 3))
+            self.move_t = random.uniform(0.10, 0.22)
+        mvx, mvy = self.move
+        on_target = self._aim_update(dt, cands, p)
+        inp = {"left": 1.0 if mvx < -0.3 else 0.0, "right": 1.0 if mvx > 0.3 else 0.0,
+               "up": 1.0 if mvy < -0.3 else 0.0, "down": 1.0 if mvy > 0.3 else 0.0,
+               "mouse_down": bool(cands) and (on_target or close >= 3),
+               "use_pressed": self.use,
+               "aim_sx": self.cur[0], "aim_sy": self.cur[1]}
         self.bonk -= dt
         self.dash -= dt
         inp["bonk_pressed"] = close >= 4 and self.bonk <= 0
         if inp["bonk_pressed"]:
-            self.bonk = 1.5
+            self.bonk = random.uniform(1.3, 1.9)
         inp["dash_pressed"] = close >= 7 and self.dash <= 0 and self.target is None
         if inp["dash_pressed"]:
-            self.dash = 2.2
+            self.dash = random.uniform(2.0, 2.8)
         run.update(dt, inp)
 
 
@@ -26955,6 +27050,11 @@ class GameTour:
         self.flags = set()
         self._bg = None
         self._setup_save()
+        # Filmdeki mağaza "açık" görünsün (gölge oyun; gerçek satın alma yok).
+        sh.purchase.enabled = True
+        sh.purchase.api_url = "tour"
+        sh.purchase._catalog_at = time.time() + 10 ** 6
+        sh.purchase.catalog = {str(CUSTOM_PET_PRODUCT_ID): {"price": 15900}}
         sh.build_menu_buttons()
         # Arena ve cehennem zeminleri ilk kez çizilirken ~0.5 sn sürüyor:
         # filmin ortasında takılmasın diye şimdi hazırlanır.
@@ -27374,8 +27474,7 @@ class GameTour:
             self.pilot.target = None
         if st > 3.3:
             for b in list(run.bosses):
-                if b.alive:
-                    b.take_damage(b.hp + 50, True, run.fx)
+                tour_kill_boss(b, run.fx)
         self.pilot.target = (run.chests[0].x, run.chests[0].y) if run.chests else None
         self._play(dt)
         self.cap(title, sub, st - 0.5, 3.8, col=col)
@@ -27475,8 +27574,7 @@ class GameTour:
             self.pilot.crowd = 16
         if st > 3.0:
             for b in list(run.bosses):
-                if b.alive:
-                    b.take_damage(b.hp + 50, True, run.fx)
+                tour_kill_boss(b, run.fx)
         self._play(dt)
         self.cap(_tc("10. DALGA: CEHENNEM PATRONU", "WAVE 10: HELL BOSS"),
                  _tc("Cehennemin patronları ateşle saldırır.", "Hell's bosses fight with fire."),

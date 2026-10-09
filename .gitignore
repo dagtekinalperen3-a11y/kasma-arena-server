@@ -1,3 +1,6 @@
 __pycache__/
 *.pyc
 home_*/
+trailer/
+trailer_out/
+*.mp4
