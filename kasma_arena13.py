@@ -1,6 +1,6 @@
 """
 =====================================================================
- ARENA BONK  —  v3.26   (eski adı: KASMA ARENA)
+ ARENA BONK  —  v3.27   (eski adı: KASMA ARENA)
  2D Top-Down Hayatta Kalma / Skor-Rekor Oyunu
  ---------------------------------------------------------------------
  Dalgalar halinde gelen düşmanlara karşı hayatta kal, nişan al, ateş et,
@@ -8,6 +8,23 @@
  patronları yen, rekorunu kır. Kaybedersen o koşuda aldıkların silinir.
  Elmasla kalıcı SKIN'ler al (her skinin kendi silahı, mermisi, efekti ve
  ÖZEL YETENEĞİ var).
+
+ v3.27 ile gelenler (DENGE + PELERİNLER):
+   * OYUN BİRAZ SAKİNLEŞTİ: yaratık doğumu %10 yavaş (SPAWN_RATE_TUNE),
+     yaratık canı %5 (ENEMY_HP_NERF), hasarı %10 (ENEMY_DMG_NERF) düştü.
+   * SEVİYE 15'TEN SONRA DA GELİYOR: eğri 13-50 arası doğrusal
+     (XP_CURVE_BANDS). Başsız botla ölçüldü: 25. dalgada ~50. seviye
+     (eskiden ~31). İlk 12 seviye aynı.
+   * PATRON AFK AÇIĞI KAPANDI: patron 30 saniyede devrilmezse dalga
+     kendiliğinden devam eder (BOSS_WAVE_TIMEOUT). Patron sahada kalır ama
+     küçük dalgalar artık sonsuza kadar "kasılamaz".
+   * PELERİNLER YENİLENDİ: dalgalanan kumaş, renk geçişi, kıvrımlar, omuz
+     tokaları ve her pelerine özel etek + efekt (alev dili ve kıvılcım,
+     buz sarkıtı ve buhar, kayan yıldızlar, şimşek, duman, düşen yaprak,
+     yarasa kanadı, çelik pul, altın parıltı...).
+   * REKLAM İZLE ödülü 50 -> 250 elmas (sunucu da: server.py).
+   * tools/combo_sim.py: oyunun motoruyla başsız koşu oynatan bot; her silah
+     / kitap kombosunun ne kadar gittiğini ölçer (bkz. tools/COMBO_RAPORU.md).
 
  v3.26 ile gelenler (ARENA BONK — VİTRİN, MAĞAZA, YILBAŞI):
    * OYUNUN ADI ARTIK "ARENA BONK". Logo ve ikon oyunun İÇİNE gömülü
@@ -664,7 +681,7 @@ WEAPON_FX_LEGACY = {"full": 100, "dim": 32, "off": 0}
 # v3.26: oyunun adı ARENA BONK. (Kayıt klasörü "KasmaArena" olarak KALIYOR:
 # adı değiştirmek oyuncuların ilerlemesini kaybettirirdi; bkz. get_save_dir.)
 GAME_TITLE = "ARENA BONK"
-GAME_VERSION = "3.26"
+GAME_VERSION = "3.27"
 
 
 # =====================================================================
@@ -28725,7 +28742,7 @@ class App:
             a = -math.pi / 2 + (j - 1) * 0.7
             draw_icon(canvas, cx + 62 + math.cos(a) * 8 + j * 4, cy - 30 + j * 14 + math.sin(t * 3 + j) * 2,
                       "gem", GEM_COLOR, 8)
-        draw_text(canvas, "+" + str(AD_REWARD_GEMS), (cx - 74, cy - 10), 22, GEM_COLOR, bold=True,
+        draw_text(canvas, "+" + str(AD_REWARD_GEMS), (cx - 88, cy - 10), 22, GEM_COLOR, bold=True,
                   center=True)
         for j, ln in enumerate(wrap_text(L("ui.ad_desc", AD_REWARD_GEMS), 12, r.w - 40)[:2]):
             draw_text(canvas, ln, (cx, r.y + 172 + j * 16), 12, TEXT_DIM, center=True, shadow=False)
