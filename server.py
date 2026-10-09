@@ -434,6 +434,10 @@ def diag():
         "player_events": ["account_id", "at", "kind", "delta", "total", "note"],
         "scores": ["name", "score", "kills", "wave", "run_time", "created_at",
                    "account_id"],
+        # v3.28: gerçek para (TL) siparişleri — bkz. README_ODEME.md
+        "shop_orders": ["id", "account_id", "product_id", "kind", "amount", "currency",
+                        "status", "provider", "provider_ref", "payload", "created_at",
+                        "paid_at", "granted_at", "error"],
     }
     for tbl, cols in need.items():
         info = {"var": False, "eksik_sutunlar": []}
@@ -465,6 +469,11 @@ def diag():
     if not _google_enabled():
         out["yapilacak"].append("Google girişi kapalı (GOOGLE_CLIENT_ID / "
                                 "GOOGLE_CLIENT_SECRET yok) — zorunlu değil")
+    shop_problem = _shop_config_problem()
+    out["magaza"] = {"saglayici": SHOP_PROVIDER or "(kapalı)",
+                     "acik": shop_problem == ""}
+    if shop_problem:
+        out["yapilacak"].append("Mağaza (TL ile satın alma) kapalı: " + shop_problem)
     if out["ok"] and not out["yapilacak"]:
         out["yapilacak"].append("her şey yerinde")
     return jsonify(out)
@@ -1386,6 +1395,11 @@ STAT_CAP = {
     "total_shots": 1_000_000_000,
 }
 SCORE_FLOOR = 6000.0           # bu skorun altında makullük aranmaz
+# v3.28: oyunda dalgaların ASGARİ SÜRESİ var; güçlü oyuncu skor hedefini
+# doldurduktan sonra da kesmeye devam ettiği için dalga başına hedeften
+# fazla skor toplayabilir. Dürüst oyuncu yanlışlıkla yasaklanmasın diye
+# dalga-hedefi tavanına koşu süresiyle büyüyen bir pay eklenir.
+SCORE_TIME_SLACK = 150.0       # koşu saniyesi başına ek skor payı
 
 # --- HIZ SINIRI ---
 RATE_WINDOW = 300.0            # saniye
@@ -1436,13 +1450,13 @@ def _login_ok(who):
             _login_fails.pop(who, None)
 
 
-def _rate_ok(key):
+def _rate_ok(key, max_n=RATE_MAX, window=RATE_WINDOW):
     now = time.time()
     with _rate_lock:
         dq = _rate_hits[key]
-        while dq and now - dq[0] > RATE_WINDOW:
+        while dq and now - dq[0] > window:
             dq.popleft()
-        if len(dq) >= RATE_MAX:
+        if len(dq) >= max_n:
             return False
         dq.append(now)
         # TEMİZLİK (v3.22). Eskiden yalnızca BOŞ kuyruklar atılıyordu, ama
@@ -1561,7 +1575,7 @@ def score_is_plausible(name, score, kills, wave, run_time):
     # hedefler küçük olduğu için bu denetim yanlış pozitif verebiliyor.
     if score >= SCORE_FLOOR:
         goal_sum = sum(_wave_goal(w) for w in range(1, int(wave) + 2))
-        if score > goal_sum * 2.5 + SCORE_FLOOR:
+        if score > goal_sum * 2.5 + SCORE_FLOOR + run_time * SCORE_TIME_SLACK:
             return False, "skor ulaşılan dalgaya göre imkânsız"
     return True, ""
 
@@ -1915,6 +1929,629 @@ def purchase_status():
         "sandbox": STEAM_SANDBOX,
         "packs": {str(k): {"gems": v[0], "desc": v[1]} for k, v in GEM_PACKS.items()},
     })
+
+# =====================================================================
+# 4. MAĞAZA — GERÇEK PARA (TL) İLE SATIN ALMA  (v3.28)
+# ---------------------------------------------------------------------
+# Akış (oyun içinden):
+#   1) Oyun POST /shop/checkout  -> sunucu bir SİPARİŞ açar (shop_orders),
+#      fiyatı KENDİ kataloğundan alır (oyunun gönderdiği fiyata bakılmaz) ve
+#      bir ödeme adresi döndürür: /shop/pay/<sipariş>?k=<anahtar>.
+#   2) Oyun bu adresi oyuncunun TARAYICISINDA açar. Sayfa ödeme
+#      sağlayıcısına (iyzico ya da Shopier) yönlendirir; kart bilgisi
+#      hiçbir zaman oyuna ya da bu sunucuya gelmez.
+#   3) Ödeme bitince sağlayıcı tarayıcıyı /shop/callback/<sağlayıcı>'ya
+#      döndürür. Sunucu ödemeyi SAĞLAYICIYA SORARAK (iyzico) ya da imzasını
+#      doğrulayarak (Shopier) teyit eder, tutarı siparişle karşılaştırır ve
+#      ürünü HESABA yazar (elmas defteri, skin, PET, özel PET).
+#   4) Oyun POST /shop/order_status ile siparişi izler; "granted" olunca
+#      sunucunun ilerlemesini indirir. Oyun kapalıyken biten ödeme de
+#      kaybolmaz: ürün hesaptadır, oyun açılınca gelir.
+#
+# GÜVENLİK
+#   * Ürün YALNIZCA sunucunun doğruladığı ödemeyle verilir; oyunun "aldım"
+#     demesi hiçbir şey vermez (bkz. _is_paid / _merge_progress).
+#   * Her sipariş TEK KEZ teslim edilir: durum geçişi (paid -> granted)
+#     veritabanında koşullu güncellemeyle yapılır, iki geri dönüş aynı anda
+#     gelse bile ürün iki kez yazılmaz.
+#   * Banka / IBAN bilgisi BU KODA GİRMEZ. Sağlayıcının paneline girilir;
+#     para oradan banka hesabına aktarılır. Sunucu yalnızca API anahtarlarını
+#     ortam değişkeni olarak bilir. Kurulum: README_ODEME.md.
+# =====================================================================
+SHOP_PROVIDER = os.environ.get("PAYMENT_PROVIDER", "").strip().lower()
+PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").strip().rstrip("/")
+SHOP_FALLBACK_EMAIL = os.environ.get("SHOP_FALLBACK_EMAIL", "").strip()
+
+IYZICO_API_KEY = os.environ.get("IYZICO_API_KEY", "").strip()
+IYZICO_SECRET_KEY = os.environ.get("IYZICO_SECRET_KEY", "").strip()
+# Canlı: https://api.iyzipay.com   Deneme: https://sandbox-api.iyzipay.com
+IYZICO_BASE_URL = os.environ.get("IYZICO_BASE_URL", "https://api.iyzipay.com").strip().rstrip("/")
+
+SHOPIER_API_KEY = os.environ.get("SHOPIER_API_KEY", "").strip()
+SHOPIER_API_SECRET = os.environ.get("SHOPIER_API_SECRET", "").strip()
+SHOPIER_WEBSITE_INDEX = os.environ.get("SHOPIER_WEBSITE_INDEX", "1").strip() or "1"
+SHOPIER_PAY_URL = "https://www.shopier.com/ShowProduct/api_pay4.php"
+
+# DENEME SAĞLAYICISI: gerçek para yok, "ÖDE" düğmesiyle sipariş tamamlanır.
+# Yalnızca PAYMENT_PROVIDER=mock iken VE yalnızca burada adı yazan hesaplar
+# için çalışır (virgülle ayrılmış kullanıcı adları). Canlıda KULLANMA.
+MOCK_PAY_USERS = {u.strip().lower() for u in
+                  os.environ.get("MOCK_PAY_USERS", "").split(",") if u.strip()}
+
+ORDER_TTL = 6 * 3600              # bu kadar eski "pending" sipariş ödenemez
+CUSTOM_PET_PRODUCT = "3100"
+CUSTOM_PET_MAX = 24               # bir hesapta en çok kaç özel PET
+
+# KATALOG — fiyat KURUŞ cinsinden. Oyundaki item_id'lerle birebir aynı.
+# Fiyatı değiştirmek için yalnızca burayı değiştirmek yeter: oyun fiyatı
+# /shop/catalog'dan okur.
+SHOP_PRODUCTS = {
+    "1001": {"kind": "gems", "gems": 500, "price": 2900, "name": "500 Elmas"},
+    "1002": {"kind": "gems", "gems": 1320, "price": 5900, "name": "1.320 Elmas"},
+    "1003": {"kind": "gems", "gems": 3120, "price": 11900, "name": "3.120 Elmas"},
+    "1004": {"kind": "gems", "gems": 9450, "price": 27900, "name": "9.450 Elmas"},
+    "2001": {"kind": "skin", "item": "web_master", "price": 7900, "name": "Ağ Ustası (skin)"},
+    "2002": {"kind": "skin", "item": "ash_warrior", "price": 7900, "name": "Kül Savaşçısı (skin)"},
+    "2003": {"kind": "skin", "item": "green_titan", "price": 9900, "name": "Yeşil Dev (skin)"},
+    "2004": {"kind": "skin", "item": "immortal_merc", "price": 8900, "name": "Ölümsüz Kiralık (skin)"},
+    "3001": {"kind": "pet", "item": "pet_cat", "price": 2900, "name": "Yavru Kedi (PET)"},
+    "3002": {"kind": "pet", "item": "pet_dog", "price": 2900, "name": "Minik Köpek (PET)"},
+    "3003": {"kind": "pet", "item": "pet_bunny", "price": 3900, "name": "Tavşan (PET)"},
+    "3004": {"kind": "pet", "item": "pet_slime", "price": 3900, "name": "Slime (PET)"},
+    "3005": {"kind": "pet", "item": "pet_ghost", "price": 4900, "name": "Sevimli Hayalet (PET)"},
+    "3006": {"kind": "pet", "item": "pet_owl", "price": 4900, "name": "Baykuş (PET)"},
+    "3007": {"kind": "pet", "item": "pet_drone", "price": 5900, "name": "Mini Drone (PET)"},
+    "3008": {"kind": "pet", "item": "pet_dragon", "price": 7900, "name": "Yavru Ejderha (PET)"},
+    CUSTOM_PET_PRODUCT: {"kind": "custom_pet", "price": 15900, "name": "Kendi PET'in (özel tasarım)"},
+}
+
+# ÖZEL PET PARÇALARI — oyundaki CUSTOM_PET_PARTS ile BİREBİR aynı olmalı.
+# Tasarım veritabanına girmeden önce bu listeyle süzülür.
+CUSTOM_PET_PARTS = {
+    "body": ("round", "chubby", "tall", "bean", "blob"),
+    "eyes": ("round", "big", "sleepy", "happy", "angry", "star", "cyclops", "heart"),
+    "mouth": ("smile", "cat", "fangs", "tongue", "o", "none"),
+    "ears": ("none", "cat", "dog", "bunny", "bear", "fox", "horns", "antenna"),
+    "tail": ("none", "cat", "fox", "puff", "dragon", "devil", "fish"),
+    "wings": ("none", "bat", "angel", "fairy", "dragon"),
+    "hat": ("none", "crown", "bow", "unicorn", "halo", "tophat", "leaf", "flower"),
+    "pattern": ("plain", "belly", "spots", "stripes", "cheeks"),
+    "fx": ("none", "sparkle", "hearts", "flames", "snow", "bubbles", "rainbow"),
+}
+CUSTOM_PET_COLORS = ("col", "col2", "eye")
+CUSTOM_PET_NAME_RE = _re.compile(r"[^0-9A-Za-zÇĞİÖŞÜçğıöşü _\-]")
+
+
+def _clean_pet_design(d):
+    """Oyundan gelen PET tasarımını süzer. Geçersizse None."""
+    if not isinstance(d, dict):
+        return None
+    out = {}
+    for key, allowed in CUSTOM_PET_PARTS.items():
+        v = str(d.get(key, allowed[0]))
+        if v not in allowed:
+            return None
+        out[key] = v
+    for key in CUSTOM_PET_COLORS:
+        c = d.get(key)
+        if not (isinstance(c, (list, tuple)) and len(c) == 3):
+            return None
+        try:
+            out[key] = [max(0, min(255, int(x))) for x in c]
+        except (TypeError, ValueError):
+            return None
+    try:
+        size = float(d.get("size", 1.0))
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(size):
+        return None
+    out["size"] = round(max(0.8, min(1.3, size)), 2)
+    name = CUSTOM_PET_NAME_RE.sub("", str(d.get("name", "") or ""))[:14].strip()
+    out["name"] = name or "Petim"
+    return out
+
+
+def _shop_config_problem():
+    """Mağaza açılabilir mi? Açılamıyorsa sebebi (Türkçe), yoksa ''."""
+    if not supabase:
+        return "Supabase bağlı değil"
+    if not SHOP_PROVIDER:
+        return "PAYMENT_PROVIDER ayarlanmamış (iyzico / shopier / mock)"
+    if not PUBLIC_BASE_URL.startswith("https://") and SHOP_PROVIDER != "mock":
+        return "PUBLIC_BASE_URL https:// ile başlamalı (ör. https://kasma-arena-server.onrender.com)"
+    if SHOP_PROVIDER == "iyzico":
+        if not (IYZICO_API_KEY and IYZICO_SECRET_KEY):
+            return "IYZICO_API_KEY / IYZICO_SECRET_KEY eksik"
+    elif SHOP_PROVIDER == "shopier":
+        if not (SHOPIER_API_KEY and SHOPIER_API_SECRET):
+            return "SHOPIER_API_KEY / SHOPIER_API_SECRET eksik"
+    elif SHOP_PROVIDER == "mock":
+        if not MOCK_PAY_USERS:
+            return "mock sağlayıcı için MOCK_PAY_USERS (deneme hesap adları) gerekli"
+    else:
+        return "bilinmeyen PAYMENT_PROVIDER: " + SHOP_PROVIDER
+    return ""
+
+
+def _shop_enabled():
+    return _shop_config_problem() == ""
+
+
+def _base_url():
+    return PUBLIC_BASE_URL or request.host_url.rstrip("/")
+
+
+def _tl(kurus):
+    """15900 -> '159', 2990 -> '29,90' (ekranda gösterim)."""
+    k = int(kurus)
+    return f"{k // 100}" if k % 100 == 0 else f"{k // 100},{k % 100:02d}"
+
+
+def _order_row(order_id):
+    rows = supabase.table("shop_orders").select("*").eq("id", str(order_id)).execute()
+    return rows.data[0] if rows.data else None
+
+
+def _order_payload(order):
+    p = order.get("payload")
+    if isinstance(p, str):
+        try:
+            p = json.loads(p)
+        except Exception:
+            p = {}
+    return p if isinstance(p, dict) else {}
+
+
+@app.route("/shop/catalog", methods=["GET"])
+def shop_catalog():
+    """Oyun mağazası fiyatları ve mağazanın açık olup olmadığı."""
+    return jsonify({
+        "enabled": _shop_enabled(),
+        "provider": SHOP_PROVIDER if _shop_enabled() else "",
+        "currency": "TRY",
+        "products": {pid: {"kind": p["kind"], "price": p["price"], "name": p["name"],
+                           "price_text": "₺" + _tl(p["price"])}
+                     for pid, p in SHOP_PRODUCTS.items()},
+        "custom_pet_parts": {k: list(v) for k, v in CUSTOM_PET_PARTS.items()},
+    })
+
+
+@app.route("/shop/checkout", methods=["POST"])
+def shop_checkout():
+    """Sipariş açar ve ödeme sayfasının adresini döndürür."""
+    if not _shop_enabled():
+        return jsonify({"success": False, "error": "satın alma şu an kapalı"}), 503
+    data = request.json or {}
+    acc = _acct(data)
+    if not acc:
+        return jsonify({"success": False, "error": "satın almak için giriş yap"}), 401
+    if not _rate_ok("shop:" + str(acc["id"])):
+        return jsonify({"success": False, "error": "çok sık deneme, biraz bekle"}), 429
+    pid = str(data.get("product_id") or "")
+    prod = SHOP_PRODUCTS.get(pid)
+    if not prod:
+        return jsonify({"success": False, "error": "bilinmeyen ürün"}), 400
+    if SHOP_PROVIDER == "mock" and str(acc.get("username") or "").lower() not in MOCK_PAY_USERS:
+        return jsonify({"success": False, "error": "deneme mağazası bu hesaba kapalı"}), 403
+    payload = {"k": secrets.token_urlsafe(18), "ip": _client_ip()}
+    prog = _stored_progress(_player_row(acc["id"]))
+    if prod["kind"] == "skin" and prod["item"] in (prog.get("skins_owned") or []):
+        return jsonify({"success": False, "error": "bu skin zaten sende"}), 409
+    if prod["kind"] == "pet" and prod["item"] in (prog.get("cosmetics_owned") or []):
+        return jsonify({"success": False, "error": "bu PET zaten sende"}), 409
+    if prod["kind"] == "custom_pet":
+        design = _clean_pet_design(data.get("design"))
+        if design is None:
+            return jsonify({"success": False, "error": "PET tasarımı geçersiz"}), 400
+        if len(prog.get("custom_pets") or []) >= CUSTOM_PET_MAX:
+            return jsonify({"success": False, "error": "özel PET sınırına ulaştın"}), 409
+        payload["design"] = design
+    oid = "AB" + time.strftime("%y%m%d") + secrets.token_hex(6).upper()
+    try:
+        supabase.table("shop_orders").insert({
+            "id": oid, "account_id": acc["id"], "product_id": pid, "kind": prod["kind"],
+            "amount": int(prod["price"]), "currency": "TRY", "status": "pending",
+            "provider": SHOP_PROVIDER, "provider_ref": "", "payload": payload,
+            "created_at": time.time(), "paid_at": 0, "granted_at": 0, "error": "",
+        }).execute()
+    except Exception as e:
+        return _oops(e, "sipariş açılamadı")
+    return jsonify({"success": True, "order_id": oid,
+                    "pay_url": f"{_base_url()}/shop/pay/{oid}?k={payload['k']}",
+                    "price_text": "₺" + _tl(prod["price"]), "name": prod["name"]})
+
+
+@app.route("/shop/order_status", methods=["POST"])
+def shop_order_status():
+    """Oyun siparişi buradan izler. Teslim edildiyse güncel ilerleme de gelir."""
+    data = request.json or {}
+    acc = _acct(data)
+    if not acc:
+        return jsonify({"success": False, "error": "oturum geçersiz"}), 401
+    if not _rate_ok("shopst:" + str(acc["id"]), max_n=150):
+        return jsonify({"success": False, "error": "çok sık soruldu"}), 429
+    order = _order_row(str(data.get("order_id") or ""))
+    if not order or str(order.get("account_id")) != str(acc["id"]):
+        return jsonify({"success": False, "error": "sipariş bulunamadı"}), 404
+    st = order.get("status")
+    if st == "paid":
+        # ödeme doğrulanmış ama teslim yarım kalmış: şimdi tamamla
+        _grant_order(order["id"])
+        order = _order_row(order["id"]) or order
+        st = order.get("status")
+    out = {"success": True, "status": st, "order_id": order["id"]}
+    if st == "granted":
+        out["progress"] = _public_progress(_stored_progress(_player_row(acc["id"])))
+    elif st in ("failed", "cancelled"):
+        out["reason"] = str(order.get("error") or "")[:120]
+    return jsonify(out)
+
+
+def _mark_order(order_id, fields, only_status=None):
+    """Siparişi KOŞULLU günceller; değişen satır varsa True."""
+    q = supabase.table("shop_orders").update(fields).eq("id", order_id)
+    if only_status is not None:
+        q = q.eq("status", only_status)
+    res = q.execute()
+    return bool(res.data)
+
+
+def _grant_order(order_id, provider_ref=None):
+    """Ödemesi doğrulanmış siparişi HESABA yazar. Her sipariş TEK KEZ.
+
+    Önce pending -> paid (ödeme teyidi), sonra paid -> granted (teslim
+    hakkı) koşullu güncellemeyle alınır; teslim hakkını alan tek çağrı
+    ilerlemeyi yazar. Yazma başarısız olursa sipariş 'paid'e geri döner ve
+    /shop/order_status bir sonraki soruşta yeniden dener.
+    Dönüş: (ok, mesaj)
+    """
+    order = _order_row(order_id)
+    if not order:
+        return False, "sipariş yok"
+    if order.get("status") == "granted":
+        return True, "zaten teslim edildi"
+    if order.get("status") == "pending":
+        f = {"status": "paid", "paid_at": time.time()}
+        if provider_ref:
+            f["provider_ref"] = str(provider_ref)[:120]
+        _mark_order(order_id, f, only_status="pending")
+        order = _order_row(order_id) or order
+    if order.get("status") != "paid":
+        return order.get("status") == "granted", str(order.get("status"))
+    if not _mark_order(order_id, {"status": "granted", "granted_at": time.time()},
+                       only_status="paid"):
+        return True, "başka bir istek teslim etti"
+    prod = SHOP_PRODUCTS.get(str(order.get("product_id")))
+    acc_id = order["account_id"]
+    try:
+        with _acct_lock(acc_id):
+            row = _player_row(acc_id)
+            before = _stored_progress(row)
+            merged = json.loads(json.dumps(before))
+            kind = prod["kind"]
+            note = f"satın alma {order_id} {prod['name']}"
+            if kind == "gems":
+                merged["gems_earned"] = int(before.get("gems_earned", 0) or 0) + int(prod["gems"])
+                merged["gems"] = max(0, merged["gems_earned"] - int(before.get("gems_spent", 0) or 0))
+                merged["gems_bought"] = int(before.get("gems_bought", 0) or 0) + int(prod["gems"])
+            elif kind == "skin":
+                lst = list(before.get("skins_owned") or ["default"])
+                if prod["item"] not in lst:
+                    lst.append(prod["item"])
+                merged["skins_owned"] = lst
+            elif kind == "pet":
+                lst = list(before.get("cosmetics_owned") or [])
+                if prod["item"] not in lst:
+                    lst.append(prod["item"])
+                merged["cosmetics_owned"] = lst
+            elif kind == "custom_pet":
+                design = _clean_pet_design(_order_payload(order).get("design"))
+                if design is None:
+                    raise ValueError("siparişteki PET tasarımı bozuk")
+                pet_id = "pet_custom_" + order_id[-8:].lower()
+                pets = list(before.get("custom_pets") or [])
+                if not any(isinstance(x, dict) and x.get("id") == pet_id for x in pets):
+                    pets.append({"id": pet_id, "design": design, "order": order_id,
+                                 "at": time.time()})
+                merged["custom_pets"] = pets[-CUSTOM_PET_MAX:]
+                lst = list(before.get("cosmetics_owned") or [])
+                if pet_id not in lst:
+                    lst.append(pet_id)
+                merged["cosmetics_owned"] = lst
+            purchases = list(before.get("purchases") or [])
+            purchases.append({"order": order_id, "product": order.get("product_id"),
+                              "amount": int(order.get("amount") or 0), "at": time.time()})
+            merged["purchases"] = purchases[-200:]
+            err = _store_progress(acc_id, row, before, merged)
+            if err is not None:
+                raise RuntimeError("ilerleme yazılamadı")
+            _log_event(acc_id, "satin", int(order.get("amount") or 0),
+                       int(merged.get("gems", 0) or 0), note)
+        return True, "teslim edildi"
+    except Exception as e:
+        try:
+            app.logger.exception("teslim hatası %s", order_id)
+        except Exception:
+            pass
+        _mark_order(order_id, {"status": "paid", "error": str(e)[:200]}, only_status="granted")
+        return False, "teslim yarım kaldı, yeniden denenecek"
+
+
+def _fail_order(order_id, reason):
+    _mark_order(order_id, {"status": "failed", "error": str(reason)[:200]}, only_status="pending")
+
+
+# ---------------- ödeme sayfası (tarayıcıda açılır) ----------------
+_PAGE_CSS = ("body{font-family:system-ui,Segoe UI,Arial;background:#14121f;color:#eee;"
+             "display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}"
+             ".k{background:#1f1c30;border:2px solid #6a5cff;border-radius:18px;padding:32px 40px;"
+             "max-width:460px;text-align:center}h1{color:#ffd66e;margin:0 0 8px}"
+             ".p{font-size:30px;font-weight:700;color:#7fe0ff;margin:14px 0}"
+             "button{font-size:18px;font-weight:700;border:0;border-radius:12px;padding:14px 26px;"
+             "margin:6px;cursor:pointer}.ok{background:#3fbf6f;color:#fff}.no{background:#444;color:#ddd}"
+             "small{color:#9a96b0}")
+
+
+def _html_page(title, body, code=200):
+    html = (f"<!doctype html><html lang='tr'><head><meta charset='utf-8'>"
+            f"<meta name='viewport' content='width=device-width,initial-scale=1'>"
+            f"<title>{title}</title><style>{_PAGE_CSS}</style></head><body><div class='k'>"
+            f"{body}</div></body></html>")
+    return html, code, {"Content-Type": "text/html; charset=utf-8",
+                        "Cache-Control": "no-store", "X-Frame-Options": "DENY"}
+
+
+def _esc(t):
+    return (str(t).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            .replace('"', "&quot;").replace("'", "&#39;"))
+
+
+def _result_page(ok, msg):
+    if ok:
+        return _html_page("Ödeme tamam", "<h1>ÖDEME TAMAM!</h1>"
+                          f"<p>{_esc(msg)}</p><p>Oyuna dönebilirsin — ürün hesabına geldi.</p>"
+                          "<small>Bu sekmeyi kapatabilirsin.</small>")
+    return _html_page("Ödeme tamamlanmadı", "<h1>ÖDEME TAMAMLANMADI</h1>"
+                      f"<p>{_esc(msg)}</p><p>Hesabından para çekilmediyse oyundan yeniden "
+                      "deneyebilirsin.</p><small>Bu sekmeyi kapatabilirsin.</small>", 200)
+
+
+@app.route("/shop/pay/<order_id>", methods=["GET"])
+def shop_pay(order_id):
+    """Oyunun tarayıcıda açtığı sayfa: siparişi sağlayıcıya yönlendirir."""
+    if not _rate_ok("pay:" + _client_ip(), max_n=40):
+        return _html_page("Bekle", "<h1>Biraz bekle</h1><p>Çok sık deneme.</p>", 429)
+    order = _order_row(order_id)
+    k = request.args.get("k", "")
+    if (not order or not hmac.compare_digest(str(_order_payload(order).get("k", "")), str(k))):
+        return _html_page("Bulunamadı", "<h1>Sipariş bulunamadı</h1>", 404)
+    if order.get("status") == "granted":
+        return _result_page(True, "Bu sipariş zaten tamamlandı.")
+    if order.get("status") != "pending":
+        return _result_page(False, "Bu sipariş artık ödenemez. Oyundan yeniden başlat.")
+    if time.time() - float(order.get("created_at") or 0) > ORDER_TTL:
+        _fail_order(order_id, "süresi doldu")
+        return _result_page(False, "Siparişin süresi doldu. Oyundan yeniden başlat.")
+    prod = SHOP_PRODUCTS.get(str(order.get("product_id")))
+    if not prod:
+        return _result_page(False, "Ürün artık satılmıyor.")
+    acc_rows = supabase.table("accounts").select("*").eq("id", order["account_id"]).execute()
+    acc = acc_rows.data[0] if acc_rows.data else {}
+    try:
+        if SHOP_PROVIDER == "iyzico":
+            return _iyzico_start(order, prod, acc)
+        if SHOP_PROVIDER == "shopier":
+            return _shopier_start(order, prod, acc)
+        if SHOP_PROVIDER == "mock":
+            return _mock_start(order, prod, acc)
+    except Exception:
+        try:
+            app.logger.exception("ödeme başlatılamadı %s", order_id)
+        except Exception:
+            pass
+        return _result_page(False, "Ödeme sayfası açılamadı. Biraz sonra yeniden dene.")
+    return _result_page(False, "Satın alma şu an kapalı.")
+
+
+def _buyer_fields(acc):
+    uname = str(acc.get("username") or acc.get("name") or "Oyuncu")
+    email = str(acc.get("email") or "") or SHOP_FALLBACK_EMAIL or "odeme@example.com"
+    return uname, email
+
+
+# ---------------- iyzico (Checkout Form) ----------------
+def _iyzico_price(kurus):
+    """iyzico fiyat biçimi: 15900 -> '159.0', 2990 -> '29.9', 2995 -> '29.95'."""
+    k = int(kurus)
+    whole, frac = k // 100, k % 100
+    if frac == 0:
+        return f"{whole}.0"
+    return f"{whole}.{frac:02d}".rstrip("0")
+
+
+def _iyzico_call(path, body):
+    """iyzico IYZWSv2 imzalı istek. Gövde, imzalanan metnin AYNISI gönderilir."""
+    rnd = str(int(time.time() * 1000)) + secrets.token_hex(4)
+    body_str = json.dumps(body)
+    sig = hmac.new(IYZICO_SECRET_KEY.encode("utf-8"), (rnd + path + body_str).encode("utf-8"),
+                   hashlib.sha256).hexdigest()
+    auth = base64.b64encode(f"apiKey:{IYZICO_API_KEY}&randomKey:{rnd}&signature:{sig}"
+                            .encode("utf-8")).decode("ascii")
+    req = urllib.request.Request(
+        IYZICO_BASE_URL + path, data=body_str.encode("utf-8"),
+        headers={"Authorization": "IYZWSv2 " + auth, "x-iyzi-rnd": rnd,
+                 "Content-Type": "application/json", "Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def _iyzico_start(order, prod, acc):
+    uname, email = _buyer_fields(acc)
+    price = _iyzico_price(order["amount"])
+    ip = _client_ip()
+    now_s = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    addr = {"contactName": uname, "city": "Istanbul", "country": "Turkey",
+            "address": "Dijital teslimat (oyun içi ürün)", "zipCode": "34000"}
+    body = {
+        "locale": "tr",
+        "conversationId": order["id"],
+        "price": price,
+        "paidPrice": price,
+        "currency": "TRY",
+        "basketId": order["id"],
+        "paymentGroup": "PRODUCT",
+        "callbackUrl": _base_url() + "/shop/callback/iyzico",
+        "enabledInstallments": [1],
+        "buyer": {
+            "id": str(acc.get("id", "")), "name": uname, "surname": "Oyuncu",
+            "gsmNumber": "+905000000000", "email": email,
+            "identityNumber": "11111111111", "lastLoginDate": now_s,
+            "registrationDate": now_s, "registrationAddress": addr["address"],
+            "ip": ip, "city": addr["city"], "country": addr["country"],
+            "zipCode": addr["zipCode"]},
+        "shippingAddress": addr,
+        "billingAddress": addr,
+        "basketItems": [{"id": str(order["product_id"]), "name": prod["name"],
+                         "category1": "Oyun", "category2": "Dijital",
+                         "itemType": "VIRTUAL", "price": price}],
+    }
+    res = _iyzico_call("/payment/iyzipos/checkoutform/initialize/auth/ecom", body)
+    if res.get("status") != "success" or not res.get("paymentPageUrl"):
+        app.logger.warning("iyzico başlatma reddi %s: %s", order["id"],
+                           res.get("errorMessage"))
+        return _result_page(False, "Ödeme sağlayıcısı siparişi kabul etmedi.")
+    _mark_order(order["id"], {"provider_ref": str(res.get("token", ""))[:120]},
+                only_status="pending")
+    return "", 302, {"Location": res["paymentPageUrl"], "Cache-Control": "no-store"}
+
+
+@app.route("/shop/callback/iyzico", methods=["POST"])
+def shop_callback_iyzico():
+    """iyzico ödeme sonrası tarayıcıyı buraya döndürür (form: token).
+
+    Gelen veriye GÜVENİLMEZ: sonuç iyzico'ya sorulur (detail), sepet
+    kimliği, tutar, para birimi ve dolandırıcılık durumu tek tek denetlenir.
+    """
+    if SHOP_PROVIDER != "iyzico":
+        return _result_page(False, "Sağlayıcı kapalı.")
+    token = str(request.form.get("token") or request.args.get("token") or "")[:200]
+    if not token:
+        return _result_page(False, "Eksik ödeme bilgisi.")
+    try:
+        res = _iyzico_call("/payment/iyzipos/checkoutform/auth/ecom/detail",
+                           {"locale": "tr", "token": token})
+    except Exception:
+        app.logger.exception("iyzico detail")
+        return _result_page(False, "Ödeme doğrulanamadı; para çekildiyse ürün birkaç "
+                                   "dakika içinde hesabına gelir ya da destekle görüş.")
+    oid = str(res.get("basketId") or "")
+    order = _order_row(oid) if oid else None
+    if not order:
+        return _result_page(False, "Sipariş bulunamadı.")
+    paid_ok = (res.get("status") == "success" and res.get("paymentStatus") == "SUCCESS"
+               and str(res.get("currency", "TRY")) == "TRY"
+               and int(res.get("fraudStatus", 1) or 0) == 1)
+    try:
+        amount_ok = abs(float(res.get("paidPrice") or 0) * 100 - int(order["amount"])) < 1
+    except (TypeError, ValueError):
+        amount_ok = False
+    if not (paid_ok and amount_ok):
+        if order.get("status") == "pending":
+            _fail_order(oid, res.get("errorMessage") or res.get("paymentStatus") or "ödeme olmadı")
+        return _result_page(False, "Ödeme tamamlanmadı.")
+    ok, msg = _grant_order(oid, provider_ref=res.get("paymentId") or token)
+    return _result_page(ok, SHOP_PRODUCTS.get(str(order["product_id"]), {}).get("name", "") +
+                        (" hesabına eklendi." if ok else " — " + msg))
+
+
+# ---------------- Shopier ----------------
+def _shopier_start(order, prod, acc):
+    uname, email = _buyer_fields(acc)
+    total = f"{int(order['amount']) // 100}.{int(order['amount']) % 100:02d}"
+    rnd = str(secrets.randbelow(900000) + 100000)
+    currency = "0"                                   # 0 = TL
+    data = rnd + order["id"] + total + currency
+    sig = base64.b64encode(hmac.new(SHOPIER_API_SECRET.encode("utf-8"), data.encode("utf-8"),
+                                    hashlib.sha256).digest()).decode("ascii")
+    f = {
+        "API_key": SHOPIER_API_KEY, "website_index": SHOPIER_WEBSITE_INDEX,
+        "platform_order_id": order["id"], "product_name": prod["name"],
+        "product_type": "1",                         # 1 = indirilebilir / sanal ürün
+        "buyer_name": uname, "buyer_surname": "Oyuncu", "buyer_email": email,
+        "buyer_account_age": "0", "buyer_id_nr": str(acc.get("id", ""))[:40],
+        "buyer_phone": "05000000000",
+        "billing_address": "Dijital teslimat", "billing_city": "Istanbul",
+        "billing_country": "Turkey", "billing_postcode": "34000",
+        "shipping_address": "Dijital teslimat", "shipping_city": "Istanbul",
+        "shipping_country": "Turkey", "shipping_postcode": "34000",
+        "total_order_value": total, "currency": currency, "platform": "0",
+        "is_in_frame": "0", "current_language": "0", "modul_version": "1.0.4",
+        "random_nr": rnd, "signature": sig,
+    }
+    inputs = "".join(f"<input type='hidden' name='{_esc(k)}' value='{_esc(v)}'>" for k, v in f.items())
+    body = (f"<h1>ARENA BONK</h1><p>{_esc(prod['name'])}</p><div class='p'>₺{_tl(order['amount'])}</div>"
+            f"<form id='f' method='post' action='{SHOPIER_PAY_URL}'>{inputs}"
+            "<button class='ok' type='submit'>GÜVENLİ ÖDEMEYE GEÇ</button></form>"
+            "<small>Shopier güvenli ödeme sayfasına yönlendiriliyorsun...</small>"
+            "<script>setTimeout(function(){document.getElementById('f').submit()},600)</script>")
+    return _html_page("Ödeme", body)
+
+
+@app.route("/shop/callback/shopier", methods=["POST"])
+def shop_callback_shopier():
+    """Shopier ödeme sonrası buraya döner. İmza (HMAC-SHA256) doğrulanır."""
+    if SHOP_PROVIDER != "shopier":
+        return _result_page(False, "Sağlayıcı kapalı.")
+    oid = str(request.form.get("platform_order_id") or "")[:40]
+    rnd = str(request.form.get("random_nr") or "")[:20]
+    status = str(request.form.get("status") or "").lower()
+    sig = str(request.form.get("signature") or "")
+    want = base64.b64encode(hmac.new(SHOPIER_API_SECRET.encode("utf-8"), (rnd + oid).encode("utf-8"),
+                                     hashlib.sha256).digest()).decode("ascii")
+    if not (oid and rnd and sig and hmac.compare_digest(want, sig)):
+        return _result_page(False, "Ödeme imzası doğrulanamadı.")
+    order = _order_row(oid)
+    if not order:
+        return _result_page(False, "Sipariş bulunamadı.")
+    if status != "success":
+        _fail_order(oid, "shopier: " + status)
+        return _result_page(False, "Ödeme tamamlanmadı.")
+    ok, msg = _grant_order(oid, provider_ref=request.form.get("payment_id") or "")
+    return _result_page(ok, SHOP_PRODUCTS.get(str(order["product_id"]), {}).get("name", "") +
+                        (" hesabına eklendi." if ok else " — " + msg))
+
+
+# ---------------- DENEME (mock) ----------------
+def _mock_start(order, prod, acc):
+    k = _order_payload(order).get("k", "")
+    body = (f"<h1>DENEME ÖDEMESİ</h1><p>{_esc(prod['name'])}</p>"
+            f"<div class='p'>₺{_tl(order['amount'])}</div>"
+            "<p><b>Gerçek para çekilmez.</b> Yalnızca kurulum denemesi içindir.</p>"
+            f"<form method='post' action='/shop/mock_result'>"
+            f"<input type='hidden' name='order' value='{_esc(order['id'])}'>"
+            f"<input type='hidden' name='k' value='{_esc(k)}'>"
+            "<button class='ok' name='r' value='ok'>ÖDE (DENEME)</button>"
+            "<button class='no' name='r' value='no'>İPTAL</button></form>")
+    return _html_page("Deneme ödemesi", body)
+
+
+@app.route("/shop/mock_result", methods=["POST"])
+def shop_mock_result():
+    if SHOP_PROVIDER != "mock":
+        return _result_page(False, "Deneme sağlayıcısı kapalı.")
+    oid = str(request.form.get("order") or "")[:40]
+    order = _order_row(oid)
+    if not order or not hmac.compare_digest(str(_order_payload(order).get("k", "")),
+                                            str(request.form.get("k") or "")):
+        return _result_page(False, "Sipariş bulunamadı.")
+    if request.form.get("r") != "ok":
+        _mark_order(oid, {"status": "cancelled", "error": "deneme: iptal"}, only_status="pending")
+        return _result_page(False, "İptal edildi.")
+    ok, msg = _grant_order(oid, provider_ref="mock")
+    return _result_page(ok, "DENEME: " + SHOP_PRODUCTS.get(str(order["product_id"]), {}).get("name", "") +
+                        (" hesabına eklendi." if ok else " — " + msg))
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
