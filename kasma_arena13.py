@@ -21,7 +21,7 @@
      ışıklı YILBAŞI AĞACI, hediyeler, kardan adam, dipte kar yığını,
      düğmelerin üstünde kar, logonun amblemine Noel şapkası.
    * MAĞAZA YENİLENDİ. Ana menüdeki kart uzadı: dönen vitrin (premium
-     skin / PET / elmas paketi), buradan doğrudan REKLAM İZLE (+50 elmas)
+     skin / PET / elmas paketi), buradan doğrudan REKLAM İZLE (+250 elmas)
      ve GÜNLÜK HEDİYE. Mağazada yeni ÜCRETSİZ sekmesi: reklam (günde 5),
      7 günlük hediye serisi, başarım ödülleri. Premium skin ve PET'ler
      yalnızca GERÇEK PARAYLA satılır (elmasla satılmaz).
@@ -1145,6 +1145,9 @@ STRINGS = {
     "ui.ann_rage":    _T("DALGA {0} — ARENA AZIYOR!", "WAVE {0} — THE ARENA TURNS!",
                          "OLEADA {0} — ¡LA ARENA SE DESATA!", "WELLE {0} — DIE ARENA DREHT DURCH!",
                          "ВОЛНА {0} — АРЕНА ЗВЕРЕЕТ!"),
+    "ui.ann_boss_timeout": _T("PATRON SÜRESİ DOLDU — DALGA {0}!", "BOSS TIMER UP — WAVE {0}!",
+                              "¡TIEMPO DEL JEFE AGOTADO — OLEADA {0}!",
+                              "BOSS-ZEIT ABGELAUFEN — WELLE {0}!", "ВРЕМЯ БОССА ВЫШЛО — ВОЛНА {0}!"),
     "ui.ann_surge":   _T("DALGA {0} — YOĞUNLUK!", "WAVE {0} — SURGE!", "OLEADA {0} — ¡OLEADA MASIVA!",
                          "WELLE {0} — ANSTURM!", "ВОЛНА {0} — НАПЛЫВ!"),
     "key.SOL TIK":    _T("SOL TIK", "LEFT CLICK", "CLIC IZQ.", "LINKSKLICK", "ЛКМ"),
@@ -4496,7 +4499,7 @@ class PurchaseBridge:
 # ÜCRETSİZ ELMAS: ÖDÜLLÜ REKLAM + GÜNLÜK HEDİYE  (v3.26)
 # ---------------------------------------------------------------------
 # Elması yalnızca parayla değil OYNAYARAK da kazanmanın yolları:
-#   * REKLAM İZLE  -> +50 elmas (günde en çok AD_DAILY_LIMIT kez, iki
+#   * REKLAM İZLE  -> +250 elmas (günde en çok AD_DAILY_LIMIT kez, iki
 #                     reklam arasında AD_COOLDOWN saniye)
 #   * GÜNLÜK HEDİYE -> her gün bir kez; arka arkaya gelinen her gün biraz
 #                     daha büyür (7 günlük seri, sonra başa döner)
@@ -4513,7 +4516,7 @@ class PurchaseBridge:
 # (server.py GEM_GAIN_CAP_PER_PUSH).
 # =====================================================================
 AD_PROVIDER = ""             # boş = ev reklamı
-AD_REWARD_GEMS = 50
+AD_REWARD_GEMS = 250           # v3.27: 50 -> 250
 AD_DAILY_LIMIT = 5
 AD_COOLDOWN = 90.0           # iki reklam arası (sn)
 AD_LENGTH = 91.2             # reklamın süresi — asıl değer GameTour.LENGTH (bkz. App'in üstü)
@@ -6971,22 +6974,327 @@ def draw_cosmetic_cape(surf, p, px, py, t):
             pygame.draw.circle(surf, lighten(acc, 0.5), (int(fxp), int(fyp)),
                                max(1, int(2.4 * (1.0 - ph))))
     else:
-        sway = math.sin(t * 4.5 + px * 0.02) * 7
-        base_x, base_y = px + bx * r * 0.25, py + by * r * 0.25
-        top_l = (base_x + nx * r * 0.85, base_y + ny * r * 0.85)
-        top_r = (base_x - nx * r * 0.85, base_y - ny * r * 0.85)
-        tip_l = (top_l[0] + bx * (30 + sway), top_l[1] + by * (30 + sway))
-        tip_r = (top_r[0] + bx * (30 - sway), top_r[1] + by * (30 - sway))
-        mid = (base_x + bx * (34 + sway * 0.5), base_y + by * (34 + sway * 0.5))
-        pts = [top_l, tip_l, mid, tip_r, top_r]
-        pygame.draw.polygon(surf, OUTLINE, [(x_, y_ + 2) for x_, y_ in pts])
-        pygame.draw.polygon(surf, col, pts)
-        pygame.draw.polygon(surf, acc, pts, 2)
-        if item["id"] == "cape_shadow":
-            add_glow(surf, mid[0], mid[1], r * 1.5, acc, .3)
-        elif item["id"] == "cape_royal":
-            pygame.draw.line(surf, acc, top_l, mid, 1)
-            pygame.draw.line(surf, acc, top_r, mid, 1)
+        _draw_cloth_cape(surf, p, item, px, py, t, r, bx, by, nx, ny, col, acc)
+
+
+# ---------------------------------------------------------------------
+# KUMAŞ PELERİN (v3.27)
+# ---------------------------------------------------------------------
+# "Pelerinler çok efektsiz." Eskiden her pelerin 5 köşeli tek bir çokgendi:
+# tek renk, tek kenar çizgisi, birkaçında bir parlama. Artık pelerin
+# omuzdan eteğe dilimlenmiş bir KUMAŞ:
+#   * her dilim kendi fazıyla dalgalanır (dalga omuzdan eteğe akar), koşarken
+#     pelerin uzar ve daha sert çırpar,
+#   * omuzdan eteğe koyulaşan renk geçişi, iki kıvrım gölgesi, bir parlak şerit,
+#   * kenarda işleme (accent), omuzlarda iki toka,
+#   * her pelerinin KENDİ etek biçimi (yarasa kanadı, yaprak, sarkıt, alev dili,
+#     duman püskülü...) ve KENDİ efekti (kıvılcım, kar tanesi, şimşek, kayan
+#     yıldız, düşen yaprak, çelik pul, altın parıltı...).
+CAPE_SEGS = 7             # omuzdan eteğe kaç dilim
+CAPE_HEM_PTS = 14         # etek çizgisinin nokta sayısı
+
+
+def _cape_hem_offset(kind, u, t, r):
+    """Etek çizgisinin (soldan sağa u = 0..1) pelerin yönünde ne kadar
+    uzadığı/kısaldığı. Pozitif = daha uzun."""
+    if kind == "cape_bat":
+        # yarasa kanadı: dört kemik ucu arasında içe oyulmuş yaylar
+        return r * 0.30 - r * 0.62 * abs(math.sin(u * math.pi * 4))
+    if kind == "cape_forest":
+        # yaprak dişleri
+        k = (u * 6.0) % 1.0
+        return r * (0.10 + 0.42 * (1.0 - abs(k - 0.5) * 2.0))
+    if kind == "cape_ice":
+        # sarkıtlar: uzun-kısa sivri uçlar
+        k = (u * 7.0) % 1.0
+        tip = 1.0 - abs(k - 0.5) * 2.0
+        long_ = 0.75 if int(u * 7.0) % 2 == 0 else 0.42
+        return r * (0.05 + long_ * tip ** 2.2)
+    if kind == "cape_flame":
+        # yalazlanan alev dilleri
+        return r * (0.12 + 0.55 * abs(math.sin(u * math.pi * 4 + t * 7.0))
+                    * (0.65 + 0.35 * math.sin(t * 11.0 + u * 9.0)))
+    if kind == "cape_shadow":
+        # dumana dönen püsküller
+        return r * (0.18 + 0.48 * (0.5 + 0.5 * math.sin(u * 17.0 + t * 4.2))
+                    * math.sin(math.pi * u) ** 0.5)
+    if kind == "cape_royal":
+        return r * 0.42 * math.sin(math.pi * u) ** 0.8
+    if kind == "cape_steel":
+        # plaka uçları: basamaklı
+        return r * (0.10 + 0.22 * (1.0 if int(u * 5.0) % 2 == 0 else 0.0))
+    if kind == "cape_red":
+        # kırlangıç kuyruğu
+        return r * (0.38 - 0.34 * math.sin(math.pi * u) ** 6)
+    return r * 0.30 * math.sin(math.pi * u)
+
+
+def _cape_spark(surf, x, y, s, col):
+    """Dört kollu küçük parıltı."""
+    ix, iy = int(x), int(y)
+    s = max(1, int(s))
+    pygame.draw.line(surf, col, (ix - s, iy), (ix + s, iy), 1)
+    pygame.draw.line(surf, col, (ix, iy - s), (ix, iy + s), 1)
+
+
+def _draw_cloth_cape(surf, p, item, px, py, t, r, bx, by, nx, ny, col, acc):
+    kind = item["id"]
+    sp = clamp(float(getattr(p, "speed_now", 0.0) or 0.0) / 260.0, 0.0, 1.0)
+    length = r * (1.95 + 0.55 * sp)
+    amp = r * (0.16 + 0.20 * sp)
+    freq = 4.2 + 2.6 * sp
+    ph0 = px * 0.013 + py * 0.007
+    if kind == "cape_royal":
+        length *= 1.12               # ağır, uzun asalet pelerini
+    elif kind == "cape_steel":
+        amp *= 0.45                  # çelik ağır: az dalgalanır
+    sx0, sy0 = px + bx * r * 0.22, py + by * r * 0.22
+
+    def center(s):
+        wv = math.sin(t * freq - s * 3.3 + ph0) * amp * s
+        al = length * s * (1.0 + 0.05 * math.sin(t * freq * 0.7 + 1.3) * s)
+        return sx0 + bx * al + nx * wv, sy0 + by * al + ny * wv
+
+    def half(s):
+        return r * (0.80 + 0.52 * s)
+
+    # omuzdan eteğe sol (L) ve sağ (R) kenar
+    Ls, Rs, Cs = [], [], []
+    for i in range(CAPE_SEGS + 1):
+        s = i / CAPE_SEGS
+        cx_, cy_ = center(s)
+        h = half(s)
+        # kenarlar merkezden biraz geç dalgalanır: kumaş kıvrılır
+        flut = math.sin(t * freq * 1.3 - s * 4.0 + ph0 + 0.8) * r * 0.10 * s
+        Ls.append((cx_ + nx * (h + flut), cy_ + ny * (h + flut)))
+        Rs.append((cx_ - nx * (h - flut), cy_ - ny * (h - flut)))
+        Cs.append((cx_, cy_))
+    hem = []
+    lx, ly = Ls[-1]
+    rx, ry = Rs[-1]
+    for k in range(CAPE_HEM_PTS + 1):
+        u = k / CAPE_HEM_PTS
+        off = _cape_hem_offset(kind, u, t, r)
+        hem.append((lx + (rx - lx) * u + bx * off, ly + (ry - ly) * u + by * off))
+    outline = Ls + hem[1:-1] + list(reversed(Rs))
+
+    # --- gölge + dış hat ---
+    pygame.draw.polygon(surf, OUTLINE, [(x_ + 1, y_ + 3) for x_, y_ in outline])
+    pygame.draw.polygon(surf, OUTLINE, outline)
+
+    # --- renk geçişi: omuz açık, etek koyu (dilim dilim) ---
+    top_col = lighten(col, 0.18)
+    bot_col = scale_col(col, 0.58)
+    if kind == "cape_flame":
+        bot_col = mix_col(col, acc, 0.75)          # alev eteğe doğru sararır
+    elif kind == "cape_ice":
+        bot_col = lighten(col, 0.45)               # buz eteğe doğru beyazlar
+    elif kind == "cape_starlight":
+        top_col, bot_col = scale_col(col, 0.75), scale_col(col, 0.35)
+    elif kind == "cape_shadow":
+        top_col, bot_col = lighten(col, 0.10), mix_col(col, acc, 0.22)
+    for i in range(CAPE_SEGS):
+        f = (i + 0.5) / CAPE_SEGS
+        c = mix_col(top_col, bot_col, f)
+        quad = [Ls[i], Ls[i + 1], Rs[i + 1], Rs[i]]
+        pygame.draw.polygon(surf, c, quad)
+    pygame.draw.polygon(surf, bot_col, [Ls[-1]] + hem + [Rs[-1]])
+
+    # --- kıvrımlar: iki koyu gölge, bir parlak şerit ---
+    def strip(u, s0=0.08):
+        out = []
+        for i in range(CAPE_SEGS + 1):
+            s = i / CAPE_SEGS
+            if s < s0:
+                continue
+            ax_, ay_ = Ls[i]
+            cx2, cy2 = Rs[i]
+            out.append((ax_ + (cx2 - ax_) * u, ay_ + (cy2 - ay_) * u))
+        return out
+    fold_col = scale_col(col, 0.42)
+    for u in (0.34, 0.68):
+        pts = strip(u + 0.05 * math.sin(t * freq - u * 5.0))
+        if len(pts) > 1:
+            pygame.draw.lines(surf, fold_col, False, pts, 2)
+    shine = strip(0.20 + 0.04 * math.sin(t * 2.0))
+    if len(shine) > 1 and kind not in ("cape_shadow",):
+        pygame.draw.lines(surf, lighten(col, 0.42), False, shine[:max(2, len(shine) - 2)], 1)
+
+    # --- desen / iç efektler (kumaşın ÜSTÜNE) ---
+    def cloth(u, s):
+        """Kumaş üzerindeki (u: soldan sağa, s: omuzdan eteğe) noktanın dünya yeri."""
+        s = clamp(s, 0.0, 1.0)
+        fi = s * CAPE_SEGS
+        i = min(CAPE_SEGS - 1, int(fi))
+        k = fi - i
+        ax_ = Ls[i][0] + (Ls[i + 1][0] - Ls[i][0]) * k
+        ay_ = Ls[i][1] + (Ls[i + 1][1] - Ls[i][1]) * k
+        cx2 = Rs[i][0] + (Rs[i + 1][0] - Rs[i][0]) * k
+        cy2 = Rs[i][1] + (Rs[i + 1][1] - Rs[i][1]) * k
+        return ax_ + (cx2 - ax_) * u, ay_ + (cy2 - ay_) * u
+
+    mx_, my_ = cloth(0.5, 0.62)
+    if kind == "cape_royal":
+        # altın işleme: ortadan inen baklavalar + kürk yaka
+        for j in range(3):
+            qx, qy = cloth(0.5, 0.30 + j * 0.22)
+            d = r * 0.20
+            pts = [(qx + bx * d, qy + by * d), (qx + nx * d * 0.7, qy + ny * d * 0.7),
+                   (qx - bx * d, qy - by * d), (qx - nx * d * 0.7, qy - ny * d * 0.7)]
+            pygame.draw.polygon(surf, acc, pts)
+            pygame.draw.polygon(surf, scale_col(acc, 0.6), pts, 1)
+        fur = [cloth(u, 0.06) for u in (0.0, 0.25, 0.5, 0.75, 1.0)]
+        pygame.draw.lines(surf, (246, 244, 236), False, fur, max(3, int(r * 0.38)))
+        for u in (0.15, 0.45, 0.8):
+            fx_, fy_ = cloth(u, 0.06)
+            pygame.draw.circle(surf, (30, 26, 34), (int(fx_), int(fy_)), 1)
+    elif kind == "cape_starlight":
+        # kumaşa işlenmiş sabit yıldızlar (göz kırpar) + aşağı kayan yıldızlar
+        rnd = random.Random(7)
+        for j in range(9):
+            u, s = rnd.uniform(0.12, 0.88), rnd.uniform(0.12, 0.95)
+            tw = 0.5 + 0.5 * math.sin(t * (2.2 + j * 0.37) + j * 1.7)
+            qx, qy = cloth(u, s)
+            _cape_spark(surf, qx, qy, 1 + tw * 2.2, mix_col(col, acc, 0.4 + tw * 0.6))
+        for j in range(2):
+            s = (t * 0.32 + j * 0.5) % 1.0
+            qx, qy = cloth(0.3 + 0.4 * j, s)
+            add_glow(surf, qx, qy, r * 0.7, acc, 0.45 * math.sin(math.pi * s))
+            _cape_spark(surf, qx, qy, 3, acc)
+    elif kind == "cape_storm":
+        # içinde çakan şimşek (kumaşın şeklini takip eder)
+        beat = int(t * 6.0)
+        if beat % 4 in (0, 1):
+            rnd = random.Random(beat)
+            u0 = rnd.uniform(0.25, 0.75)
+            pts = [cloth(clamp(u0 + rnd.uniform(-0.18, 0.18), 0.1, 0.9), s / 5.0)
+                   for s in range(1, 6)]
+            pygame.draw.lines(surf, acc, False, pts, 2)
+            pygame.draw.lines(surf, WHITE, False, pts, 1)
+            add_glow(surf, pts[2][0], pts[2][1], r * 1.6, acc, 0.42)
+        # bulut kıvrımları
+        for j in range(3):
+            qx, qy = cloth(0.2 + j * 0.3, 0.25 + 0.08 * math.sin(t * 2 + j))
+            pygame.draw.circle(surf, lighten(col, 0.25), (int(qx), int(qy)), max(2, int(r * 0.16)), 1)
+    elif kind == "cape_steel":
+        # üst üste binen çelik pullar + kayan parlama
+        for i in range(1, CAPE_SEGS):
+            s = i / CAPE_SEGS
+            row = [cloth(u / 4.0, s) for u in range(5)]
+            pygame.draw.lines(surf, scale_col(col, 0.55), False, row, 1)
+            for u in range(4):
+                qx, qy = cloth((u + 0.5 + 0.5 * (i % 2)) / 4.5, s - 0.5 / CAPE_SEGS)
+                pygame.draw.circle(surf, lighten(col, 0.5), (int(qx), int(qy)), 1)
+        sw = (t * 0.45) % 1.6
+        if sw < 1.0:
+            band = [cloth(u / 4.0, sw) for u in range(5)]
+            pygame.draw.lines(surf, WHITE, False, band, 2)
+    elif kind == "cape_forest":
+        # yaprak damarları
+        for j in range(4):
+            qx, qy = cloth(0.22 + (j % 2) * 0.55, 0.28 + j * 0.17)
+            ang = math.atan2(by, bx) + (0.6 if j % 2 else -0.6)
+            dx_, dy_ = math.cos(ang) * r * 0.32, math.sin(ang) * r * 0.32
+            pygame.draw.ellipse(surf, lighten(col, 0.25),
+                                (int(qx - r * 0.18), int(qy - r * 0.18), int(r * 0.36), int(r * 0.36)))
+            pygame.draw.line(surf, acc, (qx - dx_ * 0.5, qy - dy_ * 0.5), (qx + dx_ * 0.5, qy + dy_ * 0.5), 1)
+    elif kind == "cape_bat":
+        # kanat kemikleri: omuzdan her uca
+        for j in range(5):
+            u = j / 4.0
+            hx, hy = hem[int(round(u * CAPE_HEM_PTS))]
+            ox_, oy_ = cloth(0.5 + (u - 0.5) * 0.3, 0.05)
+            pygame.draw.line(surf, scale_col(acc, 0.7), (ox_, oy_), (hx, hy), 1)
+        add_glow(surf, mx_, my_, r * 1.4, acc, 0.22 + 0.08 * math.sin(t * 3))
+    elif kind == "cape_pink":
+        for j in range(4):
+            s = (t * 0.25 + j * 0.25) % 1.0
+            qx, qy = cloth(0.25 + 0.5 * ((j * 0.37) % 1.0), s)
+            hr = max(2, int(r * 0.13))
+            pygame.draw.circle(surf, acc, (int(qx - hr * 0.6), int(qy)), hr)
+            pygame.draw.circle(surf, acc, (int(qx + hr * 0.6), int(qy)), hr)
+            pygame.draw.polygon(surf, acc, [(qx - hr * 1.5, qy + 1), (qx + hr * 1.5, qy + 1),
+                                            (qx, qy + hr * 2.0)])
+
+    # --- kenar işlemesi ---
+    trim_w = 3 if kind in ("cape_gold_trim", "cape_royal") else 2
+    pygame.draw.lines(surf, acc, False, Ls + hem[1:-1] + list(reversed(Rs)), trim_w)
+    if kind in ("cape_gold_trim", "cape_royal"):
+        pygame.draw.lines(surf, lighten(acc, 0.45), False, Ls[1:] + hem[1:-1], 1)
+        # kenar boyunca dolaşan altın parıltı
+        edge = Ls + hem[1:-1] + list(reversed(Rs))
+        k = (t * 0.55) % 1.0
+        gx, gy = edge[int(k * (len(edge) - 1))]
+        add_glow(surf, gx, gy, r * 1.0, acc, 0.65)
+        _cape_spark(surf, gx, gy, 4, WHITE)
+
+    # --- etek efektleri ---
+    if kind == "cape_flame":
+        add_glow(surf, mx_, my_, r * 2.0, acc, 0.30 + 0.10 * math.sin(t * 9))
+        for k in range(1, CAPE_HEM_PTS, 2):
+            hx, hy = hem[k]
+            add_glow(surf, hx, hy, r * 0.6, (255, 140, 40), 0.35)
+        for j in range(5):                      # yükselen kıvılcımlar
+            ph = (t * 0.9 + j * 0.2) % 1.0
+            hx, hy = hem[(j * 3) % len(hem)]
+            ex = hx + bx * r * ph * 1.4 + nx * math.sin(t * 5 + j * 2.0) * r * 0.4
+            ey = hy + by * r * ph * 1.4 + ny * math.sin(t * 5 + j * 2.0) * r * 0.4
+            blit_disc(surf, ex, ey, max(1, int(2.6 * (1.0 - ph))), (255, 200, 90), 230 * (1.0 - ph))
+    elif kind == "cape_ice":
+        for k in range(0, CAPE_HEM_PTS + 1, 2):
+            hx, hy = hem[k]
+            tw = 0.5 + 0.5 * math.sin(t * 4.0 + k)
+            if tw > 0.7:
+                _cape_spark(surf, hx, hy, 2 + tw * 2, WHITE)
+        for j in range(3):                      # soğuk buhar
+            ph = (t * 0.5 + j * 0.33) % 1.0
+            hx, hy = hem[(j * 5 + 2) % len(hem)]
+            blit_disc(surf, hx + bx * r * ph * 1.2, hy + by * r * ph * 1.2,
+                      r * (0.14 + ph * 0.30), (220, 240, 255), 55 * (1.0 - ph))
+        add_glow(surf, mx_, my_, r * 1.6, acc, 0.20)
+    elif kind == "cape_shadow":
+        add_glow(surf, mx_, my_, r * 1.8, acc, 0.30 + 0.08 * math.sin(t * 2.5))
+        for j in range(5):                      # eteğinden kopan duman
+            ph = (t * 0.6 + j * 0.2) % 1.0
+            hx, hy = hem[(j * 3 + 1) % len(hem)]
+            wx = hx + bx * r * ph * 1.6 + nx * math.sin(t * 2 + j * 1.9) * r * 0.5
+            wy = hy + by * r * ph * 1.6 + ny * math.sin(t * 2 + j * 1.9) * r * 0.5
+            blit_disc(surf, wx, wy, r * (0.22 + ph * 0.5), mix_col(col, acc, 0.35), 150 * (1.0 - ph))
+    elif kind == "cape_forest":
+        for j in range(2):                      # düşen yapraklar
+            ph = (t * 0.35 + j * 0.5) % 1.0
+            hx, hy = hem[(j * 7 + 3) % len(hem)]
+            lx_ = hx + bx * r * ph * 2.2 + nx * math.sin(t * 3 + j * 3) * r * 0.7
+            ly_ = hy + by * r * ph * 2.2 + ny * math.sin(t * 3 + j * 3) * r * 0.7
+            a = int(220 * (1.0 - ph))
+            if a > 20:
+                pygame.draw.ellipse(surf, lighten(col, 0.3), (int(lx_ - 3), int(ly_ - 2), 6, 4))
+    elif kind == "cape_storm":
+        add_glow(surf, mx_, my_, r * 1.5, acc, 0.18)
+    elif kind == "cape_red":
+        # rüzgârda dalgalanan kahraman pelerini: koşarken uçuşan kenar çizgileri
+        if sp > 0.35:
+            for j in range(3):
+                hx, hy = hem[2 + j * 5]
+                d = r * (0.6 + 0.4 * math.sin(t * 9 + j))
+                pygame.draw.line(surf, lighten(acc, 0.3), (hx, hy),
+                                 (hx + bx * d, hy + by * d), 1)
+    elif kind == "cape_pink":
+        for k in range(1, CAPE_HEM_PTS, 3):
+            hx, hy = hem[k]
+            tw = 0.5 + 0.5 * math.sin(t * 5.0 + k * 1.3)
+            if tw > 0.6:
+                _cape_spark(surf, hx, hy, 1 + tw * 2.5, WHITE)
+
+    # --- omuz tokaları (gövdenin kenarında görünür) ---
+    clasp = acc if kind not in ("cape_gold_trim", "cape_royal", "cape_red") else GOLD
+    if kind == "cape_red":
+        clasp = (232, 186, 90)
+    for side in (1, -1):
+        cx_, cy_ = sx0 + nx * side * r * 0.86, sy0 + ny * side * r * 0.86
+        pygame.draw.circle(surf, OUTLINE, (int(cx_), int(cy_)), max(3, int(r * 0.24)))
+        pygame.draw.circle(surf, clasp, (int(cx_), int(cy_)), max(2, int(r * 0.18)))
+        pygame.draw.circle(surf, lighten(clasp, 0.55), (int(cx_ - 1), int(cy_ - 1)), 1)
 
 
 def draw_cosmetic_hat(surf, p, px, py, t):
@@ -13728,8 +14036,13 @@ STINGER_DMG_CAP = 2.0           # kendi taban hasarının en çok bu katı
 # zırha, patronlara ve CEHENNEM'e hiç dokunulmadı, yani oyunun ŞEKLİ aynı
 # kaldı, yalnızca yaratıklar %10 yumuşadı. Zorluk yine artıyor, sadece
 # biraz daha geç.
-ENEMY_HP_TUNE = 0.90
-ENEMY_DMG_TUNE = 0.90
+# v3.27: "oyun çok hızlı, ölüyorum" -> can bir %5, hasar bir %10 daha kısıldı
+# (0.90 x 0.95 = 0.855, 0.90 x 0.90 = 0.81). Bütün yaratıklara işler
+# (arena + cehennem); PATRONLAR kendi düğmeleriyle ayrı (BOSS_*_NERF).
+ENEMY_HP_NERF = 0.95
+ENEMY_DMG_NERF = 0.90
+ENEMY_HP_TUNE = 0.90 * ENEMY_HP_NERF
+ENEMY_DMG_TUNE = 0.90 * ENEMY_DMG_NERF
 
 ENEMY_DEFS = {
     "red":      {"hp": 30,  "speed": 100, "dmg": 10, "radius": 14, "coin": 5,  "xp": 4,  "score": 12,  "contact_dps": 17},
@@ -17597,6 +17910,20 @@ BOSS_CROWD_SHARE = 0.5
 EARLY_BAT_WAVES = 10
 EARLY_BAT_NERF = 0.10
 
+# v3.27 — DOĞUM HIZI %10 YAVAŞ. "Oyun çok hızlı" geri bildirimi: yaratıklar
+# saniyede %10 daha az doğar (doğum aralığı 1/0.90 = %11 uzar). Dalga skor
+# hedefleri aynı kaldı; yani dalgalar da biraz daha sakin akar.
+SPAWN_RATE_TUNE = 0.90
+
+# v3.27 — PATRON DALGASI KİLİDİ AÇILDI ("afk kalıp seviye kasılıyor").
+# Patron varken yaratıklar yarı hızda doğmaya devam ediyor (BOSS_SPAWN_RATE)
+# ve dalga patron ölene kadar İLERLEMİYORDU. Oyuncu patrona hiç dokunmadan
+# kenarda dolanıp sonsuza kadar küçük yaratık kesip XP kasabiliyordu.
+# Artık patron bu kadar saniyede devrilmezse dalga KENDİLİĞİNDEN devam eder:
+# patron sahada kalır ama doğum normal tempoya döner ve dalgalar yine
+# sertleşerek akar. Sandık patron devrilince yine düşer.
+BOSS_WAVE_TIMEOUT = 30.0
+
 
 class WaveManager:
     def __init__(self, diff="normal", biome="arena"):
@@ -17621,6 +17948,8 @@ class WaveManager:
         # --- yoğunluk (surge) penceresi ---
         self.surge_timer = 0.0
         self.surge_delay = 0.0     # pencere açılmadan önceki sükûnet
+        # Patron dövüşünün süresi (bkz. BOSS_WAVE_TIMEOUT).
+        self.boss_clock = 0.0
 
     # Dünya ekrandan büyük olduğu için doğum noktasını RunState belirler
     # (kameranın hemen dışı). Atanmazsa eski davranışa (dünya kenarı) düşer.
@@ -17732,6 +18061,18 @@ class WaveManager:
         self.wave_score = max(0, int(total_score) - int(self.wave_start_score))
 
         wave_changed = False
+        # PATRON SÜRESİ (v3.27): patron BOSS_WAVE_TIMEOUT saniyede devrilmezse
+        # dalga kilidi kalkar. Patron sahada kalır; RunState onu devirdiğinde
+        # dalgayı bir daha ATLATMAZ (bkz. boss_active kontrolü orada).
+        boss_timeout = False
+        if boss_active and not self.boss_pending:
+            self.boss_clock += dt
+            if self.boss_clock >= BOSS_WAVE_TIMEOUT:
+                self.boss_active = False
+                boss_active = False
+                boss_timeout = True
+        else:
+            self.boss_clock = 0.0
         if not boss_active and not self.boss_pending:
             # Dalga iki koşuldan biriyle ilerler:
             #   1) SKOR HEDEFİ tutturulduysa (asıl koşul, oyuncuyu ödüllendirir)
@@ -17739,7 +18080,7 @@ class WaveManager:
             #      kilitlenmesin diye — normal dalga süresinin 2.8 katı)
             goal_met = self.wave_score >= self.wave_goal
             time_out = self.wave_time >= self.wave_duration * 2.8
-            if goal_met or time_out:
+            if goal_met or time_out or boss_timeout:
                 self._begin_wave(self.wave + 1, total_score)
                 wave_changed = True
                 if self.is_boss_wave(self.wave):
@@ -17753,6 +18094,8 @@ class WaveManager:
                     self.announce_text = L("ui.ann_rage", self.wave)
                 else:
                     self.announce_text = L("ui.ann_surge", self.wave)
+                if boss_timeout:
+                    self.announce_text = L("ui.ann_boss_timeout", self.wave)
 
         # PATRON VARKEN OYUN DURMAZ (v3.26). Eskiden patron gelince yaratık
         # doğumu tamamen kesiliyordu; artık sürüyor ama YAVAŞ: doğum hızı
@@ -17769,7 +18112,7 @@ class WaveManager:
         # geç dalgalar hem gerçekten sertleşiyor hem de kare hızı sabit
         # kalıyor (yaratıklar hızlı doğuyor ama hızlı da ölüyor).
         # Sükûnet önce tükenir, yoğunluk penceresi ondan sonra işlemeye başlar.
-        base_interval = max(0.20, 1.15 - self.wave * 0.035) / self.pace
+        base_interval = max(0.20, 1.15 - self.wave * 0.035) / (self.pace * SPAWN_RATE_TUNE)
         if boss_time:
             # patron dövüşü uzasa da tempo artmaz; yalnızca yarı hız
             base_interval /= BOSS_SPAWN_RATE
@@ -20024,13 +20367,17 @@ class RunState:
             if not self.bosses:
                 # Tüm patronlar devrildi — dalga normal akışına döner ve
                 # zaferin ardından kısa bir yoğunluk penceresi açılır.
+                # v3.27: patron süresi (BOSS_WAVE_TIMEOUT) dolduysa dalga
+                # zaten ilerledi; geç devrilen patron dalgayı İKİNCİ KEZ
+                # atlatmaz.
                 beaten_wave = self.waves.wave
-                self.waves.boss_active = False
-                self.waves._begin_wave(self.waves.wave + 1, self.score)
-                self.waves.announce_timer = 2.5
-                self.waves.announce_text = (
-                    L("ui.ann_hell", self.waves.wave) if self.biome == "hell"
-                    else L("ui.ann_surge", self.waves.wave))
+                if self.waves.boss_active:
+                    self.waves.boss_active = False
+                    self.waves._begin_wave(self.waves.wave + 1, self.score)
+                    self.waves.announce_timer = 2.5
+                    self.waves.announce_text = (
+                        L("ui.ann_hell", self.waves.wave) if self.biome == "hell"
+                        else L("ui.ann_surge", self.waves.wave))
                 sfx("wave", 0.6, 0.0)
                 if self.ach and self.biome != "hell":
                     self.ach.unlock({5: "wave5", 10: "wave10", 15: "wave15",
@@ -26339,7 +26686,7 @@ class App:
         self.ads = AdBridge()
         self.ad_play = None           # oynayan reklamın geçen süresi (sn) ya da None
         self.ad_done = False          # reklam sonuna kadar izlendi mi
-        self.reward_fx = []           # "+50 ELMAS!" kutlamaları: [x, y, t, miktar]
+        self.reward_fx = []           # "+250 ELMAS!" kutlamaları: [x, y, t, miktar]
         self.store_card_t = 0.0       # menüdeki mağaza vitrininin dönme saati
         # ---- v3.26: yılbaşı süsleri + açılış ekranı ----
         self.xmas = MenuXmas() if NEW_YEAR_THEME else None
@@ -27836,7 +28183,7 @@ class App:
     # ---------------- MAĞAZA KARTI (ana menü, sağ) ----------------
     # v3.26: kare kart yerine KARAKTERİN paneliyle aynı hizadan başlayıp
     # ekranın dibine inen UZUN kart. İçinde dönen bir vitrin (premium skin /
-    # PET / elmas paketi), doğrudan buradan izlenebilen REKLAM (+50 elmas),
+    # PET / elmas paketi), doğrudan buradan izlenebilen REKLAM (+250 elmas),
     # GÜNLÜK HEDİYE ve mağazaya giden düğme var.
     STORE_CARD_RECT = (VIRTUAL_W - 26 - 184, 302, 184, 398)
     SHOWCASE_EVERY = 3.4
@@ -28133,7 +28480,7 @@ class App:
         sfx("buy", 1.0, 0.0)
 
     def _draw_reward_fx(self, canvas, dt):
-        """"+50 ELMAS!" yazısı ve dört bir yana saçılan elmaslar."""
+        """"+250 ELMAS!" yazısı ve dört bir yana saçılan elmaslar."""
         alive = []
         for fx in list(self.reward_fx):
             fx[2] += dt
