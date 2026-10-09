@@ -7040,22 +7040,64 @@ def clean_custom_pet(d):
     return out
 
 
-def random_custom_pet(rnd=None):
-    rnd = rnd or random
-    d = {k: rnd.choice(v) for k, v in CUSTOM_PET_PARTS.items()}
-    # boş görünmesin: kulak ya da şapkadan en az biri, kuyruk ya da kanattan en az biri
-    if d["ears"] == "none" and d["hat"] == "none":
-        d["ears"] = rnd.choice(CUSTOM_PET_PARTS["ears"][1:])
-    if d["tail"] == "none" and d["wings"] == "none":
-        d["tail"] = rnd.choice(CUSTOM_PET_PARTS["tail"][1:])
-    c1 = rnd.choice(CUSTOM_PET_SWATCHES)
-    c2 = rnd.choice([c for c in CUSTOM_PET_SWATCHES if c != c1])
-    d["col"], d["col2"] = list(c1), list(lighten(c2, 0.25))
-    d["eye"] = list(rnd.choice(CUSTOM_PET_SWATCHES[5:12]))
-    d["size"] = rnd.choice(CUSTOM_PET_SIZES)
-    d["name"] = rnd.choice(("Bonkçuk", "Pofuduk", "Minnoş", "Zıpzıp", "Fıstık", "Bulut",
-                            "Köfte", "Şimşek", "Pamuk", "Boncuk"))
-    return clean_custom_pet(d)
+# HAZIR TEMELLER (v3.28) — "petler rastgele olmasın; sağa sola kaydırıp hangi
+# peti yapacağımı seçeyim, sonra onunla tasarıma başlayayım". Tasarım ekranı
+# önce bu temellerden birini seçtirir, sonra parça parça değiştirilir.
+# Temeller de aynı parçalardan kurulduğu için sunucu süzgeci değişmez.
+#   ((Türkçe ad, İngilizce ad), tasarım)
+CUSTOM_PET_BASES = (
+    (("Kedi", "Cat"), dict(body="round", eyes="big", mouth="cat", ears="cat", tail="cat",
+                           wings="none", hat="none", pattern="belly", fx="none",
+                           col=[255, 168, 92], col2=[255, 236, 212], eye=[90, 190, 90])),
+    (("Köpek", "Dog"), dict(body="chubby", eyes="round", mouth="tongue", ears="dog", tail="cat",
+                            wings="none", hat="none", pattern="belly", fx="none",
+                            col=[186, 132, 84], col2=[240, 214, 176], eye=[70, 50, 40])),
+    (("Tavşan", "Bunny"), dict(body="round", eyes="big", mouth="smile", ears="bunny", tail="puff",
+                               wings="none", hat="none", pattern="cheeks", fx="none",
+                               col=[245, 245, 250], col2=[255, 170, 200], eye=[255, 110, 160])),
+    (("Ayıcık", "Teddy"), dict(body="chubby", eyes="round", mouth="smile", ears="bear", tail="puff",
+                               wings="none", hat="none", pattern="belly", fx="none",
+                               col=[150, 105, 70], col2=[235, 205, 165], eye=[40, 30, 30])),
+    (("Tilki", "Fox"), dict(body="bean", eyes="happy", mouth="cat", ears="fox", tail="fox",
+                            wings="none", hat="none", pattern="belly", fx="none",
+                            col=[240, 120, 50], col2=[255, 240, 225], eye=[60, 40, 30])),
+    (("Kaplan", "Tiger"), dict(body="chubby", eyes="angry", mouth="fangs", ears="cat", tail="cat",
+                               wings="none", hat="none", pattern="stripes", fx="none",
+                               col=[255, 150, 40], col2=[255, 240, 220], eye=[80, 200, 90])),
+    (("Ejderha", "Dragon"), dict(body="round", eyes="big", mouth="fangs", ears="horns", tail="dragon",
+                                 wings="dragon", hat="none", pattern="belly", fx="none",
+                                 col=[90, 190, 110], col2=[255, 214, 120], eye=[255, 170, 60])),
+    (("Jöle", "Slime"), dict(body="blob", eyes="happy", mouth="smile", ears="none", tail="none",
+                             wings="none", hat="none", pattern="plain", fx="bubbles",
+                             col=[110, 214, 140], col2=[200, 255, 220], eye=[30, 80, 50])),
+    (("Şeytancık", "Imp"), dict(body="round", eyes="angry", mouth="fangs", ears="horns", tail="devil",
+                                wings="bat", hat="none", pattern="plain", fx="flames",
+                                col=[220, 60, 60], col2=[70, 30, 40], eye=[255, 214, 80])),
+    (("Melek", "Angel"), dict(body="round", eyes="happy", mouth="smile", ears="none", tail="none",
+                              wings="angel", hat="halo", pattern="cheeks", fx="sparkle",
+                              col=[250, 245, 235], col2=[255, 214, 140], eye=[90, 150, 255])),
+    (("Peri", "Fairy"), dict(body="tall", eyes="star", mouth="smile", ears="none", tail="none",
+                             wings="fairy", hat="flower", pattern="cheeks", fx="sparkle",
+                             col=[255, 170, 220], col2=[200, 240, 255], eye=[150, 90, 240])),
+    (("Uzaylı", "Alien"), dict(body="bean", eyes="cyclops", mouth="o", ears="antenna", tail="none",
+                               wings="none", hat="none", pattern="spots", fx="none",
+                               col=[150, 230, 120], col2=[90, 170, 80], eye=[180, 60, 220])),
+    (("Balık", "Fish"), dict(body="bean", eyes="round", mouth="o", ears="none", tail="fish",
+                             wings="none", hat="none", pattern="stripes", fx="bubbles",
+                             col=[80, 170, 240], col2=[255, 214, 120], eye=[20, 40, 80])),
+)
+
+
+def custom_pet_base(i):
+    """i. hazır temelin tasarımı (adı temelin adıyla)."""
+    names, d = CUSTOM_PET_BASES[i % len(CUSTOM_PET_BASES)]
+    out = dict(d, size=1.0, name=names[0] if lang() == "tr" else names[1])
+    return clean_custom_pet(out)
+
+
+def custom_pet_base_name(i):
+    names = CUSTOM_PET_BASES[i % len(CUSTOM_PET_BASES)][0]
+    return names[0] if lang() == "tr" else names[1]
 
 
 def _cp_heart(surf, x, y, s, col):
@@ -28224,7 +28266,7 @@ class App:
             elif self.state == STATE_LOGIN: self.update_login(dt, mouse_pos, clicked)
             elif self.state == STATE_MASTERY: self.update_mastery(dt, mouse_pos, clicked)
             elif self.state == STATE_KEYS: self.update_keys(dt, mouse_pos, clicked)
-            elif self.state == STATE_PET_DESIGNER: self.update_pet_designer(dt, mouse_pos, clicked)
+            elif self.state == STATE_PET_DESIGNER: self.update_pet_designer(dt, mouse_pos, clicked, wheel_y)
 
             # Sohbet en üstte durur: hangi ekranda olursak olalım aynı yerde,
             # sol altta görünsün.
@@ -28282,7 +28324,11 @@ class App:
                 pd["name_focus"] = False
             elif pd.get("confirm"):
                 pd["confirm"] = False
-            elif not self.purchase.waiting():
+            elif self.purchase.waiting():
+                pass
+            elif pd.get("stage") == "design":
+                self._pd_back_to_pick()
+            else:
                 self._pd_leave()
         elif self.state in (STATE_SKIN_MARKET, STATE_COSMETIC_MARKET, STATE_BOOK_MARKET,
                             STATE_WEAPON_CODEX,
@@ -30229,10 +30275,8 @@ class App:
         if isinstance(draft, dict):
             show = clean_custom_pet(draft)
         else:
-            if not getattr(self, "_cp_showcase", None):
-                rnd = random.Random(2028)
-                self._cp_showcase = [random_custom_pet(rnd) for _ in range(8)]
-            show = self._cp_showcase[int(self.t / 2.4) % len(self._cp_showcase)]
+            # hazır temeller sırayla döner (tasarım ekranı da bunlarla başlar)
+            show = custom_pet_base(int(self.t / 2.4))
         draw_custom_pet(canvas, show, cx, cy + 22, 30, self.t, face=1 if math.sin(self.t * 0.7) > 0 else -1,
                         moving=fhov)
         n_own = len(owned_custom_pets())
@@ -30319,15 +30363,51 @@ class App:
                      ("Dev", "Huge"))
 
     def open_pet_designer(self):
+        """Önce HANGİ PET (sağa-sola kaydırmalı seçim), sonra tasarım."""
         draft = self.save.data.get("pet_draft")
+        try:
+            base_i = int(self.save.data.get("pet_draft_base", 0)) % len(CUSTOM_PET_BASES)
+        except (TypeError, ValueError):
+            base_i = 0
         self.pd = {"design": clean_custom_pet(draft) if isinstance(draft, dict)
-                   else json.loads(json.dumps(CUSTOM_PET_DEFAULT)),
+                   else custom_pet_base(base_i),
+                   "has_draft": isinstance(draft, dict),
+                   "stage": "pick", "base": base_i, "car": float(base_i), "drag_x0": None,
+                   "drag_dx": 0.0, "wheel_cd": 0.0,
                    "tab": "body", "name_focus": False, "confirm": False, "moving": True,
                    "face": 1, "cache": {}, "cache_key": "", "msg": "", "msg_ok": True,
                    "msg_t": 0.0, "pop": 0.0, "confetti": 0.0, "undo": []}
         self.purchase.refresh_catalog(force=True)
         self.goto(STATE_PET_DESIGNER)
         sfx("click", 0.6, 0.0)
+
+    def _pd_step(self, d):
+        """Seçim ekranında bir sağa (+1) ya da sola (-1) kaydır."""
+        pd = self.pd
+        pd["base"] = (pd["base"] + d) % len(CUSTOM_PET_BASES)
+        sfx("hover", 0.7, 0.0)
+
+    def _pd_choose(self, keep_draft=False):
+        """Seçilen temelle tasarıma geç (ya da yarım kalan tasarıma dön)."""
+        pd = self.pd
+        if not keep_draft:
+            pd["design"] = custom_pet_base(pd["base"])
+            pd["undo"] = []
+            self.save.data["pet_draft"] = pd["design"]
+            self.save.data["pet_draft_base"] = pd["base"]
+            pd["has_draft"] = True
+        pd["stage"] = "design"
+        pd["tab"] = "body"
+        pd["pop"] = 1.0
+        sfx("levelup", 0.6, 0.0)
+
+    def _pd_back_to_pick(self):
+        pd = self.pd
+        self.save.data["pet_draft"] = pd["design"]
+        pd["name_focus"] = False
+        pd["stage"] = "pick"
+        pd["car"] = float(pd["base"])
+        sfx("click", 0.5, 0.0)
 
     def _pd_set(self, key, value):
         pd = self.pd
@@ -30349,7 +30429,17 @@ class App:
 
     def handle_pet_designer_key(self, event):
         pd = getattr(self, "pd", None)
-        if not pd or not pd.get("name_focus"):
+        if not pd:
+            return
+        if pd.get("stage") == "pick" and not pd.get("confirm"):
+            if event.key in (pygame.K_LEFT, pygame.K_a):
+                self._pd_step(-1)
+            elif event.key in (pygame.K_RIGHT, pygame.K_d):
+                self._pd_step(1)
+            elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                self._pd_choose()
+            return
+        if not pd.get("name_focus"):
             return
         nm = pd["design"].get("name", "")
         if event.key in (pygame.K_RETURN, pygame.K_TAB):
@@ -30382,10 +30472,159 @@ class App:
             pd["cache"][(key, opt)] = img
         return img
 
-    def update_pet_designer(self, dt, mouse_pos, clicked):
+    def _pd_pick_stage(self, canvas, dt, mouse_pos, clicked, wheel_y):
+        """HANGİ PETİ YAPACAKSIN? — sağa sola kaydırmalı seçim (v3.28)."""
+        pd = self.pd
+        t = self.t
+        n = len(CUSTOM_PET_BASES)
+        # ---- üst şerit ----
+        top = pygame.Surface((VIRTUAL_W, 76), pygame.SRCALPHA)
+        pygame.draw.rect(top, (12, 13, 22, 238), top.get_rect())
+        canvas.blit(top, (0, 0))
+        pygame.draw.line(canvas, GOLD, (0, 76), (VIRTUAL_W, 76), 2)
+        draw_icon(canvas, 34, 30, "star", GOLD, 13)
+        draw_text(canvas, _tc("HANGİ PETİ YAPMAK İSTİYORSUN?", "WHICH PET DO YOU WANT TO MAKE?"),
+                  (56, 14), 26, GOLD, bold=True)
+        draw_text(canvas, _tc("Sağa sola kaydır (oklar, A/D, fare tekerleği ya da sürükle), beğendiğini seç — "
+                              "sonra gözünden kuyruğuna istediğin gibi değiştir.",
+                              "Swipe left/right (arrows, A/D, mouse wheel or drag), pick one — "
+                              "then change everything from eyes to tail."),
+                  (56, 48), 11, TEXT_DIM, shadow=False)
+        price = self.purchase.price_text(CUSTOM_PET_PRODUCT_ID, CUSTOM_PET_PRICE_HINT)
+        draw_text(canvas, price, (VIRTUAL_W - 40, 16), 28, TEXT, bold=True, right=True)
+        draw_text(canvas, _tc("tek seferlik · hesabına kalıcı", "one-time · yours forever"),
+                  (VIRTUAL_W - 40, 50), 10, TEXT_DIM, right=True, shadow=False)
+
+        area = pygame.Rect(0, 90, VIRTUAL_W, 470)
+        # ---- sürükleme / tekerlek ----
+        held = pygame.mouse.get_pressed()[0]
+        if clicked and area.collidepoint(mouse_pos) and pd["drag_x0"] is None:
+            pd["drag_x0"] = mouse_pos[0]
+            pd["drag_dx"] = 0.0
+            pd["press_side"] = None
+        elif pd["drag_x0"] is not None:      # bırakma en erken bir sonraki karede
+            pd["drag_dx"] = mouse_pos[0] - pd["drag_x0"]
+            if not held:
+                dx = pd["drag_dx"]
+                pd["drag_x0"] = None
+                pd["drag_dx"] = 0.0
+                if abs(dx) > 50:
+                    steps = int(clamp(round(-dx / 230.0), -3, 3)) or (-1 if dx > 0 else 1)
+                    for _ in range(abs(steps)):
+                        self._pd_step(1 if steps > 0 else -1)
+                    clicked = False          # sürükleme tıklama sayılmasın
+                elif abs(dx) <= 12 and pd.get("press_side") is not None:
+                    # yandaki pete TIKLANDI (sürüklenmedi): ona kaydır
+                    rel = (pd["press_side"] - pd["base"] + n / 2.0) % n - n / 2.0
+                    for _ in range(int(abs(round(rel)))):
+                        self._pd_step(1 if rel > 0 else -1)
+                pd["press_side"] = None
+        pd["wheel_cd"] = max(0.0, pd["wheel_cd"] - dt)
+        if wheel_y and pd["wheel_cd"] <= 0:
+            self._pd_step(-1 if wheel_y > 0 else 1)
+            pd["wheel_cd"] = 0.12
+        # ---- yumuşak kaydırma: car, seçili indekse en kısa yoldan yaklaşır ----
+        diff = (pd["base"] - pd["car"] + n / 2.0) % n - n / 2.0
+        pd["car"] = (pd["car"] + diff * min(1.0, dt * 10.0)) % n
+        car = pd["car"] - (pd["drag_dx"] / 230.0 if pd["drag_x0"] is not None else 0.0)
+
+        cx, cy = VIRTUAL_W / 2, 330
+        k = 0.5 + 0.5 * math.sin(t * 2.0)
+        sel = custom_pet_base(pd["base"])
+        col = tuple(sel["col"])
+        soft_rays(canvas, cx, cy - 10, t, lighten(col, 0.35), n=16, alpha=22 + int(10 * k), length=300)
+        add_glow(canvas, cx, cy, 240, col, 0.16 + 0.06 * k)
+        pygame.draw.ellipse(canvas, (34, 30, 52), pygame.Rect(cx - 150, cy + 82, 300, 60))
+        pygame.draw.ellipse(canvas, (56, 50, 82), pygame.Rect(cx - 150, cy + 76, 300, 60))
+        pygame.draw.ellipse(canvas, scale_col(GOLD, 0.75), pygame.Rect(cx - 150, cy + 76, 300, 60), 2)
+        # uzaktan yakına çiz (öndeki en son)
+        items = []
+        for i in range(n):
+            rel = (i - car + n / 2.0) % n - n / 2.0
+            if abs(rel) > 3.2:
+                continue
+            items.append((abs(rel), rel, i))
+        items.sort(reverse=True)
+        hit_side = None
+        for dist_, rel, i in items:
+            sc = max(0.38, 1.0 - 0.24 * dist_)
+            x = cx + rel * 235 * (1.0 - 0.06 * dist_)
+            y = cy + 52 - 6 * dist_
+            r = int(64 * sc)
+            front = dist_ < 0.5
+            d = custom_pet_base(i)
+            if not front:
+                pygame.draw.ellipse(canvas, (30, 28, 46),
+                                    pygame.Rect(int(x - 70 * sc), int(y + 28 * sc), int(140 * sc), int(30 * sc)))
+            draw_custom_pet(canvas, d, x, y, r, t + i * 0.37, face=1 if rel <= 0 else -1,
+                            moving=front, shadow=front)
+            if not front:
+                rr = pygame.Rect(0, 0, int(150 * sc), int(170 * sc))
+                rr.center = (int(x), int(y - 10 * sc))
+                if rr.collidepoint(mouse_pos):
+                    hit_side = i
+                    ring_aa(canvas, x, y - 6, 74 * sc, (200, 190, 240), 2)
+                draw_text(canvas, custom_pet_base_name(i), (x, y + 72 * sc), max(11, int(18 * sc)),
+                          (150, 150, 180), bold=True, center=True)
+        # seçili petin adı
+        draw_text(canvas, custom_pet_base_name(pd["base"]).upper(), (cx, cy + 150), 40, GOLD, bold=True,
+                  center=True)
+        # nokta göstergesi
+        dx0 = cx - (n - 1) * 16 / 2
+        for i in range(n):
+            circle_aa(canvas, dx0 + i * 16, cy + 196, 5 if i == pd["base"] else 3.2,
+                      GOLD if i == pd["base"] else (80, 84, 110))
+        # oklar
+        for sgn, ax in ((-1, 120), (1, VIRTUAL_W - 120)):
+            ar = pygame.Rect(0, 0, 84, 84)
+            ar.center = (ax, cy + 20)
+            hv = ar.collidepoint(mouse_pos)
+            add_glow(canvas, ax, cy + 20, 70, GOLD, 0.10 + (0.18 if hv else 0.0))
+            circle_aa(canvas, ax, cy + 20, 40, (40, 36, 60) if hv else (26, 24, 40))
+            ring_aa(canvas, ax, cy + 20, 40, GOLD if hv else (110, 100, 150), 3)
+            px = ax + sgn * 8
+            poly_aa(canvas, [(px + sgn * 14, cy + 20), (px - sgn * 12, cy), (px - sgn * 12, cy + 40)],
+                    WHITE if hv else (220, 214, 240))
+            if clicked and hv:
+                self._pd_step(sgn)
+                clicked = False
+        if clicked and hit_side is not None:
+            pd["press_side"] = hit_side      # bırakınca (sürüklenmediyse) ona kaydırılır
+            clicked = False
+
+        # ---- alt düğmeler ----
+        back = pygame.Rect(24, VIRTUAL_H - 74, 200, 54)
+        bh = back.collidepoint(mouse_pos)
+        self._mini_button(canvas, back, L("ui.back"), (60, 64, 90), bh, size=15)
+        if clicked and bh:
+            self._pd_leave()
+            sfx("click", 0.5, 0.0)
+            return
+        ok = pygame.Rect(0, 0, 420, 62)
+        ok.center = (VIRTUAL_W // 2, VIRTUAL_H - 47)
+        oh = ok.collidepoint(mouse_pos)
+        add_glow(canvas, ok.centerx, ok.centery, 220, GREEN, 0.14 + 0.10 * k)
+        self._mini_button(canvas, ok, _tc("BUNU SEÇ — TASARLA", "PICK THIS — DESIGN IT"), (54, 150, 86),
+                          oh, icon="star", size=20)
+        if clicked and oh:
+            self._pd_choose()
+            return
+        if pd["has_draft"]:
+            cont = pygame.Rect(VIRTUAL_W - 344, VIRTUAL_H - 74, 320, 54)
+            chv = cont.collidepoint(mouse_pos)
+            self._mini_button(canvas, cont, _tc("YARIM KALAN TASARIMA DÖN", "BACK TO MY DRAFT"),
+                              (70, 64, 120), chv, size=14)
+            if clicked and chv:
+                self._pd_choose(keep_draft=True)
+
+    def update_pet_designer(self, dt, mouse_pos, clicked, wheel_y=0):
         canvas = self.display.canvas
         self.bg.draw(canvas)
         pd = self.pd
+        if pd.get("stage") == "pick":
+            self._pd_pick_stage(canvas, dt, mouse_pos, clicked and not self.purchase.waiting(), wheel_y)
+            self._draw_payment_wait(canvas, mouse_pos, clicked)
+            return
         d = pd["design"]
         t = self.t
         pd["pop"] = max(0.0, pd["pop"] - dt * 3.0)
@@ -30449,28 +30688,22 @@ class App:
         bx0 = lp.centerx - (4 * bw + 3 * gap) / 2
         by = lp.bottom - 56
         btns = [(_tc("DURDUR", "STOP") if pd["moving"] else _tc("YÜRÜT", "WALK"), "walk"),
-                (_tc("ÇEVİR", "FLIP"), "flip"), (_tc("RASTGELE", "RANDOM"), "random"),
+                (_tc("ÇEVİR", "FLIP"), "flip"), (_tc("PET SEÇ", "PICK PET"), "pick"),
                 (_tc("GERİ AL", "UNDO"), "undo")]
         for i, (lbl, act) in enumerate(btns):
             r = pygame.Rect(int(bx0 + i * (bw + gap)), by, bw, bh)
             hv = r.collidepoint(mouse_pos)
             en = act != "undo" or bool(pd["undo"])
-            self._mini_button(canvas, r, lbl, (70, 64, 120) if act != "random" else (150, 100, 40),
+            self._mini_button(canvas, r, lbl, (70, 64, 120) if act != "pick" else (150, 100, 40),
                               hv, enabled=en)
             if ui_click and hv and en:
                 if act == "walk":
                     pd["moving"] = not pd["moving"]
                 elif act == "flip":
                     pd["face"] = -pd["face"]
-                elif act == "random":
-                    pd["undo"] = (pd["undo"] + [json.loads(json.dumps(d))])[-30:]
-                    nm = d.get("name")
-                    pd["design"] = random_custom_pet()
-                    if nm and nm != CUSTOM_PET_DEFAULT["name"]:
-                        pd["design"]["name"] = nm
-                    pd["pop"] = 1.0
-                    self.save.data["pet_draft"] = pd["design"]
-                    sfx("levelup", 0.5, 0.0)
+                elif act == "pick":
+                    self._pd_back_to_pick()
+                    return
                 elif act == "undo":
                     pd["design"] = pd["undo"].pop()
                     self.save.data["pet_draft"] = pd["design"]

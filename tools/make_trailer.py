@@ -407,18 +407,15 @@ class GameTrailer(K.GameTour):
         sh = self.sh
         if first:
             sh.state = K.STATE_MENU
-            sh.save.data["pet_draft"] = dict(K.CUSTOM_PET_DEFAULT, name="Bonkçuk")
+            sh.save.data.pop("pet_draft", None)
+            sh.save.data["pet_draft_base"] = 3        # Ayıcık'tan başla, 3 kaydırmada Ejderha
             sh.open_pet_designer()
-            self._pl_rnd = random.Random(31)
-            self._pl_steps = []
-            # (zaman, sekme, seçenek) — imleç kartlara gidip tıklar
-            plan = [(0.9, "body", "chubby"), (1.6, "eyes", "star"), (2.3, "ears", "fox"),
-                    (3.0, "wings", "dragon"), (3.7, "tail", "dragon"), (4.4, "hat", "crown"),
-                    (5.1, "fx", "flames"), (5.8, "colors", None)]
-            self._pl_steps = plan
+            # (zaman, sekme, seçenek) — seçimden sonra imleç kartlara gidip tıklar
+            self._pl_steps = [(3.1, "eyes", "star"), (3.7, "hat", "crown"), (4.3, "fx", "flames"),
+                              (4.9, "pattern", "spots"), (5.5, "colors", None)]
         pd = sh.pd
         area_x, area_y, area_w = 504, 184, 740
-        # sekme düğmesi ve seçenek kartının ekrandaki yeri
+
         def tab_pos(key):
             keys = [k for k, _p in sh.PD_TABS]
             i = keys.index(key)
@@ -434,7 +431,9 @@ class GameTrailer(K.GameTour):
             i = opts.index(opt)
             return (area_x + (i % cols) * (cw + 12) + cw / 2, area_y + (i // cols) * 222 + 104)
 
-        keys = [(0.0, (640, 690))]
+        right_arrow, pick_btn = (W - 120, 350), (W // 2, H - 47)
+        keys = [(0.0, (640, 600)), (0.45, right_arrow), (2.0, right_arrow), (2.35, pick_btn),
+                (2.6, pick_btn)]
         for (tt, tab, opt) in self._pl_steps:
             keys.append((tt - 0.42, tab_pos(tab)))
             keys.append((tt - 0.12, chip_pos(tab, opt) if opt else (900, 270)))
@@ -443,6 +442,15 @@ class GameTrailer(K.GameTour):
         keys.append((8.3, (785, 501)))           # onay penceresi: ÖDEMEYE GEÇ
         keys.append((9.5, (785, 501)))
         m = self.path(keys, st)
+        for x in (0.6, 1.1, 1.6):                # sağa kaydır: Ayıcık -> Tilki -> Kaplan -> Ejderha
+            if self.at(st, x):
+                sh._pd_step(1)
+                self.clicks.append((right_arrow, self.t))
+                self.hits.append(self.t)
+        if self.at(st, 2.45):
+            self.clicks.append((pick_btn, self.t))
+            sh._pd_choose()
+            self.hits.append(self.t)
         for (tt, tab, opt) in self._pl_steps:
             if self.at(st, tt - 0.35):
                 pd["tab"] = tab
@@ -456,7 +464,7 @@ class GameTrailer(K.GameTour):
                     sh._pd_set("col", [150, 110, 240])
                     sh._pd_set("col2", [255, 214, 120])
                 self.hits.append(self.t)
-        if self.at(st, 6.4):
+        if self.at(st, 6.2):
             sh._pd_set("name", "Bonkçuk")
         if self.at(st, 7.5):
             self.clicks.append((m, self.t))
@@ -465,11 +473,17 @@ class GameTrailer(K.GameTour):
         sh.update_pet_designer(dt, m, False)
         self.cursor(m)
         self.stamp(_tc("YENİ!", "NEW!"), st - 0.15, (255, 120, 140), y=110)
-        self.cap(_tc("KENDİ PETİNİ YAP", "MAKE YOUR OWN PET"),
-                 _tc("Göz, kulak, kuyruk, kanat, şapka, efekt... Dünyada TEK!",
-                     "Eyes, ears, tail, wings, hat, effects... One of a kind!"),
-                 st - 0.3, 6.8, y=612, col=(255, 170, 200))
-        if st > 7.5:
+        if st < 2.6:
+            self.cap(_tc("KENDİ PETİNİ YAP", "MAKE YOUR OWN PET"),
+                     _tc("Önce sağa sola kaydır, hangi peti yapacağını seç...",
+                         "First swipe left and right, pick your pet..."),
+                     st - 0.3, 2.3, y=612, col=(255, 170, 200))
+        elif st < 7.5:
+            self.cap(_tc("SONRA İSTEDİĞİN GİBİ DEĞİŞTİR", "THEN CHANGE ANYTHING"),
+                     _tc("Göz, kulak, kuyruk, kanat, şapka, efekt... Dünyada TEK!",
+                         "Eyes, ears, tail, wings, hat, effects... One of a kind!"),
+                     st - 2.7, 4.7, y=612, col=(255, 170, 200))
+        else:
             self.cap(_tc("BEĞENDİN Mİ? TAMAM DE!", "LOVE IT? HIT OK!"),
                      _tc("Önce tasarla, beğenince satın al.", "Design first, buy when you love it."),
                      st - 7.6, 1.9, y=612, col=(140, 230, 170))
