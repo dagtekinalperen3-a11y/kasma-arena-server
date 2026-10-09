@@ -45,6 +45,87 @@ for _n in ("spark", "burst", "ring", "shockwave", "bolt", "popup", "shake", "do_
 K.sfx = _noop
 
 
+# ---------------------------------------------------------------------
+# hızlandırma 2: oyuncu mermisi x hedef çarpışması (koşunun ~yarısı).
+# Oyunda her mermi BÜTÜN hedefleri dist() ile tarıyor. Burada aynı döngü
+# yalnızca merminin çevresindeki ızgara hücrelerinden gelen adaylarla
+# çalışır; adaylar ORİJİNAL SIRAYLA verilir ve isabet koşulu (dist < ...)
+# aynen işler, yani sonuç birebir aynıdır. Oyun kodu değişmez: yalnızca
+# simülatörün bellekteki RunState.update kopyası yamalanır.
+# ---------------------------------------------------------------------
+_CELL = 96.0
+
+
+class _TargetGrid:
+    __slots__ = ("frame", "n_en", "targets", "cells", "bosses", "max_r")
+
+    def __init__(self):
+        self.frame = -1
+        self.n_en = -1
+
+
+def _sim_near(run, proj):
+    g = getattr(run, "_sim_grid", None)
+    if g is None:
+        g = run._sim_grid = _TargetGrid()
+    if g.frame != run._sim_frame or g.n_en != len(run.enemies):
+        g.frame = run._sim_frame
+        g.n_en = len(run.enemies)
+        g.targets = list(run.enemies)
+        cells = {}
+        mr = 0.0
+        for i, e in enumerate(g.targets):
+            k = (int(e.x // _CELL), int(e.y // _CELL))
+            lst = cells.get(k)
+            if lst is None:
+                cells[k] = [i]
+            else:
+                lst.append(i)
+            hr = getattr(e, "hit_r", e.radius)
+            if hr > mr:
+                mr = hr
+        g.cells = cells
+        g.max_r = mr
+        g.bosses = [b for b in run.bosses if b.alive]
+    reach = proj.r + g.max_r + max(3.0, proj.r * 0.35) + 2.0
+    x0, x1 = int((proj.x - reach) // _CELL), int((proj.x + reach) // _CELL)
+    y0, y1 = int((proj.y - reach) // _CELL), int((proj.y + reach) // _CELL)
+    idx = []
+    cells = g.cells
+    for cx in range(x0, x1 + 1):
+        for cy in range(y0, y1 + 1):
+            lst = cells.get((cx, cy))
+            if lst:
+                idx.extend(lst)
+    if len(idx) > 1:
+        idx.sort()
+    t = g.targets
+    out = [t[i] for i in idx]
+    out.extend(g.bosses)
+    return out
+
+
+def _patch_update():
+    import inspect
+    import textwrap
+    src = textwrap.dedent(inspect.getsource(K.RunState.update))
+    old = ("        if proj.alive:\n"
+           "            for e in self._all_targets():\n")
+    assert src.count(old) == 1, "çarpışma döngüsü bulunamadı"
+    src = src.replace(old, ("        if proj.alive:\n"
+                            "            for e in _sim_near(self, proj):\n"))
+    src = src.replace("def update(self, dt, input_state):\n",
+                      "def _sim_update(self, dt, input_state):\n"
+                      "    self._sim_frame = getattr(self, '_sim_frame', 0) + 1\n", 1)
+    K._sim_near = _sim_near
+    exec(compile(src, K.__file__, "exec"), K.__dict__)
+    K.RunState.update = K._sim_update
+
+
+if os.environ.get("KASMA_SIM_FAST", "1") == "1":
+    _patch_update()
+
+
 def make_save():
     data = json.loads(json.dumps(K.SaveManager.DEFAULT))
     data["weapons_owned"] = [w["key"] for w in K.BOSS_WEAPONS]
