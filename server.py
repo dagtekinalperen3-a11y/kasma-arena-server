@@ -1136,7 +1136,7 @@ def player_save():
 # DAILY_GIFT_GEMS) BİREBİR aynı olmalı.
 # =====================================================================
 REWARD_TZ_OFFSET = 3 * 3600          # Türkiye (UTC+3)
-AD_REWARD_GEMS = 50
+AD_REWARD_GEMS = 250           # v3.27: 50 -> 250
 AD_DAILY_LIMIT = 5
 AD_COOLDOWN = 90.0
 AD_MIN_WATCH = 80.0                  # oyundaki tanıtım filmi ~91 sn
