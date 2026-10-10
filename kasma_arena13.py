@@ -1,6 +1,6 @@
 """
 =====================================================================
- ARENA BONK  —  v3.31   (eski adı: KASMA ARENA)
+ ARENA BONK  —  v3.32   (eski adı: KASMA ARENA)
  2D Top-Down Hayatta Kalma / Skor-Rekor Oyunu
  ---------------------------------------------------------------------
  Dalgalar halinde gelen düşmanlara karşı hayatta kal, nişan al, ateş et,
@@ -8,6 +8,38 @@
  patronları yen, rekorunu kır. Kaybedersen o koşuda aldıkların silinir.
  Elmasla kalıcı SKIN'ler al (her skinin kendi silahı, mermisi, efekti ve
  ÖZEL YETENEĞİ var).
+
+ v3.32 — MEGABONK USULÜ KİTAPLAR, DEPREM, YENİ SİLAH GÖRSELLERİ:
+   * KİTAPLARDA NADİRLİK: normal kitapların sabit "%7"si yok. Her seviye
+     kartı kendi nadirliğini çeker (şans yükseltir) ve kazanç ona göre
+     büyür: HASAR Yaygın +%5 ... Efsanevi +%40 (Yaygın'ın 8 katı). Kart
+     kitabın toplamını "önce → sonra" gösterir; kitaplıkta açıklamalar artık
+     sayısız ("hasarını artırır"). NADİR kitaplar (Zehir, Yankı, Yonca...)
+     sabit kalır. v3.31'in "+seviye / bedava yenileme" kitap kademeleri
+     kaldırıldı.
+   * 2 YENİ KİTAP: SOĞUMA (silahlar daha sık atar) ve KAÇINMA (darbeden
+     tamamen sıyrılma, tavan %36) — şanstan başka yapılar da olsun diye.
+   * ŞANS ÇEKİRDEĞİ UCUZLADI: 75 x1,30 -> 45 x1,20.
+   * "GİTTİKÇE DÜŞMANLAR BASİTLEŞİYOR" DÜZELDİ: portaldan geçince doğum
+     temposu (aralık, kalabalık tavanı, doğum başına sayı) cehennemin 1.
+     dalgasından yeniden başlıyordu — geç arenada ekranda ~160 yaratık
+     varken cehennem 1-10'da 2-18 yaratık kalıyor, baskı ~0'a düşüyordu.
+     Cehennem temposu artık arenanın sonundan devam ediyor
+     (HELL_TEMPO_OFFSET); bot ölçümünde baskı artık kesintisiz tırmanıyor.
+   * Hile denetimi kitap nadirliğine göre genişledi (Efsanevi Can kartı).
+   * DALGA OLAYLARI KALDIRILDI (oyunu bozuyordu). Hazine goblini kaldı.
+   * MAĞARA: tekliflere yalnız BİR kez bakılır; vazgeçince mağara çöker
+     (kapat-aç ile bedava yeniden çekme bitti).
+   * MAYIN TARLASI KALDIRILDI, yerine DEPREM: 2 sn'de bir ayağının altında
+     yer 1 sn çatlayarak birikir, sonra BONK gibi patlar (hasar + savurma +
+     sersemletme); seviyeyle alanı ve hasarı büyür. Mayını açmış oyuncuda
+     DEPREM açık sayılır.
+   * ŞAHİN güçlendi (daha sık dalış, büyük sıçrama, 2. şahin 6. seviyede)
+     ve yeniden çizildi (tüy parmaklı kanatlar, pençe izi, dalış izi).
+   * SİLAH GÖRSELLERİ gerçeğe benzetildi: BALTA (ahşap sap, çelik ağız,
+     dönüş izi), KIRBAÇ (ince, örgülü deri), METEOR (alevli kraterli kaya),
+     EMANET (savrulan gerçek kılıç), HORTUM (dönen huni), BIÇAK, YARASA,
+     AYAZ PATLAMASI (buz kristalleri).
 
  v3.31 — 5 YENİ SİLAH DAHA, KİTAPLARA ŞANS, GİZLİ MAĞARA, DALGA OLAYLARI:
    * 5 YENİ SİLAH: ŞAHİN (minyon; en canlı yaratığa dalar), YARASA SÜRÜSÜ
@@ -797,7 +829,7 @@ WEAPON_FX_LEGACY = {"full": 100, "dim": 32, "off": 0}
 # v3.26: oyunun adı ARENA BONK. (Kayıt klasörü "KasmaArena" olarak KALIYOR:
 # adı değiştirmek oyuncuların ilerlemesini kaybettirirdi; bkz. get_save_dir.)
 GAME_TITLE = "ARENA BONK"
-GAME_VERSION = "3.31"
+GAME_VERSION = "3.32"
 
 
 # =====================================================================
@@ -1395,11 +1427,11 @@ STRINGS = {
                          "Tus huecos están llenos — solo mejoras a partir de ahora.",
                          "Deine Plätze sind voll — ab jetzt nur noch Upgrades.",
                          "Слоты заполнены — дальше только улучшения."),
-    "ui.books_hint":  _T("Kitaplar 30. seviyeye kadar büyür (15'ten sonra yarım güç); nadir kitaptan yalnızca bir tane alırsın.",
-                         "Books grow to level 30 (half power after 15); you may take only one rare book.",
-                         "Los libros suben a nivel 30 (mitad de poder tras el 15); solo puedes tomar un libro raro.",
-                         "Bücher wachsen bis Stufe 30 (ab 15 halbe Kraft); nur ein seltenes Buch ist erlaubt.",
-                         "Книги растут до 30 уровня (после 15 — вполсилы); редкую можно взять только одну."),
+    "ui.books_hint":  _T("Kitabın kazancı seviye kartının nadirliğine bağlı (Yaygın küçük, Efsanevi çok büyük; şans yükseltir). Kitaplar 30. seviyeye kadar büyür; nadir kitaptan yalnızca bir tane alırsın.",
+                         "A book's gain depends on the level-up card's rarity (Common small, Legendary huge; Luck helps). Books grow to level 30; you may take only one rare book.",
+                         "La ganancia de un libro depende de la rareza de la carta (Común poca, Legendaria enorme; la suerte ayuda). Suben a nivel 30; solo un libro raro.",
+                         "Der Gewinn eines Buchs hängt von der Seltenheit der Karte ab (Gewöhnlich klein, Legendär riesig; Glück hilft). Bis Stufe 30; nur ein seltenes Buch.",
+                         "Прирост книги зависит от редкости карты (Обычная — мало, Легендарная — очень много; удача помогает). До 30 уровня; редкая книга — только одна."),
     "ui.new_weapon":  _T("YENİ SİLAH", "NEW WEAPON", "ARMA NUEVA", "NEUE WAFFE", "НОВОЕ ОРУЖИЕ"),
     "ui.weapon_lvl":  _T("SİLAH  Lv.{0}", "WEAPON  Lv.{0}", "ARMA  Nv.{0}", "WAFFE  St.{0}", "ОРУЖИЕ  Ур.{0}"),
     "ui.rare_book":   _T("NADİR KİTAP  —  TEK HAK", "RARE BOOK  —  ONE ONLY", "LIBRO RARO  —  SOLO UNO", "SELTENES BUCH  —  NUR EINS", "РЕДКАЯ КНИГА  —  ТОЛЬКО ОДНА"),
@@ -2067,37 +2099,37 @@ STRINGS.update({
 # ---- KİTAPLAR ----
 STRINGS.update({
     "b.r_dmg.name": _T("Hasar Kitabı", "Book of Damage", "Libro del Daño", "Buch des Schadens", "Книга Урона"),
-    "b.r_dmg.desc": _T("Hasarını %7 artırır", "Increases your damage by 7%", "Aumenta tu daño un 7%", "Erhöht deinen Schaden um 7%", "Увеличивает урон на 7%"),
+    "b.r_dmg.desc": _T("Hasarını artırır", "Increases your damage", "Aumenta tu daño", "Erhöht deinen Schaden", "Увеличивает урон"),
     "b.r_hp.name": _T("Can Kitabı", "Book of Life", "Libro de la Vida", "Buch des Lebens", "Книга Жизни"),
-    "b.r_hp.desc": _T("Azami canını 16 artırır — anında dolar", "Raises max health by 16 — fills instantly", "Sube la vida máxima en 16 — se llena al instante", "Erhöht max. Leben um 16 — sofort gefüllt", "Повышает макс. здоровье на 16 — сразу восполняет"),
+    "b.r_hp.desc": _T("Azami canını artırır — anında dolar", "Raises max health — fills instantly", "Sube la vida máxima — se llena al instante", "Erhöht max. Leben — sofort gefüllt", "Повышает макс. здоровье — сразу восполняет"),
     "b.r_armor.name": _T("Zırh Kitabı", "Book of Armour", "Libro de la Armadura", "Buch der Rüstung", "Книга Брони"),
-    "b.r_armor.desc": _T("Aldığın hasarı %2,5 azaltır ve +10 can verir", "Cuts incoming damage by 2.5% and grants +10 health", "Reduce el daño recibido un 2,5% y da +10 de vida", "Senkt erlittenen Schaden um 2,5% und gibt +10 Leben", "Снижает получаемый урон на 2,5% и даёт +10 здоровья"),
+    "b.r_armor.desc": _T("Aldığın hasarı azaltır ve biraz can verir", "Cuts incoming damage and grants some health", "Reduce el daño recibido y da algo de vida", "Senkt erlittenen Schaden und gibt etwas Leben", "Снижает получаемый урон и даёт немного здоровья"),
     "b.r_spd.name": _T("Rüzgâr Kitabı", "Book of Wind", "Libro del Viento", "Buch des Windes", "Книга Ветра"),
-    "b.r_spd.desc": _T("Hareket hızın %6, dash mesafen %8 artar", "Move speed +6%, dash distance +8%", "Velocidad +6%, distancia de impulso +8%", "Tempo +6%, Dash-Weite +8%", "Скорость +6%, дальность рывка +8%"),
+    "b.r_spd.desc": _T("Hareket hızını ve dash mesafeni artırır", "Increases move speed and dash distance", "Aumenta la velocidad y la distancia de impulso", "Erhöht Tempo und Dash-Weite", "Увеличивает скорость и дальность рывка"),
     "b.r_aspd.name": _T("Tempo Kitabı", "Book of Tempo", "Libro del Ritmo", "Buch des Tempos", "Книга Темпа"),
-    "b.r_aspd.desc": _T("Atış hızını %6 artırır", "Increases attack speed by 6%", "Aumenta la cadencia un 6%", "Erhöht die Angriffsrate um 6%", "Увеличивает скорость атаки на 6%"),
+    "b.r_aspd.desc": _T("Atış hızını artırır", "Increases attack speed", "Aumenta la cadencia", "Erhöht die Angriffsrate", "Увеличивает скорость атаки"),
     "b.r_crit.name": _T("Kritik Kitabı", "Book of Crits", "Libro Crítico", "Buch der Kritischen", "Книга Крита"),
-    "b.r_crit.desc": _T("Kritik vuruş şansını %3,5 artırır", "Increases crit chance by 3.5%", "Aumenta la probabilidad crítica un 3,5%", "Erhöht die Kritchance um 3,5%", "Повышает шанс крита на 3,5%"),
+    "b.r_crit.desc": _T("Kritik vuruş şansını artırır", "Increases crit chance", "Aumenta la probabilidad crítica", "Erhöht die Kritchance", "Повышает шанс крита"),
     "b.r_critd.name": _T("Kritik Güç Kitabı", "Book of Crit Power", "Libro de Fuerza Crítica", "Buch der Kritkraft", "Книга Силы Крита"),
-    "b.r_critd.desc": _T("Kritik hasarını %14 artırır", "Increases crit damage by 14%", "Aumenta el daño crítico un 14%", "Erhöht den Kritschaden um 14%", "Увеличивает крит. урон на 14%"),
+    "b.r_critd.desc": _T("Kritik hasarını artırır", "Increases crit damage", "Aumenta el daño crítico", "Erhöht den Kritschaden", "Увеличивает крит. урон"),
     "b.r_regen.name": _T("Şifa Kitabı", "Book of Healing", "Libro de Sanación", "Buch der Heilung", "Книга Исцеления"),
-    "b.r_regen.desc": _T("Saniyede 0,45 can yeniler", "Regenerates 0.45 health per second", "Regenera 0,45 de vida por segundo", "Regeneriert 0,45 Leben pro Sekunde", "Восстанавливает 0,45 здоровья в секунду"),
+    "b.r_regen.desc": _T("Saniyede can yenilersin", "Regenerates health every second", "Regeneras vida cada segundo", "Regeneriert jede Sekunde Leben", "Восстанавливает здоровье каждую секунду"),
     "b.r_coin.name": _T("Altın Kitabı", "Book of Gold", "Libro del Oro", "Buch des Goldes", "Книга Золота"),
-    "b.r_coin.desc": _T("Her seviyede topladığın altını +%7 artırır", "Each level: +7% gold picked up", "Cada nivel: +7% de oro recogido", "Jede Stufe: +7% aufgesammeltes Gold", "Каждый уровень: +7% к собранному золоту"),
+    "b.r_coin.desc": _T("Topladığın altını artırır", "Increases gold picked up", "Aumenta el oro recogido", "Erhöht aufgesammeltes Gold", "Увеличивает собранное золото"),
     "b.r_xp.name": _T("Bilgelik Kitabı", "Book of Wisdom", "Libro de la Sabiduría", "Buch der Weisheit", "Книга Мудрости"),
-    "b.r_xp.desc": _T("Her seviyede kazandığın tecrübeyi +%8 artırır", "Each level: +8% experience gained", "Cada nivel: +8% de experiencia", "Jede Stufe: +8% Erfahrung", "Каждый уровень: +8% к опыту"),
+    "b.r_xp.desc": _T("Kazandığın tecrübeyi artırır", "Increases experience gained", "Aumenta la experiencia obtenida", "Erhöht die erhaltene Erfahrung", "Увеличивает получаемый опыт"),
     "b.r_mag.name": _T("Mıknatıs Kitabı", "Book of Magnetism", "Libro del Imán", "Buch des Magneten", "Книга Магнита"),
-    "b.r_mag.desc": _T("Toplama menzilini %20 artırır", "Increases pickup range by 20%", "Aumenta el radio de recogida un 20%", "Erhöht die Aufsammelreichweite um 20%", "Увеличивает радиус подбора на 20%"),
+    "b.r_mag.desc": _T("Toplama menzilini artırır", "Increases pickup range", "Aumenta el radio de recogida", "Erhöht die Aufsammelreichweite", "Увеличивает радиус подбора"),
     "b.r_vamp.name": _T("Sülük Kitabı", "Book of Leeching", "Libro de la Sanguijuela", "Buch des Blutegels", "Книга Пиявки"),
-    "b.r_vamp.desc": _T("Verdiğin hasarın %2'si kadar can çalarsın", "Steals health equal to 2% of damage dealt", "Roba vida igual al 2% del daño", "Stiehlt Leben in Höhe von 2% des Schadens", "Крадёт здоровье в размере 2% урона"),
+    "b.r_vamp.desc": _T("Verdiğin hasarın bir kısmını can olarak çalarsın", "Steals part of the damage you deal as health", "Robas como vida parte del daño que haces", "Stiehlt einen Teil deines Schadens als Leben", "Крадёт часть нанесённого урона как здоровье"),
     "b.r_pierce.name": _T("Delgi Kitabı", "Book of Piercing", "Libro Perforante", "Buch der Durchschlagskraft", "Книга Пробоя"),
-    "b.r_pierce.desc": _T("Mermilerine +1 delme verir", "Grants +1 pierce to your shots", "Da +1 perforación a tus disparos", "Gibt deinen Schüssen +1 Durchschlag", "Даёт выстрелам +1 пробитие"),
+    "b.r_pierce.desc": _T("Mermilerin daha çok düşmanı deler", "Your shots pierce more enemies", "Tus disparos atraviesan más enemigos", "Deine Schüsse durchschlagen mehr Gegner", "Выстрелы пробивают больше врагов"),
     "b.r_bonk.name": _T("BONK Kitabı", "Book of BONK", "Libro del BONK", "Buch des BONK", "Книга БОНК"),
-    "b.r_bonk.desc": _T("BONK hasarını %14, vuruş alanını %7 büyütür", "BONK damage +14%, BONK radius +7%", "Daño de BONK +14%, radio +7%", "BONK-Schaden +14%, Radius +7%", "Урон БОНК +14%, радиус +7%"),
+    "b.r_bonk.desc": _T("BONK hasarını ve vuruş alanını büyütür", "Increases BONK damage and radius", "Aumenta el daño y el radio de BONK", "Erhöht BONK-Schaden und -Radius", "Увеличивает урон и радиус БОНК"),
     "b.r_swarm.name": _T("Sürü Kitabı", "Book of the Swarm", "Libro del Enjambre", "Buch des Schwarms", "Книга Роя"),
-    "b.r_swarm.desc": _T("Çevrende 3+ düşman varken hasarın %23 artar", "+23% damage while 3 or more enemies are near", "+23% de daño con 3 o más enemigos cerca", "+23% Schaden bei 3+ Gegnern in der Nähe", "+23% урона, когда рядом 3+ врага"),
+    "b.r_swarm.desc": _T("Çevrende 3+ düşman varken hasarın artar", "More damage while 3 or more enemies are near", "Más daño con 3 o más enemigos cerca", "Mehr Schaden bei 3+ Gegnern in der Nähe", "Больше урона, когда рядом 3+ врага"),
     "b.r_bosshunter.name": _T("Patron Avcısı Kitabı", "Book of the Boss Hunter", "Libro del Cazador de Jefes", "Buch des Bossjägers", "Книга Охотника на Боссов"),
-    "b.r_bosshunter.desc": _T("Patronlara ve elitlere %30 fazla hasar vurursun", "+30% damage to bosses and elites", "+30% de daño a jefes y élites", "+30% Schaden gegen Bosse und Elite", "+30% урона боссам и элите"),
+    "b.r_bosshunter.desc": _T("Patronlara ve elitlere daha çok hasar vurursun", "More damage to bosses and elites", "Más daño a jefes y élites", "Mehr Schaden gegen Bosse und Elite", "Больше урона боссам и элите"),
     "b.r_poison.name": _T("Zehir Kitabı", "Book of Venom", "Libro del Veneno", "Buch des Giftes", "Книга Яда"),
     "b.r_poison.desc": _T("Vurduğun düşmanı ÖLENE KADAR zehirler — zehir üst üste birikir", "Poisons whatever you hit UNTIL IT DIES — the poison stacks", "Envenena a quien golpeas HASTA MORIR — el veneno se acumula", "Vergiftet Getroffene BIS ZUM TOD — Gift stapelt sich", "Отравляет цель ДО СМЕРТИ — яд складывается"),
     "b.r_echo.name": _T("Yankı Kitabı", "Book of Echo", "Libro del Eco", "Buch des Echos", "Книга Эха"),
@@ -2119,7 +2151,11 @@ STRINGS.update({
     "b.r_hp_big.name": _T("Dev Kitabı", "Book of the Giant", "Libro del Gigante", "Buch des Riesen", "Книга Великана"),
     "b.r_hp_big.desc": _T("Azami canın +250 artar ama biraz yavaşlarsın", "Max health +250, but you move a little slower", "Vida máxima +250, pero te mueves más lento", "Max. Leben +250, aber etwas langsamer", "Макс. здоровье +250, но ты чуть медленнее"),
     "b.r_luck.name": _T("Şans Kitabı", "Book of Luck", "Libro de la Suerte", "Buch des Glücks", "Книга Удачи"),
-    "b.r_luck.desc": _T("Şans +%7,5 (10. seviyeden sonra +%2,5) — kartlar, kitaplar, sandıklar ve mağara daha yüksek kademeli çıkar", "Luck +7.5% (+2.5% after level 10) — cards, books, chests and the cave roll higher tiers", "Suerte +7,5% (+2,5% tras el nivel 10) — cartas, libros, cofres y la cueva salen de mayor rango", "Glück +7,5% (+2,5% ab Stufe 10) — Karten, Bücher, Truhen und die Höhle fallen hochstufiger aus", "Удача +7,5% (+2,5% после 10 ур.) — карты, книги, сундуки и пещера выпадают выше рангом"),
+    "b.r_luck.desc": _T("Şansını artırır — kartlar, kitaplar, sandıklar ve mağara daha yüksek kademeli çıkar", "Increases Luck — cards, books, chests and the cave roll higher tiers", "Aumenta la suerte — cartas, libros, cofres y la cueva salen de mayor rango", "Erhöht Glück — Karten, Bücher, Truhen und die Höhle fallen hochstufiger aus", "Повышает удачу — карты, книги, сундуки и пещера выпадают выше рангом"),
+    "b.r_wspd.name": _T("Soğuma Kitabı", "Book of Cooldown", "Libro de Enfriamiento", "Buch der Abklingzeit", "Книга Перезарядки"),
+    "b.r_wspd.desc": _T("Silahların daha sık atar", "Your weapons fire more often", "Tus armas disparan más a menudo", "Deine Waffen feuern öfter", "Оружие стреляет чаще"),
+    "b.r_evade.name": _T("Kaçınma Kitabı", "Book of Evasion", "Libro de Evasión", "Buch des Ausweichens", "Книга Уклонения"),
+    "b.r_evade.desc": _T("Gelen darbelerden bazen tamamen sıyrılırsın", "Sometimes you slip past a hit entirely", "A veces esquivas un golpe por completo", "Manchmal weichst du einem Treffer ganz aus", "Иногда полностью уходишь от удара"),
     "b.r_clover.name": _T("Dört Yapraklı Yonca Kitabı", "Book of the Four-Leaf Clover", "Libro del Trébol de Cuatro Hojas", "Buch des vierblättrigen Klees", "Книга Четырёхлистного Клевера"),
     "b.r_clover.desc": _T("Şans +%60 ve bundan sonra her seviye atladığında Şans +%5", "Luck +60%, then +5% Luck every time you level up", "Suerte +60% y después +5% de suerte cada vez que subes de nivel", "Glück +60%, danach +5% Glück bei jedem Stufenaufstieg", "Удача +60%, затем +5% удачи за каждый новый уровень"),
 })
@@ -2220,6 +2256,7 @@ STRINGS.update({
     "cs.length": _T("Uzunluk", "Length", "Longitud", "Länge", "Длина"),
     "cs.level": _T("Seviye", "Level", "Nivel", "Stufe", "Уровень"),
     "cs.sec": _T(" sn", "s", " s", " s", " с"),
+    "cs.per_sec": _T("/sn", "/s", "/s", "/s", "/с"),
     "lu.new_weapon": _T("YENİ SİLAH", "NEW WEAPON", "ARMA NUEVA", "NEUE WAFFE", "НОВОЕ ОРУЖИЕ"),
     "lu.lvl_up": _T("Sv {} → {}", "Lv {} → {}", "Nv {} → {}", "St {} → {}", "Ур {} → {}"),
     "lu.new_book_pill": _T("YENİ KİTAP", "NEW BOOK", "LIBRO NUEVO", "NEUES BUCH", "НОВАЯ КНИГА"),
@@ -2249,8 +2286,31 @@ STRINGS.update({
                           "Книги растут до {} ур.  •  редкая книга через {} ур."),
     "lu.free_left": _T("{} bedava hakkın var", "{} free left", "{} gratis", "{} gratis übrig", "бесплатно: {}"),
     "lu.free": _T("bedava", "free", "gratis", "gratis", "бесплатно"),
-    "lu.book_gain": _T("+{} seviye", "+{} level(s)", "+{} nivel(es)", "+{} Stufe(n)", "+{} ур."),
-    "lu.book_reroll": _T("+1 bedava yenileme", "+1 free reroll", "+1 cambio gratis", "+1 Gratis-Neuwurf", "+1 бесплатная замена"),
+    "lu.book_note": _T("Kazanç kartın nadirliğine bağlı", "Gain depends on the card's rarity",
+                       "La ganancia depende de la rareza", "Gewinn hängt von der Seltenheit ab",
+                       "Прирост зависит от редкости карты"),
+    "bs.dmg": _T("Hasar", "Damage", "Daño", "Schaden", "Урон"),
+    "bs.hp": _T("Azami Can", "Max Health", "Vida máx.", "Max. Leben", "Макс. здоровье"),
+    "bs.armor": _T("Zırh", "Armor", "Armadura", "Rüstung", "Броня"),
+    "bs.spd": _T("Hareket Hızı", "Move Speed", "Velocidad", "Tempo", "Скорость"),
+    "bs.dash": _T("Dash Mesafesi", "Dash Distance", "Dist. de impulso", "Dash-Weite", "Дальность рывка"),
+    "bs.aspd": _T("Atış Hızı", "Attack Speed", "Cadencia", "Angriffsrate", "Скорость атаки"),
+    "bs.crit": _T("Kritik Şansı", "Crit Chance", "Prob. crítica", "Kritchance", "Шанс крита"),
+    "bs.critd": _T("Kritik Hasarı", "Crit Damage", "Daño crítico", "Kritschaden", "Крит. урон"),
+    "bs.regen": _T("Can Yenileme", "Regeneration", "Regeneración", "Regeneration", "Регенерация"),
+    "bs.coin": _T("Altın Kazancı", "Gold Gain", "Ganancia de oro", "Goldgewinn", "Доход золота"),
+    "bs.xp": _T("Tecrübe", "Experience", "Experiencia", "Erfahrung", "Опыт"),
+    "bs.mag": _T("Toplama Menzili", "Pickup Range", "Radio de recogida", "Aufsammelreichweite", "Радиус подбора"),
+    "bs.vamp": _T("Can Çalma", "Lifesteal", "Robo de vida", "Lebensraub", "Вампиризм"),
+    "bs.pierce": _T("Delme", "Pierce", "Perforación", "Durchschlag", "Пробитие"),
+    "bs.bonk": _T("BONK Hasarı", "BONK Damage", "Daño de BONK", "BONK-Schaden", "Урон БОНК"),
+    "bs.bonk_r": _T("BONK Alanı", "BONK Radius", "Radio de BONK", "BONK-Radius", "Радиус БОНК"),
+    "bs.swarm": _T("Kalabalık Hasarı", "Crowd Damage", "Daño en multitud", "Schaden in Menge", "Урон в толпе"),
+    "bs.hunter": _T("Patron Hasarı", "Boss Damage", "Daño a jefes", "Bossschaden", "Урон боссам"),
+    "bs.luck": _T("Şans", "Luck", "Suerte", "Glück", "Удача"),
+    "bs.wspd": _T("Silah Hızı", "Weapon Speed", "Vel. de armas", "Waffentempo", "Скорость оружия"),
+    "bs.evade": _T("Kaçınma", "Evasion", "Evasión", "Ausweichen", "Уклонение"),
+    "fx.evade": _T("SIYRILDIN!", "EVADED!", "¡ESQUIVADO!", "AUSGEWICHEN!", "УКЛОНЕНИЕ!"),
     "lu.new_tag": _T("YENİ", "NEW", "NUEVO", "NEU", "НОВОЕ"),
     "lu.rarity_bonus": _T("+{} nadirlik hasarı", "+{} rarity damage", "+{} daño de rareza",
                           "+{} Seltenheitsschaden", "+{} урона за редкость"),
@@ -2274,6 +2334,13 @@ STRINGS.update({
                        "Bono de puntuación por maldición: +{}", "Aktueller Fluch-Punktebonus: +{}",
                        "Текущий бонус очков за проклятия: +{}"),
     "cu.leave": _T("VAZGEÇ", "WALK AWAY", "RETIRARSE", "ZURÜCKWEICHEN", "УЙТИ"),
+    "cu.once": _T("Mağaraya yalnız BİR kez bakabilirsin — vazgeçersen mağara çöker.",
+                  "You get ONE look — walk away and the cave collapses.",
+                  "Solo puedes mirar UNA vez: si te retiras, la cueva se derrumba.",
+                  "Nur EIN Blick — gehst du, stürzt die Höhle ein.",
+                  "Взглянуть можно лишь ОДИН раз — уйдёшь, и пещера обрушится."),
+    "cu.collapsed": _T("MAĞARA ÇÖKTÜ", "THE CAVE COLLAPSED", "LA CUEVA SE DERRUMBÓ",
+                       "DIE HÖHLE IST EINGESTÜRZT", "ПЕЩЕРА ОБРУШИЛАСЬ"),
     "cu.accept": _T("KABUL ET", "ACCEPT", "ACEPTAR", "ANNEHMEN", "ПРИНЯТЬ"),
     "cu.k_pair": _T("ÖDÜL + LANET", "REWARD + CURSE", "PREMIO + MALDICIÓN", "BELOHNUNG + FLUCH", "НАГРАДА + ПРОКЛЯТИЕ"),
     "cu.k_gamble": _T("ZAR AT", "ROLL THE DICE", "TIRA LOS DADOS", "WÜRFELN", "БРОСЬ КОСТИ"),
@@ -2357,16 +2424,16 @@ STRINGS.update({
     "cu.hud": _T("LANET  skor x{}", "CURSED  score x{}", "MALDITO  puntos x{}", "VERFLUCHT  Punkte x{}", "ПРОКЛЯТ  очки x{}"),
     "fx.raise": _T("DİRİLİŞ!", "RISE!", "¡LEVÁNTATE!", "ERHEBT EUCH!", "ВОССТАНЬ!"),
     "w.hawk.name": _T("ŞAHİN", "HAWK", "HALCÓN", "FALKE", "ЯСТРЕБ"),
-    "w.hawk.desc": _T("Gökte süzülen şahin, menzildeki EN CANLI yaratığa (tank, elit, patron) dalıp ağır vurur ve çevresini sarsar. 8., 16. ve 23. seviyede bir şahin daha katılır.",
-                      "A hawk circles above and dives at the TOUGHEST creature in range (tank, elite, boss), hitting hard and jolting those nearby. Another hawk joins at levels 8, 16 and 23.",
-                      "Un halcón vuela en círculos y se lanza sobre la criatura MÁS RESISTENTE (tanque, élite, jefe), golpeando fuerte. Otro halcón se une en los niveles 8, 16 y 23.",
-                      "Ein Falke kreist und stürzt sich auf die ZÄHESTE Kreatur in Reichweite (Tank, Elite, Boss) und trifft hart. Weitere Falken auf Stufe 8, 16 und 23.",
-                      "Ястреб кружит и пикирует на САМОЕ живучее существо рядом (танк, элита, босс), бьёт сильно. Ещё ястреб на 8, 16 и 23 уровнях."),
-    "w.hawk.up": _T("şahin daha sık dalar ve daha sert vurur — 8., 16. ve 23. seviyede bir şahin daha",
-                    "dives more often and hits harder — another hawk at levels 8, 16 and 23",
-                    "se lanza más seguido y golpea más fuerte — otro halcón en 8, 16 y 23",
-                    "stürzt öfter und härter — weitere Falken auf Stufe 8, 16 und 23",
-                    "пикирует чаще и сильнее — ещё ястреб на 8, 16 и 23 ур."),
+    "w.hawk.desc": _T("Gökte süzülen şahin, menzildeki EN CANLI yaratığa (tank, elit, patron) dalıp ağır vurur ve çevresini sarsar. 6., 13. ve 20. seviyede bir şahin daha katılır.",
+                      "A hawk circles above and dives at the TOUGHEST creature in range (tank, elite, boss), hitting hard and jolting those nearby. Another hawk joins at levels 6, 13 and 20.",
+                      "Un halcón vuela en círculos y se lanza sobre la criatura MÁS RESISTENTE (tanque, élite, jefe), golpeando fuerte. Otro halcón se une en los niveles 6, 13 y 20.",
+                      "Ein Falke kreist und stürzt sich auf die ZÄHESTE Kreatur in Reichweite (Tank, Elite, Boss) und trifft hart. Weitere Falken auf Stufe 6, 13 und 20.",
+                      "Ястреб кружит и пикирует на САМОЕ живучее существо рядом (танк, элита, босс), бьёт сильно. Ещё ястреб на 6, 13 и 20 уровнях."),
+    "w.hawk.up": _T("şahin daha sık dalar ve daha sert vurur — 6., 13. ve 20. seviyede bir şahin daha",
+                    "dives more often and hits harder — another hawk at levels 6, 13 and 20",
+                    "se lanza más seguido y golpea más fuerte — otro halcón en 6, 13 y 20",
+                    "stürzt öfter und härter — weitere Falken auf Stufe 6, 13 und 20",
+                    "пикирует чаще и сильнее — ещё ястреб на 6, 13 и 20 ур."),
     "w.hawk.how": _T("Göğün avcısı ol: toplam 8 patron devir.", "Hunter of the sky: defeat 8 bosses in total.",
                      "Cazador del cielo: derrota 8 jefes en total.", "Jäger des Himmels: besiege insgesamt 8 Bosse.",
                      "Охотник небес: одолей всего 8 боссов."),
@@ -2405,43 +2472,25 @@ STRINGS.update({
     "w.knives.how": _T("Tetiğe alış: toplam 20.000 mermi at.", "Get trigger-happy: fire 20,000 shots in total.",
                        "Gatillo fácil: dispara 20.000 balas en total.", "Schussfreudig: feuere insgesamt 20.000 Schüsse.",
                        "Набей руку: сделай всего 20 000 выстрелов."),
-    "w.mines.name": _T("MAYIN TARLASI", "MINEFIELD", "CAMPO MINADO", "MINENFELD", "МИННОЕ ПОЛЕ"),
-    "w.mines.desc": _T("Durduğun yere mayın bırakır; üstüne basan yaratık havaya uçar. Kaçarken arkanda tuzak bırak! 1. seviyede 4, 25. seviyede 10 mayın.",
-                       "Drops mines where you stand; creatures that step on them blow up. Leave traps behind while you run! 4 mines at level 1, 10 at level 25.",
-                       "Deja minas donde estás; las criaturas que las pisan explotan. ¡Deja trampas al huir! 4 minas en el nivel 1, 10 en el 25.",
-                       "Legt Minen, wo du stehst; wer drauftritt, fliegt in die Luft. Hinterlass Fallen auf der Flucht! 4 Minen auf Stufe 1, 10 auf Stufe 25.",
-                       "Ставит мины там, где ты стоишь; наступившее существо взрывается. Оставляй ловушки на бегу! 4 мины на 1 ур., 10 — на 25."),
-    "w.mines.up": _T("daha çok mayın kurulur ve patlama alanı büyür", "more mines and a bigger blast",
-                     "más minas y explosión más grande", "mehr Minen, größere Explosion", "больше мин и сильнее взрыв"),
-    "w.mines.how": _T("Kaçmayı öğren: toplam 1.500 kez dash at.", "Learn to run: dash 1,500 times in total.",
-                      "Aprende a huir: impúlsate 1.500 veces en total.", "Lerne zu fliehen: insgesamt 1.500 Dashes.",
-                      "Научись бегать: сделай всего 1 500 рывков."),
+    "w.quake.name": _T("DEPREM", "EARTHQUAKE", "TERREMOTO", "ERDBEBEN", "ЗЕМЛЕТРЯСЕНИЕ"),
+    "w.quake.desc": _T("Her 2 saniyede bir ayağının altında yer 1 saniye boyunca çatlayarak birikir, sonra BONK gibi patlar: içindeki her şey hasar alır, savrulur ve sersemler.",
+                       "Every 2 seconds the ground under you cracks and builds up for 1 second, then bursts like a BONK: everything inside is hit, knocked back and dazed.",
+                       "Cada 2 segundos el suelo bajo tus pies se agrieta durante 1 segundo y luego estalla como un BONK: todo lo que esté dentro recibe daño, sale despedido y queda aturdido.",
+                       "Alle 2 Sekunden reißt der Boden unter dir 1 Sekunde lang auf und bricht dann wie ein BONK aus: alles darin wird getroffen, weggeschleudert und betäubt.",
+                       "Каждые 2 секунды земля под тобой 1 секунду трескается и копит силу, а затем взрывается как БОНК: всё внутри получает урон, отлетает и оглушается."),
+    "w.quake.up": _T("deprem alanı genişler ve daha sert patlar", "a wider and harder quake",
+                     "terremoto más amplio y más fuerte", "größeres und härteres Beben",
+                     "землетрясение шире и сильнее"),
+    "w.quake.how": _T("Yeri sars: BONK ile toplam 3.000 düşmana vur.", "Shake the ground: hit 3,000 enemies with BONK in total.",
+                      "Sacude el suelo: golpea a 3.000 enemigos con BONK en total.",
+                      "Lass den Boden beben: triff insgesamt 3.000 Gegner mit BONK.",
+                      "Встряхни землю: порази БОНКОМ 3 000 врагов в сумме."),
     "cs.hawks": _T("Şahin", "Hawks", "Halcones", "Falken", "Ястребы"),
     "cs.bats": _T("Yarasa", "Bats", "Murciélagos", "Fledermäuse", "Мыши"),
     "cs.freeze": _T("Donma", "Freeze", "Congelación", "Einfrieren", "Заморозка"),
     "cs.knives": _T("Bıçak", "Knives", "Cuchillos", "Messer", "Ножи"),
     "cs.pierce": _T("Delme", "Pierce", "Perforación", "Durchschlag", "Пробитие"),
-    "cs.mines": _T("Mayın", "Mines", "Minas", "Minen", "Мины"),
-    "ev.gold_rain": _T("ALTIN YAĞMURU", "GOLD RAIN", "LLUVIA DE ORO", "GOLDREGEN", "ЗОЛОТОЙ ДОЖДЬ"),
-    "ev.gold_rain.d": _T("Bu dalga yaratıklar iki kat altın düşürür!", "Creatures drop double gold this wave!",
-                         "¡Esta oleada las criaturas sueltan el doble de oro!", "Diese Welle doppeltes Gold!",
-                         "В этой волне вдвое больше золота!"),
-    "ev.blood_moon": _T("KAN AYI", "BLOOD MOON", "LUNA DE SANGRE", "BLUTMOND", "КРОВАВАЯ ЛУНА"),
-    "ev.blood_moon.d": _T("Yaratıklar %25 hızlı — tecrübe +%40!", "Creatures are 25% faster — XP +40%!",
-                          "Criaturas 25% más rápidas — ¡XP +40%!", "Kreaturen 25% schneller — EP +40%!",
-                          "Существа на 25% быстрее — опыт +40%!"),
-    "ev.elite_night": _T("ELİT GECESİ", "ELITE NIGHT", "NOCHE DE ÉLITE", "ELITENACHT", "НОЧЬ ЭЛИТЫ"),
-    "ev.elite_night.d": _T("Elitler sık gelir ve iki kat altın düşürür!", "Elites come often and drop double gold!",
-                           "¡Las élites aparecen a menudo y dan el doble de oro!", "Elites kommen oft und geben doppeltes Gold!",
-                           "Элита приходит часто и даёт вдвое больше золота!"),
-    "ev.lucky_wind": _T("ŞANS RÜZGÂRI", "LUCKY WIND", "VIENTO DE SUERTE", "GLÜCKSWIND", "ВЕТЕР УДАЧИ"),
-    "ev.lucky_wind.d": _T("Bu dalga boyunca Şans +%75!", "Luck +75% during this wave!",
-                          "¡Suerte +75% durante esta oleada!", "Glück +75% in dieser Welle!",
-                          "Удача +75% в этой волне!"),
-    "ev.treasure_hunt": _T("HAZİNE AVI", "TREASURE HUNT", "CAZA DEL TESORO", "SCHATZJAGD", "ОХОТА ЗА СОКРОВИЩАМИ"),
-    "ev.treasure_hunt.d": _T("Hazine goblinleri kaçıyor — yakala!", "Treasure goblins are running — catch them!",
-                             "¡Los duendes del tesoro huyen, atrápalos!", "Schatzkobolde fliehen — fang sie!",
-                             "Гоблины-кладоносцы убегают — лови!"),
+    "cs.stun": _T("Sersemletme", "Daze", "Aturdimiento", "Betäubung", "Оглушение"),
     "fx.goblin": _T("HAZİNE GOBLİNİ!", "TREASURE GOBLIN!", "¡DUENDE DEL TESORO!", "SCHATZKOBOLD!", "ГОБЛИН-КЛАДОНОСЕЦ!"),
     "fx.goblin_escaped": _T("KAÇTI!", "ESCAPED!", "¡ESCAPÓ!", "ENTKOMMEN!", "СБЕЖАЛ!"),
     "fx.goblin_loot": _T("HAZİNE: {}", "TREASURE: {}", "TESORO: {}", "SCHATZ: {}", "КЛАД: {}"),
@@ -4709,7 +4758,11 @@ class SaveManager:
     # ---- silahlar (kitaplarla aynı mantık) ----
     def owns_weapon(self, key):
         """Silah AÇIK mı? Silahlar da elmasla değil GÖREVLE açılır."""
-        if key in self.data.get("weapons_owned", []):
+        owned = self.data.get("weapons_owned", [])
+        if key in owned:
+            return True
+        # v3.32: MAYIN TARLASI kaldırıldı; onu açmış oyuncuda DEPREM açık.
+        if key == "quake" and "mines" in owned:
             return True
         w = WEAPON_BY_KEY.get(key) if "WEAPON_BY_KEY" in globals() else None
         if not w:
@@ -4728,7 +4781,7 @@ class SaveManager:
                 key = w["key"]
                 if key in owned:
                     continue
-                if weapon_progress(self, w)[2]:
+                if weapon_progress(self, w)[2] or (key == "quake" and "mines" in owned):
                     owned.append(key)
                     newly.append(key)
                     grew = True
@@ -10339,8 +10392,11 @@ SHOP_ITEMS = [
      "cost": 70,  "cost_mult": 1.26, "max": 999, "endless": True, "icon": "magnet", "color": (150, 220, 255), "tier": 1, "cat": "core"},
     # v3.30 ŞANS ÇEKİRDEĞİ: diğer çekirdekler gibi TAVANSIZ alınır ama her
     # alım biraz daha az verir (azalan getiri, toplam +%56'ya yaklaşır).
+    # v3.32 UCUZLADI (75 x1,30 -> 45 x1,20): kitaplar artık nadirliğe göre
+    # verdiği için şans her yapıya lazım; "şans kitabı" kurmayan oyuncu da
+    # birkaç çekirdekle makul bir şans tabanı toplayabilsin.
     {"key": "core_luck",     "name": "Şans Çekirdeği",      "desc": "Şans +%8 (tavanı yok — her alımda biraz azalır)",
-     "cost": 75,  "cost_mult": 1.30, "max": 999, "endless": True, "icon": "horseshoe", "color": (110, 225, 130), "tier": 1, "cat": "core"},
+     "cost": 45,  "cost_mult": 1.20, "max": 999, "endless": True, "icon": "horseshoe", "color": (110, 225, 130), "tier": 1, "cat": "core"},
 
     # ---- ARENA GENİŞLEMESİ ---------------------------------------------
     # Market arenada cehenneme göre çok dardı: birkaç dalga sonra elde
@@ -10802,12 +10858,70 @@ BOOK_MAX_LEVEL = 30
 BOOK_SOFT_FROM = 15             # bu seviyeden sonrası "geç seviye"
 BOOK_LATE_K = 0.5               # geç seviyelerin payı
 BOOK_LATE_K_XP = 0.25           # Bilgelik kitabının geç payı (seviye kartopu olmasın)
-# v3.31 KİTAPLARA ŞANS: normal kitap kartı da kademe çeker.
-#   Yaygın +1 seviye · Sıradışı +1 seviye ve +1 bedava yenileme
-#   Nadir +2 seviye · Epik +2 seviye ve +1 bedava yenileme · Efsanevi +3 seviye
-#   ve +1 bedava yenileme. (Nadir kitaplar kademe çekmez: hep tek seviye.)
-BOOK_TIER_LEVELS = (1, 1, 2, 2, 3)
-BOOK_TIER_REROLL = (0, 1, 0, 1, 1)
+# v3.32 KİTAPLARDA NADİRLİK (Megabonk usulü). Normal kitapların artık SABİT
+# bir "%7" değeri yok: her seviye kartı kendi nadirliğini çeker (şans
+# yükseltir) ve kazanç o nadirliğe göre büyür. Örn. HASAR KİTABI: Yaygın
+# +%5, Sıradışı +%8, Nadir +%12,5, Epik +%20, Efsanevi +%40. Kart, kitabın
+# toplamını "önce → sonra" diye gösterir. NADİR kitaplar (Zehir, Yankı,
+# Yonca...) bu sisteme girmez: onların etkisi sabittir.
+BOOK_RARITY_MULT = (1.0, 1.6, 2.5, 4.0, 8.0)
+# (stat, YAYGIN kartın kazancı). Şansı olmayan oyuncunun ortalama kartı
+# Yaygın'ın ~1,27 katıdır; değerler eski sabit kazançlar buna bölünerek
+# seçildi (şanssız oyuncu eskisine yakın, şanslı oyuncu daha güçlü).
+BOOK_GAINS = {
+    "r_dmg": (("dmg", 0.05),),
+    "r_hp": (("hp", 13.0),),
+    "r_armor": (("armor", 0.02), ("hp", 8.0)),
+    "r_spd": (("spd", 0.05), ("dash", 0.065)),
+    "r_aspd": (("aspd", 0.05),),
+    "r_crit": (("crit", 0.028),),
+    "r_critd": (("critd", 0.11),),
+    "r_regen": (("regen", 0.36),),
+    "r_coin": (("coin", 0.055),),
+    "r_xp": (("xp", 0.06),),
+    "r_mag": (("mag", 1.0),),          # puan: menzil azalan getirili büyür
+    "r_vamp": (("vamp", 0.016),),
+    "r_pierce": (("pierce", 1.0),),    # tam sayı: kademeye göre +1..+3
+    "r_bonk": (("bonk", 0.11), ("bonk_r", 0.055)),
+    "r_swarm": (("swarm", 1.0),),      # puan: azalan getirili
+    "r_bosshunter": (("hunter", 1.0),),
+    "r_luck": (("luck", 0.05),),
+    "r_wspd": (("wspd", 0.035),),      # SOĞUMA KİTABI: silahlar daha sık
+    "r_evade": (("evade", 1.0),),      # KAÇINMA KİTABI: puan, azalan getirili
+}
+BOOK_PIERCE_BY_TIER = (1, 1, 2, 2, 3)
+LUCK_BOOK_FULL = 10             # Şans Kitabı bu seviyeye kadar tam güç
+LUCK_BOOK_LATE_K = 0.4          # ... sonra bu payla
+EVADE_PER = 0.03                # Kaçınma: stack_bonus(EVADE_PER, puan, EVADE_SOFT)
+EVADE_SOFT = 12.0               # (tavan %36)
+
+
+def book_late_k(key, lvl):
+    """Geç seviyelerin (16-30) payı. Bilgelik ve Şans kendi eğrisinde."""
+    lvl = int(lvl)
+    if key == "r_xp":
+        return 1.0 if lvl <= BOOK_SOFT_FROM else BOOK_LATE_K_XP
+    if key == "r_luck":
+        return 1.0 if lvl <= LUCK_BOOK_FULL else LUCK_BOOK_LATE_K
+    return 1.0 if lvl <= BOOK_SOFT_FROM else BOOK_LATE_K
+
+
+def book_gain(key, tier, lvl):
+    """Bu kitap kartının vereceği kazançlar: [(stat, miktar)].
+
+    tier: kartın nadirliği (0 Yaygın .. 4 Efsanevi), lvl: kitabın bu
+    seçimden SONRAKİ seviyesi."""
+    tier = int(clamp(int(tier or 0), 0, len(BOOK_RARITY_MULT) - 1))
+    m = BOOK_RARITY_MULT[tier] * book_late_k(key, lvl)
+    out = []
+    for stat, base in BOOK_GAINS.get(key, ()):
+        if stat == "pierce":
+            out.append((stat, float(BOOK_PIERCE_BY_TIER[tier])))
+        elif stat == "hp":
+            out.append((stat, float(max(1, int(round(base * m))))))
+        else:
+            out.append((stat, base * m))
+    return out
 
 
 def book_max_level(key_or_book):
@@ -10830,18 +10944,18 @@ def book_max_level(key_or_book):
 
 BOOKS = [
     # ---- TEMEL KİTAPLAR (en kolay görevler — ilk koşularda açılır) ----
-    {"key": "r_dmg", "name": "Hasar Kitabı", "desc": "Hasarını %7 artırır",
+    {"key": "r_dmg", "name": "Hasar Kitabı", "desc": "Hasarını artırır",
      "color": RED, "icon": "sword", "rare": False, "basic": True,
      "unlock": dict(text="Arenaya alış: 60 düşman öldür",
                     reqs=[rq_stat("total_kills", 60, "Toplam 60 düşman öldür")])},
     {"key": "r_hp", "name": "Can Kitabı",
-     "desc": "Azami canını 16 artırır — anında dolar",
+     "desc": "Azami canını artırır — anında dolar",
      "color": (230, 110, 130), "icon": "heart", "rare": False, "basic": True,
      "unlock": dict(text="3 koşu tamamla ve 4. dalgayı gör",
                     reqs=[rq_stat("runs", 3, "3 koşu tamamla"),
                           rq_stat("best_wave", 4, "4. dalgaya ulaş")])},
     {"key": "r_armor", "name": "Zırh Kitabı",
-     "desc": "Aldığın hasarı %2,5 azaltır ve +10 can verir",
+     "desc": "Aldığın hasarı azaltır ve biraz can verir",
      "color": (160, 170, 200), "icon": "shield", "rare": False, "basic": True,
      "unlock": dict(text="500 altın topla ve 5. dalgaya ulaş",
                     reqs=[rq_stat("total_gold", 500, "Toplam 500 altın topla"),
@@ -10849,30 +10963,30 @@ BOOKS = [
 
     # ---- ORTA KİTAPLAR (belli bir oynanışı gerektirir) ----
     {"key": "r_spd", "name": "Rüzgâr Kitabı",
-     "desc": "Hareket hızın %6, dash mesafen %8 artar",
+     "desc": "Hareket hızını ve dash mesafeni artırır",
      "color": GREEN, "icon": "boot", "rare": False,
      "unlock": dict(text="Dash ustası ol",
                     reqs=[rq_stat("total_dashes", 400, "Toplam 400 kez dash at"),
                           rq_stat("best_run_dashes", 40, "Tek koşuda 40 kez dash at")])},
     {"key": "r_aspd", "name": "Tempo Kitabı",
-     "desc": "Atış hızını %6 artırır",
+     "desc": "Atış hızını artırır",
      "color": (150, 210, 255), "icon": "target", "rare": False,
      "unlock": dict(text="Tetiği bırakma: 12.000 mermi at",
                     reqs=[rq_stat("total_shots", 12000, "Toplam 12.000 mermi at")])},
     {"key": "r_crit", "name": "Kritik Kitabı",
-     "desc": "Kritik vuruş şansını %3,5 artırır",
+     "desc": "Kritik vuruş şansını artırır",
      "color": (140, 230, 120), "icon": "clover", "rare": False,
      "unlock": dict(text="Kritik vuruşla tanış",
                     reqs=[rq_stat("total_crits", 600, "Toplam 600 kritik vuruş yap"),
                           rq_stat("best_wave", 7, "7. dalgaya ulaş")])},
     {"key": "r_critd", "name": "Kritik Güç Kitabı",
-     "desc": "Kritik hasarını %14 artırır",
+     "desc": "Kritik hasarını artırır",
      "color": (240, 90, 90), "icon": "fist", "rare": False,
      "unlock": dict(text="Kritik hasarda uzmanlaş",
                     reqs=[rq_stat("total_crits", 3000, "Toplam 3.000 kritik vuruş yap"),
                           rq_ach("combo30", "«Kombo Kralı» başarımını aç")])},
     {"key": "r_regen", "name": "Şifa Kitabı",
-     "desc": "Saniyede 0,45 can yeniler",
+     "desc": "Saniyede can yenilersin",
      "color": (120, 220, 170), "icon": "cross", "rare": False,
      "unlock": dict(text="Yaralarını sar",
                     reqs=[rq_stat("best_run_heal", 1200, "Tek koşuda 1.200 can yenile"),
@@ -10880,61 +10994,75 @@ BOOKS = [
     # --- YENİ (v3.16): kazanç kitapları. Oyuncu artık seviye atlama ekranında
     #     "güç mü, ekonomi mi?" diye düşünüyor; ikisi de aynı karttan geliyor.
     {"key": "r_coin", "name": "Altın Kitabı",
-     "desc": "Her seviyede topladığın altını +%7 artırır",
+     "desc": "Topladığın altını artırır",
      "color": GOLD, "icon": "coin", "rare": False,
      "unlock": dict(text="Kasanı doldur: tek koşuda 1.500 altın",
                     reqs=[rq_stat("best_run_gold", 1500, "Tek koşuda 1.500 altın kazan")])},
     {"key": "r_xp", "name": "Bilgelik Kitabı",
-     "desc": "Her seviyede kazandığın tecrübeyi +%8 artırır",
+     "desc": "Kazandığın tecrübeyi artırır",
      "color": PURPLE, "icon": "gem", "rare": False,
      "unlock": dict(text="Tecrübeyle büyü: bir koşuda 10. seviyeye çık",
                     reqs=[rq_ach("lvl10", "«Tecrübeli» başarımını aç"),
                           rq_stat("runs", 8, "8 koşu tamamla")])},
     {"key": "r_mag", "name": "Mıknatıs Kitabı",
-     "desc": "Toplama menzilini %20 artırır",
+     "desc": "Toplama menzilini artırır",
      "color": (150, 220, 255), "icon": "magnet", "rare": False,
      "unlock": dict(text="Yerdekini bırakma: toplam 12.000 altın topla",
                     reqs=[rq_stat("total_gold", 12000, "Toplam 12.000 altın topla")])},
     # v3.31: kitaplar 30'a çıkarken SÜLÜK 15'te kalır — 30 seviye can çalma
     # (%60) her şeyi ölümsüz yapıyordu.
     {"key": "r_vamp", "name": "Sülük Kitabı", "max": 15,
-     "desc": "Verdiğin hasarın %2'si kadar can çalarsın",
+     "desc": "Verdiğin hasarın bir kısmını can olarak çalarsın",
      "color": (210, 70, 100), "icon": "drop", "rare": False,
      "unlock": dict(text="Kanla beslen: toplam 4.000 can çal",
                     reqs=[rq_stat("total_lifesteal", 4000, "Kan Emici ile toplam 4.000 can çal")])},
     # max=5: doyan kitap. 15 seviyede 16 delmeye çıkıyordu ama arenada tek
     # bir mermi hattında 16 yaratığın dizilmesi pratikte hiç olmuyor.
     {"key": "r_pierce", "name": "Delgi Kitabı", "max": 5,
-     "desc": "Mermilerine +1 delme verir (Lv.5'e kadar)",
+     "desc": "Mermilerin daha çok düşmanı deler (Lv.5'e kadar)",
      "color": (220, 140, 90), "icon": "sword", "rare": False,
      "unlock": dict(text="Sırayı dizip tek mermiyle biç: 8. dalgaya ulaş",
                     reqs=[rq_stat("best_wave", 8, "8. dalgaya ulaş"),
                           rq_stat("total_shots", 15000, "Toplam 15.000 mermi at")])},
     {"key": "r_bonk", "name": "BONK Kitabı",
-     "desc": "BONK hasarını %14, vuruş alanını %7 büyütür",
+     "desc": "BONK hasarını ve vuruş alanını büyütür",
      "color": (240, 120, 60), "icon": "fist", "rare": False,
      "unlock": dict(text="Yumruğunla konuş",
                     reqs=[rq_stat("total_bonks", 500, "Toplam 500 kez BONK at"),
                           rq_stat("total_bonk_hits", 2500, "BONK ile toplam 2.500 düşmana vur")])},
     {"key": "r_swarm", "name": "Sürü Kitabı",
-     "desc": "Çevrende 3+ düşman varken hasarın %23 artar",
+     "desc": "Çevrende 3+ düşman varken hasarın artar",
      "color": (210, 160, 70), "icon": "orbit", "rare": False,
      "unlock": dict(text="Kalabalığın ortasında yaşa",
                     reqs=[rq_stat("best_run_kills", 250, "Tek koşuda 250 düşman öldür"),
                           rq_ach("massacre", "«Katliam» başarımını aç")])},
     {"key": "r_bosshunter", "name": "Patron Avcısı Kitabı",
-     "desc": "Patronlara ve elitlere %30 fazla hasar vurursun",
+     "desc": "Patronlara ve elitlere daha çok hasar vurursun",
      "color": (200, 90, 220), "icon": "target", "rare": False,
      "unlock": dict(text="Patron avına çık",
                     reqs=[rq_stat("bosses", 6, "6 patron devir"),
                           rq_ach("boss", "«Dev Avcısı» başarımını aç")])},
     # v3.29 ŞANS KİTABI: daha yüksek kademeli kart ve sandık (bkz. roll_rarity).
     {"key": "r_luck", "name": "Şans Kitabı", "max": 30,
-     "desc": "Şans +%7,5 (10. seviyeden sonra +%2,5) — kartlar, kitaplar, sandıklar ve mağara daha yüksek kademeli çıkar",
+     "desc": "Şansını artırır — kartlar, kitaplar, sandıklar ve mağara daha yüksek kademeli çıkar",
      "color": (110, 225, 130), "icon": "horseshoe", "rare": False,
      "unlock": dict(text="Sandıkların tadına bak: 10 patron sandığı aç",
                     reqs=[rq_stat("total_chests", 10, "Toplam 10 patron sandığı aç"),
                           rq_stat("best_wave", 9, "9. dalgaya ulaş")])},
+
+    # v3.32: iki yeni stat kitabı ("oyunun başka başka statları olsun").
+    {"key": "r_wspd", "name": "Soğuma Kitabı",
+     "desc": "Silahların daha sık atar",
+     "color": (120, 200, 255), "icon": "bolt", "rare": False,
+     "unlock": dict(text="Cephaneliği kur: 3.000 düşman öldür ve 8. dalgaya ulaş",
+                    reqs=[rq_stat("total_kills", 3000, "Toplam 3.000 düşman öldür"),
+                          rq_stat("best_wave", 8, "8. dalgaya ulaş")])},
+    {"key": "r_evade", "name": "Kaçınma Kitabı",
+     "desc": "Gelen darbelerden bazen tamamen sıyrılırsın",
+     "color": (200, 225, 255), "icon": "boot", "rare": False,
+     "unlock": dict(text="Darbeden sıyrıl: 800 dash at ve 6. dalgaya ulaş",
+                    reqs=[rq_stat("total_dashes", 800, "Toplam 800 kez dash at"),
+                          rq_stat("best_wave", 6, "6. dalgaya ulaş")])},
 
     # ---- NADİR KİTAPLAR: bir koşuda YALNIZCA BİR TANE ----
     # Alındığı anda bütün nadir kitaplar havuzdan çıkar. Hepsi tek seferlik
@@ -11737,6 +11865,10 @@ class Player:
         self.run_crit_bonus = 0.0
         self.run_critdmg_bonus = 0.0
         self.run_luck_bonus = 0.0   # koşu içi şans (kitap / market / eşya)
+        # v3.32 kitap toplamları (kart "önce → sonra" gösterir) ve yeni statlar
+        self.book_totals = {}       # stat -> bu koşuda kitaplardan gelen toplam
+        self.weapon_speed_bonus = 0.0   # SOĞUMA KİTABI: silah bekleme / (1 + bu)
+        self.evade_pts = 0.0        # KAÇINMA KİTABI puanı (bkz. eff_evasion)
         self.clover_level = 0       # DÖRT YAPRAKLI YONCA: seviye başı şans
         # Silah NADİRLİK bonusu: {silah_anahtarı: ek hasar payı}. Sandık ve
         # seviye kartlarındaki kademe buraya yazılır (bkz. add_weapon_boost).
@@ -12015,6 +12147,67 @@ class Player:
             return 0.0
         return max(4.0, self.max_hp * 0.03)
 
+    def eff_evasion(self):
+        """KAÇINMA KİTABI: bir darbeden tamamen sıyrılma olasılığı (tavan %36)."""
+        return stack_bonus(EVADE_PER, self.evade_pts, soft=EVADE_SOFT)
+
+    def mag_book_bonus(self, pts=None):
+        """MIKNATIS KİTABI'nın toplama menzili payı (azalan getirili)."""
+        pts = self.book_totals.get("mag", 0.0) if pts is None else pts
+        return stack_bonus(0.58, pts, soft=2.0)
+
+    def book_stat_view(self, stat, add=0.0):
+        """Kitap kartı satırı için bir statın değeri (add: eklenecek kazanç).
+
+        Dönüş: (değer, tür) — tür "pct" | "int" | "rate"."""
+        tot = float(self.book_totals.get(stat, 0.0)) + add
+        if stat == "hp":
+            return float(self.max_hp) + add, "int"
+        if stat == "pierce":
+            return tot, "int"
+        if stat == "regen":
+            return tot, "rate"
+        if stat == "mag":
+            return self.mag_book_bonus(tot), "pct"
+        if stat == "swarm":
+            return stack_bonus(0.30, self.swarm_level + add, soft=3.0), "pct"
+        if stat == "hunter":
+            return stack_bonus(0.385, self.boss_hunter + add, soft=3.5), "pct"
+        if stat == "evade":
+            return stack_bonus(EVADE_PER, self.evade_pts + add, soft=EVADE_SOFT), "pct"
+        return tot, "pct"
+
+    def _apply_book_stat(self, stat, a):
+        """Tek bir kitap kazancını uygular (bkz. BOOK_GAINS)."""
+        if stat == "dmg": self.run_dmg_mult += a
+        elif stat == "hp":
+            gain = int(a)
+            self.max_hp += gain
+            self.hp = min(self.max_hp, self.hp + gain)
+        elif stat == "armor": self.run_armor_bonus += a
+        elif stat == "spd": self.run_spd_mult += a
+        elif stat == "dash": self.dash_dist_mult += a
+        elif stat == "aspd": self.run_aspd_mult += a
+        elif stat == "crit": self.run_crit_bonus += a
+        elif stat == "critd": self.run_critdmg_bonus += a
+        elif stat == "regen": self.run_regen_bonus += a
+        elif stat == "coin": self.run_coin_mult += a
+        elif stat == "xp": self.run_xp_mult += a
+        elif stat == "mag":
+            # run_pickup_mult'a skinler de += ile yazar: yalnızca fark eklenir
+            old = self.mag_book_bonus()
+            self.run_pickup_mult += self.mag_book_bonus(self.book_totals.get("mag", 0.0) + a) - old
+        elif stat == "vamp": self.vamp_level += a / 0.02      # can çalma = 0.02 x seviye
+        elif stat == "pierce": self.pierce_bonus += int(a)
+        elif stat == "bonk": self.bonk_mult += a
+        elif stat == "bonk_r": self.bonk_radius_mult += a
+        elif stat == "swarm": self.swarm_level += a
+        elif stat == "hunter": self.boss_hunter += a
+        elif stat == "luck": self.run_luck_bonus += a
+        elif stat == "wspd": self.weapon_speed_bonus += a
+        elif stat == "evade": self.evade_pts += a
+        self.book_totals[stat] = self.book_totals.get(stat, 0.0) + a
+
     def boss_hunter_bonus(self):
         """PATRON AVCISI kitabının hasar bonusu (azalan getirili).
 
@@ -12107,7 +12300,7 @@ class Player:
         "ghost_swords": 0.70, "wolves": 0.80, "tesla": 0.55, "meteor": 0.45,
         "beam": 0.40,
         # v3.31
-        "hawk": 0.85, "bats": 0.45, "nova": 0.35, "knives": 0.55, "mines": 0.40,
+        "hawk": 0.85, "bats": 0.45, "nova": 0.35, "knives": 0.55, "quake": 0.40,
     }
     # TEK HEDEFE (patrona) aynı anda kaç parçanın değdiği. Baltaların hepsi
     # tek hedef varken ona uçar; kırbaçlar çevreye eşit dağıldığı için ancak
@@ -12165,8 +12358,8 @@ class Player:
     def eff_luck(self):
         """ŞANS (v3.29). Kritik şansından AYRI bir stat: yalnızca ödül
         kademesini (roll_rarity) ve birkaç küçük olasılığı etkiler.
-        event_luck: ŞANS RÜZGÂRI dalga olayının geçici payı (v3.31)."""
-        return max(0.0, self.luck + self.run_luck_bonus + getattr(self, "event_luck", 0.0))
+        """
+        return max(0.0, self.luck + self.run_luck_bonus)
 
     def add_weapon_boost(self, key, amount):
         """Silaha kalıcı nadirlik bonusu ekler (tavanlı). Dönüş: eklenen pay."""
@@ -12222,7 +12415,7 @@ class Player:
         "r_storm": "storm",
     }
 
-    def apply_run_upgrade(self, key, lvl=None):
+    def apply_run_upgrade(self, key, lvl=None, tier=0):
         """Bir KİTABIN etkisini uygular.
 
         lvl: kitabın bu seçimden SONRAKİ seviyesi (1 = ilk kez alındı).
@@ -12234,7 +12427,15 @@ class Player:
             lvl = self.books.get(key, 0) + 1
         lvl = max(1, int(lvl))
 
-        # v3.31: 16-30. seviyeler yarım güç (bkz. BOOK_LATE_K).
+        # v3.32: NORMAL kitaplar kartın NADİRLİĞİ kadar verir (BOOK_GAINS).
+        # Aşağıdaki eski dallar yalnızca nadir kitaplar için çalışır.
+        if key in BOOK_GAINS:
+            for stat, amt in book_gain(key, tier, lvl):
+                self._apply_book_stat(stat, amt)
+            shop_key = self.RUN_TO_SHOP_KEY.get(key)
+            if shop_key:
+                self.shop_levels[shop_key] = self.shop_levels.get(shop_key, 0) + 1
+            return
         k = 1.0 if lvl <= BOOK_SOFT_FROM else BOOK_LATE_K
         if key == "r_dmg": self.run_dmg_mult += 0.07 * k
         elif key == "r_spd":
@@ -12365,9 +12566,10 @@ class Player:
         if shop_key:
             self.shop_levels[shop_key] = self.shop_levels.get(shop_key, 0) + 1
 
-    def take_book(self, key):
+    def take_book(self, key, tier=0):
         """Kitabı koşu defterine yazar ve etkisini uygular.
 
+        tier: kartın nadirliği (normal kitaplar için; bkz. BOOK_GAINS).
         Dönüş: kitabın yeni seviyesi. Tavanı dolmuş bir kitap için 0 döner.
         """
         bk = BOOK_BY_KEY.get(key)
@@ -12385,7 +12587,7 @@ class Player:
             return 0
         new_lvl = cur + 1
         self.books[key] = new_lvl
-        self.apply_run_upgrade(key, new_lvl)
+        self.apply_run_upgrade(key, new_lvl, tier)
         return new_lvl
 
     def gain_xp(self, amount):
@@ -12415,6 +12617,11 @@ class Player:
             fx.shockwave(self.x, self.y, 46, (160, 200, 255), 0.25, 3)
             fx.popup(self.x, self.y - 34, "KALKAN!", (160, 200, 255), 18, life=0.6)
             sfx("shield", 1.0, 0.05)
+            return 0
+        if self.evade_pts > 0 and random.random() < self.eff_evasion():
+            # KAÇINMA KİTABI (v3.32): darbe tamamen boşa gider
+            fx.popup(self.x, self.y - 34, L("fx.evade"), (200, 225, 255), 16, life=0.5)
+            fx.ring(self.x, self.y, (200, 225, 255), n=10, speed=140, life=0.25, r=2.2)
             return 0
         dmg = amount * (1 - self.eff_armor()) * self.dmg_taken_mult * self.lowhp_factor()
         self.hp -= dmg
@@ -14311,21 +14518,32 @@ class Tornado:
         # Huni ve toz halkaları doğrudan hedefe çizilir; eskiden her elips için
         # ayrı bir SRCALPHA yüzeyi ayrılıyordu (kare başına 13 yüzey).
         # Saydamlık yerine rengi karartıyoruz: koyu zeminde göz aynı şeyi görür.
-        for i in range(11):
-            h = i / 10.0
-            ey = y - h * 150
-            erx = lerp(16, 118, h ** 0.8)
-            ery = erx * 0.34
-            wob = math.sin(t * 7 - h * 5.2) * (8 + h * 20)
-            dim = (0.60 - 0.28 * h) * fade
-            if dim <= 0.04:
-                continue
-            rect = (int(x + wob - erx), int(ey - ery), int(erx * 2), int(ery * 2))
-            pygame.draw.ellipse(surf, scale_col(TORNADO_COLOR, dim), rect, 3)
-            if erx > 26:
-                inner = (int(x + wob - erx * 0.7), int(ey - ery * 0.7),
-                         int(erx * 1.4), int(ery * 1.4))
-                pygame.draw.ellipse(surf, scale_col(TORNADO_COLOR2, dim * 0.55), inner, 2)
+        # v3.32: halka yığını değil, DOLU ve dönen bir HUNİ: yarı saydam
+        # gövde + yukarı tırmanan sarmal bantlar (önü parlak, arkası sönük).
+        if fade > 0.03:
+            W_, H_ = 280, 196
+            fs = pygame.Surface((W_, H_), pygame.SRCALPHA)
+            ox_, oy_ = W_ / 2.0, H_ - 22.0
+
+            def ring(h):
+                erx = lerp(12, 118, h ** 0.8)
+                wob = math.sin(t * 7 - h * 5.2) * (8 + h * 20)
+                return ox_ + wob, oy_ - h * 150, erx
+            left, right = [], []
+            for i in range(14):
+                cx_, cy_, erx = ring(i / 13.0)
+                left.append((cx_ - erx, cy_))
+                right.append((cx_ + erx, cy_))
+            pygame.draw.polygon(fs, (*TORNADO_COLOR, int(64 * fade)), left + right[::-1])
+            for b in range(10):
+                h = ((b / 10.0) + t * 0.85) % 1.0
+                cx_, cy_, erx = ring(h)
+                ery = max(3.0, erx * 0.32)
+                rect = pygame.Rect(int(cx_ - erx), int(cy_ - ery), int(erx * 2), int(ery * 2))
+                pygame.draw.arc(fs, (*TORNADO_COLOR, int(80 * fade)), rect, 0.15, math.pi - 0.15, 2)
+                pygame.draw.arc(fs, (*TORNADO_COLOR2, int(200 * fade * (1.0 - 0.45 * h))), rect,
+                                math.pi + 0.1, math.tau - 0.1, 3)
+            surf.blit(fs, (x - ox_, y - oy_))
         # çevresinde dönen enkaz
         for d in self.debris:
             a, rr, hh, _ = d
@@ -14354,32 +14572,61 @@ class Tornado:
 AXE_COLOR = (235, 140, 74)
 
 
+AXE_STEEL = (198, 206, 220)
+AXE_STEEL_D = (120, 128, 146)
+AXE_WOOD = (132, 86, 50)
+
+
+def _axe_blade_local():
+    """Baltanın ağzı (yerel koordinat: f = sap boyunca, s = sapa dik)."""
+    pts = [(8.0, 3.0), (15.0, 3.0), (18.5, 9.0)]
+    for i in range(10):
+        th = i * math.pi / 9.0
+        pts.append((11.5 + 10.0 * math.cos(th), 15.0 + 5.0 * math.sin(th)))
+    pts += [(4.5, 9.0)]
+    return pts
+
+
+_AXE_BLADE = _axe_blade_local()
+
+
 def draw_axe_shape(surf, x, y, spin, k=1.0, color=AXE_COLOR, glow=0.6):
-    """Dönen iki ağızlı savaş baltası. k, baltanın boy çarpanıdır."""
+    """Dönen savaş baltası (v3.32): deri sargılı ahşap sap, çekik çelik ağız,
+    parlayan keskin kenar ve arkada küçük çekiç topuzu. k: boy çarpanı."""
     hx, hy = math.cos(spin), math.sin(spin)
     nx, ny = -hy, hx
-    haft = 15 * k
+
+    def P(f, s_):
+        return (x + (hx * f + nx * s_) * k, y + (hy * f + ny * s_) * k)
     if glow > 0:
-        add_glow(surf, x, y, 28 * k, color, glow)
+        add_glow(surf, x + nx * 8 * k, y + ny * 8 * k, 26 * k, color, glow * 0.7)
     # sap
-    pygame.draw.line(surf, OUTLINE, (x - hx * haft, y - hy * haft),
-                     (x + hx * haft, y + hy * haft), max(3, int(7 * k)))
-    pygame.draw.line(surf, (108, 72, 44), (x - hx * haft, y - hy * haft),
-                     (x + hx * haft, y + hy * haft), max(2, int(5 * k)))
-    # iki ağız
-    for sgn in (-1, 1):
-        bx, by = x + hx * 12 * k * sgn, y + hy * 12 * k * sgn
-        blade = [(bx + hx * 9 * k * sgn, by + hy * 9 * k * sgn),
-                 (bx + nx * 11 * k, by + ny * 11 * k),
-                 (bx - hx * 6 * k * sgn, by - hy * 6 * k * sgn),
-                 (bx - nx * 11 * k, by - ny * 11 * k)]
-        pygame.draw.polygon(surf, OUTLINE, blade)
-        pygame.draw.polygon(surf, (232, 238, 248), blade)
-        pygame.draw.polygon(surf, scale_col(color, 0.9), blade, max(1, int(2 * k)))
-        # ağzın ucunda kıvılcım
-        pygame.draw.circle(surf, (255, 248, 230),
-                           (int(x + hx * 20 * k * sgn), int(y + hy * 20 * k * sgn)),
-                           max(1, int(2 * k)))
+    thick_line(surf, P(-17, 0), P(15, 0), 6.6 * k, OUTLINE)
+    thick_line(surf, P(-17, 0), P(15, 0), 4.4 * k, AXE_WOOD)
+    thick_line(surf, P(-16, -0.9), P(13, -0.9), 1.3 * k, (178, 128, 82))
+    for f in (-14.0, -11.0, -8.0):
+        thick_line(surf, P(f, -2.4), P(f + 1.8, 2.4), 1.5 * k, (66, 40, 24))
+    circle_aa(surf, *P(-18, 0), 2.8 * k, OUTLINE)
+    circle_aa(surf, *P(-18, 0), 2.0 * k, AXE_STEEL_D)
+    # çekiç topuzu (arka)
+    poll = [P(9, -2.5), P(14, -2.5), P(14.5, -7), P(8.5, -7)]
+    poly_aa(surf, [(px_ + 1, py_ + 1.5) for px_, py_ in poll], OUTLINE)
+    poly_aa(surf, poll, AXE_STEEL_D)
+    # ağız
+    blade = [P(f, s_) for f, s_ in _AXE_BLADE]
+    poly_aa(surf, [(px_ + 1.2, py_ + 1.8) for px_, py_ in blade], OUTLINE)
+    poly_aa(surf, blade, AXE_STEEL)
+    inner = [P(f, s_ * 0.80 + 0.6) for f, s_ in _AXE_BLADE[:-1]]
+    poly_aa(surf, poly_inset(inner, 0.72), AXE_STEEL_D)
+    # keskin kenar: ince parlak hilal
+    edge = [P(11.5 + 10.0 * math.cos(th), 15.0 + 5.0 * math.sin(th))
+            for th in [i * math.pi / 9.0 for i in range(10)]]
+    for a_, b_ in zip(edge, edge[1:]):
+        thick_line(surf, a_, b_, 1.6 * k, (250, 252, 255))
+    # sapın ağza girdiği yuva + perçin
+    sock = [P(7, -3.3), P(16, -3.3), P(16, 3.3), P(7, 3.3)]
+    poly_aa(surf, sock, (88, 94, 108))
+    circle_aa(surf, *P(11.5, 0), 1.3 * k, color)
 
 
 class FlyingAxe:
@@ -14451,19 +14698,27 @@ class FlyingAxe:
                                  life=0.28, r=2.6)
 
     def draw(self, surf, t):
-        # 1) geçmiş konumlar — sönen hayaletler
-        for i, (gx, gy, gs) in enumerate(self.trail[:-1]):
-            fade = (i + 1) / max(1, len(self.trail))
-            draw_axe_shape(surf, gx, gy, gs, self.k * (0.6 + 0.3 * fade),
-                           scale_col(self.color, 0.35 + 0.3 * fade), glow=0.0)
-        # 2) süpürme halkası
-        rr = int(24 * self.k)
-        ring_a = int(70 + 50 * abs(math.sin(self.spin * 2)))
-        rs = pygame.Surface((rr * 2 + 6, rr * 2 + 6), pygame.SRCALPHA)
-        pygame.draw.circle(rs, (*self.color, ring_a), (rr + 3, rr + 3), rr, 3)
-        surf.blit(rs, (self.x - rr - 3, self.y - rr - 3))
-        # 3) asıl balta
-        draw_axe_shape(surf, self.x, self.y, self.spin, self.k, self.color, glow=0.6)
+        # 1) DÖNÜŞ İZİ: ağzın arkasında kalan yarı saydam hilal (eskiden
+        #    baltanın beyaz kopyaları üst üste biniyor, kutu yığını gibiydi)
+        k = self.k
+        R0, R1 = 13.0 * k, 25.0 * k
+        a1 = self.spin + 1.04                  # ağzın ucunun açısı
+        a0 = a1 - 2.3
+        n = 12
+        size = int(R1 * 2 + 8)
+        sw = pygame.Surface((size, size), pygame.SRCALPHA)
+        c0 = size / 2.0
+        outer = [(c0 + math.cos(a0 + (a1 - a0) * i / n) * R1,
+                  c0 + math.sin(a0 + (a1 - a0) * i / n) * R1) for i in range(n + 1)]
+        inner = [(c0 + math.cos(a1 - (a1 - a0) * i / n) * R0,
+                  c0 + math.sin(a1 - (a1 - a0) * i / n) * R0) for i in range(n + 1)]
+        pygame.draw.polygon(sw, (*lighten(self.color, 0.35), 70), outer + inner)
+        for i in range(n):
+            q = i / float(n)
+            pygame.draw.line(sw, (255, 250, 236, int(40 + 150 * q)), outer[i], outer[i + 1], 2)
+        surf.blit(sw, (self.x - c0, self.y - c0))
+        # 2) asıl balta
+        draw_axe_shape(surf, self.x, self.y, self.spin, k, self.color, glow=0.5)
 
 
 # =====================================================================
@@ -14475,6 +14730,8 @@ class FlyingAxe:
 
 WHIP_COLOR = (238, 152, 84)
 WHIP_COLOR2 = (255, 226, 176)
+WHIP_LEATHER = (176, 106, 58)       # kamçının gerçek deri rengi (v3.32)
+WHIP_LEATHER2 = (246, 212, 160)
 
 
 class WhipLash:
@@ -14588,10 +14845,11 @@ class WhipLash:
     def draw(self, surf, t):
         k = clamp(self.life / self.LIFE, 0.0, 1.0)
         f = 1.0 - k
-        body = self.color
-        dark = scale_col(body, 0.30)
-        mid = scale_col(body, 0.72)
-        lite = WHIP_COLOR2
+        # v3.32: turuncu bant değil, örgülü kahverengi DERİ kamçı
+        body = WHIP_LEATHER
+        dark = scale_col(body, 0.36)
+        mid = scale_col(body, 0.74)
+        lite = WHIP_LEATHER2
         w = self.width
 
         # 1) HAREKET İZİ — birkaç kare geriden gelen, sönen hayalet kırbaçlar.
@@ -14617,6 +14875,21 @@ class WhipLash:
         # bir hacim veren tek çizgi bu.
         poly_aa(surf, self._ribbon(pts, w * 0.30, 0.5, off=-w * 0.24),
                 scale_col(lite, 0.62 + 0.38 * f))
+        # ÖRGÜ: gövde boyunca çapraz koyu çentikler (deri kamçı dokusu)
+        n_ = len(pts)
+        for i in range(1, n_ - 3, 2):
+            fr = i / (n_ - 1.0)
+            hw = lerp(w, 1.0, fr ** 1.05) * 0.5
+            if hw < 0.9:
+                break
+            ax_, ay_ = pts[i + 1][0] - pts[i - 1][0], pts[i + 1][1] - pts[i - 1][1]
+            L_ = math.hypot(ax_, ay_) or 1.0
+            ux_, uy_ = ax_ / L_, ay_ / L_
+            px_, py_ = -uy_, ux_
+            cx_, cy_ = pts[i]
+            thick_line(surf, (cx_ + px_ * hw * 0.9 - ux_ * hw * 0.6, cy_ + py_ * hw * 0.9 - uy_ * hw * 0.6),
+                       (cx_ - px_ * hw * 0.9 + ux_ * hw * 0.6, cy_ - py_ * hw * 0.9 + uy_ * hw * 0.6),
+                       max(1.0, hw * 0.35), dark)
 
         # 3) KABZA — elde duran kısa, deri sargılı sap. Bilerek İNCE: gövdeden
         # biraz kalın ama oyuncunun üstünde şişkin bir topak bırakmayacak kadar.
@@ -14709,6 +14982,26 @@ class SwordSlash:
                 g = abs(i / (len(band) - 2.0) - 0.5) * 2.0
                 thick_line(surf, band[i], band[i + 1],
                            max(1.0, w0 * (1.0 - 0.75 * g)), colr)
+        # KILIÇ (v3.32): yayın önündeki gerçek kılıç — kabza oyuncunun
+        # elinde, namlu yay boyunca savruluyor.
+        a_s = self.ang + sweep
+        ca, sa = math.cos(a_s), math.sin(a_s)
+        nx, ny = -sa, ca
+        x0, y0 = self.x + ca * 14, self.y + sa * 14
+        Lb = rad * 0.98 - 14
+        blade = [(x0 + ca * 6 + nx * 3.2, y0 + sa * 6 + ny * 3.2),
+                 (x0 + ca * (Lb - 10) + nx * 3.0, y0 + sa * (Lb - 10) + ny * 3.0),
+                 (x0 + ca * Lb, y0 + sa * Lb),
+                 (x0 + ca * (Lb - 10) - nx * 3.0, y0 + sa * (Lb - 10) - ny * 3.0),
+                 (x0 + ca * 6 - nx * 3.2, y0 + sa * 6 - ny * 3.2)]
+        poly_aa(surf, [(px_ + 1, py_ + 1.5) for px_, py_ in blade], OUTLINE)
+        poly_aa(surf, blade, (214, 222, 236))
+        thick_line(surf, (x0 + ca * 8, y0 + sa * 8), (x0 + ca * (Lb - 6), y0 + sa * (Lb - 6)), 1.2,
+                   (150, 160, 180))
+        thick_line(surf, (x0 + ca * 6 + nx * 7, y0 + sa * 6 + ny * 7),
+                   (x0 + ca * 6 - nx * 7, y0 + sa * 6 - ny * 7), 3.0, (200, 160, 70))
+        thick_line(surf, (x0 + ca * 5, y0 + sa * 5), (x0 - ca * 4, y0 - sa * 4), 3.2, (96, 62, 40))
+        circle_aa(surf, x0 - ca * 5, y0 - sa * 5, 2.2, (200, 160, 70))
         # yayın ucunda kıvılcım
         ex, ey = outer[-1]
         add_glow(surf, ex, ey, 22 * k + 8, EMANET_COLOR2, 0.38 * k)
@@ -15471,24 +15764,72 @@ class MeteorStrike:
         pygame.draw.circle(surf, METEOR_COLOR2, (int(self.x), int(self.y)),
                            max(2, int(self.radius * (1.0 - k))), 1)
 
+    def _rock(self, cx, cy, R, rot):
+        """Pürüzlü kaya çokgeni (her göktaşının kendi deseni)."""
+        rnd = random.Random(int(self.seed * 1000))
+        pts = []
+        for i in range(10):
+            a = rot + i * math.tau / 10
+            rr = R * rnd.uniform(0.78, 1.08)
+            pts.append((cx + math.cos(a) * rr, cy + math.sin(a) * rr))
+        return pts
+
     def draw(self, surf, t):
-        """Düşen göktaşı ve çarpışma parlaması (en üst katman)."""
+        """Düşen ALEVLİ GÖKTAŞI ve çarpışma (en üst katman). v3.32: küçük
+        dairelerden ibaret değil; kraterli kaya, eriyik çatlaklar ve katmanlı
+        alev kuyruğu."""
         if self.boom_t >= 0:
             q = clamp(self.boom_t / 0.45, 0.0, 1.0)
             add_glow(surf, self.x, self.y, self.radius * (1.0 + 0.4 * q), METEOR_COLOR,
                      0.9 * (1.0 - q))
+            # krater ve dağılan kaya parçaları
+            pygame.draw.ellipse(surf, scale_col((60, 36, 28), 1.0),
+                                (int(self.x - self.radius * 0.45), int(self.y - self.radius * 0.22),
+                                 int(self.radius * 0.9), int(self.radius * 0.44)), 3)
+            for i in range(6):
+                a = self.seed + i * math.tau / 6
+                d = self.radius * (0.3 + 0.7 * q)
+                circle_aa(surf, self.x + math.cos(a) * d, self.y + math.sin(a) * d * 0.6 - 20 * math.sin(q * math.pi),
+                          4.0 * (1 - q) + 1, (110, 70, 52))
             return
         k = clamp(self.t / self.max_delay, 0.0, 1.0)
-        # gökten çapraz iniş: sağ üstten gelir
         fall = (1.0 - k) ** 1.6
         mx = self.x + 260 * fall
         my = self.y - 520 * fall
-        tail = [(mx + 60 * (1 - k * 0.3), my - 120 * (1 - k * 0.3)), (mx, my)]
-        taper_line(surf, tail, 1.5, 9.0, scale_col(METEOR_COLOR, 0.7), METEOR_COLOR2)
-        add_glow(surf, mx, my, 26, METEOR_COLOR, 0.8)
-        circle_aa(surf, mx, my, 9, (110, 60, 40))
-        circle_aa(surf, mx - 2, my - 2, 6, METEOR_COLOR)
-        circle_aa(surf, mx - 3, my - 3, 3, METEOR_COLOR2)
+        R = 11.0 + min(9.0, self.radius * 0.06)
+        # gidiş yönü (sağ üstten sol alta) ve kuyruk yönü
+        dx, dy = -0.447, 0.894
+        ux, uy = -dx, -dy
+        nx_, ny_ = -uy, ux
+        Lt = R * (5.0 + 2.0 * fall)
+        flick = 0.85 + 0.15 * math.sin(t * 30 + self.seed)
+        for scale, col in ((1.0, (226, 84, 34)), (0.72, (255, 150, 52)), (0.42, (255, 230, 150))):
+            w_ = R * 1.05 * scale
+            tail = [(mx + nx_ * w_, my + ny_ * w_),
+                    (mx + ux * Lt * scale * flick + nx_ * w_ * 0.25, my + uy * Lt * scale * flick + ny_ * w_ * 0.25),
+                    (mx + ux * Lt * scale * 1.05 * flick, my + uy * Lt * scale * 1.05 * flick),
+                    (mx + ux * Lt * scale * flick - nx_ * w_ * 0.25, my + uy * Lt * scale * flick - ny_ * w_ * 0.25),
+                    (mx - nx_ * w_, my - ny_ * w_)]
+            poly_aa(surf, tail, col)
+        for i in range(4):
+            ph = (t * 3.0 + i * 0.27 + self.seed) % 1.0
+            ex_ = mx + ux * Lt * (0.4 + ph) + nx_ * math.sin(i * 2.1 + t * 9) * R * 0.8
+            ey_ = my + uy * Lt * (0.4 + ph) + ny_ * math.sin(i * 2.1 + t * 9) * R * 0.8
+            circle_aa(surf, ex_, ey_, 2.2 * (1 - ph) + 0.6, (255, 200, 90))
+        add_glow(surf, mx, my, R * 3.0, METEOR_COLOR, 0.85)
+        rot = t * 2.0 + self.seed
+        rock = self._rock(mx, my, R, rot)
+        poly_aa(surf, [(px_ + 1.5, py_ + 2) for px_, py_ in rock], OUTLINE)
+        poly_aa(surf, rock, (92, 58, 44))
+        poly_aa(surf, poly_inset(rock, 0.62, dx=-R * 0.18, dy=-R * 0.18), (138, 92, 64))
+        # eriyik çatlaklar + kraterler
+        for i in range(3):
+            a = rot + i * 2.1
+            thick_line(surf, (mx + math.cos(a) * R * 0.15, my + math.sin(a) * R * 0.15),
+                       (mx + math.cos(a + 0.4) * R * 0.85, my + math.sin(a + 0.4) * R * 0.85),
+                       1.8, (255, 150, 60))
+        circle_aa(surf, mx + math.cos(rot + 1.0) * R * 0.45, my + math.sin(rot + 1.0) * R * 0.45,
+                  R * 0.18, (70, 44, 34))
 
 
 class SunBeam:
@@ -15555,7 +15896,7 @@ class SunBeam:
 
 # =====================================================================
 # YENİ SİLAHLAR — 2. PAKET (v3.31): ŞAHİN, YARASA SÜRÜSÜ, AYAZ PATLAMASI,
-# BIÇAK YELPAZESİ, MAYIN TARLASI
+# BIÇAK YELPAZESİ, DEPREM (v3.32: MAYIN TARLASI'nın yerine)
 # ---------------------------------------------------------------------
 # Her biri oyuna YENİ bir oynanış ekler, eskilerin kopyası değil:
 #   ŞAHİN          : MİNYON. Gökte süzülür, menzildeki EN CANLI yaratığa
@@ -15566,8 +15907,9 @@ class SunBeam:
 #                    Kontrol silahı — sıkışınca nefes aldırır.
 #   BIÇAK YELPAZESİ: Nişan yönüne yelpaze gibi açılan DELİCİ bıçaklar. Yönlü,
 #                    beceri isteyen silah.
-#   MAYIN TARLASI  : Durduğun yere mayın bırakır; üstüne basan patlar. Kaçarken
-#                    arkanda tuzak bırakan oyuncuyu ödüllendirir.
+#   DEPREM (v3.32) : Ayağının altında yer 1 sn boyunca çatlayarak BİRİKİR,
+#                    sonra BONK gibi patlar; 2 sn'de bir. Seviyeyle alanı ve
+#                    hasarı büyür. (Beğenilmeyen MAYIN TARLASI'nın yerine.)
 # Hepsi weapon_damage + _weapon_hit kapısından geçer ve tools/weapon_bench.py
 # ile eski silahların aralığına oturtuldu.
 # =====================================================================
@@ -15579,25 +15921,29 @@ NOVA_COLOR = (150, 228, 255)
 NOVA_COLOR2 = (236, 250, 255)
 KNIFE_COLOR = (214, 226, 246)
 KNIFE_COLOR2 = (255, 255, 255)
-MINE_COLOR = (255, 112, 72)
-MINE_COLOR2 = (255, 222, 160)
+QUAKE_COLOR = (226, 146, 70)
+QUAKE_COLOR2 = (255, 228, 168)
+QUAKE_ROCK = (122, 96, 74)
 
 # --- ŞAHİN ---
 HAWK_RANGE = 440.0
 HAWK_ORBIT_R = 82.0
 HAWK_ALT = 34.0                 # gökteki yüksekliği (çizimde yukarı kaydırma)
 HAWK_SPEED = 820.0
-HAWK_SPLASH_R = 42.0            # dalışın çevreye sıçradığı yarıçap
-HAWK_SPLASH_K = 0.40
+# v3.32 GÜÇLENDİ ("şahin çok güçsüz"): daha sık dalar, sıçrama alanı ve
+# payı büyüdü, ikinci şahin 6. seviyede gelir.
+HAWK_SPLASH_R = 64.0            # dalışın çevreye sıçradığı yarıçap
+HAWK_SPLASH_K = 0.60
+HAWK_DRAW_K = 1.6               # çizim ölçeği
 
 
 def hawk_count(lvl):
     lvl = int(lvl)
-    return 1 + (lvl >= 8) + (lvl >= 16) + (lvl >= 23)
+    return 1 + (lvl >= 6) + (lvl >= 13) + (lvl >= 20)
 
 
 def hawk_cd(lvl):
-    return max(0.9, 2.0 * (0.982 ** weapon_growth(lvl)))
+    return max(0.7, 1.45 * (0.982 ** weapon_growth(lvl)))
 
 
 # --- YARASA SÜRÜSÜ ---
@@ -15640,42 +15986,69 @@ def knife_pierce(lvl):
     return 3 + (lvl >= 10) + (lvl >= 20)
 
 
-# --- MAYIN TARLASI ---
-MINE_ARM_T = 0.45
-MINE_LIFE = 16.0
-MINE_TRIGGER_R = 34.0
-MINE_BASE_R = 78.0
-MINE_R_PER = 2.2
+# --- DEPREM (v3.32) ---
+QUAKE_CHARGE_T = 1.0            # halkanın birikme süresi (sonra patlar)
+QUAKE_BASE_R = 118.0
+QUAKE_R_PER = 4.2               # büyüme puanı başına yarıçap
+QUAKE_KB = 260.0
 
 
-def mine_max(lvl):
-    return 4 + int(weapon_growth(lvl) / 4.0)
+def quake_radius(lvl):
+    return QUAKE_BASE_R + QUAKE_R_PER * weapon_growth(lvl)
 
 
-def mine_radius(lvl):
-    return MINE_BASE_R + MINE_R_PER * weapon_growth(lvl)
+def quake_stun(lvl):
+    """Patlamanın sıradan yaratıkları sersemlettiği süre (yavaşlatma)."""
+    return 0.35 + 0.012 * weapon_growth(lvl)
 
 
 def draw_hawk_shape(surf, x, y, ang, flap, k, col, dive=False):
-    """Kanatlı şahin silueti (üstten görünüş)."""
+    """Kanatlı şahin silueti (üstten): tüy parmaklı kanatlar, bantlı kuyruk,
+    açık renk baş ve kancalı sarı gaga. Dalışta kanatlar geriye katlanır."""
     ca, sa = math.cos(ang), math.sin(ang)
     nx, ny = -sa, ca
 
     def P(f, s):
         return (x + ca * f * k + nx * s * k, y + sa * f * k + ny * s * k)
-    span = 6 if dive else 20 + 4 * flap
-    sweep = 10 if dive else 2 - 4 * flap
+    dark = scale_col(col, 0.42)
+    mid = scale_col(col, 0.72)
+    light = lighten(col, 0.35)
+    span = 9.0 if dive else 25.0 + 5.0 * flap
+    sweep = 14.0 if dive else 1.0 - 5.0 * flap
     for sg in (-1, 1):
-        wing = [P(4, 3 * sg), P(-sweep, span * sg), P(-8 - sweep * 0.5, (span - 5) * sg), P(-6, 3 * sg)]
-        poly_aa(surf, wing, scale_col(col, 0.70))
-        thick_line(surf, P(2, 3 * sg), P(-sweep, span * sg), max(1.0, 1.2 * k), lighten(col, 0.3))
-    body = [P(13, 0), P(5, 4), P(-10, 3), P(-16, 0), P(-10, -3), P(5, -4)]
+        # kanat: ön kenar + dört uç tüyü ("parmak") + arka kenar
+        pts = [P(6, 3 * sg), P(3 - sweep * 0.3, span * 0.55 * sg), P(-1 - sweep, span * sg)]
+        for i in range(4):
+            fx_ = -4 - sweep - i * 2.6
+            pts.append(P(fx_, span * (0.97 - i * 0.10) * sg))
+            pts.append(P(fx_ + 1.4, span * (0.90 - i * 0.10) * sg))
+        pts += [P(-11 - sweep * 0.4, span * 0.45 * sg), P(-8, 3.5 * sg)]
+        poly_aa(surf, [(px_ + 1.5, py_ + 2.0) for px_, py_ in pts], (20, 14, 10))
+        poly_aa(surf, pts, dark)
+        cov = [P(5, 3 * sg), P(2 - sweep * 0.3, span * 0.50 * sg),
+               P(-4 - sweep * 0.6, span * 0.62 * sg), P(-7, 3.5 * sg)]
+        poly_aa(surf, cov, mid)
+        thick_line(surf, P(5, 3 * sg), P(-1 - sweep, span * sg), max(1.0, 1.1 * k), light)
+        # tüy çizgileri
+        for i in range(3):
+            thick_line(surf, P(-3 - i * 3, (4 + i) * sg), P(-6 - sweep * 0.7 - i * 2.2, span * (0.7 - i * 0.12) * sg),
+                       max(1.0, 0.6 * k), scale_col(dark, 0.7))
+    # kuyruk yelpazesi (bantlı)
+    tail = [P(-11, 3), P(-22, 6.5), P(-24, 0), P(-22, -6.5), P(-11, -3)]
+    poly_aa(surf, tail, mid)
+    for f in (-16, -20):
+        thick_line(surf, P(f, -5.2 + (f + 16) * -0.1), P(f, 5.2 - (f + 16) * -0.1), max(1.0, 1.2 * k), dark)
+    # gövde
+    body = [P(13, 0), P(8, 4.4), P(-4, 4.8), P(-12, 2.6), P(-12, -2.6), P(-4, -4.8), P(8, -4.4)]
     poly_aa(surf, body, col)
-    tail = [P(-12, 2), P(-20, 5), P(-20, -5), P(-12, -2)]
-    poly_aa(surf, tail, scale_col(col, 0.6))
-    circle_aa(surf, *P(9, 0), 3.2 * k, lighten(col, 0.25))
-    poly_aa(surf, [P(12, 1.4), P(16, 0), P(12, -1.4)], (255, 214, 90))
-    circle_aa(surf, *P(10, 1.6), 0.9 * k, (20, 16, 10))
+    poly_aa(surf, [P(6, 0), P(0, 2.6), P(-8, 1.4), P(-8, -1.4), P(0, -2.6)], light)
+    # baş + gaga + göz
+    circle_aa(surf, *P(10, 0), 4.0 * k, light)
+    circle_aa(surf, *P(11, 0), 2.6 * k, (250, 244, 228))
+    poly_aa(surf, [P(13.5, 1.7), P(18.5, 0.3), P(17, -0.6), P(13.5, -1.7)], (255, 204, 70))
+    for sg in (-1, 1):
+        circle_aa(surf, *P(11.5, 2.3 * sg), 1.0 * k, (16, 12, 8))
+        circle_aa(surf, *P(11.8, 2.1 * sg), 0.35 * k, (255, 255, 255))
 
 
 class Hawk:
@@ -15693,12 +16066,15 @@ class Hawk:
         self.flap = 0.0
         self.alt = HAWK_ALT
         self.trail = []
+        self.strikes = []           # pençe izleri: (x, y, açı, yaş)
         self.alive = True
 
     def update(self, dt, run, n, lvl, dmg, clock):
         p = run.player
         self.t += dt
         self.flap = math.sin(clock * 9 + self.idx * 1.7)
+        if self.strikes:
+            self.strikes = [(sx, sy, sa_, age + dt) for (sx, sy, sa_, age) in self.strikes if age + dt < 0.35]
         a = clock * 1.1 + self.idx * math.tau / max(1, n)
         ox = p.x + math.cos(a) * HAWK_ORBIT_R
         oy = p.y + math.sin(a) * HAWK_ORBIT_R * 0.6
@@ -15738,8 +16114,11 @@ class Hawk:
                     if (o is not self.target and o.alive
                             and dist(o.x, o.y, self.tx, self.ty) < HAWK_SPLASH_R + getattr(o, "radius", 12)):
                         run._weapon_hit(o, dmg * HAWK_SPLASH_K, kb=120, wlvl=lvl)
-                run.fx.burst(self.tx, self.ty, HAWK_COLOR2, n=10, speed=200, life=0.35, r=3)
-                run.fx.ring(self.tx, self.ty, HAWK_COLOR, n=12, speed=180, life=0.3, r=2.6)
+                run.fx.burst(self.tx, self.ty, HAWK_COLOR2, n=12, speed=220, life=0.35, r=3)
+                run.fx.burst(self.tx, self.ty, scale_col(HAWK_COLOR, 0.6), n=6, speed=120,
+                             life=0.6, r=2.4, gravity=140)          # dökülen tüyler
+                run.fx.ring(self.tx, self.ty, HAWK_COLOR, n=14, speed=200, life=0.3, r=2.6)
+                self.strikes.append((self.tx, self.ty, self.ang, 0.0))
                 sfx("whip", 0.28, 0.06)
                 self.state = "climb"
                 self.t = 0.0
@@ -15756,16 +16135,35 @@ class Hawk:
             self.x, self.y, self.state = p.x, p.y - 60, "circle"
 
     def draw(self, surf, t):
-        # yerdeki gölge, gökteki kuş
-        surf.blit(shadow_sprite(26), (int(self.x - 13), int(self.y + 2)))
+        k = HAWK_DRAW_K
         dive = self.state == "dive"
-        for i, (gx, gy) in enumerate(self.trail[:-1]):
-            k = (i + 1) / max(1, len(self.trail))
-            circle_aa(surf, gx, gy, 2 + 3 * k, scale_col(HAWK_COLOR, 0.3 + 0.4 * k))
+        # pençe izleri: üç paralel yırtık
+        for (sx, sy, sa_, age) in self.strikes:
+            q = age / 0.35
+            ca, sn = math.cos(sa_ + 0.6), math.sin(sa_ + 0.6)
+            nx_, ny_ = -sn, ca
+            L_ = 22 * (0.6 + 0.4 * min(1.0, q * 3))
+            for j in (-1, 0, 1):
+                ox_, oy_ = sx + nx_ * j * 7, sy + ny_ * j * 7
+                thick_line(surf, (ox_ - ca * L_, oy_ - sn * L_), (ox_ + ca * L_, oy_ + sn * L_),
+                           3.2 * (1 - q) + 0.6, scale_col(HAWK_COLOR2, 1.0 - 0.5 * q))
+            add_glow(surf, sx, sy, 26, HAWK_COLOR, 0.5 * (1 - q))
+        # yerdeki gölge (dalışta hedefe yaklaşır, küçülür)
+        sh_r = int(18 + self.alt * 0.25)
+        surf.blit(shadow_sprite(sh_r * 2), (int(self.x - sh_r), int(self.y + 2)))
+        bx, by = self.x, self.y - self.alt
         if dive:
-            add_glow(surf, self.x, self.y - self.alt, 26, HAWK_COLOR, 0.45)
-        draw_hawk_shape(surf, self.x, self.y - self.alt, self.ang, self.flap, 1.25,
-                        HAWK_COLOR, dive=dive)
+            # hız çizgileri: iki kanat ucundan uzanan ince izler
+            ca, sn = math.cos(self.ang), math.sin(self.ang)
+            for j in (-1, 1):
+                ox_, oy_ = bx - sn * j * 8, by + ca * j * 8
+                thick_line(surf, (ox_, oy_), (ox_ - ca * 46, oy_ - sn * 46), 1.6,
+                           scale_col(HAWK_COLOR2, 0.55))
+            for i, (gx, gy) in enumerate(self.trail[:-1]):
+                q = (i + 1) / max(1, len(self.trail))
+                circle_aa(surf, gx, gy, 2 + 4 * q, scale_col(HAWK_COLOR, 0.25 + 0.45 * q))
+            add_glow(surf, bx, by, 34, HAWK_COLOR, 0.55)
+        draw_hawk_shape(surf, bx, by, self.ang, self.flap, k, HAWK_COLOR, dive=dive)
 
 
 class BatSwarmBat:
@@ -15805,17 +16203,35 @@ class BatSwarmBat:
                     break
 
     def draw(self, surf, t):
+        """Gerçek YARASA silueti (v3.32): parmak kemikli zar kanatlar,
+        sivri kulaklar, kırmızı gözler."""
         flap = math.sin(t * 22 + self.a0 * 3)
         fade = min(1.0, (BAT_LIFE - self.t) * 5.0)
-        col = scale_col(BAT_COLOR, 0.5 + 0.5 * fade)
-        x, y = self.x, self.y
+        col = scale_col((92, 56, 120), 0.55 + 0.45 * fade)
+        mem = scale_col(BAT_COLOR, 0.45 + 0.4 * fade)
+        x0, y0 = self.x, self.y
+        S_ = 1.4
+
+        def B(dx, dy):
+            return (x0 + dx * S_, y0 + dy * S_)
+        add_glow(surf, x0, y0, 24, BAT_COLOR, 0.30 * fade)
+        up = 7.0 * flap
         for sg in (-1, 1):
-            wing = [(x, y), (x + sg * 9, y - 6 - 4 * flap), (x + sg * 6, y - 1), (x + sg * 11, y + 2 - 2 * flap)]
-            poly_aa(surf, wing, col)
-        circle_aa(surf, x, y, 4.0, scale_col(col, 0.8))
+            # kanat: omuz -> üç parmak ucu, aralarında içe kıvrık zar
+            sh = B(sg * 3, -1)
+            tips = [B(sg * 16, -7 - up), B(sg * 18, 1 - up * 0.5), B(sg * 13, 6 - up * 0.2)]
+            notch = [B(sg * 12, -1 - up * 0.6), B(sg * 11, 3 - up * 0.3)]
+            wing = [sh, tips[0], notch[0], tips[1], notch[1], tips[2], B(sg * 4, 4)]
+            poly_aa(surf, [(px_, py_ + 1.5) for px_, py_ in wing], OUTLINE)
+            poly_aa(surf, wing, mem)
+            for tp in tips:
+                thick_line(surf, sh, tp, 1.2, col)
+        # gövde + kulaklar
+        circle_aa(surf, *B(0, 1), 4.6 * S_, OUTLINE)
+        circle_aa(surf, *B(0, 1), 3.8 * S_, col)
         for sg in (-1, 1):
-            circle_aa(surf, x + sg * 1.6, y - 1, 0.9, (255, 120, 150))
-        add_glow(surf, x, y, 12, BAT_COLOR, 0.25 * fade)
+            poly_aa(surf, [B(sg * 1.2, -2), B(sg * 3.4, -7), B(sg * 3.6, -1.5)], col)
+            circle_aa(surf, *B(sg * 1.5, -0.2), 0.95 * S_, (255, 90, 120))
 
 
 class FrostNova:
@@ -15834,17 +16250,40 @@ class FrostNova:
             self.alive = False
 
     def draw(self, surf, t):
+        """AYAZ PATLAMASI (v3.32): dışa açılan buz halkası, halkadan fışkıran
+        BUZ KRİSTALLERİ (altıgen sarkıtlar) ve ortada kar tanesi."""
         k = clamp(self.t / 0.30, 0.0, 1.0)
         fade = 1.0 - clamp((self.t - 0.25) / 0.30, 0.0, 1.0)
-        r = self.radius * (0.25 + 0.75 * k)
-        blit_disc(surf, self.x, self.y, r, NOVA_COLOR, int(60 * fade))
-        pygame.draw.circle(surf, scale_col(NOVA_COLOR2, 0.4 + 0.6 * fade), (int(self.x), int(self.y)),
-                           max(2, int(r)), max(1, int(4 * fade) + 1))
-        for a in self.shards:
-            sx, sy = self.x + math.cos(a) * r, self.y + math.sin(a) * r
-            ex, ey = self.x + math.cos(a) * (r + 16 * fade), self.y + math.sin(a) * (r + 16 * fade)
-            thick_line(surf, (sx, sy), (ex, ey), 2.5 * fade + 0.5, NOVA_COLOR2)
-        add_glow(surf, self.x, self.y, r * 0.8, NOVA_COLOR, 0.35 * fade)
+        r = self.radius * (0.25 + 0.75 * ease_out_cubic(k))
+        x, y = self.x, self.y
+        blit_disc(surf, x, y, r, NOVA_COLOR, int(70 * fade))
+        pygame.draw.circle(surf, scale_col(NOVA_COLOR2, 0.4 + 0.6 * fade), (int(x), int(y)),
+                           max(2, int(r)), max(1, int(5 * fade) + 1))
+        for i, a in enumerate(self.shards):
+            ca, sa = math.cos(a), math.sin(a)
+            nx, ny = -sa, ca
+            L_ = (14 + 8 * (i % 3)) * (0.5 + 0.5 * fade)
+            w_ = 4.0 + (i % 2) * 1.5
+            bx, by = x + ca * (r - 4), y + sa * (r - 4)
+            crystal = [(bx + nx * w_, by + ny * w_), (bx + ca * L_ * 0.7 + nx * w_, by + sa * L_ * 0.7 + ny * w_),
+                       (bx + ca * L_, by + sa * L_),
+                       (bx + ca * L_ * 0.7 - nx * w_, by + sa * L_ * 0.7 - ny * w_), (bx - nx * w_, by - ny * w_)]
+            poly_aa(surf, crystal, scale_col(NOVA_COLOR, 0.55 + 0.45 * fade))
+            thick_line(surf, (bx, by), (bx + ca * L_ * 0.9, by + sa * L_ * 0.9), 1.2,
+                       scale_col(NOVA_COLOR2, 0.6 + 0.4 * fade))
+        # ortadaki kar tanesi
+        sk = 18 * fade
+        if sk > 2:
+            for j in range(6):
+                a = j * math.pi / 3 + t
+                ex, ey = x + math.cos(a) * sk, y + math.sin(a) * sk
+                thick_line(surf, (x, y), (ex, ey), 2.0, NOVA_COLOR2)
+                for sg in (-1, 1):
+                    thick_line(surf, (x + math.cos(a) * sk * 0.6, y + math.sin(a) * sk * 0.6),
+                               (x + math.cos(a) * sk * 0.6 + math.cos(a + sg * 0.8) * sk * 0.3,
+                                y + math.sin(a) * sk * 0.6 + math.sin(a + sg * 0.8) * sk * 0.3),
+                               1.4, NOVA_COLOR2)
+        add_glow(surf, x, y, r * 0.8, NOVA_COLOR, 0.38 * fade)
 
 
 class ThrownKnife:
@@ -15884,85 +16323,156 @@ class ThrownKnife:
                     return
 
     def draw(self, surf, t):
+        """Gerçek bir FIRLATMA BIÇAĞI (v3.32): çelik ağız, sırt çizgisi,
+        pirinç balçak, sargılı sap ve arkasında hız izi."""
         ca, sa = math.cos(self.ang), math.sin(self.ang)
         nx, ny = -sa, ca
         x, y = self.x, self.y
-        taper_line(surf, [(x - ca * 30, y - sa * 30), (x - ca * 6, y - sa * 6)], 0.5, 3.0,
-                   scale_col(KNIFE_COLOR, 0.35))
-        blade = [(x + ca * 11, y + sa * 11), (x + nx * 2.6, y + ny * 2.6),
-                 (x - ca * 3, y - sa * 3), (x - nx * 2.6, y - ny * 2.6)]
+
+        def P(f, s_):
+            return (x + ca * f + nx * s_, y + sa * f + ny * s_)
+        taper_line(surf, [P(-46, 0), P(-12, 0)], 0.5, 4.0, scale_col(KNIFE_COLOR, 0.30))
+        thick_line(surf, P(-30, 3), P(-14, 1.5), 1.0, scale_col(KNIFE_COLOR2, 0.35))
+        thick_line(surf, P(-30, -3), P(-14, -1.5), 1.0, scale_col(KNIFE_COLOR2, 0.35))
+        blade = [P(16, 0), P(10, 3.4), P(0, 3.6), P(0, -2.6), P(10, -2.6)]
+        poly_aa(surf, [(px_ + 1, py_ + 1.5) for px_, py_ in blade], OUTLINE)
         poly_aa(surf, blade, KNIFE_COLOR)
-        thick_line(surf, (x - ca * 1, y - sa * 1), (x + ca * 9, y + sa * 9), 1.0, KNIFE_COLOR2)
-        thick_line(surf, (x - ca * 3 + nx * 4, y - sa * 3 + ny * 4),
-                   (x - ca * 3 - nx * 4, y - sa * 3 - ny * 4), 2.0, (120, 96, 70))
-        thick_line(surf, (x - ca * 3, y - sa * 3), (x - ca * 9, y - sa * 9), 2.4, (96, 70, 50))
+        poly_aa(surf, [P(15, 0.2), P(10, 3.0), P(1, 3.1), P(1, 1.0), P(10, 1.0)], (160, 172, 196))
+        thick_line(surf, P(1, -1.4), P(14, -0.4), 1.0, KNIFE_COLOR2)
+        thick_line(surf, P(0, 5.5), P(0, -4.5), 2.6, OUTLINE)
+        thick_line(surf, P(0, 5.0), P(0, -4.0), 1.8, (214, 170, 80))
+        thick_line(surf, P(-1, 0), P(-10, 0), 3.6, OUTLINE)
+        thick_line(surf, P(-1, 0), P(-10, 0), 2.6, (92, 62, 44))
+        for f in (-3.5, -6.5):
+            thick_line(surf, P(f, -1.6), P(f - 1, 1.6), 1.0, (60, 38, 26))
+        circle_aa(surf, *P(-11, 0), 1.8, (214, 170, 80))
 
 
-class LandMine:
-    """MAYIN TARLASI'nın mayını: kurulur, üstüne basılınca patlar."""
+class QuakeCharge:
+    """DEPREM: oyuncunun ayağının altında 1 sn biriken, sonra patlayan halka.
 
-    def __init__(self, x, y, dmg, radius, lvl):
-        self.x, self.y = x, y
-        self.dmg = dmg
+    Birikirken halka dışa doğru açılır, yerde çatlaklar uzar, toz kalkar;
+    süre dolunca BONK gibi patlar: içindeki her şey hasar alır, dışa itilir
+    ve sıradan yaratıklar bir an sersemler.
+    """
+
+    def __init__(self, p, radius, dmg, lvl):
+        self.p = p
+        self.x, self.y = p.x, p.y
         self.radius = radius
+        self.dmg = dmg
         self.lvl = max(1, int(lvl))
         self.t = 0.0
         self.boom_t = -1.0
         self.alive = True
+        rnd = random.Random()
+        # çatlaklar: her biri birkaç kırık parçalı bir çizgi
+        self.cracks = []
+        for i in range(9):
+            a = i * math.tau / 9 + rnd.uniform(-0.25, 0.25)
+            segs = []
+            for j in range(5):
+                segs.append((a + rnd.uniform(-0.22, 0.22), (j + 1) / 5.0))
+            self.cracks.append(segs)
+        self.rocks = [(rnd.uniform(0, math.tau), rnd.uniform(0.3, 1.0), rnd.uniform(2.5, 5.0))
+                      for _ in range(14)]
 
-    def trigger(self, run):
-        if self.boom_t >= 0:
-            return
+    def explode(self, run):
         self.boom_t = 0.0
+        stun = quake_stun(self.lvl)
         for e in run._all_targets():
             if not e.alive:
                 continue
             d = dist(self.x, self.y, e.x, e.y)
             if d <= self.radius + getattr(e, "radius", 12) * 0.5:
-                run._weapon_hit(e, self.dmg, kb=200, wlvl=self.lvl)
-        run.fx.shockwave(self.x, self.y, self.radius, MINE_COLOR, 0.35, 5)
-        run.fx.burst(self.x, self.y, MINE_COLOR2, n=14, speed=240, life=0.45, r=3.4)
-        run.fx.burst(self.x, self.y, (80, 70, 64), n=6, speed=120, life=0.5, r=3.6, gravity=180)
-        run.fx.shake(3.0, 0.10)
-        sfx("explosion", 0.30, 0.06)
+                # merkeze yakın olan biraz daha sert yer (en çok +%25)
+                k = 1.0 + 0.25 * (1.0 - clamp(d / max(1.0, self.radius), 0.0, 1.0))
+                run._weapon_hit(e, self.dmg * k, kb=QUAKE_KB, wlvl=self.lvl)
+                if hasattr(e, "apply_slow") and not getattr(e, "is_boss", False):
+                    e.apply_slow(0.25, stun)
+        run.fx.shockwave(self.x, self.y, self.radius, QUAKE_COLOR, 0.40, 7)
+        run.fx.shockwave(self.x, self.y, self.radius * 0.6, QUAKE_COLOR2, 0.30, 4)
+        run.fx.burst(self.x, self.y, QUAKE_ROCK, n=18, speed=260, life=0.6, r=4.2, gravity=320)
+        run.fx.burst(self.x, self.y, QUAKE_COLOR2, n=10, speed=200, life=0.35, r=3.0)
+        run.fx.shake(4.5, 0.16)
+        sfx("bonk", 0.45, 0.05)
 
     def update(self, dt, run):
         if self.boom_t >= 0:
             self.boom_t += dt
-            if self.boom_t > 0.35:
+            if self.boom_t > 0.45:
                 self.alive = False
             return
         self.t += dt
-        if self.t > MINE_LIFE:
-            self.trigger(run)
-            return
-        if self.t < MINE_ARM_T:
-            return
-        for e in run._all_targets():
-            if e.alive and dist(self.x, self.y, e.x, e.y) < MINE_TRIGGER_R + getattr(e, "radius", 12):
-                self.trigger(run)
-                return
+        # halka oyuncuyla yürür (pentagram gibi ayağının altında)
+        self.x, self.y = self.p.x, self.p.y
+        if self.t >= QUAKE_CHARGE_T:
+            self.explode(run)
+        elif random.random() < dt * 14:
+            a = random.uniform(0, math.tau)
+            rr = self.radius * (self.t / QUAKE_CHARGE_T) * random.uniform(0.5, 1.0)
+            run.fx.spark(self.x + math.cos(a) * rr, self.y + math.sin(a) * rr,
+                         QUAKE_ROCK, 0, -60, 0.4, 2.6)
 
     def draw(self, surf, t):
-        if self.boom_t >= 0:
-            q = clamp(self.boom_t / 0.35, 0.0, 1.0)
-            add_glow(surf, self.x, self.y, self.radius * (0.7 + 0.5 * q), MINE_COLOR, 0.9 * (1 - q))
-            return
-        armed = self.t >= MINE_ARM_T
         x, y = self.x, self.y
-        surf.blit(shadow_sprite(22), (int(x - 11), int(y + 3)))
-        for i in range(8):
-            a = i * math.tau / 8 + 0.2
-            thick_line(surf, (x + math.cos(a) * 7, y + math.sin(a) * 7),
-                       (x + math.cos(a) * 11, y + math.sin(a) * 11), 2.0, (70, 70, 80))
-        circle_aa(surf, x, y, 8.5, OUTLINE)
-        circle_aa(surf, x, y, 7.5, (92, 96, 108))
-        circle_aa(surf, x - 2, y - 2, 3.0, (140, 146, 160))
-        blink = armed and (math.sin(t * 9 + x * 0.1) > 0.2)
-        lc = MINE_COLOR if blink else scale_col(MINE_COLOR, 0.35)
-        circle_aa(surf, x, y, 2.6, lc)
-        if blink:
-            add_glow(surf, x, y, 12, MINE_COLOR, 0.55)
+        R = self.radius
+        if self.boom_t >= 0:
+            q = clamp(self.boom_t / 0.45, 0.0, 1.0)
+            fade = 1.0 - q
+            blit_disc(surf, x, y, R * (0.9 + 0.2 * q), QUAKE_COLOR, int(90 * fade))
+            pygame.draw.circle(surf, scale_col(QUAKE_COLOR2, 0.4 + 0.6 * fade), (int(x), int(y)),
+                               max(2, int(R * (0.95 + 0.25 * q))), max(1, int(6 * fade) + 1))
+            for segs in self.cracks:
+                px_, py_ = x, y
+                for (a, f) in segs:
+                    nx_, ny_ = x + math.cos(a) * R * f, y + math.sin(a) * R * f
+                    thick_line(surf, (px_, py_), (nx_, ny_), 3.4 * fade + 0.6,
+                               scale_col(QUAKE_COLOR2, 0.5 + 0.5 * fade))
+                    px_, py_ = nx_, ny_
+            add_glow(surf, x, y, R * 0.9, QUAKE_COLOR, 0.55 * fade)
+            return
+        k = clamp(self.t / QUAKE_CHARGE_T, 0.0, 1.0)
+        ek = ease_out_cubic(k)
+        r = R * (0.15 + 0.85 * ek)
+        pulse = 0.5 + 0.5 * math.sin(t * (10 + 18 * k))
+        # yerin kararan zemini + dolan iç halka
+        blit_disc(surf, x, y, R, (40, 26, 16), int(40 + 50 * k))
+        blit_disc(surf, x, y, r, QUAKE_COLOR, int(20 + 60 * k * (0.6 + 0.4 * pulse)))
+        # hedef sınır (patlayacağı yer) kesik çizgiyle
+        nd = 28
+        for i in range(nd):
+            if i % 2:
+                continue
+            a0 = i * math.tau / nd + t * 0.6
+            a1 = a0 + math.tau / nd
+            thick_line(surf, (x + math.cos(a0) * R, y + math.sin(a0) * R),
+                       (x + math.cos(a1) * R, y + math.sin(a1) * R), 2.0,
+                       scale_col(QUAKE_COLOR, 0.45 + 0.4 * k))
+        # büyüyen halka
+        pygame.draw.circle(surf, scale_col(QUAKE_COLOR2, 0.55 + 0.45 * pulse), (int(x), int(y)),
+                           max(2, int(r)), 3)
+        # çatlaklar merkezden dışa uzar
+        for segs in self.cracks:
+            px_, py_ = x, y
+            for (a, f) in segs:
+                if f > ek + 1e-6:
+                    break
+                nx_, ny_ = x + math.cos(a) * R * f, y + math.sin(a) * R * f
+                thick_line(surf, (px_, py_), (nx_, ny_), 2.6, (36, 22, 14))
+                thick_line(surf, (px_, py_), (nx_, ny_), 1.2,
+                           scale_col(QUAKE_COLOR2, 0.35 + 0.65 * k * pulse))
+                px_, py_ = nx_, ny_
+        # titreşen kaya parçaları (yer kalkıyor)
+        for (a, f, sz) in self.rocks:
+            if f > ek + 0.1:
+                continue
+            jx = math.sin(t * 40 + a * 7) * 1.6 * k
+            rx, ry = x + math.cos(a) * r * f + jx, y + math.sin(a) * r * f - 2 * k
+            circle_aa(surf, rx, ry + 1.5, sz, OUTLINE)
+            circle_aa(surf, rx, ry, sz, QUAKE_ROCK)
+            circle_aa(surf, rx - sz * 0.3, ry - sz * 0.3, sz * 0.45, (168, 136, 104))
+        add_glow(surf, x, y, r * 0.7, QUAKE_COLOR, 0.15 + 0.35 * k)
 
 
 # passive=True olan silahlar SÜREKLİ çalışır: bekleme süresi yoktur,
@@ -16163,10 +16673,10 @@ BOSS_WEAPONS = [
                            rq_stat("best_wave", 10, "10. dalgaya ulaş")])),
     # ---- v3.31 YENİ SİLAHLAR (2. paket) ----
     dict(key="hawk", name="ŞAHİN", icon="target", color=HAWK_COLOR,
-         cd=0.0, dmg=7.5, style=None, passive=True, dpl=0.060,
-         up="şahin daha sık dalar ve daha sert vurur — 8., 16. ve 23. seviyede bir şahin daha",
+         cd=0.0, dmg=9.5, style=None, passive=True, dpl=0.078,
+         up="şahin daha sık dalar ve daha sert vurur — 6., 13. ve 20. seviyede bir şahin daha",
          desc="Gökte süzülen şahin, menzildeki EN CANLI yaratığa (tank, elit, patron) "
-              "dalıp ağır vurur ve çevresini sarsar. 8., 16. ve 23. seviyede bir şahin "
+              "dalıp ağır vurur ve çevresini sarsar. 6., 13. ve 20. seviyede bir şahin "
               "daha katılır.",
          how="Göğün avcısı ol: toplam 8 patron devir.",
          unlock=dict(text="Toplam 8 patron devir",
@@ -16198,14 +16708,17 @@ BOSS_WEAPONS = [
          how="Tetiğe alış: toplam 20.000 mermi at.",
          unlock=dict(text="Toplam 20.000 mermi at",
                      reqs=[rq_stat("total_shots", 20000, "Toplam 20.000 mermi at")])),
-    dict(key="mines", name="MAYIN TARLASI", icon="target", color=MINE_COLOR,
-         cd=2.0, dmg=4.4, style=None, dpl=0.060,
-         up="daha çok mayın kurulur ve patlama alanı büyür",
-         desc="Durduğun yere mayın bırakır; üstüne basan yaratık havaya uçar. "
-              "Kaçarken arkanda tuzak bırak! 1. seviyede 4, 25. seviyede 10 mayın.",
-         how="Kaçmayı öğren: toplam 1.500 kez dash at.",
-         unlock=dict(text="Toplam 1.500 dash at",
-                     reqs=[rq_stat("total_dashes", 1500, "Toplam 1.500 kez dash at")])),
+    # DEPREM (v3.32): MAYIN TARLASI'nın yerine. Mayını açmış oyuncuda
+    # DEPREM de açık sayılır (SaveManager.owns_weapon).
+    dict(key="quake", name="DEPREM", icon="target", color=QUAKE_COLOR,
+         cd=2.0, dmg=3.4, style=None, dpl=0.060,
+         up="deprem alanı genişler ve daha sert patlar",
+         desc="Her 2 saniyede bir ayağının altında yer 1 saniye boyunca çatlayarak "
+              "birikir, sonra BONK gibi patlar: içindeki her şey hasar alır, "
+              "savrulur ve sersemler. Seviyeyle alanı ve hasarı büyür.",
+         how="Yeri sars: BONK ile toplam 3.000 düşmana vur.",
+         unlock=dict(text="BONK ile toplam 3.000 düşmana vur",
+                     reqs=[rq_stat("total_bonk_hits", 3000, "BONK ile toplam 3.000 düşmana vur")])),
 ]
 WEAPON_BY_KEY = {w["key"]: w for w in BOSS_WEAPONS}
 # Yetenek çubuğunda silahların hep aynı sırada görünmesi için.
@@ -21024,6 +21537,20 @@ WAVE_ACCEL_MAX = 1.10     # en fazla 2.1 kat hızlanır
 # ek düşman eklendiği).
 WAVE_ACCEL_EXTRA_AFTER = 26.0
 
+# v3.32 — "GİTTİKÇE DÜŞMANLAR BASİTLEŞİYOR". Ölçüm: geç arenada ekranda ~160
+# yaratık varken portaldan geçince cehennemin 1. dalgasında 2-18 yaratık
+# kalıyordu; doğum temposu (aralık, kalabalık tavanı, doğum başına sayı)
+# cehennemde 1. dalgadan YENİDEN başlıyordu ve ancak ~15 dalgada geri
+# geliyordu. Cehennem temposu artık arenanın sonundan devam eder:
+# cehennem 1 = arena 1 + HELL_TEMPO_OFFSET temposunda doğum.
+HELL_TEMPO_OFFSET = 20
+
+
+def spawn_tempo_wave(wave, biome):
+    """Doğum temposunun okunduğu dalga (cehennemde arenadan devam eder)."""
+    return int(wave) + (HELL_TEMPO_OFFSET if biome == "hell" else 0)
+
+
 # Arenada aynı anda yaşayabilecek AZAMİ düşman sayısı.
 # Dalga içi hızlanma, oyuncu düşmanları temizleyemediğinde sınırsız birikime
 # yol açabilirdi; bu da kare hızını (FPS) yere serer. Sınır dolduğunda yeni
@@ -21120,7 +21647,7 @@ class WaveManager:
         # --- skor tabanlı ilerleme ---
         self.wave_start_score = 0      # bu dalgaya girerken oyuncunun skoru
         self.wave_score = 0            # bu dalgada toplanan skor
-        self.wave_goal = wave_score_goal(1)
+        self.wave_goal = wave_score_goal(spawn_tempo_wave(1, biome))
         # v3.28: dalganın asgari süresi (bkz. wave_min_time)
         self.min_time = wave_min_time(1, diff, biome)
         # --- yoğunluk (surge) penceresi ---
@@ -21132,8 +21659,6 @@ class WaveManager:
         # RunState ile AYNI sözlük paylaşılır (cehenneme geçişte de taşınır).
         self.curses = {}
         # v3.31 DALGA OLAYI: RunState ayarlar (hız çarpanı, elit gecesi)
-        self.event_speed = 1.0
-        self.event_elite = False
 
     # Dünya ekrandan büyük olduğu için doğum noktasını RunState belirler
     # (kameranın hemen dışı). Atanmazsa eski davranışa (dünya kenarı) düşer.
@@ -21191,7 +21716,7 @@ class WaveManager:
         self.wave_time = 0.0
         self.wave_start_score = total_score
         self.wave_score = 0
-        self.wave_goal = wave_score_goal(new_wave)
+        self.wave_goal = wave_score_goal(spawn_tempo_wave(new_wave, self.biome))
         self.min_time = wave_min_time(new_wave, self.diff, self.biome)
         self.wave_duration = min(42 / self.pace, self.wave_duration + 1.1 / self.pace)
         # NEFES PAYI (v3.22): yoğunluk penceresi eskiden hedef dolduğu KAREDE
@@ -21314,7 +21839,8 @@ class WaveManager:
         # geç dalgalar hem gerçekten sertleşiyor hem de kare hızı sabit
         # kalıyor (yaratıklar hızlı doğuyor ama hızlı da ölüyor).
         # Sükûnet önce tükenir, yoğunluk penceresi ondan sonra işlemeye başlar.
-        base_interval = max(0.20, 1.15 - self.wave * 0.035) / (self.pace * SPAWN_RATE_TUNE)
+        tw = spawn_tempo_wave(self.wave, self.biome)
+        base_interval = max(0.20, 1.15 - tw * 0.035) / (self.pace * SPAWN_RATE_TUNE)
         if boss_time:
             # patron dövüşü uzasa da tempo artmaz; yalnızca yarı hız
             base_interval /= BOSS_SPAWN_RATE
@@ -21327,7 +21853,7 @@ class WaveManager:
         if self.spawn_timer <= 0:
             self.spawn_timer = base_interval
             # Kalabalık tavanı: arena tıkanmışsa bu turda yeni düşman doğmaz.
-            cap = max_alive_enemies(self.wave)
+            cap = max_alive_enemies(tw)
             if boss_time:
                 cap = max(6, int(cap * BOSS_CROWD_SHARE))
             # KALABALIK laneti: kalabalık tavanı büyür (v3.30)
@@ -21338,13 +21864,13 @@ class WaveManager:
                 return wave_changed
             # Geç dalgalarda yalnızca hasar değil, düşman YOĞUNLUĞU da artar —
             # maksimum eşyalı bir oyuncu bile kalabalığa yenik düşebilsin.
-            if self.wave < 3:
+            if tw < 3:
                 count = 1
-            elif self.wave < 6:
+            elif tw < 6:
                 count = 2
-            elif self.wave < 10:
+            elif tw < 10:
                 count = 3
-            elif self.wave < 16:
+            elif tw < 16:
                 count = 4
             else:
                 count = 5
@@ -21373,15 +21899,11 @@ class WaveManager:
                 if frenzy:
                     # KUDURMA laneti: yaratıklar daha hızlı
                     e_new.speed *= 1.0 + CURSE_FRENZY_SPD * frenzy
-                if self.event_speed != 1.0:
-                    e_new.speed *= self.event_speed      # KAN AYI olayı
                 enemies.append(e_new)
             elite_chance = 0.12 + min(0.28, self.wave * 0.008)
             if self.surge_active():
                 elite_chance += 0.10
-            if self.event_elite:
-                elite_chance += 0.25                    # ELİT GECESİ olayı
-            if (not boss_time and (self.wave % 5 == 0 or self.event_elite)
+            if (not boss_time and self.wave % 5 == 0
                     and random.random() < elite_chance):
                 x, y = self.spawn_pos()
                 if hell:
@@ -21678,7 +22200,7 @@ RUNCHK_DMG_BASE = 12.0          # 1. seviyedeki hasar çarpanı tavanı
 RUNCHK_DMG_PER_LEVEL = 4.3      # seviye başına eklenen pay
 RUNCHK_DMG_CAP = 2000.0         # mutlak tavan (taban hasarın katı)
 RUNCHK_HP_BASE = 800.0          # 1. seviyedeki azami can tavanı
-RUNCHK_HP_PER_LEVEL = 120.0
+RUNCHK_HP_PER_LEVEL = 170.0     # v3.32: Efsanevi Can kartı tek seferde +104 verir
 RUNCHK_HP_CAP = 400000.0
 RUNCHK_SPEED_BASE = 4.5         # 1. seviyedeki hız tavanı (taban hızın katı)
 RUNCHK_SPEED_PER_LEVEL = 0.52
@@ -21845,7 +22367,7 @@ class RunState:
         self.bats = []              # YARASA SÜRÜSÜ yarasaları
         self.novas = []             # AYAZ PATLAMASI görselleri
         self.knives = []            # BIÇAK YELPAZESİ bıçakları
-        self.mines = []             # MAYIN TARLASI mayınları
+        self.quakes = []            # DEPREM halkaları (v3.32)
         self.bat_heal_budget = 0.0  # yarasa iyileştirmesinin saniye kovası
         self.minion_t = 0.0         # minyonların ortak saati (yörünge fazı)
         self.wolf_howl_cd = 6.0     # v3.31: ilk sürü ulumasına kalan süre
@@ -21869,8 +22391,6 @@ class RunState:
         self.level_drops_total = 0  # bu koşuda düşen seviye taşı
         self.chests_opened = 0      # v3.29: açılan patron sandığı (ŞANS KİTABI görevi)
         self.reroll_bonus = 0       # v3.31: kitap kartından kazanılan bedava yenileme
-        self.wave_event = None      # v3.31: bu dalganın olayı (WAVE_EVENTS) ya da None
-        self.last_event = None
         self.goblins_caught = 0     # bu koşuda yakalanan hazine goblini
         # --- v3.30 LANETLİ SANDIK ---
         self.curses = {}            # kabul edilen lanetler {anahtar: seviye}
@@ -22112,7 +22632,7 @@ class RunState:
         self.bats.clear()
         self.novas.clear()
         self.knives.clear()
-        self.mines.clear()
+        self.quakes.clear()
         # Minyonlar (kılıç, kurt, şahin) oyuncuyla birlikte geçer.
         for mn in list(self.ghost_blades) + list(self.wolves) + list(self.hawks):
             mn.x, mn.y = ARENA_RECT.centerx, ARENA_RECT.centery
@@ -22138,7 +22658,6 @@ class RunState:
         self.waves.spawn_pos_fn = self.near_camera_point
         # Lanetler cehenneme de taşınır (aynı sözlük); mağara ağzı kalır arenada.
         self.waves.curses = self.curses
-        self._set_wave_event(None)          # arenadaki dalga olayı biter
         self.cursed_shrine = None
         self.cursed_seen_wave = 0
         self.cursed_next_wave = CURSED_FIRST_WAVE    # cehennemde de 2. dalgada
@@ -22460,7 +22979,7 @@ class RunState:
                 p.weapon_timers[key] = 0.0
                 continue
             self._fire_weapon(w, lvl, targets)
-            p.weapon_timers[key] = weapon_cooldown(w, lvl)
+            p.weapon_timers[key] = weapon_cooldown(w, lvl) / (1.0 + p.weapon_speed_bonus)
 
     def _weapon_hit(self, e, dmg, kb=90, crit=None, wlvl=None):
         """Silah vuruşunun ortak kapısı: kritik, infaz, kan emme, ölüm.
@@ -22783,7 +23302,7 @@ class RunState:
         """Su birikintileri, ateş halkaları, hortumlar, baltalar, kırbaçlar."""
         for lst_name in ("water_zones", "fire_rings", "tornados",
                          "flying_axes", "whip_lashes", "sword_slashes",
-                         "meteors", "beams", "bats", "novas", "knives", "mines"):
+                         "meteors", "beams", "bats", "novas", "knives", "quakes"):
             lst = getattr(self, lst_name)
             for obj in list(lst):
                 obj.update(dt, self)
@@ -22931,7 +23450,7 @@ class RunState:
             n_whip = weapon_count(lvl, "whip")
             reach = whip_reach(lvl)
             half_arc = whip_arc(lvl)
-            width = 9 + n_whip
+            width = 7.0 + 0.5 * n_whip        # v3.32: ince, gerçek bir kamçı
             total_hit = 0
             # 8 kırbaç x 20 düşman x 7 parçacık = 1120 parçacık; tavan 650.
             # Bu yüzden şaklama patlaması ATIŞ BAŞINA bütçelidir.
@@ -23161,13 +23680,10 @@ class RunState:
                                                a, dmg, knife_pierce(lvl), lvl))
             sfx("whip", 0.22, 0.04)
 
-        elif key == "mines":
-            # MAYIN TARLASI: ayağının dibine mayın; en eski fazlalık patlar.
-            self.mines.append(LandMine(p.x + random.uniform(-14, 14), p.y + random.uniform(-10, 14),
-                                       dmg, mine_radius(lvl), lvl))
-            live = [m for m in self.mines if m.boom_t < 0]
-            while len(live) > mine_max(lvl):
-                live.pop(0).trigger(self)
+        elif key == "quake":
+            # DEPREM: ayağının altında birikip patlayan halka.
+            self.quakes.append(QuakeCharge(p, quake_radius(lvl), dmg, lvl))
+            sfx("ice_step", 0.30, 0.08)
 
         elif key == "beam":
             # GÜNEŞ IŞINI: nişan yönünden başlayıp tam tur döner.
@@ -23703,12 +24219,6 @@ class RunState:
                                      * econ_wave_factor(self.waves.wave, self.biome, "gold"),
                                      self.biome)
         xp_gain = e.xp * econ_wave_factor(self.waves.wave, self.biome, "xp")
-        # DALGA OLAYLARI (v3.31)
-        ev = self.wave_event
-        if ev == "gold_rain" or (ev == "elite_night" and getattr(e, "kind", "") == "elite"):
-            coin_gain *= 2
-        elif ev == "blood_moon":
-            xp_gain *= EVENT_BLOOD_XP
         if getattr(e, "kind", "") == "goblin":
             self._goblin_loot(e)
         # Altın ARTIK ölüm anında verilmiyor: yere düşen parayı toplaman gerek.
@@ -24103,7 +24613,7 @@ class RunState:
                 and mini_boss_wave(self.waves.wave)):
             self.spawn_mini_boss()
         if wave_changed:
-            self._roll_wave_event()
+            self._roll_goblin()
         self._update_goblins()
 
         if self.coins_earned >= 1500 and self.ach:
@@ -24204,37 +24714,14 @@ class RunState:
         return e
 
     # ---------------- DALGA OLAYLARI + HAZİNE GOBLİNİ (v3.31) ----------------
-    def _set_wave_event(self, ev):
-        self.wave_event = ev
-        p = self.player
-        p.event_luck = EVENT_LUCK if ev == "lucky_wind" else 0.0
-        self.waves.event_speed = (1.0 + EVENT_BLOOD_SPEED) if ev == "blood_moon" else 1.0
-        self.waves.event_elite = (ev == "elite_night")
-
-    def _roll_wave_event(self):
-        """Dalga değişti: önceki olay biter, belki yenisi başlar."""
-        self._set_wave_event(None)
+    def _roll_goblin(self):
+        """Dalga değişti: arada bir HAZİNE GOBLİNİ çıkar (patron dalgası değilse)."""
         w = int(self.waves.wave)
-        if (w < WAVE_EVENT_MIN_WAVE or self.waves.boss_pending or self.waves.boss_active
+        if (w < GOBLIN_MIN_WAVE or self.waves.boss_pending or self.waves.boss_active
                 or self.waves.is_boss_wave(w)):
             return
         if random.random() < GOBLIN_CHANCE:
             self.spawn_goblin()
-        if random.random() >= WAVE_EVENT_CHANCE:
-            return
-        ev = random.choice([e for e in WAVE_EVENTS if e != self.last_event])
-        self.last_event = ev
-        self._set_wave_event(ev)
-        if ev == "treasure_hunt":
-            for _ in range(2):
-                self.spawn_goblin()
-        self.waves.announce_text = L("ev." + ev)
-        self.waves.announce_timer = 2.8
-        p = self.player
-        col = WAVE_EVENT_COLORS.get(ev, GOLD)
-        self.fx.popup(p.x, p.y - 80, L("ev." + ev + ".d"), col, 16, life=2.6)
-        self.fx.do_flash(col, 0.25)
-        sfx("wave", 0.7, 0.0)
 
     def spawn_goblin(self):
         x, y = self.near_camera_point()
@@ -24383,9 +24870,20 @@ class RunState:
         return offers
 
     def decline_curse(self):
-        """VAZGEÇ: teklifler kapanır, mağara yerinde kalır (sonra yine açılabilir)."""
-        if self.cursed_shrine is not None:
-            self.cursed_shrine.opened = False
+        """VAZGEÇ: teklifler kapanır ve MAĞARA ÇÖKER (v3.32).
+
+        Eskiden mağara yerinde kalıyordu; kapat-aç ile teklifler bedavaya
+        yeniden çekilebiliyordu. Artık her mağaraya yalnız bir kez bakılır.
+        """
+        sh = self.cursed_shrine
+        if sh is not None:
+            sh.opened = False
+            sh.used = True                      # çöküş animasyonu + sonraki sayaç
+            p = self.player
+            self.fx.popup(sh.x, sh.y - 70, L("cu.collapsed"), (200, 180, 220), 20, life=1.8)
+            self.fx.burst(sh.x, sh.y, (120, 100, 140), n=26, speed=180, life=0.7, r=4.0)
+            self.fx.shake(6, 0.3)
+            sfx("bonk", 0.5, 0.0)
         self.curse_offers = None
 
     def accept_curse(self, idx):
@@ -24529,9 +25027,9 @@ class RunState:
     def _book_offer(self, bk, lvl, is_new):
         """Seviye atlama kartı için KİTAP teklifi.
 
-        v3.31 KİTAPLARA ŞANS: normal kitap kartı da kademe çeker; kademe kaç
-        seviye verileceğini ve bedava yenileme hakkını belirler (BOOK_TIER_*).
-        Nadir kitap kartları kademe çekmez."""
+        v3.32 KİTAPLARDA NADİRLİK: normal kitap kartı kendi nadirliğini çeker
+        (şans yükseltir) ve kazancı o nadirliğe göre büyür (bkz. BOOK_GAINS).
+        Nadir kitap kartları nadirlik çekmez: etkileri sabittir."""
         rare = bool(bk.get("rare"))
         off = {
             "kind": "book", "key": bk["key"], "book": bk, "lvl": lvl, "new": is_new,
@@ -24539,12 +25037,10 @@ class RunState:
             "desc": bk_desc(bk), "rare": rare,
             "max": book_max_level(bk),
         }
-        if not rare:
+        if not rare and bk["key"] in BOOK_GAINS:
             tier = roll_rarity(self.player.eff_luck())
-            room = max(1, book_max_level(bk) - (lvl - 1))
             off["rarity"] = tier
-            off["levels"] = min(room, BOOK_TIER_LEVELS[tier])
-            off["bonus_reroll"] = BOOK_TIER_REROLL[tier]
+            off["gains"] = book_gain(bk["key"], tier, lvl)
         return off
 
     # ---------------- GİZLİ DENGE (anti-meta) ----------------
@@ -24796,15 +25292,7 @@ class RunState:
         p = self.player
         if ch["kind"] == "book":
             col = ch["color"]
-            lvl = p.take_book(ch["key"])
-            # v3.31: kademeli kitap kartı birden çok seviye verebilir.
-            for _ in range(max(0, int(ch.get("levels", 1)) - 1)):
-                nl = p.take_book(ch["key"]) if lvl > 0 else 0
-                if nl <= 0:
-                    break
-                lvl = nl
-            if lvl > 0 and ch.get("bonus_reroll"):
-                self.reroll_bonus += int(ch["bonus_reroll"])
+            lvl = p.take_book(ch["key"], int(ch.get("rarity") or 0))
             if lvl > 0 and ch.get("rarity"):
                 tier = int(ch["rarity"])
                 self.fx.popup(p.x, p.y - 40, rarity_name(tier), rarity_color(tier),
@@ -26653,7 +27141,7 @@ def draw_weapon_slots(surf, run, t):
             remain, total_cd = 0.0, 0.0
         else:
             remain = max(0.0, p.weapon_timers.get(key, 0.0))
-            total_cd = weapon_cooldown(w, lvl)
+            total_cd = weapon_cooldown(w, lvl) / (1.0 + getattr(p, "weapon_speed_bonus", 0.0))
         ready = (passive and not timed) or invis_now or remain <= 0.001 or total_cd <= 0
         frac = 0.0 if ready else clamp(remain / max(0.0001, total_cd), 0.0, 1.0)
         pulse = 0.5 + 0.5 * math.sin(t * 3.2 + i * 0.9)
@@ -27028,6 +27516,8 @@ def player_stat_groups(p, run):
         hayat.append((L("st.second"), f"{p.second_wind_charges}", GOLD))
     if p.thorns_level:
         hayat.append((L("st.thorns"), f"{p.thorns_level}", (170, 125, 90)))
+    if getattr(p, "evade_pts", 0) > 0:
+        hayat.append((L("bs.evade"), _pct(p.eff_evasion()), (200, 225, 255)))
 
     hasar = [
         (L("st.dmg"), _pct(dmg_r), (245, 120, 110)),
@@ -27040,6 +27530,8 @@ def player_stat_groups(p, run):
     ]
     if p.boss_hunter:
         hasar.append((L("st.bossdmg"), f"+{_pct(p.boss_hunter_bonus())}", (200, 90, 220)))
+    if getattr(p, "weapon_speed_bonus", 0) > 0:
+        hasar.append((L("bs.wspd"), "+" + _pct(p.weapon_speed_bonus), (120, 200, 255)))
     if p.execute_threshold > 0:
         hasar.append((L("st.execute"), _pct(p.execute_threshold), GOLD))
 
@@ -27229,20 +27721,6 @@ def draw_hud(surf, run, t):
         else:
             draw_text(surf, f"{fmt_num(min(w.wave_score, w.wave_goal))} / {fmt_num(w.wave_goal)}",
                       (VIRTUAL_W / 2, 64), 10, TEXT_DIM, center=True, shadow=False)
-    # DALGA OLAYI çipi (v3.31): zamanın solunda
-    ev = getattr(run, "wave_event", None)
-    if ev:
-        ecol = WAVE_EVENT_COLORS.get(ev, GOLD)
-        etxt = L("ev." + ev)
-        ew_ = text_width(etxt, 11, True) + 30
-        er_ = pygame.Rect(0, 0, ew_, 18)
-        er_.midright = (VIRTUAL_W / 2 - 70, 19)
-        es_ = pygame.Surface(er_.size, pygame.SRCALPHA)
-        pygame.draw.rect(es_, (*ecol, 50), es_.get_rect(), border_radius=9)
-        pygame.draw.rect(es_, (*ecol, 210), es_.get_rect(), width=1, border_radius=9)
-        surf.blit(es_, er_.topleft)
-        draw_icon(surf, er_.x + 11, er_.centery, WAVE_EVENT_ICONS.get(ev, "star"), ecol, 6)
-        draw_text(surf, etxt, (er_.x + 21, er_.y + 3), 11, lighten(ecol, 0.2), bold=True, shadow=False)
     # LANET rozeti (v3.30): kabul edilen lanetler ve skor çarpanı
     if getattr(run, "curse_score_bonus", 0) > 0:
         ctxt = L("cu.hud", "%.2f" % (1.0 + run.curse_score_bonus) if lang() != "tr"
@@ -27274,7 +27752,7 @@ def draw_hud(surf, run, t):
     if p.pierce_bonus: badges.append(("sword", RED, p.pierce_bonus))
     if p.multishot_level: badges.append(("star", PURPLE, p.multishot_level))
     if p.explosive_level: badges.append(("star", (240, 110, 60), p.explosive_level))
-    if p.vamp_level: badges.append(("heart", (220, 60, 90), p.vamp_level))
+    if p.vamp_level: badges.append(("heart", (220, 60, 90), max(1, int(round(p.vamp_level)))))
     if p.thorns_level: badges.append(("shield", (170, 125, 90), p.thorns_level))
     if p.chain_level: badges.append(("bolt", (120, 200, 255), p.chain_level))
     if p.homing_level: badges.append(("target", (140, 220, 200), p.homing_level))
@@ -27308,10 +27786,7 @@ def draw_hud(surf, run, t):
         alpha = int(255 * min(1, a * 2))
         scale_t = ease_out_cubic(1 - a)
         size = int(lerp(64, 44, scale_t))
-        _ev = getattr(run, "wave_event", None)
-        if _ev and run.waves.announce_text == L("ev." + _ev):
-            col = WAVE_EVENT_COLORS.get(_ev, GOLD)     # v3.31 dalga olayı
-        elif "PATRON" in run.waves.announce_text:
+        if "PATRON" in run.waves.announce_text:
             col = RED
         elif "YOĞUNLUK" in run.waves.announce_text:
             col = ORANGE
@@ -27445,9 +27920,8 @@ def draw_run(surf, run, t, aim_pos=None, shake=(0, 0)):
         for mt in run.meteors:
             if vis_far.collidepoint(mt.x, mt.y):
                 mt.draw_ground(world, t)
-        for mn in run.mines:
-            if vis_near.collidepoint(mn.x, mn.y):
-                mn.draw(world, t)
+        for qk in run.quakes:
+            qk.draw(world, t)
         for wz in run.water_zones:
             if vis_far.collidepoint(wz.x, wz.y):
                 wz.draw(world, t)
@@ -28117,11 +28591,20 @@ def draw_weapon_sigil(surf, cx, cy, r, key, col, t=0.0):
     elif key == "meteor":
         # ---------------- METEOR ----------------
         # Sağ üstten çapraz düşen, alev kuyruklu taş.
-        tail = [(cx + r * 0.85, cy - r * 0.85), (cx + r * 0.10, cy - r * 0.10)]
-        taper_line(surf, tail, max(1.2, r * 0.06), r * 0.42, scale_col(col, 0.55), col)
-        taper_line(surf, [(cx + r * 0.70, cy - r * 0.95), (cx + r * 0.05, cy - r * 0.25)],
-                   1.0, r * 0.18, lite)
-        add_glow(surf, cx - r * 0.12, cy + r * 0.12, r * 0.75, col, 0.35)
+        # v3.32: katmanlı ALEV kuyruğu (dünyadaki göktaşıyla aynı dil)
+        ux, uy = 0.707, -0.707
+        nx_, ny_ = 0.707, 0.707
+        bx, by = cx - r * 0.08, cy + r * 0.10
+        for sc_, fc in ((1.0, (226, 84, 34)), (0.72, (255, 150, 52)), (0.42, (255, 230, 150))):
+            w_ = r * 0.40 * sc_
+            Lt = r * 1.15 * sc_
+            fl = 0.92 + 0.08 * math.sin(t * 20 + sc_ * 5)
+            poly_aa(surf, [(bx + nx_ * w_, by + ny_ * w_),
+                           (bx + ux * Lt * fl + nx_ * w_ * 0.3, by + uy * Lt * fl + ny_ * w_ * 0.3),
+                           (bx + ux * Lt * 1.08 * fl, by + uy * Lt * 1.08 * fl),
+                           (bx + ux * Lt * fl - nx_ * w_ * 0.3, by + uy * Lt * fl - ny_ * w_ * 0.3),
+                           (bx - nx_ * w_, by - ny_ * w_)], fc)
+        add_glow(surf, cx - r * 0.12, cy + r * 0.12, r * 0.85, col, 0.45)
         rock = [(cx - r * 0.48, cy + r * 0.02), (cx - r * 0.22, cy - r * 0.30),
                 (cx + r * 0.16, cy - r * 0.22), (cx + r * 0.30, cy + r * 0.12),
                 (cx + r * 0.10, cy + r * 0.46), (cx - r * 0.34, cy + r * 0.42)]
@@ -28152,7 +28635,7 @@ def draw_weapon_sigil(surf, cx, cy, r, key, col, t=0.0):
     elif key == "hawk":
         # ---------------- ŞAHİN ----------------
         add_glow(surf, cx, cy, r * 0.9, col, 0.20)
-        draw_hawk_shape(surf, cx, cy + r * 0.05, -math.pi / 2, 0.6 * math.sin(t * 3), r / 20.0, col)
+        draw_hawk_shape(surf, cx, cy + r * 0.05, -math.pi / 2, 0.6 * math.sin(t * 3), r / 24.0, col)
 
     elif key == "bats":
         # ---------------- YARASA ----------------
@@ -28205,20 +28688,32 @@ def draw_weapon_sigil(surf, cx, cy, r, key, col, t=0.0):
                        max(1.5, r * 0.07), gold)
             thick_line(surf, (bx + ca * r * 0.28, by + sa * r * 0.28), (bx, by), max(1.5, r * 0.09), timber)
 
-    elif key == "mines":
-        # ---------------- MAYIN ----------------
-        for i in range(8):
-            a = i * math.tau / 8 + 0.2
-            thick_line(surf, (cx + math.cos(a) * r * 0.45, cy + math.sin(a) * r * 0.45),
-                       (cx + math.cos(a) * r * 0.80, cy + math.sin(a) * r * 0.80),
-                       max(1.5, r * 0.12), steel_d)
-        circle_aa(surf, cx, cy + r * 0.04, r * 0.56, OUTLINE)
-        circle_aa(surf, cx, cy, r * 0.50, steel_d)
-        disc_grad(surf, cx - r * 0.10, cy - r * 0.10, r * 0.40, steel, steel_d, 6)
-        blink = math.sin(t * 6) > 0
-        circle_aa(surf, cx, cy, r * 0.15, col if blink else scale_col(col, 0.4))
-        if blink:
-            add_glow(surf, cx, cy, r * 0.6, col, 0.5)
+    elif key == "quake":
+        # ---------------- DEPREM: çatlayan toprak + şok halkaları ----------------
+        pulse = 0.5 + 0.5 * math.sin(t * 5)
+        for i, rr in enumerate((0.92, 0.74)):
+            ph = (t * 0.8 + i * 0.5) % 1.0
+            pygame.draw.ellipse(surf, scale_col(col, 0.35 + 0.5 * (1 - ph)),
+                                pygame.Rect(int(cx - r * rr), int(cy + r * 0.05 - r * rr * 0.45),
+                                            int(2 * r * rr), int(r * rr * 0.9)), max(1, int(r * 0.07)))
+        slab = [(cx - r * 0.78, cy + r * 0.10), (cx - r * 0.30, cy - r * 0.22),
+                (cx + r * 0.42, cy - r * 0.18), (cx + r * 0.80, cy + r * 0.12),
+                (cx + r * 0.35, cy + r * 0.46), (cx - r * 0.45, cy + r * 0.42)]
+        poly_aa(surf, [(px_, py_ + r * 0.08) for px_, py_ in slab], OUTLINE)
+        poly_aa(surf, slab, (122, 96, 74))
+        poly_aa(surf, poly_inset(slab, 0.6, dx=-r * 0.04, dy=-r * 0.06), (160, 128, 96))
+        crack = [(cx - r * 0.05, cy - r * 0.22), (cx + r * 0.06, cy - r * 0.02),
+                 (cx - r * 0.08, cy + r * 0.12), (cx + r * 0.05, cy + r * 0.44)]
+        for a_, b_ in zip(crack, crack[1:]):
+            thick_line(surf, a_, b_, max(2.0, r * 0.13), (40, 24, 14))
+            thick_line(surf, a_, b_, max(1.0, r * 0.05), scale_col(col, 0.7 + 0.3 * pulse))
+        add_glow(surf, cx, cy + r * 0.1, r * 0.55, col, 0.25 + 0.25 * pulse)
+        for sg in (-1, 1):
+            for j in range(2):
+                bx_ = cx + sg * r * (0.30 + 0.25 * j)
+                by_ = cy - r * (0.40 + 0.22 * j)
+                circle_aa(surf, bx_, by_ - math.sin(t * 9 + j + sg) * r * 0.05, r * (0.10 - 0.02 * j),
+                          (140, 112, 86))
 
     else:
         draw_icon(surf, cx, cy, "star", col, int(r))
@@ -28389,8 +28884,8 @@ def weapon_stat_values(key, lvl):
         return [("cs.area", nova_radius(lvl), "px"), ("cs.freeze", nova_freeze(lvl), "s")]
     if key == "knives":
         return [("cs.knives", knife_count(lvl), "n"), ("cs.pierce", knife_pierce(lvl), "n")]
-    if key == "mines":
-        return [("cs.mines", mine_max(lvl), "n"), ("cs.area", mine_radius(lvl), "px")]
+    if key == "quake":
+        return [("cs.area", quake_radius(lvl), "px"), ("cs.stun", quake_stun(lvl), "s")]
     return [("cs.cd", weapon_cooldown(w, lvl), "s")]
 
 
@@ -28426,6 +28921,26 @@ def weapon_card_rows(p, w, lvl_to, bonus):
         b = old.get(k)
         rows.append((L(k), None if b is None else fmt_stat(b[0], kd), fmt_stat(v, kd)))
     return rows[:3]
+
+
+def fmt_book_stat(v, kind):
+    if kind == "int":
+        return "%d" % int(round(v))
+    if kind == "rate":
+        t = "%.2f" % v
+        t = t.replace(".", ",") if lang() == "tr" else t
+        return t + L("cs.per_sec")
+    return fmt_pct1(v)
+
+
+def book_card_rows(p, ch):
+    """Kitap kartının satırları: [(etiket, önce, sonra)] — en fazla 2 satır."""
+    rows = []
+    for stat, amt in ch.get("gains", ())[:2]:
+        b, kind = p.book_stat_view(stat)
+        a, _k = p.book_stat_view(stat, amt)
+        rows.append((L("bs." + stat), fmt_book_stat(b, kind), fmt_book_stat(a, kind)))
+    return rows
 
 
 _LU_BG_CACHE = {}
@@ -28551,11 +29066,10 @@ def draw_levelup_card(surf, r2, ch, run, t, hover):
         pill = L("lu.new_weapon") if ch["new"] else L("lu.lvl_up", ch["lvl"] - 1, ch["lvl"])
     else:
         mx = ch.get("max", BOOK_MAX_LEVEL)
-        gain = max(1, int(ch.get("levels", 1)))
-        if ch.get("new") and gain <= 1:
+        if ch.get("new"):
             pill = L("lu.new_book_pill")
         else:
-            pill = L("lu.lvl_up", ch["lvl"] - 1, min(mx, ch["lvl"] - 1 + gain))
+            pill = L("lu.lvl_up", ch["lvl"] - 1, ch["lvl"])
         if not rare_book:
             pill += "  /" + str(mx)
     pw_ = text_width(pill, 11, True) + 18
@@ -28596,19 +29110,30 @@ def draw_levelup_card(surf, r2, ch, run, t, hover):
                     else L("ui.boost_capped"))
             draw_text(surf, btxt, (r2.centerx, box.bottom + 12), 12,
                       lighten(rarity_color(tier_i), 0.1), bold=True, center=True, shadow=False)
+    elif ch.get("gains"):
+        # v3.32 KİTAP: nadirliğe göre kazanç, "önce → sonra" satırları
+        rows = book_card_rows(p, ch)
+        up_col = lighten(rarity_color(tier_i), 0.15) if tier_i >= 1 else GREEN
+        y = box.y + 9 + (14 if len(rows) == 1 else 0)
+        for lbl, before, after in rows:
+            draw_text(surf, lbl, (box.x + 10, y), 13, (176, 182, 204), shadow=False)
+            xr = box.right - 10
+            draw_text(surf, after, (xr, y - 1), 15, up_col, bold=True, right=True, shadow=False)
+            xr -= text_width(after, 15, True) + 6
+            draw_text(surf, "→", (xr, y), 13, (120, 126, 150), right=True, shadow=False)
+            xr -= text_width("→", 13) + 5
+            draw_text(surf, before, (xr, y), 13, (140, 146, 170), right=True, shadow=False)
+            y += 27
+        for i, ln in enumerate(wrap_text(ch["desc"], 11, box.w - 18)[:1]):
+            draw_text(surf, ln, (box.centerx, box.bottom - 16), 11, (150, 156, 180),
+                      center=True, shadow=False)
+        draw_text(surf, L("lu.book_note"), (r2.centerx, box.bottom + 12), 11,
+                  lighten(rarity_color(tier_i), 0.1) if tier_i >= 1 else (170, 176, 196),
+                  bold=True, center=True, shadow=False)
     else:
         for i, ln in enumerate(wrap_text(ch["desc"], 13, box.w - 18)[:4]):
             draw_text(surf, ln, (box.centerx, box.y + 18 + i * 20), 13, (196, 200, 220),
                       center=True, shadow=False)
-        if tiered:
-            # KİTAP KADEMESİ: kaç seviye ve varsa bedava yenileme
-            gain = max(1, int(ch.get("levels", 1)))
-            btxt = L("lu.book_gain", gain)
-            if ch.get("bonus_reroll"):
-                btxt += "  ·  " + L("lu.book_reroll")
-            draw_text(surf, btxt, (r2.centerx, box.bottom + 12), 12,
-                      lighten(rarity_color(tier_i), 0.15) if tier_i >= 1 else (190, 196, 214),
-                      bold=True, center=True, shadow=False)
 
     # ---- Efsanevi: kayan parıltı + yıldızcıklar ----
     if tiered and tier_i >= 4:
@@ -28712,30 +29237,13 @@ GHOST_PHASE_T = 1.1             # dokunulmaz süre
 RAISED_COLOR = (214, 210, 186)
 
 # =====================================================================
-# DALGA OLAYLARI ve HAZİNE GOBLİNİ (v3.31) — "her koşu aynı akmasın"
-# ---------------------------------------------------------------------
-# 3. dalgadan sonra her dalga başında (patron dalgaları hariç) WAVE_EVENT_CHANCE
-# olasılıkla o dalgaya özel bir OLAY çıkar. Olay dalga bitince biter:
-#   ALTIN YAĞMURU : yaratıklar iki kat altın düşürür.
-#   KAN AYI       : yaratıklar %25 hızlı, tecrübe +%40.
-#   ELİT GECESİ   : elitler her dalgada ve çok daha sık gelir, iki kat altın.
-#   ŞANS RÜZGÂRI  : bu dalga boyunca Şans +%75.
-#   HAZİNE AVI    : hazine goblinleri gelir.
-# HAZİNE GOBLİNİ: arada bir ortaya çıkıp oyuncudan KAÇAN, sırtında çuval
-# taşıyan bir yaratık. Vurmaz; WAVE_GOBLIN_LIFE saniye içinde yakalanmazsa
+# HAZİNE GOBLİNİ (v3.31): arada bir ortaya çıkıp oyuncudan KAÇAN, sırtında
+# çuval taşıyan bir yaratık. Vurmaz; GOBLIN_LIFE saniye içinde yakalanmazsa
 # kaçar. Devrilirse altın saçar ve ŞANSA göre bir ganimet verir: bedava
 # yenileme, mıknatıs, seviye taşı ya da patron sandığı.
+# (v3.32: v3.31'in DALGA OLAYLARI oyunu bozduğu için tamamen kaldırıldı.)
 # =====================================================================
-WAVE_EVENT_CHANCE = 0.30
-WAVE_EVENT_MIN_WAVE = 3
-WAVE_EVENTS = ("gold_rain", "blood_moon", "elite_night", "lucky_wind", "treasure_hunt")
-WAVE_EVENT_COLORS = {"gold_rain": GOLD, "blood_moon": (235, 60, 80), "elite_night": (232, 186, 90),
-                     "lucky_wind": GREEN, "treasure_hunt": (120, 210, 90)}
-WAVE_EVENT_ICONS = {"gold_rain": "coin", "blood_moon": "drop", "elite_night": "skull",
-                    "lucky_wind": "horseshoe", "treasure_hunt": "gem"}
-EVENT_BLOOD_SPEED = 0.25
-EVENT_BLOOD_XP = 1.40
-EVENT_LUCK = 0.75
+GOBLIN_MIN_WAVE = 3
 GOBLIN_CHANCE = 0.18            # dalga başına goblin olasılığı (3. dalgadan)
 GOBLIN_LIFE = 22.0              # yakalanmazsa kaçtığı süre
 GOBLIN_COLOR = (120, 210, 90)
@@ -28998,6 +29506,8 @@ class CurseOverlay:
         panel(surf, self.btn_leave, bg=(40, 30, 50) if hl else (24, 20, 32),
               edge=lighten(CURSE_COLOR, 0.2) if hl else (90, 70, 110), alpha=240, radius=12, edge_w=2)
         draw_text(surf, L("cu.leave"), self.btn_leave.center, 17, TEXT, bold=True, center=True)
+        draw_text(surf, L("cu.once"), (self.btn_leave.centerx, self.btn_leave.bottom + 12), 12,
+                  (255, 120, 140), center=True)
         if hl and clicked and result is None:
             result = ("leave", None)
         return result

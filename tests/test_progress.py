@@ -57,10 +57,10 @@ def test_new_weapons_owned():
     old["weapons_owned"] = ["axe"]
     new = srv._blank_progress()
     new["weapons_owned"] = ["axe", "ghost_swords", "wolves", "tesla", "meteor", "beam",
-                            "hawk", "bats", "nova", "knives", "mines"]
+                            "hawk", "bats", "nova", "knives", "quake"]
     out = srv._merge_progress(old, new)
     for k in ("ghost_swords", "wolves", "tesla", "meteor", "beam",
-              "hawk", "bats", "nova", "knives", "mines"):
+              "hawk", "bats", "nova", "knives", "quake"):
         assert k in out["weapons_owned"]
 
 

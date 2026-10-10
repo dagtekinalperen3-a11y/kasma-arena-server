@@ -148,11 +148,12 @@ def test_levelup_flow():
                 assert "rarity" in c and abs(c["boost"] - K.rarity_boost(c["rarity"], "card")) < 1e-9
                 seen_tiers.add(c["rarity"])
             else:
-                # v3.31: nadir olmayan kitaplar da kademe çeker (+seviye, bedava yenileme)
-                if "rarity" in c:
+                # v3.32: normal kitap kartı nadirlik çeker; kazanç nadirliğe göre
+                if c.get("rare"):
+                    assert "rarity" not in c and "gains" not in c
+                else:
                     r = c["rarity"]
-                    assert 1 <= c.get("levels", 1) <= K.BOOK_TIER_LEVELS[r]
-                    assert c.get("bonus_reroll", 0) == K.BOOK_TIER_REROLL[r]
+                    assert c["gains"] == K.book_gain(c["key"], r, c["lvl"])
         # varsa yükseltme kartını seç
         idx = next((i for i, c in enumerate(run.levelup_choices)
                     if c["kind"] == "weapon" and not c["new"]), 0)
@@ -218,14 +219,19 @@ def test_rare_book_weight_luck():
 
 def test_luck_content():
     p = K.Player("default")
+    base = dict(K.BOOK_GAINS["r_luck"])["luck"]
     for _ in range(3):
-        p.take_book("r_luck")
-    assert abs(p.eff_luck() - 3 * 0.075) < 1e-9
-    assert K.book_max_level("r_luck") == 30                # v3.31: 30'a kadar
+        p.take_book("r_luck")                               # Yaygın kart
+    assert abs(p.eff_luck() - 3 * base) < 1e-9
+    assert K.book_max_level("r_luck") == 30
     for _ in range(12):
         p.take_book("r_luck")
     # 10'dan sonrası azalan getirili
-    assert abs(p.eff_luck() - (10 * 0.075 + 5 * K.LUCK_BOOK_LATE)) < 1e-9
+    assert abs(p.eff_luck() - (10 * base + 5 * base * K.LUCK_BOOK_LATE_K)) < 1e-9
+    # Efsanevi kart Yaygın'ın 8 katı verir
+    q2 = K.Player("default")
+    q2.take_book("r_luck", 4)
+    assert abs(q2.eff_luck() - base * K.BOOK_RARITY_MULT[4]) < 1e-9
     q = K.Player("default")
     assert q.take_book("r_clover") == 1
     assert abs(q.eff_luck() - K.CLOVER_LUCK_ON_TAKE) < 1e-9          # v3.31: %60
@@ -386,20 +392,109 @@ def test_v331_reroll_goblin_cave():
     finally:
         K.roll_rarity = orig
     assert run.goblins_caught == 5 and run.reroll_bonus >= 1
-    # dalga olayları açılıp kapanır
-    for ev in K.WAVE_EVENTS:
-        run._set_wave_event(ev)
-    run._set_wave_event(None)
-    assert run.player.event_luck == 0 and run.waves.event_speed == 1.0
+    # v3.32: dalga olayları tamamen kaldırıldı
+    assert not hasattr(K, "WAVE_EVENTS") and not hasattr(run, "wave_event")
     # mağara sessiz yerleşir, ekranda değildir
     run.spawn_cursed_shrine()
     sh = run.cursed_shrine
     assert not sh.discovered
     assert K.dist(sh.x, sh.y, run.player.x, run.player.y) > 600
-    for key in ("cu.found", "cu.found_sub", "cu.map_label", "ev.gold_rain", "fx.goblin",
-                "w.hawk.name", "w.bats.name", "w.nova.name", "w.knives.name", "w.mines.name"):
+    for key in ("cu.found", "cu.found_sub", "cu.map_label", "fx.goblin", "cu.once", "cu.collapsed",
+                "w.hawk.name", "w.bats.name", "w.nova.name", "w.knives.name", "w.quake.name",
+                "w.quake.desc", "b.r_wspd.name", "b.r_evade.desc", "bs.dmg", "bs.evade", "fx.evade"):
         row = K.STRINGS[key]
         assert len(row) == 5 and all(row), key
+
+
+def test_v332_books_cave_quake():
+    # --- kitap kazancı nadirliğe göre; nadir kitaplar sabit ---
+    for key in K.BOOK_GAINS:
+        assert key in K.BOOK_BY_KEY and not K.BOOK_BY_KEY[key].get("rare"), key
+        g0 = dict(K.book_gain(key, 0, 1))
+        g4 = dict(K.book_gain(key, 4, 1))
+        for st in g0:
+            assert g4[st] > g0[st], (key, st)
+    for b in K.BOOKS:
+        if not b.get("rare"):
+            assert b["key"] in K.BOOK_GAINS, b["key"]
+            # kitaplıkta yüzdeli/sayılı açıklama yok
+            for lang in K.LANG_CODES:
+                K.set_lang(lang)
+                d = K.bk_desc(b)
+                assert "%" not in d and not any(ch.isdigit() for ch in d.replace("5'e", "").replace("3+", "").replace("3 ", "")), (b["key"], d)
+            K.set_lang("tr")
+    p = K.Player("default")
+    d0 = p.run_dmg_mult
+    p.take_book("r_dmg", 0)
+    assert abs(p.run_dmg_mult - d0 - 0.05) < 1e-9
+    p.take_book("r_dmg", 4)
+    assert abs(p.run_dmg_mult - d0 - 0.05 - 0.40) < 1e-9           # Efsanevi +%40
+    assert abs(p.book_totals["dmg"] - 0.45) < 1e-9
+    # geç seviyeler (16+) yarı güç
+    for _ in range(14):
+        p.take_book("r_dmg", 0)
+    tot = p.book_totals["dmg"]
+    p.take_book("r_dmg", 0)                                        # 17. seviye
+    assert abs(p.book_totals["dmg"] - tot - 0.05 * K.BOOK_LATE_K) < 1e-9
+    # kaçınma: darbeden sıyrılır, tavanı var
+    e = K.Player("default")
+    for _ in range(30):
+        e.take_book("r_evade", 4)
+    assert 0.3 < e.eff_evasion() < 0.37
+    fx = K.EffectSystem()
+    random.seed(3)
+    dodged = 0
+    for _ in range(400):
+        e.hp = e.max_hp
+        if e.take_damage(1, fx) == 0:
+            dodged += 1
+    assert 80 < dodged < 190, dodged
+    # soğuma: silah bekleme kısalır
+    run = _run()
+    run.player.weapons = {"tesla": 3}
+    run.player.weapon_speed_bonus = 0.5
+    w = K.WEAPON_BY_KEY["tesla"]
+    assert K.weapon_cooldown(w, 3) / 1.5 < K.weapon_cooldown(w, 3)
+    # kitap kartı çizimi (5 dil) çökmesin
+    surf = pygame.Surface((K.VIRTUAL_W, K.VIRTUAL_H))
+    run.pending_levelups = 1
+    run.start_levelup_choice()
+    for lang in K.LANG_CODES:
+        K.set_lang(lang)
+        for key in ("r_dmg", "r_hp", "r_regen", "r_mag", "r_pierce", "r_swarm"):
+            o = run._book_offer(K.BOOK_BY_KEY[key], 1, True)
+            K.draw_levelup_card(surf, pygame.Rect(100, 100, 270, 330), o, run, 1.0, True)
+    K.set_lang("tr")
+
+    # --- mağara: vazgeçince ÇÖKER, bir daha açılmaz ---
+    run = _run()
+    run.spawn_cursed_shrine()
+    sh = run.cursed_shrine
+    run.open_cursed()
+    assert run.curse_offers
+    run.decline_curse()
+    assert run.curse_offers is None and sh.used and not sh.in_range(run.player)
+
+    # --- DEPREM: birikir, sonra patlar ---
+    run = _run()
+    p = run.player
+    p.weapons = {"quake": 5}
+    e = K.Enemy("tank", p.x + 60, p.y, 1.0, wave=5)
+    run.enemies.append(e)
+    hp0 = e.hp
+    qk = K.QuakeCharge(p, K.quake_radius(5), 10.0, 5)
+    run.quakes.append(qk)
+    for _ in range(20):
+        qk.update(1 / 60, run)
+    assert e.hp == hp0 and qk.boom_t < 0                          # henüz birikiyor
+    for _ in range(50):
+        qk.update(1 / 60, run)
+    assert e.hp < hp0                                             # patladı
+    # MAYIN kaldırıldı; eski kayıtta mayını olan DEPREM'i açık bulur
+    assert "mines" not in K.WEAPON_BY_KEY
+    sv = _save(weapons_owned=["axe", "mines"])
+    assert sv.owns_weapon("quake")
+
 
 if __name__ == "__main__":
     print("roll_rarity dağılımı (20.000 çekiliş):")
