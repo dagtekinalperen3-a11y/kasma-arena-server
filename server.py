@@ -791,7 +791,8 @@ def _merge_mastery(old, new, gems_spent):
 PROGRESS_STATS = ("runs", "best_score", "total_kills", "total_time", "bosses",
                   "best_wave", "total_shots", "total_gold", "total_lifesteal",
                   "best_run_gold", "best_run_dashes", "best_run_shots",
-                  "total_bonk_hits", "total_chests", "total_cursed", "best_curse")
+                  "total_bonk_hits", "total_chests", "total_cursed", "best_curse",
+                  "total_goblins")
 
 
 
