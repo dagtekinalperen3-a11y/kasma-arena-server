@@ -791,7 +791,7 @@ def _merge_mastery(old, new, gems_spent):
 PROGRESS_STATS = ("runs", "best_score", "total_kills", "total_time", "bosses",
                   "best_wave", "total_shots", "total_gold", "total_lifesteal",
                   "best_run_gold", "best_run_dashes", "best_run_shots",
-                  "total_bonk_hits", "total_chests")
+                  "total_bonk_hits", "total_chests", "total_cursed", "best_curse")
 
 
 
@@ -1374,8 +1374,15 @@ REQUIRE_SIGNATURE = os.environ.get("KASMA_REQUIRE_SIG", "1") == "1"
 # Hepsi oyunun kendi eğrilerinden türetildi ve dürüst bir oyuncunun asla
 # takılmayacağı kadar geniş bırakıldı.
 MAX_SCORE_PER_KILL = 900.0     # bir öldürmeden çıkabilecek en yüksek skor
-MAX_SCORE_PER_SEC = 4000.0     # saniyede üretilebilecek en yüksek skor
-MAX_KILLS_PER_SEC = 25.0       # saniyede devrilebilecek en çok yaratık
+# v3.30 — LANETLİ SANDIK: kabul edilen lanetler skor kazancını en çok x2,5
+# büyütüyor (CURSE_SCORE_ROOM) ve sahaya daha çok yaratık getiriyor
+# (bölünenler, kalabalık). Sunucu laneti göremediği için sınırlar o kadar
+# genişletildi; yoksa lanetli DÜRÜST bir koşu "imkânsız skor" sayılıp hesap
+# kalıcı olarak yasaklanırdı. Ölçüm (başsız bot, bütün lanetler, kabus,
+# 30 dk): saniyede 18 öldürme, 1.307 skor, dalga-hedef oranı eski sınırın 0,81'i.
+CURSE_SCORE_ROOM = 2.5
+MAX_SCORE_PER_SEC = 6000.0     # saniyede üretilebilecek en yüksek skor
+MAX_KILLS_PER_SEC = 45.0       # saniyede devrilebilecek en çok yaratık
 MIN_RUN_TIME = 5.0             # bundan kısa bir koşu skor üretemez
 MAX_RUN_TIME = 6 * 3600.0      # 6 saatten uzun koşu kabul edilmez
 MAX_WAVE = 400
@@ -1576,7 +1583,7 @@ def score_is_plausible(name, score, kills, wave, run_time):
     # hedefler küçük olduğu için bu denetim yanlış pozitif verebiliyor.
     if score >= SCORE_FLOOR:
         goal_sum = sum(_wave_goal(w) for w in range(1, int(wave) + 2))
-        if score > goal_sum * 2.5 + SCORE_FLOOR + run_time * SCORE_TIME_SLACK:
+        if score > (goal_sum * 2.5 + SCORE_FLOOR + run_time * SCORE_TIME_SLACK) * CURSE_SCORE_ROOM:
             return False, "skor ulaşılan dalgaya göre imkânsız"
     return True, ""
 
