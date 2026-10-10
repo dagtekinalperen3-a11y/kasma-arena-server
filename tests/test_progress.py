@@ -33,10 +33,12 @@ def test_new_stats_merge():
     old = srv._blank_progress()
     old["stats"] = {"total_chests": 4, "total_cursed": 1}
     new = srv._blank_progress()
-    new["stats"] = {"total_chests": 9, "total_cursed": 3, "best_curse": 2, "runs": 5}
+    new["stats"] = {"total_chests": 9, "total_cursed": 3, "best_curse": 2, "runs": 5,
+                    "total_goblins": 7}
     out = srv._merge_progress(old, new)
     st = out["stats"]
     assert st["total_chests"] == 9 and st["total_cursed"] == 3 and st["best_curse"] == 2
+    assert st["total_goblins"] == 7                     # v3.31
     # geri gitmez
     back = srv._blank_progress()
     back["stats"] = {"total_chests": 1}
@@ -54,9 +56,11 @@ def test_new_weapons_owned():
     old = srv._blank_progress()
     old["weapons_owned"] = ["axe"]
     new = srv._blank_progress()
-    new["weapons_owned"] = ["axe", "ghost_swords", "wolves", "tesla", "meteor", "beam"]
+    new["weapons_owned"] = ["axe", "ghost_swords", "wolves", "tesla", "meteor", "beam",
+                            "hawk", "bats", "nova", "knives", "mines"]
     out = srv._merge_progress(old, new)
-    for k in ("ghost_swords", "wolves", "tesla", "meteor", "beam"):
+    for k in ("ghost_swords", "wolves", "tesla", "meteor", "beam",
+              "hawk", "bats", "nova", "knives", "mines"):
         assert k in out["weapons_owned"]
 
 

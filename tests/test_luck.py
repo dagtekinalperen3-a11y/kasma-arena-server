@@ -148,7 +148,11 @@ def test_levelup_flow():
                 assert "rarity" in c and abs(c["boost"] - K.rarity_boost(c["rarity"], "card")) < 1e-9
                 seen_tiers.add(c["rarity"])
             else:
-                assert "rarity" not in c                     # kitaplarda kademe yok
+                # v3.31: nadir olmayan kitaplar da kademe çeker (+seviye, bedava yenileme)
+                if "rarity" in c:
+                    r = c["rarity"]
+                    assert 1 <= c.get("levels", 1) <= K.BOOK_TIER_LEVELS[r]
+                    assert c.get("bonus_reroll", 0) == K.BOOK_TIER_REROLL[r]
         # varsa yükseltme kartını seç
         idx = next((i for i, c in enumerate(run.levelup_choices)
                     if c["kind"] == "weapon" and not c["new"]), 0)
@@ -217,12 +221,17 @@ def test_luck_content():
     for _ in range(3):
         p.take_book("r_luck")
     assert abs(p.eff_luck() - 3 * 0.075) < 1e-9
-    assert K.book_max_level("r_luck") == 10
+    assert K.book_max_level("r_luck") == 30                # v3.31: 30'a kadar
+    for _ in range(12):
+        p.take_book("r_luck")
+    # 10'dan sonrası azalan getirili
+    assert abs(p.eff_luck() - (10 * 0.075 + 5 * K.LUCK_BOOK_LATE)) < 1e-9
     q = K.Player("default")
     assert q.take_book("r_clover") == 1
-    assert abs(q.eff_luck() - 0.40) < 1e-9
+    assert abs(q.eff_luck() - K.CLOVER_LUCK_ON_TAKE) < 1e-9          # v3.31: %60
     q.gain_xp(10 ** 6)
-    assert abs(q.eff_luck() - (0.40 + 0.015 * (q.level - 1))) < 1e-6
+    assert abs(q.eff_luck() - (K.CLOVER_LUCK_ON_TAKE
+                               + K.CLOVER_LUCK_PER_LEVEL * (q.level - 1))) < 1e-6
     # market
     s = K.Player("default")
     for key in ("core_luck", "lucky_coin", "gambler_dice"):
@@ -347,6 +356,50 @@ def test_score_checks_with_boosts():
     p.run_luck_bonus = 3.0
     assert K.run_integrity_check(run) is None
 
+
+
+def test_v331_reroll_goblin_cave():
+    run = _run()
+    # yenileme ucuzladı: bedavalardan sonra 40, 50, 70 ...
+    run.reroll_used = run.REROLL_FREE
+    assert run.reroll_cost() == 40
+    run.reroll_used = run.REROLL_FREE + 4
+    assert run.reroll_cost() < 150
+    # kitap kartından kazanılan bedava hak önce harcanır
+    run.pending_levelups = 1
+    run.start_levelup_choice()
+    run.reroll_bonus = 1
+    assert run.reroll_cost() == 0
+    used = run.reroll_used
+    ok, _msg = run.reroll_levelup()
+    assert ok and run.reroll_bonus == 0 and run.reroll_used == used
+    # hazine goblini: ganimet her kademede çökmeden
+    run.waves.wave = 8
+    run.spawn_goblin()
+    g = next(e for e in run.enemies if e.kind == "goblin")
+    assert g.contact_dps == 0
+    orig = K.roll_rarity
+    try:
+        for t in range(5):
+            K.roll_rarity = lambda luck, rnd=random, t=t: t
+            run._goblin_loot(g)
+    finally:
+        K.roll_rarity = orig
+    assert run.goblins_caught == 5 and run.reroll_bonus >= 1
+    # dalga olayları açılıp kapanır
+    for ev in K.WAVE_EVENTS:
+        run._set_wave_event(ev)
+    run._set_wave_event(None)
+    assert run.player.event_luck == 0 and run.waves.event_speed == 1.0
+    # mağara sessiz yerleşir, ekranda değildir
+    run.spawn_cursed_shrine()
+    sh = run.cursed_shrine
+    assert not sh.discovered
+    assert K.dist(sh.x, sh.y, run.player.x, run.player.y) > 600
+    for key in ("cu.found", "cu.found_sub", "cu.map_label", "ev.gold_rain", "fx.goblin",
+                "w.hawk.name", "w.bats.name", "w.nova.name", "w.knives.name", "w.mines.name"):
+        row = K.STRINGS[key]
+        assert len(row) == 5 and all(row), key
 
 if __name__ == "__main__":
     print("roll_rarity dağılımı (20.000 çekiliş):")
