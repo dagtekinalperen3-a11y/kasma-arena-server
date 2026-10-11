@@ -555,6 +555,204 @@ def test_v333_crash_trims_mutes():
     K.set_lang("tr")
 
 
+_NOINP = {"left": 0, "right": 0, "up": 0, "down": 0, "mouse_down": False}
+
+
+def test_v334_maps_and_draft():
+    # --- HARİTALAR: kural uygulanır, değişince geri alınır, cehennemde biter
+    run = _run()
+    xp0, coin0 = run.player.run_xp_mult, run.player.run_coin_mult
+    run.set_map_theme("jungle")
+    assert abs(run.player.run_xp_mult - (xp0 + 0.12)) < 1e-9
+    assert abs(run.waves.spawn_rate_mult - 1.12) < 1e-9
+    run.set_map_theme("desert")
+    assert abs(run.player.run_xp_mult - xp0) < 1e-9          # orman payı geri alındı
+    assert abs(run.player.run_coin_mult - (coin0 + 0.15)) < 1e-9
+    assert abs(run.waves.enemy_speed_mult - 1.08) < 1e-9
+    run.set_map_theme("frost")
+    assert abs(run.wave_hp_mult(10) / K.arena_hp_mult(10) - 1.10) < 1e-6
+    run.waves.wave = K.HELL_PORTAL_WAVE
+    run.enter_hell()
+    assert run.waves.enemy_speed_mult == 1.0 and run.waves.spawn_rate_mult == 1.0
+    assert set(K.MAP_THEMES) == set(K.MAP_RULES) == set(K.MAP_FLOOR_KEY)
+    # --- BAŞLANGIÇ ELİ: kader kilidi dışından, kademeye göre seviye
+    for seed in range(40):
+        random.seed(seed)
+        run = _run()
+        d = run.make_draft()
+        assert 1 <= len(d["weapons"]) <= 3 and len(d["oaths"]) == 3
+        assert len(set(d["oaths"])) == 3
+        for o in d["weapons"]:
+            assert o["key"] not in run.destiny_locked
+            assert o["lvl"] == K.DRAFT_START_LVL[o["rarity"]] and o["start"]
+        o = d["weapons"][0]
+        run.take_start_weapon(0)
+        assert run.player.weapons == {o["key"]: o["lvl"]}
+        assert run.draft["step"] == "oath"
+    run = _run()
+    run.make_draft()
+    run.take_start_weapon(None)                               # silahsız: +2 yenileme
+    assert not run.player.weapons and run.reroll_bonus == K.DRAFT_NO_WEAPON_REROLLS
+    # --- YEMİNLER: her biri bir artı bir eksi; dürüst koşu denetime takılmaz
+    for key, _ic, _col in K.OATHS:
+        for skin in ("default", "immortal_merc", "green_titan", "shadow_hunter"):
+            if skin not in K.SKIN_BY_ID:
+                continue
+            run = _run(skin)
+            run.make_draft()
+            run.take_start_weapon(0)
+            run.apply_oath(key)
+            assert run.oath == key and run.draft is None
+            assert K.run_integrity_check(run) is None, (key, skin)
+            assert run.player.max_hp >= 30 and run.player.hp == run.player.max_hp
+    run = _run()
+    hp0 = run.player.max_hp
+    run.apply_oath("glass")
+    assert run.player.max_hp == int(round(hp0 * 0.75))
+    run = _run()
+    run.apply_oath("blood")
+    assert run.player.eff_regen() == 0.0 and run.player.vamp_level >= 1.0
+    run = _run()
+    run.apply_oath("feast")
+    assert abs(run.waves.spawn_rate_mult - 1.15) < 1e-9
+    run = _run()
+    run.apply_oath("bulwark")
+    sc = run.player.shield_charges
+    run.player.shield_charges = 0
+    run.player.take_damage = lambda *a, **k: 0               # kalkan harcanmasın
+    for _ in range(int(K.OATH_BULWARK_EVERY * 30) + 5):
+        run.update(1 / 30, _NOINP)
+        if run.game_over:
+            break
+    assert sc >= 3 and run.player.shield_charges >= 1
+    run = _run()
+    run.apply_oath(None)                                     # yeminsiz
+    assert run.oath is None
+
+
+def test_v334_shrine_chest_quests():
+    # --- GÜÇ SUNAĞI: içinde SHRINE_CHARGE sn durunca dolar, kitaplara dokunmaz
+    run = _run()
+    p = run.player
+    s = K.PowerShrine(p.x, p.y)
+    run.shrines.append(s)
+    totals = dict(p.book_totals)
+    before = (p.run_dmg_mult, p.run_aspd_mult, p.max_hp, p.run_spd_mult, p.run_crit_bonus,
+              p.run_critdmg_bonus, p.run_regen_bonus, p.run_xp_mult, p.run_luck_bonus, p.run_armor_bonus)
+    for _ in range(int(K.SHRINE_CHARGE * 30) + 3):
+        run.update_shrines(1 / 30, _NOINP)
+    assert s.done and run.shrines_done == 1
+    after = (p.run_dmg_mult, p.run_aspd_mult, p.max_hp, p.run_spd_mult, p.run_crit_bonus,
+             p.run_critdmg_bonus, p.run_regen_bonus, p.run_xp_mult, p.run_luck_bonus, p.run_armor_bonus)
+    assert sum(1 for a, b in zip(before, after) if a != b) == 1
+    assert dict(p.book_totals) == totals
+    # dışarı çıkınca dolum geri iner
+    s2 = K.PowerShrine(p.x + 2000, p.y)
+    s2.prog = 0.5
+    s2.update(1.0, p)
+    assert s2.prog < 0.5 and not s2.done
+    # sunak ve sandık kendiliğinden belirir
+    run = _run()
+    for _ in range(int((K.TCHEST_FIRST + 1) * 10)):
+        run.update_shrines(0.1, _NOINP)
+    assert run.shrines and run.tchests
+    for o in run.shrines + run.tchests:
+        assert K.ARENA_RECT.collidepoint(o.x, o.y)
+    # --- HAZİNE SANDIĞI: altın ister, bedeli büyür, eli seviye harcamaz
+    run = _run()
+    c = K.TreasureChest(run.player.x, run.player.y)
+    run.tchests.append(c)
+    assert run.tchest_cost() == K.TCHEST_BASE_COST
+    run.gold_wallet = 10
+    assert not run.open_tchest(c) and not c.opened
+    run.gold_wallet = 1000
+    run.update_shrines(1 / 30, dict(_NOINP, use_pressed=True))
+    assert c.opened and run.gold_wallet == 1000 - K.TCHEST_BASE_COST
+    assert run.tchest_cost() == int(round(K.TCHEST_BASE_COST * K.TCHEST_COST_GROWTH / 5.0)) * 5
+    lvl0, pend0, luck0 = run.player.level, run.pending_levelups, run.player.run_luck_bonus
+    assert run.start_chest_hand() and run.chest_hand and run.levelup_choices
+    assert abs(run.player.run_luck_bonus - luck0) < 1e-9     # ek şans yalnız dağıtırken
+    run.choose_levelup(0)
+    assert not run.chest_hand and run.pending_levelups == pend0 and run.player.level == lvl0
+    run.chest_hand_pending = 1
+    run.start_chest_hand()
+    skips = run.skip_used
+    ok, _msg = run.skip_levelup()
+    assert ok and run.skip_used == skips and not run.levelup_choices
+    # --- KOŞU GÖREVLERİ: kolay/orta/zor, farklı türler, yalnız temiz koşu öder
+    for seed in range(30):
+        qs = _run().roll_quests(random.Random(seed))
+        assert [q["tier"] for q in qs] == [0, 1, 2]
+        assert len({q["key"] for q in qs}) == 3
+        assert all(K.QUEST_DEFS[q["key"]][2][q["tier"]] == q["goal"] for q in qs)
+    run = _run()
+    run.quests = [{"key": "kills", "tier": 0, "goal": 5, "done": False},
+                  {"key": "shrine", "tier": 1, "goal": 1, "done": False},
+                  {"key": "wave", "tier": 2, "goal": 99, "done": False}]
+    run.kills = 6
+    run.shrines_done = 1
+    run.update_quests()
+    assert [q["done"] for q in run.quests] == [True, True, False]
+    run.finish_run()
+    assert run.quest_gems == K.QUEST_GEMS[0] + K.QUEST_GEMS[1]
+    assert run.gems_earned >= run.quest_gems
+    bad = _run()
+    bad.quests = [{"key": "kills", "tier": 2, "goal": 1, "done": False}]
+    bad.kills = 5
+    bad.cheat_flag = "hasar"
+    bad.finish_run()
+    assert bad.quest_gems == 0 and bad.gems_earned == 0
+
+
+def test_v334_app_flow():
+    app = K.App()
+    app.splash_t = 99
+    app.save.data["weapons_owned"] = [w["key"] for w in K.BOSS_WEAPONS]
+    seen = set()
+    prev = None
+    for i in range(8):
+        app.start_run()
+        assert app.state == K.STATE_DRAFT and app.run.draft and len(app.run.quests) == 3
+        seen.add(app.run.map_theme)
+        assert app.run.map_theme != prev                     # art arda aynı harita yok
+        prev = app.run.map_theme
+    assert len(seen) >= 3
+    app.update_draft(1 / 30, (0, 0), False)
+    app.handle_escape()
+    assert app.state == K.STATE_PAUSE
+    app.resume_run()
+    assert app.state == K.STATE_DRAFT                         # seçim bitmeden oyuna geçmez
+    run = app.run
+    run.take_start_weapon(0)
+    run.apply_oath(run.draft["oaths"][0])
+    app.update_draft(1 / 30, (0, 0), False)
+    assert app.state == K.STATE_PLAY
+    # hazine eli oyunda açılır
+    run.chest_hand_pending = 1
+    app.update_play(1 / 30, K._NoKeys(), (640, 360), False, False, False)
+    assert app.state == K.STATE_LEVELUP and run.chest_hand
+    for _ in range(30):                                       # kartlar süzülerek gelir
+        app.t += 1 / 30
+        app.update_levelup(1 / 30, (0, 0), False)
+    app.update_levelup(1 / 30, app.levelup_ui.cards[0][0].center, True)
+    assert app.state == K.STATE_PLAY and not run.chest_hand
+    # tuş: yeniden başla eylemi var, varsayılanı R
+    assert "restart" in K.KEY_ACTIONS and K.DEFAULT_KEYS["restart"] == ["r"]
+    # metinler beş dilde
+    for k in ["dr.title_weapon", "dr.title_oath", "q.title", "sh.prompt", "tc.title", "key.restart",
+              "st.oath"] + ["oath.%s.%s" % (o[0], f) for o in K.OATHS for f in ("name", "up", "down")] \
+            + ["q." + q for q in K.QUEST_DEFS]:
+        assert len(set(K.STRINGS[k])) >= 2 and all(K.STRINGS[k]), k
+    # tanıtım filmi hep taş arenada ve seçim ekranı olmadan oynar
+    tour = K.GameTour(app)
+    for _ in range(30 * 30):
+        tour.update(1 / 30)
+        if getattr(tour.sh, "run", None) is not None:
+            break
+    assert tour.sh.run.map_theme == "stone" and tour.sh.run.draft is None
+    assert tour.sh.state == K.STATE_PLAY
+
+
 if __name__ == "__main__":
     print("roll_rarity dağılımı (20.000 çekiliş):")
     print("  şans   | Yaygın | Sıradışı | Nadir | Epik  | Efsanevi")
