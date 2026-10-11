@@ -736,7 +736,11 @@ MASTERY_COSTS = {
     "m_dmg": (120, 1.60), "m_hp": (110, 1.60), "m_armor": (140, 1.65),
     "m_speed": (120, 1.60), "m_gem": (150, 1.70), "m_xp": (130, 1.65),
     "m_luck": (130, 1.65),      # v3.29 UĞUR (kalıcı şans)
+    # v3.33 KAPATMA HAKKI: elmasla +1 silah / +1 kitap kapatma (en çok 4)
+    "m_wmute": (250, 1.50), "m_bmute": (250, 1.50),
 }
+# Kademesi sınırlı dallar (oyundaki MASTERY satırındaki "max").
+MASTERY_MAX = {"m_wmute": 4, "m_bmute": 4}
 # Kurcalanmış bir istemcinin "kademe 10^9" yazıp sayıyla oynamasını
 # engeller; gerçek oyuncu bu sayıya hiçbir zaman yaklaşamaz (prestij
 # bedeli üstel).
@@ -779,7 +783,7 @@ def _merge_mastery(old, new, gems_spent):
             b = int((new or {}).get(key, 0) or 0)
         except (TypeError, ValueError):
             b = 0
-        out[key] = max(0, min(MASTERY_LEVEL_CAP, max(a, b)))
+        out[key] = max(0, min(MASTERY_MAX.get(key, MASTERY_LEVEL_CAP), max(a, b)))
     # Ödenebilirlik: en pahalı daldan başlayarak kırp.
     butce = max(0, int(gems_spent or 0))
     while sum(_mastery_total(k, v) for k, v in out.items()) > butce:
@@ -1147,10 +1151,10 @@ def player_save():
 # DAILY_GIFT_GEMS) BİREBİR aynı olmalı.
 # =====================================================================
 REWARD_TZ_OFFSET = 3 * 3600          # Türkiye (UTC+3)
-AD_REWARD_GEMS = 250           # v3.27: 50 -> 250
+AD_REWARD_GEMS = 300           # v3.27: 50 -> 250, v3.33: 300
 AD_DAILY_LIMIT = 5
 AD_COOLDOWN = 90.0
-AD_MIN_WATCH = 80.0                  # oyundaki tanıtım filmi ~91 sn
+AD_MIN_WATCH = 105.0                 # oyundaki tanıtım filmi 120 sn (v3.33)
 DAILY_GIFT_GEMS = (20, 25, 30, 35, 40, 50, 75)
 
 
@@ -1382,8 +1386,15 @@ MAX_SCORE_PER_KILL = 900.0     # bir öldürmeden çıkabilecek en yüksek skor
 # kalıcı olarak yasaklanırdı. Ölçüm (başsız bot, bütün lanetler, kabus,
 # 30 dk): saniyede 18 öldürme, 1.307 skor, dalga-hedef oranı eski sınırın 0,81'i.
 CURSE_SCORE_ROOM = 2.5
-MAX_SCORE_PER_SEC = 6000.0     # saniyede üretilebilecek en yüksek skor
-MAX_KILLS_PER_SEC = 45.0       # saniyede devrilebilecek en çok yaratık
+# v3.33 — "80 karakter öldürüyorum, hile koruması": lanetli cehennemde
+# (bölünenler + kalabalık + cehennem temposu) dürüst ve çok güçlü bir bot
+# SANİYEDE ORTALAMA 64-67, ANLIK ~100 öldürme ve saniyede ~6.700 skor
+# üretti; eski sınırlar (45 / 6.000) bu oyuncuyu "imkânsız skor" sayıp
+# hesabını kalıcı yasaklıyordu. Yeni sınırlar ölçülen uç değerin 2-4 katı.
+# Asıl hile süzgeçleri (imza, öldürme başına skor, dalga-hedef tavanı)
+# değişmedi.
+MAX_SCORE_PER_SEC = 25000.0    # saniyede üretilebilecek en yüksek skor
+MAX_KILLS_PER_SEC = 200.0      # saniyede devrilebilecek en çok yaratık
 MIN_RUN_TIME = 5.0             # bundan kısa bir koşu skor üretemez
 MAX_RUN_TIME = 6 * 3600.0      # 6 saatten uzun koşu kabul edilmez
 MAX_WAVE = 400

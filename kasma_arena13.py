@@ -1,6 +1,6 @@
 """
 =====================================================================
- ARENA BONK  —  v3.32   (eski adı: KASMA ARENA)
+ ARENA BONK  —  v3.33   (eski adı: KASMA ARENA)
  2D Top-Down Hayatta Kalma / Skor-Rekor Oyunu
  ---------------------------------------------------------------------
  Dalgalar halinde gelen düşmanlara karşı hayatta kal, nişan al, ateş et,
@@ -8,6 +8,25 @@
  patronları yen, rekorunu kır. Kaybedersen o koşuda aldıkların silinir.
  Elmasla kalıcı SKIN'ler al (her skinin kendi silahı, mermisi, efekti ve
  ÖZEL YETENEĞİ var).
+
+ v3.33 — ÇÖKME DÜZELTMESİ, HİLE KORUMASI, KAPATMA HAKKI, 2 DAKİKALIK FİLM:
+   * ÇÖKME DÜZELTİLDİ: LANETLİ bir koşuda PATRON gelince üst panel ('surge'
+     değişkeni) hata verip oyunu kapatıyordu (v3.30'dan beri). Güçlü,
+     lanet alan oyuncu her patronda buna takılıyordu.
+   * GÜVENLİK AĞI: tek bir karede çıkan hata artık oyunu kapatmaz; kayıt
+     klasörüne crash_log.txt yazılır, oyun devam eder.
+   * HİLE KORUMASI: lanetli cehennemde saniyede 80+ öldürme ölçüldü; sunucu
+     45'te hesabı yasaklıyordu. Sınırlar dürüst en uç koşulara göre
+     genişletildi (bkz. server.py MAX_KILLS_PER_SEC / MAX_SCORE_PER_SEC).
+   * XP ve ALTIN %10 KISILDI (XP_TRIM, GOLD_TRIM); elmas etkilenmez.
+   * KAPATMA HAKKI: Arena Ustalığı'nda SİLAH ELEĞİ ve KİTAP ELEĞİ — elmasla
+     bedava 4 silah / 6 kitap kapatmaya +4'er hak (sunucu da tanıyor).
+   * YENİ 2 DAKİKALIK TANITIM FİLMİ (mağazanın sağ altındaki ödüllü reklam,
+     ödül 300 elmas): kanca, kontroller, NADİRLİK ve ŞANS, yıldırım /
+     hortum / güneş ışını / pentagram, kitaplar, market, patron, EFSANEVİ
+     sandık, lanetli mağara, cehennem, ejderha, rekor, dünya sıralaması,
+     ustalık, skinler, petler. Alt yazılar 5 dilde. tools/make_trailer.py
+     aynı filmi MP4'e kaydeder.
 
  v3.32 — MEGABONK USULÜ KİTAPLAR, DEPREM, YENİ SİLAH GÖRSELLERİ:
    * KİTAPLARDA NADİRLİK: normal kitapların sabit "%7"si yok. Her seviye
@@ -829,7 +848,7 @@ WEAPON_FX_LEGACY = {"full": 100, "dim": 32, "off": 0}
 # v3.26: oyunun adı ARENA BONK. (Kayıt klasörü "KasmaArena" olarak KALIYOR:
 # adı değiştirmek oyuncuların ilerlemesini kaybettirirdi; bkz. get_save_dir.)
 GAME_TITLE = "ARENA BONK"
-GAME_VERSION = "3.32"
+GAME_VERSION = "3.33"
 
 
 # =====================================================================
@@ -1257,6 +1276,19 @@ STRINGS = {
     "mastery.m_gem.desc": _T("Koşu sonunda daha çok elmas", "More gems at the end of a run",
                              "Más gemas al final de la partida", "Mehr Edelsteine am Ende eines Laufs",
                              "Больше алмазов в конце забега"),
+    "mastery.m_wmute.name": _T("SİLAH ELEĞİ", "WEAPON FILTER", "FILTRO DE ARMAS", "WAFFENFILTER", "ФИЛЬТР ОРУЖИЯ"),
+    "mastery.m_wmute.desc": _T("+1 silah kapatma hakkı (bedava 4'e ek, en çok +4)",
+                               "+1 weapon mute slot (on top of the free 4, up to +4)",
+                               "+1 espacio para silenciar armas (además de 4 gratis, hasta +4)",
+                               "+1 Waffen-Sperrplatz (zusätzlich zu 4 gratis, bis +4)",
+                               "+1 слот отключения оружия (к 4 бесплатным, до +4)"),
+    "mastery.m_bmute.name": _T("KİTAP ELEĞİ", "BOOK FILTER", "FILTRO DE LIBROS", "BUCHFILTER", "ФИЛЬТР КНИГ"),
+    "mastery.m_bmute.desc": _T("+1 kitap kapatma hakkı (bedava 6'ya ek, en çok +4)",
+                               "+1 book mute slot (on top of the free 6, up to +4)",
+                               "+1 espacio para silenciar libros (además de 6 gratis, hasta +4)",
+                               "+1 Buch-Sperrplatz (zusätzlich zu 6 gratis, bis +4)",
+                               "+1 слот отключения книг (к 6 бесплатным, до +4)"),
+    "ui.mastery_max": _T("TAMAM", "MAXED", "MÁX.", "MAX", "МАКС."),
     "mastery.m_luck.name": _T("UĞUR", "FORTUNE'S FAVOR", "BUENA ESTRELLA", "GLÜCKSSTERN", "ВЕЗЕНИЕ"),
     "mastery.m_luck.desc": _T("Kalıcı Şans: daha yüksek kademeli kartlar ve sandıklar",
                               "Permanent Luck: higher-tier cards and chests",
@@ -4582,10 +4614,14 @@ class SaveManager:
         m = MASTERY_BY_KEY.get(key)
         return mastery_cost(m, self.mastery_level(key)) if m else 0
 
+    def mastery_maxed(self, key):
+        m = MASTERY_BY_KEY.get(key)
+        return bool(m and m.get("max") and self.mastery_level(key) >= int(m["max"]))
+
     def buy_mastery(self, key):
         """Bir ustalık kademesi alır. Dönüş: alındı mı?"""
         m = MASTERY_BY_KEY.get(key)
-        if not m or not self.can_spend():
+        if not m or not self.can_spend() or self.mastery_maxed(key):
             return False
         cost = self.mastery_next_cost(key)
         if self.get_gems() < cost:
@@ -4692,6 +4728,14 @@ class SaveManager:
     def book_muted(self, key):
         return key in self.data.get("books_muted", [])
 
+    def max_muted_books(self):
+        """Bedava 6 + Arena Ustalığı'ndan alınan (en çok +4) kitap kapatma."""
+        return MAX_MUTED_BOOKS + min(4, self.mastery_level("m_bmute"))
+
+    def max_muted_weapons(self):
+        """Bedava 4 + Arena Ustalığı'ndan alınan (en çok +4) silah kapatma."""
+        return MAX_MUTED_WEAPONS + min(4, self.mastery_level("m_wmute"))
+
     def toggle_book_mute(self, key):
         """Kitabı kapatır/açar. Dönüş: (yeni_durum, mesaj).
 
@@ -4715,8 +4759,8 @@ class SaveManager:
             if n_rare >= MAX_MUTED_RARE_BOOKS:
                 return True, (f"en fazla {MAX_MUTED_RARE_BOOKS} nadir kitap "
                               "kapatabilirsin")
-        if len(muted) >= MAX_MUTED_BOOKS:
-            return True, f"en fazla {MAX_MUTED_BOOKS} kitap kapatabilirsin"
+        if len(muted) >= self.max_muted_books():
+            return True, f"en fazla {self.max_muted_books()} kitap kapatabilirsin"
         open_left = [b["key"] for b in BOOKS
                      if self.owns_book(b["key"]) and b["key"] not in muted
                      and b["key"] != key]
@@ -4809,8 +4853,8 @@ class SaveManager:
             muted.remove(key)
             self.save()
             return False, "açıldı"
-        if len(muted) >= MAX_MUTED_WEAPONS:
-            return True, f"en fazla {MAX_MUTED_WEAPONS} silah kapatabilirsin"
+        if len(muted) >= self.max_muted_weapons():
+            return True, f"en fazla {self.max_muted_weapons()} silah kapatabilirsin"
         open_left = [w["key"] for w in BOSS_WEAPONS
                      if self.owns_weapon(w["key"]) and w["key"] not in muted
                      and w["key"] != key]
@@ -5232,10 +5276,10 @@ class PurchaseBridge:
 # (server.py GEM_GAIN_CAP_PER_PUSH).
 # =====================================================================
 AD_PROVIDER = ""             # boş = ev reklamı
-AD_REWARD_GEMS = 250           # v3.27: 50 -> 250
+AD_REWARD_GEMS = 300           # v3.27: 50 -> 250, v3.33: 300 (2 dakikalık yeni tanıtım filmi)
 AD_DAILY_LIMIT = 5
 AD_COOLDOWN = 90.0           # iki reklam arası (sn)
-AD_LENGTH = 91.2             # reklamın süresi — asıl değer GameTour.LENGTH (bkz. App'in üstü)
+AD_LENGTH = 120.0            # reklamın süresi — asıl değer GameTour.LENGTH (bkz. App'in üstü)
 DAILY_GIFT_GEMS = (20, 25, 30, 35, 40, 50, 75)
 
 def _day_key(offset_days=0):
@@ -11518,6 +11562,15 @@ MASTERY = [
     # Sunucudaki MASTERY_COSTS'a da eklendi (server.py).
     dict(key="m_luck", icon="horseshoe", color=(110, 225, 130),
          cost=130, growth=1.65, per=0.03, soft=0.01, cap_soft=18.0),
+    # v3.33 KAPATMA HAKKI: bedava 4 silah / 6 kitap kapatmaya EK olarak
+    # elmasla +4 silah ve +4 kitap kapatma hakkı (her kademe +1, en çok 4).
+    # Güç vermez; yalnızca seviye kartında istemediğin şeyi eler. Nadir
+    # kitap kapatma tavanı (MAX_MUTED_RARE_BOOKS) DEĞİŞMEZ. Sunucudaki
+    # MASTERY_COSTS / MASTERY_MAX'a da eklendi (server.py).
+    dict(key="m_wmute", icon="sword", color=(255, 170, 110),
+         cost=250, growth=1.50, per=1.0, soft=0.0, cap_soft=1.0, max=4, kind="count"),
+    dict(key="m_bmute", icon="book", color=(170, 150, 255),
+         cost=250, growth=1.50, per=1.0, soft=0.0, cap_soft=1.0, max=4, kind="count"),
 ]
 MASTERY_BY_KEY = {m["key"]: m for m in MASTERY}
 
@@ -11619,7 +11672,10 @@ XP_BASE_NEED = 22
 # daha arttı (1.40 x 1.15 x 1.20). Bantlara (eğrinin ŞEKLİNE) dokunulmadı;
 # ilk seviyeler de son seviyeler de aynı oranda hızlandı.
 XP_GAIN_BUFFS = (1.15, 1.20)
-XP_GAIN_SCALE = 1.40 * XP_GAIN_BUFFS[0] * XP_GAIN_BUFFS[1]
+# v3.33: "gelen XP'yi tam %10 kıs" — BÜTÜN tecrübe (yaratık, patron, kitap
+# çarpanı dahil; hepsi gain_xp'den geçer) x0,90.
+XP_TRIM = 0.90
+XP_GAIN_SCALE = 1.40 * XP_GAIN_BUFFS[0] * XP_GAIN_BUFFS[1] * XP_TRIM
 # v3.27 — 15. SEVİYEDEN SONRA KİLİT KALKTI. "15'ten sonra çok yavaşlıyor,
 # xp'yi %200 yapsak da atlayamıyoruz; 25. dalgada 50. seviye civarı olayım."
 # Ölçüm (başsız bot, tools/combo_sim.py, 4 farklı takım): 25. dalgaya kadar
@@ -17569,8 +17625,13 @@ COIN_DROP_SCALE = 0.50 * GOLD_GAIN_BUFF
 COIN_DROP_SCALE_HELL = 0.70 * GOLD_GAIN_BUFF
 
 
+# v3.33: "parayı da %10 kıs" — yere düşen BÜTÜN altın x0,90. Elmas bundan
+# etkilenmez: gem_coins toplanan altını bu ölçeğe bölerek hesaplıyor.
+GOLD_TRIM = 0.90
+
+
 def coin_drop_scale(biome):
-    return COIN_DROP_SCALE_HELL if biome == "hell" else COIN_DROP_SCALE
+    return (COIN_DROP_SCALE_HELL if biome == "hell" else COIN_DROP_SCALE) * GOLD_TRIM
 
 
 def scaled_coin_gain(base, mult, biome):
@@ -22263,8 +22324,10 @@ def run_score_plausible(run):
     # (sunucuda da aynı pay var: server.py SCORE_TIME_SLACK).
     if score > goal_sum * 2.5 + RUNCHK_SCORE_FLOOR + rt * RUNCHK_SCORE_TIME_SLACK:
         return False
-    # 3) Saniyede üretilebilecek skorun bir tavanı var.
-    if score / rt > 4000.0:
+    # 3) Saniyede üretilebilecek skorun bir tavanı var. v3.33: lanetli
+    #    cehennemde dürüst uç bot saniyede ~2.700 (lanet payı ayrılmış) üretti;
+    #    pay geniş tutuldu (sunucu: MAX_SCORE_PER_SEC).
+    if score / rt > 12000.0:
         return False
     return True
 
@@ -22867,10 +22930,11 @@ class RunState:
         can_up = [k for k, lvl in p.weapons.items()
                   if k in WEAPON_BY_KEY and lvl < weapon_max_level(WEAPON_BY_KEY[k])]
         if not can_up:
-            gold = 400 + self.waves.wave * 45
+            gem = 400 + self.waves.wave * 45
+            gold = int(gem * GOLD_TRIM)
             self.gold_wallet += gold
             self.coins_earned += gold
-            self.gem_coins += gold
+            self.gem_coins += gem
             self.fx.popup(chest.x, chest.y - 60, f"+{gold} ALTIN", GOLD, 26, life=1.6)
             if not p.weapons:
                 # Henüz hiç silahı yok: sandığın niye altına döndüğünü söyle.
@@ -27721,7 +27785,13 @@ def draw_hud(surf, run, t):
         else:
             draw_text(surf, f"{fmt_num(min(w.wave_score, w.wave_goal))} / {fmt_num(w.wave_goal)}",
                       (VIRTUAL_W / 2, 64), 10, TEXT_DIM, center=True, shadow=False)
-    # LANET rozeti (v3.30): kabul edilen lanetler ve skor çarpanı
+        if surge:
+            draw_text(surf, L("ui.surge", f"{w.surge_timer:0.1f}"), (gbar.right + 10, 49), 12,
+                      ORANGE, bold=True, shadow=False)
+    # LANET rozeti (v3.30): kabul edilen lanetler ve skor çarpanı.
+    # v3.33 ÇÖKME DÜZELTMESİ: bu blok yanlışlıkla yukarıdaki "if surge"
+    # dalını yutmuştu; LANETLİ bir koşuda PATRON gelince 'surge' tanımsız
+    # kaldığı için oyun kapanıyordu.
     if getattr(run, "curse_score_bonus", 0) > 0:
         ctxt = L("cu.hud", "%.2f" % (1.0 + run.curse_score_bonus) if lang() != "tr"
                  else ("%.2f" % (1.0 + run.curse_score_bonus)).replace(".", ","))
@@ -27734,10 +27804,6 @@ def draw_hud(surf, run, t):
         surf.blit(cs_, cr_.topleft)
         draw_icon(surf, cr_.x + 11, cr_.centery, "skull", CURSE_COLOR2, 6)
         draw_text(surf, ctxt, (cr_.x + 21, cr_.y + 3), 11, CURSE_COLOR2, bold=True, shadow=False)
-
-        if surge:
-            draw_text(surf, L("ui.surge", f"{w.surge_timer:0.1f}"), (gbar.right + 10, 49), 12,
-                      ORANGE, bold=True, shadow=False)
 
     # Sağ üstteki "⋮" istatistik düğmesine yer açmak için biraz sola kaydırıldı.
     rx = VIRTUAL_W - 48
@@ -29274,7 +29340,7 @@ def cursed_reward_values(key, tier, wave):
     if key == "arsenal":
         return dict(wlevels=int(round(2 * m)), boost=0.10 * m)
     if key == "treasure":
-        return dict(gold=int((600 + 120 * max(1, int(wave))) * m), coin=0.25 * m)
+        return dict(gold=int((600 + 120 * max(1, int(wave))) * m * GOLD_TRIM), coin=0.25 * m)
     if key == "fortress":
         return dict(hp=int(250 * m), armor=0.08 * m, shields=int(round(2 * m)))
     if key == "edge":
@@ -31425,9 +31491,12 @@ def draw_stamp(surf, text, st, col, y=360, life=2.2):
               alpha=int(255 * a))
 
 
-def _tc(tr, en):
-    """Tur yazıları: Türkçe oyuncuya Türkçe, diğer dillere İngilizce."""
-    return tr if lang() == "tr" else en
+def _tc(tr, en, es=None, de=None, ru=None):
+    """Tur yazıları oyuncunun dilinde (v3.33: 5 dil; eksik dil İngilizceye düşer)."""
+    lg = lang()
+    if lg == "tr":
+        return tr
+    return {"es": es, "de": de, "ru": ru}.get(lg) or en
 
 
 def tour_kill_boss(b, fx):
@@ -31599,18 +31668,59 @@ class _TourPilot:
         run.update(dt, inp)
 
 
+class _ForcedRarity:
+    """Turda (gösteri) sandık / mağara kademesini sırayla sabitler.
+
+    Modülün roll_rarity'si geçici olarak değiştirilir; çıkışta geri konur.
+    Yalnızca GameTour kullanır — gerçek oyunda hiç devreye girmez."""
+
+    def __init__(self, seq):
+        self.seq = list(seq)
+
+    def __enter__(self):
+        g = globals()
+        self.orig = g["roll_rarity"]
+        seq = self.seq
+
+        def fake(luck, rnd=random):
+            return seq.pop(0) if seq else 0
+        g["roll_rarity"] = fake
+        return self
+
+    def __exit__(self, *_a):
+        globals()["roll_rarity"] = self.orig
+        return False
+
+
 class GameTour:
-    # (ad, süre, sahne başında geçiş perdesi)
+    """OYUN TURU — 2 dakikalık tanıtım + öğretici (v3.33).
+
+    Mağazanın sağ altındaki ödüllü reklam bu filmi oynatır; tools/make_trailer.py
+    de aynı filmi MP4'e kaydeder. Her kare oyunun GERÇEK motorudur: "gölge
+    oyun" (App(shadow_of=...)) kaydın KOPYASIYLA çalışır, savaşları insan gibi
+    nişan alan pilot oynar (bkz. _TourPilot), menülerde sanal imleç gezer.
+
+    Akış: kanca (dev kalabalık) -> temel kontroller -> seviye kartları ve
+    NADİRLİK -> ŞANS -> silahlar (yıldırım, hortum, güneş ışını, pentagram)
+    -> kitaplar -> market -> patron ve SANDIK -> lanetli mağara -> cehennem ->
+    ejderha -> geç oyun gücü -> rekor -> dünya sıralaması -> ustalık ->
+    skinler / petler -> çağrı.
+    """
+    # (ad, süre, geçiş) — geçiş: "wipe" altın perde, "flash" beyaz çakma, "" yok
     SCENES = (
-        ("intro", 4.0, False), ("login", 6.0, True), ("codex", 7.0, True), ("books", 6.0, True),
-        ("ach", 4.0, True), ("toplay", 1.2, True), ("wave1", 4.0, False), ("wave5", 4.0, True),
-        ("levelup", 3.0, False), ("market", 3.0, False), ("boss1", 4.5, True), ("boss2", 4.5, True),
-        ("magnet", 4.5, True), ("portal", 3.0, True), ("hell1", 3.0, False), ("hell5", 3.0, True),
-        ("hellboss", 4.0, True), ("dragon", 3.0, False), ("gameover", 3.0, False),
-        ("worldlb", 5.0, True), ("pets", 3.0, True), ("skins", 5.5, True), ("outro", 3.0, True),
+        ("intro", 4.0, ""), ("hook", 6.0, "flash"), ("basics", 6.0, "wipe"),
+        ("levelup", 10.0, ""), ("luck", 7.0, "wipe"), ("arsenal", 8.0, "flash"),
+        ("books", 6.0, "wipe"), ("market", 4.0, "wipe"), ("boss", 6.0, "wipe"),
+        ("chest", 6.0, ""), ("cave", 8.0, "wipe"), ("hell", 7.0, "wipe"),
+        ("dragon", 5.5, "flash"), ("power", 6.0, "flash"), ("record", 4.5, "wipe"),
+        ("worldlb", 6.0, "wipe"), ("mastery", 5.0, "wipe"), ("skins", 5.0, "wipe"),
+        ("pets", 4.0, "wipe"), ("outro", 6.0, "flash"),
     )
     LENGTH = sum(d for _n, d, _w in SCENES)
+    PLAY_SCENES = ("hook", "basics", "arsenal", "boss", "chest", "cave", "hell", "dragon",
+                   "power")
     NAME = "Kanka"
+    WEAPONS = ("tesla", "tornado", "beam", "pentagram")
 
     def __init__(self, real_app):
         self.sh = sh = App(shadow_of=real_app)
@@ -31621,9 +31731,16 @@ class GameTour:
         self.clicks = []
         self.pilot = None
         self.music = [(0.0, "menu")]     # MP4 aracı için müzik geçişleri
+        self.cut_times = []              # MP4 müziği: sahne kesmeleri
+        self.hits = []                   # MP4 müziği: vurgu anları
         self.flags = set()
         self._bg = None
         self._setup_save()
+        acc = 0.0
+        for _nm, dur, cut in self.SCENES:
+            if cut:
+                self.cut_times.append((acc, cut))
+            acc += dur
         # Filmdeki mağaza "açık" görünsün (gölge oyun; gerçek satın alma yok).
         sh.purchase.enabled = True
         sh.purchase.api_url = "tour"
@@ -31648,9 +31765,10 @@ class GameTour:
         d["taint_reasons"] = []
         d["board_banned"] = False
         d["ban_reasons"] = []
-        d["books_owned"] = [b["key"] for b in BOOKS if not b.get("rare")][:10]
+        d["books_owned"] = [b["key"] for b in BOOKS if not b.get("rare")][:12] + \
+            ["r_echo", "r_multi", "r_poison"]
         d["books_muted"] = []
-        d["weapons_owned"] = ["axe", "book", "pentagram", "whip", "tornado"]
+        d["weapons_owned"] = ["axe", "book", "pentagram", "whip", "tornado", "tesla", "beam"]
         d["weapons_muted"] = []
         d["stats"] = {"runs": 9, "best_score": 21450, "total_kills": 940, "total_time": 3100.0,
                       "bosses": 2, "best_wave": 8, "total_shots": 6200, "total_lifesteal": 0.0,
@@ -31663,8 +31781,9 @@ class GameTour:
         d["cosmetics_owned"] = ["pet_dragon"]
         d.setdefault("equipped_cosmetics", {})
         d["equipped_cosmetics"] = {"hat": None, "eyewear": None, "cape": None, "pet": "pet_dragon"}
-        d["gems"] = d["gems_earned"] = 640
+        d["gems"] = d["gems_earned"] = 2640
         d["gems_spent"] = 0
+        d["mastery"] = {"m_dmg": 3, "m_hp": 2, "m_luck": 2, "m_wmute": 1}
         d["rewards"] = {"pid": self.sh.save.profile_id()}
         self.sh.selected_skin = "inferno"
         self.sh.diff = "normal"
@@ -31695,6 +31814,13 @@ class GameTour:
         """Bu karede x saniyesi geçildi mi? (tek seferlik olaylar)"""
         return self.prev < x <= st
 
+    def hit(self, st, x):
+        """Tek seferlik vurgu: MP4 müziğine 'çarpma' olarak da yazılır."""
+        if self.at(st, x):
+            self.hits.append(self.t)
+            return True
+        return False
+
     def path(self, keys, st):
         if st <= keys[0][0]:
             return keys[0][1]
@@ -31710,24 +31836,33 @@ class GameTour:
         sfx("click", 0.6, 0.0)
 
     def cap(self, text, sub, st, dur, y=600, col=(255, 214, 120), x0=0):
-        """Alt yazı şeridi: soldan kayarak girer, sağa doğru söner."""
+        """Alt yazı şeridi: soldan kayarak girer, sağa doğru söner.
+        Uzun (Almanca/Rusça) yazılar ekrana sığana kadar küçülür."""
         if st < 0 or st > dur:
             return
         c = self.sh.display.canvas
         k = min(ease_out_cubic(st / 0.4), ease_out_cubic((dur - st) / 0.3))
-        tw = max(text_width(text, 38, True), text_width(sub, 21, True) if sub else 0) + 90
+        ts, ss = 38, 21
+
+        def width():
+            return max(text_width(text, ts, True), text_width(sub, ss, True) if sub else 0) + 90
+        while ts > 20 and width() > VIRTUAL_W - 30:
+            ts -= 2
+            ss = max(13, ss - 1)
+        tw = width()
         x = x0 - tw + (tw + 50) * k
-        h = 94 if sub else 66
+        sub_y = y + 9 + ts + 11
+        h = (sub_y + ss + 15 - y) if sub else ts + 28
         bar = pygame.Surface((int(tw), h), pygame.SRCALPHA)
         bar.fill((10, 8, 18, 222))
         c.blit(bar, (int(x), y))
         pygame.draw.rect(c, col, pygame.Rect(int(x + tw - 10), y, 10, h))
-        draw_text(c, text, (int(x) + 30, y + 9), 38, col, bold=True)
+        draw_text(c, text, (int(x) + 30, y + 9), ts, col, bold=True)
         if sub:
-            draw_text(c, sub, (int(x) + 32, y + 58), 21, (236, 232, 244), bold=True)
+            draw_text(c, sub, (int(x) + 32, sub_y), ss, (236, 232, 244), bold=True)
 
-    def stamp(self, text, st, col, y=150):
-        draw_stamp(self.sh.display.canvas, text, st, col, y)
+    def stamp(self, text, st, col, y=150, life=2.2):
+        draw_stamp(self.sh.display.canvas, text, st, col, y, life=life)
 
     def cursor(self, pos, kind="ui"):
         draw_cursor(self.sh.display.canvas, pos, kind, self.sh.t, hot=(kind == "aim"))
@@ -31737,7 +31872,7 @@ class GameTour:
         dt = min(dt, 1 / 20.0)
         self.t = min(self.LENGTH, self.t + dt)
         self.sh.t += dt
-        i, name, st, dur, wipe = self._scene()
+        i, name, st, dur, cut = self._scene()
         first = i != self.scene_i
         if first:
             self.scene_i = i
@@ -31748,18 +31883,22 @@ class GameTour:
             k = (self.t - t0) / 0.45
             if 0 <= k <= 1:
                 ring_aa(c, pos[0], pos[1], 8 + 34 * k, (255, 236, 170), max(1, int(5 * (1 - k))))
-        if name in ("wave1", "wave5", "boss1", "boss2", "magnet", "portal", "hell1", "hell5",
-                    "hellboss", "dragon"):
+        if name in self.PLAY_SCENES:
             logo = brand_scaled("logo", h=54)
             if logo is not None:
                 c.blit(logo, (VIRTUAL_W - logo.get_width() - 16, VIRTUAL_H - logo.get_height() - 12))
-        if wipe and st < 0.32 and self.t > 0.5:
+        if cut == "wipe" and st < 0.32 and self.t > 0.5:
             k = st / 0.32
             x0 = -260 + (VIRTUAL_W + 520) * k
             pygame.draw.polygon(c, (236, 186, 92), [(x0, 0), (x0 + 300, 0), (x0 + 80, VIRTUAL_H),
                                                    (x0 - 220, VIRTUAL_H)])
             pygame.draw.polygon(c, (255, 242, 205), [(x0 + 230, 0), (x0 + 300, 0),
                                                     (x0 + 80, VIRTUAL_H), (x0 + 10, VIRTUAL_H)])
+        elif cut == "flash" and st < 0.22 and self.t > 0.5:
+            fl = pygame.Surface((VIRTUAL_W, VIRTUAL_H))
+            fl.fill((255, 250, 235))
+            fl.set_alpha(int(235 * (1.0 - st / 0.22) ** 1.6))
+            c.blit(fl, (0, 0))
         self.prev = st
 
     def render(self):
@@ -31773,13 +31912,66 @@ class GameTour:
             pass
 
     # ------------------------------------------------------------------
-    # yardımcı: savaş karesi
+    # yardımcılar
+    def _fresh_run(self, wave, weapons, level, crowd, books=None, hell=False):
+        """Sahne için yeni bir koşu: silahlar, kitaplar (seviye, kademe), dalga."""
+        sh = self.sh
+        sh.start_run()
+        run = sh.run
+        run.ach = None                  # filmde başarım bildirimi çıkmasın
+        p = run.player
+        p.no_stats = True
+        # Filmde kahraman hasar almaz: ekranda "ölmek üzere" can çubuğu olmasın.
+        p.take_damage = lambda *a, **k: 0
+        p.weapons = dict(weapons)
+        for k in p.weapons:
+            p.weapon_timers[k] = 0.0
+        for bk, (lv, tier) in (books or {}).items():
+            for _ in range(lv):
+                p.take_book(bk, tier)
+        p.level = level
+        if hell:
+            run.waves.wave = HELL_PORTAL_WAVE
+            run.enter_hell()
+        if wave > 1:
+            run.waves._begin_wave(wave, run.score)
+        run.waves.announce_timer = 0.0
+        self.pilot = _TourPilot(run, crowd=crowd)
+        sh.state = STATE_PLAY
+        if not self.music or self.music[-1][1] != "battle":
+            self.music.append((self.t, "battle"))
+        return run
+
+    def _spawn_ring(self, run, n, rmin=150, rmax=380):
+        """Yaratıkları oyuncunun ÇEVRESİNE dizer: aksiyon anında başlasın."""
+        p = run.player
+        w = run.waves.wave
+        for _ in range(n):
+            a = random.uniform(0, math.tau)
+            d = random.uniform(rmin, rmax)
+            x = clamp(p.x + math.cos(a) * d, ARENA_RECT.left + 40, ARENA_RECT.right - 40)
+            y = clamp(p.y + math.sin(a) * d * 0.75, ARENA_RECT.top + 40, ARENA_RECT.bottom - 40)
+            if run.biome == "hell":
+                run.enemies.append(Enemy(None, x, y, run.wave_hp_mult(w), 1.0, wave=w,
+                                         variant=hell_pick_kind(w), biome="hell"))
+            else:
+                kind = random.choice(("red", "red", "blue", "yellow", "tank", "sprinter", "brute"))
+                run.enemies.append(Enemy(kind, x, y, run.wave_hp_mult(w), 1.0, wave=w))
+
+    def _big_bonk(self, run):
+        p = run.player
+        p.bonk_cd = 0.0
+        try:
+            run.do_bonk()
+        except Exception:
+            pass
+        run.fx.shake(12, 0.35)
+
     def _play(self, dt, step=True):
         sh = self.sh
         if step and self.pilot is not None and sh.state == STATE_PLAY:
             self.pilot.step(dt)
         if sh.state == STATE_PLAY and sh.run.game_over:
-            # ölüm: oyunun kendi akışı sonuç ekranına geçirsin
             sh.run.run_is_clean = lambda: True
             sh.update_play(0.0, _NoKeys(), self.pilot.aim, False, False, False)
             return
@@ -31823,7 +32015,7 @@ class GameTour:
             if st > 0.5:
                 q = min(1.0, (st - 0.5) / 0.6)
                 ring_aa(c, cx, cy, 140 + 500 * q, (255, 230, 170), max(1, int(12 * (1 - q))))
-            if self.at(st, 0.5):
+            if self.hit(st, 0.5):
                 sfx("bonk", 1.0, 0.0)
         else:
             logo = brand_scaled("logo", w=880)
@@ -31836,187 +32028,234 @@ class GameTour:
                 c.blit(img, (cx - img.get_width() / 2, cy - img.get_height() / 2))
             if st > 2.2:
                 a = int(255 * min(1.0, (st - 2.2) / 0.4))
-                draw_text(c, _tc("Oyunu 90 saniyede öğren!", "Learn the game in 90 seconds!"),
+                draw_text(c, _tc("Oyunu 2 dakikada öğren!", "Learn the game in 2 minutes!",
+                                 "¡Aprende el juego en 2 minutos!", "Lerne das Spiel in 2 Minuten!",
+                                 "Изучи игру за 2 минуты!"),
                           (cx, cy + 210), 32, (255, 236, 182), bold=True, center=True, alpha=a)
 
-    def _s_login(self, st, dt, first):
-        sh = self.sh
+    def _s_hook(self, st, dt, first):
         if first:
-            sh.state = STATE_LOGIN
-            sh.login_mode = "up"
-            sh.login_fields = {"user": "", "password": "", "email": "", "newpw": ""}
-            sh.login_focus = "user"
-            sh.account.account = None
-        name, pw = self.NAME, "bonkbonk"
-        if st < 1.8:
-            sh.login_fields["user"] = name[:max(0, int((st - 0.7) / 0.18))]
-        else:
-            sh.login_fields["user"] = name
-            sh.login_focus = "password"
-            sh.login_fields["password"] = pw[:max(0, int((st - 1.9) / 0.1))]
-        for k in range(len(name)):
-            if self.at(st, 0.7 + k * 0.18):
-                sfx("hover", 0.5, 0.0)
-        m = self.path([(0.0, (640, 640)), (0.6, (640, 281)), (1.8, (640, 281)), (2.0, (640, 337)),
-                       (2.9, (640, 337)), (3.4, (640, 452)), (6.0, (640, 452))], st)
-        if self.at(st, 3.6):
-            self.click(m)
-            sh.account.sign_in(name, "kanka@mail.com")
-            sh.login_mode = "in"
-            sfx("levelup", 0.7, 0.0)
-        sh.update_login(dt, m, False)
-        self.cursor(m)
-        self.cap(_tc("HESAP AÇ", "CREATE AN ACCOUNT"),
-                 _tc("Kullanıcı adı + şifre, ya da tek tıkla Google.", "Username + password, or one click with Google."),
-                 st - 0.3, 3.3)
-        self.cap(_tc("GİRİŞ YAPILDI!", "YOU'RE IN!"),
-                 _tc("İlerlemen hesabında — her bilgisayarda seninle.", "Your progress lives in your account, on any PC."),
-                 st - 3.8, 2.2, col=(140, 230, 170))
-
-    def _s_codex(self, st, dt, first):
-        sh = self.sh
-        if first:
-            sh.state = STATE_MENU
-        if st < 1.5:
-            m = self.path([(0.0, (1100, 60)), (1.0, (342, 340))], st)
-            if self.at(st, 1.15):
-                self.click(m)
-            sh.update_menu(dt, m, False)
-            self.cursor(m)
-            self.cap(_tc("ANA MENÜ", "MAIN MENU"), _tc("Önce silahlarına bir bakalım...", "First, a look at your weapons..."),
-                     st - 0.1, 1.4, col=(130, 200, 255))
-            return
-        if self.at(st, 1.5) or sh.state != STATE_WEAPON_CODEX:
-            sh.goto(STATE_WEAPON_CODEX)
-        m = self.path([(1.5, (342, 340)), (2.4, (211, 470)), (3.6, (211, 470)), (4.3, (1069, 371)),
-                       (7.0, (1069, 371))], st)
-        clicked = self.at(st, 4.6)
-        if clicked:
-            self.clicks.append((m, self.t))
-        sh.update_weapon_codex(dt, m, clicked, 0)
-        self.cursor(m)
-        self.cap(_tc("SİLAHLIK", "ARMORY"),
-                 _tc("Silahlar GÖREVLE açılır: kilitli kartta görevi yazar.", "Weapons unlock through QUESTS: the locked card tells you how."),
-                 st - 1.7, 2.8, col=(238, 150, 100))
-        self.cap(_tc("KIRBAÇ KAPATILDI", "WHIP TURNED OFF"),
-                 _tc("Sevmediğin silahı kapat: seviye atlarken artık çıkmaz.", "Turn off what you don't like: it won't be offered again."),
-                 st - 4.7, 2.3, col=(232, 130, 130))
-
-    def _s_books(self, st, dt, first):
-        sh = self.sh
-        if first:
-            sh.goto(STATE_BOOK_MARKET)
-            sh.book_filter = "all"
-        if st > 2.6:
-            sh.book_scroll = 280 * ease_out_cubic((st - 2.6) / 1.2)
-        m = self.path([(0.0, (1069, 371)), (1.2, (783, 371)), (2.6, (783, 371)), (4.0, (1069, 560)),
-                       (6.0, (1069, 560))], st)
-        clicked = self.at(st, 1.5)
-        if clicked:
-            self.clicks.append((m, self.t))
-        sh.update_book_market(dt, m, clicked, 0)
-        self.cursor(m)
-        self.cap(_tc("KİTAPLIK: 27 GÜÇ KİTABI", "LIBRARY: 27 POWER BOOKS"),
-                 _tc("Seviye atlayınca kitap seç; koşu boyunca büyüt.", "Pick books as you level up and grow them all run."),
-                 st - 0.1, 1.5, col=(196, 150, 255))
-        self.cap(_tc("ZIRH KİTABI KAPATILDI", "ARMOR BOOK OFF"),
-                 _tc("Kitapları da kapatabilirsin — destene sen karar ver.", "Books can be turned off too — build your own deck."),
-                 st - 1.7, 2.1, col=(232, 130, 130))
-        self.cap(_tc("KİLİTLİ KİTAPLAR", "LOCKED BOOKS"),
-                 _tc("Görevi yazıyor: tamamla, kitap senin!", "The quest is written on it: finish it, it's yours!"),
-                 st - 4.0, 2.0, col=(232, 186, 90))
-
-    def _s_ach(self, st, dt, first):
-        sh = self.sh
-        if first:
-            sh.goto(STATE_ACHIEVEMENTS)
-        m = self.path([(0.0, (783, 560)), (0.8, (640, 520)), (4.0, (640, 520))], st)
-        clicked = self.at(st, 1.0)
-        if clicked:
-            self.clicks.append((m, self.t))
-        sh.update_achievements(dt, m, clicked, 0)
-        self.cursor(m)
-        self.cap(_tc("BAŞARIMLAR", "ACHIEVEMENTS"),
-                 _tc("Her biri elmas kazandırır — tıkla, nasıl alınacağını gör.", "Each one pays gems — click to see how to earn it."),
-                 st - 1.3, 2.6, y=620)
-
-    def _s_toplay(self, st, dt, first):
-        sh = self.sh
-        if first:
-            sh.ach_detail = None
-            sh.state = STATE_MENU
-        m = self.path([(0.0, (640, 560)), (0.7, (640, 340)), (1.2, (640, 340))], st)
-        if self.at(st, 0.85):
-            self.click(m)
-        sh.update_menu(dt, m, False)
-        self.cursor(m)
-
-    def _s_wave1(self, st, dt, first):
-        sh = self.sh
-        if first:
-            sh.start_run()
-            self.music.append((self.t, "battle"))
-            run = sh.run
-            run.player.no_stats = True
-            self.pilot = _TourPilot(run, crowd=7)
+            run = self._fresh_run(16, {"tesla": 14, "tornado": 12, "beam": 14, "pentagram": 14},
+                                  42, 60, books={"r_dmg": (8, 3), "r_aspd": (6, 2)})
+            self._spawn_ring(run, 55)
+        run = self.sh.run
+        if self.hit(st, 3.0):
+            self._big_bonk(run)
         self._play(dt)
-        self.cap(_tc("1. DALGA", "WAVE 1"),
-                 _tc("WASD ile koş, fareyle nişan al, sol tıkla ateş et!", "Run with WASD, aim with the mouse, left-click to shoot!"),
-                 st - 0.3, 3.5, col=(140, 230, 170))
+        self.stamp(_tc("YÜZLERCE YARATIK. TEK SEN.", "HUNDREDS OF MONSTERS. ONLY YOU.",
+                       "CIENTOS DE MONSTRUOS. SOLO TÚ.", "HUNDERTE MONSTER. NUR DU.",
+                       "СОТНИ МОНСТРОВ. ТОЛЬКО ТЫ."), st - 0.3, GOLD, y=300, life=2.4)
+        self.cap(_tc("HAYATTA KAL · GÜÇLEN · REKOR KIR", "SURVIVE · POWER UP · BREAK RECORDS",
+                     "SOBREVIVE · MEJORA · BATE RÉCORDS", "ÜBERLEBE · WERDE STÄRKER · KNACK REKORDE",
+                     "ВЫЖИВИ · УСИЛЬСЯ · БЕЙ РЕКОРДЫ"),
+                 _tc("Dalga dalga gelen sürülere karşı tek kişilik ordu ol.",
+                     "Be a one-man army against wave after wave.",
+                     "Sé un ejército de uno contra oleada tras oleada.",
+                     "Sei eine Ein-Mann-Armee gegen Welle um Welle.",
+                     "Стань армией из одного против волны за волной."),
+                 st - 2.8, 3.1)
 
-    def _s_wave5(self, st, dt, first):
-        sh = self.sh
-        run = sh.run
+    def _s_basics(self, st, dt, first):
         if first:
-            run.waves._begin_wave(5, run.score)
-            run.waves.announce_text = L("ui.ann_surge", 5)
-            run.player.level = max(run.player.level, 6)
-            self.pilot.crowd = 30
+            self._fresh_run(2, {}, 3, 9)
+        run = self.sh.run
+        if self.hit(st, 3.7):
+            self._big_bonk(run)
         self._play(dt)
-        self.cap(_tc("5. DALGA", "WAVE 5"),
-                 _tc("SPACE: BONK — kalabalığı savur!  SHIFT: dash at!", "SPACE: BONK the crowd away!  SHIFT: dash!"),
-                 st - 0.4, 3.4)
+        self.cap(_tc("KOŞ · NİŞAN AL · ATEŞ ET", "RUN · AIM · SHOOT", "CORRE · APUNTA · DISPARA",
+                     "LAUFEN · ZIELEN · SCHIESSEN", "БЕГИ · ЦЕЛЬСЯ · СТРЕЛЯЙ"),
+                 _tc("WASD ile koş, fareyle nişan al, sol tıkla ateş et.",
+                     "WASD to run, mouse to aim, left-click to shoot.",
+                     "WASD para correr, ratón para apuntar, clic izquierdo para disparar.",
+                     "WASD zum Laufen, Maus zum Zielen, Linksklick zum Schießen.",
+                     "WASD — бег, мышь — прицел, ЛКМ — выстрел."),
+                 st - 0.3, 3.1, col=(140, 230, 170))
+        self.cap(_tc("SPACE: BONK!   SHIFT: DASH", "SPACE: BONK!   SHIFT: DASH",
+                     "ESPACIO: ¡BONK!   SHIFT: IMPULSO", "LEERTASTE: BONK!   SHIFT: DASH",
+                     "ПРОБЕЛ: БОНК!   SHIFT: РЫВОК"),
+                 _tc("BONK etrafını savurur, dash ile tehlikeden sıyrıl.",
+                     "BONK blasts the crowd away, dash out of danger.",
+                     "BONK aparta a la multitud; impúlsate fuera del peligro.",
+                     "BONK schleudert die Menge weg, Dash bringt dich in Sicherheit.",
+                     "БОНК раскидывает толпу, рывок уводит от опасности."),
+                 st - 3.5, 2.4)
 
     def _s_levelup(self, st, dt, first):
         sh = self.sh
         run = sh.run
         if first:
             try:
-                run.levelup_choices = [
-                    run._book_offer(BOOK_BY_KEY["r_crit"], run.player.books.get("r_crit", 0) + 1, True),
-                    run._weapon_offer(WEAPON_BY_KEY["tornado"], 1, True),
-                    run._book_offer(BOOK_BY_KEY["r_hp"], run.player.books.get("r_hp", 0) + 1, True),
-                ]
+                p = run.player
+                o1 = run._weapon_offer(WEAPON_BY_KEY["tesla"], 1, True)
+                o1["rarity"], o1["boost"] = 3, rarity_boost(3, "card")
+                lv = p.books.get("r_dmg", 0) + 1
+                o2 = run._book_offer(BOOK_BY_KEY["r_dmg"], lv, lv == 1)
+                o2["rarity"], o2["gains"] = 4, book_gain("r_dmg", 4, lv)
+                o3 = run._weapon_offer(WEAPON_BY_KEY["beam"], 1, True)
+                o3["rarity"], o3["boost"] = 0, 0.0
+                run.levelup_choices = [o1, o2, o3]
                 run.pending_levelups = 1
                 sh.state = STATE_LEVELUP
                 sfx("levelup", 1.0, 0.0)
             except Exception:
                 sh.state = STATE_PLAY
         if sh.state == STATE_LEVELUP:
+            sh.levelup_ui.rebuild(run.levelup_choices)
             cards = [r.center for (r, _c, _i) in sh.levelup_ui.cards] or [(640, 360)] * 3
-            m = self.path([(0.0, (640, 640)), (0.6, cards[0]), (1.2, cards[1]), (3.0, cards[1])], st)
-            clicked = self.at(st, 1.8)
+            cards = (cards + [cards[-1]] * 3)[:3]
+            m = self.path([(0.0, (640, 690)), (0.8, cards[0]), (2.6, cards[0]), (3.2, cards[2]),
+                           (4.6, cards[2]), (5.2, cards[1]), (8.0, cards[1])], st)
+            clicked = self.at(st, 7.2)
             if clicked:
                 self.clicks.append((m, self.t))
+                self.hits.append(self.t)
             sh.update_levelup(dt, m, clicked)
             self.cursor(m)
         else:
             self._play(dt)
-        self.cap(_tc("SEVİYE ATLADIN!", "LEVEL UP!"),
-                 _tc("Kırbaç kapalı → yerine HORTUM geldi. Al bakalım!", "Whip is off → TORNADO showed up instead. Take it!"),
-                 st - 0.2, 2.8, y=612, col=(232, 186, 90))
+        self.cap(_tc("SEVİYE ATLADIN: 3 KART", "LEVEL UP: 3 CARDS", "SUBES DE NIVEL: 3 CARTAS",
+                     "LEVEL UP: 3 KARTEN", "НОВЫЙ УРОВЕНЬ: 3 КАРТЫ"),
+                 _tc("Her kart bir NADİRLİK çeker: Yaygın → Sıradışı → Nadir → Epik → EFSANEVİ",
+                     "Every card rolls a RARITY: Common → Uncommon → Rare → Epic → LEGENDARY",
+                     "Cada carta tira una RAREZA: Común → Poco común → Rara → Épica → LEGENDARIA",
+                     "Jede Karte würfelt eine SELTENHEIT: Gewöhnlich → Ungewöhnlich → Selten → Episch → LEGENDÄR",
+                     "Каждая карта получает РЕДКОСТЬ: Обычная → Необычная → Редкая → Эпическая → ЛЕГЕНДАРНАЯ"),
+                 st - 0.2, 3.0, y=612, col=(232, 186, 90))
+        self.cap(_tc("EFSANEVİ HASAR KİTABI: +%40!", "LEGENDARY DAMAGE BOOK: +40%!",
+                     "LIBRO DE DAÑO LEGENDARIO: ¡+40%!", "LEGENDÄRES SCHADENSBUCH: +40%!",
+                     "ЛЕГЕНДАРНАЯ КНИГА УРОНА: +40%!"),
+                 _tc("Aynı kitap Yaygın gelseydi yalnızca +%5 verirdi.",
+                     "The same book as a Common card would give just +5%.",
+                     "El mismo libro en carta Común daría solo +5%.",
+                     "Dasselbe Buch als gewöhnliche Karte gäbe nur +5%.",
+                     "Та же книга обычной редкости дала бы лишь +5%."),
+                 st - 5.0, 2.5, y=612, col=(255, 200, 80))
+        self.stamp(_tc("EFSANEVİ!", "LEGENDARY!", "¡LEGENDARIA!", "LEGENDÄR!", "ЛЕГЕНДА!"),
+                   st - 7.3, GOLD, y=330, life=1.6)
+        if sh.state == STATE_PLAY and st > 7.4:
+            self.cap(_tc("BEĞENMEDİN Mİ? YENİLE!", "DON'T LIKE IT? REROLL!", "¿NO TE GUSTA? ¡CAMBIA!",
+                         "GEFÄLLT NICHT? NEU WÜRFELN!", "НЕ НРАВИТСЯ? ПЕРЕБРОСЬ!"),
+                     _tc("İlk 3 yenileme bedava, sonrası ucuz altın.",
+                         "The first 3 rerolls are free, then cheap gold.",
+                         "Los 3 primeros cambios son gratis, luego oro barato.",
+                         "Die ersten 3 Neuwürfe sind gratis, danach billiges Gold.",
+                         "Первые 3 переброса бесплатны, дальше — немного золота."),
+                     st - 7.5, 2.4, col=(130, 200, 255))
+
+    def _s_luck(self, st, dt, first):
+        """ŞANS bilgi ekranı: şans arttıkça kademe olasılıkları nasıl kayar."""
+        c = self.sh.display.canvas
+        c.blit(self._grad_bg(), (0, 0))
+        cx = VIRTUAL_W / 2
+        self._rays(c, cx, 120, st, alpha=14)
+        q = clamp((st - 0.9) / 3.6, 0.0, 1.0)
+        luck = 2.5 * ease_out_cubic(q)
+        add_glow(c, cx, 110, 260, (110, 225, 130), 0.25)
+        draw_icon(c, cx - 175, 92, "horseshoe", (110, 225, 130), 26)
+        draw_text(c, _tc("ŞANS", "LUCK", "SUERTE", "GLÜCK", "УДАЧА"), (cx - 140, 64), 54,
+                  (150, 245, 160), bold=True)
+        draw_text(c, fmt_pct1(luck), (cx + 150, 66), 50, WHITE, bold=True)
+        wts = rarity_weights(luck)
+        tot = sum(wts) or 1.0
+        x0, y0, bw = 300, 190, 640
+        for i in range(RARITY_COUNT):
+            pct = wts[i] / tot
+            y = y0 + i * 62
+            rc = rarity_color(i)
+            draw_text(c, rarity_name(i), (x0 - 20, y + 8), 22, rc, bold=True, right=True)
+            pygame.draw.rect(c, (24, 20, 36), pygame.Rect(x0, y + 4, bw, 34), border_radius=10)
+            wd = max(6, int(bw * pct / 0.75))
+            pygame.draw.rect(c, rc, pygame.Rect(x0, y + 4, min(bw, wd), 34), border_radius=10)
+            if i == RARITY_COUNT - 1 and pct > 0.02:
+                add_glow(c, x0 + min(bw, wd), y + 21, 40, rc, 0.4 + 0.2 * math.sin(st * 8))
+            draw_text(c, fmt_pct1(pct), (x0 + bw + 20, y + 8), 22, WHITE, bold=True)
+        if self.hit(st, 4.5):
+            sfx("levelup", 0.8, 0.0)
+        self.cap(_tc("ŞANS = DAHA ÇOK EFSANEVİ", "LUCK = MORE LEGENDARIES", "SUERTE = MÁS LEGENDARIAS",
+                     "GLÜCK = MEHR LEGENDÄRES", "УДАЧА = БОЛЬШЕ ЛЕГЕНД"),
+                 _tc("Kartlar, kitaplar, sandıklar ve mağara — hepsi şansla daha yüksek kademe çeker.",
+                     "Cards, books, chests and the cave all roll higher tiers with Luck.",
+                     "Cartas, libros, cofres y la cueva salen de mayor rango con suerte.",
+                     "Karten, Bücher, Truhen und die Höhle würfeln mit Glück höher.",
+                     "Карты, книги, сундуки и пещера с удачей выпадают выше рангом."),
+                 st - 0.4, 3.6, col=(150, 245, 160))
+        self.cap(_tc("ŞANSI NASIL KASARSIN?", "HOW TO GET LUCK?", "¿CÓMO CONSEGUIR SUERTE?",
+                     "WIE BEKOMMST DU GLÜCK?", "КАК ПОЛУЧИТЬ УДАЧУ?"),
+                 _tc("Şans Kitabı, Yonca, Şans Çekirdeği, Uğur ustalığı, skinler...",
+                     "Book of Luck, Clover, Luck Core, Fortune mastery, skins...",
+                     "Libro de la Suerte, Trébol, Núcleo de Suerte, maestría, skins...",
+                     "Glücksbuch, Kleeblatt, Glückskern, Meisterschaft, Skins...",
+                     "Книга Удачи, Клевер, Ядро Удачи, мастерство, скины..."),
+                 st - 4.2, 2.7)
+
+    def _s_arsenal(self, st, dt, first):
+        if first:
+            run = self._fresh_run(12, {"tesla": 10, "tornado": 8, "beam": 10, "pentagram": 10}, 26, 42,
+                                  books={"r_dmg": (5, 2)})
+            self._spawn_ring(run, 30)
+        run = self.sh.run
+        if self.hit(st, 5.0):
+            self._big_bonk(run)
+        self._play(dt)
+        subs = {
+            "tesla": _tc("Yıldırım yaratıktan yaratığa zıplar.", "Lightning jumps from monster to monster.",
+                         "El rayo salta de monstruo en monstruo.", "Der Blitz springt von Monster zu Monster.",
+                         "Молния перескакивает с монстра на монстра."),
+            "tornado": _tc("Kasırga sürüyü içine çekip öğütür.", "The tornado sucks the swarm in and grinds it.",
+                           "El tornado absorbe al enjambre y lo tritura.", "Der Tornado saugt den Schwarm ein.",
+                           "Смерч затягивает и перемалывает толпу."),
+            "beam": _tc("Güneş ışını etrafında tam tur döner.", "The sun beam sweeps a full circle around you.",
+                        "El rayo solar gira a tu alrededor.", "Der Sonnenstrahl kreist um dich herum.",
+                        "Солнечный луч описывает круг вокруг тебя."),
+            "pentagram": _tc("Ayağının altındaki mühür içine gireni yakar.", "The seal under your feet burns all inside.",
+                             "El sello bajo tus pies quema a quien entre.", "Das Siegel unter dir verbrennt alles darin.",
+                             "Печать под ногами сжигает всех внутри."),
+        }
+        cols = {"tesla": (150, 200, 255), "tornado": (200, 220, 230), "beam": (255, 210, 110),
+                "pentagram": (238, 110, 150)}
+        for i, k in enumerate(self.WEAPONS):
+            w = WEAPON_BY_KEY[k]
+            self.cap(w_name(w).upper(), subs[k], st - 0.3 - i * 1.95, 1.9, col=cols[k])
+
+    def _s_books(self, st, dt, first):
+        sh = self.sh
+        if first:
+            sh.goto(STATE_BOOK_MARKET)
+            sh.book_filter = "all"
+            self.music.append((self.t, "menu"))
+        if st > 2.4:
+            sh.book_scroll = 260 * ease_out_cubic((st - 2.4) / 1.4)
+        m = self.path([(0.0, (1069, 371)), (1.2, (783, 330)), (2.6, (783, 330)), (4.0, (520, 520)),
+                       (6.0, (520, 520))], st)
+        sh.update_book_market(dt, m, False, 0)
+        self.cursor(m)
+        self.cap(_tc("KİTAPLAR", "BOOKS", "LIBROS", "BÜCHER", "КНИГИ"),
+                 _tc("4 kitap taşırsın; her biri 30. seviyeye kadar büyür.",
+                     "Carry 4 books; each grows up to level 30.",
+                     "Llevas 4 libros; cada uno sube hasta el nivel 30.",
+                     "Trage 4 Bücher; jedes wächst bis Stufe 30.",
+                     "Носи 4 книги; каждая растёт до 30 уровня."),
+                 st - 0.2, 2.8, col=(196, 150, 255))
+        self.cap(_tc("+1 NADİR KİTAP", "+1 RARE BOOK", "+1 LIBRO RARO", "+1 SELTENES BUCH",
+                     "+1 РЕДКАЯ КНИГА"),
+                 _tc("Zehir, Yankı, Çoğalma... Koşuyu değiştiren tek büyük karar.",
+                     "Poison, Echo, Multishot... one big run-changing pick.",
+                     "Veneno, Eco, Multidisparo... una gran decisión que cambia la partida.",
+                     "Gift, Echo, Mehrfachschuss... die eine große Entscheidung.",
+                     "Яд, Эхо, Мультивыстрел... один большой выбор на забег."),
+                 st - 3.1, 2.8, col=(255, 200, 90))
 
     def _s_market(self, st, dt, first):
         sh = self.sh
-        run = sh.run
         if first:
-            run.gold_wallet = max(run.gold_wallet, 900)
+            run = self._fresh_run(8, {"tesla": 6, "tornado": 4, "beam": 6, "pentagram": 6}, 16, 12)
+            run.gold_wallet = max(run.gold_wallet, 1400)
             run.open_shop()
             sh.state = STATE_RUN_SHOP
-        m = self.path([(0.0, (640, 600)), (0.7, (183, 250)), (1.6, (183, 250)), (2.2, (640, 688)),
-                       (3.0, (640, 688))], st)
+        m = self.path([(0.0, (640, 600)), (0.7, (183, 250)), (1.6, (183, 250)), (2.2, (420, 250)),
+                       (4.0, (420, 250))], st)
         clicked = False
-        for x in (0.95, 1.35, 2.4):
+        for x in (0.95, 1.35, 2.5):
             if self.at(st, x):
                 clicked = True
                 self.clicks.append((m, self.t))
@@ -32025,140 +32264,179 @@ class GameTour:
             self.cursor(m)
         else:
             self._play(dt)
-        self.cap(_tc("MARKET  (B)", "SHOP  (B)"),
-                 _tc("Topladığın altınla anında güçlen.", "Spend the gold you pick up — power up on the spot."),
-                 st - 0.3, 2.6, y=612)
+        self.cap(_tc("MARKET  (B)", "SHOP  (B)", "TIENDA  (B)", "LADEN  (B)", "МАГАЗИН  (B)"),
+                 _tc("Topladığın altınla anında güçlen.", "Spend the gold you pick up and power up.",
+                     "Gasta el oro que recoges y mejora al instante.",
+                     "Gib das gesammelte Gold aus und werde sofort stärker.",
+                     "Трать собранное золото и усиливайся сразу."),
+                 st - 0.3, 3.4, y=612)
 
-    def _boss_scene(self, st, dt, first, wave, title, sub, col):
+    def _s_boss(self, st, dt, first):
         sh = self.sh
-        run = sh.run
         if first:
-            sh.state = STATE_PLAY
-            p = run.player
-            p.weapons.setdefault("axe", 3)
-            p.weapons.setdefault("pentagram", 3)
-            p.weapons.setdefault("tornado", 2)
-            p.level = max(p.level, 12 if wave == 10 else 16)
+            run = self._fresh_run(10, {"tesla": 8, "tornado": 6, "beam": 8, "pentagram": 8}, 20, 12)
             run.chests.clear()
-            run.waves.wave = wave
-            # 10. dalga Savaş Lordu, 15. dalga Cadı (BOSS_ORDER sırası)
-            run.waves.boss_idx = 0 if wave == 10 else 1
+            run.waves.wave = 10
+            run.waves.boss_idx = 0
             run.waves.boss_pending = True
-            self.pilot.crowd = 12
             self.pilot.target = None
-        if st > 3.3:
+        run = sh.run
+        if st > 4.2:
             for b in list(run.bosses):
                 tour_kill_boss(b, run.fx)
-        self.pilot.target = (run.chests[0].x, run.chests[0].y) if run.chests else None
+            if self.hit(st, 4.25):
+                pass
+        self.pilot.target = None
         self._play(dt)
-        self.cap(title, sub, st - 0.5, 3.8, col=col)
+        self.cap(_tc("HER 5 DALGADA BİR PATRON", "A BOSS EVERY 5 WAVES", "UN JEFE CADA 5 OLEADAS",
+                     "ALLE 5 WELLEN EIN BOSS", "БОСС КАЖДЫЕ 5 ВОЛН"),
+                 _tc("Kaç, vur, devir! Devrilen patron SANDIK düşürür.",
+                     "Dodge, hit, win! Every boss drops a CHEST.",
+                     "¡Esquiva, golpea, gana! Cada jefe suelta un COFRE.",
+                     "Ausweichen, treffen, siegen! Jeder Boss lässt eine TRUHE fallen.",
+                     "Уклоняйся, бей, побеждай! С босса падает СУНДУК."),
+                 st - 0.4, 4.4, col=(255, 110, 90))
 
-    def _s_boss1(self, st, dt, first):
-        self._boss_scene(st, dt, first, 10, _tc("10. DALGA: PATRON!", "WAVE 10: BOSS!"),
-                         _tc("Devir, düşürdüğü sandığı kap: silahın güçlenir.", "Take it down and grab its chest: your weapon levels up."),
-                         (255, 110, 90))
-
-    def _s_boss2(self, st, dt, first):
-        self._boss_scene(st, dt, first, 15, _tc("15. DALGA: YENİ PATRON!", "WAVE 15: NEW BOSS!"),
-                         _tc("Her patron başka saldırır. Kaç, vur, devir!", "Every boss fights differently. Dodge, hit, win!"),
-                         (255, 150, 90))
-
-    def _s_magnet(self, st, dt, first):
+    def _s_chest(self, st, dt, first):
         sh = self.sh
         run = sh.run
-        p = run.player
         if first:
-            run.chests.clear()
-            run.enemies[:] = run.enemies[:5]
-            self.pilot.crowd = 5
-            for i in range(70):
-                a = i * 2.39
-                d = 160 + (i % 9) * 40
-                run.drop_pickup(p.x + math.cos(a) * d, p.y + math.sin(a) * d * 0.7,
-                                "xp" if i % 3 else "coin", 3)
-            run.magnets.append(MagnetDrop(p.x + 190, p.y - 20))
-        if not run.magnets and "stone" not in self.flags:
-            self.flags.add("stone")
-            run.level_drops.append(LevelDrop(p.x - 200, p.y + 40))
-        if run.magnets:
-            self.pilot.target = (run.magnets[0].x, run.magnets[0].y)
-        elif run.level_drops and st > 2.3:
-            self.pilot.target = (run.level_drops[0].x, run.level_drops[0].y)
+            self.flags.discard("chest_open")
+            if not run.chests:
+                p = run.player
+                run.chests.append(BossChest(p.x + 170, p.y + 30, "tour"))
+            self.pilot.crowd = 6
+        n0 = run.chests_opened
+        if run.chests:
+            self.pilot.target = (run.chests[0].x, run.chests[0].y)
+            with _ForcedRarity([4]):
+                self._play(dt)
         else:
             self.pilot.target = None
-        self._play(dt)
-        self.cap(_tc("MIKNATIS", "MAGNET"),
-                 _tc("Yerdeki bütün tecrübe ve altını tek seferde çeker!", "Pulls in every XP orb and coin on the floor!"),
-                 st - 0.2, 2.1, col=(120, 200, 255))
-        self.cap(_tc("MOR SEVİYE TAŞI", "PURPLE LEVEL STONE"),
-                 _tc("Topla, anında bir seviye atla!", "Grab it and level up instantly!"),
-                 st - 2.4, 2.0, col=(196, 120, 255))
+            self._play(dt)
+        if run.chests_opened > n0 and "chest_open" not in self.flags:
+            self.flags.add("chest_open")
+            self.hits.append(self.t)
+            self.flags.add("chest_t=%.2f" % st)
+        opened_at = None
+        for f in self.flags:
+            if f.startswith("chest_t="):
+                opened_at = float(f[8:])
+        self.cap(_tc("SANDIK DA ŞANS ÇEKER", "CHESTS ROLL LUCK TOO", "LOS COFRES TAMBIÉN TIRAN SUERTE",
+                     "AUCH TRUHEN WÜRFELN", "СУНДУКИ ТОЖЕ НА УДАЧУ"),
+                 _tc("Efsanevi sandık: silaha büyük bonus + bir seviye daha!",
+                     "Legendary chest: a big weapon bonus + an extra level!",
+                     "Cofre legendario: gran bonus de arma + un nivel extra!",
+                     "Legendäre Truhe: großer Waffenbonus + eine Extrastufe!",
+                     "Легендарный сундук: большой бонус оружию + ещё уровень!"),
+                 st - 0.3, 5.4, col=(255, 200, 80))
+        if opened_at is not None:
+            self.stamp(_tc("EFSANEVİ SANDIK!", "LEGENDARY CHEST!", "¡COFRE LEGENDARIO!",
+                           "LEGENDÄRE TRUHE!", "ЛЕГЕНДАРНЫЙ СУНДУК!"), st - opened_at, GOLD, y=300, life=1.9)
 
-    def _s_portal(self, st, dt, first):
+    def _s_cave(self, st, dt, first):
         sh = self.sh
+        if first:
+            run = self._fresh_run(9, {"tesla": 8, "tornado": 6, "beam": 8, "pentagram": 8}, 22, 14)
+            p = run.player
+            cs = CursedShrine(clamp(p.x + 300, ARENA_RECT.left + 200, ARENA_RECT.right - 200),
+                              clamp(p.y - 60, ARENA_RECT.top + 200, ARENA_RECT.bottom - 200))
+            cs.discovered = True
+            run.cursed_shrine = cs
+            run.cursed_next_wave = 999
+            self.flags.discard("cave_open")
         run = sh.run
+        cs = run.cursed_shrine
+        if "cave_open" not in self.flags and st >= 2.8 and cs is not None:
+            self.flags.add("cave_open")
+            with _ForcedRarity([4, 2, 1]):
+                run.open_cursed()
+            sh.state = STATE_CURSE
+            self.hits.append(self.t)
+        if sh.state == STATE_CURSE and run.curse_offers:
+            sh.curse_ui.rebuild(run.curse_offers)
+            cards = [r.center for (r, _o, _i) in sh.curse_ui.cards] or [(640, 360)]
+            m = self.path([(2.8, (640, 680)), (3.6, cards[0]), (6.0, cards[0])], st)
+            clicked = self.at(st, 5.6)
+            if clicked:
+                self.clicks.append((m, self.t))
+                self.hits.append(self.t)
+            sh.update_curse(dt, m, clicked)
+            self.cursor(m)
+            self.cap(_tc("BÜYÜK ÖDÜL... AMA BİR BEDELİ VAR", "A HUGE REWARD... AT A PRICE",
+                         "UNA GRAN RECOMPENSA... CON UN PRECIO", "GROSSE BELOHNUNG... MIT PREIS",
+                         "БОЛЬШАЯ НАГРАДА... НО ЕСТЬ ЦЕНА"), None, st - 3.0, 2.5, y=640,
+                     col=(200, 130, 255))
+        else:
+            if cs is not None and not cs.used and "cave_open" not in self.flags:
+                self.pilot.target = (cs.x - 40, cs.y + 40)
+            else:
+                self.pilot.target = None
+            self._play(dt)
+        self.cap(_tc("LANETLİ MAĞARA", "CURSED CAVE", "CUEVA MALDITA", "VERFLUCHTE HÖHLE",
+                     "ПРОКЛЯТАЯ ПЕЩЕРА"),
+                 _tc("Haritada gizli. Bulursan haritada parlar — mağarada şans 1,5 kat!",
+                     "Hidden on the map. Find it — Luck is x1.5 inside!",
+                     "Oculta en el mapa. Encuéntrala: ¡dentro la suerte es x1,5!",
+                     "Versteckt auf der Karte. Finde sie — drinnen ist Glück x1,5!",
+                     "Спрятана на карте. Найди её — внутри удача x1,5!"),
+                 st - 0.2, 2.6, col=(200, 130, 255))
+        self.cap(_tc("LANET KABUL!", "CURSE ACCEPTED!", "¡MALDICIÓN ACEPTADA!", "FLUCH ANGENOMMEN!",
+                     "ПРОКЛЯТИЕ ПРИНЯТО!"),
+                 _tc("Ödül senin — yeni yaratıklar koşu boyunca peşinde, skorun da katlanır.",
+                     "The reward is yours — new monsters hunt you, and your score multiplies.",
+                     "La recompensa es tuya: nuevos monstruos te cazan y tu puntuación crece.",
+                     "Die Belohnung gehört dir — neue Monster jagen dich, dein Score wächst.",
+                     "Награда твоя — новые монстры охотятся за тобой, а очки растут."),
+                 st - 5.9, 2.0, col=(255, 90, 120))
+
+    def _s_hell(self, st, dt, first):
+        sh = self.sh
         if first:
-            self.pilot.target = None
-            self.pilot.crowd = 0
+            run = self._fresh_run(HELL_PORTAL_WAVE, {"tesla": 12, "tornado": 10, "beam": 12,
+                                                     "pentagram": 12}, 34, 4,
+                                  books={"r_dmg": (8, 2)})
             run.enemies[:] = run.enemies[:4]
-            run.level_drops.clear()
             run.open_hell_portal()
+            self.pilot.crowd = 0
+        run = sh.run
         hp = run.hell_portal
-        if hp is not None and st > 0.8:
+        if run.biome != "hell" and hp is not None and st > 0.6:
             self.pilot.target = (hp.x, hp.y)
-            self.pilot.use = st > 1.6
-        self._play(dt)
-        if run.biome == "hell":
+            self.pilot.use = st > 1.4
+        if run.biome == "hell" and "hell_in" not in self.flags:
+            self.flags.add("hell_in")
             self.pilot.use = False
             self.pilot.target = None
-        self.cap(_tc("CEHENNEM KAPISI", "HELL GATE"),
-                 _tc("25. dalganın patronundan sonra açılır. E ile gir!", "Opens after the wave-25 boss. Press E to enter!"),
-                 st - 0.3, 2.6, col=(200, 110, 255))
-
-    def _s_hell1(self, st, dt, first):
-        run = self.sh.run
-        if first:
-            if run.biome != "hell":
-                run.enter_hell()
-            self.pilot.use = False
-            self.pilot.target = None
-            self.pilot.crowd = 16
+            self.pilot.crowd = 34
             self.pilot.cx, self.pilot.cy = run.player.x, run.player.y
+            self.hits.append(self.t)
+            self._spawn_ring(run, 20)
+        if st > 3.6 and run.biome != "hell":
+            run.enter_hell()
         self._play(dt)
-        self.cap(_tc("CEHENNEM — 1. DALGA", "HELL — WAVE 1"),
-                 _tc("İkinci harita: lav, alev, çok daha sert yaratıklar.", "The second map: lava, fire, much tougher monsters."),
-                 st - 0.3, 2.6, col=(255, 120, 60))
-
-    def _s_hell5(self, st, dt, first):
-        run = self.sh.run
-        if first:
-            run.waves._begin_wave(5, run.score)
-            run.waves.announce_text = L("ui.ann_hell", 5)
-            self.pilot.crowd = 32
-        self._play(dt)
-        self.cap(_tc("CEHENNEM — 5. DALGA", "HELL — WAVE 5"), _tc("Kalabalık kızışıyor...", "It's heating up..."),
-                 st - 0.3, 2.6, col=(255, 120, 60))
-
-    def _s_hellboss(self, st, dt, first):
-        run = self.sh.run
-        if first:
-            run.waves.wave = 10
-            run.waves.boss_idx = 1
-            run.waves.boss_pending = True
-            self.pilot.crowd = 16
-        if st > 3.0:
-            for b in list(run.bosses):
-                tour_kill_boss(b, run.fx)
-        self._play(dt)
-        self.cap(_tc("10. DALGA: CEHENNEM PATRONU", "WAVE 10: HELL BOSS"),
-                 _tc("Cehennemin patronları ateşle saldırır.", "Hell's bosses fight with fire."),
-                 st - 0.3, 3.4, col=(255, 80, 80))
+        self.cap(_tc("25. DALGA: CEHENNEM KAPISI", "WAVE 25: THE HELL GATE", "OLEADA 25: LA PUERTA DEL INFIERNO",
+                     "WELLE 25: DAS HÖLLENTOR", "ВОЛНА 25: ВРАТА АДА"),
+                 _tc("Patronu devir, kapıdan geç (E): lav, ateş, çok daha sert yaratıklar.",
+                     "Beat the boss, step through (E): lava, fire, far tougher monsters.",
+                     "Vence al jefe y cruza (E): lava, fuego y monstruos mucho más duros.",
+                     "Besiege den Boss, geh hindurch (E): Lava, Feuer, härtere Monster.",
+                     "Победи босса и войди (E): лава, огонь и куда более злые монстры."),
+                 st - 0.3, 4.0, col=(255, 120, 60))
+        self.cap(_tc("CEHENNEM", "HELL", "INFIERNO", "HÖLLE", "АД"),
+                 _tc("Burada her dalga bir öncekinden sert — ne kadar dayanabilirsin?",
+                     "Every wave here is harder than the last — how long can you last?",
+                     "Cada oleada es más dura que la anterior: ¿cuánto aguantarás?",
+                     "Jede Welle ist härter als die letzte — wie lange hältst du durch?",
+                     "Каждая волна сильнее прежней — сколько ты продержишься?"),
+                 st - 4.6, 2.3, col=(255, 90, 60))
 
     def _s_dragon(self, st, dt, first):
         sh = self.sh
         run = sh.run
         p = run.player
         if first:
+            self.flags.discard("hell_in")
             run.chests.clear()
             cam = run.cam_rect()
             dg = Boss("dragon", cam.centerx + 260, cam.centery - 120, 1.0, 1.0, run.waves.wave,
@@ -32168,21 +32446,51 @@ class GameTour:
             run.waves.boss_active = True
             self.pilot.crowd = 14
             sfx("boss", 1.0, 0.0)
-        if st > 0.9:
-            self.pilot.keep_hp = False
-            if p.alive and int(st / 0.3) != int(self.prev / 0.3):
-                p.invuln = 0.0
-                p.take_damage(p.max_hp * 0.3, run.fx, src="boss")
+            self.hits.append(self.t)
+        if st > 4.6:
+            for b in list(run.bosses):
+                tour_kill_boss(b, run.fx)
         self._play(dt)
-        self.cap(_tc("EJDERHA UYANDI!", "THE DRAGON AWAKENS!"),
-                 _tc("...ve bu sefer kaybettin. Bir dahakine!", "...and this time you lost. Next time!"),
-                 st - 0.2, 2.8, col=(255, 90, 60))
+        self.cap(_tc("EJDERHA UYANDI!", "THE DRAGON AWAKENS!", "¡EL DRAGÓN DESPIERTA!",
+                     "DER DRACHE ERWACHT!", "ДРАКОН ПРОБУДИЛСЯ!"),
+                 _tc("Cehennem patronları alev püskürtür, üstüne dalar.",
+                     "Hell's bosses breathe fire and dive at you.",
+                     "Los jefes del infierno escupen fuego y se lanzan sobre ti.",
+                     "Die Höllenbosse speien Feuer und stürzen sich auf dich.",
+                     "Боссы ада дышат огнём и пикируют на тебя."),
+                 st - 0.3, 4.6, col=(255, 90, 60))
 
-    def _s_gameover(self, st, dt, first):
+    def _s_power(self, st, dt, first):
+        if first:
+            run = self._fresh_run(20, {"tesla": 22, "tornado": 20, "beam": 22, "pentagram": 22}, 74, 56,
+                                  books={"r_dmg": (16, 4), "r_aspd": (12, 3), "r_crit": (10, 3)},
+                                  hell=True)
+            run.waves._begin_wave(20, run.score)
+            run.waves.announce_timer = 0.0
+            run.fx.texts.clear()
+            self._spawn_ring(run, 44)
+        run = self.sh.run
+        if self.hit(st, 2.6):
+            self._big_bonk(run)
+        self._play(dt)
+        self.stamp(_tc("DURDURULAMAZ!", "UNSTOPPABLE!", "¡IMPARABLE!", "UNAUFHALTSAM!", "НЕУДЕРЖИМ!"),
+                   st - 0.5, (255, 140, 60), y=300, life=1.8)
+        self.cap(_tc("EFSANEVİLER GELDİKÇE GÜÇLENİRSİN", "EVERY LEGENDARY MAKES YOU STRONGER",
+                     "CADA LEGENDARIA TE HACE MÁS FUERTE", "JEDES LEGENDÄRE MACHT DICH STÄRKER",
+                     "КАЖДАЯ ЛЕГЕНДА ДЕЛАЕТ ТЕБЯ СИЛЬНЕЕ"),
+                 _tc("Her koşu farklı: kartlar, kitaplar, sandıklar hep yeniden çekilir.",
+                     "Every run is different: cards, books and chests are rolled anew.",
+                     "Cada partida es distinta: cartas, libros y cofres se tiran de nuevo.",
+                     "Jeder Lauf ist anders: Karten, Bücher und Truhen werden neu gewürfelt.",
+                     "Каждый забег разный: карты, книги и сундуки выпадают заново."),
+                 st - 2.2, 3.7, col=(255, 200, 80))
+
+    def _s_record(self, st, dt, first):
         sh = self.sh
         if first:
             self.music.append((self.t, "menu"))
             if sh.state == STATE_PLAY and sh.run is not None:
+                sh.run.score = max(sh.run.score, 152340)
                 sh.run.player.alive = False
                 sh.run.game_over = True
                 sh.run.run_is_clean = lambda: True
@@ -32194,13 +32502,21 @@ class GameTour:
         m = (640 + math.sin(st) * 40, 520)
         if sh.state == STATE_GAMEOVER:
             sh.update_gameover(dt, m, False)
-        else:
+        elif sh.run is not None and self.pilot is not None:
             self._play(dt, step=False)
         self.cursor(m)
-        self.stamp(_tc("YENİ REKOR!", "NEW HIGH SCORE!"), st - 0.4, GOLD, y=360)
-        self.cap(_tc("SKORUN DÜNYAYA GİDER", "YOUR SCORE GOES GLOBAL"),
-                 _tc("Hesabınla oynadıysan skorun dünya sıralamasına yazılır.", "Signed in? Your score lands on the world ranking."),
-                 st - 0.6, 2.4)
+        if self.hit(st, 0.4):
+            pass
+        self.stamp(_tc("YENİ REKOR!", "NEW HIGH SCORE!", "¡NUEVO RÉCORD!", "NEUER REKORD!",
+                       "НОВЫЙ РЕКОРД!"), st - 0.4, GOLD, y=360)
+        self.cap(_tc("SKORUN DÜNYAYA GİDER", "YOUR SCORE GOES GLOBAL", "TU PUNTUACIÓN ES MUNDIAL",
+                     "DEIN SCORE GEHT WELTWEIT", "ТВОЙ СЧЁТ — НА ВЕСЬ МИР"),
+                 _tc("Hesabınla oyna: skorun dünya sıralamasına yazılır.",
+                     "Play signed in: your score lands on the world ranking.",
+                     "Juega con tu cuenta: tu puntuación entra en el ranking mundial.",
+                     "Spiel angemeldet: dein Score kommt in die Weltrangliste.",
+                     "Играй с аккаунтом: твой счёт попадёт в мировой рейтинг."),
+                 st - 0.8, 3.5)
 
     def _s_worldlb(self, st, dt, first):
         sh = self.sh
@@ -32216,7 +32532,7 @@ class GameTour:
             return
         if sh.state != STATE_WORLD_LB:
             sh.goto(STATE_WORLD_LB)
-        m = self.path([(1.3, (640, 487)), (2.2, (980, 200)), (5.0, (980, 200))], st)
+        m = self.path([(1.3, (640, 487)), (2.2, (980, 200)), (6.0, (980, 200))], st)
         sh.update_world_leaderboard(dt, m, False)
         c = sh.display.canvas
         if st > 1.4:                       # altın konfeti
@@ -32225,25 +32541,35 @@ class GameTour:
                 y = ((st - 1.4) * (160 + (i % 7) * 30) + i * 23) % (VIRTUAL_H + 40) - 20
                 col = ((255, 214, 110), (255, 120, 140), (120, 210, 255), (150, 240, 160))[i % 4]
                 pygame.draw.rect(c, col, pygame.Rect(int(x), int(y), 6, 10))
-        if self.at(st, 1.4):
+        if self.hit(st, 1.4):
             sfx("buy", 1.0, 0.0)
         self.cursor(m)
-        self.stamp(_tc("1. SENSİN!", "YOU'RE #1!"), st - 1.4, GOLD, y=360)
-        self.cap(_tc("DÜNYA SIRALAMASI", "WORLD RANKING"),
-                 _tc("Zirvede SEN varsın. Arkadaşların seni geçebilecek mi?", "YOU are on top. Can your friends beat you?"),
-                 st - 2.0, 3.0, col=(130, 200, 255))
+        self.stamp(_tc("1. SENSİN!", "YOU'RE #1!", "¡ERES EL #1!", "DU BIST #1!", "ТЫ — №1!"),
+                   st - 1.4, GOLD, y=360)
+        self.cap(_tc("DÜNYA SIRALAMASI", "WORLD RANKING", "RANKING MUNDIAL", "WELTRANGLISTE",
+                     "МИРОВОЙ РЕЙТИНГ"),
+                 _tc("Zirveye kas, adın en üstte parlasın. Arkadaşların seni geçebilecek mi?",
+                     "Grind to the top and see your name shine. Can your friends beat you?",
+                     "Sube a la cima y haz brillar tu nombre. ¿Te superarán tus amigos?",
+                     "Kämpf dich nach oben. Können deine Freunde dich schlagen?",
+                     "Пробейся на вершину. Смогут ли друзья тебя обогнать?"),
+                 st - 2.0, 3.8, col=(130, 200, 255))
 
-    def _s_pets(self, st, dt, first):
+    def _s_mastery(self, st, dt, first):
         sh = self.sh
         if first:
-            sh.state = STATE_GEM_STORE
-            sh.store_tab = "pets"
-        m = self.path([(0.0, (640, 600)), (1.0, (896, 230)), (2.0, (1150, 400)), (3.0, (400, 420))], st)
-        sh.update_gem_store(dt, m, False)
+            sh.state = STATE_MASTERY
+        m = self.path([(0.0, (980, 200)), (1.2, (440, 160)), (2.6, (840, 456)), (5.0, (640, 540))], st)
+        sh.update_mastery(dt, m, False)
         self.cursor(m)
-        self.cap(_tc("PET'LER", "PETS"),
-                 _tc("Kedi, köpek, ejderha, drone... Yanında koşan sadık dostlar.", "Cat, dog, dragon, drone... loyal buddies by your side."),
-                 st - 0.2, 2.7, y=612, col=(255, 170, 200))
+        self.cap(_tc("ARENA USTALIĞI", "ARENA MASTERY", "MAESTRÍA DE ARENA", "ARENA-MEISTERSCHAFT",
+                     "МАСТЕРСТВО АРЕНЫ"),
+                 _tc("Elmasla KALICI güç: hasar, can, şans... ve silah/kitap eleği.",
+                     "PERMANENT power with gems: damage, health, luck... and weapon/book filters.",
+                     "Poder PERMANENTE con gemas: daño, vida, suerte... y filtros.",
+                     "DAUERHAFTE Stärke mit Edelsteinen: Schaden, Leben, Glück... und Filter.",
+                     "ПОСТОЯННАЯ сила за кристаллы: урон, здоровье, удача... и фильтры."),
+                 st - 0.3, 4.4, y=630, col=(255, 205, 110))
 
     def _s_skins(self, st, dt, first):
         sh = self.sh
@@ -32253,12 +32579,11 @@ class GameTour:
         c.blit(self._grad_bg(), (0, 0))
         cx, cy = VIRTUAL_W / 2, 330
         self._rays(c, cx, cy - 40, st, alpha=18)
-        # parlak zemin (döner sahne)
         pygame.draw.ellipse(c, (40, 26, 66), pygame.Rect(cx - 470, cy + 40, 940, 150))
         pygame.draw.ellipse(c, (120, 90, 180), pygame.Rect(cx - 470, cy + 40, 940, 150), 2)
         add_glow(c, cx, cy + 110, 360, (160, 110, 255), 0.18)
         picks = ["default", "crimson", "royal", "inferno", "frost_witch", "storm_bringer",
-                 "prism", "web_master", "green_titan", "immortal_merc"]
+                 "prism", "web_master", "green_titan", "immortal_merc", "lucky_fox"]
         sks = [SKIN_BY_ID[k] for k in picks if k in SKIN_BY_ID]
         n = len(sks)
         rot = st * 0.85
@@ -32276,26 +32601,36 @@ class GameTour:
             add_glow(c, x, y, r * 3, sk["color"], 0.08 + 0.25 * depth)
             c.blit(shadow_sprite(r * 2 + 12), (int(x - r - 6), int(y + r - 6)))
             draw_skin_preview(c, sk, x, y, sh.t, r=r)
-        # öndeki skinin künyesi
         nm = skin_name(front)
         add_glow(c, cx, 92, 220, front["color"], 0.18)
         draw_text(c, nm, (cx, 86), 46, front["color"], bold=True, center=True)
         u = get_skin_ult(front["id"]) or {}
         if u.get("name"):
-            draw_text(c, _tc("ÖZEL YETENEK: ", "SPECIAL: ") + str(u.get("name")), (cx, 132), 20,
-                      (236, 232, 244), bold=True, center=True)
-        if front.get("premium"):
-            tag, tcol = _tc("PREMİUM  ·  ", "PREMIUM  ·  ") + front.get("price_hint", ""), PURPLE
-            draw_text(c, tag, (cx, 162), 18, tcol, bold=True, center=True)
-        elif not front.get("cost"):
-            draw_text(c, _tc("BAŞLANGIÇ SKİNİ — bedava", "STARTER SKIN — free"), (cx, 162), 18,
-                      GREEN, bold=True, center=True)
-        else:
-            draw_coin_label(c, cx, 172, _tc("{0} elmas", "{0} gems").format(fmt_num(front["cost"])),
-                            GEM_COLOR, 18, icon="gem", icon_r=9, gap=7)
-        self.cap(_tc("24 SKİN", "24 SKINS"),
-                 _tc("Her skinin kendi silahı ve ÖZEL YETENEĞİ var. Elmasla aç!", "Each skin has its own weapon and SPECIAL ABILITY."),
-                 st - 0.3, 5.0, y=604, col=(255, 205, 110))
+            draw_text(c, _tc("ÖZEL YETENEK: ", "SPECIAL: ", "ESPECIAL: ", "SPEZIAL: ", "ОСОБОЕ: ")
+                      + str(u.get("name")), (cx, 132), 20, (236, 232, 244), bold=True, center=True)
+        self.cap(_tc("SKİNLER", "SKINS", "SKINS", "SKINS", "СКИНЫ"),
+                 _tc("Her skinin kendi silahı ve ÖZEL YETENEĞİ var.",
+                     "Every skin has its own weapon and SPECIAL ABILITY.",
+                     "Cada skin tiene su propia arma y HABILIDAD ESPECIAL.",
+                     "Jeder Skin hat eine eigene Waffe und SPEZIALFÄHIGKEIT.",
+                     "У каждого скина своё оружие и ОСОБАЯ СПОСОБНОСТЬ."),
+                 st - 0.3, 4.5, y=604, col=(255, 205, 110))
+
+    def _s_pets(self, st, dt, first):
+        sh = self.sh
+        if first:
+            sh.state = STATE_GEM_STORE
+            sh.store_tab = "pets"
+        m = self.path([(0.0, (640, 600)), (1.0, (896, 230)), (2.0, (1150, 400)), (4.0, (400, 420))], st)
+        sh.update_gem_store(dt, m, False)
+        self.cursor(m)
+        self.cap(_tc("PETLER", "PETS", "MASCOTAS", "BEGLEITER", "ПИТОМЦЫ"),
+                 _tc("Kedi, köpek, ejderha... Yanında koşan sadık dostlar.",
+                     "Cat, dog, dragon... loyal buddies by your side.",
+                     "Gato, perro, dragón... fieles compañeros a tu lado.",
+                     "Katze, Hund, Drache... treue Freunde an deiner Seite.",
+                     "Кот, пёс, дракон... верные друзья рядом с тобой."),
+                 st - 0.2, 3.6, y=612, col=(255, 170, 200))
 
     def _s_outro(self, st, dt, first):
         c = self.sh.display.canvas
@@ -32312,10 +32647,14 @@ class GameTour:
         add_glow(c, b.centerx, b.centery, 260, GREEN, 0.18 + 0.12 * q)
         c.blit(_button_body(b.w, b.h, (60, 150, 92), q, 22), b.topleft)
         pygame.draw.rect(c, (190, 255, 210), b, width=3, border_radius=22)
-        draw_text(c, _tc("ŞİMDİ SIRA SENDE!", "YOUR TURN NOW!"), b.center, int(36 + 3 * q), WHITE,
+        draw_text(c, _tc("ŞİMDİ SIRA SENDE!", "YOUR TURN NOW!", "¡AHORA TE TOCA!", "JETZT BIST DU DRAN!",
+                         "ТЕПЕРЬ ТВОЯ ОЧЕРЕДЬ!"), b.center, int(34 + 3 * q), WHITE,
                   bold=True, center=True)
-        draw_text(c, _tc("Hayatta kal. Vur. BONKla.", "Survive. Shoot. BONK."), (cx, 590), 24,
+        draw_text(c, _tc("Hayatta kal. Vur. BONKla.", "Survive. Shoot. BONK.", "Sobrevive. Dispara. BONK.",
+                         "Überlebe. Schieß. BONK.", "Выживай. Стреляй. БОНК."), (cx, 590), 24,
                   (236, 222, 196), bold=True, center=True)
+        if self.hit(st, 0.2):
+            sfx("bonk", 1.0, 0.0)
         for i in range(50):
             x = (i * 131.3 + math.sin(st + i) * 20) % VIRTUAL_W
             y = (st * (40 + i % 5 * 12) + i * 57) % VIRTUAL_H
@@ -32777,30 +33116,39 @@ class App:
                                   STATE_ACHIEVEMENTS):
                     wheel_y -= pad.right_stick()[1] * 13.0 * dt
 
-            if self.state == STATE_MENU: self.update_menu(dt, mouse_pos, clicked)
-            elif self.state == STATE_PLAY: self.update_play(dt, keys, mouse_pos, mouse_down, bonk_pressed,
-                                                            dash_pressed, use_pressed, clicked, stats_pressed)
-            elif self.state == STATE_PAUSE: self.update_pause(dt, mouse_pos, clicked)
-            elif self.state == STATE_LEVELUP: self.update_levelup(dt, mouse_pos, clicked)
-            elif self.state == STATE_CURSE: self.update_curse(dt, mouse_pos, clicked)
-            elif self.state == STATE_RUN_SHOP: self.update_run_shop(dt, mouse_pos, clicked)
-            elif self.state == STATE_GAMEOVER: self.update_gameover(dt, mouse_pos, clicked)
-            elif self.state == STATE_SKIN_MARKET: self.update_skin_market(dt, mouse_pos, clicked, wheel_y)
-            elif self.state == STATE_SKIN_DETAIL: self.update_skin_detail(dt, mouse_pos, clicked)
-            elif self.state == STATE_COSMETIC_MARKET: self.update_cosmetic_market(dt, mouse_pos, clicked, wheel_y)
-            elif self.state == STATE_BOOK_MARKET: self.update_book_market(dt, mouse_pos, clicked, wheel_y)
-            elif self.state == STATE_WEAPON_CODEX: self.update_weapon_codex(dt, mouse_pos, clicked, wheel_y)
-            elif self.state == STATE_LEADERBOARD: self.update_leaderboard(dt, mouse_pos, clicked)
-            elif self.state == STATE_WORLD_LB: self.update_world_leaderboard(dt, mouse_pos, clicked)
-            elif self.state == STATE_NAME_ENTRY: self.update_name_entry(dt, mouse_pos, clicked)
-            elif self.state == STATE_HOW_TO: self.update_howto(dt, mouse_pos, clicked)
-            elif self.state == STATE_SETTINGS: self.update_settings(dt, mouse_pos, clicked)
-            elif self.state == STATE_ACHIEVEMENTS: self.update_achievements(dt, mouse_pos, clicked, wheel_y)
-            elif self.state == STATE_GEM_STORE: self.update_gem_store(dt, mouse_pos, clicked)
-            elif self.state == STATE_LOGIN: self.update_login(dt, mouse_pos, clicked)
-            elif self.state == STATE_MASTERY: self.update_mastery(dt, mouse_pos, clicked)
-            elif self.state == STATE_KEYS: self.update_keys(dt, mouse_pos, clicked)
-            elif self.state == STATE_PET_DESIGNER: self.update_pet_designer(dt, mouse_pos, clicked, wheel_y)
+            # v3.33 GÜVENLİK AĞI: tek bir karede çıkan hata (çizim / güncelleme)
+            # artık oyunu KAPATMAZ: kayda yazılır (crash_log.txt), kare atlanır,
+            # oyun devam eder. Aynı hata art arda yağıyorsa (bozuk durum) eskisi
+            # gibi kayıt alınıp çıkılır.
+            try:
+                if self.state == STATE_MENU: self.update_menu(dt, mouse_pos, clicked)
+                elif self.state == STATE_PLAY: self.update_play(dt, keys, mouse_pos, mouse_down, bonk_pressed,
+                                                                dash_pressed, use_pressed, clicked, stats_pressed)
+                elif self.state == STATE_PAUSE: self.update_pause(dt, mouse_pos, clicked)
+                elif self.state == STATE_LEVELUP: self.update_levelup(dt, mouse_pos, clicked)
+                elif self.state == STATE_CURSE: self.update_curse(dt, mouse_pos, clicked)
+                elif self.state == STATE_RUN_SHOP: self.update_run_shop(dt, mouse_pos, clicked)
+                elif self.state == STATE_GAMEOVER: self.update_gameover(dt, mouse_pos, clicked)
+                elif self.state == STATE_SKIN_MARKET: self.update_skin_market(dt, mouse_pos, clicked, wheel_y)
+                elif self.state == STATE_SKIN_DETAIL: self.update_skin_detail(dt, mouse_pos, clicked)
+                elif self.state == STATE_COSMETIC_MARKET: self.update_cosmetic_market(dt, mouse_pos, clicked, wheel_y)
+                elif self.state == STATE_BOOK_MARKET: self.update_book_market(dt, mouse_pos, clicked, wheel_y)
+                elif self.state == STATE_WEAPON_CODEX: self.update_weapon_codex(dt, mouse_pos, clicked, wheel_y)
+                elif self.state == STATE_LEADERBOARD: self.update_leaderboard(dt, mouse_pos, clicked)
+                elif self.state == STATE_WORLD_LB: self.update_world_leaderboard(dt, mouse_pos, clicked)
+                elif self.state == STATE_NAME_ENTRY: self.update_name_entry(dt, mouse_pos, clicked)
+                elif self.state == STATE_HOW_TO: self.update_howto(dt, mouse_pos, clicked)
+                elif self.state == STATE_SETTINGS: self.update_settings(dt, mouse_pos, clicked)
+                elif self.state == STATE_ACHIEVEMENTS: self.update_achievements(dt, mouse_pos, clicked, wheel_y)
+                elif self.state == STATE_GEM_STORE: self.update_gem_store(dt, mouse_pos, clicked)
+                elif self.state == STATE_LOGIN: self.update_login(dt, mouse_pos, clicked)
+                elif self.state == STATE_MASTERY: self.update_mastery(dt, mouse_pos, clicked)
+                elif self.state == STATE_KEYS: self.update_keys(dt, mouse_pos, clicked)
+                elif self.state == STATE_PET_DESIGNER: self.update_pet_designer(dt, mouse_pos, clicked, wheel_y)
+
+            except Exception:
+                if not self._frame_error():
+                    raise
 
             # Sohbet en üstte durur: hangi ekranda olursak olalım aynı yerde,
             # sol altta görünsün.
@@ -32827,6 +33175,26 @@ class App:
 
         self.save.save()
         pygame.quit()
+
+    def _frame_error(self):
+        """Bir karede yakalanan hatayı kaydeder. Dönüş: oyun sürsün mü?"""
+        import traceback
+        now = time.time()
+        times = [x for x in getattr(self, "_err_times", []) if now - x < 10.0]
+        times.append(now)
+        self._err_times = times
+        try:
+            path = os.path.join(get_save_dir(), "crash_log.txt")
+            if os.path.exists(path) and os.path.getsize(path) > 512 * 1024:
+                os.replace(path, path + ".old")
+            with open(path, "a", encoding="utf-8") as f:
+                f.write("\n=== %s  v%s  durum=%s ===\n" % (
+                    time.strftime("%Y-%m-%d %H:%M:%S"), GAME_VERSION, self.state))
+                f.write(traceback.format_exc())
+        except Exception:
+            pass
+        # 10 saniyede 40'tan fazla hata: durum bozuk, devam etmek anlamsız
+        return len(times) <= 40
 
     def handle_escape(self):
         # Reklam penceresi açıksa ESC yalnızca onu kapatır (sonuna kadar
@@ -34250,7 +34618,7 @@ class App:
             return False
         self.rewards.begin_ad()
         try:
-            # v3.26: reklam = 90 sn'lik OYUN TURU (izleyen oyunu öğrenir).
+            # v3.33: reklam = 2 dakikalık OYUN TURU (izleyen oyunu öğrenir, 300 elmas).
             self.house_ad = GameTour(self)
         except Exception as e:          # film kurulamazsa ödül yine verilebilsin
             print("Reklam filmi kurulamadı:", e)
@@ -35985,7 +36353,7 @@ class App:
         self.bg.draw(canvas)
         # v3.29: 7. kart (UĞUR) için panel 4 satıra büyüdü.
         n_rows = (len(MASTERY) + 1) // 2
-        pr = pygame.Rect(0, 0, 940, 600 if n_rows <= 3 else 690)
+        pr = pygame.Rect(0, 0, 940, 600 if n_rows <= 3 else (690 if n_rows == 4 else 708))
         pr.center = (VIRTUAL_W / 2, VIRTUAL_H / 2 - (10 if n_rows <= 3 else 0))
         panel(canvas, pr, alpha=246)
         cx = pr.centerx
@@ -36003,10 +36371,10 @@ class App:
         draw_text(canvas, L("ui.mastery_spent", fmt_num(self.save.mastery_spent())),
                   (pr.x + 34, pr.y + 28), 11, (130, 136, 162), shadow=False)
 
-        kart_w, kart_h = 410, 112
+        kart_w, kart_h = 410, (112 if n_rows <= 4 else 92)
         gx0 = cx - kart_w - 12
-        gy0 = pr.y + (102 if n_rows <= 3 else 96)
-        gap_y = 14 if n_rows <= 3 else 8
+        gy0 = pr.y + (102 if n_rows <= 3 else (96 if n_rows == 4 else 90))
+        gap_y = 14 if n_rows <= 3 else (8 if n_rows == 4 else 6)
         for i, m in enumerate(MASTERY):
             col, row = i % 2, i // 2
             r = pygame.Rect(gx0 + col * (kart_w + 24), gy0 + row * (kart_h + gap_y),
@@ -36015,7 +36383,8 @@ class App:
                 r.centerx = cx                  # tek kalan kart ortada
             lvl = self.save.mastery_level(m["key"])
             cost = self.save.mastery_next_cost(m["key"])
-            alinabilir = gem >= cost and self.save.can_spend()
+            maxed = self.save.mastery_maxed(m["key"])
+            alinabilir = gem >= cost and self.save.can_spend() and not maxed
             hov = r.collidepoint(mouse_pos)
             renk = tuple(m["color"])
             panel(canvas, r, bg=(30, 32, 50) if hov else (21, 23, 37),
@@ -36030,7 +36399,10 @@ class App:
                       shadow=False)
 
             # kademe etiketi: 5'e kadar "Kademe N", sonrası "PRESTİJ N"
-            if lvl > MASTERY_TIERS:
+            if m.get("max"):
+                etiket = L("ui.mastery_tier", lvl) + " / %d" % int(m["max"])
+                et_col = TEXT if lvl else TEXT_DIM
+            elif lvl > MASTERY_TIERS:
                 etiket = L("ui.mastery_prestige", lvl - MASTERY_TIERS)
                 et_col = (255, 196, 90)
             else:
@@ -36041,18 +36413,21 @@ class App:
 
             # şu anki toplam bonus
             b = mastery_bonus(m, lvl)
-            if m["key"] == "m_hp":
+            if m["key"] == "m_hp" or m.get("kind") == "count":
                 b_txt = "+%d" % round(b)
             else:
                 b_txt = fmt_pct(b * 100)
-            draw_text(canvas, b_txt, (r.right - 16, r.y + 52), 20,
+            draw_text(canvas, b_txt, (r.right - 16, r.y + (52 if kart_h > 100 else 10)), 20,
                       renk if lvl else (138, 144, 172), bold=True, right=True)
 
             # kademe çubuğu (doğrusal kısım dolunca prestij rengine döner)
             # Çubuk satın alma düğmesinin soluna sığsın (düğme r.right-150'de
             # başlıyor): 150 piksel genişlik tam oturuyor.
             bar = pygame.Rect(r.x + 78, r.y + 80, 150, 8)
-            dolu = (min(lvl, MASTERY_TIERS) / float(MASTERY_TIERS)) if lvl <= MASTERY_TIERS else 1.0
+            if m.get("max"):
+                dolu = min(1.0, lvl / float(m["max"]))
+            else:
+                dolu = (min(lvl, MASTERY_TIERS) / float(MASTERY_TIERS)) if lvl <= MASTERY_TIERS else 1.0
             draw_bar(canvas, bar, dolu, renk, radius=4)
 
             # satın alma düğmesi
@@ -36062,11 +36437,15 @@ class App:
                              br, border_radius=7)
             pygame.draw.rect(canvas, (90, 160, 115) if alinabilir else (62, 66, 88),
                              br, width=1, border_radius=7)
-            draw_icon(canvas, br.x + 18, br.centery, "gem",
-                      GEM_COLOR if alinabilir else (96, 104, 128), 6)
-            draw_text(canvas, fmt_num(cost), (br.x + 32, br.centery - 8), 14,
-                      WHITE if alinabilir else (110, 116, 142), bold=True,
-                      shadow=False)
+            if maxed:
+                draw_text(canvas, L("ui.mastery_max"), br.center, 14, GOLD, bold=True,
+                          center=True, shadow=False)
+            else:
+                draw_icon(canvas, br.x + 18, br.centery, "gem",
+                          GEM_COLOR if alinabilir else (96, 104, 128), 6)
+                draw_text(canvas, fmt_num(cost), (br.x + 32, br.centery - 8), 14,
+                          WHITE if alinabilir else (110, 116, 142), bold=True,
+                          shadow=False)
             if clicked and br.collidepoint(mouse_pos):
                 if self.save.buy_mastery(m["key"]):
                     sfx("buy", 0.7, 0.0)
@@ -36421,7 +36800,7 @@ class App:
             ("EMANET (KILIÇ)", "Saniyede bir yay çizer; zırhlı ve kalkanlıyı zırhını saymadan keser"),
             ("GÖRÜNMEZLİK PELERİNİ", "Her dakika 5 saniye kaybolursun — patronlar hariç kimse göremez"),
             ("KİTAPLARI DA KAPATABİLİRSİN",
-             f"Kitaplıkta en fazla {MAX_MUTED_BOOKS} kitabı kapat; kapalı kitap seviye atlarken çıkmaz"),
+             f"Kitaplıkta {MAX_MUTED_BOOKS} kitabı bedava kapat (Arena Ustalığı'ndan elmasla +4); kapalı kitap seviye atlarken çıkmaz"),
             ("CEHENNEM PATRONU", "İlk patron EJDERHA: alev püskürtür, üstüne dalar"),
             ("SKİN ÖZEL YETENEĞİ", "Her skinin OTOMATİK bir yeteneği var, süresi altta yazar"),
             ("YETENEK = 0.5 SN DONMA", "Yetenek çalışınca düşmanlar yarım saniye donar"),
@@ -37740,7 +38119,7 @@ class App:
                  GOLD if owned_n >= total else (238, 150, 100), radius=5)
         draw_text(canvas, f"%{int(owned_n / max(1, total) * 100)}", (pbx + pbw + 8, 38), 11,
                   TEXT_DIM, bold=True, shadow=False)
-        draw_text(canvas, L("ui.muted_count", len(muted), MAX_MUTED_WEAPONS), (pbx, 58), 10,
+        draw_text(canvas, L("ui.muted_count", len(muted), self.save.max_muted_weapons()), (pbx, 58), 10,
                   (232, 130, 130) if muted else TEXT_DIM, bold=True, shadow=False)
 
         tabs = [("all", f"TÜMÜ ({total})"),
@@ -38093,7 +38472,7 @@ class App:
         draw_icon(canvas, 30, 30, "book", (186, 150, 255), 13)
         draw_text(canvas, L("ui.books"), (52, 18), 26, (186, 150, 255), bold=True)
         draw_text(canvas,
-                  L("ui.books_sub", MAX_MUTED_BOOKS, MAX_MUTED_RARE_BOOKS),
+                  L("ui.books_sub", self.save.max_muted_books(), MAX_MUTED_RARE_BOOKS),
                   (52, 48), 11, TEXT_DIM, shadow=False)
         draw_text(canvas,
                   L("ui.books_rule", MAX_RUN_BOOKS, BOOK_MAX_LEVEL, MAX_RUN_RARE_BOOKS),
@@ -38108,7 +38487,7 @@ class App:
                  GOLD if owned_n >= len(BOOKS) else (168, 132, 245), radius=5)
         draw_text(canvas, f"%{int(owned_n / max(1, len(BOOKS)) * 100)}", (pbx + pbw + 8, 38), 11,
                   TEXT_DIM, bold=True, shadow=False)
-        draw_text(canvas, L("ui.muted_count", len(bmuted), MAX_MUTED_BOOKS), (pbx, 58), 10,
+        draw_text(canvas, L("ui.muted_count", len(bmuted), self.save.max_muted_books()), (pbx, 58), 10,
                   (232, 130, 130) if bmuted else TEXT_DIM, bold=True, shadow=False)
 
         # ---- filtre sekmeleri ----

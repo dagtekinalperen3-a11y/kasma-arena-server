@@ -496,6 +496,65 @@ def test_v332_books_cave_quake():
     assert sv.owns_weapon("quake")
 
 
+def test_v333_crash_trims_mutes():
+    # --- ÇÖKME: lanetli koşuda patron gelince HUD 'surge' hatası verip
+    # oyunu kapatıyordu. Lanet + patron + yoğunluk birlikte çizilebilmeli.
+    run = _run()
+    run.curse_score_bonus = 0.5
+    run.waves.wave = 10
+    run.waves.boss_pending = True
+    run.update(1 / 60, {"left": 0, "right": 0, "up": 0, "down": 0, "mouse_down": False})
+    surf = pygame.Surface((K.VIRTUAL_W, K.VIRTUAL_H))
+    for _ in range(90):
+        run.update(1 / 60, {"left": 0, "right": 0, "up": 0, "down": 0, "mouse_down": False})
+        if run.bosses:
+            break
+    assert run.bosses, "patron doğmadı"
+    K.draw_hud(surf, run, 1.0)
+    run.bosses.clear()
+    run.waves.surge_timer = 3.0
+    K.draw_hud(surf, run, 1.0)
+    # --- güvenlik ağı: tek karelik hata oyunu kapatmaz, kayda yazılır
+    app = K.App()
+    try:
+        raise RuntimeError("deneme")
+    except RuntimeError:
+        assert app._frame_error()
+    # --- %10 XP ve altın kısıntısı (elmas etkilenmez)
+    assert abs(K.XP_TRIM - 0.90) < 1e-9 and abs(K.GOLD_TRIM - 0.90) < 1e-9
+    assert abs(K.coin_drop_scale("arena") - K.COIN_DROP_SCALE * 0.90) < 1e-9
+    p = K.Player("default")
+    q = K.Player("default")
+    p.gain_xp(10.0)
+    assert abs(p.xp - 10.0 * p.eff_xp_mult() * K.XP_GAIN_SCALE) < 1e-6
+    assert abs(K.XP_GAIN_SCALE - 1.40 * K.XP_GAIN_BUFFS[0] * K.XP_GAIN_BUFFS[1] * 0.90) < 1e-9
+    del q
+    # --- elmasla kapatma hakkı (+4 silah, +4 kitap)
+    sv = _save(mastery={"m_wmute": 2, "m_bmute": 4}, gems=10 ** 6)
+    assert sv.max_muted_weapons() == K.MAX_MUTED_WEAPONS + 2
+    assert sv.max_muted_books() == K.MAX_MUTED_BOOKS + 4
+    assert sv.mastery_maxed("m_bmute") and not sv.buy_mastery("m_bmute")
+    sv.data["weapons_owned"] = [w["key"] for w in K.BOSS_WEAPONS]
+    sv.data["weapons_muted"] = []
+    for w in K.BOSS_WEAPONS[:9]:
+        sv.toggle_weapon_mute(w["key"])
+    assert len(sv.data["weapons_muted"]) == K.MAX_MUTED_WEAPONS + 2
+    # mute dalları oyuncuya güç vermez
+    K.MASTERY_SAVE[0] = sv
+    try:
+        m = K.Player("default")
+    finally:
+        K.MASTERY_SAVE[0] = None
+    assert m.eff_dmg() == K.Player("default").eff_dmg()
+    # --- tanıtım filmi: 2 dakika, ödül 300 elmas
+    assert abs(K.GameTour.LENGTH - 120.0) < 1e-6 and K.AD_REWARD_GEMS == 300
+    for lang in K.LANG_CODES:
+        K.set_lang(lang)
+        assert K._tc("a", "b", "c", "d", "e") == {"tr": "a", "en": "b", "es": "c",
+                                                  "de": "d", "ru": "e"}[lang]
+    K.set_lang("tr")
+
+
 if __name__ == "__main__":
     print("roll_rarity dağılımı (20.000 çekiliş):")
     print("  şans   | Yaygın | Sıradışı | Nadir | Epik  | Efsanevi")

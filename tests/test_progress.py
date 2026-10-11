@@ -91,8 +91,8 @@ def test_cursed_run_is_plausible():
     # ama uydurma bir skor hâlâ reddedilir
     ok, why = srv.score_is_plausible("x", 50_000_000, 200, 10, 300.0)
     assert not ok
-    ok, why = srv.score_is_plausible("x", 400_000, 100_000, 12, 600.0)
-    assert not ok                      # saniyede 166 öldürme
+    ok, why = srv.score_is_plausible("x", 400_000, 400_000, 12, 600.0)
+    assert not ok                      # saniyede 666 öldürme (v3.33 sınırı 200)
 
     # oyunun kendi denetimi de lanet payını tanır
     class _R:
@@ -107,6 +107,33 @@ def test_cursed_run_is_plausible():
     r.curse_score_bonus = 0.0
     r.score = 10 ** 9
     assert not K.run_score_plausible(r)
+
+
+def test_v333_mutes_and_limits():
+    srv = _srv()
+    import kasma_arena13 as K
+    # yeni ustalık dalları: oyunun ve sunucunun bedeli birebir aynı
+    for key in ("m_wmute", "m_bmute"):
+        m = K.MASTERY_BY_KEY[key]
+        for lvl in range(0, 4):
+            assert K.mastery_cost(m, lvl) == srv._mastery_cost(key, lvl), (key, lvl)
+    # sunucu bu dalları silmez ve 4'te kırpar
+    paid = srv._mastery_total("m_wmute", 4) + srv._mastery_total("m_bmute", 2)
+    out = srv._merge_mastery({}, {"m_wmute": 9, "m_bmute": 2}, paid + 10 ** 6)
+    assert out["m_wmute"] == 4 and out["m_bmute"] == 2
+    # reklam ödülü ve süre: oyun ile sunucu aynı, film süresine uygun
+    assert srv.AD_REWARD_GEMS == K.AD_REWARD_GEMS == 300
+    assert srv.AD_MIN_WATCH < K.GameTour.LENGTH
+    # ÇOK GÜÇLÜ dürüst oyuncu (lanetli cehennem, saniyede ~80 öldürme) BANLANMAZ
+    rt = 1800.0
+    kills = int(80 * rt)
+    wave = 70
+    score = int(kills * 60)
+    ok, why = srv.score_is_plausible("x", score, kills, wave, rt)
+    assert ok, why
+    # ama uydurma bir skor hâlâ reddedilir
+    assert not srv.score_is_plausible("x", 50_000_000, 200, 10, 300.0)[0]
+    assert not srv.score_is_plausible("x", 400_000, 1_000_000, 12, 600.0)[0]
 
 
 if __name__ == "__main__":
