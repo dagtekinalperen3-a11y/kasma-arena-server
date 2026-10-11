@@ -796,7 +796,12 @@ PROGRESS_STATS = ("runs", "best_score", "total_kills", "total_time", "bosses",
                   "best_wave", "total_shots", "total_gold", "total_lifesteal",
                   "best_run_gold", "best_run_dashes", "best_run_shots",
                   "total_bonk_hits", "total_chests", "total_cursed", "best_curse",
-                  "total_goblins")
+                  "total_goblins",
+                  # v3.35 HARİTA BAŞARIMI sayaçları (Buzul / Çöl / Orman)
+                  "frost_kills", "frost_bosses", "best_frost_wave", "frost_shots",
+                  "desert_dashes", "best_desert_wind", "best_desert_wave", "desert_kills",
+                  "desert_bonk_hits", "jungle_snakes", "jungle_bosses", "best_jungle_time",
+                  "jungle_kills")
 
 
 
@@ -856,7 +861,17 @@ def _ban_account(account_id, reason):
     Oyuncunun ilerlemesine (elmas, skin, istatistik) dokunulmaz: ceza
     yalnızca DÜNYA SIRALAMASI'na. Oyun bu bayrağı /player/load ile
     öğrenip arayüzde "sıralamadan çıkarıldın" yazıyor.
+
+    v3.35: yazma HESAP KİLİDİ altında. Eskiden aynı anda gelen bir
+    /player/save, yasaktan ÖNCE okuduğu ilerlemeyi yasaktan SONRA yazıp
+    yasağı silebiliyordu (okuma-birleştirme-yazma yarışı).
     """
+    with _acct_lock(account_id):
+        _ban_account_locked(account_id, reason)
+    _wipe_scores(account_id)
+
+
+def _ban_account_locked(account_id, reason):
     try:
         row = _player_row(account_id)
         prog = _stored_progress(row)
@@ -1134,6 +1149,38 @@ def player_save():
     if err is not None:
         return err
     return jsonify({"success": True, "progress": _public_progress(merged)})
+
+
+# OYUNUN KENDİ HİLE İTİRAFI (v3.35)
+# ---------------------------------------------------------------------
+# AÇIK BUYDU: oyun hile kodunu (ya da kurcalanmış elmas defterini)
+# yakalayınca yalnızca YEREL kayda "board_banned" yazıyordu. Sunucu bunu
+# hiç öğrenmiyordu: /player/save bu alana bilerek güvenmiyor (başka hesaba
+# sızan yasak, v3.25) ve yasaklı oyun /submit'e hiç gitmediği için oradaki
+# itiraf kanalı da hiç çalışmıyordu. Yerel bayrak bir şekilde kaybolunca
+# (çıkış/giriş hatası, kayıt silme, başka bilgisayar) hesap yeniden
+# sıralamaya girebiliyordu.
+#
+# ARTIK: oyun yakaladığı anda bu uca bildirir. Hesap, isteğin KENDİ geçerli
+# oturum jetonundan (ve cihazından) çözülür: biri yalnızca KENDİ hesabını
+# itiraf edebilir, başkasınınkini asla. Sebep beyaz listeden gelir.
+CHEAT_REPORT_REASONS = ("cheat_code", "gems", "stats", "run")
+
+
+@app.route("/player/report_cheat", methods=["POST"])
+def player_report_cheat():
+    if not _accounts_enabled():
+        return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
+    data = request.json or {}
+    acc = _acct(data)
+    if not acc:
+        return jsonify({"success": False, "error": "oturum geçersiz"}), 401
+    reason = str(data.get("reason") or "")
+    if reason not in CHEAT_REPORT_REASONS:
+        reason = "cheat_code"
+    _ban_account(acc["id"], "oyun:" + reason)
+    prog = _stored_progress(_player_row(acc["id"]))
+    return jsonify({"success": True, "banned": True, "progress": _public_progress(prog)})
 
 
 # =====================================================================
