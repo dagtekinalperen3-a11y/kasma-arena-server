@@ -136,6 +136,124 @@ def test_v333_mutes_and_limits():
     assert not srv.score_is_plausible("x", 400_000, 1_000_000, 12, 600.0)[0]
 
 
+def test_v335_cheat_ban_survives_relogin_and_reinstall():
+    """HİLE AÇIĞI (v3.35): hile kodu + çıkış/giriş, kaydı silme, başka hesap,
+    çevrimdışı hile. Yasak her durumda KALICI kalmalı, hile içeriği hesaba
+    yazılmamalı ve temiz hesaplar hiç etkilenmemeli."""
+    import tempfile
+    import threading
+    import time as _time
+    os.environ["XDG_DATA_HOME"] = tempfile.mkdtemp(prefix="arena_cheat_")
+    srv = _srv()
+    C = srv.app.test_client()
+    import kasma_arena13 as K
+    import pygame
+    pygame.init()
+    pygame.display.set_mode((K.VIRTUAL_W, K.VIRTUAL_H))
+
+    class SyncThread:
+        def __init__(self, target=None, args=(), kwargs=None, daemon=None):
+            self.t, self.a, self.k = target, args, kwargs or {}
+
+        def start(self):
+            if self.t:
+                self.t(*self.a, **self.k)
+
+    saved = (threading.Thread, _time.sleep, K.ONLINE_API_URL, K.AccountClient._post,
+             K.OnlineClient.submit_score_async, K.SaveManager.on_ban, K.SaveManager.on_progress_change)
+    sent = []
+
+    def _post(self, path, payload, timeout=20):
+        return C.post(path, json=payload).get_json() or {}
+
+    def _submit(self, payload, on_done=None):
+        j = C.post("/submit", json=payload).get_json() or {}
+        sent.append(bool(j.get("success")))
+        if on_done:
+            on_done(bool(j.get("success")), str(j.get("error") or ""))
+
+    def server_state(acc_id):
+        prog = srv._stored_progress(srv._player_row(acc_id))
+        sc = [r for r in srv.supabase.table("scores").select("*").execute().data
+              if r.get("account_id") == acc_id]
+        return bool(prog.get("board_banned")), int(prog.get("gems") or 0), len(prog.get("skins_owned") or []), len(sc)
+
+    def submit(app):
+        r = K.RunState(app.save, "default", "normal", ach=None)
+        r.score, r.kills, r.run_time, r.game_over = 20000, 400, 400.0, True
+        r.waves.wave = 8
+        app.run = r
+        app.online_submit_status = None
+        app._maybe_submit_online()
+        return app.online_submit_status
+
+    threading.Thread = SyncThread
+    _time.sleep = lambda s: None
+    K.ONLINE_API_URL = "http://fake"
+    K.AccountClient._post = _post
+    K.OnlineClient.submit_score_async = _submit
+    try:
+        app = K.App()
+        app.online.enabled = True
+        app.account.register("alp", "sifre12345", "alp@example.com")
+        acc = app.account.account["id"]
+        assert submit(app) == "gönderildi" and server_state(acc)[3] == 1
+        # HİLE: hesap sunucuda da yasaklanır, skorları silinir, içerik hesaba gitmez
+        app._apply_cheat()
+        banned, gems, skins, scores = server_state(acc)
+        assert banned and gems == 0 and skins == 1 and scores == 0
+        assert app.save.is_board_banned()
+        assert submit(app) == "reddedildi"
+        # ÇIKIŞ + GİRİŞ (asıl açık buradaydı: yasak siliniyordu)
+        app.account.logout()
+        app.account.login("alp", "sifre12345")
+        assert app.save.is_board_banned()
+        assert submit(app) == "reddedildi"
+        # KAYDI SİL, YENİDEN KUR, GİRİŞ YAP: yasak sunucudan geri gelir
+        for f in (K.SAVE_FILE, K.LEGACY_SAVE):
+            if os.path.exists(f):
+                os.remove(f)
+        app2 = K.App()
+        app2.online.enabled = True
+        app2.account.login("alp", "sifre12345")
+        assert app2.save.is_board_banned()
+        assert submit(app2) == "reddedildi"
+        # yerel bayrak elle silinse bile: oyun yasağı sunucudan geri alır...
+        app2.save.data["board_banned"] = False
+        app2.save.data["tainted"] = False
+        assert submit(app2) == "reddedildi" and app2.save.is_board_banned()
+        # ...ve oyun kapısı tamamen aşılsa bile SUNUCU kabul etmez
+        pay = {"name": "alp", "score": 20000, "kills": 400, "wave": 8, "run_time": 400.0,
+               "created_at": _time.time(), "diff": "normal"}
+        pay["sig"] = K.sign_submit(pay)
+        pay.update(token=app2.account.token, device=K.device_id(), device_legacy=K.device_id_legacy())
+        r = C.post("/submit", json=pay)
+        assert r.status_code == 403 and server_state(acc)[3] == 0
+        # ÇEVRİMDIŞI HİLE: ağ gelince yasak sunucuya taşınır
+        app2.account.logout()
+        app2.account.register("veli", "sifre12345", "veli@example.com")
+        acc2 = app2.account.account["id"]
+        K.AccountClient._post = lambda self, path, payload, timeout=20: (_ for _ in ()).throw(OSError("off"))
+        app2._apply_cheat()
+        assert not server_state(acc2)[0]
+        K.AccountClient._post = _post
+        app2.account.pull_progress()
+        banned2, gems2, skins2, _sc = server_state(acc2)
+        assert banned2 and gems2 == 0 and skins2 == 1
+        # TEMİZ HESAP etkilenmez
+        app2.account.logout()
+        app2.account.register("ayse", "sifre12345", "ayse@example.com")
+        acc3 = app2.account.account["id"]
+        assert not app2.save.is_board_banned()
+        assert submit(app2) == "gönderildi" and not server_state(acc3)[0]
+        # başkasının adına itiraf edilemez (jeton zorunlu)
+        r = C.post("/player/report_cheat", json={"token": "uydurma", "reason": "cheat_code"})
+        assert r.status_code == 401
+    finally:
+        (threading.Thread, _time.sleep, K.ONLINE_API_URL, K.AccountClient._post,
+         K.OnlineClient.submit_score_async, K.SaveManager.on_ban, K.SaveManager.on_progress_change) = saved
+
+
 if __name__ == "__main__":
     for n in sorted(k for k in list(globals()) if k.startswith("test_")):
         globals()[n]()
