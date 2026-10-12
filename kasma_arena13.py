@@ -1,6 +1,6 @@
 """
 =====================================================================
- ARENA BONK  —  v3.36   (eski adı: KASMA ARENA)
+ ARENA BONK  —  v3.37   (eski adı: KASMA ARENA)
  2D Top-Down Hayatta Kalma / Skor-Rekor Oyunu
  ---------------------------------------------------------------------
  Dalgalar halinde gelen düşmanlara karşı hayatta kal, nişan al, ateş et,
@@ -8,6 +8,21 @@
  patronları yen, rekorunu kır. Kaybedersen o koşuda aldıkların silinir.
  Elmasla kalıcı SKIN'ler al (her skinin kendi silahı, mermisi, efekti ve
  ÖZEL YETENEĞİ var).
+
+ v3.37 — .EXE SUNUCUYA BAĞLANAMIYORDU ("SUNUCU KAPALI"):
+   * .exe'nin içindeki Python 3.13 sertifikaları KATI denetliyor; Windows'ta
+     antivirüslerin HTTPS / web taraması kendi kök sertifikasıyla araya
+     girdiğinde (Avast, Kaspersky, ESET...) bağlantıyı reddediyordu —
+     tarayıcı açılırken oyun açılmıyordu. Artık 3.12'deki gibi: zincir ve
+     alan adı denetimi aynen duruyor, yalnızca biçim katılığı kalktı.
+     Sunucunun kök sertifikaları (Let's Encrypt, Google) oyunun içinde.
+   * Render'ın ücretsiz sunucusu boşta UYUR; ilk istek 30-60 sn sürer. Tek
+     bir 12 sn'lik deneme her ilk açılışta "SUNUCU KAPALI" diyordu. Artık
+     ~1,5 dk boyunca tekrar dener, çipte "SUNUCU UYANIYOR" yazar. Skor
+     gönderimi ve dünya sıralaması da uyanan sunucuyu bekler.
+   * Bağlanamazsa SEBEBİ ekranda (5 dilde): sertifika/antivirüs, zaman
+     aşımı, internet yok, engellendi, HTTP hatası, sunucuda veritabanı
+     ayarı eksik. Ayrıntısı kayıt klasöründe connection_log.txt'de.
 
  v3.36 — HER HARİTANIN KENDİ YARATIKLARI VE PATRONLARI, YENİ OYNA EKRANI:
    * HARİTA YARATIKLARI: Buzul Vadisi, Zümrüt Orman ve Kızıl Çöl'ün 11'er
@@ -824,6 +839,8 @@ import threading
 import colorsys
 import urllib.request
 import urllib.error
+import ssl
+import socket
 from array import array
 import hmac
 import hashlib
@@ -838,6 +855,161 @@ import urllib.parse
 # ÇEVRİMİÇİ SUNUCU AYARI
 # =====================================================================
 ONLINE_API_URL = "https://kasma-arena-server.onrender.com"
+
+# =====================================================================
+# GÜVENLİ BAĞLANTI (HTTPS) — v3.37
+# ---------------------------------------------------------------------
+# SORUN: .exe'nin içindeki Python 3.13, sertifika zincirini "KATI"
+# (VERIFY_X509_STRICT) denetliyor. Windows'ta antivirüslerin HTTPS / web
+# taraması (Avast, AVG, Kaspersky, ESET...) bağlantıya KENDİ kök
+# sertifikasıyla girer; bu sertifikaların çoğu katı kurala uymaz ("Basic
+# Constraints ... not marked critical", "Missing Authority Key
+# Identifier"). Tarayıcı ve Python 3.12 onları kabul eder, 3.13 reddeder:
+# tarayıcıda sunucu açılır ama oyun "SUNUCU KAPALI" der.
+# ÇÖZÜM: biçim katılığını kaldırıp 3.12'nin davranışına dönüyoruz. ZİNCİR
+# ve ALAN ADI denetimi AYNEN duruyor (sahte sunucuya bağlanılmaz).
+# Ayrıca Windows kök sertifikaları "gerekince" indirir; o köke hiç
+# uğramamış bir bilgisayarda Python onu göremez. Bu yüzden sunucunun
+# (Render) kullandığı kökler — Let's Encrypt (ISRG) ve Google Trust
+# Services (GTS) — oyunun içinde de duruyor. Hepsi herkese açık köklerdir.
+# =====================================================================
+_SERVER_ROOTS_PEM = """
+# ISRG Root X1
+-----BEGIN CERTIFICATE-----
+MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw
+TzELMAkGA1UEBhMCVVMxKTAnBgNVBAoTIEludGVybmV0IFNlY3VyaXR5IFJlc2Vh
+cmNoIEdyb3VwMRUwEwYDVQQDEwxJU1JHIFJvb3QgWDEwHhcNMTUwNjA0MTEwNDM4
+WhcNMzUwNjA0MTEwNDM4WjBPMQswCQYDVQQGEwJVUzEpMCcGA1UEChMgSW50ZXJu
+ZXQgU2VjdXJpdHkgUmVzZWFyY2ggR3JvdXAxFTATBgNVBAMTDElTUkcgUm9vdCBY
+MTCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBAK3oJHP0FDfzm54rVygc
+h77ct984kIxuPOZXoHj3dcKi/vVqbvYATyjb3miGbESTtrFj/RQSa78f0uoxmyF+
+0TM8ukj13Xnfs7j/EvEhmkvBioZxaUpmZmyPfjxwv60pIgbz5MDmgK7iS4+3mX6U
+A5/TR5d8mUgjU+g4rk8Kb4Mu0UlXjIB0ttov0DiNewNwIRt18jA8+o+u3dpjq+sW
+T8KOEUt+zwvo/7V3LvSye0rgTBIlDHCNAymg4VMk7BPZ7hm/ELNKjD+Jo2FR3qyH
+B5T0Y3HsLuJvW5iB4YlcNHlsdu87kGJ55tukmi8mxdAQ4Q7e2RCOFvu396j3x+UC
+B5iPNgiV5+I3lg02dZ77DnKxHZu8A/lJBdiB3QW0KtZB6awBdpUKD9jf1b0SHzUv
+KBds0pjBqAlkd25HN7rOrFleaJ1/ctaJxQZBKT5ZPt0m9STJEadao0xAH0ahmbWn
+OlFuhjuefXKnEgV4We0+UXgVCwOPjdAvBbI+e0ocS3MFEvzG6uBQE3xDk3SzynTn
+jh8BCNAw1FtxNrQHusEwMFxIt4I7mKZ9YIqioymCzLq9gwQbooMDQaHWBfEbwrbw
+qHyGO0aoSCqI3Haadr8faqU9GY/rOPNk3sgrDQoo//fb4hVC1CLQJ13hef4Y53CI
+rU7m2Ys6xt0nUW7/vGT1M0NPAgMBAAGjQjBAMA4GA1UdDwEB/wQEAwIBBjAPBgNV
+HRMBAf8EBTADAQH/MB0GA1UdDgQWBBR5tFnme7bl5AFzgAiIyBpY9umbbjANBgkq
+hkiG9w0BAQsFAAOCAgEAVR9YqbyyqFDQDLHYGmkgJykIrGF1XIpu+ILlaS/V9lZL
+ubhzEFnTIZd+50xx+7LSYK05qAvqFyFWhfFQDlnrzuBZ6brJFe+GnY+EgPbk6ZGQ
+3BebYhtF8GaV0nxvwuo77x/Py9auJ/GpsMiu/X1+mvoiBOv/2X/qkSsisRcOj/KK
+NFtY2PwByVS5uCbMiogziUwthDyC3+6WVwW6LLv3xLfHTjuCvjHIInNzktHCgKQ5
+ORAzI4JMPJ+GslWYHb4phowim57iaztXOoJwTdwJx4nLCgdNbOhdjsnvzqvHu7Ur
+TkXWStAmzOVyyghqpZXjFaH3pO3JLF+l+/+sKAIuvtd7u+Nxe5AW0wdeRlN8NwdC
+jNPElpzVmbUq4JUagEiuTDkHzsxHpFKVK7q4+63SM1N95R1NbdWhscdCb+ZAJzVc
+oyi3B43njTOQ5yOf+1CceWxG1bQVs5ZufpsMljq4Ui0/1lvh+wjChP4kqKOJ2qxq
+4RgqsahDYVvTH9w7jXbyLeiNdd8XM2w9U/t7y0Ff/9yi0GE44Za4rF2LN9d11TPA
+mRGunUHBcnWEvgJBQl9nJEiU0Zsnvgc/ubhPgXRR4Xq37Z0j4r7g1SgEEzwxA57d
+emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
+-----END CERTIFICATE-----
+# ISRG Root X2
+-----BEGIN CERTIFICATE-----
+MIICGzCCAaGgAwIBAgIQQdKd0XLq7qeAwSxs6S+HUjAKBggqhkjOPQQDAzBPMQsw
+CQYDVQQGEwJVUzEpMCcGA1UEChMgSW50ZXJuZXQgU2VjdXJpdHkgUmVzZWFyY2gg
+R3JvdXAxFTATBgNVBAMTDElTUkcgUm9vdCBYMjAeFw0yMDA5MDQwMDAwMDBaFw00
+MDA5MTcxNjAwMDBaME8xCzAJBgNVBAYTAlVTMSkwJwYDVQQKEyBJbnRlcm5ldCBT
+ZWN1cml0eSBSZXNlYXJjaCBHcm91cDEVMBMGA1UEAxMMSVNSRyBSb290IFgyMHYw
+EAYHKoZIzj0CAQYFK4EEACIDYgAEzZvVn4CDCuwJSvMWSj5cz3es3mcFDR0HttwW
++1qLFNvicWDEukWVEYmO6gbf9yoWHKS5xcUy4APgHoIYOIvXRdgKam7mAHf7AlF9
+ItgKbppbd9/w+kHsOdx1ymgHDB/qo0IwQDAOBgNVHQ8BAf8EBAMCAQYwDwYDVR0T
+AQH/BAUwAwEB/zAdBgNVHQ4EFgQUfEKWrt5LSDv6kviejM9ti6lyN5UwCgYIKoZI
+zj0EAwMDaAAwZQIwe3lORlCEwkSHRhtFcP9Ymd70/aTSVaYgLXTWNLxBo1BfASdW
+tL4ndQavEi51mI38AjEAi/V3bNTIZargCyzuFJ0nN6T5U6VR5CmD1/iQMVtCnwr1
+/q4AaOeMSQ+2b1tbFfLn
+-----END CERTIFICATE-----
+# GTS Root R1
+-----BEGIN CERTIFICATE-----
+MIIFVzCCAz+gAwIBAgINAgPlk28xsBNJiGuiFzANBgkqhkiG9w0BAQwFADBHMQsw
+CQYDVQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2VzIExMQzEU
+MBIGA1UEAxMLR1RTIFJvb3QgUjEwHhcNMTYwNjIyMDAwMDAwWhcNMzYwNjIyMDAw
+MDAwWjBHMQswCQYDVQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZp
+Y2VzIExMQzEUMBIGA1UEAxMLR1RTIFJvb3QgUjEwggIiMA0GCSqGSIb3DQEBAQUA
+A4ICDwAwggIKAoICAQC2EQKLHuOhd5s73L+UPreVp0A8of2C+X0yBoJx9vaMf/vo
+27xqLpeXo4xL+Sv2sfnOhB2x+cWX3u+58qPpvBKJXqeqUqv4IyfLpLGcY9vXmX7w
+Cl7raKb0xlpHDU0QM+NOsROjyBhsS+z8CZDfnWQpJSMHobTSPS5g4M/SCYe7zUjw
+TcLCeoiKu7rPWRnWr4+wB7CeMfGCwcDfLqZtbBkOtdh+JhpFAz2weaSUKK0Pfybl
+qAj+lug8aJRT7oM6iCsVlgmy4HqMLnXWnOunVmSPlk9orj2XwoSPwLxAwAtcvfaH
+szVsrBhQf4TgTM2S0yDpM7xSma8ytSmzJSq0SPly4cpk9+aCEI3oncKKiPo4Zor8
+Y/kB+Xj9e1x3+naH+uzfsQ55lVe0vSbv1gHR6xYKu44LtcXFilWr06zqkUspzBmk
+MiVOKvFlRNACzqrOSbTqn3yDsEB750Orp2yjj32JgfpMpf/VjsPOS+C12LOORc92
+wO1AK/1TD7Cn1TsNsYqiA94xrcx36m97PtbfkSIS5r762DL8EGMUUXLeXdYWk70p
+aDPvOmbsB4om3xPXV2V4J95eSRQAogB/mqghtqmxlbCluQ0WEdrHbEg8QOB+DVrN
+VjzRlwW5y0vtOUucxD/SVRNuJLDWcfr0wbrM7Rv1/oFB2ACYPTrIrnqYNxgFlQID
+AQABo0IwQDAOBgNVHQ8BAf8EBAMCAYYwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4E
+FgQU5K8rJnEaK0gnhS9SZizv8IkTcT4wDQYJKoZIhvcNAQEMBQADggIBAJ+qQibb
+C5u+/x6Wki4+omVKapi6Ist9wTrYggoGxval3sBOh2Z5ofmmWJyq+bXmYOfg6LEe
+QkEzCzc9zolwFcq1JKjPa7XSQCGYzyI0zzvFIoTgxQ6KfF2I5DUkzps+GlQebtuy
+h6f88/qBVRRiClmpIgUxPoLW7ttXNLwzldMXG+gnoot7TiYaelpkttGsN/H9oPM4
+7HLwEXWdyzRSjeZ2axfG34arJ45JK3VmgRAhpuo+9K4l/3wV3s6MJT/KYnAK9y8J
+ZgfIPxz88NtFMN9iiMG1D53Dn0reWVlHxYciNuaCp+0KueIHoI17eko8cdLiA6Ef
+MgfdG+RCzgwARWGAtQsgWSl4vflVy2PFPEz0tv/bal8xa5meLMFrUKTX5hgUvYU/
+Z6tGn6D/Qqc6f1zLXbBwHSs09dR2CQzreExZBfMzQsNhFRAbd03OIozUhfJFfbdT
+6u9AWpQKXCBfTkBdYiJ23//OYb2MI3jSNwLgjt7RETeJ9r/tSQdirpLsQBqvFAnZ
+0E6yove+7u7Y/9waLd64NnHi/Hm3lCXRSHNboTXns5lndcEZOitHTtNCjv0xyBZm
+2tIMPNuzjsmhDYAPexZ3FL//2wmUspO8IFgV6dtxQ/PeEMMA3KgqlbbC1j+Qa3bb
+bP6MvPJwNQzcmRk13NfIRmPVNnGuV/u3gm3c
+-----END CERTIFICATE-----
+# GTS Root R3
+-----BEGIN CERTIFICATE-----
+MIICCTCCAY6gAwIBAgINAgPluILrIPglJ209ZjAKBggqhkjOPQQDAzBHMQswCQYD
+VQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2VzIExMQzEUMBIG
+A1UEAxMLR1RTIFJvb3QgUjMwHhcNMTYwNjIyMDAwMDAwWhcNMzYwNjIyMDAwMDAw
+WjBHMQswCQYDVQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2Vz
+IExMQzEUMBIGA1UEAxMLR1RTIFJvb3QgUjMwdjAQBgcqhkjOPQIBBgUrgQQAIgNi
+AAQfTzOHMymKoYTey8chWEGJ6ladK0uFxh1MJ7x/JlFyb+Kf1qPKzEUURout736G
+jOyxfi//qXGdGIRFBEFVbivqJn+7kAHjSxm65FSWRQmx1WyRRK2EE46ajA2ADDL2
+4CejQjBAMA4GA1UdDwEB/wQEAwIBhjAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQW
+BBTB8Sa6oC2uhYHP0/EqEr24Cmf9vDAKBggqhkjOPQQDAwNpADBmAjEA9uEglRR7
+VKOQFhG/hMjqb2sXnh5GmCCbn9MN2azTL818+FsuVbu/3ZL3pAzcMeGiAjEA/Jdm
+ZuVDFhOD3cffL74UOO0BzrEXGhF16b0DjyZ+hOXJYKaV11RZt+cRLInUue4X
+-----END CERTIFICATE-----
+# GTS Root R4
+-----BEGIN CERTIFICATE-----
+MIICCTCCAY6gAwIBAgINAgPlwGjvYxqccpBQUjAKBggqhkjOPQQDAzBHMQswCQYD
+VQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2VzIExMQzEUMBIG
+A1UEAxMLR1RTIFJvb3QgUjQwHhcNMTYwNjIyMDAwMDAwWhcNMzYwNjIyMDAwMDAw
+WjBHMQswCQYDVQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2Vz
+IExMQzEUMBIGA1UEAxMLR1RTIFJvb3QgUjQwdjAQBgcqhkjOPQIBBgUrgQQAIgNi
+AATzdHOnaItgrkO4NcWBMHtLSZ37wWHO5t5GvWvVYRg1rkDdc/eJkTBa6zzuhXyi
+QHY7qca4R9gq55KRanPpsXI5nymfopjTX15YhmUPoYRlBtHci8nHc8iMai/lxKvR
+HYqjQjBAMA4GA1UdDwEB/wQEAwIBhjAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQW
+BBSATNbrdP9JNqPV2Py1PsVq8JQdjDAKBggqhkjOPQQDAwNpADBmAjEA6ED/g94D
+9J+uHXqnLrmvT/aDHQ4thQEd0dlq7A/Cr8deVl5c1RxYIigL9zC2L7F8AjEA8GE8
+p/SgguMh1YQdc4acLa/KNJvxn7kjNuK8YAOdgLOaVsjh4rsUecrNIdSUtUlD
+-----END CERTIFICATE-----
+"""
+
+
+def make_ssl_context():
+    """Oyunun bütün HTTPS isteklerinde kullandığı güvenlik bağlamı."""
+    ctx = ssl.create_default_context()          # Windows'un kendi kökleri
+    try:
+        ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
+    except Exception:
+        pass
+    try:
+        ctx.load_verify_locations(cadata=_SERVER_ROOTS_PEM)
+    except Exception:
+        pass
+    return ctx
+
+
+def install_https():
+    """urllib.request.urlopen'a (bağlam verilmeyen HER çağrıya) bu bağlamı
+    taktırır. Vekil sunucu (proxy) ayarları olduğu gibi kalır."""
+    try:
+        urllib.request.install_opener(urllib.request.build_opener(
+            urllib.request.HTTPSHandler(context=make_ssl_context())))
+        return True
+    except Exception:
+        return False
+
+
+HTTPS_READY = install_https()
 
 # =====================================================================
 # TEMEL AYARLAR
@@ -886,7 +1058,7 @@ WEAPON_FX_LEGACY = {"full": 100, "dim": 32, "off": 0}
 # v3.26: oyunun adı ARENA BONK. (Kayıt klasörü "KasmaArena" olarak KALIYOR:
 # adı değiştirmek oyuncuların ilerlemesini kaybettirirdi; bkz. get_save_dir.)
 GAME_TITLE = "ARENA BONK"
-GAME_VERSION = "3.36"
+GAME_VERSION = "3.37"
 
 
 # =====================================================================
@@ -2172,6 +2344,45 @@ STRINGS = {
     "ui.connecting":   _T("BAĞLANIYOR", "CONNECTING", "CONECTANDO", "VERBINDE", "ПОДКЛЮЧЕНИЕ"),
     "ui.acc_offline_chip": _T("SUNUCU KAPALI", "SERVER DOWN", "SERVIDOR CAÍDO",
                           "SERVER AUS", "СЕРВЕР НЕДОСТУПЕН"),
+    # v3.37: bağlanamamanın SEBEBİ (bkz. net_error_kind / net_reason_text)
+    "ui.srv_waking":   _T("SUNUCU UYANIYOR", "SERVER WAKING UP", "DESPERTANDO SERVIDOR",
+                          "SERVER STARTET", "СЕРВЕР ПРОСЫПАЕТСЯ"),
+    "ui.srv_waking_long": _T("Sunucu uyku modundan uyanıyor; bu bir dakika kadar sürebilir.",
+                          "The server is waking up from sleep; this can take about a minute.",
+                          "El servidor está despertando; puede tardar un minuto.",
+                          "Der Server wacht gerade auf; das kann etwa eine Minute dauern.",
+                          "Сервер просыпается; это может занять около минуты."),
+    "ui.net_why":      _T("Sebep: {0}", "Reason: {0}", "Motivo: {0}", "Grund: {0}", "Причина: {0}"),
+    "ui.net_ssl":      _T("güvenli bağlantı (SSL) kurulamadı — antivirüsün HTTPS / web taraması engelliyor olabilir.",
+                          "the secure connection (SSL) failed — your antivirus' HTTPS / web scanning may be blocking it.",
+                          "falló la conexión segura (SSL) — el análisis HTTPS / web del antivirus puede estar bloqueándola.",
+                          "sichere Verbindung (SSL) fehlgeschlagen — der HTTPS-/Web-Scan deines Virenschutzes blockiert sie evtl.",
+                          "не удалось защищённое соединение (SSL) — его может блокировать HTTPS-/веб-проверка антивируса."),
+    "ui.net_timeout":  _T("sunucu zamanında cevap vermedi — uyanıyor olabilir, biraz sonra YENİDEN DENE.",
+                          "the server did not answer in time — it may still be waking up, RETRY in a moment.",
+                          "el servidor no respondió a tiempo — puede estar despertando, REINTENTA en un momento.",
+                          "der Server antwortete nicht rechtzeitig — er startet evtl. noch, gleich ERNEUT VERSUCHEN.",
+                          "сервер не ответил вовремя — возможно, он ещё просыпается, ПОВТОРИ чуть позже."),
+    "ui.net_dns":      _T("internete ya da sunucu adresine ulaşılamadı — bağlantını kontrol et.",
+                          "could not reach the internet or the server address — check your connection.",
+                          "no se pudo llegar a internet o a la dirección del servidor — revisa tu conexión.",
+                          "Internet oder Serveradresse nicht erreichbar — prüfe deine Verbindung.",
+                          "нет доступа к интернету или адресу сервера — проверь подключение."),
+    "ui.net_blocked":  _T("bağlantı engellendi — güvenlik duvarı ya da antivirüs oyuna izin vermiyor olabilir.",
+                          "the connection was blocked — a firewall or antivirus may not allow the game.",
+                          "la conexión fue bloqueada — un firewall o antivirus puede no permitir el juego.",
+                          "die Verbindung wurde blockiert — Firewall oder Virenschutz erlaubt das Spiel evtl. nicht.",
+                          "соединение заблокировано — брандмауэр или антивирус может не пускать игру."),
+    "ui.net_http":     _T("sunucu hata verdi (HTTP {0}).", "the server returned an error (HTTP {0}).",
+                          "el servidor devolvió un error (HTTP {0}).", "der Server meldete einen Fehler (HTTP {0}).",
+                          "сервер вернул ошибку (HTTP {0})."),
+    "ui.net_setup":    _T("sunucu açık ama hesap sistemi kapalı (sunucuda veritabanı ayarı eksik).",
+                          "the server is up but accounts are off (database settings are missing on the server).",
+                          "el servidor funciona pero las cuentas están desactivadas (falta la configuración de la base de datos).",
+                          "der Server läuft, aber Konten sind aus (Datenbank-Einstellungen fehlen auf dem Server).",
+                          "сервер работает, но аккаунты выключены (на сервере нет настроек базы данных)."),
+    "ui.net_other":    _T("bağlantı kurulamadı ({0}).", "could not connect ({0}).", "no se pudo conectar ({0}).",
+                          "keine Verbindung ({0}).", "не удалось подключиться ({0})."),
     "ui.banned_title": _T("DÜNYA SIRALAMASINDAN ÇIKARILDIN",
                           "REMOVED FROM THE WORLD RANKING",
                           "EXPULSADO DEL RANKING MUNDIAL",
@@ -6325,6 +6536,75 @@ ACCOUNT_RETURN_PAGE_FAIL = """<!doctype html><meta charset="utf-8">
 <p>Oyuna donup tekrar deneyebilirsin.</p></body>"""
 
 
+# =====================================================================
+# BAĞLANTI HATASININ SEBEBİ  (v3.37)
+# ---------------------------------------------------------------------
+# Eskiden her hata tek kelimeydi: "SUNUCU KAPALI". Oyuncu da geliştirici
+# de neyin bozuk olduğunu bilemiyordu: sunucu mu uyuyor, antivirüs mü
+# kesiyor, internet mi yok? Artık hata türüne ayrılıp ekranda yazıyor ve
+# kayıt klasöründeki connection_log.txt'ye ayrıntısıyla düşüyor.
+# =====================================================================
+# Render'ın ÜCRETSİZ sunucusu 15 dakika boşta kalınca UYUR; uyuyan sunucuya
+# gelen ilk istek 30-60 saniye bekler. Tek bir 12 saniyelik deneme bu yüzden
+# her ilk açılışta "SUNUCU KAPALI" diyordu. Açılış yoklaması artık sunucuya
+# uyanması için yaklaşık bir buçuk dakika tanıyor (arka planda; oyun beklemez).
+BOOT_PROBE_TIMEOUTS = (12, 30, 45)
+BOOT_PROBE_PAUSE = 2.0
+# Skor tablosu ve skor gönderimi de arka planda; uyanan sunucuya süre tanı.
+WORLD_FETCH_TIMEOUT = 30
+SUBMIT_TIMEOUT = 45
+NET_LOG_MAX = 256 * 1024
+
+
+def net_error_kind(e):
+    """Bir ağ hatasını (tür, ayrıntı) çiftine çevirir.
+
+    tür: "http" | "ssl" | "timeout" | "dns" | "blocked" | "net"
+    """
+    if isinstance(e, urllib.error.HTTPError):
+        return "http", str(e.code)
+    r = e.reason if isinstance(e, urllib.error.URLError) else e
+    if not isinstance(r, BaseException):
+        r = e
+    text = str(r)
+    if isinstance(r, ssl.SSLError) or "CERTIFICATE_VERIFY" in text.upper():
+        return "ssl", str(getattr(r, "verify_message", "") or getattr(r, "reason", "") or text)[:120]
+    if isinstance(r, TimeoutError) or "timed out" in text.lower():
+        return "timeout", ""
+    if isinstance(r, socket.gaierror):
+        return "dns", ""
+    if isinstance(r, (ConnectionRefusedError, ConnectionResetError,
+                      ConnectionAbortedError, PermissionError)):
+        return "blocked", type(r).__name__
+    return "net", (type(r).__name__ + ": " + text)[:120]
+
+
+def net_reason_text(kind, detail=""):
+    """Hata türünün oyuncuya gösterilecek (yerelleştirilmiş) açıklaması."""
+    if kind == "http":
+        return L("ui.net_http", detail)
+    if kind in ("ssl", "timeout", "dns", "blocked", "setup"):
+        return L("ui.net_" + kind)
+    return L("ui.net_other", detail or "?")
+
+
+def log_net_error(where, e, kind=None):
+    """connection_log.txt'ye bir satır yazar (kayıt klasöründe). Jeton,
+    şifre gibi hiçbir istek gövdesi YAZILMAZ — yalnızca hata."""
+    try:
+        path = os.path.join(get_save_dir(), "connection_log.txt")
+        if os.path.exists(path) and os.path.getsize(path) > NET_LOG_MAX:
+            os.replace(path, path + ".old")
+        k = kind or net_error_kind(e)
+        with open(path, "a", encoding="utf-8") as f:
+            f.write("%s  v%s  py%s%s  %s  %s/%s  %s\n" % (
+                time.strftime("%Y-%m-%d %H:%M:%S"), GAME_VERSION,
+                sys.version.split()[0], " exe" if getattr(sys, "frozen", False) else "",
+                where, k[0], k[1], repr(e)[:300]))
+    except Exception:
+        pass
+
+
 class AccountClient:
     """Hesap işlemleri. Ağ işleri HEP ayrı bir iş parçacığında döner;
     oyun döngüsü hiçbir zaman beklemez."""
@@ -6343,6 +6623,10 @@ class AccountClient:
         self.enabled = bool(self.base_url)
         self.server_ok = None if self.base_url else False
         self.booting = bool(self.base_url)
+        # v3.37: açılış yoklaması kaçıncı denemede (0 = ilk) ve son
+        # bağlantı hatasının sebebi (tür, ayrıntı) — ekranda yazar.
+        self.boot_try = 0
+        self.net_error = ("", "")
         self.account = None          # {"name","email","provider","gems"}
         # Jeton kayıtta MAKİNEYE BAĞLI sarılı durur; başka bilgisayarda
         # açılmaz. Sunucu ayrıca oturumu cihaz kimliğine bağlar.
@@ -6403,17 +6687,19 @@ class AccountClient:
         iki giriş birbirine karışıyordu. Artık oyuncu ya eski hesabıyla
         açılmış oluyor ya da temiz bir giriş ekranı görüyor — arası yok.
         """
-        try:
-            with urllib.request.urlopen(self.base_url + "/auth/status", timeout=12) as r:
-                st = json.loads(r.read().decode("utf-8"))
-            self.google_ready = bool(st.get("google"))
-            self.client_id = st.get("client_id", "")
-            self.server_ok = bool(st.get("accounts"))
-        except Exception:
+        st = self._status_probe()
+        if st is None:
             self.server_ok = False
             self.booting = False
             return
+        self.google_ready = bool(st.get("google"))
+        self.client_id = st.get("client_id", "")
+        self.server_ok = bool(st.get("accounts"))
         if not self.server_ok:
+            # Sunucu AYAKTA ama hesap sistemi kapalı: Render'da
+            # SUPABASE_URL / SUPABASE_KEY girilmemiş.
+            self.net_error = ("setup", "")
+            log_net_error("auth/status", RuntimeError("accounts=false"), ("setup", ""))
             self.booting = False
             return
         # Açılışta saklanan oturum hâlâ geçerli mi? Bu iş ARKA PLANDA dönüyor
@@ -6449,6 +6735,34 @@ class AccountClient:
         else:
             self._forget()
 
+    def _status_probe(self):
+        """/auth/status'u yoklar; cevap (dict) ya da None döner.
+
+        Uyuyan sunucu için birkaç kez, artan bekleme süreleriyle dener
+        (bkz. BOOT_PROBE_TIMEOUTS). Tekrar denemenin sonucu değiştirmeyeceği
+        hatalarda (sertifika, adres bulunamadı, bağlantı engellendi, yanlış
+        adres = 404) hemen bırakır.
+        """
+        tries = BOOT_PROBE_TIMEOUTS
+        for i, tmo in enumerate(tries):
+            self.boot_try = i
+            try:
+                with urllib.request.urlopen(self.base_url + "/auth/status", timeout=tmo) as r:
+                    st = json.loads(r.read().decode("utf-8"))
+                if not isinstance(st, dict):
+                    raise ValueError("auth/status: beklenmeyen cevap")
+                self.net_error = ("", "")
+                return st
+            except Exception as e:
+                kind = net_error_kind(e)
+                self.net_error = kind
+                log_net_error("auth/status #%d" % (i + 1), e, kind)
+                if kind[0] in ("ssl", "dns", "blocked") or kind == ("http", "404"):
+                    break
+                if i + 1 < len(tries):
+                    time.sleep(BOOT_PROBE_PAUSE)
+        return None
+
     def retry_connect(self):
         """Sunucu kapalıyken 'YENİDEN DENE' düğmesi. Açılıştaki yoklamayı
         baştan çalıştırır; oyunu bekletmez."""
@@ -6456,6 +6770,7 @@ class AccountClient:
             return
         self.booting = True
         self.server_ok = None
+        self.boot_try = 0
         self.status = ""
         threading.Thread(target=self._boot, daemon=True).start()
 
@@ -6912,7 +7227,9 @@ class OnlineClient:
         try:
             req = urllib.request.Request(self.base_url + "/scores",
                                          headers={"Accept": "application/json"})
-            with urllib.request.urlopen(req, timeout=8) as resp:
+            # v3.37: uyuyan sunucu (Render) 30-60 sn'de uyanır; 8 sn yetmiyordu.
+            # Arka planda döner, ekranda "yükleniyor" yazar — oyun beklemez.
+            with urllib.request.urlopen(req, timeout=WORLD_FETCH_TIMEOUT) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 if isinstance(data, dict):
                     data = data.get("scores", [])
@@ -6922,8 +7239,10 @@ class OnlineClient:
                 # Tablo İLK 10 ile biter: sunucu daha fazla satır dönse bile
                 # ekranda 10'dan sonrası boş bir liste olarak duruyordu.
                 self.world_scores = data[:WORLD_LB_SIZE]
-        except Exception:
-            self.world_error = "Sunucuya ulaşılamadı. İnternet bağlantını kontrol et."
+        except Exception as e:
+            kind = net_error_kind(e)
+            log_net_error("scores", e, kind)
+            self.world_error = L("ui.acc_neterr") + " " + net_reason_text(*kind)
             self.world_scores = []
         finally:
             self.loading = False
@@ -6946,7 +7265,7 @@ class OnlineClient:
             req = urllib.request.Request(
                 self.base_url + "/submit", data=body,
                 headers={"Content-Type": "application/json"}, method="POST")
-            with urllib.request.urlopen(req, timeout=10) as resp:
+            with urllib.request.urlopen(req, timeout=SUBMIT_TIMEOUT) as resp:
                 res = json.loads(resp.read().decode("utf-8") or "{}")
             ok = bool(res.get("success", True))
             if not ok:
@@ -6957,7 +7276,9 @@ class OnlineClient:
             except Exception:
                 why = str(e.reason)
         except Exception as e:
-            why = str(e)
+            kind = net_error_kind(e)
+            log_net_error("submit", e, kind)
+            why = net_reason_text(*kind)
         if on_done:
             on_done(ok, why)
 
@@ -38450,7 +38771,8 @@ class App:
         if inn:
             label = L("ui.pick_name") if pick else acc.display_name()
         elif acc.booting:
-            label = L("ui.connecting")
+            # ilk deneme tutmadıysa sunucu büyük ihtimalle uykudan uyanıyor
+            label = L("ui.srv_waking") if getattr(acc, "boot_try", 0) else L("ui.connecting")
         elif not acc.server_ok:
             label = L("ui.acc_offline_chip")
         else:
@@ -40621,7 +40943,7 @@ class App:
         elif acc.booting:
             ph = 260                       # hesabın kontrol ediliyor
         elif not acc.server_ok:
-            ph = 340
+            ph = 392                       # v3.37: +sebep satırları
         else:
             ph = 560 if self.login_mode == "up" else 500
         pr = pygame.Rect(0, 0, 560, ph)
@@ -40777,7 +41099,8 @@ class App:
         if acc.booting:
             draw_text(canvas, L("ui.acc_checking_session"), (cx, pr.y + 96), 16, CYAN,
                       bold=True, center=True, shadow=False)
-            draw_text(canvas, L("ui.acc_wait_login"), (cx, pr.y + 126), 12, TEXT_DIM,
+            draw_text(canvas, L("ui.acc_wait_login") if not getattr(acc, "boot_try", 0)
+                      else L("ui.srv_waking_long"), (cx, pr.y + 126), 12, TEXT_DIM,
                       center=True, shadow=False)
             # dönen nokta kuşağı: ekran donmadı, bekliyoruz
             for i in range(8):
@@ -40799,6 +41122,14 @@ class App:
             for ln in wrap_text(L("ui.acc_off"), 13, pr.w - 80)[:2]:
                 draw_text(canvas, ln, (cx, oy), 13, ORANGE, center=True, shadow=False)
                 oy += 17
+            # v3.37: NEDEN bağlanamadı? (sertifika, uyuyan sunucu, engel...)
+            kind, detail = getattr(acc, "net_error", ("", "")) or ("", "")
+            if kind:
+                oy += 6
+                why = L("ui.net_why", net_reason_text(kind, detail))
+                for ln in wrap_text(why, 12, pr.w - 70)[:3]:
+                    draw_text(canvas, ln, (cx, oy), 12, (236, 196, 120), center=True, shadow=False)
+                    oy += 16
             oy += 10
             for ln in wrap_text(L("ui.acc_why"), 11, pr.w - 80)[:3]:
                 draw_text(canvas, ln, (cx, oy), 11, TEXT_DIM, center=True, shadow=False)
@@ -41883,8 +42214,12 @@ class App:
 
         elif self.online.world_error and not self.online.world_scores:
             draw_icon(canvas, panel_rect.centerx, panel_rect.centery - 56, "shield", (110, 118, 148), 26)
-            draw_text(canvas, self.online.world_error, (panel_rect.centerx, panel_rect.centery - 16),
-                      17, TEXT, center=True)
+            # v3.37: hata artık SEBEBİYLE geliyor (uzun) — satırlara bölünür.
+            wl = wrap_text(self.online.world_error, 15, panel_rect.w - 120)[:3]
+            for i, ln in enumerate(wl):
+                draw_text(canvas, ln, (panel_rect.centerx,
+                                       panel_rect.centery - 16 + (i - (len(wl) - 1)) * 19),
+                          15, TEXT, center=True)
             if not self.online.enabled:
                 draw_text(canvas, L("ui.dev_note1"),
                           (panel_rect.centerx, panel_rect.centery + 14), 13, TEXT_DIM, center=True, shadow=False)

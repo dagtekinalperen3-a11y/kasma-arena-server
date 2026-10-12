@@ -1114,6 +1114,271 @@ def test_v336_pause_quest_toggle_and_backgrounds():
             fn(1 / 30, (0, 0), False, 0)
 
 
+
+# ---------------------------------------------------------------------
+# v3.37 — SUNUCUYA BAĞLANAMAMA ("SUNUCU KAPALI") DÜZELTMESİ
+# ---------------------------------------------------------------------
+# Antivirüslerin HTTPS taramasındaki kök sertifikalara benzeyen TEST
+# sertifikaları: kökün basicConstraints'i "critical" DEĞİL. Python 3.13'ün
+# varsayılan (katı) denetimi bunu reddeder; tarayıcılar ve 3.12 kabul eder.
+# Yalnızca testte, 127.0.0.1 için. (2126'ya kadar geçerli.)
+_T_CA = """-----BEGIN CERTIFICATE-----
+MIIDFjCCAf6gAwIBAgIUNqi/EXGfNF3PU1TbihGr32tvB/4wDQYJKoZIhvcNAQEL
+BQAwJTEjMCEGA1UEAwwaQXJlbmEgVGVzdCBXZWIgU2hpZWxkIFJvb3QwIBcNMjYx
+MDEyMDcyNzQwWhgPMjEyNjA5MTgwNzI3NDBaMCUxIzAhBgNVBAMMGkFyZW5hIFRl
+c3QgV2ViIFNoaWVsZCBSb290MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC
+AQEAjYptz1U7lzAynN7RNFUkHkvx4W5IdlqJ3/WPTaNysM2psooPh0AUqeeI6SJl
+7tK5kUVYZumtIIaqIrrjCkEAUzrQxLu+YYuYsy8+dLPukCQxR0e93ssC7tH5HQol
+zpP2/aKbictltLAv+UbAOJu4YSB9RzeudsdqAL+RzB7s4UJgMBtEbbkvbfxESKMD
+KSajdbtlgM0hnTksg7jl99tTHOcV94mNKKk64ohjFxccA54sE8B82c4BKVQC2KNg
+bhrPNdFiUIFTkzBa+AsCU+nLeiMp3sJ5TTX0byN35fxoCv59aLxFORQvJg6/hHFL
+UEi6wKSe10xJxcfS2EImc8vdTwIDAQABozwwOjAMBgNVHRMEBTADAQH/MAsGA1Ud
+DwQEAwIBBjAdBgNVHQ4EFgQUXRKKv6xuhWCSU73292JsyvpIf3YwDQYJKoZIhvcN
+AQELBQADggEBAGQGr8+6KXv/L5DD04H8OeC7Ab3f7iyEZsBUdTg2sT8P2bZpcIgB
+n8Dspfg28wGMHV44CVIeSARBehxY1yQKHCjZvPOjVtArxSg0hNfz/gm2oFZLbPqu
+7lEmjwI8Q8NqU1A70GcoM1/uaU5mOwmdqcdDqgM8fZG7G3NIrd46pVYjD0Mwv0/8
+uu2Uu88AlqN9BCSu2fUYbbm8wBwlzKhYWkxcpSIPAlGdusAkTZUwqi58bkNI4kXn
+MLewLT1C9OpEgp5nXaJBbOg+H/3pJrFD4veLb97EZdlypirz0uad6tuEYWDiHkic
+4ZCiTQFFFJLTZ25hKM97vDcszdOtt4Mz/pE=
+-----END CERTIFICATE-----"""
+_T_LEAF = """-----BEGIN CERTIFICATE-----
+MIIDVjCCAj6gAwIBAgIUfm1qyYIgDI8cUTPyOMgs7ZatP8gwDQYJKoZIhvcNAQEL
+BQAwJTEjMCEGA1UEAwwaQXJlbmEgVGVzdCBXZWIgU2hpZWxkIFJvb3QwIBcNMjYx
+MDEyMDcyNzQwWhgPMjEyNjA5MTgwNzI3NDBaMBQxEjAQBgNVBAMMCWxvY2FsaG9z
+dDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMcOAE8Uhc/VOKHysnYk
+ojX810i9+SRe3TwlufVxZtD/ygYYFtQO3Uaam+sQ1JE/KB74a3f8niGyI58E1SpM
+z2iJwGu4rqSxlkjeCCcM+mhl69LSWRfNuMExGykmNDgagQpaFRxvwlXx0+V0VHso
+y8JTQ1ccpHBmh9hBuPtOhK6U7LdZzGOqGpOQkXRZtX9wHBsKHe7vvt9/JM1Mldqk
+w5vHN9zjgGhZS8VkX+Ihlodh11hkSx6+2YMgCrB5F5q9jMvdO7g2lQbMvY8bFMoz
+ltVLonN1VZjaQrr+Kqc50tNTAG3zi4ghGhREJXVT14t7UbhYDIH5yOhtO5LkTR2k
+RycCAwEAAaOBjDCBiTAJBgNVHRMEAjAAMBoGA1UdEQQTMBGCCWxvY2FsaG9zdIcE
+fwAAATALBgNVHQ8EBAMCBaAwEwYDVR0lBAwwCgYIKwYBBQUHAwEwHwYDVR0jBBgw
+FoAUXRKKv6xuhWCSU73292JsyvpIf3YwHQYDVR0OBBYEFKoqi6QnzVUzZIxpEtbA
+PPo6zZm5MA0GCSqGSIb3DQEBCwUAA4IBAQCHynyD/Kl4VTHbGi3znHFwLeF/qfTp
+z33QhhsexULoH5J4mPA17EDuFEJyCdHM6RmW1BomJWSG3KBQd7dOphw/p1LnkPnW
+vzSfIVETZJVFqHM3y/ByU5e1TZ8mu3jkoJ/FcPrJQncUSlTN/kC4JON7BWyowmgR
+006OxOfxyxX8VquypYgT3aV6nOPqxZpIn7ZWB/fZhuMlGcVNhcZ4XBmm8Rrr+R9u
+ubd2pQEnb/q6n1NE5gvIy2AOkMjPzqMNWLsNbQg2I2AFJI03oQmq+lh8LiYFEBgK
+NnnGBIALseHMhfpalEwj475WXJLhXrzbSWdFhgLmZx60SXvoV5sybvT3
+-----END CERTIFICATE-----"""
+_T_KEY = """-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDHDgBPFIXP1Tih
+8rJ2JKI1/NdIvfkkXt08Jbn1cWbQ/8oGGBbUDt1GmpvrENSRPyge+Gt3/J4hsiOf
+BNUqTM9oicBruK6ksZZI3ggnDPpoZevS0lkXzbjBMRspJjQ4GoEKWhUcb8JV8dPl
+dFR7KMvCU0NXHKRwZofYQbj7ToSulOy3WcxjqhqTkJF0WbV/cBwbCh3u777ffyTN
+TJXapMObxzfc44BoWUvFZF/iIZaHYddYZEsevtmDIAqweReavYzL3Tu4NpUGzL2P
+GxTKM5bVS6JzdVWY2kK6/iqnOdLTUwBt84uIIRoURCV1U9eLe1G4WAyB+cjobTuS
+5E0dpEcnAgMBAAECggEAK00T6yADReVTxwMFKGcqtETWzjepSWyrgsiQLeDn5WIn
+X/EAkkvTfebnMRj9rMUI5MfUlQrqmVjnn9GMz4FbAxooNia8Mw6Aq0RFkL0lge1e
+AgQJJoD1hm04w9hQNr4pQQe8nO2A4HJVTo5iTFJhFNpJBVuxN9ROC9CsPVrkyRcx
+MkKnB7IrC7C0ii8X5Pd7XVWPK0bVrVc75+f9T3Aq1Uww8hVPaFd7nN44NLS0/xLQ
+h8TPr3ukipz90obl+wz9em/O2t1lHMZNo2X9WzSkJBG8C2k90mdTLYDgegRxPNxk
+J+flX/o9PiQ6PeY0DkL/68m0Inp98Sw25sD9gAaXXQKBgQDnuOuxObS+OBWMSJf3
+AhAxa00akO5VmrEF3VpOh3uDBdmvNLKkh1MBcA4eMohtlsgq+97BvfZhSryOYsRF
+aQM/dWKC0yMbgL2PnvFiEgoO1a7ufrrI4eaqxqrbCIvZFLaH+vyCaqbAe8kshb3f
+eN9wpDZjMa9RVTM7kDNwO/2/PQKBgQDb6OTLeYVnvpRFrrQtJ+u9Yo1/5meajovI
+x0a78jH7vX68ibtOLgZj01nrHi+yS3SpoWgNccg+pXvtAjHBPCuLr1L4RRz0zXBT
+rfaP0SYoe5+cIj5tukw+k/EWjibh7/+1QRJAwZ5HBYOcl1aniZSFzKlYAJjAN0/x
+G2Rs68bGMwKBgQDGh1t/grZFBt4HS6bPHPhsrsbnjOZ1d0xVfvlBMLh0YA3KG3c2
+mS5Xm/6shpT2d2nV0edezHcLkjGMODh6U2dR9itJdMWuaZV/OCkM4fG2FgODGBbF
+xy2OgRmfAWp3uVRNmo6+2cs2PJf2SjuL/A5LfpWOVOIk5782N+yqKuvS7QKBgQCV
+6RmvK9QpeN2S8xmYftJRdFGJkwOldO8Nm+s4TE6OkgtHc4zgKrfobTeq9BUHsjCB
+QqqwH5SmQCFO3GQWmnIE8yvYWyT2LOYZ5UljmOwuRLf1s9Ji8tDvB+MdwSH4e6cR
+ZJ6QzmybdcLWiMRlyYAaBf6bIyz+O7afYlD/f2styQKBgAafxorf5nZr3v+UnmnF
+Acpqa6kadDRxeAxu+rH56qVS+esYQUwfdB+U+nvYumyIbkaCjp1IcNrA6kGF7LNe
+la7SBDZFeg8llZLZwr91wegbnwODV45sSWlRfj3pGKSd6QmgKhLJsdS3NZKUmclb
+vkNxs7+sX6flsu683KI3eELj
+-----END PRIVATE KEY-----"""
+
+
+def _https_test_server():
+    import http.server
+    import ssl
+    import threading
+
+    class _H(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            b = b'{"accounts": true, "google": false}'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(b)))
+            self.end_headers()
+            self.wfile.write(b)
+
+        def log_message(self, *a):
+            pass
+
+    d = tempfile.mkdtemp(prefix="arena_tls_")
+    chain, keyf = os.path.join(d, "chain.pem"), os.path.join(d, "key.pem")
+    with open(chain, "w") as f:
+        f.write(_T_LEAF + "\n" + _T_CA + "\n")
+    with open(keyf, "w") as f:
+        f.write(_T_KEY + "\n")
+    srv = http.server.HTTPServer(("127.0.0.1", 0), _H)
+    sctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    sctx.load_cert_chain(chain, keyf)
+    srv.socket = sctx.wrap_socket(srv.socket, server_side=True)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv
+
+
+def test_v337_https_accepts_antivirus_style_root():
+    import ssl
+    import urllib.error
+    import urllib.request
+    srv = _https_test_server()
+    url = "https://127.0.0.1:%d/auth/status" % srv.server_address[1]
+    try:
+        ctx = K.make_ssl_context()
+        # biçim katılığı kalktı, ama zincir ve alan adı denetimi DURUYOR
+        assert not (ctx.verify_flags & ssl.VERIFY_X509_STRICT)
+        assert ctx.verify_mode == ssl.CERT_REQUIRED and ctx.check_hostname
+        ctx.load_verify_locations(cadata=_T_CA)      # antivirüs kökü Windows deposunda
+        with urllib.request.urlopen(url, context=ctx, timeout=10) as r:
+            assert json.loads(r.read().decode())["accounts"] is True
+        # Python 3.13'ün varsayılanı AYNI kökü reddediyor: hatanın sebebi buydu
+        if sys.version_info >= (3, 13):
+            plain = ssl.create_default_context(cadata=_T_CA)
+            try:
+                urllib.request.urlopen(url, context=plain, timeout=10)
+                raise AssertionError("katı denetimin reddetmesi bekleniyordu")
+            except urllib.error.URLError as e:
+                assert K.net_error_kind(e)[0] == "ssl", K.net_error_kind(e)
+        # tanınmayan kök YİNE reddedilir: güvenlik gevşemedi
+        try:
+            urllib.request.urlopen(url, context=K.make_ssl_context(), timeout=10)
+            raise AssertionError("tanınmayan kök kabul edildi")
+        except urllib.error.URLError as e:
+            assert K.net_error_kind(e)[0] == "ssl"
+        # bağlam verilmeyen HER urlopen aynı bağlamı kullanır (global açıcı)
+        hs = [h for h in urllib.request._opener.handlers
+              if isinstance(h, urllib.request.HTTPSHandler)]
+        assert K.HTTPS_READY and hs
+        assert not (hs[0]._context.verify_flags & ssl.VERIFY_X509_STRICT)
+        # sunucunun (Render) kökleri oyunun içinde: Let's Encrypt + Google
+        only = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        only.load_verify_locations(cadata=K._SERVER_ROOTS_PEM)
+        assert only.cert_store_stats()["x509_ca"] == 5
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_v337_boot_waits_for_sleeping_server_and_says_why():
+    import io
+    import socket
+    import ssl
+    import urllib.error
+    import urllib.request
+
+    class _Resp(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    saved = (urllib.request.urlopen, K.time.sleep, K.SaveManager.on_progress_change,
+             K.SaveManager.on_ban)
+    calls = []
+
+    def boot(*outcomes):
+        seq = list(outcomes)
+        calls.clear()
+
+        def fake(url, *a, **k):
+            assert url.endswith("/auth/status")
+            calls.append(k.get("timeout"))
+            out = seq.pop(0)
+            if isinstance(out, BaseException):
+                raise out
+            return _Resp(json.dumps(out).encode())
+        urllib.request.urlopen = fake
+        acc = K.AccountClient("", K.SaveManager())     # boş adres: iş parçacığı açmaz
+        acc.base_url, acc.enabled, acc.booting, acc.server_ok = "https://fake", True, True, None
+        acc._boot()
+        assert not acc.booting
+        return acc
+
+    def http_err(code):
+        return urllib.error.HTTPError("https://fake/auth/status", code, "x", {}, None)
+
+    log = os.path.join(K.get_save_dir(), "connection_log.txt")
+    K.time.sleep = lambda s: None
+    try:
+        # UYUYAN SUNUCU: ilk deneme zaman aşımı, ikincide uyanmış
+        a = boot(urllib.error.URLError(TimeoutError("timed out")), {"accounts": True})
+        assert a.server_ok is True and a.net_error == ("", "") and a.boot_try == 1
+        assert calls == list(K.BOOT_PROBE_TIMEOUTS[:2])
+        # Render uyanırken 502 verirse de bekler; üçü de tutmazsa vazgeçer
+        a = boot(http_err(502), http_err(502), http_err(503))
+        assert a.server_ok is False and a.net_error == ("http", "503") and len(calls) == 3
+        assert sum(K.BOOT_PROBE_TIMEOUTS) >= 80           # uyanmaya ~1,5 dk süre
+        # TEKRAR DENEMEK FAYDA ETMEZ: sertifika, adres yok, engel, yanlış adres
+        for err, kind in ((urllib.error.URLError(ssl.SSLCertVerificationError(
+                              1, "certificate verify failed")), "ssl"),
+                          (urllib.error.URLError(socket.gaierror(11001, "getaddrinfo failed")), "dns"),
+                          (urllib.error.URLError(ConnectionResetError(10054, "reset")), "blocked"),
+                          (urllib.error.URLError(PermissionError(10013, "forbidden")), "blocked"),
+                          (http_err(404), "http")):
+            a = boot(err)
+            assert a.server_ok is False and a.net_error[0] == kind and len(calls) == 1, (kind, a.net_error)
+        # sunucu açık ama Supabase ayarı yok
+        a = boot({"accounts": False, "google": False})
+        assert a.server_ok is False and a.net_error == ("setup", "")
+        # her şey kayıt klasöründeki günlüğe düştü
+        txt = open(log, encoding="utf-8").read()
+        for kind in ("timeout", "http/502", "ssl", "dns", "blocked", "http/404", "setup"):
+            assert kind in txt, kind
+        # sebep metinleri 5 dilde var ve dile göre değişiyor
+        for kind, det in (("ssl", ""), ("timeout", ""), ("dns", ""), ("blocked", ""),
+                          ("http", "502"), ("setup", ""), ("net", "OSError: x")):
+            seen = set()
+            for lang in ("tr", "en", "es", "de", "ru"):
+                K.set_lang(lang)
+                t = K.net_reason_text(kind, det)
+                assert t and "ui.net" not in t, (lang, kind, t)
+                seen.add(t)
+            assert len(seen) == 5, (kind, seen)
+        K.set_lang("tr")
+    finally:
+        (urllib.request.urlopen, K.time.sleep, K.SaveManager.on_progress_change,
+         K.SaveManager.on_ban) = saved
+        K.set_lang("tr")
+
+
+def test_v337_server_down_screen_shows_reason():
+    app = K.App()
+    acc = K.AccountClient("", app.save)
+    acc.enabled = True
+    app.account = acc
+    canvas = app.display.canvas
+    try:
+        for lang in ("tr", "en", "es", "de", "ru"):
+            K.set_lang(lang)
+            # uyanıyor: çip ve ekran
+            acc.booting, acc.server_ok, acc.boot_try = True, None, 1
+            app.draw_account_chip(canvas, 1 / 30, (0, 0), False)
+            app.state = K.STATE_LOGIN
+            app.update_login(1 / 30, (0, 0), False)
+            # kapalı: her sebep çizilir
+            acc.booting, acc.server_ok = False, False
+            for ne in (("ssl", ""), ("timeout", ""), ("http", "404"), ("setup", ""),
+                       ("blocked", "PermissionError"), ("net", "OSError: x"), ("", "")):
+                acc.net_error = ne
+                app.draw_account_chip(canvas, 1 / 30, (0, 0), False)
+                app.update_login(1 / 30, (0, 0), False)
+        # dünya sıralaması hatası da sebebiyle ve uzun metin taşmadan çizilir
+        app.online.world_scores, app.online.loading = [], False
+        app.online.world_error = K.L("ui.acc_neterr") + " " + K.net_reason_text("ssl")
+        app.state = K.STATE_WORLD_LB          # goto() değil: ağa çıkmasın
+        for _ in range(3):
+            app.t += 1 / 30
+            app.update_world_leaderboard(1 / 30, (0, 0), False)
+    finally:
+        K.set_lang("tr")
+
+
 if __name__ == "__main__":
     print("roll_rarity dağılımı (20.000 çekiliş):")
     print("  şans   | Yaygın | Sıradışı | Nadir | Epik  | Efsanevi")
