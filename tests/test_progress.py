@@ -13,7 +13,12 @@ Denenenler:
 """
 import os
 import sys
-import math
+import tempfile
+
+# Oyuncunun GERÇEK kaydına asla dokunma (Windows'ta %APPDATA% dahil): oyun bu
+# klasörü kullanır (bkz. kasma_arena13.ARENA_SAVE_DIR). Oyun modülü içe
+# aktarılmadan ÖNCE ayarlanmalı.
+os.environ["ARENA_SAVE_DIR"] = tempfile.mkdtemp(prefix="arena_prog_")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -140,10 +145,8 @@ def test_v335_cheat_ban_survives_relogin_and_reinstall():
     """HİLE AÇIĞI (v3.35): hile kodu + çıkış/giriş, kaydı silme, başka hesap,
     çevrimdışı hile. Yasak her durumda KALICI kalmalı, hile içeriği hesaba
     yazılmamalı ve temiz hesaplar hiç etkilenmemeli."""
-    import tempfile
     import threading
     import time as _time
-    os.environ["XDG_DATA_HOME"] = tempfile.mkdtemp(prefix="arena_cheat_")
     srv = _srv()
     C = srv.app.test_client()
     import kasma_arena13 as K
@@ -160,7 +163,14 @@ def test_v335_cheat_ban_survives_relogin_and_reinstall():
                 self.t(*self.a, **self.k)
 
     saved = (threading.Thread, _time.sleep, K.ONLINE_API_URL, K.AccountClient._post,
-             K.OnlineClient.submit_score_async, K.SaveManager.on_ban, K.SaveManager.on_progress_change)
+             K.OnlineClient.submit_score_async, K.SaveManager.on_ban, K.SaveManager.on_progress_change,
+             K.SAVE_FILE, K.LEGACY_SAVE)
+    # Bu testin KENDİ boş kaydı: sahte sunucu hesap kimliklerini her seferinde
+    # acc-1'den verir; başka bir testin (ya da önceki çalıştırmanın) kaydında
+    # kalmış "acc:acc-1" profili buraya karışmasın.
+    _own = tempfile.mkdtemp(prefix="arena_cheat_")
+    K.SAVE_FILE = os.path.join(_own, "kasma_arena_save.json")
+    K.LEGACY_SAVE = os.path.join(_own, "legacy_kasma_arena_save.json")
     sent = []
 
     def _post(self, path, payload, timeout=20):
@@ -251,7 +261,8 @@ def test_v335_cheat_ban_survives_relogin_and_reinstall():
         assert r.status_code == 401
     finally:
         (threading.Thread, _time.sleep, K.ONLINE_API_URL, K.AccountClient._post,
-         K.OnlineClient.submit_score_async, K.SaveManager.on_ban, K.SaveManager.on_progress_change) = saved
+         K.OnlineClient.submit_score_async, K.SaveManager.on_ban, K.SaveManager.on_progress_change,
+         K.SAVE_FILE, K.LEGACY_SAVE) = saved
 
 
 if __name__ == "__main__":

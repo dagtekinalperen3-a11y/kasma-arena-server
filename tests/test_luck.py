@@ -11,6 +11,7 @@ zırh altında çalışması, eski kaydın yüklenmesi ve skor denetimi payı.
 import os
 import sys
 import json
+import math
 import random
 import tempfile
 
@@ -22,6 +23,7 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 # Kayıt dosyası geçici bir klasöre yazılsın (oyuncunun gerçek kaydına dokunma).
 _TMP = tempfile.mkdtemp(prefix="arena_luck_")
 os.environ["XDG_DATA_HOME"] = _TMP
+os.environ["ARENA_SAVE_DIR"] = os.path.join(_TMP, "KasmaArena")   # Windows'ta da geçerli
 
 import pygame  # noqa: E402
 import kasma_arena13 as K  # noqa: E402
@@ -565,15 +567,15 @@ def test_v334_maps_and_oaths():
     run.set_map_theme("jungle")
     assert abs(run.player.run_xp_mult - (xp0 + 0.12)) < 1e-9
     assert abs(run.waves.spawn_rate_mult - 1.12) < 1e-9
-    assert run.waves.snakes and run.waves.doom
+    assert run.waves.theme == "jungle" and run.waves.doom
     run.set_map_theme("desert")
     assert abs(run.player.run_xp_mult - xp0) < 1e-9          # orman payı geri alındı
     assert abs(run.player.run_coin_mult - (coin0 + 0.15)) < 1e-9
-    assert abs(run.waves.enemy_speed_mult - 1.08) < 1e-9 and not run.waves.snakes
+    assert abs(run.waves.enemy_speed_mult - 1.08) < 1e-9 and run.waves.theme == "desert"
     run.set_map_theme("frost")
     assert abs(run.wave_hp_mult(10) / K.arena_hp_mult(10) - 1.10) < 1e-6
     run.set_map_theme("stone")
-    assert not run.waves.doom and not run.waves.snakes
+    assert not run.waves.doom and run.waves.theme == "stone"
     assert set(K.MAP_THEMES) == set(K.MAP_RULES) == set(K.MAP_FLOOR_KEY)
     # --- YEMİNLER: her biri bir artı bir eksi; dürüst koşu denetime takılmaz
     for key, _ic, _col in K.OATHS:
@@ -608,37 +610,115 @@ def test_v334_maps_and_oaths():
     assert run.oath is None
 
 
-def test_v335_merchant_wave0():
+def test_v336_merchant_stays_all_run():
     run = _run()
-    run.start_calm()
-    assert run.calm and run.merchant is not None and len(set(run.merchant_oaths)) == 3
-    # DALGA 0: yaratık doğmaz, dalga ilerlemez, koşu süresi işlemez
-    for _ in range(300):
-        run.update(1 / 30, _NOINP)
-    assert run.calm and not run.enemies and run.waves.wave == 1 and run.run_time == 0.0
-    # tüccara yürü, E -> mağara açılır
     p = run.player
-    p.x, p.y = run.merchant.x + 20, run.merchant.y
-    run.update(1 / 30, dict(_NOINP, use_pressed=True))
-    assert run.merchant_open
-    run.choose_oath(run.merchant_oaths[0])
-    assert run.oath == run.merchant_oaths[0] and not run.merchant_open and run.merchant.done
-    run.choose_oath(run.merchant_oaths[1])                   # ikinci yemin alınamaz
-    assert run.oath == run.merchant_oaths[0]
-    for _ in range(int((K.CALM_AFTER_OATH + 0.5) * 30)):
-        run.update(1 / 30, _NOINP)
-    assert not run.calm and run.run_time > 0
+    run.update_camera(0, snap=True)
+    run.spawn_merchant()
+    m = run.merchant
+    assert m is not None and not hasattr(run, "calm")
+    # kameranın dışında, oyuncudan uzakta doğar (haritada işaretlenmez)
+    assert not run.cam_rect().collidepoint(m.x, m.y)
+    assert K.dist(m.x, m.y, p.x, p.y) > 600
+    # DALGA 0 YOK: oyun hemen başlar, yaratık doğar, süre işler
     for _ in range(200):
         run.update(1 / 30, _NOINP)
         if run.enemies:
             break
-    assert run.enemies, "1. dalga başlamadı"
-    # süre dolunca yeminsiz de başlar
+    assert run.enemies and run.run_time > 0
+    # uzaktayken E bir şey açmaz; yanına gidince açılır
+    run.update(1 / 30, dict(_NOINP, use_pressed=True))
+    assert not run.merchant_open
+    p.x, p.y = m.x + 20, m.y
+    run.enemies.clear()
+    run.update(1 / 30, dict(_NOINP, use_pressed=True))
+    assert run.merchant_open
+    hand = run.merchant_offers()
+    assert len(hand) == 3 and len({k for k, _t in hand}) == 3
+    assert all(0 <= t_ < K.RARITY_COUNT and k in K.OATH_BY_KEY for k, t_ in hand)
+    # aynı seviyede el DEĞİŞMEZ (konuşup durmak kademe çekmez) ...
+    for _ in range(30):
+        assert run.merchant_offers() == hand
+    # ... seviye atlayınca yenilenir ve tüccarın şansı seviyeyle artar
+    luck1 = run.merchant_luck()
+    p.level += 5
+    run.merchant_offers()
+    assert run.merchant_hand_lvl == p.level
+    assert abs(run.merchant_luck() - luck1 - 5 * K.MERCHANT_LUCK_PER_LEVEL) < 1e-9
+    # yemin: kademesiyle uygulanır, koşuda TEK yemin, tüccar yerinde kalır
+    run.choose_oath("glass", 3)
+    assert run.oath == "glass" and run.oath_tier == 3 and not run.merchant_open
+    assert m.done and run.merchant is m
+    run.choose_oath("turtle", 4)
+    assert run.oath == "glass" and run.oath_tier == 3
+    run.update(1 / 30, dict(_NOINP, use_pressed=True))   # yine konuşulabilir
+    assert run.merchant_open
+    run.choose_oath(None)
+    assert not run.merchant_open and run.oath == "glass"
+    # kademe aralık dışına taşamaz
     run2 = _run()
-    run2.start_calm()
-    for _ in range(int((K.CALM_TIME + 1) * 30)):
-        run2.update(1 / 30, _NOINP)
-    assert not run2.calm and run2.oath is None
+    run2.choose_oath("glass", 99)
+    assert run2.oath_tier == K.RARITY_COUNT - 1
+
+
+def test_v336_tiered_oaths_fair():
+    """Kademe yalnız GÜÇ tarafını büyütür, bedel aynı kalır; her kademe ve
+    her skinle dürüst koşu hile denetimine takılmaz."""
+    mult = K.OATH_TIER_MULT
+    assert len(mult) == K.RARITY_COUNT and list(mult) == sorted(mult) and mult[0] == 1.0
+    for key, _ic, _col in K.OATHS:
+        vals = [K.oath_values(key, t) for t in range(K.RARITY_COUNT)]
+        for a_, b_ in zip(vals, vals[1:]):
+            if key == "bulwark":     # daha çok kalkan, daha KISA dolum süresi
+                assert b_[0] >= a_[0] and b_[1] <= a_[1], (key, vals)
+            else:
+                assert all(y >= x for x, y in zip(a_, b_)), (key, vals)
+        texts = [K.oath_up_text(key, t) for t in range(K.RARITY_COUNT)]
+        assert all(texts) and len(set(texts)) >= 2, (key, texts)
+        downs = set()
+        for tier in range(K.RARITY_COUNT):
+            for skin in ("default", "immortal_merc", "green_titan", "shadow_hunter"):
+                run = _run(skin)
+                p = run.player
+                base = (p.max_hp, p.run_dmg_mult, p.run_spd_mult, p.run_aspd_mult, p.run_xp_mult,
+                        p.run_coin_mult, p.enemy_hp_curse, p.regen_mult)
+                run.choose_oath(key, tier)
+                assert run.oath == key and run.oath_tier == tier
+                assert K.run_integrity_check(run) is None, (key, tier, skin)
+                assert p.max_hp >= 30 and p.hp == p.max_hp
+                if skin == "default":
+                    # bedel (eksi taraf) kademeden bağımsız
+                    if key == "glass":
+                        downs.add(p.max_hp / float(base[0]))
+                    elif key == "gold_fever":
+                        downs.add(round(p.enemy_hp_curse - base[6], 6))
+                    elif key == "turtle":
+                        downs.add(round(p.run_spd_mult - base[2], 6))
+                    elif key == "scholar":
+                        downs.add(round(p.run_dmg_mult - base[1], 6))
+                    elif key in ("bulwark", "hawkeye"):
+                        downs.add(round(p.run_aspd_mult - base[3], 6))
+                    elif key == "hunter":
+                        downs.add(round(p.run_coin_mult - base[5], 6))
+                    elif key == "hoard":
+                        downs.add(round(p.run_xp_mult - base[4], 6))
+                    elif key == "blood":
+                        downs.add(p.regen_mult)
+                    elif key == "wind":
+                        downs.add(run.oath_speed)
+                    elif key == "feast":
+                        downs.add(run.oath_spawn)
+        if downs:
+            assert len(downs) == 1, (key, downs)
+    # güç tarafı gerçekten büyür
+    lo, hi = _run(), _run()
+    lo.choose_oath("glass", 0)
+    hi.choose_oath("glass", K.RARITY_COUNT - 1)
+    assert hi.player.run_dmg_mult > lo.player.run_dmg_mult
+    lo, hi = _run(), _run()
+    lo.choose_oath("bulwark", 0)
+    hi.choose_oath("bulwark", K.RARITY_COUNT - 1)
+    assert hi.player.shield_charges > lo.player.shield_charges and hi.oath_period < lo.oath_period
 
 
 def test_v335_map_achievements_and_weapons():
@@ -684,23 +764,27 @@ def test_v335_map_achievements_and_weapons():
     run2.finish_run()
     assert sv.data["stats"]["frost_kills"] == 1010
     assert sv.data["stats"]["best_frost_wave"] == 7
-    # ORMAN: yılan doğar ve sayılır
+    # ORMAN: arenanın "kırmızı" yaratığının yerine YILAN doğar ve sayılır
     run3 = _run()
     run3.set_map_theme("jungle")
-    random.seed(5)
-    kinds = [run3.waves.pick_base_kind() for _ in range(400)]
-    assert "snake" in kinds
-    e = K.Enemy("snake", run3.player.x + 30, run3.player.y, 1.0, 1.0, wave=3)
+    assert run3.waves.theme == "jungle"
+    e = K.make_map_enemy("jungle", "red", run3.player.x + 30, run3.player.y, 1.0, 1.0, wave=3)
+    assert e.kind == "red" and e.variant == "j_snake"
     surf = pygame.Surface((K.VIRTUAL_W, K.VIRTUAL_H))
     e.draw(surf, 1.0)
     run3.enemies.append(e)
     e.hp = 0
     e.alive = False
     run3.on_enemy_killed(e)
+    other = K.make_map_enemy("jungle", "blue", 0, 0, 1.0, 1.0, wave=3)
+    other.alive = False
+    run3.on_enemy_killed(other)
     assert run3.snakes_killed == 1 and run3.map_stat_values()["jungle_snakes"] == 1
-    # yılan Taş Meydan'da doğmaz
+    # Taş Meydan'da yılan yok; eski "snake" türü de kalktı
     run4 = _run()
-    assert all(run4.waves.pick_base_kind() != "snake" for _ in range(300))
+    assert run4.waves.theme == "stone"
+    assert K.make_map_enemy(run4.waves.theme, "red", 0, 0, 1.0).variant is None
+    assert "snake" not in K.ENEMY_DEFS
 
 
 def test_v335_no_hell_and_doom():
@@ -729,12 +813,14 @@ def test_v335_app_flow_and_world_gate():
     assert app.selected_map() == "frost"
     app.start_run()
     run = app.run
-    assert app.state == K.STATE_PLAY and run.map_theme == "frost" and run.calm and run.merchant
+    assert app.state == K.STATE_PLAY and run.map_theme == "frost" and run.merchant is not None
+    assert run.waves.theme == "frost" and not hasattr(run, "calm")
     # dünya sıralaması yalnız Taş Meydan'da
     run.game_over = True
     assert app.world_block_reason() is not None
     # tüccar akışı: E -> mağara -> yemin
     run.game_over = False
+    run.merchant_offers()
     run.merchant_open = True
     app.update_play(1 / 30, K._NoKeys(), (640, 360), False, False, False)
     assert app.state == K.STATE_MERCHANT
@@ -748,7 +834,8 @@ def test_v335_app_flow_and_world_gate():
         app.t += 1 / 30
         app.update_merchant(1 / 30, (0, 0), False)
     app.update_merchant(1 / 30, app.merchant_ui.cards[0][0].center, True)
-    assert app.state == K.STATE_PLAY and run.oath == run.merchant_oaths[0]
+    key, tier = run.merchant_hand[0]
+    assert app.state == K.STATE_PLAY and run.oath == key and run.oath_tier == tier
     app.handle_escape()
     assert app.state == K.STATE_PAUSE
     app.resume_run()
@@ -759,7 +846,8 @@ def test_v335_app_flow_and_world_gate():
     assert "restart" in K.KEY_ACTIONS and K.DEFAULT_KEYS["restart"] == ["r"]
     # metinler beş dilde
     for k in ["dr.title_oath", "q.title", "key.restart", "st.oath", "m.greet", "m.talk", "ms.title",
-              "map.doom", "map.no_world", "ui.show_quests"] + \
+              "map.doom", "map.no_world", "ui.show_quests", "m.hint", "m.luck", "m.sworn", "m.ok",
+              "m.one_oath", "m.later_sub"] + \
             ["oath.%s.%s" % (o[0], f) for o in K.OATHS for f in ("name", "up", "down")] + \
             ["q." + q for q in K.QUEST_DEFS]:
         assert len(set(K.STRINGS[k])) >= 2 and all(K.STRINGS[k]), k
@@ -769,7 +857,7 @@ def test_v335_app_flow_and_world_gate():
         tour.update(1 / 30)
         if getattr(tour.sh, "run", None) is not None:
             break
-    assert tour.sh.run.map_theme == "stone" and not tour.sh.run.calm and tour.sh.run.merchant is None
+    assert tour.sh.run.map_theme == "stone" and tour.sh.run.merchant is None
     assert tour.sh.state == K.STATE_PLAY
     K.set_lang("tr")
 
@@ -796,6 +884,234 @@ def test_v334_quests_pay_only_clean():
     bad.cheat_flag = "hasar"
     bad.finish_run()
     assert bad.quest_gems == 0 and bad.gems_earned == 0
+
+
+LANGS = ("tr", "en", "es", "de", "ru")
+
+
+def test_v336_map_creatures_same_game():
+    """Her haritanın 11 kendi yaratığı var; can, hasar, hız, ödül ve isabet
+    alanı arenadaki karşılığıyla BİREBİR aynı (oyun mantığı değişmez)."""
+    assert set(K.MAP_ROSTER) == {"frost", "jungle", "desert"}
+    attrs = ("kind", "max_hp", "speed", "dmg", "contact_dps", "radius", "hit_r", "coin", "xp",
+             "score", "armor")
+    seen = set()
+    for theme, roster in K.MAP_ROSTER.items():
+        assert set(roster) == {"red", "blue", "yellow", "tank", "sprinter", "brute", "elite",
+                               "bomber", "healer", "wizard", "stinger"}, theme
+        for kind, var in roster.items():
+            assert var not in seen
+            seen.add(var)
+            d = K.MAP_ENEMIES[var]
+            assert d["base"] == kind and K.HELL_SHAPES.get(d["shape"]) == "_draw_" + d["shape"]
+            assert not any(f in d for f in ("hp", "dmg", "radius")), var     # çarpan YOK
+            for w in (1, 12, 30):
+                a = K.Enemy(kind, 0, 0, 1.7, 1.0, wave=w)
+                b = K.Enemy(None, 0, 0, 1.7, 1.0, wave=w, variant=var)
+                for at in attrs:
+                    assert getattr(a, at) == getattr(b, at), (var, w, at)
+            e = K.make_map_enemy(theme, kind, 0, 0, 1.0)
+            assert e.variant == var and e.map_var and not e.hellish
+            for lg in LANGS:                                  # ad 5 dilde
+                K.set_lang(lg)
+                assert K.make_map_enemy(theme, kind, 0, 0, 1.0).disp_name
+            K.set_lang("tr")
+            assert all(K.STRINGS["en." + var]) and len(set(K.STRINGS["en." + var])) >= 2
+    assert len(seen) == 33
+    # cehennem yaratıkları eskisi gibi
+    h = K.Enemy(None, 0, 0, 1.0, wave=3, variant="h_imp", biome="hell")
+    assert h.hellish and not h.map_var
+    # Taş Meydan / lanet türleri dokunulmadan döner
+    assert K.make_map_enemy("stone", "red", 0, 0, 1.0).variant is None
+    assert K.make_map_enemy("frost", "goblin", 0, 0, 1.0).variant is None
+
+
+def test_v336_map_creatures_draw_inside_sprite():
+    """Her yaratık her yönde ve her adımda gövde önbelleğinin içine sığar."""
+    for var in K.MAP_ENEMIES:
+        e = K.Enemy(None, 0, 0, 1.0, wave=5, variant=var)
+        e.spawn_t = 9.0
+        r = e.radius
+        pad = int(r * 2.2) + 6
+        for i in range(8):
+            ang = i * math.tau / 8
+            for walk, t, sc in ((0.0, 0.0, 0.0), (1.7, 1.3, 0.5), (4.1, 2.9, 2.0)):
+                e.face_x, e.face_y = math.cos(ang), math.sin(ang)
+                e.walk, e.shoot_cd = walk, sc
+                spr = pygame.Surface((pad * 2, pad * 2), pygame.SRCALPHA)
+                K._GLOW_ON_ALPHA = True
+                try:
+                    e._draw_body(spr, pad, pad, t, r)
+                finally:
+                    K._GLOW_ON_ALPHA = False
+                m = pygame.mask.from_surface(spr, 24)
+                bb = m.get_bounding_rects()
+                assert bb, var
+                u = bb[0].unionall(bb[1:]) if len(bb) > 1 else bb[0]
+                assert u.left > 0 and u.top > 0 and u.right < pad * 2 and u.bottom < pad * 2, (var, ang)
+        e.hit_flash = 0.2                       # vuruş parlaması da çizilir
+        e.draw(pygame.Surface((K.VIRTUAL_W, K.VIRTUAL_H)), 1.0)
+
+
+def test_v336_map_spawns_and_shots():
+    random.seed(11)
+    run = _run()
+    run.set_map_theme("desert")
+    run.player.take_damage = lambda *a, **k: 0
+    run.waves.wave = 16
+    for _ in range(900):
+        run.update(1 / 30, _NOINP)
+    arena_kinds = set(K.MAP_ROSTER["desert"])
+    mapped = [e for e in run.enemies if e.kind in arena_kinds]
+    assert mapped and all(e.variant == K.MAP_ROSTER["desert"][e.kind] for e in mapped)
+    # dönüşte haritayı değiştirmek takımı da değiştirir; cehennemde harita takımı yok
+    run.set_map_theme("stone")
+    assert run.waves.theme == "stone"
+    # okçu (sarı) ve büyücü kendi mermi görselini atar; hasar arenanınkiyle aynı
+    for kind, style in (("yellow", "arrow"), ("wizard", "arrow")):
+        p = K.Player("default")
+        p.x, p.y = 900.0, 900.0
+        shots = {}
+        for var_kind in (None, "desert"):
+            e = (K.make_map_enemy(var_kind, kind, 900.0 + 260, 900.0, 1.0, wave=16) if var_kind
+                 else K.Enemy(kind, 900.0 + 260, 900.0, 1.0, wave=16))
+            e.spawn_t, e.shoot_cd = 2.0, 0.0
+            projs = []
+            for _ in range(60):
+                e.update(1 / 30, p, run.fx, projs, enemies=[])
+                if projs:
+                    break
+            assert projs, (kind, var_kind)
+            shots[var_kind] = projs[0]
+        assert shots["desert"].style == style and shots[None].style == "orb"
+        assert abs(shots["desert"].dmg - shots[None].dmg) < 1e-9
+        assert shots["desert"].r == shots[None].r and shots["desert"].poison == shots[None].poison
+        surf = pygame.Surface((K.VIRTUAL_W, K.VIRTUAL_H))
+        for st in ("orb", "icicle", "spit", "arrow"):
+            K.EnemyProjectile(400, 300, 120, -40, 5, style=st).draw(surf, 1.0)
+
+
+def test_v336_map_bosses():
+    run = _run()
+    for theme in ("frost", "jungle", "desert"):
+        for kind in K.BOSS_ORDER:
+            random.seed(3)
+            a = K.Boss(kind, 900, 900, 1.0, 1.0, 15)
+            random.seed(3)
+            b = K.Boss(kind, 900, 900, 1.0, 1.0, 15, theme=theme)
+            for at in ("max_hp", "speed", "dmg", "radius", "hit_r", "armor", "score", "coin", "xp",
+                       "boss_index"):
+                assert getattr(a, at) == getattr(b, at), (theme, kind, at)
+            assert a.trait == b.trait and b.theme == theme and b.name != a.name
+            assert all(K.STRINGS["bn.%s.%s" % (theme, kind)])
+            surf = pygame.Surface((K.VIRTUAL_W, K.VIRTUAL_H))
+            b.spawn_t = 9.0
+            b.draw(surf, 1.0)
+            b.draw(surf, 1.0, hud=False)
+            # çağırdığı yaratıklar da haritanın
+            b._summon_minions(run.fx)
+            assert b.summoned_enemies
+            assert all(e.variant == K.MAP_ROSTER[theme][e.kind] for e in b.summoned_enemies)
+        for lg in LANGS:
+            K.set_lang(lg)
+            names = {K.Boss(k, 0, 0, 1.0, 1.0, 10, theme=theme).name for k in K.BOSS_ORDER}
+            assert len(names) == 5
+        K.set_lang("tr")
+    # cehennem patronu harita kimliği almaz
+    hb = K.Boss("warlord", 0, 0, 1.0, 1.0, 10, hellish=True, theme="frost")
+    assert hb.theme is None and hb.name == K.HELL_BOSS_NAMES["warlord"]
+    # oyunda: harita koşusunun patron dalgası haritanın patronunu getirir
+    run = _run()
+    run.set_map_theme("jungle")
+    run.waves.wave = 10
+    run.waves.boss_pending = True
+    run.update(1 / 30, _NOINP)
+    assert run.bosses and all(bb.theme == "jungle" for bb in run.bosses)
+
+
+def test_v336_map_select_screen():
+    app = K.App()
+    app.splash_t = 99
+
+    def step(n, mouse=(0, 0), click=False):
+        for i in range(n):
+            app.t += 1 / 30
+            app.update_map_select(1 / 30, mouse, click and i == 0)
+    app.open_map_select()
+    step(12)                                        # manzaralar hazırlanır
+    for th in K.MAP_THEMES:
+        assert (th,) + K.MS_CARD_SCENE in K._MAP_SCENES and (th,) + K.MS_BIG_SCENE in K._MAP_SCENES
+    # karta tıkla -> kart büyüyüp ayrıntı penceresine dönüşür
+    c = K._ms_card_rect(2)
+    step(1, c.center, True)
+    assert app._ms_zoom == "jungle" and app.selected_map() == "jungle"
+    assert 0.0 <= app.ms_zoom_k() < 1.0
+    step(12, (700, 160))
+    assert app.ms_zoom_k() == 1.0
+    # ESC önce pencereyi kapatır, sonra menüye döner
+    app.handle_escape()
+    step(12)
+    assert app.state == K.STATE_MAP_SELECT and app._ms_zoom is None
+    # ok tuşu yokken pencere dışına tıklamak da kapatır
+    step(1, K._ms_card_rect(3).center, True)
+    step(12)
+    assert app._ms_zoom == "desert"
+    step(1, (5, 5), True)
+    step(12)
+    assert app._ms_zoom is None
+    # ayrıntı penceresinden BAŞLA: o harita başlar
+    step(1, K._ms_card_rect(1).center, True)
+    step(12)
+    bs = pygame.Rect(K.MS_WIN_RECT.x + 20 + 162, K.MS_WIN_RECT.bottom - 62, K.MS_BIG_SCENE[0] - 162, 46)
+    step(1, bs.center, True)
+    assert app.state == K.STATE_PLAY and app.run.map_theme == "frost"
+    # her dilde ve her haritada çizilir (taşan / eksik metin hata vermez)
+    app.open_map_select()
+    for lg in LANGS:
+        K.set_lang(lg)
+        step(2)
+        for i, th in enumerate(K.MAP_THEMES):
+            app.set_selected_map(th)
+            app.ms_open_zoom(th, i)
+            app._ms_zoom_t0 -= 1.0
+            step(2, (640, 160))
+            app._ms_zoom = None
+    K.set_lang("tr")
+    for k in ["ms.tap", "ms.creatures", "ms.creatures_sub", "ms.creatures_stone", "ms.hover_hint",
+              "ms.bosses", "ms.boss_waves", "ms.hell_bosses", "ms.weapons", "ms.stone_weapons",
+              "ms.rules", "ms.same", "ms.stone_note", "ms.badge_world", "ms.badge_hell",
+              "ms.weap_done", "ms.record", "ms.r_score", "ms.r_wave", "ms.r_kills", "ms.r_bosses",
+              "ms.r_time", "ms.r_dashes"] + ["ms.tag." + th for th in K.MAP_THEMES] + \
+            ["ms.role." + k for k in K.MS_BEST_KINDS]:
+        assert len(set(K.STRINGS[k])) >= 2 and all(K.STRINGS[k]), k
+    app.handle_escape()
+    assert app.state == K.STATE_MENU
+
+
+def test_v336_pause_quest_toggle_and_backgrounds():
+    app = K.App()
+    app.splash_t = 99
+    app.start_run()
+    app.handle_escape()
+    assert app.state == K.STATE_PAUSE
+    app.update_pause(1 / 30, (0, 0), False)
+    was = bool(K.CFG.get("show_quests", True))
+    app.update_pause(1 / 30, app.pause_quest_rect.center, True)
+    assert bool(K.CFG.get("show_quests", True)) == (not was)
+    assert app.save.data["settings"]["show_quests"] == (not was)
+    app.update_pause(1 / 30, app.pause_quest_rect.center, True)
+    assert bool(K.CFG.get("show_quests", True)) == was
+    # KİTAPLIK ve KIYAFET MARKET kendi arka planlarını çizer
+    surf = pygame.Surface((K.VIRTUAL_W, K.VIRTUAL_H))
+    for t in (0.0, 3.7, 61.2):
+        K.draw_library_bg(surf, t)
+        K.draw_wardrobe_bg(surf, t)
+    for st, fn in ((K.STATE_BOOK_MARKET, app.update_book_market),
+                   (K.STATE_COSMETIC_MARKET, app.update_cosmetic_market)):
+        app.goto(st)
+        for _ in range(3):
+            app.t += 1 / 30
+            fn(1 / 30, (0, 0), False, 0)
 
 
 if __name__ == "__main__":

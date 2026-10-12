@@ -1,6 +1,6 @@
 """
 =====================================================================
- ARENA BONK  —  v3.35   (eski adı: KASMA ARENA)
+ ARENA BONK  —  v3.36   (eski adı: KASMA ARENA)
  2D Top-Down Hayatta Kalma / Skor-Rekor Oyunu
  ---------------------------------------------------------------------
  Dalgalar halinde gelen düşmanlara karşı hayatta kal, nişan al, ateş et,
@@ -9,34 +9,39 @@
  Elmasla kalıcı SKIN'ler al (her skinin kendi silahı, mermisi, efekti ve
  ÖZEL YETENEĞİ var).
 
- v3.35 — HİLE AÇIĞI KAPANDI, HARİTA BAŞARIMLARI, GEZGİN TÜCCAR:
-   * HİLE KORUMASI (ACİL): hile kodu kullanılan hesap çıkış/giriş yapınca
-     yasak kalkıyor, skor yine dünya sıralamasına gidiyordu. İki açık vardı:
-     (1) sunucudan ilerleme yüklenirken "board_banned" alanı sunucunun
-     "yasaksız" değeriyle eziliyordu; (2) hile sunucuya hiç bildirilmiyordu,
-     yani yerel bayrak kaybolunca hesap temiz görünüyordu. Artık hile anında
-     sunucuya bildirilir (/player/report_cheat, yalnız KENDİ oturumuyla),
-     hesap sunucuda kalıcı yasaklanır ve skorları silinir; hile içeriği
-     hesaba yazılmaz. Çevrimdışı hile, ağ gelince taşınır. Çıkış/giriş,
-     oyunu kapatıp açma, kaydı silip yeniden kurma, başka bilgisayar: hiçbiri
-     yasağı kaldırmaz (bkz. tests/test_progress.py uçtan uca testi).
-   * GÜÇ SUNAĞI ve HAZİNE SANDIĞI kaldırıldı. Başlangıç silahı seçimi
-     kaldırıldı.
-   * GEZGİN TÜCCAR: koşu DALGA 0 ile başlar (yaratık yok, en çok 30 sn).
-     Haritada tezgâhıyla bir tüccar bekler; [E] ile konuşunca MAĞARASI
-     açılır ve 3 YEMİN satar (ya da yeminsiz). Seçince 1. dalga başlar.
-   * OYNA -> HARİTA SEÇ: Taş Meydan (normal, dünya sıralaması, cehennem),
-     Buzul Vadisi, Zümrüt Orman, Kızıl Çöl. Her harita önizlemesi, artıları,
-     eksileri ve başarımlarıyla gösterilir.
-   * HARİTA BAŞARIMLARI: 13 başarım yalnızca kendi haritasında kazanılır ve
-     20 silahın 12'sinin kilidini açar (ör. BUZ İZİ = Buzul'da 1.000 düşman
-     + PAPUÇ; HORTUM = Çöl'de 300 dash + Çöl'de Rüzgâr Kitabı Lv.5). Zümrüt
-     Orman'da YILAN yaratığı doğar ("Yılan Avcısı" ŞAHİN'i açar).
-   * Taş Meydan dışındaki haritalarda CEHENNEM YOK; 25. dalgadan sonra
-     ÖLÜM DUVARI başlar (can x1,25, hasar x1,30 her dalga, arenanın kendi
-     baskısının üstüne). 30 kat güçlü bot bile ~35. dalgada düşüyor.
-     Bu haritaların skoru DÜNYA SIRALAMASINA GİRMEZ.
-   * AYARLAR: koşu görevleri kutusu gizlenip açılabilir.
+ v3.36 — HER HARİTANIN KENDİ YARATIKLARI VE PATRONLARI, YENİ OYNA EKRANI:
+   * HARİTA YARATIKLARI: Buzul Vadisi, Zümrüt Orman ve Kızıl Çöl'ün 11'er
+     yaratığı var (buz böceği, yeti, kar kurdu, kartopu, buz golemi...;
+     yılan, ateşböceği, zehir kurbağası, goril, ağaç adam...; akrep, kum
+     okçusu, mumya, çakal, çöl haydudu...). Oyun mantığı ve sayılar Taş
+     Meydan'la BİREBİR aynı (can, hasar, hız, ödül, isabet alanı; testle
+     sabitlendi). Değişen: görünüm, ad ve mermi (buz sarkıtı, zehir, ok).
+   * HARİTA PATRONLARI: her haritanın 5 patronu (BUZ ŞÖVALYESİ, AYAZ
+     KRALİÇESİ...; ORMAN REİSİ, YILAN ANA...; FİRAVUN, SFENKS...). Güç ve
+     yetenekler arena patronlarıyla aynı; adı, rengi, tacı (buz tacı /
+     yaprak çelengi / firavun başlığı) ve zemin halesi farklı. Çağırdıkları
+     yaratıklar da o haritanın. Cehennem yok, 25. dalgadan sonra ölüm duvarı.
+   * OYNA EKRANI baştan: dört büyük kart, her kartta elle çizilmiş canlı
+     manzara (kolezyum, kuzey ışıklı karlı dağlar, tapınaklı orman,
+     piramitli çöl) ve içinde dolaşan yaratıklar. Karta tıklayınca kart
+     büyüyüp ayrıntı penceresine dönüşür: 11 yaratık (üstüne gelince ne
+     yaptığı), 5 patron, açılan silahlar ve ilerlemesi, kurallar, rekorlar.
+   * GEZGİN TÜCCAR: dalga 0 kaldırıldı, koşu hemen başlar. Tüccar haritanın
+     bir yerinde doğar ve koşu boyunca orada kalır; haritada işaretlenmez,
+     konuşmak isteğe bağlı. Yeminlerin KADEMESİ var (Yaygın..Efsanevi):
+     tüccarın şansı = oyuncunun şansı + seviye başına %8, el yalnız seviye
+     atlayınca yenilenir. Kademe yalnız GÜÇ tarafını büyütür, bedel aynı.
+   * Görev kutusunu gizle / göster düğmesi oyun içindeki ESC menüsünde.
+   * KİTAPLIK ve KIYAFET MARKET'in kendi arka planları var: ahşap kitap
+     rafları, şamdanlar, uçuşan sayfalar / askılı kıyafet rayı, boy
+     aynaları, kadife perdeler, spot ışıkları.
+
+ v3.35 — HİLE AÇIĞI KAPANDI: hile anında sunucuya bildirilir, hesap
+   sunucuda kalıcı yasaklanır, skorları silinir (çıkış/giriş, yeniden
+   kurulum, başka bilgisayar yasağı kaldırmaz). OYNA -> HARİTA SEÇ; 13
+   harita başarımı 20 silahın 12'sini açar; Taş Meydan dışında cehennem
+   yok, 25. dalgadan sonra ölüm duvarı; o haritalar dünya sıralamasına
+   girmez. Güç sunağı, hazine sandığı ve başlangıç silahı kaldırıldı.
 
  v3.34 — HER KOŞU FARKLI: 4 harita (v3.35'te seçmeli oldu), 12 YEMİN,
    KOŞU GÖREVLERİ (25/50/100 elmas, yalnız temiz koşu öder), R'yi basılı
@@ -881,7 +886,7 @@ WEAPON_FX_LEGACY = {"full": 100, "dim": 32, "off": 0}
 # v3.26: oyunun adı ARENA BONK. (Kayıt klasörü "KasmaArena" olarak KALIYOR:
 # adı değiştirmek oyuncuların ilerlemesini kaybettirirdi; bkz. get_save_dir.)
 GAME_TITLE = "ARENA BONK"
-GAME_VERSION = "3.35"
+GAME_VERSION = "3.36"
 
 
 # =====================================================================
@@ -1230,7 +1235,6 @@ STRINGS = {
     # ---- YARATIK ADLARI (ölüm nedeni ekranda bunu yazar) ----
     # Eskiden ham anahtar yazılıyordu: oyuncu "red tarafından öldürüldün"
     # görüyordu. Cehennem yaratıklarının adı zaten vardı, arenadakilerin yoktu.
-    "en.snake":     _T("Yılan", "Snake", "Serpiente", "Schlange", "Змея"),
     "en.red":       _T("Sürüngen", "Crawler", "Reptante", "Kriecher", "Ползун"),
     "en.blue":      _T("Yavru", "Whelp", "Cría", "Brut", "Детёныш"),
     "en.yellow":    _T("Tüküren", "Spitter", "Escupidor", "Spucker", "Плевун"),
@@ -1248,6 +1252,55 @@ STRINGS = {
     "en.necro":     _T("Ölü Çağırıcı", "Necromancer", "Nigromante", "Totenbeschwörer", "Некромант"),
     "en.ghost":     _T("Hayalet", "Ghost", "Fantasma", "Geist", "Призрак"),
     "en.raised":    _T("Diriltilmiş", "Risen", "Resucitado", "Auferstandener", "Восставший"),
+    # --- v3.36 HARİTA YARATIKLARI ve PATRONLARI ---
+    "en.f_beetle": _T('Buz Böceği', 'Frost Beetle', 'Escarabajo de Hielo', 'Frostkäfer', 'Ледяной жук'),
+    "en.f_bat": _T('Ayaz Yarasası', 'Frost Bat', 'Murciélago de Escarcha', 'Frostfledermaus', 'Морозная летучая мышь'),
+    "en.f_wisp": _T('Kar Ruhu', 'Snow Wisp', 'Espíritu de Nieve', 'Schneegeist', 'Снежный дух'),
+    "en.f_golem": _T('Buz Golemi', 'Ice Golem', 'Gólem de Hielo', 'Eisgolem', 'Ледяной голем'),
+    "en.f_wolf": _T('Kar Kurdu', 'Snow Wolf', 'Lobo de las Nieves', 'Schneewolf', 'Снежный волк'),
+    "en.f_yeti": _T('Yeti', 'Yeti', 'Yeti', 'Yeti', 'Йети'),
+    "en.f_yeti_k": _T('Yeti Reisi', 'Yeti Chief', 'Jefe Yeti', 'Yeti-Häuptling', 'Вождь йети'),
+    "en.f_snowball": _T('Kartopu', 'Snowball', 'Bola de Nieve', 'Schneeball', 'Снежок'),
+    "en.f_healer": _T('Şifa Ruhu', 'Healing Wisp', 'Espíritu Sanador', 'Heilgeist', 'Целебный дух'),
+    "en.f_mage": _T('Buz Büyücüsü', 'Ice Mage', 'Mago de Hielo', 'Eismagier', 'Ледяной маг'),
+    "en.f_sprite": _T('Kristal Yarasa', 'Crystal Bat', 'Murciélago de Cristal', 'Kristallfledermaus', 'Хрустальная летучая мышь'),
+    "en.j_snake": _T('Yılan', 'Snake', 'Serpiente', 'Schlange', 'Змея'),
+    "en.j_fly": _T('Ateşböceği', 'Firefly', 'Luciérnaga', 'Glühwürmchen', 'Светлячок'),
+    "en.j_frog": _T('Zehir Kurbağası', 'Poison Frog', 'Rana Venenosa', 'Giftfrosch', 'Ядовитая лягушка'),
+    "en.j_treant": _T('Ağaç Adam', 'Treant', 'Ent', 'Baumhirte', 'Древень'),
+    "en.j_panther": _T('Panter', 'Panther', 'Pantera', 'Panther', 'Пантера'),
+    "en.j_gorilla": _T('Goril', 'Gorilla', 'Gorila', 'Gorilla', 'Горилла'),
+    "en.j_silver": _T('Gümüş Sırt', 'Silverback', 'Lomo Plateado', 'Silberrücken', 'Серебристая спина'),
+    "en.j_shroom": _T('Patlak Mantar', 'Burst Shroom', 'Hongo Explosivo', 'Platzpilz', 'Взрыв-гриб'),
+    "en.j_healer": _T('Şifacı Kurbağa', 'Healer Frog', 'Rana Sanadora', 'Heilerfrosch', 'Лягушка-целитель'),
+    "en.j_shaman": _T('Şaman Kurbağa', 'Shaman Frog', 'Rana Chamán', 'Schamanenfrosch', 'Лягушка-шаман'),
+    "en.j_wasp": _T('Eşek Arısı', 'Hornet', 'Avispón', 'Hornisse', 'Шершень'),
+    "en.d_scorpion": _T('Akrep', 'Scorpion', 'Escorpión', 'Skorpion', 'Скорпион'),
+    "en.d_vulture": _T('Akbaba', 'Vulture', 'Buitre', 'Geier', 'Стервятник'),
+    "en.d_archer": _T('Kum Okçusu', 'Sand Archer', 'Arquero de Arena', 'Sandschütze', 'Песчаный лучник'),
+    "en.d_mummy": _T('Mumya', 'Mummy', 'Momia', 'Mumie', 'Мумия'),
+    "en.d_jackal": _T('Çakal', 'Jackal', 'Chacal', 'Schakal', 'Шакал'),
+    "en.d_bandit": _T('Çöl Haydudu', 'Desert Bandit', 'Bandido del Desierto', 'Wüstenbandit', 'Пустынный разбойник'),
+    "en.d_guard": _T('Firavun Muhafızı', "Pharaoh's Guard", 'Guardia del Faraón', 'Pharaonenwache', 'Страж фараона'),
+    "en.d_cactus": _T('Patlak Kaktüs', 'Burst Cactus', 'Cactus Explosivo', 'Platzkaktus', 'Взрыв-кактус'),
+    "en.d_shaman": _T('Çöl Şamanı', 'Desert Shaman', 'Chamán del Desierto', 'Wüstenschamane', 'Шаман пустыни'),
+    "en.d_sorcerer": _T('Kum Büyücüsü', 'Sand Sorcerer', 'Hechicero de Arena', 'Sandzauberer', 'Песчаный колдун'),
+    "en.d_sting": _T('Sarı Akrep', 'Yellow Scorpion', 'Escorpión Amarillo', 'Gelber Skorpion', 'Жёлтый скорпион'),
+    "bn.frost.warlord": _T('BUZ ŞÖVALYESİ', 'FROST KNIGHT', 'CABALLERO DE HIELO', 'FROSTRITTER', 'ЛЕДЯНОЙ РЫЦАРЬ'),
+    "bn.frost.witch": _T('AYAZ KRALİÇESİ', 'FROST QUEEN', 'REINA DE LA ESCARCHA', 'FROSTKÖNIGIN', 'КОРОЛЕВА МОРОЗА'),
+    "bn.frost.colossus": _T('BUZUL DEVİ', 'GLACIER GIANT', 'GIGANTE GLACIAL', 'GLETSCHERRIESE', 'ЛЕДНИКОВЫЙ ВЕЛИКАН'),
+    "bn.frost.reaper": _T('KAR ORAKÇISI', 'SNOW REAPER', 'SEGADOR DE NIEVE', 'SCHNEESCHNITTER', 'СНЕЖНЫЙ ЖНЕЦ'),
+    "bn.frost.hive": _T('BUZ KOVANI', 'ICE HIVE', 'COLMENA DE HIELO', 'EISSTOCK', 'ЛЕДЯНОЙ УЛЕЙ'),
+    "bn.jungle.warlord": _T('ORMAN REİSİ', 'JUNGLE CHIEF', 'JEFE DE LA SELVA', 'DSCHUNGELHÄUPTLING', 'ВОЖДЬ ДЖУНГЛЕЙ'),
+    "bn.jungle.witch": _T('SARMAŞIK CADISI', 'VINE WITCH', 'BRUJA DE LIANAS', 'RANKENHEXE', 'ВЕДЬМА ЛИАН'),
+    "bn.jungle.colossus": _T('KADİM ENT', 'ANCIENT ENT', 'ENT ANCESTRAL', 'URALTER ENT', 'ДРЕВНИЙ ЭНТ'),
+    "bn.jungle.reaper": _T('GÖLGE PANTERİ', 'SHADOW PANTHER', 'PANTERA SOMBRÍA', 'SCHATTENPANTHER', 'ТЕНЕВАЯ ПАНТЕРА'),
+    "bn.jungle.hive": _T('YILAN ANA', 'SERPENT MOTHER', 'MADRE SERPIENTE', 'SCHLANGENMUTTER', 'МАТЬ ЗМЕЙ'),
+    "bn.desert.warlord": _T('FİRAVUN', 'PHARAOH', 'FARAÓN', 'PHARAO', 'ФАРАОН'),
+    "bn.desert.witch": _T('SERAP CADISI', 'MIRAGE WITCH', 'BRUJA DEL ESPEJISMO', 'FATA-MORGANA-HEXE', 'ВЕДЬМА МИРАЖА'),
+    "bn.desert.colossus": _T('SFENKS', 'SPHINX', 'ESFINGE', 'SPHINX', 'СФИНКС'),
+    "bn.desert.reaper": _T('MUMYA ORAKÇISI', 'MUMMY REAPER', 'SEGADOR MOMIA', 'MUMIENSCHNITTER', 'ЖНЕЦ-МУМИЯ'),
+    "bn.desert.hive": _T('AKREP ANA', 'SCORPION MOTHER', 'MADRE ESCORPIÓN', 'SKORPIONMUTTER', 'МАТЬ СКОРПИОНОВ'),
     # ---- TUŞ ATAMA ----
     "ui.keybinds":   _T("TUŞLAR", "CONTROLS", "CONTROLES", "TASTEN", "УПРАВЛЕНИЕ"),
     "ui.keys_sub":   _T("Bir satıra tıkla, sonra yeni tuşa bas. ESC vazgeçer.",
@@ -1321,8 +1374,6 @@ STRINGS = {
     "ms.jungle_p": _T("+%12 tecrübe", "+12% XP", "+12% de EXP", "+12% EP", "+12% опыта"),
     "ms.jungle_c": _T("%12 daha sık doğum", "12% more spawns", "12% más apariciones", "12% mehr Monster",
                       "На 12% больше монстров"),
-    "ms.snakes": _T("Yılanlar çıkar · 4 silah açar", "Snakes appear · unlocks 4 weapons",
-                    "Aparecen serpientes · 4 armas", "Schlangen · schaltet 4 Waffen frei", "Змеи · открывает 4 оружия"),
     "ms.desert_p": _T("+%15 altın", "+15% gold", "+15% de oro", "+15% Gold", "+15% золота"),
     "ms.desert_c": _T("Yaratıklar %8 hızlı", "Monsters 8% faster", "Monstruos 8% más rápidos",
                       "Monster 8% schneller", "Монстры на 8% быстрее"),
@@ -1333,89 +1384,92 @@ STRINGS = {
     "ms.world_off": _T("Dünya sıralamasına girmez", "No world ranking", "Sin ranking mundial",
                        "Keine Weltrangliste", "Без мирового рейтинга"),
     "ms.ach_done": _T("BAŞARIM {}/{}", "ACHIEVEMENTS {}/{}", "LOGROS {}/{}", "ERFOLGE {}/{}", "ДОСТИЖЕНИЯ {}/{}"),
-    "ms.stone_head": _T("TAŞ MEYDAN · DÜNYA SIRALAMASI", "STONE PLAZA · WORLD RANKING",
-                        "PLAZA DE PIEDRA · RANKING MUNDIAL", "STEINPLATZ · WELTRANGLISTE",
-                        "КАМЕННАЯ ПЛОЩАДЬ · МИРОВОЙ РЕЙТИНГ"),
-    "ms.stone_info": _T("Klasik arena. Skorun dünya sıralamasına girer; 25. dalganın patronunu devirince "
-                        "Cehennem Kapısı açılır. Yeni silahların bir kısmı yalnızca Buzul Vadisi, Zümrüt Orman ve "
-                        "Kızıl Çöl'deki başarımlarla açılır: o haritalarda cehennem yoktur ve 25. dalgadan sonra "
-                        "ölüm duvarı başlar — en güçlü kurulum bile orada sonunda düşer.",
-                        "The classic arena. Your score goes to the world ranking; beat the wave-25 boss and the Hell "
-                        "Gate opens. Some new weapons only unlock through achievements in Frozen Valley, Emerald "
-                        "Jungle and Crimson Desert: those maps have no hell and a death wall after wave 25 — even "
-                        "the strongest build falls there in the end.",
-                        "La arena clásica. Tu puntuación entra al ranking mundial; vence al jefe de la oleada 25 y se "
-                        "abre la Puerta del Infierno. Algunas armas solo se desbloquean con logros en el Valle Helado, "
-                        "la Selva Esmeralda y el Desierto Carmesí: allí no hay infierno y tras la oleada 25 llega el "
-                        "muro mortal.",
-                        "Die klassische Arena. Dein Score zählt für die Weltrangliste; besiege den Boss von Welle 25 "
-                        "und das Höllentor öffnet sich. Manche Waffen gibt es nur über Erfolge im Eistal, im "
-                        "Smaragdwald und in der Roten Wüste: dort gibt es keine Hölle, nach Welle 25 kommt die "
-                        "Todesmauer.",
-                        "Классическая арена. Счёт идёт в мировой рейтинг; победи босса 25-й волны — откроются Врата "
-                        "ада. Часть оружия открывается только достижениями в Ледяной долине, Изумрудном лесу и "
-                        "Красной пустыне: там нет ада, а после 25-й волны — стена смерти."),
-    "ms.ach_head": _T("{} BAŞARIMLARI — her biri bir silahın kilidini açar",
-                      "{} ACHIEVEMENTS — each one unlocks a weapon", "LOGROS DE {} — cada uno desbloquea un arma",
-                      "{} – ERFOLGE: jeder schaltet eine Waffe frei", "ДОСТИЖЕНИЯ: {} — каждое открывает оружие"),
     "ms.done": _T("TAMAM", "DONE", "HECHO", "ERLEDIGT", "ГОТОВО"),
     "ms.unlocks": _T("kilidini açar", "unlocks", "desbloquea", "schaltet frei", "открывает"),
     "ms.owned": _T("açık", "unlocked", "desbloqueada", "frei", "открыто"),
     "ms.start": _T("BAŞLA · {}", "START · {}", "EMPEZAR · {}", "START · {}", "НАЧАТЬ · {}"),
+    # ---- v3.36 HARİTA SEÇİMİ: manzara kartları + ayrıntı penceresi ----
+    "ms.tap": _T('Ayrıntılar için tıkla', 'Click for details', 'Haz clic para ver detalles', 'Klicken für Details', 'Нажми для подробностей'),
+    "ms.tag.stone": _T('Klasik arena. Skorun dünya sıralamasına girer; 25. dalgada Cehennem Kapısı açılır.', 'The classic arena. Your score counts for the world ranking; the Hell Gate opens at wave 25.', 'La arena clásica. Tu puntuación cuenta para el ranking mundial; el Infierno se abre en la oleada 25.', 'Die klassische Arena. Dein Score zählt für die Weltrangliste; bei Welle 25 öffnet sich das Höllentor.', 'Классическая арена. Счёт идёт в мировой рейтинг; на 25-й волне открываются Врата ада.'),
+    "ms.tag.frost": _T('Karlı dağlar ve donmuş göl. Yetiler, kar kurtları ve buz golemleri.', 'Snowy peaks and a frozen lake. Yetis, snow wolves and ice golems.', 'Montañas nevadas y un lago helado. Yetis, lobos de las nieves y gólems de hielo.', 'Verschneite Gipfel und ein gefrorener See. Yetis, Schneewölfe und Eisgolems.', 'Снежные горы и замёрзшее озеро. Йети, снежные волки и ледяные големы.'),
+    "ms.tag.jungle": _T('Sık orman ve eski bir tapınak. Yılanlar, zehirli kurbağalar ve goriller.', 'Dense jungle and an ancient temple. Snakes, poison frogs and gorillas.', 'Selva espesa y un templo antiguo. Serpientes, ranas venenosas y gorilas.', 'Dichter Dschungel und ein alter Tempel. Schlangen, Giftfrösche und Gorillas.', 'Густые джунгли и древний храм. Змеи, ядовитые лягушки и гориллы.'),
+    "ms.tag.desert": _T('Kızgın kum ve piramitler. Akrepler, kum okçuları ve mumyalar.', 'Scorching sand and pyramids. Scorpions, sand archers and mummies.', 'Arena ardiente y pirámides. Escorpiones, arqueros de arena y momias.', 'Glühender Sand und Pyramiden. Skorpione, Sandschützen und Mumien.', 'Раскалённый песок и пирамиды. Скорпионы, песчаные лучники и мумии.'),
+    "ms.creatures": _T('YARATIKLAR', 'MONSTERS', 'MONSTRUOS', 'MONSTER', 'МОНСТРЫ'),
+    "ms.creatures_sub": _T("bu haritaya özel · güçleri Taş Meydan'la aynı", 'unique to this map · same strength as Stone Plaza', 'propios de este mapa · misma fuerza que en la Plaza', 'nur auf dieser Karte · gleich stark wie am Steinplatz', 'только на этой карте · сила как на Площади'),
+    "ms.creatures_stone": _T('arenanın klasik yaratıkları', "the arena's classic monsters", 'los monstruos clásicos de la arena', 'die klassischen Arena-Monster', 'классические монстры арены'),
+    "ms.hover_hint": _T('Bir yaratığın üstüne gel: ne yaptığını gör.', 'Hover over a monster to see what it does.', 'Pasa el ratón sobre un monstruo para ver qué hace.', 'Fahre über ein Monster, um zu sehen, was es tut.', 'Наведи на монстра, чтобы узнать, что он делает.'),
+    "ms.role.red": _T('seni kovalar, değince ısırır', 'chases you and bites on contact', 'te persigue y muerde al tocarte', 'jagt dich und beißt bei Berührung', 'преследует и кусает при касании'),
+    "ms.role.blue": _T('küçük ve hızlı, sürü hâlinde gelir', 'small and fast, comes in swarms', 'pequeño y rápido, llega en enjambres', 'klein und schnell, kommt in Schwärmen', 'маленький и быстрый, нападает стаей'),
+    "ms.role.yellow": _T('uzakta durur, sana atış yapar', 'keeps its distance and shoots at you', 'mantiene la distancia y te dispara', 'hält Abstand und schießt auf dich', 'держится на расстоянии и стреляет'),
+    "ms.role.tank": _T('yavaş ama çok dayanıklı', 'slow but very tough', 'lento pero muy resistente', 'langsam, aber sehr zäh', 'медленный, но очень крепкий'),
+    "ms.role.sprinter": _T('aniden üstüne atılır', 'suddenly dashes at you', 'se lanza de repente hacia ti', 'stürmt plötzlich auf dich zu', 'внезапно бросается на тебя'),
+    "ms.role.brute": _T('iri ve ağır vurur', 'big and hits hard', 'grande y golpea fuerte', 'groß und schlägt hart zu', 'крупный и бьёт сильно'),
+    "ms.role.elite": _T("5'in katı dalgalarda gelen elit", 'an elite that comes on every 5th wave', 'élite que llega cada 5 oleadas', 'Elite, die in jeder 5. Welle kommt', 'элита, приходит каждую 5-ю волну'),
+    "ms.role.bomber": _T('ölünce patlar — dibinde öldürme', "explodes on death — don't kill it up close", 'explota al morir: no lo mates de cerca', 'explodiert beim Tod – nicht aus der Nähe töten', 'взрывается при смерти — не убивай вплотную'),
+    "ms.role.healer": _T('çevresindekileri iyileştirir — önce onu vur', 'heals those around it — hit it first', 'cura a los que le rodean: atácalo primero', 'heilt seine Umgebung – zuerst ausschalten', 'лечит соседей — бей его первым'),
+    "ms.role.wizard": _T('uzaktan zehirli atış yapar', 'fires poison shots from afar', 'lanza disparos venenosos desde lejos', 'verschießt Giftgeschosse aus der Ferne', 'стреляет ядом издалека'),
+    "ms.role.stinger": _T('çok hızlı, küçük vurur ama yığılır', 'very fast, small hits, but they pile up', 'muy rápido, golpes pequeños que se acumulan', 'sehr schnell, kleine Treffer, die sich häufen', 'очень быстрый, бьёт слабо, но толпой'),
+    "ms.bosses": _T('PATRONLAR', 'BOSSES', 'JEFES', 'BOSSE', 'БОССЫ'),
+    "ms.boss_waves": _T('10 · 15 · 20 · 25. dalga', 'waves 10 · 15 · 20 · 25', 'oleadas 10 · 15 · 20 · 25', 'Wellen 10 · 15 · 20 · 25', 'волны 10 · 15 · 20 · 25'),
+    "ms.hell_bosses": _T('cehennemde 6 patron daha', '6 more bosses in hell', '6 jefes más en el infierno', '6 weitere Bosse in der Hölle', 'ещё 6 боссов в аду'),
+    "ms.weapons": _T('AÇILAN SİLAHLAR', 'WEAPONS TO UNLOCK', 'ARMAS POR DESBLOQUEAR', 'FREISCHALTBARE WAFFEN', 'ОТКРЫВАЕМОЕ ОРУЖИЕ'),
+    "ms.stone_weapons": _T('oynadıkça açılır · her haritada sayılır', 'unlock as you play · counts on every map', 'se desbloquean jugando · cuenta en todos los mapas', 'schalten sich beim Spielen frei · zählt überall', 'открываются по ходу игры · на любой карте'),
+    "ms.rules": _T('KURALLAR', 'RULES', 'REGLAS', 'REGELN', 'ПРАВИЛА'),
+    "ms.same": _T("Hasar ve can Taş Meydan'la aynı; yalnız yaratıklar ve patronlar farklı. 25. dalgadan sonra ölüm duvarı: koşu mutlaka biter.", "Damage and health match Stone Plaza; only monsters and bosses differ. After wave 25 the death wall comes: every run ends.", "Daño y vida como en la Plaza; solo cambian monstruos y jefes. Tras la oleada 25 llega el muro mortal: toda partida termina.", "Schaden und Leben wie am Steinplatz; nur Monster und Bosse sind anders. Nach Welle 25 kommt die Todesmauer: jeder Lauf endet.", "Урон и здоровье как на Площади; другие только монстры и боссы. После 25-й волны — стена смерти: забег всегда кончается."),
+    "ms.record": _T("REKORLARIN", "YOUR RECORDS", "TUS RÉCORDS", "DEINE REKORDE", "ТВОИ РЕКОРДЫ"),
+    "ms.r_score": _T("En yüksek skor", "Best score", "Mejor puntuación", "Bester Score", "Лучший счёт"),
+    "ms.r_wave": _T("En iyi dalga", "Best wave", "Mejor oleada", "Beste Welle", "Лучшая волна"),
+    "ms.r_kills": _T("Öldürme", "Kills", "Bajas", "Kills", "Убийства"),
+    "ms.r_bosses": _T("Patron", "Bosses", "Jefes", "Bosse", "Боссы"),
+    "ms.r_time": _T("En uzun süre", "Longest run", "Partida más larga", "Längster Lauf", "Самый долгий забег"),
+    "ms.r_dashes": _T("Dash", "Dashes", "Dashes", "Dashes", "Рывки"),
+    "ms.stone_note": _T('Dünya sıralaması yalnız burada sayılır. Hile açılan hesap sıralamaya giremez.', "The world ranking only counts here. Accounts that used cheats can't enter the ranking.", 'El ranking mundial solo cuenta aquí. Las cuentas que usaron trucos no pueden entrar.', 'Die Weltrangliste zählt nur hier. Konten mit Cheats kommen nicht in die Rangliste.', 'Мировой рейтинг считается только здесь. Аккаунты с читами в рейтинг не попадают.'),
+    "ms.badge_world": _T('DÜNYA SIRALAMASI', 'WORLD RANKING', 'RANKING MUNDIAL', 'WELTRANGLISTE', 'МИРОВОЙ РЕЙТИНГ'),
+    "ms.badge_hell": _T('CEHENNEM', 'HELL', 'INFIERNO', 'HÖLLE', 'АД'),
+    "ms.weap_done": _T('SİLAH {}/{}', 'WEAPONS {}/{}', 'ARMAS {}/{}', 'WAFFEN {}/{}', 'ОРУЖИЕ {}/{}'),
     # ---- v3.34 YEMİNLER (koşu başında: bir güç + bir bedel) ----
     "oath.glass.name": _T("CAM TOP", "GLASS CANNON", "CAÑÓN DE CRISTAL", "GLASKANONE", "СТЕКЛЯННАЯ ПУШКА"),
-    "oath.glass.up": _T("+%30 hasar", "+30% damage", "+30% de daño", "+30% Schaden", "+30% урона"),
+    "oath.glass.up": _T('{} hasar', '{} damage', '{} de daño', '{} Schaden', '{} урона'),
     "oath.glass.down": _T("-%25 azami can", "-25% max HP", "-25% de vida máx.", "-25% max. LP", "-25% макс. здоровья"),
     "oath.gold_fever.name": _T("ALTIN HUMMASI", "GOLD FEVER", "FIEBRE DEL ORO", "GOLDFIEBER", "ЗОЛОТАЯ ЛИХОРАДКА"),
-    "oath.gold_fever.up": _T("+%35 altın", "+35% gold", "+35% de oro", "+35% Gold", "+35% золота"),
+    "oath.gold_fever.up": _T('{} altın', '{} gold', '{} de oro', '{} Gold', '{} золота'),
     "oath.gold_fever.down": _T("Yaratıklar %10 dayanıklı", "Monsters have +10% HP", "Monstruos +10% de vida",
                                "Monster +10% LP", "Монстры +10% здоровья"),
     "oath.turtle.name": _T("KAPLUMBAĞA", "TURTLE", "TORTUGA", "SCHILDKRÖTE", "ЧЕРЕПАХА"),
-    "oath.turtle.up": _T("+50 can, +%8 zırh", "+50 HP, +8% armor", "+50 vida, +8% armadura",
-                         "+50 LP, +8% Rüstung", "+50 здоровья, +8% брони"),
+    "oath.turtle.up": _T('{} can, {} zırh', '{} HP, {} armor', '{} vida, {} armadura', '{} LP, {} Rüstung', '{} здоровья, {} брони'),
     "oath.turtle.down": _T("-%7 hareket hızı", "-7% move speed", "-7% de velocidad", "-7% Tempo",
                            "-7% скорости"),
     "oath.scholar.name": _T("ALİM", "SCHOLAR", "ERUDITO", "GELEHRTER", "УЧЁНЫЙ"),
-    "oath.scholar.up": _T("+%25 tecrübe", "+25% XP", "+25% de EXP", "+25% EP", "+25% опыта"),
+    "oath.scholar.up": _T('{} tecrübe', '{} XP', '{} de EXP', '{} EP', '{} опыта'),
     "oath.scholar.down": _T("-%12 hasar", "-12% damage", "-12% de daño", "-12% Schaden", "-12% урона"),
     "oath.gambler.name": _T("KUMARBAZ", "GAMBLER", "APOSTADOR", "SPIELER", "ИГРОК"),
-    "oath.gambler.up": _T("+%50 şans", "+50% luck", "+50% de suerte", "+50% Glück", "+50% удачи"),
+    "oath.gambler.up": _T('{} şans', '{} luck', '{} de suerte', '{} Glück', '{} удачи'),
     "oath.gambler.down": _T("-%15 azami can", "-15% max HP", "-15% de vida máx.", "-15% max. LP",
                             "-15% макс. здоровья"),
     "oath.blood.name": _T("KAN YEMİNİ", "BLOOD OATH", "JURAMENTO DE SANGRE", "BLUTSCHWUR", "КЛЯТВА КРОВИ"),
-    "oath.blood.up": _T("Hasarın %2'si can olur", "2% of damage heals you", "El 2% del daño te cura",
-                        "2% des Schadens heilt dich", "2% урона лечит тебя"),
+    "oath.blood.up": _T('Can çalma {}', 'Lifesteal {}', 'Robo de vida {}', 'Lebensraub {}', 'Вампиризм {}'),
     "oath.blood.down": _T("Can yenilenmesi yok", "No HP regen", "Sin regeneración", "Keine LP-Regeneration",
                           "Нет регенерации"),
     "oath.wind.name": _T("RÜZGÂR", "WIND", "VIENTO", "WIND", "ВЕТЕР"),
-    "oath.wind.up": _T("+%12 hız, +%25 atılma", "+12% speed, +25% dash", "+12% velocidad, +25% impulso",
-                       "+12% Tempo, +25% Sprint", "+12% скорости, +25% рывка"),
+    "oath.wind.up": _T('{} hız, {} atılma', '{} speed, {} dash', '{} velocidad, {} impulso', '{} Tempo, {} Sprint', '{} скорости, {} рывка'),
     "oath.wind.down": _T("Yaratıklar %10 hızlı", "Monsters 10% faster", "Monstruos un 10% más rápidos",
                          "Monster 10% schneller", "Монстры на 10% быстрее"),
     "oath.bulwark.name": _T("SUR", "BULWARK", "BALUARTE", "BOLLWERK", "БАСТИОН"),
-    "oath.bulwark.up": _T("+3 kalkan, 40 sn'de bir dolar", "+3 shields, refill every 40s",
-                          "+3 escudos, se recargan cada 40 s", "+3 Schilde, alle 40 s neu",
-                          "+3 щита, раз в 40 с"),
+    "oath.bulwark.up": _T("{} kalkan, {} sn'de bir dolar", '{} shields, refill every {}s', '{} escudos, se recargan cada {} s', '{} Schilde, alle {} s neu', '{} щитов, раз в {} с'),
     "oath.bulwark.down": _T("-%10 saldırı hızı", "-10% attack speed", "-10% vel. de ataque",
                             "-10% Angriffstempo", "-10% скорости атаки"),
     "oath.hunter.name": _T("AVCI", "HUNTER", "CAZADOR", "JÄGER", "ОХОТНИК"),
-    "oath.hunter.up": _T("+%30 patron ve elit hasarı", "+30% damage to bosses & elites",
-                         "+30% de daño a jefes y élites", "+30% Schaden an Bossen & Elites",
-                         "+30% урона боссам и элите"),
+    "oath.hunter.up": _T('{} patron ve elit hasarı', '{} damage to bosses & elites', '{} de daño a jefes y élites', '{} Schaden an Bossen & Elites', '{} урона боссам и элите'),
     "oath.hunter.down": _T("-%10 altın", "-10% gold", "-10% de oro", "-10% Gold", "-10% золота"),
     "oath.feast.name": _T("ŞÖLEN", "FEAST", "FESTÍN", "FESTMAHL", "ПИР"),
-    "oath.feast.up": _T("+%25 tecrübe ve altın", "+25% XP and gold", "+25% de EXP y oro",
-                        "+25% EP und Gold", "+25% опыта и золота"),
+    "oath.feast.up": _T('{} tecrübe ve altın', '{} XP and gold', '{} de EXP y oro', '{} EP und Gold', '{} опыта и золота'),
     "oath.feast.down": _T("%15 daha çok yaratık", "15% more monsters", "15% más monstruos",
                           "15% mehr Monster", "На 15% больше монстров"),
     "oath.hoard.name": _T("HAZİNE", "HOARD", "TESORO", "HORT", "КЛАД"),
-    "oath.hoard.up": _T("350 altınla başla", "Start with 350 gold", "Empieza con 350 de oro",
-                        "Starte mit 350 Gold", "Старт с 350 золота"),
+    "oath.hoard.up": _T('{} altınla başla', 'Start with {} gold', 'Empieza con {} de oro', 'Starte mit {} Gold', 'Старт с {} золота'),
     "oath.hoard.down": _T("-%10 tecrübe", "-10% XP", "-10% de EXP", "-10% EP", "-10% опыта"),
     "oath.hawkeye.name": _T("ŞAHİN GÖZÜ", "HAWKEYE", "OJO DE HALCÓN", "FALKENAUGE", "СОКОЛИНЫЙ ГЛАЗ"),
-    "oath.hawkeye.up": _T("+%12 kritik, +%25 kritik hasarı", "+12% crit, +25% crit damage",
-                          "+12% crítico, +25% daño crítico", "+12% Krit, +25% Kritschaden",
-                          "+12% крита, +25% крит. урона"),
+    "oath.hawkeye.up": _T('{} kritik, {} kritik hasarı', '{} crit, {} crit damage', '{} crítico, {} daño crítico', '{} Krit, {} Kritschaden', '{} крита, {} крит. урона'),
     "oath.hawkeye.down": _T("-%10 saldırı hızı", "-10% attack speed", "-10% vel. de ataque",
                             "-10% Angriffstempo", "-10% скорости атаки"),
     # ---- v3.34 BAŞLANGIÇ SEÇİMİ ekranı ----
@@ -1423,38 +1477,46 @@ STRINGS = {
     "m.name": _T("GEZGİN TÜCCAR", "WANDERING MERCHANT", "MERCADER ERRANTE", "WANDERHÄNDLER",
                  "СТРАНСТВУЮЩИЙ ТОРГОВЕЦ"),
     "m.talk": _T("[{}] KONUŞ", "[{}] TALK", "[{}] HABLAR", "[{}] REDEN", "[{}] ГОВОРИТЬ"),
-    "m.map": _T("TÜCCAR", "MERCHANT", "MERCADER", "HÄNDLER", "ТОРГОВЕЦ"),
-    "m.greet": _T("Hoş geldin yolcu! Arenaya eli boş çıkılmaz... Sana üç YEMİN getirdim: her biri bir "
-                  "güç verir, karşılığında bir bedel alır. Birini seç ya da yeminsiz git. Acele et, ilk "
-                  "dalga yaklaşıyor! Aşağıdaki görevleri bitirirsen elmasları da ben öderim.",
-                  "Welcome, traveler! No one enters the arena empty-handed... I brought you three OATHS: "
-                  "each grants a power and takes a price. Pick one or go without. Hurry, the first wave "
-                  "is coming! Finish the quests below and I'll pay you in gems.",
-                  "¡Bienvenido, viajero! Nadie entra a la arena con las manos vacías... Te traje tres "
-                  "JURAMENTOS: cada uno da un poder y cobra un precio. Elige uno o sigue sin él. ¡Date "
-                  "prisa, la primera oleada se acerca! Si cumples las misiones de abajo, te pago en gemas.",
-                  "Willkommen, Reisender! Niemand betritt die Arena mit leeren Händen... Ich habe dir drei "
-                  "SCHWÜRE mitgebracht: jeder gibt eine Kraft und fordert einen Preis. Wähle einen oder "
-                  "geh ohne. Beeil dich, die erste Welle kommt! Erfülle die Aufgaben unten, dann zahle "
-                  "ich in Edelsteinen.",
-                  "Добро пожаловать, путник! На арену с пустыми руками не ходят... Я принёс тебе три "
-                  "КЛЯТВЫ: каждая даёт силу и берёт плату. Выбери одну или иди без неё. Спеши, первая "
-                  "волна близко! Выполнишь задания ниже — заплачу самоцветами."),
+    "m.greet": _T("Hoş geldin yolcu! Sana üç YEMİN getirdim: her biri bir güç verir, karşılığında bir "
+                  "bedel alır. Ne kadar tecrübeliysen o kadar iyi mallarım çıkar — istersen şimdi seç, "
+                  "istersen seviye atlayıp sonra gel. Görevleri bitirirsen elmasları da ben öderim.",
+                  "Welcome, traveler! I brought you three OATHS: each grants a power and takes a price. "
+                  "The more experienced you are, the better my wares — choose now, or level up and come "
+                  "back later. Finish the quests and I'll pay you in gems.",
+                  "¡Bienvenido, viajero! Te traje tres JURAMENTOS: cada uno da un poder y cobra un precio. "
+                  "Cuanta más experiencia tengas, mejores serán mis mercancías: elige ahora o sube de "
+                  "nivel y vuelve luego. Si cumples las misiones, te pago en gemas.",
+                  "Willkommen, Reisender! Ich habe dir drei SCHWÜRE mitgebracht: jeder gibt eine Kraft und "
+                  "fordert einen Preis. Je erfahrener du bist, desto besser meine Ware — wähle jetzt oder "
+                  "steig auf und komm später wieder. Erfülle die Aufgaben, dann zahle ich in Edelsteinen.",
+                  "Добро пожаловать, путник! Я принёс тебе три КЛЯТВЫ: каждая даёт силу и берёт плату. "
+                  "Чем ты опытнее, тем лучше мой товар — выбирай сейчас или подними уровень и вернись. "
+                  "Выполнишь задания — заплачу самоцветами."),
+    "m.hint": _T("Haritada bir yerde GEZGİN TÜCCAR var — bulursan [E] ile konuş",
+                 "A WANDERING MERCHANT is somewhere on the map — find him and press [E]",
+                 "Hay un MERCADER ERRANTE en el mapa — encuéntralo y pulsa [E]",
+                 "Irgendwo auf der Karte ist ein WANDERHÄNDLER — finde ihn und drück [E]",
+                 "Где-то на карте есть СТРАНСТВУЮЩИЙ ТОРГОВЕЦ — найди его и нажми [E]"),
+    "m.luck": _T("Tüccarın şansı: {}  ·  seviye atladıkça artar, el her yeni seviyede yenilenir",
+                 "Merchant's luck: {}  ·  grows as you level up; the hand refreshes every new level",
+                 "Suerte del mercader: {}  ·  sube con tu nivel; la mano se renueva en cada nivel",
+                 "Glück des Händlers: {}  ·  steigt mit deiner Stufe; neue Hand bei jeder Stufe",
+                 "Удача торговца: {}  ·  растёт с уровнем; предложения обновляются каждый уровень"),
+    "m.sworn": _T("Yeminini ettin: {} ({}). Sözünü tut yolcu — yolun açık olsun!",
+                  "You swore {} ({}). Keep your word, traveler — safe travels!",
+                  "Juraste {} ({}). Cumple tu palabra, viajero — ¡buen viaje!",
+                  "Du hast {} geschworen ({}). Halte dein Wort, Reisender — gute Reise!",
+                  "Ты поклялся: {} ({}). Держи слово, путник — счастливого пути!"),
+    "m.ok": _T("TAMAM", "OK", "VALE", "OK", "ОК"),
+    "m.one_oath": _T("Koşu başına tek yemin", "One oath per run", "Un juramento por partida",
+                     "Ein Schwur pro Lauf", "Одна клятва за забег"),
     "m.see_oaths": _T("YEMİNLERE BAK", "SEE THE OATHS", "VER JURAMENTOS", "SCHWÜRE ANSEHEN", "КЛЯТВЫ"),
     "m.see_oaths_sub": _T("3 güç, 3 bedel", "3 powers, 3 prices", "3 poderes, 3 precios",
                           "3 Kräfte, 3 Preise", "3 силы, 3 цены"),
     "m.later": _T("SONRA", "LATER", "LUEGO", "SPÄTER", "ПОЗЖЕ"),
-    "m.later_sub": _T("Dalga başlamadan dönebilirsin", "Come back before the wave starts",
-                      "Vuelve antes de la oleada", "Komm vor der Welle zurück", "Вернись до начала волны"),
+    "m.later_sub": _T("İstediğin zaman geri gel", "Come back any time", "Vuelve cuando quieras",
+                      "Komm jederzeit zurück", "Возвращайся когда угодно"),
     "m.back": _T("GERİ", "BACK", "ATRÁS", "ZURÜCK", "НАЗАД"),
-    "m.bye": _T("Yolun açık olsun!", "Safe travels!", "¡Buen viaje!", "Gute Reise!", "Счастливого пути!"),
-    "m.calm_title": _T("DALGA 0 · HAZIRLIK", "WAVE 0 · PREPARE", "OLEADA 0 · PREPÁRATE",
-                       "WELLE 0 · VORBEREITUNG", "ВОЛНА 0 · ПОДГОТОВКА"),
-    "m.calm_sub": _T("Tüccarla konuş [{}] — dalga {} sn sonra", "Talk to the merchant [{}] — wave in {}s",
-                     "Habla con el mercader [{}] — oleada en {} s", "Sprich mit dem Händler [{}] — Welle in {} s",
-                     "Поговори с торговцем [{}] — волна через {} с"),
-    "m.calm_go": _T("Hazır ol, dalga geliyor!", "Get ready, the wave is coming!", "¡Prepárate, llega la oleada!",
-                    "Mach dich bereit, die Welle kommt!", "Готовься, волна идёт!"),
     "dr.title_oath": _T("YEMİNİNİ ET", "SWEAR AN OATH", "HAZ UN JURAMENTO", "LEISTE EINEN SCHWUR",
                         "ДАЙ КЛЯТВУ"),
     "dr.sub_oath": _T("Her yemin bir güç verir, bir bedel alır. Koşu boyunca sürer.",
@@ -1462,9 +1524,6 @@ STRINGS = {
                       "Cada juramento da un poder y cobra un precio. Dura toda la partida.",
                       "Jeder Schwur gibt eine Kraft und fordert einen Preis. Er gilt den ganzen Lauf.",
                       "Каждая клятва даёт силу и берёт плату. Действует весь забег."),
-    "dr.no_oath": _T("YEMİNSİZ", "NO OATH", "SIN JURAMENTO", "KEIN SCHWUR", "БЕЗ КЛЯТВЫ"),
-    "dr.no_oath_sub": _T("Bonus yok, bedel yok", "No bonus, no price", "Sin bonus ni precio",
-                         "Kein Bonus, kein Preis", "Ни бонуса, ни платы"),
     "dr.restarting": _T("YENİ KOŞU...", "NEW RUN...", "NUEVA PARTIDA...", "NEUER LAUF...",
                         "НОВЫЙ ЗАБЕГ..."),
     "dr.power": _T("GÜÇ", "POWER", "PODER", "KRAFT", "СИЛА"),
@@ -3195,12 +3254,20 @@ def _base_dir():
 
 
 BASE_DIR = _base_dir()
-LEGACY_SAVE = os.path.join(BASE_DIR, "kasma_arena_save.json")
+# TESTLER İÇİN: ARENA_SAVE_DIR verilirse kayıt (ve eski kayıt yolu) yalnızca o
+# klasörde aranır — her işletim sisteminde. Testler oyuncunun GERÇEK kaydına
+# (Windows'ta %APPDATA%) asla dokunmasın diye. Oyuncu için bu değişken yoktur.
+_FORCED_SAVE_DIR = os.environ.get("ARENA_SAVE_DIR", "").strip()
+LEGACY_SAVE = (os.path.join(_FORCED_SAVE_DIR, "legacy_kasma_arena_save.json") if _FORCED_SAVE_DIR
+               else os.path.join(BASE_DIR, "kasma_arena_save.json"))
 
 
 def get_save_dir():
     """Kayıt dosyası kullanıcı klasörüne yazılır (PyInstaller/Steam ile uyumlu)."""
     try:
+        if _FORCED_SAVE_DIR:
+            os.makedirs(_FORCED_SAVE_DIR, exist_ok=True)
+            return _FORCED_SAVE_DIR
         if os.name == "nt":
             base = os.environ.get("APPDATA") or os.path.expanduser("~")
             d = os.path.join(base, "KasmaArena")
@@ -13602,8 +13669,11 @@ class Player:
 
 class EnemyProjectile:
     def __init__(self, x, y, vx, vy, dmg, color=(235, 210, 70), r=6, life=4.0,
-                 target=None, turn=0.0, accel=0.0, owner=None, poison=0.0):
+                 target=None, turn=0.0, accel=0.0, owner=None, poison=0.0, style="orb"):
         self.x, self.y = x, y
+        # Görsel (v3.36): "orb" | "icicle" | "spit" | "arrow". İsabet hep
+        # r yarıçaplı daire; stil yalnız nasıl GÖRÜNDÜĞÜNÜ değiştirir.
+        self.style = style
         self.vx, self.vy = vx, vy
         self.dmg = dmg
         # BÜYÜCÜ'nün zehir oku: isabet edince oyuncuyu bir süre zehirler.
@@ -13643,10 +13713,48 @@ class EnemyProjectile:
 
     def draw(self, surf, t):
         x, y = int(self.x), int(self.y)
+        if self.style != "orb":
+            self._draw_styled(surf, x, y, t)
+            return
         add_glow(surf, x, y, self.r * 3.2, self.color, 0.75)
         pygame.draw.circle(surf, OUTLINE, (x, y), self.r + 2)
         pygame.draw.circle(surf, self.color, (x, y), self.r)
         pygame.draw.circle(surf, lighten(self.color, 0.7), (x - 1, y - 1), max(1, self.r // 2))
+
+    def _draw_styled(self, surf, x, y, t):
+        """Harita yaratıklarının mermileri: buz sarkıtı, zehir tükürüğü, ok.
+        Gövde merminin merkezinde durur ki görünen ile vuran aynı yer olsun."""
+        sp = math.hypot(self.vx, self.vy) or 1.0
+        fx_, fy_ = self.vx / sp, self.vy / sp
+        sx_, sy_ = -fy_, fx_
+        r = self.r
+        col = self.color
+
+        def P(f, s):
+            return (x + fx_ * f + sx_ * s, y + fy_ * f + sy_ * s)
+        if self.style == "icicle":
+            add_glow(surf, x, y, r * 2.8, col, 0.6)
+            pts = [P(r * 2.0, 0), P(0, r * 0.8), P(-r * 1.7, 0), P(0, -r * 0.8)]
+            pygame.draw.polygon(surf, OUTLINE, [P(r * 2.3, 0), P(0, r * 1.1), P(-r * 2.0, 0), P(0, -r * 1.1)])
+            pygame.draw.polygon(surf, col, pts)
+            pygame.draw.line(surf, WHITE, P(r * 1.6, 0), P(-r * 1.0, 0), 2)
+        elif self.style == "spit":
+            add_glow(surf, x, y, r * 2.8, col, 0.6)
+            for i in (3, 2, 1):
+                bx, by = P(-r * 0.9 * i, math.sin(t * 18 + i) * r * 0.25)
+                pygame.draw.circle(surf, scale_col(col, 0.8), (int(bx), int(by)), max(1, int(r * (0.9 - 0.22 * i))))
+            pygame.draw.circle(surf, OUTLINE, (x, y), r + 2)
+            pygame.draw.circle(surf, col, (x, y), r)
+            pygame.draw.circle(surf, lighten(col, 0.6), (x - 1, y - 2), max(1, r // 2))
+        else:  # arrow
+            tail, head = P(-r * 2.4, 0), P(r * 1.4, 0)
+            pygame.draw.line(surf, OUTLINE, tail, head, 5)
+            pygame.draw.line(surf, (150, 104, 60), tail, head, 3)
+            tip = P(r * 2.4, 0)
+            pygame.draw.polygon(surf, OUTLINE, [P(r * 2.7, 0), P(r * 0.9, r * 1.0), P(r * 0.9, -r * 1.0)])
+            pygame.draw.polygon(surf, (226, 228, 236), [tip, P(r * 1.1, r * 0.7), P(r * 1.1, -r * 0.7)])
+            for s_ in (-1, 1):
+                pygame.draw.polygon(surf, col, [P(-r * 1.6, 0), P(-r * 2.5, r * 0.75 * s_), P(-r * 2.1, 0)])
 
 
 STYLE_IV = {"bolt": .03, "feather": .035, "toxic": .03, "star": .04, "lightning": .035,
@@ -14183,6 +14291,119 @@ HELL_SHAPES = {
 }
 
 HELL_ENEMY_COLORS = {k: v["color"] for k, v in HELL_ENEMIES.items()}
+
+
+# ---------------------------------------------------------------------
+# HARİTA YARATIKLARI (v3.36)
+# ---------------------------------------------------------------------
+# Buzul / Orman / Çöl'ün kendi yaratıkları var. Cehennemdeki gibi her biri
+# kanıtlanmış bir arena davranışını (base) kullanır ve can / hasar / hız
+# ÇARPANI YOKTUR: oyunun mantığı ve hasarı Taş Meydan'la birebir aynı,
+# değişen yalnızca görünüm, ad ve mermi görseli (shot).
+MAP_ENEMIES = {
+    # ---- BUZUL VADİSİ ----
+    "f_beetle":   dict(name="Buz Böceği",     base="red",      shape="f_beetle",   color=(150, 214, 255)),
+    "f_bat":      dict(name="Ayaz Yarasası",  base="blue",     shape="f_bat",      color=(118, 176, 250)),
+    "f_wisp":     dict(name="Kar Ruhu",       base="yellow",   shape="f_wisp",     color=(206, 236, 255), shot="icicle"),
+    "f_golem":    dict(name="Buz Golemi",     base="tank",     shape="f_golem",    color=(126, 178, 232)),
+    "f_wolf":     dict(name="Kar Kurdu",      base="sprinter", shape="f_wolf",     color=(226, 234, 248)),
+    "f_yeti":     dict(name="Yeti",           base="brute",    shape="f_yeti",     color=(232, 238, 250)),
+    "f_yeti_k":   dict(name="Yeti Reisi",     base="elite",    shape="f_yeti",     color=(176, 214, 255)),
+    "f_snowball": dict(name="Kartopu",        base="bomber",   shape="f_snowball", color=(240, 248, 255)),
+    "f_healer":   dict(name="Şifa Ruhu",      base="healer",   shape="f_wisp",     color=(150, 250, 210)),
+    "f_mage":     dict(name="Buz Büyücüsü",   base="wizard",   shape="f_wisp",     color=(150, 162, 255), shot="icicle"),
+    "f_sprite":   dict(name="Kristal Yarasa",  base="stinger",  shape="f_bat",      color=(196, 228, 255)),
+    # ---- ZÜMRÜT ORMAN ----
+    "j_snake":    dict(name="Yılan",          base="red",      shape="j_snake",    color=(96, 196, 92)),
+    "j_fly":      dict(name="Ateşböceği",     base="blue",     shape="j_fly",      color=(200, 236, 96)),
+    "j_frog":     dict(name="Zehir Kurbağası", base="yellow",  shape="j_frog",     color=(70, 206, 120), shot="spit"),
+    "j_treant":   dict(name="Ağaç Adam",      base="tank",     shape="j_treant",   color=(126, 92, 60)),
+    "j_panther":  dict(name="Panter",         base="sprinter", shape="j_panther",  color=(70, 62, 86)),
+    "j_gorilla":  dict(name="Goril",          base="brute",    shape="j_gorilla",  color=(92, 86, 96)),
+    "j_silver":   dict(name="Gümüş Sırt",     base="elite",    shape="j_gorilla",  color=(150, 150, 164)),
+    "j_shroom":   dict(name="Patlak Mantar",  base="bomber",   shape="j_shroom",   color=(220, 76, 70)),
+    "j_healer":   dict(name="Şifacı Kurbağa", base="healer",   shape="j_frog",     color=(120, 228, 196)),
+    "j_shaman":   dict(name="Şaman Kurbağa",  base="wizard",   shape="j_frog",     color=(176, 108, 228), shot="spit"),
+    "j_wasp":     dict(name="Eşek Arısı",     base="stinger",  shape="j_fly",      color=(250, 196, 56)),
+    # ---- KIZIL ÇÖL ----
+    "d_scorpion": dict(name="Akrep",          base="red",      shape="d_scorpion", color=(214, 118, 58)),
+    "d_vulture":  dict(name="Akbaba",         base="blue",     shape="d_vulture",  color=(122, 92, 72)),
+    "d_archer":   dict(name="Kum Okçusu",     base="yellow",   shape="d_archer",   color=(222, 182, 112), shot="arrow"),
+    "d_mummy":    dict(name="Mumya",          base="tank",     shape="d_mummy",    color=(222, 206, 170)),
+    "d_jackal":   dict(name="Çakal",          base="sprinter", shape="d_jackal",   color=(206, 152, 92)),
+    "d_bandit":   dict(name="Çöl Haydudu",    base="brute",    shape="d_bandit",   color=(176, 72, 62)),
+    "d_guard":    dict(name="Firavun Muhafızı", base="elite",  shape="d_bandit",   color=(232, 190, 80)),
+    "d_cactus":   dict(name="Patlak Kaktüs",  base="bomber",   shape="d_cactus",   color=(92, 172, 92)),
+    "d_shaman":   dict(name="Çöl Şamanı",     base="healer",   shape="d_archer",   color=(120, 222, 200)),
+    "d_sorcerer": dict(name="Kum Büyücüsü",   base="wizard",   shape="d_archer",   color=(204, 124, 224), shot="arrow"),
+    "d_sting":    dict(name="Sarı Akrep",     base="stinger",  shape="d_scorpion", color=(240, 200, 90)),
+}
+# Harita -> {arena türü: o haritadaki yaratık}
+MAP_ROSTER = {
+    "frost": {"red": "f_beetle", "blue": "f_bat", "yellow": "f_wisp", "tank": "f_golem",
+              "sprinter": "f_wolf", "brute": "f_yeti", "elite": "f_yeti_k", "bomber": "f_snowball",
+              "healer": "f_healer", "wizard": "f_mage", "stinger": "f_sprite"},
+    "jungle": {"red": "j_snake", "blue": "j_fly", "yellow": "j_frog", "tank": "j_treant",
+               "sprinter": "j_panther", "brute": "j_gorilla", "elite": "j_silver", "bomber": "j_shroom",
+               "healer": "j_healer", "wizard": "j_shaman", "stinger": "j_wasp"},
+    "desert": {"red": "d_scorpion", "blue": "d_vulture", "yellow": "d_archer", "tank": "d_mummy",
+               "sprinter": "d_jackal", "brute": "d_bandit", "elite": "d_guard", "bomber": "d_cactus",
+               "healer": "d_shaman", "wizard": "d_sorcerer", "stinger": "d_sting"},
+}
+
+
+def map_variant(theme, kind):
+    """Bu haritada `kind` türünün yerine geçen yaratık (yoksa None)."""
+    return (MAP_ROSTER.get(theme) or {}).get(kind)
+
+
+# HARİTA PATRONLARI: davranış ve güç arena patronlarıyla AYNI; ad, renk ve
+# haritaya özgü süsleri (buz tacı / yaprak tacı / firavun başlığı) farklı.
+MAP_BOSS_NAMES = {
+    "frost": {"warlord": "BUZ ŞÖVALYESİ", "witch": "AYAZ KRALİÇESİ", "colossus": "BUZUL DEVİ",
+              "reaper": "KAR ORAKÇISI", "hive": "BUZ KOVANI"},
+    "jungle": {"warlord": "ORMAN REİSİ", "witch": "SARMAŞIK CADISI", "colossus": "KADİM ENT",
+               "reaper": "GÖLGE PANTERİ", "hive": "YILAN ANA"},
+    "desert": {"warlord": "FİRAVUN", "witch": "SERAP CADISI", "colossus": "SFENKS",
+               "reaper": "MUMYA ORAKÇISI", "hive": "AKREP ANA"},
+}
+MAP_BOSS_COLORS = {
+    "frost": {"warlord": (120, 170, 230), "witch": (170, 200, 255), "colossus": (110, 160, 210),
+              "reaper": (150, 220, 240), "hive": (140, 200, 250)},
+    "jungle": {"warlord": (90, 150, 70), "witch": (110, 190, 90), "colossus": (120, 96, 64),
+               "reaper": (70, 64, 96), "hive": (96, 190, 90)},
+    "desert": {"warlord": (226, 182, 74), "witch": (210, 140, 80), "colossus": (214, 176, 120),
+               "reaper": (206, 192, 160), "hive": (210, 120, 60)},
+}
+# Haritanın ayırt edici rengi (patron süsü / ışıma)
+MAP_ACCENT = {"frost": (200, 236, 255), "jungle": (150, 240, 110), "desert": (255, 214, 120)}
+
+
+def map_boss_name(theme, kind, default):
+    nm = (MAP_BOSS_NAMES.get(theme) or {}).get(kind)
+    if not nm:
+        return default
+    return LX("bn.%s.%s" % (theme, kind), nm)
+
+# Harita yaratıklarının çizimleri de HELL_SHAPES üzerinden dağıtılır
+# (Enemy._draw_body tek bir sözlüğe bakar).
+HELL_SHAPES.update({v["shape"]: "_draw_" + v["shape"] for v in MAP_ENEMIES.values()})
+# Mermi görselleri (YALNIZ görünüm: hasar, hız ve isabet yarıçapı aynı).
+MAP_SHOT_COLORS = {"icicle": (196, 232, 255), "spit": (140, 232, 96), "arrow": (236, 210, 150)}
+
+
+def make_map_enemy(theme, kind, x, y, wave_mult, diff_mult=1.0, wave=1):
+    """Arena türünü haritanın kendi yaratığı olarak üretir (v3.36).
+
+    Davranış, can, hasar, hız, ödül ve isabet alanı arenadakiyle BİREBİR
+    aynı (MAP_ENEMIES'te çarpan yok); değişen yalnız görünüm, ad ve mermi
+    görseli. Haritada karşılığı olmayan türler (lanet yaratıkları, sancaktar)
+    olduğu gibi döner.
+    """
+    mv = map_variant(theme, kind)
+    if mv:
+        return Enemy(None, x, y, wave_mult, diff_mult, wave=wave, variant=mv)
+    return Enemy(kind, x, y, wave_mult, diff_mult, wave=wave)
 
 # Cehennem dalgalarında hangi yaratıktan ne sıklıkla geleceği.
 def hell_pick_kind(wave):
@@ -18002,7 +18223,6 @@ class BossChest:
 # =====================================================================
 
 ENEMY_COLORS = {
-    "snake":  (96, 196, 92),
     "red":    (222, 70, 78),
     "blue":   (78, 150, 232),
     "yellow": (235, 210, 70),
@@ -18077,9 +18297,6 @@ ENEMY_HP_TUNE = 0.90 * ENEMY_HP_NERF
 ENEMY_DMG_TUNE = 0.90 * ENEMY_DMG_NERF
 
 ENEMY_DEFS = {
-    # YILAN (v3.35): yalnız ZÜMRÜT ORMAN'da doğar. Hızlı süzülür, canı az.
-    # "Yılan Avcısı" başarımı (ŞAHİN'i açar) bunları sayar.
-    "snake":    {"hp": 20,  "speed": 168, "dmg": 7,  "radius": 12, "coin": 3,  "xp": 4,  "score": 12,  "contact_dps": 11},
     "red":      {"hp": 30,  "speed": 100, "dmg": 10, "radius": 14, "coin": 5,  "xp": 4,  "score": 12,  "contact_dps": 17},
     "blue":     {"hp": 14,  "speed": 194, "dmg": 6,  "radius": 10, "coin": 1,  "xp": 2,  "score": 6,   "contact_dps": 10},
     "yellow":   {"hp": 23,  "speed": 78,  "dmg": 9,  "radius": 13, "coin": 3,  "xp": 6,  "score": 16,  "contact_dps": 12},
@@ -18233,18 +18450,23 @@ class Enemy:
         """Bir yaratık üretir.
 
         kind    : davranış türü (red / blue / yellow / tank / sprinter / brute / elite)
-        variant : CEHENNEM yaratığı anahtarı (HELL_ENEMIES). Verilirse davranış
-                  variant'ın base'inden, GÖRÜNÜM ise variant'tan gelir; böylece
-                  cehennem yaratıkları arenadakilere hiç benzemez.
+        variant : CEHENNEM yaratığı (HELL_ENEMIES) ya da HARİTA yaratığı
+                  (MAP_ENEMIES, v3.36) anahtarı. Verilirse davranış variant'ın
+                  base'inden, GÖRÜNÜM ise variant'tan gelir; böylece cehennem
+                  ve harita yaratıkları arenadakilere hiç benzemez.
         biome   : "arena" | "hell" — hız/hasar eğrileri buna göre seçilir.
         """
-        var = HELL_ENEMIES.get(variant) if variant else None
+        var = (HELL_ENEMIES.get(variant) or MAP_ENEMIES.get(variant)) if variant else None
         if var:
             kind = var["base"]
         d = ENEMY_DEFS[kind]
         self.kind = kind                 # davranış
         self.variant = variant
-        self.hellish = bool(var)
+        self.hellish = variant in HELL_ENEMIES
+        # HARİTA YARATIĞI (v3.36): yalnız görünüşü / adı / mermi görseli
+        # farklı; bütün sayılar arenadaki türüyle aynı.
+        self.map_var = variant in MAP_ENEMIES
+        self.shot_style = var.get("shot", "orb") if var else "orb"
         # Çizim biçimi. Yeni arketipler (BOMBACI/ŞİFACI) kendi gövdelerini
         # çizdirmiyor: kanıtlanmış gövdeleri RENK ve DAVRANIŞ farkıyla
         # yeniden kullanıyorlar. Oyuncu onları renginden ve ne yaptığından
@@ -18256,7 +18478,7 @@ class Enemy:
         # Ölüm nedeni / arayüz adı. Cehennem yaratığının adı kendi satırında
         # yazılı; arenadakiler için çeviri tablosundan okunur (eskiden ham
         # anahtar yazılıyordu: "red tarafından öldürüldün").
-        self.disp_name = var["name"] if var else LX("en." + kind, kind)
+        self.disp_name = LX("en." + variant, var["name"]) if var else LX("en." + kind, kind)
         self.x, self.y = x, y
 
         # --- cehennemde hız 1. dalga temposuna döner, can/hasar 25. dalga seviyesinde ---
@@ -18270,8 +18492,8 @@ class Enemy:
         else:
             pr_hp, pr_dmg, pr_spd, pr_armor = arena_pressure(wave)
 
-        hp_var = var["hp"] if var else 1.0
-        dmg_var = var["dmg"] if var else 1.0
+        hp_var = var.get("hp", 1.0) if var else 1.0
+        dmg_var = var.get("dmg", 1.0) if var else 1.0
 
         self.max_hp = d["hp"] * wave_mult * hp_var * pr_hp * ENEMY_HP_TUNE
         self.hp = self.max_hp
@@ -18284,7 +18506,7 @@ class Enemy:
         # baştan zırhı vardır ve dalga başına açılır — yoksa cehennem, zırhlı
         # geç-arena yaratıklarından kolay geliyordu.
         self.armor = hell_armor(wave) if biome == "hell" else pr_armor
-        self.radius = d["radius"] * (var["radius"] if var else 1.0)
+        self.radius = d["radius"] * (var.get("radius", 1.0) if var else 1.0)
         self.coin = d["coin"]
         self.xp = d["xp"]
         self.score = d["score"]
@@ -18310,7 +18532,9 @@ class Enemy:
             self.red_intensity = 0.0
         # Çarpışma (hitbox) yarıçapı — görünen şekle göre ayarlanır, gözle görünenden
         # daha büyük bir alanda "hayalet" hasar/isabet olmasın.
-        self.hit_r = self.radius * ENEMY_HITBOX_FACTOR.get(self.shape, 1.0)
+        # Harita yaratığının isabet alanı arenadaki karşılığınınki (oyun aynı).
+        hb_shape = SHAPE_ALIAS.get(kind, kind) if self.map_var else self.shape
+        self.hit_r = self.radius * ENEMY_HITBOX_FACTOR.get(hb_shape, 1.0)
         self.color = var["color"] if var else ENEMY_COLORS[kind]
         # --- YARI PATRON (SANCAKTAR) ve KORUMALARI (SİPERCİ) ---
         # herald   : yarı patron. guards listesi onu koruyan siperciler.
@@ -18562,12 +18786,13 @@ class Enemy:
                 if self.shoot_cd <= 0 and self.spawn_t > 0.6:
                     self.shoot_cd = random.uniform(*WIZARD_SHOOT_CD)
                     pdx, pdy = norm_dir(self.x, self.y, player.x, player.y)
+                    wcol = self.color if self.map_var else ENEMY_COLORS["wizard"]
                     projectiles.append(EnemyProjectile(
                         self.x, self.y, pdx * WIZARD_SHOT_SPEED,
                         pdy * WIZARD_SHOT_SPEED, self.dmg,
-                        color=ENEMY_COLORS["wizard"], r=7,
-                        poison=self.dmg * WIZARD_POISON_MULT))
-                    fx.ring(self.x, self.y, ENEMY_COLORS["wizard"], n=10,
+                        color=wcol, r=7,
+                        poison=self.dmg * WIZARD_POISON_MULT, style=self.shot_style))
+                    fx.ring(self.x, self.y, wcol, n=10,
                             speed=130, life=0.3, r=2.5)
                     sfx("shoot_c", 0.32, 0.08)
             elif self.kind == "goblin":
@@ -18632,7 +18857,14 @@ class Enemy:
                 if self.shoot_cd <= 0 and self.spawn_t > 0.4:
                     self.shoot_cd = random.uniform(1.5, 2.3)
                     pdx, pdy = norm_dir(self.x, self.y, player.x, player.y)
-                    projectiles.append(EnemyProjectile(self.x, self.y, pdx * 230, pdy * 230, self.dmg * 0.85))
+                    if self.map_var:
+                        projectiles.append(EnemyProjectile(
+                            self.x, self.y, pdx * 230, pdy * 230, self.dmg * 0.85,
+                            color=MAP_SHOT_COLORS.get(self.shot_style, (235, 210, 70)),
+                            style=self.shot_style))
+                    else:
+                        projectiles.append(EnemyProjectile(self.x, self.y, pdx * 230, pdy * 230,
+                                                           self.dmg * 0.85))
                     sfx("shoot_c", 0.3, 0.08)
             elif self.kind == "sprinter":
                 self.dash_cd -= dt
@@ -18822,6 +19054,658 @@ class Enemy:
             ex = x + math.sin(t * 2.4 + i * 2.1 + self.wobble) * r * 0.8
             ey = y - r * 0.4 - ph * r * 1.9
             blit_disc(surf, ex, ey, max(1.0, 3.0 * (1.0 - ph)), col, int(210 * (1.0 - ph)))
+
+    # =================================================================
+    # HARİTA YARATIKLARI (v3.36) — Buzul Vadisi / Zümrüt Orman / Kızıl Çöl
+    # -----------------------------------------------------------------
+    # Davranışları arena türlerinden (MAP_ENEMIES "base"); çizimleri kendi.
+    # Hepsi P(ileri, yan) yardımcısıyla bakış yönüne göre çizilir ve gövde
+    # önbelleğinin sınırı içinde (en fazla ~2r) kalır.
+    # =================================================================
+    def _spike(self, surf, base, tip, half, col, sx_, sy_):
+        pts = [(base[0] - sx_ * half, base[1] - sy_ * half), tip,
+               (base[0] + sx_ * half, base[1] + sy_ * half)]
+        pygame.draw.polygon(surf, OUTLINE, pts, 3)
+        pygame.draw.polygon(surf, col, pts)
+
+    def _limb(self, surf, a, b, w, col):
+        pygame.draw.line(surf, OUTLINE, a, b, max(3, int(w + 2)))
+        pygame.draw.line(surf, col, a, b, max(2, int(w)))
+
+    # ---------------------------- BUZUL ------------------------------
+    def _draw_f_beetle(self, surf, x, y, r, col, t, breathe):
+        """BUZ BÖCEĞİ: ortadan ayrık buz kabuk, kristal sırtlar, kıskaçlı baş."""
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        dark = scale_col(col, 0.55)
+        self._legs(surf, x, y, r, fx_, fy_, scale_col(col, 0.45), pairs=3, length=0.62, width=3)
+        bite = 0.5 + 0.5 * math.sin(self.walk * 1.8)
+        for sgn in (-1, 1):
+            claw = [P(0.80, 0.16 * sgn), P(1.22, (0.34 + 0.12 * bite) * sgn),
+                    P(1.38, (0.10 + 0.08 * bite) * sgn), P(1.06, 0.06 * sgn)]
+            self._hpoly(surf, claw, (214, 238, 255), x, y, grow=0.06)
+        hx, hy = P(0.80, 0.0)
+        circle_aa(surf, hx, hy, r * 0.34 + 2, OUTLINE)
+        circle_aa(surf, hx, hy, r * 0.34, (44, 70, 110))
+        k = breathe
+        shell = [P(0.66 * k, 0.0), P(0.45 * k, 0.80 * k), P(-0.35 * k, 0.92 * k), P(-0.95 * k, 0.45 * k),
+                 P(-1.05 * k, 0.0), P(-0.95 * k, -0.45 * k), P(-0.35 * k, -0.92 * k), P(0.45 * k, -0.80 * k)]
+        self._hpoly(surf, shell, col, x, y, grow=0.08)
+        pygame.draw.line(surf, dark, P(0.58, 0.0), P(-1.0, 0.0), 2)
+        for sgn in (-1, 1):
+            for i in range(3):
+                f = 0.22 - i * 0.42
+                tri = [P(f + 0.18, 0.30 * sgn), P(f - 0.05, 0.64 * sgn), P(f - 0.22, 0.28 * sgn)]
+                pygame.draw.polygon(surf, (236, 248, 255), tri)
+                pygame.draw.polygon(surf, scale_col(col, 0.7), tri, 1)
+        circle_aa(surf, *P(0.05, -0.42), max(1.5, r * 0.10), WHITE)
+        self._eyes(surf, hx, hy, r * 0.6, fx_, fy_, n=2, spread=0.36, fwd=0.40, sz=0.20,
+                   eye_col=(200, 240, 255), glow_col=(150, 220, 255), t=t)
+
+    def _draw_f_bat(self, surf, x, y, r, col, t, breathe):
+        """AYAZ YARASASI: buz sarkıtı uçlu kanatlar; kırağı perisi daha parlak."""
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        flap = math.sin(self.walk * 2.6 + t * 6.0)
+        wing_col = mix_col(col, (40, 70, 130), 0.45)
+        for sgn in (-1, 1):
+            span = 1.40 + flap * 0.30
+            wing = [P(0.05, 0.30 * sgn), P(0.35, span * 0.75 * sgn), P(-0.05, span * sgn),
+                    P(-0.45, span * 0.82 * sgn), P(-0.70, 0.40 * sgn)]
+            self._hpoly(surf, wing, wing_col, x, y, grow=0.05)
+            pygame.draw.polygon(surf, lighten(col, 0.3), wing, 1)
+            for f, s in ((-0.05, span), (-0.45, span * 0.82)):
+                bx, by = P(f, s * sgn)
+                tip = (bx - fx_ * r * 0.38, by - fy_ * r * 0.38)
+                pygame.draw.polygon(surf, (230, 246, 255),
+                                    [(bx - sx_ * 2, by - sy_ * 2), tip, (bx + sx_ * 2, by + sy_ * 2)])
+        pr = r * 0.62 * breathe
+        circle_aa(surf, x, y, pr + 2, OUTLINE)
+        circle_aa(surf, x, y, pr, col)
+        for sgn in (-1, 1):
+            self._hpoly(surf, [P(0.30, 0.18 * sgn), P(0.86, 0.42 * sgn), P(0.40, 0.46 * sgn)], col, x, y, grow=0.05)
+        if self.kind == "stinger":
+            add_glow(surf, x, y, r * 1.6, (200, 236, 255), 0.30)
+        self._eyes(surf, x, y, pr, fx_, fy_, n=2, spread=0.30, fwd=0.40, sz=0.24,
+                   eye_col=(210, 245, 255), glow_col=(140, 210, 255), t=t)
+
+    def _draw_f_wisp(self, surf, x, y, r, col, t, breathe):
+        """KAR RUHU: süzülen kar küresi, kar kuyruğu, yörüngede buz kırıkları.
+        Büyücü buz taçlı, şifacı yeşil ışıklı."""
+        y -= math.sin(t * 2.4 + self.wobble) * r * 0.12
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        add_glow(surf, x, y, r * 1.75, col, 0.30)
+        for i in range(6):
+            k = i / 5.0
+            px_, py_ = P(-0.40 - k * 1.25, math.sin(t * 3 + i * 0.9) * 0.25 * k)
+            circle_aa(surf, px_, py_, max(1.0, r * (0.55 - 0.40 * k)), mix_col(col, WHITE, 0.3 + 0.5 * k))
+        pr = r * 0.80 * breathe
+        circle_aa(surf, x, y, pr + 2, OUTLINE)
+        circle_aa(surf, x, y, pr, col)
+        circle_aa(surf, x - pr * 0.25, y - pr * 0.25, pr * 0.42, lighten(col, 0.5))
+        for i in range(6):
+            a = t * 1.2 + i * math.pi / 3
+            pygame.draw.line(surf, WHITE, (x, y), (x + math.cos(a) * pr * 0.55, y + math.sin(a) * pr * 0.55), 2)
+        for i in range(3):
+            a = -t * 2.0 + i * math.tau / 3 + self.wobble
+            ox, oy = x + math.cos(a) * r * 1.30, y + math.sin(a) * r * 1.0
+            ca, sa = math.cos(a), math.sin(a)
+            sh = [(ox + ca * r * 0.30, oy + sa * r * 0.30), (ox - sa * r * 0.10, oy + ca * r * 0.10),
+                  (ox - ca * r * 0.30, oy - sa * r * 0.30), (ox + sa * r * 0.10, oy - ca * r * 0.10)]
+            pygame.draw.polygon(surf, (225, 245, 255), sh)
+            pygame.draw.polygon(surf, scale_col(col, 0.6), sh, 1)
+        if self.kind == "wizard":
+            for k in (-1, 0, 1):
+                self._spike(surf, P(-0.55, k * 0.32), P(-1.05 - (0.14 if k == 0 else 0.0), k * 0.44),
+                            3, (220, 240, 255), sx_, sy_)
+        elif self.kind == "healer":
+            add_glow(surf, x, y, r * 1.5, (120, 255, 180), 0.35)
+        self._eyes(surf, x, y, pr, fx_, fy_, n=2, spread=0.28, fwd=0.30, sz=0.17,
+                   eye_col=(40, 70, 120), pupil=(220, 240, 255), t=t)
+
+    def _draw_f_golem(self, surf, x, y, r, col, t, breathe):
+        """BUZ GOLEMİ: çok yüzlü kristal gövde, blok kollar, parlayan çekirdek."""
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        sway = math.sin(self.walk * 1.1) * 0.12
+        dark = scale_col(col, 0.6)
+        for sgn in (-1, 1):
+            o = sway * sgn
+            arm = [P(0.35 + o, 0.85 * sgn), P(0.55 + o, 1.25 * sgn), P(0.05 + o, 1.38 * sgn), P(-0.25 + o, 1.0 * sgn)]
+            self._hpoly(surf, arm, dark, x, y, grow=0.06)
+            pygame.draw.polygon(surf, lighten(col, 0.35), arm, 2)
+        k = breathe
+        body = [P(0.85 * k, 0.0), P(0.45 * k, 0.80 * k), P(-0.40 * k, 0.95 * k), P(-0.95 * k, 0.35 * k),
+                P(-0.90 * k, -0.45 * k), P(-0.25 * k, -0.95 * k), P(0.55 * k, -0.78 * k)]
+        self._hpoly(surf, body, col, x, y, grow=0.07)
+        cx_, cy_ = P(-0.05, 0.0)
+        for i, pt in enumerate(body):
+            pygame.draw.line(surf, lighten(col, 0.45) if i % 2 else dark, (cx_, cy_), pt, 1)
+        pulse = 0.5 + 0.5 * math.sin(t * 3 + self.wobble)
+        add_glow(surf, cx_, cy_, r * (0.9 + 0.3 * pulse), (120, 200, 255), 0.45)
+        circle_aa(surf, cx_, cy_, r * 0.26, (190, 236, 255))
+        circle_aa(surf, cx_, cy_, r * 0.13, WHITE)
+        self._eyes(surf, x, y, r, fx_, fy_, n=2, spread=0.25, fwd=0.55, sz=0.12,
+                   eye_col=(170, 230, 255), glow_col=(120, 200, 255), t=t)
+
+    def _beast(self, surf, x, y, r, col, t, breathe, back_col, ear_col, ears="point", tail_w=0.42,
+               tail_col=None, snout=1.35, eye_col=(255, 220, 90), muzzle=None):
+        """Dört ayaklı koşucu iskeleti (kurt / çakal / panter): kalın bacaklar
+        ve patiler, oval gövde, sırt şeridi, kulaklı kama baş, sallanan kuyruk."""
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        dark = scale_col(col, 0.62)
+        for f, ph in ((0.40, 0.0), (-0.44, math.pi)):
+            for sgn in (-1, 1):
+                sw = math.sin(self.walk * 2.2 + ph + (0.0 if sgn > 0 else math.pi)) * 0.26
+                a, b = P(f, 0.24 * sgn), P(f + sw, 0.64 * sgn)
+                self._limb(surf, a, b, max(3, r * 0.24), dark)
+                circle_aa(surf, b[0], b[1], max(2.0, r * 0.15), OUTLINE)
+                circle_aa(surf, b[0], b[1], max(1.5, r * 0.11), scale_col(col, 0.86))
+        run = math.sin(self.walk * 2.2)
+        tail = [P(-0.78, 0.0), P(-1.18, run * 0.22), P(-1.58, run * 0.40)]
+        pygame.draw.lines(surf, OUTLINE, False, tail, max(4, int(r * (tail_w + 0.14))))
+        pygame.draw.lines(surf, tail_col or col, False, tail, max(2, int(r * tail_w)))
+        body = [P(0.62, 0.0), P(0.50, 0.36), P(0.10, 0.47), P(-0.45, 0.44), P(-0.85, 0.22), P(-0.92, 0.0),
+                P(-0.85, -0.22), P(-0.45, -0.44), P(0.10, -0.47), P(0.50, -0.36)]
+        self._hpoly(surf, body, col, x, y, grow=0.07)
+        pygame.draw.polygon(surf, back_col, [P(0.32, 0.0), P(0.10, 0.19), P(-0.55, 0.19), P(-0.80, 0.0),
+                                             P(-0.55, -0.19), P(0.10, -0.19)])
+        for sgn in (-1, 1):
+            if ears == "round":
+                ex, ey = P(0.66, 0.30 * sgn)
+                circle_aa(surf, ex, ey, r * 0.17, OUTLINE)
+                circle_aa(surf, ex, ey, r * 0.13, ear_col)
+            else:
+                big = 1.5 if ears == "big" else 1.0
+                ear = [P(0.76, 0.12 * sgn), P(0.50 - 0.12 * (big - 1), (0.42 + 0.22 * (big - 1)) * sgn),
+                       P(0.84, 0.32 * sgn)]
+                self._hpoly(surf, ear, ear_col, x, y, grow=0.06)
+        head = [P(snout, 0.0), P(snout - 0.20, 0.17), P(0.98, 0.31), P(0.66, 0.30), P(0.56, 0.0),
+                P(0.66, -0.30), P(0.98, -0.31), P(snout - 0.20, -0.17)]
+        self._hpoly(surf, head, col, x, y, grow=0.06)
+        if muzzle:
+            pygame.draw.polygon(surf, muzzle, [P(snout - 0.04, 0.0), P(1.0, 0.14), P(1.0, -0.14)])
+        circle_aa(surf, *P(snout - 0.03, 0.0), max(1.5, r * 0.09), OUTLINE)
+        hx, hy = P(0.84, 0.0)
+        self._eyes(surf, hx, hy, r * 0.7, fx_, fy_, n=2, spread=0.30, fwd=0.14, sz=0.16,
+                   eye_col=eye_col, glow_col=eye_col, t=t)
+        return P
+
+    def _draw_f_wolf(self, surf, x, y, r, col, t, breathe):
+        """KAR KURDU: buz mavisi sırt, açık namlu, kabarık beyaz kuyruk ucu."""
+        P = self._beast(surf, x, y, r, col, t, breathe, mix_col(col, (150, 175, 210), 0.45),
+                        scale_col(col, 0.65), eye_col=(150, 220, 255), muzzle=WHITE)
+        circle_aa(surf, *P(-1.56, math.sin(self.walk * 2.2) * 0.40), r * 0.20, WHITE)
+
+    def _draw_f_yeti(self, surf, x, y, r, col, t, breathe):
+        """YETİ: kabarık kürk, öne uzanan iri kollar, mavi yüz. Yeti Reisi buz taçlı."""
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        swing = math.sin(self.walk * 1.3)
+        pr = r * breathe
+        circle_aa(surf, x, y, pr + 2, OUTLINE)
+        circle_aa(surf, x, y, pr, col)
+        for i in range(12):
+            a = i * math.tau / 12 + self.wobble
+            circle_aa(surf, x + math.cos(a) * pr * 0.90, y + math.sin(a) * pr * 0.90, pr * 0.22,
+                      lighten(col, 0.15) if i % 2 else scale_col(col, 0.92))
+        if self.kind == "elite":
+            add_glow(surf, *P(-0.7, 0.0), r * 0.9, (170, 220, 255), 0.35)
+            for k in (-2, -1, 0, 1, 2):
+                self._spike(surf, P(-0.55, k * 0.22), P(-1.02 - (0.18 if k == 0 else 0.0), k * 0.30),
+                            3.5, (210, 236, 255), sx_, sy_)
+        for sgn in (-1, 1):
+            hand = P(0.70 + 0.16 * swing * sgn, 0.92 * sgn)
+            self._limb(surf, P(0.0, 0.78 * sgn), hand, max(5, r * 0.40), lighten(col, 0.08))
+            circle_aa(surf, hand[0], hand[1], r * 0.27, OUTLINE)
+            circle_aa(surf, hand[0], hand[1], r * 0.21, (120, 140, 180))
+        fxp, fyp = P(0.40, 0.0)
+        circle_aa(surf, fxp, fyp, pr * 0.46, (110, 150, 200))
+        mo = 0.5 + 0.5 * math.sin(self.walk * 1.6)
+        self._hpoly(surf, [P(0.60, -0.20), P(0.78, 0.0), P(0.60, 0.20), P(0.53 + 0.08 * mo, 0.0)],
+                    (40, 30, 60), x, y, grow=0.0)
+        for k in (-1, 1):
+            pygame.draw.line(surf, WHITE, P(0.60, k * 0.12), P(0.72, k * 0.08), 2)
+        self._eyes(surf, x, y, pr, fx_, fy_, n=2, spread=0.20, fwd=0.34, sz=0.12, t=t)
+
+    def _draw_f_snowball(self, surf, x, y, r, col, t, breathe):
+        """KARTOPU: yuvarlanan kar topu, kömür gözler, havuç burun."""
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        roll = self.walk * 0.9
+        pr = r * 0.95 * breathe
+        add_glow(surf, x, y, r * 1.6, (180, 220, 255), 0.18 + 0.12 * math.sin(t * 6 + self.wobble))
+        for k in (-1, 1):
+            self._spike(surf, P(-0.75, 0.25 * k), P(-1.28, 0.45 * k), 3, (190, 225, 255), sx_, sy_)
+        circle_aa(surf, x, y, pr + 2, OUTLINE)
+        circle_aa(surf, x, y, pr, col)
+        for i in range(7):
+            a = roll + i * 0.9
+            d_ = pr * (0.25 + 0.55 * ((i * 37) % 10) / 10.0)
+            circle_aa(surf, x + math.cos(a) * d_, y + math.sin(a) * d_ * 0.8, pr * 0.12, (206, 222, 240))
+        circle_aa(surf, x - pr * 0.3, y - pr * 0.35, pr * 0.26, WHITE)
+        self._eyes(surf, x, y, pr, fx_, fy_, n=2, spread=0.26, fwd=0.38, sz=0.13,
+                   eye_col=(30, 30, 40), pupil=(30, 30, 40), t=t)
+        nb, nt = P(0.62, 0.0), P(1.08, 0.0)
+        pygame.draw.polygon(surf, (255, 140, 50),
+                            [(nb[0] - sx_ * 4, nb[1] - sy_ * 4), nt, (nb[0] + sx_ * 4, nb[1] + sy_ * 4)])
+
+    # ---------------------------- ORMAN ------------------------------
+    def _draw_j_snake(self, surf, x, y, r, col, t, breathe):
+        """YILAN: kıvrılarak süzülen pullu gövde, çatal dil."""
+        fx_, fy_ = self.face_x, self.face_y
+        l = math.hypot(fx_, fy_) or 1.0
+        fx_, fy_ = fx_ / l, fy_ / l
+        sx_, sy_ = -fy_, fx_
+        dark = scale_col(col, 0.58)
+        lite = lighten(col, 0.34)
+        n = 7
+        pts = []
+        for i in range(n):
+            k = i / (n - 1)
+            back = r * (0.25 + 1.58 * k)
+            wig = math.sin(self.walk * 1.4 - k * 4.2) * r * 0.55 * k
+            pts.append((x - fx_ * back + sx_ * wig, y - fy_ * back + sy_ * wig, r * (0.62 - 0.38 * k)))
+        for (px_, py_, rr_) in reversed(pts):
+            pygame.draw.circle(surf, OUTLINE, (int(px_), int(py_)), int(rr_ + 2))
+        for i, (px_, py_, rr_) in enumerate(reversed(pts)):
+            pygame.draw.circle(surf, col if i % 2 else dark, (int(px_), int(py_)), int(rr_))
+            pygame.draw.circle(surf, lite, (int(px_ - rr_ * 0.3), int(py_ - rr_ * 0.3)), max(1, int(rr_ * 0.3)))
+        hx_, hy_ = x + fx_ * r * 0.35, y + fy_ * r * 0.35
+        head = [(hx_ + fx_ * r * 0.75, hy_ + fy_ * r * 0.75), (hx_ + sx_ * r * 0.55, hy_ + sy_ * r * 0.55),
+                (hx_ - fx_ * r * 0.45, hy_ - fy_ * r * 0.45), (hx_ - sx_ * r * 0.55, hy_ - sy_ * r * 0.55)]
+        pygame.draw.polygon(surf, OUTLINE, [(a, b + 1) for a, b in head])
+        pygame.draw.polygon(surf, col, head)
+        if int(t * 3 + self.wobble) % 2 == 0:
+            tx_, ty_ = hx_ + fx_ * r * 0.75, hy_ + fy_ * r * 0.75
+            tip_x, tip_y = tx_ + fx_ * r * 0.50, ty_ + fy_ * r * 0.50
+            pygame.draw.line(surf, (220, 50, 70), (tx_, ty_), (tip_x, tip_y), 2)
+            for s_ in (-1, 1):
+                pygame.draw.line(surf, (220, 50, 70), (tip_x, tip_y),
+                                 (tip_x + fx_ * r * 0.2 + sx_ * r * 0.18 * s_,
+                                  tip_y + fy_ * r * 0.2 + sy_ * r * 0.18 * s_), 2)
+        self._eyes(surf, hx_, hy_, r * 0.8, fx_, fy_, n=2, spread=0.42, fwd=0.35, sz=0.16,
+                   eye_col=(255, 230, 90), t=t)
+
+    def _draw_j_fly(self, surf, x, y, r, col, t, breathe):
+        """ATEŞBÖCEĞİ (parlayan karın) / EŞEK ARISI (çizgili, iğneli)."""
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        wasp = self.kind == "stinger"
+        buzz = math.sin(t * 40 + self.wobble)
+        for sgn in (-1, 1):
+            for f in (0.15, -0.20):
+                span = 1.05 + 0.15 * buzz
+                wing = [P(f, 0.20 * sgn), P(f + 0.35, span * sgn), P(f - 0.30, (span - 0.10) * sgn)]
+                pygame.draw.polygon(surf, (226, 240, 246), wing)
+                pygame.draw.polygon(surf, (140, 160, 172), wing, 1)
+        if not wasp:
+            add_glow(surf, *P(-0.62, 0.0), r * (1.05 + 0.25 * math.sin(t * 5 + self.wobble)), (230, 255, 120), 0.55)
+        abd = [P(-0.10, 0.0), P(-0.40, 0.42), P(-1.05, 0.30), P(-1.25, 0.0), P(-1.05, -0.30), P(-0.40, -0.42)]
+        self._hpoly(surf, abd, col if wasp else (250, 248, 160), x, y, grow=0.07)
+        if wasp:
+            for f in (-0.45, -0.75, -1.0):
+                pygame.draw.line(surf, OUTLINE, P(f, -0.36), P(f, 0.36), 3)
+            pygame.draw.polygon(surf, OUTLINE, [P(-1.18, 0.10), P(-1.62, 0.0), P(-1.18, -0.10)])
+        circle_aa(surf, x, y, r * 0.42 + 2, OUTLINE)
+        circle_aa(surf, x, y, r * 0.42, col if wasp else scale_col(col, 0.62))
+        hx, hy = P(0.50, 0.0)
+        circle_aa(surf, hx, hy, r * 0.34 + 2, OUTLINE)
+        circle_aa(surf, hx, hy, r * 0.34, (40, 40, 40) if wasp else (74, 64, 40))
+        for sgn in (-1, 1):
+            pygame.draw.line(surf, OUTLINE, P(0.72, 0.12 * sgn), P(1.10, 0.40 * sgn), 2)
+        self._eyes(surf, hx, hy, r * 0.5, fx_, fy_, n=2, spread=0.45, fwd=0.25, sz=0.30,
+                   eye_col=(255, 120, 60) if wasp else (255, 240, 120), t=t)
+
+    def _draw_j_frog(self, surf, x, y, r, col, t, breathe):
+        """ZEHİR KURBAĞASI: benekli gövde, iri gözler, şişen gırtlak.
+        Şaman yaprak şapkalı, şifacının başında çiçek var."""
+        y -= abs(math.sin(self.walk * 1.3)) * r * 0.18
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        dark = scale_col(col, 0.55)
+        for sgn in (-1, 1):
+            self._hpoly(surf, [P(-0.35, 0.55 * sgn), P(-0.15, 1.05 * sgn), P(-0.75, 1.05 * sgn),
+                               P(-0.85, 0.60 * sgn)], dark, x, y, grow=0.05)
+            self._limb(surf, P(0.45, 0.55 * sgn), P(0.75, 0.88 * sgn), max(2, r * 0.14), dark)
+        k = breathe
+        body = [P(0.85 * k, 0.0), P(0.55 * k, 0.75 * k), P(-0.45 * k, 0.85 * k), P(-0.85 * k, 0.30 * k),
+                P(-0.85 * k, -0.30 * k), P(-0.45 * k, -0.85 * k), P(0.55 * k, -0.75 * k)]
+        self._hpoly(surf, body, col, x, y, grow=0.07)
+        for (f, s) in ((-0.30, 0.35), (0.05, -0.40), (-0.55, -0.20), (0.20, 0.45)):
+            circle_aa(surf, *P(f, s), r * 0.13, (30, 30, 50))
+        charge = clamp(1.0 - float(getattr(self, "shoot_cd", 2.0)), 0.0, 1.0)
+        circle_aa(surf, *P(0.72, 0.0), r * (0.18 + 0.20 * charge), lighten(col, 0.45))
+        for sgn in (-1, 1):
+            ex, ey = P(0.40, 0.42 * sgn)
+            circle_aa(surf, ex, ey, r * 0.27, OUTLINE)
+            circle_aa(surf, ex, ey, r * 0.22, (255, 220, 60))
+            circle_aa(surf, ex + fx_ * r * 0.06, ey + fy_ * r * 0.06, r * 0.10, (20, 20, 20))
+        if self.kind == "wizard":
+            self._hpoly(surf, [P(-0.05, 0.0), P(-0.45, 0.55), P(-1.25, 0.0), P(-0.45, -0.55)],
+                        (60, 150, 60), x, y, grow=0.05)
+            pygame.draw.line(surf, (30, 90, 30), P(-0.05, 0.0), P(-1.2, 0.0), 2)
+        elif self.kind == "healer":
+            fxp, fyp = P(-0.35, 0.0)
+            for i in range(5):
+                a = i * math.tau / 5 + t
+                circle_aa(surf, fxp + math.cos(a) * r * 0.20, fyp + math.sin(a) * r * 0.20, r * 0.14, (255, 190, 220))
+            circle_aa(surf, fxp, fyp, r * 0.11, (255, 230, 90))
+
+    def _draw_j_treant(self, surf, x, y, r, col, t, breathe):
+        """AĞAÇ ADAM: kabuklu gövde, dal kollar, yaprak taç, kovuktan bakan gözler."""
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        sway = math.sin(self.walk * 1.0) * 0.10
+        dark = scale_col(col, 0.6)
+        for sgn in (-1, 1):
+            a, b, c = P(0.10, 0.70 * sgn), P(0.55 + sway * sgn, 1.22 * sgn), P(0.85 + sway * sgn, 1.08 * sgn)
+            pygame.draw.lines(surf, OUTLINE, False, [a, b, c], max(6, int(r * 0.32)))
+            pygame.draw.lines(surf, col, False, [a, b, c], max(4, int(r * 0.22)))
+            for kk in (0.0, 0.4):
+                circle_aa(surf, *P(0.62 + sway * sgn + kk * 0.3, (1.30 - kk * 0.1) * sgn), r * 0.17, (90, 170, 70))
+        pr = r * breathe
+        circle_aa(surf, x, y, pr + 2, OUTLINE)
+        circle_aa(surf, x, y, pr, col)
+        box = (x - pr * 0.7, y - pr * 0.7, pr * 1.4, pr * 1.4)
+        for i in range(5):
+            a = i * math.tau / 5 + 0.4
+            pygame.draw.arc(surf, dark, box, a, a + 0.9, 2)
+        for i in range(7):
+            a = i * math.tau / 7 + self.wobble
+            circle_aa(surf, *P(-0.55 + math.cos(a) * 0.42, math.sin(a) * 0.62), r * 0.34,
+                      (70, 150, 60) if i % 2 else (96, 176, 70))
+        circle_aa(surf, *P(-0.5, 0.0), r * 0.32, (112, 192, 82))
+        hx, hy = P(0.45, 0.0)
+        circle_aa(surf, hx, hy, r * 0.32, (40, 26, 18))
+        self._eyes(surf, hx, hy, r * 0.6, fx_, fy_, n=2, spread=0.32, fwd=0.05, sz=0.20,
+                   eye_col=(255, 220, 90), glow_col=(255, 200, 80), t=t)
+
+    def _draw_j_panther(self, surf, x, y, r, col, t, breathe):
+        """PANTER: kara, ince gövde, yuvarlak kulaklar, uzun kuyruk, sarı gözler."""
+        P = self._beast(surf, x, y, r, col, t, breathe, lighten(col, 0.12), scale_col(col, 0.8),
+                        ears="round", tail_w=0.24, snout=1.24, eye_col=(255, 214, 60))
+        for (f, s) in ((0.1, 0.30), (-0.3, -0.30), (-0.55, 0.28), (0.25, -0.30)):
+            pygame.draw.circle(surf, scale_col(col, 0.7), [int(v) for v in P(f, s)], max(1, int(r * 0.08)), 1)
+
+    def _draw_j_gorilla(self, surf, x, y, r, col, t, breathe):
+        """GORİL: kambur yuvarlak sırt, öne uzanan kalın kollar ve yumruklar;
+        GÜMÜŞ SIRT'ın sırtı gümüş."""
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        step = math.sin(self.walk * 1.4)
+        k = breathe
+        body = [P(0.50 * k, 0.0), P(0.34 * k, 0.74 * k), P(-0.30 * k, 0.90 * k), P(-0.82 * k, 0.56 * k),
+                P(-0.98 * k, 0.0), P(-0.82 * k, -0.56 * k), P(-0.30 * k, -0.90 * k), P(0.34 * k, -0.74 * k)]
+        self._hpoly(surf, body, col, x, y, grow=0.07)
+        back = (198, 200, 212) if self.kind == "elite" else lighten(col, 0.14)
+        pygame.draw.polygon(surf, back, [P(0.10, 0.0), P(-0.10, 0.36), P(-0.70, 0.34), P(-0.84, 0.0),
+                                         P(-0.70, -0.34), P(-0.10, -0.36)])
+        for sgn in (-1, 1):
+            hand = P(0.78 + 0.16 * step * sgn, 0.92 * sgn)
+            self._limb(surf, P(0.10, 0.70 * sgn), hand, max(5, r * 0.38), scale_col(col, 0.9))
+            circle_aa(surf, hand[0], hand[1], r * 0.27, OUTLINE)
+            circle_aa(surf, hand[0], hand[1], r * 0.21, scale_col(col, 0.68))
+        hx, hy = P(0.56, 0.0)
+        circle_aa(surf, hx, hy, r * 0.42 + 2, OUTLINE)
+        circle_aa(surf, hx, hy, r * 0.42, scale_col(col, 0.82))
+        circle_aa(surf, *P(0.76, 0.0), r * 0.26, (150, 128, 126))
+        pygame.draw.line(surf, OUTLINE, P(0.64, -0.24), P(0.64, 0.24), max(2, int(r * 0.08)))
+        for sgn in (-1, 1):
+            circle_aa(surf, *P(0.88, 0.07 * sgn), max(1.0, r * 0.04), OUTLINE)
+        self._eyes(surf, hx, hy, r * 0.6, fx_, fy_, n=2, spread=0.36, fwd=0.22, sz=0.17,
+                   eye_col=(255, 200, 120), t=t)
+
+    def _draw_j_shroom(self, surf, x, y, r, col, t, breathe):
+        """PATLAK MANTAR: beyaz benekli kırmızı şapka, yükselen sporlar."""
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        throb = 1.0 + 0.06 * math.sin(t * 7 + self.wobble)
+        for sgn in (-1, 1):
+            self._limb(surf, P(-0.2, 0.35 * sgn), P(-0.2 + 0.25 * math.sin(self.walk * 2 + sgn), 0.75 * sgn),
+                       max(2, r * 0.16), (236, 226, 200))
+        pr = r * 0.98 * breathe * throb
+        add_glow(surf, x, y, r * 1.6, col, 0.15 + 0.10 * math.sin(t * 7 + self.wobble))
+        circle_aa(surf, x, y, pr + 2, OUTLINE)
+        circle_aa(surf, x, y, pr, col)
+        circle_aa(surf, x - pr * 0.25, y - pr * 0.30, pr * 0.40, lighten(col, 0.25))
+        for i, (f, s, rr) in enumerate(((0.35, 0.40, 0.17), (-0.25, -0.45, 0.20), (-0.45, 0.30, 0.14),
+                                        (0.10, -0.10, 0.12), (0.45, -0.35, 0.12))):
+            circle_aa(surf, *P(f, s), r * rr, (250, 246, 236))
+        for i in range(4):
+            ph = (t * 0.6 + i * 0.25 + self.wobble * 0.1) % 1.0
+            circle_aa(surf, x + math.sin(t * 2 + i * 1.7) * r * 0.8, y - r * 0.4 - ph * r * 1.2,
+                      max(1.0, r * 0.12 * (1.0 - ph)), (230, 210, 170))
+        self._eyes(surf, x, y, pr, fx_, fy_, n=2, spread=0.24, fwd=0.55, sz=0.13,
+                   eye_col=(255, 250, 230), t=t)
+
+    # ----------------------------- ÇÖL -------------------------------
+    def _draw_d_scorpion(self, surf, x, y, r, col, t, breathe):
+        """AKREP: segmentli gövde, açılıp kapanan iki kıskaç, iğneli kuyruk."""
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        dark = scale_col(col, 0.58)
+        self._legs(surf, x, y, r, fx_, fy_, dark, pairs=4, length=0.60, width=2, spread=0.55)
+        snap = 0.5 + 0.5 * math.sin(self.walk * 1.7)
+        for sgn in (-1, 1):
+            sh, el, wr = P(0.35, 0.30 * sgn), P(0.56, 0.66 * sgn), P(0.98, 0.60 * sgn)
+            self._limb(surf, sh, el, max(2, r * 0.15), col)
+            self._limb(surf, el, wr, max(2, r * 0.17), col)
+            # C biçimli kıskaç: dış ve iç parmağın arasındaki ağız açılıp kapanır
+            o, i_ = 0.66 + 0.07 * snap, 0.42 - 0.07 * snap
+            claw = [P(0.92, 0.44 * sgn), P(0.98, 0.80 * sgn), P(1.36, 0.86 * sgn), P(1.62, o * sgn),
+                    P(1.34, 0.66 * sgn), P(1.20, 0.58 * sgn), P(1.36, 0.50 * sgn), P(1.56, i_ * sgn),
+                    P(1.24, 0.36 * sgn)]
+            self._hpoly(surf, claw, col, x, y, grow=0.05)
+            pygame.draw.line(surf, lighten(col, 0.28), P(1.02, 0.70 * sgn), P(1.30, 0.76 * sgn), 2)
+        segs = []
+        for i in range(5):
+            kk = i / 4.0
+            sway = math.sin(t * 2.5 + self.wobble - kk * 2) * 0.25 * kk
+            segs.append(P(-0.65 - 0.30 * i + 0.15 * kk * kk * 4, sway))
+        for i, (sx0, sy0) in enumerate(segs):
+            circle_aa(surf, sx0, sy0, r * (0.30 - 0.03 * i) + 2, OUTLINE)
+            circle_aa(surf, sx0, sy0, r * (0.30 - 0.03 * i), col if i % 2 else dark)
+        tip = segs[-1]
+        sting = (tip[0] + fx_ * r * 0.45, tip[1] + fy_ * r * 0.45)
+        pygame.draw.polygon(surf, OUTLINE, [(tip[0] - sx_ * 4, tip[1] - sy_ * 4), sting, (tip[0] + sx_ * 4, tip[1] + sy_ * 4)])
+        pygame.draw.polygon(surf, (60, 30, 20), [(tip[0] - sx_ * 3, tip[1] - sy_ * 3), sting, (tip[0] + sx_ * 3, tip[1] + sy_ * 3)])
+        k = breathe
+        body = [P(0.60 * k, 0.0), P(0.30, 0.55 * k), P(-0.50, 0.50 * k), P(-0.75, 0.0), P(-0.50, -0.50 * k), P(0.30, -0.55 * k)]
+        self._hpoly(surf, body, col, x, y, grow=0.07)
+        for f in (0.15, -0.15, -0.45):
+            pygame.draw.line(surf, dark, P(f, -0.45), P(f, 0.45), 2)
+        self._eyes(surf, x, y, r, fx_, fy_, n=2, spread=0.16, fwd=0.48, sz=0.11,
+                   eye_col=(30, 20, 20), pupil=(255, 90, 60), t=t)
+
+    def _draw_d_vulture(self, surf, x, y, r, col, t, breathe):
+        """AKBABA: geniş tüylü kanatlar, beyaz yaka, kel pembe baş, kanca gaga."""
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        flap = math.sin(self.walk * 2.0 + t * 3.0)
+        dark = scale_col(col, 0.6)
+        for sgn in (-1, 1):
+            span = 1.45 + 0.20 * flap
+            wing = [P(0.20, 0.30 * sgn), P(0.25, span * 0.70 * sgn), P(-0.10, span * sgn),
+                    P(-0.55, span * 0.80 * sgn), P(-0.60, 0.35 * sgn)]
+            self._hpoly(surf, wing, col, x, y, grow=0.04)
+            for i in range(4):
+                f = 0.05 - i * 0.18
+                a = P(f, (span - 0.25) * 0.90 * sgn)
+                b = P(f - 0.18, (span + 0.05 - i * 0.05) * sgn)
+                pygame.draw.line(surf, dark, a, b, 3)
+        tail = [P(-0.55, 0.25), P(-1.15, 0.30), P(-1.15, -0.30), P(-0.55, -0.25)]
+        self._hpoly(surf, tail, dark, x, y, grow=0.05)
+        pr = r * 0.62 * breathe
+        circle_aa(surf, x, y, pr + 2, OUTLINE)
+        circle_aa(surf, x, y, pr, col)
+        circle_aa(surf, *P(0.35, 0.0), r * 0.36, (238, 232, 220))
+        hx, hy = P(0.75, 0.0)
+        circle_aa(surf, hx, hy, r * 0.26 + 2, OUTLINE)
+        circle_aa(surf, hx, hy, r * 0.26, (232, 150, 150))
+        beak = [P(0.90, -0.10), P(1.25, 0.0), P(1.08, 0.10), P(0.90, 0.10)]
+        self._hpoly(surf, beak, (236, 210, 120), x, y, grow=0.05)
+        self._eyes(surf, hx, hy, r * 0.45, fx_, fy_, n=2, spread=0.42, fwd=0.20, sz=0.22,
+                   eye_col=(255, 220, 90), t=t)
+
+    def _draw_d_archer(self, surf, x, y, r, col, t, breathe):
+        """KUM OKÇUSU: sarıklı, peçeli çöl okçusu; sırtında sadak, atıştan önce
+        yayı gerer. Şaman yeşil taşlı, büyücü mor küreli asa taşır."""
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        cloth = col
+        dark = scale_col(cloth, 0.62)
+        flow = math.sin(t * 3 + self.wobble)
+        scarf = [P(-0.30, 0.10), P(-0.80, 0.30 + 0.10 * flow), P(-1.20, 0.18 + 0.20 * flow),
+                 P(-1.05, 0.02 + 0.12 * flow), P(-0.55, -0.05)]
+        self._hpoly(surf, scarf, lighten(cloth, 0.18), x, y, grow=0.05)
+        if self.kind == "yellow":
+            q0, q1 = P(-0.10, -0.42), P(-0.85, -0.70)
+            self._limb(surf, q0, q1, max(4, r * 0.26), (122, 78, 42))
+            for kq in range(3):
+                bx, by = P(-0.12 + kq * 0.05, -0.30 - kq * 0.10)
+                tip = (bx + fx_ * r * 0.28, by + fy_ * r * 0.28)
+                pygame.draw.line(surf, (230, 226, 214), (bx, by), tip, 2)
+        body = [P(0.30, 0.0), P(0.22, 0.66), P(-0.12, 0.86), P(-0.52, 0.64), P(-0.66, 0.0),
+                P(-0.52, -0.64), P(-0.12, -0.86), P(0.22, -0.66)]
+        body = [(x + (px - x) * breathe, y + (py - y) * breathe) for px, py in body]
+        self._hpoly(surf, body, dark, x, y, grow=0.06)
+        hx, hy = P(0.04, 0.0)
+        pr = r * 0.50
+        circle_aa(surf, hx, hy, pr + 2, OUTLINE)
+        circle_aa(surf, hx, hy, pr, lighten(cloth, 0.10))
+        for kk in (0.62, 0.38):
+            pygame.draw.circle(surf, dark, (int(hx), int(hy)), int(pr * kk), 2)
+        veil = [P(0.28, -0.40), P(0.60, 0.0), P(0.28, 0.40), P(0.40, 0.0)]
+        pygame.draw.polygon(surf, (60, 46, 40), veil)
+        self._eyes(surf, hx, hy, pr, fx_, fy_, n=2, spread=0.32, fwd=0.62, sz=0.15,
+                   eye_col=(255, 236, 200), t=t)
+        if self.kind == "yellow":
+            pull = clamp(1.0 - float(getattr(self, "shoot_cd", 2.0)) / 1.2, 0.0, 1.0)
+            c0 = P(0.95, 0.0)
+            box = pygame.Rect(0, 0, int(r * 1.5), int(r * 1.5))
+            box.center = (int(c0[0] - fx_ * r * 0.35), int(c0[1] - fy_ * r * 0.35))
+            ang = math.atan2(-fy_, fx_)
+            pygame.draw.arc(surf, OUTLINE, box, ang - 1.05, ang + 1.05, 5)
+            pygame.draw.arc(surf, (150, 100, 50), box, ang - 1.05, ang + 1.05, 3)
+            e1, e2 = P(0.90, 0.62), P(0.90, -0.62)
+            mid = P(0.62 - 0.30 * pull, 0.0)
+            pygame.draw.lines(surf, (230, 220, 200), False, [e1, mid, e2], 1)
+            pygame.draw.line(surf, (120, 80, 40), mid, P(1.35, 0.0), 2)
+            self._spike(surf, P(1.30, 0.0), P(1.50, 0.0), 3, (200, 200, 210), sx_, sy_)
+        else:
+            orb = (110, 240, 170) if self.kind == "healer" else (210, 120, 255)
+            top = P(0.80, 0.70)
+            self._limb(surf, P(-0.30, 0.75), top, max(2, r * 0.12), (130, 90, 50))
+            add_glow(surf, top[0], top[1], r * 0.6, orb, 0.5)
+            circle_aa(surf, top[0], top[1], r * 0.20, orb)
+
+    def _draw_d_mummy(self, surf, x, y, r, col, t, breathe):
+        """MUMYA: sargılı gövde, öne uzanan sargılı kollar, sargının arasından
+        parlayan tek yeşil göz, arkasında sürüklenen sargı."""
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        reach = math.sin(self.walk * 1.2) * 0.08
+        dark = scale_col(col, 0.72)
+        trail = [P(-0.75, 0.30), P(-1.25, 0.45 + 0.15 * math.sin(t * 3 + self.wobble)),
+                 P(-1.70, 0.30 + 0.25 * math.sin(t * 3 + self.wobble + 1))]
+        pygame.draw.lines(surf, OUTLINE, False, trail, 6)
+        pygame.draw.lines(surf, col, False, trail, 4)
+        pr = r * 0.92 * breathe
+        circle_aa(surf, x, y, pr + 2, OUTLINE)
+        circle_aa(surf, x, y, pr, col)
+        for i in range(-3, 4):
+            f = i * 0.24
+            off = 0.06 * ((i * 7) % 3 - 1)
+            pygame.draw.line(surf, dark, P(f + off, -0.86), P(f - off, 0.86), 2)
+        for sgn in (-1, 1):
+            a, b = P(0.30, 0.55 * sgn), P(1.30 + reach * sgn, 0.50 * sgn)
+            self._limb(surf, a, b, max(4, r * 0.26), col)
+            for kk in (0.35, 0.65):
+                m = (a[0] + (b[0] - a[0]) * kk, a[1] + (b[1] - a[1]) * kk)
+                pygame.draw.line(surf, dark, (m[0] - sx_ * r * 0.12, m[1] - sy_ * r * 0.12),
+                                 (m[0] + sx_ * r * 0.12 + fx_ * 3, m[1] + sy_ * r * 0.12 + fy_ * 3), 2)
+            circle_aa(surf, b[0], b[1], r * 0.16 + 2, OUTLINE)
+            circle_aa(surf, b[0], b[1], r * 0.16, lighten(col, 0.1))
+        ex, ey = P(0.55, 0.22)
+        add_glow(surf, ex, ey, r * 0.6, (120, 255, 140), 0.6)
+        circle_aa(surf, ex, ey, r * 0.13, (170, 255, 170))
+        circle_aa(surf, *P(0.55, -0.22), r * 0.08, (60, 50, 40))
+
+    def _draw_d_jackal(self, surf, x, y, r, col, t, breathe):
+        """ÇAKAL: kum rengi, koyu sırt, kocaman kulaklar, krem namlu."""
+        self._beast(surf, x, y, r, col, t, breathe, scale_col(col, 0.62), scale_col(col, 0.75),
+                    ears="big", tail_w=0.30, eye_col=(255, 200, 80), muzzle=(240, 220, 180))
+
+    def _draw_d_bandit(self, surf, x, y, r, col, t, breathe):
+        """ÇÖL HAYDUDU: geniş omuzlar, çapraz kuşak, beyaz sarık, pala.
+        FİRAVUN MUHAFIZI: altın-lacivert çizgili başlık ve mızrak."""
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        guard = self.kind == "elite"
+        skin = (196, 150, 110)
+        swing = math.sin(self.walk * 1.5)
+        k = breathe
+        body = [P(0.36 * k, 0.0), P(0.26 * k, 0.80 * k), P(-0.18 * k, 0.96 * k), P(-0.62 * k, 0.70 * k),
+                P(-0.76 * k, 0.0), P(-0.62 * k, -0.70 * k), P(-0.18 * k, -0.96 * k), P(0.26 * k, -0.80 * k)]
+        self._hpoly(surf, body, col, x, y, grow=0.07)
+        sash = (60, 90, 200) if guard else (236, 196, 72)
+        pygame.draw.line(surf, OUTLINE, P(0.24, -0.74), P(-0.46, 0.72), max(5, int(r * 0.20)))
+        pygame.draw.line(surf, sash, P(0.24, -0.74), P(-0.46, 0.72), max(3, int(r * 0.13)))
+        hands = []
+        for sgn in (-1, 1):
+            hand = P(0.62 + 0.14 * swing * sgn, 0.92 * sgn)
+            self._limb(surf, P(0.05, 0.80 * sgn), hand, max(4, r * 0.26), scale_col(col, 0.85))
+            circle_aa(surf, hand[0], hand[1], r * 0.17 + 2, OUTLINE)
+            circle_aa(surf, hand[0], hand[1], r * 0.17, skin)
+            hands.append(hand)
+        if guard:
+            self._limb(surf, P(-0.45, 0.92), P(1.20, 0.92), max(2, r * 0.09), (130, 90, 50))
+            self._spike(surf, P(1.15, 0.92), P(1.52, 0.92), 4, (220, 220, 230), sx_, sy_)
+        else:
+            h = hands[1]
+            blade = [h, (h[0] + fx_ * r * 0.55 + sx_ * r * 0.05, h[1] + fy_ * r * 0.55 + sy_ * r * 0.05),
+                     (h[0] + fx_ * r * 0.85 + sx_ * r * 0.28, h[1] + fy_ * r * 0.85 + sy_ * r * 0.28),
+                     (h[0] + fx_ * r * 0.55 + sx_ * r * 0.20, h[1] + fy_ * r * 0.55 + sy_ * r * 0.20)]
+            self._hpoly(surf, blade, (226, 230, 240), x, y, grow=0.04)
+        hx, hy = P(0.20, 0.0)
+        pr = r * 0.46
+        if guard:
+            for sgn in (-1, 1):
+                for i in range(3):
+                    stripe = [P(0.30 - i * 0.05, (0.26 + i * 0.12) * sgn), P(-0.50 - i * 0.08, (0.50 + i * 0.10) * sgn),
+                              P(-0.50 - i * 0.08, (0.58 + i * 0.10) * sgn), P(0.30 - i * 0.05, (0.34 + i * 0.12) * sgn)]
+                    pygame.draw.polygon(surf, GOLD if i % 2 == 0 else (60, 90, 200), stripe)
+            circle_aa(surf, hx, hy, pr + 2, OUTLINE)
+            circle_aa(surf, hx, hy, pr, GOLD)
+            for i in range(3):
+                pygame.draw.line(surf, (60, 90, 200), P(0.20 - 0.14 * (i - 1) - 0.25, -0.30),
+                                 P(0.20 - 0.14 * (i - 1) - 0.25, 0.30), 2)
+            add_glow(surf, hx, hy, r * 0.8, GOLD, 0.3)
+            circle_aa(surf, *P(0.58, 0.0), max(2.0, r * 0.08), (200, 40, 40))
+        else:
+            circle_aa(surf, hx, hy, pr + 2, OUTLINE)
+            circle_aa(surf, hx, hy, pr, (236, 230, 216))
+            for kk in (0.70, 0.45):
+                pygame.draw.circle(surf, (196, 186, 166), (int(hx), int(hy)), int(pr * kk), 2)
+            circle_aa(surf, *P(0.50, 0.0), pr * 0.40, skin)
+        self._eyes(surf, hx, hy, pr, fx_, fy_, n=2, spread=0.30, fwd=0.70, sz=0.16, t=t)
+
+    def _draw_d_cactus(self, surf, x, y, r, col, t, breathe):
+        """PATLAK KAKTÜS: dikenli yuvarlak gövde, iki kol, tepede pembe çiçek."""
+        P, fx_, fy_, sx_, sy_ = self._hmap(x, y, r)
+        throb = 1.0 + 0.05 * math.sin(t * 7 + self.wobble)
+        dark = scale_col(col, 0.62)
+        for sgn in (-1, 1):
+            ax, ay = P(-0.05, 1.0 * sgn)
+            circle_aa(surf, ax, ay, r * 0.36 + 2, OUTLINE)
+            circle_aa(surf, ax, ay, r * 0.36, col)
+            bx, by = P(0.30, 1.15 * sgn)
+            circle_aa(surf, bx, by, r * 0.24 + 2, OUTLINE)
+            circle_aa(surf, bx, by, r * 0.24, col)
+        pr = r * 0.95 * breathe * throb
+        add_glow(surf, x, y, r * 1.5, (255, 140, 120), 0.10 + 0.10 * math.sin(t * 7 + self.wobble))
+        circle_aa(surf, x, y, pr + 2, OUTLINE)
+        circle_aa(surf, x, y, pr, col)
+        for i in range(8):
+            a = i * math.tau / 8 + self.wobble * 0.2
+            pygame.draw.line(surf, dark, (x, y), (x + math.cos(a) * pr * 0.92, y + math.sin(a) * pr * 0.92), 2)
+        for i in range(16):
+            a = i * math.tau / 16 + 0.2
+            p0 = (x + math.cos(a) * pr * 0.96, y + math.sin(a) * pr * 0.96)
+            p1 = (x + math.cos(a) * pr * 1.22, y + math.sin(a) * pr * 1.22)
+            pygame.draw.line(surf, (250, 240, 200), p0, p1, 1)
+        fxp, fyp = P(-0.20, 0.0)
+        for i in range(5):
+            a = i * math.tau / 5 + t * 0.5
+            circle_aa(surf, fxp + math.cos(a) * r * 0.20, fyp + math.sin(a) * r * 0.20, r * 0.15, (255, 120, 180))
+        circle_aa(surf, fxp, fyp, r * 0.12, (255, 230, 90))
+        self._eyes(surf, x, y, pr, fx_, fy_, n=2, spread=0.24, fwd=0.50, sz=0.12, t=t)
 
     # ---- İMP: küçük, zıplayan, yarasa kanatlı şeytancık ----
     def _draw_imp(self, surf, x, y, r, col, t, breathe):
@@ -19360,41 +20244,6 @@ class Enemy:
         hell_draw = HELL_SHAPES.get(self.shape)
         if hell_draw is not None:
             getattr(self, hell_draw)(surf, x, y, r, col, t, breathe)
-        elif self.shape == "snake":
-            # ---- YILAN (v3.35): kıvrılarak süzülen pullu gövde, çatal dil
-            n = 7
-            pts = []
-            for i in range(n):
-                k = i / (n - 1)
-                back = r * (0.25 + 1.75 * k)
-                wig = math.sin(self.walk * 1.4 - k * 4.2) * r * 0.55 * k
-                pts.append((x - fx_ * back + sx_ * wig, y - fy_ * back + sy_ * wig,
-                            r * (0.62 - 0.38 * k)))
-            for (px_, py_, rr_) in reversed(pts):
-                pygame.draw.circle(surf, OUTLINE, (int(px_), int(py_)), int(rr_ + 2))
-            for i, (px_, py_, rr_) in enumerate(reversed(pts)):
-                cc = col if (flash or i % 2) else dark
-                pygame.draw.circle(surf, cc, (int(px_), int(py_)), int(rr_))
-                pygame.draw.circle(surf, lite, (int(px_ - rr_ * 0.3), int(py_ - rr_ * 0.3)),
-                                   max(1, int(rr_ * 0.3)))
-            hx_, hy_ = x + fx_ * r * 0.35, y + fy_ * r * 0.35
-            head = [(hx_ + fx_ * r * 0.75, hy_ + fy_ * r * 0.75),
-                    (hx_ + sx_ * r * 0.55, hy_ + sy_ * r * 0.55),
-                    (hx_ - fx_ * r * 0.45, hy_ - fy_ * r * 0.45),
-                    (hx_ - sx_ * r * 0.55, hy_ - sy_ * r * 0.55)]
-            pygame.draw.polygon(surf, OUTLINE, [(a, b + 1) for a, b in head])
-            pygame.draw.polygon(surf, col, head)
-            if int(t * 3 + self.wobble) % 2 == 0:       # dil çıkıp girer
-                tx_, ty_ = hx_ + fx_ * r * 0.75, hy_ + fy_ * r * 0.75
-                tip_x, tip_y = tx_ + fx_ * r * 0.55, ty_ + fy_ * r * 0.55
-                pygame.draw.line(surf, (220, 50, 70), (tx_, ty_), (tip_x, tip_y), 2)
-                for s_ in (-1, 1):
-                    pygame.draw.line(surf, (220, 50, 70), (tip_x, tip_y),
-                                     (tip_x + fx_ * r * 0.2 + sx_ * r * 0.18 * s_,
-                                      tip_y + fy_ * r * 0.2 + sy_ * r * 0.18 * s_), 2)
-            self._eyes(surf, hx_, hy_, r * 0.8, fx_, fy_, n=2, spread=0.42, fwd=0.35, sz=0.16,
-                       eye_col=(255, 230, 90), t=t)
-
         elif self.shape == "red":
             # ---- ETLİ SÜRÜNGEN: çenesi olan, tek gözlü, sıçrayarak yürüyen yaratık
             vivid = col if flash else mix_col(self.color, (255, 20, 15), self.red_intensity * 0.85)
@@ -20030,7 +20879,7 @@ def boss_count_for_wave(wave):
 
 
 class Boss:
-    def __init__(self, kind, x, y, hp_mult, diff_mult=1.0, wave=10, hellish=False):
+    def __init__(self, kind, x, y, hp_mult, diff_mult=1.0, wave=10, hellish=False, theme=None):
         d = BOSS_DEFS[kind]
         self.kind = kind
         # CEHENNEM PATRONU: davranışı arena patronuyla aynı (dengesi oturmuş),
@@ -20057,6 +20906,12 @@ class Boss:
         self.radius = d["radius"]
         self.hit_r = self.radius * 0.92
         self.color = HELL_BOSS_COLORS.get(kind, d["color"]) if hellish else d["color"]
+        # HARİTA PATRONU (v3.36): davranışı, canı, hasarı ve yetenekleri
+        # arena patronuyla AYNI; adı, rengi ve haritaya özgü süsü farklı.
+        self.theme = theme if (theme in MAP_BOSS_NAMES and not hellish) else None
+        if self.theme:
+            self.name = map_boss_name(self.theme, kind, self.name)
+            self.color = MAP_BOSS_COLORS[self.theme].get(kind, self.color)
         self.alive = True
         self.spawn_t = 0.0
         self.hit_flash = 0.0
@@ -20731,6 +21586,10 @@ class Boss:
                 self.summoned_enemies.append(
                     Enemy(kind, mx, my, mult, 1.0, wave=self.wave,
                           variant=hell_pick_kind(self.wave), biome="hell"))
+            elif self.theme:
+                # harita patronu kendi haritasının yaratıklarını çağırır
+                self.summoned_enemies.append(
+                    make_map_enemy(self.theme, kind, mx, my, mult, 1.0, wave=self.wave))
             else:
                 self.summoned_enemies.append(Enemy(kind, mx, my, mult, 1.0, wave=self.wave))
         fx.ring(self.x, self.y, self.color, n=18, speed=190, life=0.4, r=3)
@@ -21295,6 +22154,131 @@ class Boss:
         self._boss_eyes(surf, P, r, t, n=2, spread=0.20, fwd=0.32, sz=0.11,
                         col=(240, 220, 255), glow=(190, 110, 245))
 
+    # ---------------- HARİTA PATRONLARI (v3.36) ----------------
+    # Patronun başının yeri ve yarıçapı (P(ileri, yan) biriminde). Taç / başlık
+    # buraya oturur; her patronun gövdesi farklı olduğu için tek tek ölçüldü.
+    MAP_HEAD = {"warlord": (0.46, 0.40), "witch": (0.14, 0.50), "colossus": (0.80, 0.36),
+                "reaper": (0.30, 0.46), "hive": (0.94, 0.42)}
+
+    def _draw_map_aura(self, surf, x, y, r, t):
+        """Ayağının dibindeki harita halesi: kar taneleri / yapraklar / kum girdabı."""
+        th = self.theme
+        acc = MAP_ACCENT.get(th, WHITE)
+        add_glow(surf, x, y, r * 2.6, acc, 0.14 + 0.05 * math.sin(t * 2.2))
+        ring = pygame.Rect(0, 0, int(r * 2.8), int(r * 1.4))
+        ring.center = (int(x), int(y + r * 0.55))
+        pygame.draw.ellipse(surf, scale_col(acc, 0.8), ring, 2)
+        if th == "frost":
+            for i in range(8):
+                a = t * 0.8 + i * math.tau / 8
+                px_ = x + math.cos(a) * r * 1.40
+                py_ = y + r * 0.55 + math.sin(a) * r * 0.70
+                arm = 4.5 + (i % 2) * 2.0
+                for k in range(3):
+                    b = a * 0.5 + k * math.pi / 3
+                    dx_, dy_ = math.cos(b) * arm, math.sin(b) * arm
+                    pygame.draw.line(surf, (236, 248, 255), (px_ - dx_, py_ - dy_), (px_ + dx_, py_ + dy_), 2)
+        elif th == "jungle":
+            for i in range(8):
+                a = -t * 0.7 + i * math.tau / 8
+                px_ = x + math.cos(a) * r * 1.42
+                py_ = y + r * 0.55 + math.sin(a) * r * 0.72
+                ca, sa = math.cos(a * 2.0 + i), math.sin(a * 2.0 + i)
+                lf = [(px_ + ca * 8, py_ + sa * 8), (px_ - sa * 3.5, py_ + ca * 3.5),
+                      (px_ - ca * 8, py_ - sa * 8), (px_ + sa * 3.5, py_ - ca * 3.5)]
+                pygame.draw.polygon(surf, (60, 150, 60) if i % 2 else (110, 196, 80), lf)
+                pygame.draw.line(surf, (40, 100, 40), lf[0], lf[2], 1)
+            for i in range(5):
+                ph = (t * 0.5 + i * 0.2) % 1.0
+                fx0 = x + math.sin(t * 1.3 + i * 2.3) * r * 1.2
+                fy0 = y - r * 0.2 - ph * r * 1.4
+                blit_disc(surf, fx0, fy0, 2.6, (230, 255, 120), int(220 * (1.0 - ph)))
+        elif th == "desert":
+            for k in range(3):
+                a0 = t * 1.6 + k * math.tau / 3
+                box = pygame.Rect(0, 0, int(r * (2.3 + 0.25 * k)), int(r * (1.15 + 0.12 * k)))
+                box.center = (int(x), int(y + r * 0.55))
+                pygame.draw.arc(surf, (236, 200, 130), box, a0, a0 + 1.4, 3)
+            for i in range(12):
+                a = t * 1.9 + i * math.tau / 12
+                rr = 1.25 + 0.20 * math.sin(i * 1.7 + t)
+                blit_disc(surf, x + math.cos(a) * r * rr, y + r * 0.55 + math.sin(a) * r * rr * 0.5,
+                          2.2, (240, 210, 150), 200)
+
+    def _draw_map_regalia(self, surf, x, y, r, t):
+        """Haritanın tacı: BUZ TACI / YAPRAK TACI / FİRAVUN BAŞLIĞI."""
+        P, fx_, fy_, sx_, sy_ = self._mapper(x, y, r)
+        hf, hr = self.MAP_HEAD.get(self.kind, (0.4, 0.40))
+        th = self.theme
+        if th == "frost":
+            # başın arkasında yelpaze gibi açılan buz sarkıtları
+            for i in range(9):
+                a = math.pi * (0.55 + 0.9 * i / 8.0)          # arka yarım + yanlar
+                ca, sa = math.cos(a), math.sin(a)
+                ln = 0.36 if i % 2 == 0 else 0.24
+                if i == 4:
+                    ln = 0.46
+                base_l = P(hf + ca * hr - sa * 0.07, sa * hr + ca * 0.07)
+                base_r = P(hf + ca * hr + sa * 0.07, sa * hr - ca * 0.07)
+                tip = P(hf + ca * (hr + ln), sa * (hr + ln))
+                pygame.draw.polygon(surf, OUTLINE, [base_l, tip, base_r], 3)
+                pygame.draw.polygon(surf, (214, 240, 255), [base_l, tip, base_r])
+                pygame.draw.line(surf, WHITE, P(hf + ca * hr, sa * hr), tip, 1)
+            add_glow(surf, *P(hf - hr * 0.6, 0.0), r * 0.55, (180, 230, 255), 0.35)
+            cx_, cy_ = P(hf + hr * 0.15, 0.0)
+            pygame.draw.circle(surf, OUTLINE, (int(cx_), int(cy_)), max(3, int(r * 0.09)))
+            pygame.draw.circle(surf, (140, 220, 255), (int(cx_), int(cy_)), max(2, int(r * 0.065)))
+        elif th == "jungle":
+            # başı saran yaprak çelengi + arkada kırmızı orman çiçeği
+            n = 11
+            for i in range(n):
+                a = i * math.tau / n + 0.15
+                ca, sa = math.cos(a), math.sin(a)
+                m = hr + 0.12
+                pts = [P(hf + ca * hr * 0.95, sa * hr * 0.95),
+                       P(hf + ca * m - sa * 0.09, sa * m + ca * 0.09),
+                       P(hf + ca * (hr + 0.27), sa * (hr + 0.27)),
+                       P(hf + ca * m + sa * 0.09, sa * m - ca * 0.09)]
+                pygame.draw.polygon(surf, OUTLINE, pts, 3)
+                pygame.draw.polygon(surf, (70, 160, 64) if i % 2 else (118, 200, 84), pts)
+                pygame.draw.line(surf, (40, 104, 40), pts[0], pts[2], 1)
+            fl = P(hf - hr - 0.06, 0.0)
+            for i in range(5):
+                a = i * math.tau / 5 + t * 0.6
+                blit_disc(surf, fl[0] + math.cos(a) * r * 0.10, fl[1] + math.sin(a) * r * 0.10,
+                          max(2.0, r * 0.08), (236, 70, 90), 255)
+            pygame.draw.circle(surf, (255, 220, 90), (int(fl[0]), int(fl[1])), max(2, int(r * 0.055)))
+        elif th == "desert":
+            # FİRAVUN BAŞLIĞI (nemes): başın arkasını örten çizgili başlık, iki
+            # yandan omuzlara inen çizgili kanatlar, arkada örgü, alında kobra.
+            gold, lapis = (236, 196, 72), (52, 78, 170)
+            for sgn in (-1, 1):
+                a0, a1 = P(hf + 0.04, hr * 0.62 * sgn), P(hf - 0.22, hr * 0.30 * sgn)
+                b0, b1 = P(hf - hr - 0.34, (hr + 0.24) * sgn), P(hf - hr - 0.34, (hr - 0.02) * sgn)
+                flap = [a0, b0, b1, a1]
+                pygame.draw.polygon(surf, OUTLINE, flap, 4)
+                for i in range(4):
+                    k0, k1 = i / 4.0, (i + 1) / 4.0
+                    band = [(a0[0] + (b0[0] - a0[0]) * k0, a0[1] + (b0[1] - a0[1]) * k0),
+                            (a0[0] + (b0[0] - a0[0]) * k1, a0[1] + (b0[1] - a0[1]) * k1),
+                            (a1[0] + (b1[0] - a1[0]) * k1, a1[1] + (b1[1] - a1[1]) * k1),
+                            (a1[0] + (b1[0] - a1[0]) * k0, a1[1] + (b1[1] - a1[1]) * k0)]
+                    pygame.draw.polygon(surf, gold if i % 2 == 0 else lapis, band)
+            tail = [P(hf - hr * 0.9, 0.12), P(hf - hr - 0.55, 0.0), P(hf - hr * 0.9, -0.12)]
+            pygame.draw.polygon(surf, gold, tail)
+            pygame.draw.polygon(surf, OUTLINE, tail, 2)
+            cx_, cy_ = P(hf - hr * 0.30, 0.0)
+            cr = r * hr * 0.80
+            pygame.draw.circle(surf, OUTLINE, (int(cx_), int(cy_)), int(cr + 2))
+            pygame.draw.circle(surf, gold, (int(cx_), int(cy_)), int(cr))
+            for kk in (0.72, 0.44):
+                pygame.draw.circle(surf, lapis, (int(cx_), int(cy_)), max(2, int(cr * kk)), max(2, int(r * 0.045)))
+            ux, uy = P(hf + hr * 0.48, 0.0)
+            add_glow(surf, ux, uy, r * 0.30, (255, 220, 120), 0.45)
+            pygame.draw.circle(surf, OUTLINE, (int(ux), int(uy)), max(3, int(r * 0.09)))
+            pygame.draw.circle(surf, (250, 210, 90), (int(ux), int(uy)), max(2, int(r * 0.065)))
+            pygame.draw.circle(surf, (200, 40, 40), (int(ux), int(uy)), max(1, int(r * 0.028)))
+
     # ---------------- SAVAŞ LORDU ----------------
     def _draw_warlord(self, surf, x, y, r, col, t):
         """Zırhlı savaş lordu: dalgalanan pelerin, omuzluklar, boynuzlu miğfer,
@@ -21762,7 +22746,8 @@ class Boss:
         self._boss_eyes(surf, P, r, t, n=2, spread=0.14, fwd=1.66, sz=0.09,
                         col=(255, 248, 214), glow=(255, 170, 60))
 
-    def draw(self, surf, t):
+    def draw(self, surf, t, hud=True):
+        """hud=False: can çubuğu / ad yazısı yok (harita seçimindeki portre)."""
         scale = ease_out_cubic(self.spawn_t / 0.6) if self.spawn_t < 0.6 else 1.0
         r = self.radius * scale
         x, y = self.x, self.y
@@ -21804,6 +22789,9 @@ class Boss:
                 blit_disc(surf, ex, ey, max(1.0, 3.6 * (1.0 - ph)), (255, 170, 70),
                           int(210 * (1.0 - ph)))
 
+        if self.theme and not hidden:
+            self._draw_map_aura(surf, x, y, r, t)
+
         # --- GÖVDE ---
         # Her patronun kendi çizimi var. GÖLGE PERDESİ açıkken gövde hiç
         # çizilmez; yalnızca havadaki titreşim ve puslu gözler görünür.
@@ -21819,6 +22807,8 @@ class Boss:
                 "dragon": self._draw_dragon,
             }.get(self.kind, self._draw_warlord)
             drawer(surf, x, y, r, col, t)
+            if self.theme:
+                self._draw_map_regalia(surf, x, y, r, t)
 
         if self.telegraph:
             kind, a, b, c, timer, total = self.telegraph
@@ -21970,6 +22960,8 @@ class Boss:
                     fy_ = y + math.sin(ang) * (60 + i * 46) * (0.5 + k)
                     pygame.draw.circle(surf, (255, 150, 90), (int(fx_), int(fy_)), max(2, int(5 * k)), 2)
 
+        if not hud:
+            return
         # HP bar (üst, isim + imza özelliği + zırh + dövüş süresi ile)
         w = 340
         bx, by = x - w / 2, y - r - 30
@@ -22246,7 +23238,8 @@ class WaveManager:
         # v3.34 harita kuralı + yemin: yaratık hızı ve doğum sıklığı çarpanı
         self.enemy_speed_mult = 1.0
         self.spawn_rate_mult = 1.0
-        self.snakes = False         # v3.35: ZÜMRÜT ORMAN'da yılan doğar
+        # v3.36: haritanın yaratık takımı (MAP_ROSTER). "stone" = arena türleri.
+        self.theme = "stone"
         self.doom = False           # v3.35: cehennemsiz haritada ölüm duvarı
         # normal: yavaş/sakin tempo (uzun dalgalar) — kabus: hızlı/yoğun tempo (kısa dalgalar)
         self.wave_duration = 24.0 / self.pace
@@ -22354,7 +23347,6 @@ class WaveManager:
             return hell_pick_kind(self.wave)
         w = self.wave
         weights = {
-            "snake": (8 + min(w, 8)) if self.snakes else 0,
             "red": 10,
             "blue": 6 + min(w, 10),
             "tank": max(0, min(w - 2, 8)),
@@ -22510,7 +23502,9 @@ class WaveManager:
                     e_new = Enemy(None, x, y, wave_mult_fn(self.wave), 1.0,
                                   wave=self.wave, variant=kind, biome="hell")
                 else:
-                    e_new = Enemy(kind, x, y, wave_mult_fn(self.wave), 1.0, wave=self.wave)
+                    # v3.36: Buzul / Orman / Çöl kendi yaratıklarını doğurur
+                    e_new = make_map_enemy(self.theme, kind, x, y, wave_mult_fn(self.wave),
+                                           1.0, wave=self.wave)
                 if frenzy:
                     # KUDURMA laneti: yaratıklar daha hızlı
                     e_new.speed *= 1.0 + CURSE_FRENZY_SPD * frenzy
@@ -22529,7 +23523,8 @@ class WaveManager:
                     enemies.append(Enemy(None, x, y, wave_mult_fn(self.wave) * 1.1, 1.0,
                                          wave=self.wave, variant="h_warden", biome="hell"))
                 else:
-                    el = Enemy("elite", x, y, wave_mult_fn(self.wave) * 1.1, 1.0, wave=self.wave)
+                    el = make_map_enemy(self.theme, "elite", x, y, wave_mult_fn(self.wave) * 1.1,
+                                        1.0, wave=self.wave)
                     if self.doom:
                         self._doomify(el)
                     enemies.append(el)
@@ -23039,20 +24034,22 @@ class RunState:
         self.new_weapons = []
         self.new_books = []
         # --- v3.34 HER KOŞU FARKLI ---
-        self.map_theme = "stone"    # harita (App.start_run rastgele seçer)
+        self.map_theme = "stone"    # harita (App.start_run oyuncunun seçtiğini kurar)
         self.theme_hp = 0.0         # haritanın yaratık canı payı (yalnız arenada)
         self.theme_speed = 1.0
         self.theme_spawn = 1.0
         self.oath = None            # koşu başında edilen YEMİN (bkz. OATHS)
         self.oath_speed = 1.0       # yeminin yaratık hızı çarpanı
         self.oath_spawn = 1.0       # yeminin doğum sıklığı çarpanı
-        # DALGA 0 + GEZGİN TÜCCAR (v3.35, bkz. start_calm). Araçlar ve testler
-        # RunState'i doğrudan kurar: onlarda dalga 0 yoktur.
-        self.calm = False
-        self.calm_t = 0.0
+        # GEZGİN TÜCCAR (v3.36, bkz. spawn_merchant). Koşu boyunca haritanın
+        # bir yerinde durur (haritada GÖSTERİLMEZ); konuşmak isteğe bağlı.
+        # Araçlar ve testler RunState'i doğrudan kurar: onlarda tüccar yoktur.
         self.merchant = None
         self.merchant_open = False
-        self.merchant_oaths = []
+        self.merchant_hand = []     # [(yemin, kademe), ...] — seviye değişince yenilenir
+        self.merchant_hand_lvl = 0
+        self.oath_tier = 0          # edilen yeminin kademesi (0 Yaygın .. 4 Efsanevi)
+        self.oath_period = OATH_BULWARK_EVERY
         self.oath_t = 0.0           # SUR yemini: kalkan dolum sayacı
         self.quests = []            # koşu görevleri (bkz. roll_quests)
         self.snakes_killed = 0      # ZÜMRÜT ORMAN yılanları (başarım)
@@ -23178,114 +24175,118 @@ class RunState:
     def quest_gems_due(self):
         return sum(QUEST_GEMS[q["tier"]] for q in self.quests if q["done"])
 
-    # ---------------- GEZGİN TÜCCAR + DALGA 0 (v3.35) ----------------
-    def start_calm(self):
-        """Koşu DALGA 0 ile başlar: yaratık yok, haritada GEZGİN TÜCCAR
-        bekler. Tüccarla konuşan YEMİN seçer; seçince (ya da süre dolunca)
-        1. dalga başlar."""
+    # ---------------- GEZGİN TÜCCAR (v3.36) ----------------
+    def spawn_merchant(self):
+        """Tüccar koşu başında haritanın bir yerinde belirir ve koşu boyunca
+        orada kalır. Haritada / kenar oklarında gösterilmez: oyuncu bulur."""
         p = self.player
-        self.calm = True
-        self.calm_t = CALM_TIME
-        a = random.uniform(0, math.tau)
-        d = random.uniform(260, 360)
-        x = clamp(p.x + math.cos(a) * d, ARENA_RECT.left + 160, ARENA_RECT.right - 160)
-        y = clamp(p.y + math.sin(a) * d * 0.6, ARENA_RECT.top + 200, ARENA_RECT.bottom - 120)
+        cam = self.cam_rect().inflate(120, 120)
+        x = y = 0.0
+        for _ in range(80):
+            x = random.uniform(ARENA_RECT.left + 220, ARENA_RECT.right - 220)
+            y = random.uniform(ARENA_RECT.top + 240, ARENA_RECT.bottom - 160)
+            if 650 < dist(x, y, p.x, p.y) < 1150 and not cam.collidepoint(x, y):
+                break
         self.merchant = Merchant(x, y)
-        self.merchant_oaths = random.sample([k for k, _i, _c in OATHS], 3)
-        self.waves.announce_timer = 0.0          # "DALGA 1" yazısı dalga başlayınca
+        self.merchant_hand = []
+        self.merchant_hand_lvl = 0
+        self.fx.popup(p.x, p.y - 96, L("m.hint"), MERCHANT_COLOR, 18, life=4.0)
 
-    def end_calm(self):
-        if not self.calm:
-            return
-        self.calm = False
-        self.calm_t = 0.0
-        self.merchant_open = False
-        if self.merchant is not None:
-            self.merchant.leave()
-            self.fx.popup(self.merchant.x, self.merchant.y - 130, L("m.bye"), MERCHANT_COLOR, 18, life=1.8)
-        self.waves.announce_timer = 2.4
-        self.waves.announce_text = L("ui.wave", 1)
-        sfx("wave", 0.6, 0.0)
+    def merchant_luck(self):
+        """Tüccarın kademe şansı: oyuncunun şansı + seviye başına pay.
+        Geç gelen daha iyi yemin bulur (ama yeminin gücünden o kadar geç
+        yararlanır)."""
+        p = self.player
+        return p.eff_luck() + MERCHANT_LUCK_PER_LEVEL * max(0, int(p.level) - 1)
+
+    def merchant_offers(self):
+        """Tüccarın eli: 3 farklı yemin, her biri kendi kademesiyle. El
+        YALNIZCA oyuncu seviye atlayınca yenilenir (aynı seviyede konuşup
+        durmak eli değiştirmez)."""
+        lvl = int(self.player.level)
+        if not self.merchant_hand or self.merchant_hand_lvl != lvl:
+            luck = self.merchant_luck()
+            keys = random.sample([k for k, _i, _c in OATHS], 3)
+            self.merchant_hand = [(k, roll_rarity(luck)) for k in keys]
+            self.merchant_hand_lvl = lvl
+        return list(self.merchant_hand)
 
     def update_merchant(self, dt, input_state, portal_used=False):
         m = self.merchant
         if m is None:
             return
         m.update(dt)
-        if not m.alive:
-            self.merchant = None
-            return
-        if not self.calm:
-            return
-        self.calm_t -= dt
-        if self.calm_t <= 0:
-            self.end_calm()
-            return
         p = self.player
-        if (not portal_used and not m.done and not self.merchant_open and p.alive
+        if (not portal_used and not self.merchant_open and p.alive and self.curse_offers is None
                 and input_state.get("use_pressed") and m.in_range(p)):
+            self.merchant_offers()
             self.merchant_open = True
 
-    def choose_oath(self, key):
-        """Tüccar ekranında seçilen yemin (None: yeminsiz). Dalga az sonra başlar."""
-        if self.oath is None and (self.merchant is None or not self.merchant.done):
-            self.apply_oath(key)
+    def choose_oath(self, key, tier=0):
+        """Tüccar ekranında seçilen yemin (None: vazgeç). Koşuda TEK yemin."""
+        if key is not None and self.oath is None:
+            self.apply_oath(key, tier)
+            if self.merchant is not None:
+                self.merchant.done = True
         self.merchant_open = False
-        if self.merchant is not None:
-            self.merchant.done = True
-        if self.calm:
-            self.calm_t = min(self.calm_t, CALM_AFTER_OATH)
 
     def _scale_max_hp(self, f):
         p = self.player
         p.max_hp = max(30, int(round(p.max_hp * f)))
         p.hp = p.max_hp
 
-    def apply_oath(self, key):
-        """YEMİN: koşu boyunca bir artı, bir eksi (bkz. OATHS)."""
+    def apply_oath(self, key, tier=0):
+        """YEMİN: koşu boyunca bir artı, bir eksi (bkz. OATHS). Kademe
+        (tüccarın şansı çeker) yalnız GÜÇ tarafını büyütür; bedel aynıdır."""
         p = self.player
-        self.oath = key if key in OATH_BY_KEY else None
+        if key not in OATH_BY_KEY:
+            self.oath = None
+            return
+        self.oath = key
+        self.oath_tier = tier = int(clamp(int(tier), 0, RARITY_COUNT - 1))
+        v = oath_values(key, tier)
         if key == "glass":
-            p.run_dmg_mult += 0.30
+            p.run_dmg_mult += v[0]
             self._scale_max_hp(0.75)
         elif key == "gold_fever":
-            p.run_coin_mult += 0.35
+            p.run_coin_mult += v[0]
             p.enemy_hp_curse += 0.10
         elif key == "turtle":
-            p.max_hp += 50
+            p.max_hp += int(v[0])
             p.hp = p.max_hp
-            p.run_armor_bonus += 0.08
+            p.run_armor_bonus += v[1]
             p.run_spd_mult -= 0.07
         elif key == "scholar":
-            p.run_xp_mult += 0.25
+            p.run_xp_mult += v[0]
             p.run_dmg_mult -= 0.12
         elif key == "gambler":
-            p.run_luck_bonus += 0.50
+            p.run_luck_bonus += v[0]
             self._scale_max_hp(0.85)
         elif key == "blood":
-            p.vamp_level += 1.0                 # hasarın %2'si can olur
+            p.vamp_level += v[0] / 0.02         # can çalma = 0.02 x seviye
             p.regen_mult = 0.0
         elif key == "wind":
-            p.run_spd_mult += 0.12
-            p.dash_dist_mult += 0.25
+            p.run_spd_mult += v[0]
+            p.dash_dist_mult += v[1]
             self.oath_speed = 1.10
         elif key == "bulwark":
-            p.shield_charges += 3
+            p.shield_charges += int(v[0])
+            self.oath_period = float(v[1])
             p.run_aspd_mult -= 0.10
             self.oath_t = 0.0
         elif key == "hunter":
-            p.boss_hunter += 1.0                # ~%30 patron/elit hasarı
+            p.boss_hunter += v[0]
             p.run_coin_mult -= 0.10
         elif key == "feast":
-            p.run_xp_mult += 0.25
-            p.run_coin_mult += 0.25
+            p.run_xp_mult += v[0]
+            p.run_coin_mult += v[0]
             self.oath_spawn = 1.15
         elif key == "hoard":
-            self.gold_wallet += 350
+            self.gold_wallet += int(v[0])
             p.run_xp_mult -= 0.10
         elif key == "hawkeye":
-            p.run_crit_bonus += 0.12
-            p.run_critdmg_bonus += 0.25
+            p.run_crit_bonus += v[0]
+            p.run_critdmg_bonus += v[1]
             p.run_aspd_mult -= 0.10
         self._apply_wave_mods()
 
@@ -23294,7 +24295,7 @@ class RunState:
         arena = self.biome != "hell"
         self.waves.enemy_speed_mult = (self.theme_speed if arena else 1.0) * self.oath_speed
         self.waves.spawn_rate_mult = (self.theme_spawn if arena else 1.0) * self.oath_spawn
-        self.waves.snakes = arena and self.map_theme == "jungle"
+        self.waves.theme = self.map_theme if arena else "stone"
         self.waves.doom = self.map_theme != "stone"
 
     # ---------------- KAMERA ----------------
@@ -25094,7 +26095,7 @@ class RunState:
                          life=0.4, r=3)
         p = self.player
         self.kills += 1
-        if getattr(e, "kind", "") == "snake":
+        if getattr(e, "variant", None) == "j_snake":
             self.snakes_killed += 1
         self.combo.add_kill()
         # KAN KİTABI: her öldürmede bir miktar can geri kazanılır. Sabit pay
@@ -25188,9 +26189,7 @@ class RunState:
             return
 
         p = self.player
-        # DALGA 0 (hazırlık) koşu süresine yazılmaz: skor üretilmez.
-        if not self.calm:
-            self.run_time += dt
+        self.run_time += dt
         # KOŞU GÖREVLERİ: yarım saniyede bir bakılır.
         self.quest_t -= dt
         if self.quest_t <= 0:
@@ -25204,7 +26203,7 @@ class RunState:
         # SUR yemini (v3.34): 40 sn'de bir kalkan dolar (en çok 3).
         if self.oath == "bulwark":
             self.oath_t += dt
-            if self.oath_t >= OATH_BULWARK_EVERY:
+            if self.oath_t >= self.oath_period:
                 self.oath_t = 0.0
                 if self.player.shield_charges < 3:
                     self.player.shield_charges += 1
@@ -25311,7 +26310,8 @@ class RunState:
                 by = cam.top + 110
                 bx = clamp(bx, ARENA_RECT.left + 90, ARENA_RECT.right - 90)
                 by = clamp(by, ARENA_RECT.top + 90, ARENA_RECT.bottom - 90)
-                self.bosses.append(Boss(kind, bx, by, hp_mult, 1.0, wave, hellish=hell))
+                self.bosses.append(Boss(kind, bx, by, hp_mult, 1.0, wave, hellish=hell,
+                                        theme=None if hell else self.map_theme))
             # Patron canı oyuncunun gücüne göre ölçeklenir: dövüş, oyuncu ne
             # kadar güçlenirse güçlensin benzer uzunlukta sürsün.
             scale_bosses_to_player(self.bosses, p)
@@ -25520,11 +26520,8 @@ class RunState:
             self.fx.ring(p.x, p.y, GOLD, n=30, speed=320, life=0.8, r=4)
             sfx("levelup", 1.0, 0.0)
 
-        if self.calm:
-            wave_changed = False        # DALGA 0: yaratık doğmaz, dalga saymaz
-        else:
-            wave_changed = self.waves.update(0.0 if frozen else dt, self.enemies, self.wave_hp_mult,
-                                             self.waves.boss_active, total_score=self.score)
+        wave_changed = self.waves.update(0.0 if frozen else dt, self.enemies, self.wave_hp_mult,
+                                         self.waves.boss_active, total_score=self.score)
         if wave_changed:
             sfx("wave", 0.6, 0.0)
             if self.waves.wave % 5 == 0 and self.ach:
@@ -25556,7 +26553,7 @@ class RunState:
 
         # --- v3.30 LANETLİ SANDIK ---
         self.update_cursed(dt, input_state, portal_used)
-        # --- v3.35 GEZGİN TÜCCAR (dalga 0) ---
+        # --- v3.36 GEZGİN TÜCCAR (koşu boyunca haritada) ---
         self.update_merchant(dt, input_state, portal_used)
 
         self.combo.update(dt)
@@ -25625,13 +26622,16 @@ class RunState:
                     e.necro_cd = NECRO_CD
                     self._necro_raise(e)
 
-    def _make_enemy(self, kind, x, y):
-        """Şu anki dalga ve haritaya göre tek bir yaratık üretir."""
+    def _make_enemy(self, kind, x, y, themed=True):
+        """Şu anki dalga ve haritaya göre tek bir yaratık üretir.
+        themed: arena türü haritanın kendi yaratığına çevrilsin mi (v3.36)."""
         w = int(self.waves.wave)
         x = clamp(x, ARENA_RECT.left + 30, ARENA_RECT.right - 30)
         y = clamp(y, ARENA_RECT.top + 30, ARENA_RECT.bottom - 30)
         if kind in HELL_ENEMIES:
             e = Enemy(None, x, y, self.wave_hp_mult(w), 1.0, wave=w, variant=kind, biome="hell")
+        elif themed and self.biome != "hell" and map_variant(self.waves.theme, kind):
+            e = make_map_enemy(self.waves.theme, kind, x, y, self.wave_hp_mult(w), 1.0, wave=w)
         else:
             e = Enemy(kind, x, y, self.wave_hp_mult(w), 1.0, wave=w, biome=self.biome)
         fz = int(self.curses.get("frenzy", 0))
@@ -25710,7 +26710,7 @@ class RunState:
         col = ENEMY_COLORS["necro"]
         for c in near:
             self.corpses.remove(c)
-            sk = self._make_enemy("red", c[0], c[1])
+            sk = self._make_enemy("red", c[0], c[1], themed=False)
             sk.raised = True
             sk.color = RAISED_COLOR
             sk.red_intensity = 0.0
@@ -27058,8 +28058,57 @@ MAP_RULES = {
 # koşu boyunca sürer: bir ARTI, bir EKSİ. Kötü başlangıç = R ile yeniden.
 # ---------------------------------------------------------------------
 OATH_BULWARK_EVERY = 40.0            # SUR yemini: kalkan dolum aralığı (sn)
-CALM_TIME = 30.0                     # DALGA 0: tüccar en çok bu kadar bekler (sn)
-CALM_AFTER_OATH = 2.5                # yemin seçilince 1. dalgaya kalan süre
+MERCHANT_LUCK_PER_LEVEL = 0.08       # tüccarın kademe şansı: seviye başına +%8
+# Yeminin GÜÇ tarafı kademeyle büyür (Yaygın .. Efsanevi); bedel sabittir.
+OATH_TIER_MULT = (1.0, 1.25, 1.5, 1.85, 2.3)
+
+
+def oath_values(key, tier=0):
+    """Yeminin güç değerleri bu kademede: (değer1, değer2?)."""
+    m = OATH_TIER_MULT[int(clamp(int(tier), 0, len(OATH_TIER_MULT) - 1))]
+    t = int(clamp(int(tier), 0, len(OATH_TIER_MULT) - 1))
+    if key == "glass":
+        return (0.30 * m,)
+    if key == "gold_fever":
+        return (0.35 * m,)
+    if key == "turtle":
+        return (float(int(round(50 * m))), 0.08 * m)
+    if key == "scholar":
+        return (0.25 * m,)
+    if key == "gambler":
+        return (0.50 * m,)
+    if key == "blood":
+        return (0.02 * m,)
+    if key == "wind":
+        return (0.12 * m, 0.25 * m)
+    if key == "bulwark":
+        return (float(3 + t), float(int(round(OATH_BULWARK_EVERY / m))))
+    if key == "hunter":
+        return (1.0 * m,)
+    if key == "feast":
+        return (0.25 * m,)
+    if key == "hoard":
+        return (float(int(round(350 * m / 10.0)) * 10),)
+    if key == "hawkeye":
+        return (0.12 * m, 0.25 * m)
+    return ()
+
+
+def oath_up_text(key, tier=0):
+    """Yemin kartının GÜÇ satırı, kademenin gerçek sayılarıyla."""
+    v = oath_values(key, tier)
+    pct = lambda x: "+" + fmt_pct1(x)
+    if key == "turtle":
+        args = ("+%d" % int(v[0]), pct(v[1]))
+    elif key == "bulwark":
+        args = ("+%d" % int(v[0]), "%d" % int(v[1]))
+    elif key == "hoard":
+        args = (fmt_num(int(v[0])),)
+    elif key == "hunter":
+        args = (pct(stack_bonus(0.385, v[0], soft=3.5)),)
+    else:
+        args = tuple(pct(x) for x in v)
+    return L("oath.%s.up" % key, *args)
 RESTART_HOLD = 1.0                   # oyunda R'yi bu kadar basılı tut = yeni koşu
 OATHS = (
     ("glass", "sword", (255, 110, 110)),
@@ -27889,17 +28938,6 @@ def draw_minimap(surf, run, t, big=False):
         pygame.draw.circle(surf, TORNADO_COLOR, (int(px), int(py)), max(3, int(k * 5)),
                            max(1, int(k)))
 
-    # GEZGİN TÜCCAR (v3.35)
-    _mer = getattr(run, "merchant", None)
-    if _mer is not None and getattr(run, "calm", False):
-        px, py = mp(_mer.x, _mer.y)
-        add_glow(surf, px, py, 14 * k * (1.6 if big else 1.0), MERCHANT_COLOR, 0.45)
-        pygame.draw.circle(surf, MERCHANT_COLOR, (int(px), int(py)), max(3, int(k * 4)))
-        pygame.draw.circle(surf, OUTLINE, (int(px), int(py)), max(3, int(k * 4)), 1)
-        if big:
-            draw_text(surf, L("m.map"), (px, py - k * 16), max(10, int(8 * k)), MERCHANT_COLOR,
-                      bold=True, center=True)
-
     # LANETLİ SANDIK (v3.30)
     # (v3.31: yalnızca BULUNDUKTAN sonra; M haritasında belirgin parlar)
     _csh = getattr(run, "cursed_shrine", None)
@@ -27991,10 +29029,6 @@ def draw_offscreen_markers(surf, run, cam, t):
     _csh = getattr(run, "cursed_shrine", None)
     if _csh is not None and not _csh.used and getattr(_csh, "discovered", False):
         marks.append((_csh.x, _csh.y, CURSE_COLOR, "skull"))
-    # v3.35 GEZGİN TÜCCAR: dalga 0 boyunca ekran dışındaysa ok göster
-    _mer = getattr(run, "merchant", None)
-    if _mer is not None and getattr(run, "calm", False) and not _mer.done:
-        marks.append((_mer.x, _mer.y, MERCHANT_COLOR, "coin"))
     # HAZİNE GOBLİNİ (v3.31): kaçan ganimet ekran dışındaysa ok göster
     for e in run.enemies:
         if e.alive and e.kind == "goblin":
@@ -28742,10 +29776,18 @@ def player_stat_groups(p, run):
         kazanc.append((L("st.frenzy"), f"{p.frenzy_stacks}", (255, 200, 80)))
     if p.soul_stacks:
         kazanc.append((L("st.souls"), f"{p.soul_stacks}", (200, 120, 255)))
-    # v3.34: koşunun yemini ve doldurulan sunaklar
+    # v3.34: koşunun yemini (v3.36: kademesiyle, kademe renginde)
     _oath = getattr(run, "oath", None) if run is not None else None
     if _oath in OATH_BY_KEY:
-        kazanc.append((L("st.oath"), L("oath.%s.name" % _oath), OATH_BY_KEY[_oath][2]))
+        _tier = int(getattr(run, "oath_tier", 0) or 0)
+        _nm, _col = L("oath.%s.name" % _oath), OATH_BY_KEY[_oath][2]
+        if _tier > 0:
+            _col = rarity_color(_tier)
+            _full = "%s · %s" % (_nm, rarity_name(_tier))
+            # dar panelde sığmazsa yalnız ad kalır (renk kademeyi zaten söyler)
+            if text_width(_full, 13, True) + text_width(L("st.oath"), 13) + 40 <= STATS_PANEL_W:
+                _nm = _full
+        kazanc.append((L("st.oath"), _nm, _col))
 
     return [(L("st.g_life"), hayat), (L("st.g_dmg"), hasar),
             (L("st.g_move"), hareket), (L("st.g_gain"), kazanc)]
@@ -28884,16 +29926,7 @@ def draw_hud(surf, run, t):
     draw_text(surf, fmt_time(run.run_time), (VIRTUAL_W / 2, 18), 26, TEXT, bold=True, center=True)
 
     w = run.waves
-    if getattr(run, "calm", False):
-        # DALGA 0 (v3.35): hazırlık — tüccarla konuş, süre dolunca 1. dalga
-        draw_text(surf, L("m.calm_title"), (VIRTUAL_W / 2, 40), 14, MERCHANT_COLOR, bold=True, center=True)
-        k = clamp(run.calm_t / CALM_TIME, 0.0, 1.0)
-        gbar = pygame.Rect(VIRTUAL_W / 2 - 120, 52, 240, 7)
-        draw_bar(surf, gbar, k, MERCHANT_COLOR, bg=(16, 17, 26), border=(52, 56, 76), radius=4)
-        sub = (L("m.calm_go") if (run.merchant is None or run.merchant.done)
-               else L("m.calm_sub", key_label_short("use"), int(math.ceil(run.calm_t))))
-        draw_text(surf, sub, (VIRTUAL_W / 2, 64), 11, (240, 214, 170), center=True, shadow=False)
-    elif run.bosses:
+    if run.bosses:
         n = len([b for b in run.bosses if b.alive])
         label = "PATRON DALGASI" if n <= 1 else f"PATRON DALGASI  ×{n}"
         draw_text(surf, label, (VIRTUAL_W / 2, 41), 15, RED, bold=True, center=True)
@@ -29099,7 +30132,7 @@ def draw_run(surf, run, t, aim_pos=None, shake=(0, 0)):
     _csh = getattr(run, "cursed_shrine", None)
     if _csh is not None and cam.inflate(400, 400).collidepoint(_csh.x, _csh.y):
         _csh.draw(world, t)
-    # v3.35 GEZGİN TÜCCAR (dalga 0)
+    # v3.36 GEZGİN TÜCCAR (haritada işaretlenmez; oyuncu bulur)
     _mer = getattr(run, "merchant", None)
     if _mer is not None and cam.inflate(400, 400).collidepoint(_mer.x, _mer.y):
         _mer.draw(world, t)
@@ -29223,7 +30256,7 @@ def draw_run(surf, run, t, aim_pos=None, shake=(0, 0)):
     run.fx.draw(world)
     if _csh is not None and run.player.alive:
         _csh.draw_prompt(world, t, run.player)
-    if _mer is not None and run.player.alive and getattr(run, "calm", False):
+    if _mer is not None and run.player.alive:
         _mer.draw_prompt(world, t, run.player)
     run.fx.draw_texts(world)          # hasar sayıları da dünya koordinatında
     world.set_clip(prev_clip)
@@ -31121,35 +32154,471 @@ def draw_quest_hud(surf, run, x, y, t):
 
 
 # =====================================================================
-# v3.35 HARİTA SEÇİMİ (OYNA'ya basınca)
+# v3.36 HARİTA SEÇİMİ — manzara kartları + yakınlaşan ayrıntı penceresi
+# ---------------------------------------------------------------------
+# OYNA'ya basınca dört büyük kart çıkar; her kartın üstünde o haritanın
+# elle çizilmiş manzarası ve içinde dolaşan kendi yaratıkları var. Karta
+# tıklayınca kart büyüyüp ayrıntı penceresine dönüşür: yaratıklar, patronlar,
+# açılan silahlar (ilerlemesiyle), kurallar ve BAŞLA düğmesi.
 # =====================================================================
-_MAP_THUMBS = {}
+_MAP_SCENES = {}
+MS_CARD_SCENE = (272, 236)       # kart manzarasının boyu
+MS_BIG_SCENE = (440, 236)        # ayrıntı penceresindeki manzara
+MS_ZOOM_TIME = 0.26              # kartın büyüme / küçülme süresi (sn)
+MS_BOSS_PORTRAIT = 112           # ayrıntı penceresindeki patron portresi (px)
+# Kartlarda dolaşan üç yaratık (arena türü; haritada o haritanın karşılığı çizilir)
+MS_SCENE_KINDS = ("red", "yellow", "tank")
+MS_BEST_KINDS = ("red", "blue", "yellow", "tank", "sprinter", "brute",
+                 "elite", "bomber", "healer", "wizard", "stinger")
 
 
-def map_thumb(theme, w=264, h=118):
-    """Haritanın zemininden kırpılmış küçük önizleme (önbellekli).
+def _vgrad(surf, rect, top, bot):
+    """Dikey renk geçişi (satır satır; yalnız önbelleğe çizerken kullanılır)."""
+    x, y, w, h = [int(v) for v in rect]
+    for i in range(max(1, h)):
+        pygame.draw.line(surf, mix_col(top, bot, i / max(1, h - 1)), (x, y + i), (x + w - 1, y + i))
 
-    Zemin ilk kez kurulurken ~0,3 sn sürer; ekran her karede EN ÇOK BİR
-    önizleme hazırlar (bkz. App.update_map_select), takılma hissedilmez."""
-    img = _MAP_THUMBS.get(theme)
-    if img is not None:
-        return img
-    key = MAP_FLOOR_KEY.get(theme, "arena")
-    fl = floor_surface(key)
-    cw, ch = 700, 312
-    r = pygame.Rect(0, 0, cw, ch)
-    r.center = (fl.get_width() // 2 + 380, fl.get_height() // 2 - 140)
-    r.clamp_ip(fl.get_rect())
-    img = pygame.transform.smoothscale(fl.subsurface(r).copy(), (w, h))
-    _MAP_THUMBS[theme] = img
+
+def _alpha_poly(surf, pts, col, a):
+    """Saydam çokgen (sis, ışık huzmesi, kuzey ışığı)."""
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    x0, y0 = int(min(xs)) - 1, int(min(ys)) - 1
+    w, h = int(max(xs)) - x0 + 2, int(max(ys)) - y0 + 2
+    if w <= 0 or h <= 0:
+        return
+    lay = pygame.Surface((w, h), pygame.SRCALPHA)
+    pygame.draw.polygon(lay, (col[0], col[1], col[2], int(a)), [(px - x0, py - y0) for px, py in pts])
+    surf.blit(lay, (x0, y0))
+
+
+def _ridge(w, base, amp, n, rng, sharp=True):
+    """Dağ / tepe sırtı noktaları (soldan sağa)."""
+    pts = []
+    for i in range(n + 1):
+        x = w * i / n
+        if sharp:
+            y = base - amp * (0.35 + 0.65 * rng.random()) * (1 if i % 2 else 0.45)
+        else:
+            y = base - amp * (0.5 + 0.5 * math.sin(i * 1.3 + rng.random()))
+        pts.append((x, y))
+    return pts
+
+
+def _pine(surf, x, y, hgt, col, snow=None):
+    """Kat kat çam ağacı; snow verilirse dalların üstü karlı."""
+    trunk = pygame.Rect(0, 0, max(2, int(hgt * 0.10)), int(hgt * 0.18))
+    trunk.midtop = (int(x), int(y - hgt * 0.18))
+    pygame.draw.rect(surf, (52, 36, 30), trunk)
+    for k in range(3):
+        top = y - hgt * (1.0 - k * 0.24)
+        half = hgt * (0.20 + k * 0.08)
+        bot = y - hgt * (0.46 - k * 0.20)
+        tri = [(x, top), (x - half, bot), (x + half, bot)]
+        pygame.draw.polygon(surf, col, tri)
+        if snow:
+            pygame.draw.polygon(surf, snow, [(x, top), (x - half * 0.45, top + (bot - top) * 0.45),
+                                             (x + half * 0.45, top + (bot - top) * 0.45)])
+
+
+def _scene_stone(s, w, h, rng):
+    hz = int(h * 0.52)
+    _vgrad(s, (0, 0, w, hz), (20, 22, 52), (214, 120, 84))
+    for _ in range(26):
+        s.set_at((rng.randrange(w), rng.randrange(max(1, int(hz * 0.55)))), (210, 210, 236))
+    add_glow(s, w * 0.5, hz, w * 0.40, (255, 160, 90), 0.40)
+    # kolezyum duvarı: iki kat kemer
+    wt, wb = int(h * 0.20), hz + int(h * 0.05)
+    pygame.draw.rect(s, (74, 66, 86), (0, wt, w, wb - wt))
+    pygame.draw.rect(s, (104, 94, 118), (0, wt - 4, w, 6))
+    for (y0, y1, n, lit) in ((wt + h * 0.035, wt + h * 0.135, 10, (60, 44, 52)),
+                             (wt + h * 0.16, wb - h * 0.015, 8, (150, 90, 64))):
+        aw = w / n
+        for i in range(n):
+            ax = i * aw + aw * 0.2
+            r_ = pygame.Rect(int(ax), int(y0 + (y1 - y0) * 0.30), int(aw * 0.6), int((y1 - y0) * 0.70))
+            pygame.draw.rect(s, lit, r_)
+            pygame.draw.ellipse(s, lit, (r_.x, int(y0), r_.w, int((y1 - y0) * 0.62)))
+        pygame.draw.line(s, (96, 86, 108), (0, int(y1) + 2), (w, int(y1) + 2), 2)
+    # sancaklar
+    for i in range(4):
+        bx = w * (0.16 + i * 0.23)
+        ban = [(bx - 7, wt + 2), (bx + 7, wt + 2), (bx + 7, wt + h * 0.13), (bx, wt + h * 0.11),
+               (bx - 7, wt + h * 0.13)]
+        pygame.draw.polygon(s, (170, 40, 46) if i % 2 == 0 else (60, 70, 160), ban)
+        pygame.draw.polygon(s, OUTLINE, ban, 1)
+    # zemin: perspektifli taş döşeme
+    _vgrad(s, (0, wb, w, h - wb), (104, 98, 118), (58, 56, 72))
+    vx, vy = w * 0.5, wb - h * 0.55
+    for i in range(-9, 10):
+        xb = w * 0.5 + i * w * 0.12
+        k_ = (wb - vy) / (h - vy)
+        xt = vx + (xb - vx) * k_
+        pygame.draw.line(s, (78, 74, 92), (xt, wb), (xb, h), 1)
+    yy, step = wb + 4, 5.0
+    while yy < h:
+        pygame.draw.line(s, (78, 74, 92), (0, int(yy)), (w, int(yy)), 1)
+        yy += step
+        step *= 1.32
+    er = pygame.Rect(0, 0, int(w * 0.50), int(h * 0.16))
+    er.center = (int(w * 0.5), int(wb + (h - wb) * 0.55))
+    pygame.draw.ellipse(s, (140, 128, 160), er, 3)
+    pygame.draw.ellipse(s, (120, 110, 140), er.inflate(-int(w * 0.16), -int(h * 0.05)), 2)
+    # yan sütunlar
+    for px in (int(w * 0.05), int(w * 0.95)):
+        col_r = pygame.Rect(0, 0, int(w * 0.075), int(h * 0.62))
+        col_r.midbottom = (px, int(h * 0.96))
+        pygame.draw.rect(s, OUTLINE, col_r.inflate(4, 4))
+        pygame.draw.rect(s, (128, 120, 146), col_r)
+        pygame.draw.rect(s, (156, 148, 176), (col_r.x + 3, col_r.y, 4, col_r.h))
+        cap = pygame.Rect(0, 0, col_r.w + 12, 8)
+        cap.midbottom = (px, col_r.y + 2)
+        pygame.draw.rect(s, (150, 140, 170), cap)
+        bowl = pygame.Rect(0, 0, col_r.w + 6, 9)
+        bowl.midbottom = (px, cap.y + 2)
+        pygame.draw.rect(s, (70, 50, 40), bowl, border_radius=3)
+
+
+def _scene_frost(s, w, h, rng):
+    hz = int(h * 0.60)
+    _vgrad(s, (0, 0, w, hz), (8, 14, 40), (64, 112, 156))
+    for _ in range(40):
+        s.set_at((rng.randrange(w), rng.randrange(max(1, int(hz * 0.7)))), (220, 236, 255))
+    # kuzey ışığı
+    for band, (col, a, base, amp) in enumerate((((90, 255, 180), 60, 0.20, 0.07),
+                                                ((120, 200, 255), 48, 0.28, 0.06))):
+        top, bot = [], []
+        for i in range(25):
+            x = w * i / 24
+            yc = h * base + math.sin(i * 0.55 + band * 1.7) * h * amp
+            top.append((x, yc - h * 0.05))
+            bot.append((x, yc + h * 0.04 + math.sin(i * 1.3) * h * 0.012))
+        _alpha_poly(s, top + bot[::-1], col, a)
+    # uzak ve yakın dağlar (karlı tepeler)
+    for (base, amp, n, col, cap) in ((hz + 2, h * 0.30, 9, (78, 104, 148), (226, 236, 250)),
+                                      (hz + 6, h * 0.20, 7, (52, 72, 112), (206, 222, 244))):
+        pts = _ridge(w, base, amp, n, rng)
+        pygame.draw.polygon(s, col, [(0, base)] + pts + [(w, base)])
+        for i in range(1, len(pts) - 1, 2):
+            px_, py_ = pts[i]
+            lx, ly = pts[i - 1]
+            rx, ry = pts[i + 1]
+            k = 0.32
+            pygame.draw.polygon(s, cap, [(px_, py_), (px_ + (lx - px_) * k, py_ + (ly - py_) * k),
+                                         (px_ + (rx - px_) * k, py_ + (ry - py_) * k)])
+    # kar ovası + donmuş göl
+    _vgrad(s, (0, hz, w, h - hz), (214, 230, 246), (160, 188, 222))
+    lake = pygame.Rect(0, 0, int(w * 0.62), int(h * 0.16))
+    lake.center = (int(w * 0.52), int(hz + (h - hz) * 0.42))
+    pygame.draw.ellipse(s, (120, 186, 226), lake)
+    pygame.draw.ellipse(s, (170, 222, 248), lake.inflate(-int(w * 0.10), -int(h * 0.05)))
+    for _ in range(5):
+        cx_ = lake.x + rng.randrange(lake.w)
+        cy_ = lake.y + lake.h // 2 + rng.randrange(-lake.h // 4, lake.h // 4 + 1)
+        pygame.draw.line(s, (236, 248, 255), (cx_, cy_), (cx_ + rng.randrange(-16, 17), cy_ + rng.randrange(-4, 5)), 1)
+    # çamlar
+    for i in range(7):
+        side = i % 2
+        x = (w * (0.02 + 0.07 * i) if side == 0 else w * (0.98 - 0.07 * i))
+        _pine(s, x, hz + h * (0.06 + 0.03 * (i % 3)), h * (0.26 + 0.05 * (i % 2)), (30, 70, 64), (236, 244, 252))
+
+
+def _scene_jungle(s, w, h, rng):
+    _vgrad(s, (0, 0, w, h), (22, 54, 40), (8, 24, 16))
+    # ışık huzmeleri
+    for i in range(3):
+        x0 = w * (0.25 + 0.25 * i)
+        _alpha_poly(s, [(x0, 0), (x0 + w * 0.06, 0), (x0 + w * 0.20, h), (x0 + w * 0.08, h)], (220, 255, 170), 22)
+    # uzaktaki tapınak (basamaklı)
+    base_y = h * 0.62
+    for k in range(5):
+        tw, th_ = w * (0.42 - k * 0.07), h * 0.065
+        r_ = pygame.Rect(0, 0, int(tw), int(th_))
+        r_.midbottom = (int(w * 0.5), int(base_y - k * th_))
+        pygame.draw.rect(s, (64, 86, 70) if k % 2 == 0 else (74, 98, 78), r_)
+        pygame.draw.line(s, (50, 120, 60), r_.topleft, r_.topright, 2)
+    door = pygame.Rect(0, 0, int(w * 0.06), int(h * 0.09))
+    door.midbottom = (int(w * 0.5), int(base_y))
+    pygame.draw.rect(s, (16, 22, 18), door)
+    # sis
+    _alpha_poly(s, [(0, h * 0.50), (w, h * 0.46), (w, h * 0.70), (0, h * 0.72)], (150, 190, 160), 46)
+    # arka ağaçlar
+    for i in range(6):
+        x = w * (0.05 + 0.18 * i) + rng.randrange(-8, 9)
+        tw_ = max(4, int(w * 0.03))
+        pygame.draw.rect(s, (40, 30, 24), (int(x), 0, tw_, int(h * 0.74)))
+        for k in range(4):
+            circle_aa(s, x + tw_ / 2 + rng.randrange(-22, 23), rng.randrange(0, int(h * 0.20)),
+                      w * (0.07 + 0.03 * rng.random()), (26, 76 + rng.randrange(30), 40))
+    # zemin
+    _vgrad(s, (0, int(h * 0.70), w, int(h * 0.30) + 1), (30, 70, 36), (16, 40, 22))
+    # eğreltiotları
+    for i in range(9):
+        fx0 = w * (0.04 + 0.12 * i) + rng.randrange(-6, 7)
+        fy0 = h * (0.86 + 0.08 * rng.random())
+        for k in range(5):
+            a = math.pi * (1.15 + 0.175 * k)
+            ln = h * (0.10 + 0.03 * rng.random())
+            tip = (fx0 + math.cos(a) * ln, fy0 + math.sin(a) * ln)
+            pygame.draw.line(s, (60, 150, 70), (fx0, fy0), tip, 3)
+            pygame.draw.line(s, (90, 190, 90), (fx0, fy0), tip, 1)
+    # ön ağaçlar ve sarmaşıklar
+    for x in (int(w * 0.03), int(w * 0.93)):
+        pygame.draw.rect(s, (54, 38, 28), (x - 8, 0, 18, h))
+        pygame.draw.line(s, (78, 56, 40), (x - 4, 0), (x - 4, h), 2)
+    for i in range(5):
+        x0 = w * (0.12 + 0.19 * i)
+        ln = h * (0.25 + 0.20 * rng.random())
+        pts = [(x0 + math.sin(k * 0.8 + i) * 5, ln * k / 8) for k in range(9)]
+        pygame.draw.lines(s, (40, 110, 50), False, pts, 2)
+        for k in range(2, 9, 2):
+            px_, py_ = pts[k]
+            pygame.draw.ellipse(s, (70, 160, 70), (int(px_ - 4), int(py_ - 2), 8, 5))
+
+
+def _scene_desert(s, w, h, rng):
+    hz = int(h * 0.58)
+    _vgrad(s, (0, 0, w, hz), (62, 28, 72), (252, 156, 84))
+    sx_, sy_ = w * 0.72, hz - h * 0.14
+    add_glow(s, sx_, sy_, h * 0.45, (255, 170, 90), 0.55)
+    circle_aa(s, sx_, sy_, h * 0.11, (255, 214, 140))
+    # piramitler
+    for (px_, pw, ph) in ((0.30, 0.34, 0.26), (0.52, 0.22, 0.17), (0.12, 0.16, 0.11)):
+        cx_ = w * px_
+        top = (cx_, hz - h * ph)
+        lft, rgt = (cx_ - w * pw / 2, hz + 2), (cx_ + w * pw / 2, hz + 2)
+        mid = (cx_ + w * pw * 0.12, hz + 2)
+        pygame.draw.polygon(s, (226, 162, 96), [top, lft, mid])
+        pygame.draw.polygon(s, (164, 102, 64), [top, mid, rgt])
+        for k in range(1, 5):
+            yk = top[1] + (hz - top[1]) * k / 5
+            hw = (w * pw / 2) * k / 5
+            pygame.draw.line(s, (150, 96, 58), (cx_ - hw, yk), (cx_ + hw, yk), 1)
+    # kum tepeleri (üç kat)
+    for i, col in enumerate(((206, 118, 66), (224, 146, 80), (238, 176, 104))):
+        base = hz + (h - hz) * (0.10 + 0.32 * i)
+        pts = [(0, h)]
+        for k in range(31):
+            x = w * k / 30
+            pts.append((x, base + math.sin(k * 0.42 + i * 1.9) * h * 0.035 + math.sin(k * 0.17 + i) * h * 0.02))
+        pts.append((w, h))
+        pygame.draw.polygon(s, col, pts)
+        pygame.draw.lines(s, lighten(col, 0.18), False, pts[1:-1], 2)
+    # kaktüsler
+    for (cx_, cy_, ch) in ((0.84, 0.80, 0.22), (0.08, 0.86, 0.16)):
+        x, y, hh = w * cx_, h * cy_, h * ch
+        pygame.draw.rect(s, (52, 120, 64), (int(x - 5), int(y - hh), 10, int(hh)), border_radius=5)
+        pygame.draw.rect(s, (52, 120, 64), (int(x - 15), int(y - hh * 0.70), 8, int(hh * 0.34)), border_radius=4)
+        pygame.draw.rect(s, (52, 120, 64), (int(x - 15), int(y - hh * 0.42), 12, 7), border_radius=3)
+        pygame.draw.rect(s, (52, 120, 64), (int(x + 7), int(y - hh * 0.82), 8, int(hh * 0.30)), border_radius=4)
+        pygame.draw.rect(s, (52, 120, 64), (int(x + 3), int(y - hh * 0.58), 12, 7), border_radius=3)
+
+
+_SCENE_PAINTERS = {"stone": _scene_stone, "frost": _scene_frost,
+                   "jungle": _scene_jungle, "desert": _scene_desert}
+
+
+def map_scene(theme, w, h):
+    """Haritanın elle çizilmiş manzarası (önbellekli, durağan katman)."""
+    key = (theme, int(w), int(h))
+    img = _MAP_SCENES.get(key)
+    if img is None:
+        img = pygame.Surface((int(w), int(h)))
+        _SCENE_PAINTERS.get(theme, _scene_stone)(img, int(w), int(h), random.Random(sum(map(ord, theme)) * 131))
+        _MAP_SCENES[key] = img
     return img
+
+
+_MS_ENEMIES = {}
+
+
+def ms_creature(theme, kind, slot=0):
+    """Ekranda gösterilen (oyuna girmeyen) bir yaratık örneği — önbellekli."""
+    key = (theme, kind, slot)
+    e = _MS_ENEMIES.get(key)
+    if e is None:
+        mv = map_variant(theme, kind) if theme != "stone" else None
+        e = (Enemy(None, 0, 0, 1.0, 1.0, wave=5, variant=mv) if mv
+             else Enemy(kind, 0, 0, 1.0, 1.0, wave=5))
+        e.spawn_t = 9.0
+        e.shoot_cd = 2.0
+        e.walk = (slot * 1.7 + len(kind)) * 0.9
+        _MS_ENEMIES[key] = e
+    return e
+
+
+def ms_creature_name(theme, kind):
+    """Yaratığın adı GÜNCEL dilde (önbellekteki örneğin adı eski dilde kalabilir)."""
+    mv = map_variant(theme, kind) if theme != "stone" else None
+    if mv:
+        return LX("en." + mv, MAP_ENEMIES[mv]["name"])
+    return LX("en." + kind, kind)
+
+
+def ms_draw_creature(surf, theme, kind, x, y, r, t, face=(1.0, 0.2), slot=0, walk_speed=3.0):
+    """Gösterim yaratığını çizer. Oyundaki gövde önbelleğinden geçer
+    (Enemy.draw): görünüş değişmedikçe yeniden çizilmez, ekran akıcı kalır."""
+    e = ms_creature(theme, kind, slot)
+    e.face_x, e.face_y = face
+    e.walk = t * walk_speed + slot * 1.3
+    e.hit_flash = 0.0
+    e.x, e.y, e.radius = x, y, r
+    e.draw(surf, t)
+
+
+def draw_map_scene(surf, rect, theme, t, creatures=True):
+    """Manzara + canlı katman (kar / ateşböceği / kum / meşale) + dolaşan yaratıklar."""
+    rect = pygame.Rect(rect)
+    img = _MAP_SCENES.get((theme, rect.w, rect.h))
+    if img is None:
+        pygame.draw.rect(surf, (24, 28, 42), rect)
+        draw_text(surf, "...", rect.center, 18, TEXT_DIM, center=True)
+        return
+    surf.blit(img, rect.topleft)
+    prev = surf.get_clip()
+    surf.set_clip(rect)
+    w, h = rect.w, rect.h
+    if theme == "frost":
+        for k in range(26):
+            sp = 0.06 + (k % 5) * 0.025
+            ph = (t * sp + k * 0.137) % 1.0
+            x = rect.x + (k * 53 + math.sin(t * 0.8 + k) * 10) % w
+            circle_aa(surf, x, rect.y + ph * h, 1.2 + (k % 3) * 0.5, WHITE)
+    elif theme == "jungle":
+        for k in range(16):
+            a_ = 0.5 + 0.5 * math.sin(t * 2.6 + k * 1.7)
+            x = rect.x + (k * 61) % w + math.sin(t * 0.6 + k) * 12
+            y = rect.y + h * 0.25 + (k * 37) % int(h * 0.65) + math.cos(t * 0.5 + k) * 8
+            if a_ > 0.25:
+                add_glow(surf, x, y, 7, (200, 255, 110), 0.35 * a_)
+                circle_aa(surf, x, y, 1.2 + a_, (230, 255, 150))
+    elif theme == "desert":
+        for k in range(12):
+            ph = (t * (0.35 + (k % 4) * 0.08) + k * 0.21) % 1.0
+            x = rect.x + (ph * 1.4 - 0.2) * w
+            y = rect.y + h * 0.55 + (k * 23) % int(h * 0.42)
+            pygame.draw.line(surf, (250, 214, 150), (x, y), (x + 12 + (k % 3) * 6, y), 1)
+    else:
+        for px in (rect.x + int(w * 0.05), rect.x + int(w * 0.95)):
+            fy = rect.y + int(h * 0.96) - int(h * 0.62) - 16
+            fl = 0.6 + 0.4 * math.sin(t * 9 + px)
+            add_glow(surf, px, fy, 20 + 6 * fl, (255, 150, 60), 0.55)
+            pygame.draw.polygon(surf, (255, 170, 70), [(px - 6, fy + 6), (px, fy - 10 - 4 * fl), (px + 6, fy + 6)])
+            pygame.draw.polygon(surf, (255, 236, 160), [(px - 3, fy + 5), (px, fy - 3 - 2 * fl), (px + 3, fy + 5)])
+    if creatures:
+        r = h * 0.072
+        spots = ((0.26, 0.80, 1.0), (0.52, 0.70, -1.0), (0.76, 0.84, 1.0))
+        for i, kind in enumerate(MS_SCENE_KINDS):
+            fx_, fy_, dirx = spots[i]
+            sway = math.sin(t * 0.7 + i * 2.1) * w * 0.05
+            x = rect.x + w * fx_ + sway
+            y = rect.y + h * fy_ + math.sin(t * 1.9 + i) * 1.5
+            rr = r * (1.35 if kind == "tank" else 1.0)
+            vx = math.cos(t * 0.7 + i * 2.1) * dirx
+            face = (1.0 if vx >= 0 else -1.0, 0.25)
+            ms_draw_creature(surf, theme, kind, x, y, rr, t, face=face, slot=i)
+    surf.set_clip(prev)
+
+
+_MS_BOSS_CACHE = {}
+
+
+def ms_boss_portrait(theme, kind, size, t, refresh=True):
+    """Patron portresi: gerçek Boss çizimi küçük bir yüzeye. refresh=False
+    iken (ve önbellekte varsa) eski kare kullanılır: pencere beş patronu
+    sırayla, karede bir tane yeniler (bkz. _ms_draw_detail)."""
+    key = (theme, kind, size)
+    ent = _MS_BOSS_CACHE.get(key)
+    frame = int(t * 12)
+    if ent is not None and (ent[0] == frame or not refresh):
+        return ent[1]
+    b = ent[2] if ent is not None else None
+    if b is None:
+        b = Boss(kind, 0, 0, 1.0, 1.0, 10, hellish=False, theme=None if theme == "stone" else theme)
+        b.spawn_t = 9.0
+        # portre boyunda DOĞRUDAN çizilir (büyük çizip küçültmek pahalıydı)
+        b.radius = BOSS_DEFS[kind]["radius"] * size / 210.0
+    img = pygame.Surface((size, size), pygame.SRCALPHA)
+    b.x, b.y = size / 2.0, size / 2.0 + 3
+    b.face_x, b.face_y = 0.35, 0.94
+    b.gait = t * 2.0
+    global _GLOW_ON_ALPHA
+    _GLOW_ON_ALPHA = True
+    try:
+        b.draw(img, t, hud=False)
+    finally:
+        _GLOW_ON_ALPHA = False
+    _MS_BOSS_CACHE[key] = (frame, img, b)
+    return img
+
+
+def ms_boss_name(theme, kind):
+    if theme == "stone":
+        return BOSS_DEFS[kind]["name"]
+    return map_boss_name(theme, kind, BOSS_DEFS[kind]["name"])
+
+
+def ms_weapons_for(theme):
+    """Bu haritada açılan silahlar: [(silah, başarım ya da None)]."""
+    out = []
+    if theme == "stone":
+        for w in BOSS_WEAPONS:
+            reqs = weapon_reqs(w)
+            if reqs and all(rq.get("kind") == "stat" for rq in reqs):
+                out.append((w, None))
+        return out
+    for a in MAP_ACHS:
+        if a["map"] != theme:
+            continue
+        w = next((w for w in BOSS_WEAPONS for rq in weapon_reqs(w)
+                  if rq.get("kind") == "ach" and rq.get("ach") == a["id"]), None)
+        out.append((w, a))
+    return out
+
+
+def ms_records(save, theme):
+    """Ayrıntı penceresindeki rekor kutuları: [(etiket, değer)]."""
+    st = save.data.get("stats", {}) or {}
+
+    def g(k):
+        try:
+            return st.get(k, 0) or 0
+        except Exception:
+            return 0
+    if theme == "frost":
+        return [(L("ms.r_wave"), fmt_num(int(g("best_frost_wave")))),
+                (L("ms.r_kills"), fmt_num(int(g("frost_kills")))),
+                (L("ms.r_bosses"), fmt_num(int(g("frost_bosses"))))]
+    if theme == "jungle":
+        return [(L("ms.r_time"), fmt_time(float(g("best_jungle_time")))),
+                (L("ms.r_kills"), fmt_num(int(g("jungle_kills")))),
+                (L("ms.r_bosses"), fmt_num(int(g("jungle_bosses"))))]
+    if theme == "desert":
+        return [(L("ms.r_wave"), fmt_num(int(g("best_desert_wave")))),
+                (L("ms.r_kills"), fmt_num(int(g("desert_kills")))),
+                (L("ms.r_dashes"), fmt_num(int(g("desert_dashes"))))]
+    return [(L("ms.r_score"), fmt_num(int(g("best_score")))),
+            (L("ms.r_wave"), fmt_num(int(g("best_wave")))),
+            (L("ms.r_kills"), fmt_num(int(g("total_kills"))))]
+
+
+def ms_fit(text, size, max_w, bold=False):
+    """Metni genişliğe sığdır (gerekirse küçült, en son '…' ile kes)."""
+    sz = size
+    while sz > 9 and text_width(text, sz, bold) > max_w:
+        sz -= 1
+    if text_width(text, sz, bold) <= max_w:
+        return text, sz
+    while text and text_width(text + "…", sz, bold) > max_w:
+        text = text[:-1]
+    return text + "…", sz
 
 
 # Haritanın artıları / eksileri (metin anahtarları)
 MAP_PROS = {
     "stone": ("ms.world_on", "ms.hell_on"),
     "frost": ("ms.frost_p", "ms.ach_n"),
-    "jungle": ("ms.jungle_p", "ms.snakes"),
+    "jungle": ("ms.jungle_p", "ms.ach_n"),
     "desert": ("ms.desert_p", "ms.ach_n"),
 }
 MAP_CONS = {
@@ -31160,149 +32629,479 @@ MAP_CONS = {
 }
 
 
-def draw_map_select(app, canvas, mouse_pos, clicked, t):
-    """Harita seçim ekranı. Dönüş: ("start", tema) | ("back", None) | None."""
-    save = app.save
-    sel = app.selected_map()
-    result = None
-    canvas.blit(app.bg.static_frame(), (0, 0))
-    ov = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
-    ov.fill((6, 8, 16, 150))
-    canvas.blit(ov, (0, 0))
-    draw_text(canvas, L("ms.title"), (VIRTUAL_W / 2, 34), 32, GOLD, bold=True, center=True)
-    draw_text(canvas, L("ms.sub"), (VIRTUAL_W / 2, 64), 13, TEXT_DIM, center=True, shadow=False)
-    cw, chh, gap = 290, 300, 16
-    x0 = VIRTUAL_W / 2 - (4 * cw + 3 * gap) / 2
-    top = 84
-    for i, th in enumerate(MAP_THEMES):
-        r = pygame.Rect(int(x0 + i * (cw + gap)), top, cw, chh)
-        col = MAP_THEME_COLOR.get(th, GOLD)
-        hov = r.collidepoint(mouse_pos)
-        on = th == sel
-        if on:
-            add_glow(canvas, r.centerx, r.centery, r.w * 0.7, col, 0.22 + 0.06 * math.sin(t * 3))
-        rr = r.move(0, -4 if (hov or on) else 0)
-        panel(canvas, rr, bg=(22, 26, 40) if on else (16, 18, 30), edge=col if on else
-              (lighten(col, 0.1) if hov else scale_col(col, 0.5)), alpha=248, radius=16, edge_w=3 if on else 2)
-        # önizleme
-        thumb = _MAP_THUMBS.get(th)
-        tr = pygame.Rect(rr.x + 13, rr.y + 13, 264, 118)
-        if thumb is not None:
-            canvas.blit(thumb, tr.topleft)
+def _ms_rule_lines(theme):
+    out = []
+    for k_ in MAP_PROS[theme]:
+        txt = L(k_, sum(1 for a in MAP_ACHS if a["map"] == theme)) if k_ == "ms.ach_n" else L(k_)
+        out.append((True, txt))
+    for k_ in MAP_CONS[theme]:
+        out.append((False, L(k_)))
+    return out
+
+
+_MS_CACHE = {}
+_MS_CARDS = {}
+
+
+def _ms_arrow(good):
+    """Artı (yeşil, yukarı) / eksi (kırmızı, aşağı) üçgeni — bir kez çizilir."""
+    key = ("arrow", good)
+    img = _MS_CACHE.get(key)
+    if img is None:
+        img = pygame.Surface((12, 12), pygame.SRCALPHA)
+        if good:
+            poly_aa(img, [(1, 9), (6, 3), (11, 9)], GREEN)
         else:
-            pygame.draw.rect(canvas, (30, 34, 48), tr)
-            draw_text(canvas, "...", tr.center, 18, TEXT_DIM, center=True)
-        pygame.draw.rect(canvas, col, tr, 2, border_radius=4)
-        # haritanın havası: kar / ateşböceği / kum
-        prev = canvas.get_clip()
-        canvas.set_clip(tr)
-        for k in range(14):
-            ph = (t * (0.15 + (k % 4) * 0.04) + k * 0.13) % 1.0
-            if th == "frost":
-                circle_aa(canvas, tr.x + (k * 37 + math.sin(t + k) * 8) % tr.w, tr.y + ph * tr.h, 1.6, WHITE)
-            elif th == "jungle":
-                a_ = 0.5 + 0.5 * math.sin(t * 3 + k)
-                circle_aa(canvas, tr.x + (k * 41) % tr.w + math.sin(t * 0.7 + k) * 10,
-                          tr.y + (k * 23) % tr.h + math.cos(t * 0.6 + k) * 6, 1.4 + a_, (220, 255, 120))
-            elif th == "desert":
-                xx = tr.x + ((ph * 1.3 - 0.15) * tr.w)
-                yy = tr.y + (k * 29) % tr.h
-                pygame.draw.line(canvas, (240, 200, 140), (xx, yy), (xx + 14, yy), 1)
-        canvas.set_clip(prev)
-        # ad + ikon
-        draw_icon(canvas, rr.x + 24, rr.y + 150, MAP_THEME_ICON.get(th, "star"), col, 9)
-        draw_text(canvas, L("map.%s.name" % th), (rr.x + 40, rr.y + 140), 17, lighten(col, 0.25), bold=True)
-        if th == "stone":
-            nt = L("ms.normal")
-            nr = pygame.Rect(0, 0, text_width(nt, 10, True) + 16, 18)
-            nr.topright = (tr.right - 6, tr.y + 6)
-            pygame.draw.rect(canvas, (20, 16, 8), nr, border_radius=9)
-            pygame.draw.rect(canvas, GOLD, nr, 1, border_radius=9)
-            draw_text(canvas, nt, nr.center, 10, GOLD, bold=True, center=True, shadow=False)
-        y = rr.y + 170
-        for k_ in MAP_PROS[th]:
-            txt = L(k_, sum(1 for a in MAP_ACHS if a["map"] == th)) if k_ == "ms.ach_n" else L(k_)
-            poly_aa(canvas, [(rr.x + 16, y + 9), (rr.x + 21, y + 3), (rr.x + 26, y + 9)], GREEN)
-            draw_text(canvas, txt, (rr.x + 32, y), 12, (170, 240, 180), bold=True, shadow=False)
-            y += 19
-        for k_ in MAP_CONS[th]:
-            poly_aa(canvas, [(rr.x + 16, y + 3), (rr.x + 26, y + 3), (rr.x + 21, y + 9)], (255, 120, 120))
-            draw_text(canvas, L(k_), (rr.x + 32, y), 12, (255, 170, 170), bold=True, shadow=False)
-            y += 19
-        # başarım sayacı rozeti
-        achs = [a for a in MAP_ACHS if a["map"] == th]
-        if achs:
-            got = sum(1 for a in achs if a["id"] in save.data.get("achievements", {}))
-            bt = L("ms.ach_done", got, len(achs))
-            bw_ = text_width(bt, 11, True) + 22
-            br = pygame.Rect(rr.right - bw_ - 12, rr.bottom - 30, bw_, 20)
-            pygame.draw.rect(canvas, (10, 12, 20), br, border_radius=10)
-            pygame.draw.rect(canvas, GOLD if got == len(achs) else col, br, 1, border_radius=10)
-            draw_text(canvas, bt, br.center, 11, GOLD if got == len(achs) else lighten(col, 0.2), bold=True,
-                      center=True, shadow=False)
-        if hov and clicked:
-            if on:
-                result = ("start", th)
-            else:
-                app.set_selected_map(th)
-                sfx("click", 0.6, 0.0)
-    # ---- seçilen haritanın başarımları ----
-    sel = app.selected_map()
-    col = MAP_THEME_COLOR.get(sel, GOLD)
-    det = pygame.Rect(VIRTUAL_W / 2 - 610, top + chh + 12, 1220, 222)
-    panel(canvas, det, bg=(14, 16, 28), edge=scale_col(col, 0.7), alpha=240, radius=14, edge_w=2)
-    achs = [a for a in MAP_ACHS if a["map"] == sel]
-    if not achs:
-        draw_text(canvas, L("ms.stone_head"), (det.x + 22, det.y + 16), 16, GOLD, bold=True)
-        for j, ln in enumerate(wrap_text(L("ms.stone_info"), 14, det.w - 44)[:6]):
-            draw_text(canvas, ln, (det.x + 22, det.y + 46 + j * 22), 14, TEXT, shadow=False)
-    else:
-        draw_text(canvas, L("ms.ach_head", L("map.%s.name" % sel)), (det.x + 22, det.y + 12), 15,
-                  lighten(col, 0.25), bold=True)
-        rh = 33
-        for j, a in enumerate(achs):
-            y = det.y + 36 + j * (rh + 3)
-            row = pygame.Rect(det.x + 14, y, det.w - 28, rh)
-            done = a["id"] in save.data.get("achievements", {})
-            pygame.draw.rect(canvas, (24, 28, 42) if not done else (22, 40, 30), row, border_radius=8)
-            pygame.draw.rect(canvas, GREEN if done else (50, 56, 80), row, 1, border_radius=8)
-            draw_icon(canvas, row.x + 18, row.centery, a.get("icon", "star"), GOLD if done else col, 8)
-            draw_text(canvas, ach_name(a), (row.x + 36, row.y + 8), 14, GOLD if done else TEXT, bold=True,
+            poly_aa(img, [(1, 3), (11, 3), (6, 9)], (255, 120, 120))
+        _MS_CACHE[key] = img
+    return img
+
+
+_MS_EMB = {}
+
+
+def ms_weapon_emblem(surf, cx, cy, h, w, locked):
+    """Küçük silah arması: bir kez çizilip saklanır (arma çizimi ağır; her
+    karede dört-sekiz tanesini baştan çizmek pencereyi takılttırıyordu).
+    surf None ise yalnız hazırlar (bkz. App.update_map_select)."""
+    key = (w["key"], int(h), bool(locked))
+    img = _MS_EMB.get(key)
+    if img is None:
+        size = int(h * 2.2) + 4
+        img = pygame.Surface((size, size), pygame.SRCALPHA)
+        global _GLOW_ON_ALPHA
+        _GLOW_ON_ALPHA = True
+        try:
+            draw_weapon_emblem(img, size / 2.0, size / 2.0, h, w, 0.0, locked=locked)
+        finally:
+            _GLOW_ON_ALPHA = False
+        _MS_EMB[key] = img
+    if surf is not None:
+        surf.blit(img, (int(cx - img.get_width() / 2), int(cy - img.get_height() / 2)))
+
+
+def _ms_dim(alpha):
+    """Tam ekran karartma (tek renk + yüzey saydamlığı: hızlı blit)."""
+    img = _MS_CACHE.get("dim")
+    if img is None:
+        img = pygame.Surface((VIRTUAL_W, VIRTUAL_H))
+        img.fill((4, 6, 12))
+        _MS_CACHE["dim"] = img
+    img.set_alpha(int(clamp(alpha, 0, 255)))
+    return img
+
+
+def _ms_backdrop(app):
+    """Menü zemini + koyu örtü, birlikte bir kez hazırlanır."""
+    base = app.bg.static_frame()
+    ent = _MS_CACHE.get("backdrop")
+    if ent is None or ent[0] is not base:
+        img = base.copy()
+        ov = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+        ov.fill((6, 8, 16, 150))
+        img.blit(ov, (0, 0))
+        ent = (base, img)
+        _MS_CACHE["backdrop"] = ent
+    return ent[1]
+
+
+def _ms_draw_rules(canvas, x, y, theme, size=12, step=19, max_w=260):
+    for good, txt in _ms_rule_lines(theme):
+        canvas.blit(_ms_arrow(good), (x - 1, y))
+        txt, sz = ms_fit(txt, size, max_w, True)
+        draw_text(canvas, txt, (x + 16, y), sz, (170, 240, 180) if good else (255, 170, 170),
+                  bold=True, shadow=False)
+        y += step
+    return y
+
+
+def _ms_card_rect(i):
+    cw, gap = 292, 16
+    x0 = VIRTUAL_W / 2 - (4 * cw + 3 * gap) / 2
+    return pygame.Rect(int(x0 + i * (cw + gap)), 84, cw, 528)
+
+
+MS_WIN_RECT = pygame.Rect(22, 50, VIRTUAL_W - 44, 662)
+
+
+def _ms_badge_items(theme, save):
+    """Kartın altındaki rozetler: başarım / silah ilerlemesi ya da dünya sıralaması."""
+    col = MAP_THEME_COLOR.get(theme, GOLD)
+    if theme == "stone":
+        return [(L("ms.badge_world"), GOLD), (L("ms.badge_hell"), (255, 130, 80))]
+    achs = [a for a in MAP_ACHS if a["map"] == theme]
+    got = sum(1 for a in achs if a["id"] in save.data.get("achievements", {}))
+    ws = [w for w, _ in ms_weapons_for(theme) if w is not None]
+    own = sum(1 for w in ws if save.owns_weapon(w["key"]))
+    return [(L("ms.ach_done", got, len(achs)), GOLD if got == len(achs) else lighten(col, 0.2)),
+            (L("ms.weap_done", own, len(ws)), GREEN if own == len(ws) else lighten(col, 0.2))]
+
+
+def _ms_draw_badges(canvas, items, rr):
+    x = rr.x + 12
+    avail = rr.w - 24 - 8 * (len(items) - 1) - 20 * len(items)
+    sz = 11
+    while sz > 9 and sum(text_width(tx, sz, True) for tx, _ in items) > avail:
+        sz -= 1
+    for txt, c_ in items:
+        if sum(text_width(tx, sz, True) for tx, _ in items) > avail:
+            txt, sz = ms_fit(txt, sz, avail // len(items), True)
+        bw_ = text_width(txt, sz, True) + 20
+        br = pygame.Rect(x, rr.bottom - 32, bw_, 22)
+        pygame.draw.rect(canvas, (10, 12, 20), br, border_radius=11)
+        pygame.draw.rect(canvas, c_, br, 1, border_radius=11)
+        draw_text(canvas, txt, br.center, sz, c_, bold=True, center=True, shadow=False)
+        x = br.right + 8
+
+
+MS_STRIP_KINDS = ("red", "blue", "sprinter", "brute", "bomber")
+
+
+def _ms_card_layer(app, theme, size, on, hov):
+    """Kartın DURAĞAN katmanı (panel, ad, kurallar, rozetler, şerit çerçeveleri).
+    Yazılar ve paneller her karede yeniden çizilmesin diye bir kez hazırlanır;
+    dil, seçim/üstüne gelme ya da rozet metni değişince yenilenir."""
+    items = _ms_badge_items(theme, app.save)
+    key = (theme, size, on, hov, lang(), tuple(items))
+    img = _MS_CARDS.get(key)
+    if img is not None:
+        return img
+    if len(_MS_CARDS) > 64:
+        _MS_CARDS.clear()
+    w, h = size
+    col = MAP_THEME_COLOR.get(theme, GOLD)
+    img = pygame.Surface((w + 24, h + 26), pygame.SRCALPHA)
+    rr = pygame.Rect(12, 6, w, h)                 # panel() gölgesi için pay
+    panel(img, rr, bg=(22, 26, 40) if on else (15, 17, 28), alpha=248, radius=16,
+          edge=col if on else (lighten(col, 0.1) if hov else scale_col(col, 0.5)), edge_w=3 if on else 2)
+    y = rr.y + 10 + MS_CARD_SCENE[1] + 10
+    draw_icon(img, rr.x + 22, y + 11, MAP_THEME_ICON.get(theme, "star"), col, 9)
+    nm, nsz = ms_fit(L("map.%s.name" % theme), 19, rr.w - 50, True)
+    draw_text(img, nm, (rr.x + 38, y), nsz, lighten(col, 0.25), bold=True)
+    y += 28
+    for ln in wrap_text(L("ms.tag.%s" % theme), 11, rr.w - 28)[:2]:
+        draw_text(img, ln, (rr.x + 14, y), 11, TEXT_DIM, shadow=False)
+        y += 15
+    y = rr.y + MS_CARD_SCENE[1] + 84
+    pygame.draw.line(img, scale_col(col, 0.45), (rr.x + 14, y - 6), (rr.right - 14, y - 6), 1)
+    _ms_draw_rules(img, rr.x + 16, y, theme, size=12, step=19, max_w=rr.w - 48)
+    sy = rr.bottom - 74
+    for k in range(len(MS_STRIP_KINDS)):
+        cx_ = rr.x + 34 + k * 56
+        pygame.draw.circle(img, (24, 28, 42), (cx_, sy), 22)
+        pygame.draw.circle(img, scale_col(col, 0.55), (cx_, sy), 22, 1)
+    _ms_draw_badges(img, items, rr)
+    _MS_CARDS[key] = img
+    return img
+
+
+def _ms_draw_card(app, canvas, i, theme, mouse_pos, t, sel, alpha_hover=True):
+    r = _ms_card_rect(i)
+    col = MAP_THEME_COLOR.get(theme, GOLD)
+    hov = r.collidepoint(mouse_pos) and alpha_hover
+    on = theme == sel
+    if on:
+        add_glow(canvas, r.centerx, r.centery, r.w * 0.75, col, 0.20 + 0.06 * math.sin(t * 3))
+    rr = r.move(0, -5 if (hov or on) else 0)
+    canvas.blit(_ms_card_layer(app, theme, r.size, on, hov), (rr.x - 12, rr.y - 6))
+    # HAREKETLİ katman: manzara, havası ve içinde dolaşan yaratıklar
+    sr = pygame.Rect(rr.x + 10, rr.y + 10, MS_CARD_SCENE[0], MS_CARD_SCENE[1])
+    draw_map_scene(canvas, sr, theme, t + i * 3.1)
+    pygame.draw.rect(canvas, col, sr, 2, border_radius=6)
+    if theme == "stone":
+        nt = L("ms.normal")
+        nr = pygame.Rect(0, 0, text_width(nt, 10, True) + 16, 18)
+        nr.topright = (sr.right - 6, sr.y + 6)
+        pygame.draw.rect(canvas, (20, 16, 8), nr, border_radius=9)
+        pygame.draw.rect(canvas, GOLD, nr, 1, border_radius=9)
+        draw_text(canvas, nt, nr.center, 10, GOLD, bold=True, center=True, shadow=False)
+    if hov:
+        hr_ = pygame.Rect(sr.x, sr.bottom - 26, sr.w, 26)
+        canvas.blit(_ms_hint_band(hr_.size), hr_.topleft)
+        draw_text(canvas, L("ms.tap"), hr_.center, 12, WHITE, bold=True, center=True, shadow=False)
+    sy = rr.bottom - 74
+    for k, kind in enumerate(MS_STRIP_KINDS):
+        ms_draw_creature(canvas, theme, kind, rr.x + 34 + k * 56, sy, 11, t + k, face=(0.9, 0.45),
+                         slot=10 + k)
+    return r, hov
+
+
+def _ms_hint_band(size):
+    img = _MS_CACHE.get(("hint", size))
+    if img is None:
+        img = pygame.Surface(size, pygame.SRCALPHA)
+        img.fill((0, 0, 0, 150))
+        _MS_CACHE[("hint", size)] = img
+    return img
+
+
+def _ms_detail_layout():
+    """Ayrıntı penceresinin ölçüleri: durağan ve canlı katman AYNI yerleri kullanır."""
+    wr = MS_WIN_RECT
+    lx = wr.x + 20
+    sr = pygame.Rect(lx, wr.y + 18, MS_BIG_SCENE[0], MS_BIG_SCENE[1])
+    rx = sr.right + 22
+    rw = wr.right - 20 - rx
+    cy0 = wr.y + 40
+    cw_ = rw / 6.0
+    cells = []
+    for j, kind in enumerate(MS_BEST_KINDS):
+        row, cidx = divmod(j, 6)
+        off = (cw_ / 2) if row == 1 else 0
+        cells.append((kind, pygame.Rect(int(rx + off + cidx * cw_) + 3, int(cy0 + row * 86), int(cw_) - 6, 80)))
+    hint_y = cy0 + 2 * 86
+    boss_y = hint_y + 48
+    bw = (rw - 4 * 8) / 5.0
+    bosses = [(kind, pygame.Rect(int(rx + j * (bw + 8)), int(boss_y), int(bw), 128))
+              for j, kind in enumerate(BOSS_ORDER)]
+    return dict(wr=wr, lx=lx, sr=sr, rx=rx, rw=rw, cells=cells, hint_y=hint_y,
+                boss_head_y=hint_y + 24, bosses=bosses, weap_y=boss_y + 140,
+                bb=pygame.Rect(lx, wr.bottom - 62, 150, 46),
+                bs=pygame.Rect(lx + 162, wr.bottom - 62, sr.w - 162, 46))
+
+
+def _ms_head(img, x, y, title, sub, col, max_w):
+    draw_text(img, title, (x, y), 15, lighten(col, 0.25), bold=True, shadow=False)
+    if sub:
+        tw = text_width(title, 15, True)
+        sub, ssz = ms_fit(sub, 11, max_w - tw - 24)
+        draw_text(img, sub, (x + tw + 14, y + 3), ssz, TEXT_DIM, shadow=False)
+
+
+def _ms_detail_static(app, theme):
+    """Ayrıntı penceresinin DURAĞAN katmanı: zemin, karartma, pencere, bütün
+    yazılar, rekorlar, hücreler ve silah satırları — tek opak yüzey. Pencere
+    her açılışta (ve dil / harita değişince) bir kez hazırlanır; her karede
+    yalnız canlı katman çizilir (manzara, yaratıklar, patronlar, düğmeler)."""
+    key = ("detail", theme, lang(), getattr(app, "_ms_zoom_t0", 0.0))
+    img = _MS_CACHE.get(key)
+    if img is not None:
+        return img
+    for old in [k_ for k_ in _MS_CACHE if isinstance(k_, tuple) and k_[0] == "detail"]:
+        del _MS_CACHE[old]
+    save = app.save
+    col = MAP_THEME_COLOR.get(theme, GOLD)
+    lay = _ms_detail_layout()
+    wr, lx, sr, rx, rw = lay["wr"], lay["lx"], lay["sr"], lay["rx"], lay["rw"]
+    img = _ms_backdrop(app).copy()
+    img.blit(_ms_dim(170), (0, 0))
+    panel(img, wr, bg=(13, 15, 26), edge=col, alpha=252, radius=18, edge_w=3)
+    # ---- SOL SÜTUN: ad, slogan, kurallar, not, rekorlar ----
+    y = sr.bottom + 10
+    draw_icon(img, lx + 12, y + 15, MAP_THEME_ICON.get(theme, "star"), col, 11)
+    nm, nsz = ms_fit(L("map.%s.name" % theme), 26, sr.w - 40, True)
+    draw_text(img, nm, (lx + 30, y), nsz, lighten(col, 0.25), bold=True)
+    y += 34
+    for ln in wrap_text(L("ms.tag.%s" % theme), 13, sr.w)[:2]:
+        draw_text(img, ln, (lx, y), 13, TEXT_DIM, shadow=False)
+        y += 17
+    y += 5
+    draw_text(img, L("ms.rules"), (lx, y), 13, GOLD, bold=True, shadow=False)
+    y += 21
+    y = _ms_draw_rules(img, lx + 2, y, theme, size=13, step=20, max_w=sr.w - 24)
+    info = L("ms.stone_note") if theme == "stone" else L("ms.same")
+    for ln in wrap_text(info, 12, sr.w)[:2]:
+        draw_text(img, ln, (lx, y + 3), 12, (200, 206, 226), shadow=False)
+        y += 16
+    ry = wr.bottom - 62 - 74
+    draw_text(img, L("ms.record"), (lx, ry), 12, GOLD, bold=True, shadow=False)
+    tiles = ms_records(save, theme)
+    tw_ = (sr.w - 8 * (len(tiles) - 1)) / float(len(tiles))
+    for j, (lab, val) in enumerate(tiles):
+        tr_ = pygame.Rect(int(lx + j * (tw_ + 8)), ry + 18, int(tw_), 48)
+        pygame.draw.rect(img, (22, 26, 40), tr_, border_radius=9)
+        pygame.draw.rect(img, scale_col(col, 0.55), tr_, 1, border_radius=9)
+        draw_text(img, val, (tr_.centerx, tr_.y + 16), 18, WHITE, bold=True, center=True, shadow=False)
+        lab, lsz = ms_fit(lab, 11, tr_.w - 8)
+        draw_text(img, lab, (tr_.centerx, tr_.y + 36), lsz, TEXT_DIM, center=True, shadow=False)
+    # ---- SAĞ SÜTUN: YARATIKLAR (hücre + ad) ----
+    _ms_head(img, rx, wr.y + 16, L("ms.creatures"),
+             L("ms.creatures_sub") if theme != "stone" else L("ms.creatures_stone"), col, rw)
+    for kind, cr in lay["cells"]:
+        pygame.draw.rect(img, (26, 30, 46), cr, border_radius=10)
+        pygame.draw.rect(img, scale_col(col, 0.55), cr, 1, border_radius=10)
+        nm, sz = ms_fit(ms_creature_name(theme, kind), 11, cr.w - 8, True)
+        draw_text(img, nm, (cr.centerx, cr.bottom - 13), sz, TEXT, bold=True, center=True, shadow=False)
+    # ---- PATRONLAR (hücre + ad) ----
+    _ms_head(img, rx, lay["boss_head_y"], L("ms.bosses"),
+             L("ms.boss_waves") + ("  ·  " + L("ms.hell_bosses") if theme == "stone" else ""), col, rw)
+    for kind, cr in lay["bosses"]:
+        pygame.draw.rect(img, (22, 24, 38), cr, border_radius=10)
+        pygame.draw.rect(img, scale_col(col, 0.5), cr, 1, border_radius=10)
+        nm, sz = ms_fit(ms_boss_name(theme, kind), 11, cr.w - 8, True)
+        draw_text(img, nm, (cr.centerx, cr.bottom - 14), sz, GOLD, bold=True, center=True, shadow=False)
+    # ---- AÇILAN SİLAHLAR ----
+    y = lay["weap_y"]
+    _ms_head(img, rx, y, L("ms.weapons"), L("ms.stone_weapons") if theme == "stone" else "", col, rw)
+    y += 22
+    items = ms_weapons_for(theme)
+    if theme == "stone":
+        colw = (rw - 10) / 2.0
+        for j, (w, _a) in enumerate(items[:8]):
+            cidx, row = divmod(j, 4)
+            cr = pygame.Rect(int(rx + cidx * (colw + 10)), int(y + row * 36), int(colw), 32)
+            own = save.owns_weapon(w["key"])
+            pygame.draw.rect(img, (24, 28, 42) if not own else (22, 40, 30), cr, border_radius=8)
+            pygame.draw.rect(img, GREEN if own else (50, 56, 80), cr, 1, border_radius=8)
+            ms_weapon_emblem(img, cr.x + 18, cr.centery, 24, w, not own)
+            nm, sz = ms_fit(w_name(w), 12, colw * 0.62, True)
+            draw_text(img, nm, (cr.x + 36, cr.y + 3), sz, tuple(w["color"]) if own else TEXT, bold=True,
                       shadow=False)
-            draw_text(canvas, ach_desc(a), (row.x + 210, row.y + 9), 12, TEXT_DIM, shadow=False)
+            bar = pygame.Rect(int(cr.right - colw * 0.24 - 8), cr.y + 20, int(colw * 0.24), 6)
+            if own:
+                draw_text(img, L("ms.owned"), (cr.x + 36, cr.y + 17), 10, GREEN, shadow=False)
+                draw_bar(img, bar, 1.0, GREEN, bg=(12, 13, 20), border=(52, 56, 76), radius=3)
+            else:
+                rq = next((q for q in weapon_reqs(w) if not book_req_state(save, q)[2]), None)
+                if rq is not None:
+                    rc, rn, _d, rt = book_req_state(save, rq)
+                    rt = req_text(rq) or rt
+                    rt, rsz = ms_fit(rt, 10, colw * 0.62 - 44)
+                    draw_text(img, rt, (cr.x + 36, cr.y + 17), rsz, TEXT_DIM, shadow=False)
+                    draw_text(img, "%s / %s" % (fmt_num(min(rc, rn)), fmt_num(rn)), (bar.centerx, cr.y + 10),
+                              10, TEXT_DIM, bold=True, center=True, shadow=False)
+                draw_bar(img, bar, weapon_frac(save, w), col, bg=(12, 13, 20), border=(52, 56, 76), radius=3)
+    else:
+        for j, (w, a) in enumerate(items[:5]):
+            cr = pygame.Rect(int(rx), int(y + j * 34), int(rw), 31)
+            done = a["id"] in save.data.get("achievements", {})
+            pygame.draw.rect(img, (24, 28, 42) if not done else (22, 40, 30), cr, border_radius=8)
+            pygame.draw.rect(img, GREEN if done else (50, 56, 80), cr, 1, border_radius=8)
+            draw_icon(img, cr.x + 16, cr.centery, a.get("icon", "star"), GOLD if done else col, 8)
+            nm, sz = ms_fit(ach_name(a), 12, rw * 0.22, True)
+            draw_text(img, nm, (cr.x + 32, cr.y + 3), sz, GOLD if done else TEXT, bold=True, shadow=False)
+            ds, dsz = ms_fit(ach_desc(a), 10, rw * 0.40)
+            draw_text(img, ds, (cr.x + 32, cr.y + 17), dsz, TEXT_DIM, shadow=False)
             tr_ = a["track"]
             cur = min(ach_stat_value(save, tr_["stat"]), tr_["need"])
-            bar = pygame.Rect(row.right - 420, row.y + 22, 150, 6)
-            draw_bar(canvas, bar, 1.0 if done else cur / max(1, tr_["need"]), GREEN if done else col,
+            bar = pygame.Rect(int(cr.x + rw * 0.47), cr.y + 19, int(rw * 0.17), 6)
+            draw_bar(img, bar, 1.0 if done else cur / max(1, tr_["need"]), GREEN if done else col,
                      bg=(12, 13, 20), border=(52, 56, 76), radius=3)
-            draw_text(canvas, ("%s / %s" % (fmt_num(cur), fmt_num(tr_["need"]))
-                      if not done else L("ms.done")), (bar.centerx, row.y + 4), 11,
-                      GREEN if done else TEXT_DIM, bold=True, center=True, shadow=False)
-            wk = next((w for w in BOSS_WEAPONS for rq in weapon_reqs(w)
-                       if rq.get("kind") == "ach" and rq.get("ach") == a["id"]), None)
-            if wk is not None:
-                own = save.owns_weapon(wk["key"])
-                draw_weapon_emblem(canvas, row.right - 236, row.centery, 28, wk, t, locked=not own)
-                draw_text(canvas, ("→ " if not own else "") + w_name(wk), (row.right - 216, row.y + 4), 12,
-                          tuple(wk["color"]) if own else (190, 196, 216), bold=True, shadow=False)
-                draw_text(canvas, L("ms.unlocks") if not own else L("ms.owned"), (row.right - 216, row.y + 19),
-                          10, GREEN if own else TEXT_DIM, shadow=False)
-    # ---- düğmeler ----
-    bb = pygame.Rect(VIRTUAL_W / 2 - 330, 666, 300, 46)
-    bs = pygame.Rect(VIRTUAL_W / 2 + 30, 666, 300, 46)
-    for rect, label, c_, kind in ((bb, L("ui.back"), (110, 116, 150), "back"),
-                                 (bs, L("ms.start", L("map.%s.short" % sel)), (60, 130, 90), "start")):
+            draw_text(img, ("%s / %s" % (fmt_num(cur), fmt_num(tr_["need"]))) if not done else L("ms.done"),
+                      (bar.centerx, cr.y + 10), 10, GREEN if done else TEXT_DIM, bold=True, center=True,
+                      shadow=False)
+            if w is not None:
+                own = save.owns_weapon(w["key"])
+                ex = int(cr.x + rw * 0.70)
+                ms_weapon_emblem(img, ex, cr.centery, 24, w, not own)
+                wn, wsz = ms_fit(("→ " if not own else "") + w_name(w), 12, rw * 0.27, True)
+                draw_text(img, wn, (ex + 18, cr.y + 3), wsz, tuple(w["color"]) if own else (196, 202, 222),
+                          bold=True, shadow=False)
+                draw_text(img, L("ms.unlocks") if not own else L("ms.owned"), (ex + 18, cr.y + 17), 10,
+                          GREEN if own else TEXT_DIM, shadow=False)
+    _MS_CACHE[key] = img
+    return img
+
+
+def _ms_draw_detail(app, canvas, theme, mouse_pos, clicked, t, k):
+    """Ayrıntı penceresi (açık): durağan katman + canlı katman. Dönüş:
+    "start" | "back" | None."""
+    col = MAP_THEME_COLOR.get(theme, GOLD)
+    lay = _ms_detail_layout()
+    canvas.blit(_ms_detail_static(app, theme), (0, 0))
+    result = None
+    sr = lay["sr"]
+    draw_map_scene(canvas, sr, theme, t)
+    pygame.draw.rect(canvas, col, sr, 2, border_radius=8)
+    # yaratıklar (üstüne gelinen hücre parlar, satırda ne yaptığı yazar)
+    hov_kind = None
+    for j, (kind, cr) in enumerate(lay["cells"]):
+        if cr.collidepoint(mouse_pos):
+            hov_kind = kind
+            pygame.draw.rect(canvas, col, cr, 2, border_radius=10)
+        rr_ = 15 if kind not in ("tank", "elite") else 19
+        ms_draw_creature(canvas, theme, kind, cr.centerx, cr.y + 32, rr_, t + j * 0.7,
+                         face=(math.cos(t * 0.5 + j), 0.6), slot=20 + j, walk_speed=2.4)
+    if hov_kind:
+        ln = "%s — %s" % (ms_creature_name(theme, hov_kind), L("ms.role.%s" % hov_kind))
+    else:
+        ln = L("ms.hover_hint")
+    ln, lsz = ms_fit(ln, 12, lay["rw"])
+    draw_text(canvas, ln, (lay["rx"], lay["hint_y"]), lsz, (226, 214, 160) if hov_kind else TEXT_DIM,
+              bold=bool(hov_kind), shadow=False)
+    # patronlar: karede en çok biri yenilenir
+    slot = int(t * 60) % len(lay["bosses"])
+    for j, (kind, cr) in enumerate(lay["bosses"]):
+        img = ms_boss_portrait(theme, kind, MS_BOSS_PORTRAIT, t, refresh=(j == slot))
+        canvas.blit(img, (cr.centerx - MS_BOSS_PORTRAIT // 2, cr.y - 6))
+    # düğmeler
+    for rect, label, c_, kind in ((lay["bb"], L("ui.back"), (100, 106, 140), "back"),
+                                 (lay["bs"], L("ms.start", L("map.%s.short" % theme)), (56, 132, 88), "start")):
         hov = rect.collidepoint(mouse_pos)
-        panel(canvas, rect, bg=lighten(c_, 0.15) if hov else c_, edge=lighten(c_, 0.4), alpha=250,
+        if kind == "start":
+            add_glow(canvas, rect.centerx, rect.centery, rect.w * 0.6, (90, 220, 130), 0.14 + 0.06 * math.sin(t * 4))
+        panel(canvas, rect, bg=lighten(c_, 0.15) if hov else c_, edge=lighten(c_, 0.45), alpha=250,
               radius=12, edge_w=2)
-        draw_text(canvas, label, rect.center, 19, WHITE, bold=True, center=True)
-        if hov and clicked and result is None:
-            result = (kind, sel)
+        lab, lsz = ms_fit(label, 19, rect.w - 16, True)
+        draw_text(canvas, lab, rect.center, lsz, WHITE, bold=True, center=True)
+        if hov and clicked and k >= 1.0:
+            result = kind
+    return result
+
+
+def draw_map_select(app, canvas, mouse_pos, clicked, t):
+    """Harita seçim ekranı. Dönüş: ("start", tema) | ("back", None) | None."""
+    sel = app.selected_map()
+    result = None
+    zoom = getattr(app, "_ms_zoom", None)
+    zk = app.ms_zoom_k() if zoom else 0.0
+    full = zoom is not None and zk >= 1.0
+    if not full:
+        canvas.blit(_ms_backdrop(app), (0, 0))
+        draw_text(canvas, L("ms.title"), (VIRTUAL_W / 2, 30), 32, GOLD, bold=True, center=True)
+        draw_text(canvas, L("ms.sub"), (VIRTUAL_W / 2, 60), 13, TEXT_DIM, center=True, shadow=False)
+        for i, th in enumerate(MAP_THEMES):
+            r, hov = _ms_draw_card(app, canvas, i, th, mouse_pos, t, sel, alpha_hover=zoom is None)
+            if zoom is None and hov and clicked:
+                app.set_selected_map(th)
+                app.ms_open_zoom(th, i)
+                sfx("click", 0.6, 0.0)
+                clicked = False
+        # alt düğmeler
+        bb = pygame.Rect(VIRTUAL_W / 2 - 330, 640, 300, 46)
+        bs = pygame.Rect(VIRTUAL_W / 2 + 30, 640, 300, 46)
+        for rect, label, c_, kind in ((bb, L("ui.back"), (110, 116, 150), "back"),
+                                     (bs, L("ms.start", L("map.%s.short" % sel)), (60, 130, 90), "start")):
+            hov = rect.collidepoint(mouse_pos) and zoom is None
+            panel(canvas, rect, bg=lighten(c_, 0.15) if hov else c_, edge=lighten(c_, 0.4), alpha=250,
+                  radius=12, edge_w=2)
+            lab, lsz = ms_fit(label, 19, rect.w - 16, True)
+            draw_text(canvas, lab, rect.center, lsz, WHITE, bold=True, center=True)
+            if hov and clicked and result is None:
+                result = (kind, sel)
+    if zoom is not None:
+        e = ease_out_cubic(zk)
+        if not full:
+            # büyüme animasyonu: kart dikdörtgeninden pencereye. Pencerenin
+            # durağan katmanı ilk karede hazırlanır ki açılış sonunda takılmasın.
+            if getattr(app, "_ms_zoom_dir", 1) > 0:
+                _ms_detail_static(app, zoom)
+            canvas.blit(_ms_dim(170 * e), (0, 0))
+            a = app._ms_zoom_from
+            b = MS_WIN_RECT
+            rr = pygame.Rect(int(a.x + (b.x - a.x) * e), int(a.y + (b.y - a.y) * e),
+                             int(a.w + (b.w - a.w) * e), int(a.h + (b.h - a.h) * e))
+            col = MAP_THEME_COLOR.get(zoom, GOLD)
+            pygame.draw.rect(canvas, (13, 15, 26), rr, border_radius=18)
+            pygame.draw.rect(canvas, col, rr, 3, border_radius=18)
+            img = _MAP_SCENES.get((zoom, MS_CARD_SCENE[0], MS_CARD_SCENE[1]))
+            if img is not None:
+                sw = int(MS_CARD_SCENE[0] + (MS_BIG_SCENE[0] - MS_CARD_SCENE[0]) * e)
+                shh = int(MS_CARD_SCENE[1] + (MS_BIG_SCENE[1] - MS_CARD_SCENE[1]) * e)
+                canvas.blit(pygame.transform.scale(img, (sw, shh)), (rr.x + 10 + int(10 * e), rr.y + 10 + int(8 * e)))
+        else:
+            act = _ms_draw_detail(app, canvas, zoom, mouse_pos, clicked, t, zk)
+            if act == "start":
+                result = ("start", zoom)
+            elif act == "back":
+                app.ms_close_zoom()
+            elif clicked and not MS_WIN_RECT.collidepoint(mouse_pos):
+                app.ms_close_zoom()
     return result
 
 
 # =====================================================================
-# v3.35 GEZGİN TÜCCAR — DALGA 0'da haritada bekler, YEMİN satar
+# v3.36 GEZGİN TÜCCAR — koşu boyunca haritada durur, YEMİN satar
 # =====================================================================
 MERCHANT_COLOR = (255, 196, 110)
 MERCHANT_CLOAK = (74, 58, 120)
@@ -31392,35 +33191,23 @@ def draw_merchant_figure(surf, x, y, s, t, blink_seed=0.0, talking=False):
 
 class Merchant:
     """Haritadaki GEZGİN TÜCCAR: çizgili tenteli küçük bir tezgâh ve tüccar.
-    DALGA 0 boyunca bekler; konuşulunca YEMİN ekranı açılır."""
+    Koşu boyunca yerinde durur; konuşmak isteğe bağlı (konuşulunca YEMİN
+    ekranı açılır, koşuda tek yemin)."""
 
     def __init__(self, x, y):
         self.x, self.y = x, y
         self.t = random.uniform(0, 10)
-        self.alive = True
-        self.done = False           # yemin seçildi / reddedildi
-        self.leave_t = -1.0         # >= 0: gidiyor (soluyor)
+        self.done = False           # bu koşuda yemin edildi
 
     def in_range(self, p):
-        return self.leave_t < 0 and dist(self.x, self.y, p.x, p.y) < 96
-
-    def leave(self):
-        if self.leave_t < 0:
-            self.leave_t = 0.0
+        return dist(self.x, self.y, p.x, p.y) < 96
 
     def update(self, dt):
         self.t += dt
-        if self.leave_t >= 0:
-            self.leave_t += dt
-            if self.leave_t > 1.2:
-                self.alive = False
 
     def draw(self, surf, t):
         x, y = self.x, self.y
-        fade = 1.0 - clamp(self.leave_t / 1.2, 0.0, 1.0) if self.leave_t >= 0 else 1.0
-        if fade <= 0.02:
-            return
-        add_glow(surf, x, y - 30, 120, MERCHANT_COLOR, 0.14 * fade)
+        add_glow(surf, x, y - 30, 120, MERCHANT_COLOR, 0.14)
         # TEZGÂH: tahta tezgâh + çizgili tente
         st = pygame.Rect(0, 0, 92, 30)
         st.midbottom = (int(x + 52), int(y))
@@ -31452,15 +33239,9 @@ class Merchant:
         circle_aa(surf, st.right - 16, st.y - 6, 7, MERCHANT_COLOR)
         draw_icon(surf, st.right - 16, st.y - 6, "star", (120, 80, 30), 4)
         # TÜCCAR
-        if fade < 1.0:
-            tmp = pygame.Surface((200, 220), pygame.SRCALPHA)
-            draw_merchant_figure(tmp, 100, 200, 1.0, self.t, x * 0.01)
-            tmp.set_alpha(int(255 * fade))
-            surf.blit(tmp, (int(x - 100), int(y - 200)))
-        else:
-            draw_merchant_figure(surf, x, y, 1.0, self.t, x * 0.01)
+        draw_merchant_figure(surf, x, y, 1.0, self.t, x * 0.01)
         # konuşulmayı bekliyor: zıplayan "!"
-        if not self.done and self.leave_t < 0:
+        if not self.done:
             by = y - 128 + math.sin(self.t * 4) * 5
             add_glow(surf, x, by, 22, MERCHANT_COLOR, 0.5)
             pygame.draw.circle(surf, OUTLINE, (int(x), int(by)), 13)
@@ -31468,8 +33249,6 @@ class Merchant:
             draw_text(surf, "!", (x, by - 1), 17, (60, 34, 10), bold=True, center=True, shadow=False)
 
     def draw_prompt(self, surf, t, p):
-        if self.leave_t >= 0 or self.done:
-            return
         d = dist(self.x, self.y, p.x, p.y)
         a = clamp((300 - d) / 120.0, 0.0, 1.0)
         if a <= 0:
@@ -31576,7 +33355,7 @@ class MerchantOverlay(LevelUpOverlay):
 
     1. sahne (konuşma): mağara, fenerler, tüccar ve konuşma balonu.
     2. sahne (yeminler): 3 YEMİN kartı (bir güç + bir bedel) ya da YEMİNSİZ.
-    Dönüş: ("oath", anahtar|None) | ("close", None) | None
+    Dönüş: ("oath", (anahtar, kademe)) | ("close", None) | None
     """
 
     def __init__(self):
@@ -31633,14 +33412,16 @@ class MerchantOverlay(LevelUpOverlay):
                       shadow=False)
         return hover
 
-    def _oath_card(self, surf, r2, key, t, hover):
+    def _oath_card(self, surf, r2, key, t, hover, tier=0):
         _k, icon, col = OATH_BY_KEY[key]
-        add_glow(surf, r2.centerx, r2.centery, r2.w * 0.66, col, 0.08 + (0.10 if hover else 0.0))
+        rc = rarity_color(tier)
+        add_glow(surf, r2.centerx, r2.centery, r2.w * (0.66 + 0.04 * tier), rc if tier else col,
+                 0.08 + 0.04 * tier + (0.10 if hover else 0.0))
         surf.blit(_panel_shadow(r2.w, r2.h, 18), (r2.x - 6, r2.y - 2))
         surf.blit(_lu_card_bg(r2.w, r2.h, col, 1), r2.topleft)
         prev = surf.get_clip()
         surf.set_clip(r2.inflate(-6, -6).clip(prev) if prev else r2.inflate(-6, -6))
-        ecx, ecy = r2.centerx, r2.y + 98
+        ecx, ecy = r2.centerx, r2.y + 90
         rs = pygame.Surface((r2.w, r2.h), pygame.SRCALPHA)
         for i in range(8):
             a = t * 0.35 + i * math.tau / 8
@@ -31650,17 +33431,21 @@ class MerchantOverlay(LevelUpOverlay):
             pygame.draw.polygon(rs, (*col, 18), pts)
         surf.blit(rs, r2.topleft)
         surf.set_clip(prev)
-        edge = lighten(col, 0.25) if hover else col
-        pygame.draw.rect(surf, edge, r2, width=3, border_radius=18)
+        edge = lighten(rc if tier else col, 0.25) if hover else (rc if tier else col)
+        pygame.draw.rect(surf, edge, r2, width=3 + (1 if tier >= 3 else 0), border_radius=18)
         pygame.draw.rect(surf, scale_col(edge, 0.45), r2.inflate(-10, -10), width=1, border_radius=14)
+        # üst şerit: KADEME (Yaygın .. Efsanevi) — tüccarın şansı çeker
         band = pygame.Rect(r2.x + 3, r2.y + 3, r2.w - 6, 30)
-        pygame.draw.rect(surf, scale_col(col, 0.55), band, border_top_left_radius=15,
+        pygame.draw.rect(surf, scale_col(rc, 0.55), band, border_top_left_radius=15,
                          border_top_right_radius=15)
-        pygame.draw.rect(surf, col, band.inflate(0, -6).move(0, -3),
+        pygame.draw.rect(surf, rc, band.inflate(0, -6).move(0, -3),
                          border_top_left_radius=14, border_top_right_radius=14)
-        tc = (14, 14, 22) if sum(col) > 360 else WHITE
-        draw_text(surf, L("oath." + key + ".name"), (band.centerx, band.centery - 2), 15, tc, bold=True,
+        tc = (14, 14, 22) if sum(rc) > 360 else WHITE
+        draw_text(surf, rarity_name(tier), (band.centerx, band.centery - 2), 15, tc, bold=True,
                   center=True, shadow=False)
+        tw_ = text_width(rarity_name(tier), 15, True)
+        for s_ in (-1, 1):
+            _sparkle(surf, band.centerx + s_ * (tw_ / 2 + 14), band.centery - 2, 4.5 + (1.5 if tier >= 3 else 0), tc)
         pulse = 0.5 + 0.5 * math.sin(t * 3.0 + r2.x * 0.01)
         add_glow(surf, ecx, ecy, 58, col, 0.22 + 0.10 * pulse)
         pygame.draw.circle(surf, (12, 12, 20), (ecx, ecy), 40)
@@ -31669,11 +33454,13 @@ class MerchantOverlay(LevelUpOverlay):
             a = -t * 0.8 + i * math.tau / 12
             circle_aa(surf, ecx + math.cos(a) * 48, ecy + math.sin(a) * 48, 2.0, lighten(col, 0.3))
         draw_icon(surf, ecx, ecy, icon, lighten(col, 0.15), 22 if hover else 20)
-        y = r2.y + 160
+        draw_text(surf, L("oath." + key + ".name"), (r2.centerx, r2.y + 150), 17, lighten(col, 0.2),
+                  bold=True, center=True)
+        y = r2.y + 170
         for j, (lbl, txt, bgc, fgc, edc, up) in enumerate((
-                (L("dr.power"), L("oath." + key + ".up"), (10, 26, 16), lighten(GREEN, 0.2), GREEN, True),
+                (L("dr.power"), oath_up_text(key, tier), (10, 26, 16), lighten(GREEN, 0.2), GREEN, True),
                 (L("dr.price"), L("oath." + key + ".down"), (30, 10, 14), (255, 150, 150), RED, False))):
-            box = pygame.Rect(r2.x + 14, y + j * 72, r2.w - 28, 64)
+            box = pygame.Rect(r2.x + 14, y + j * 66, r2.w - 28, 60)
             pygame.draw.rect(surf, bgc, box, border_radius=10)
             pygame.draw.rect(surf, scale_col(edc, 0.6), box, width=1, border_radius=10)
             tri = ([(box.x + 10, box.y + 15), (box.x + 15, box.y + 8), (box.x + 20, box.y + 15)] if up else
@@ -31709,17 +33496,29 @@ class MerchantOverlay(LevelUpOverlay):
             self.t0 = t
             sfx("magnet", 0.5, 0.0)
         result = None
-        oaths = list(getattr(run, "merchant_oaths", []) or [])
+        hand = list(getattr(run, "merchant_hand", []) or [])
+        sworn = getattr(run, "oath", None)
         if self.stage == "talk":
             self._scene(surf, t)
             draw_merchant_figure(surf, 330, 560, 3.0, t, 0.0, talking=True)
             br = pygame.Rect(560, 120, 620, 190)
-            done = self._bubble(surf, br, L("m.greet"), t - self.t0 - 0.25)
+            if sworn:
+                txt = L("m.sworn", L("oath.%s.name" % sworn), rarity_name(getattr(run, "oath_tier", 0)))
+            else:
+                txt = L("m.greet")
+            done = self._bubble(surf, br, txt, t - self.t0 - 0.25)
             draw_quest_strip(surf, run, pygame.Rect(560, 326, 620, 124), t)
+            if not sworn:
+                lt = L("m.luck", fmt_pct1(run.merchant_luck()))
+                draw_text(surf, lt, (870, 302), 11, (120, 90, 60), center=True, shadow=False)
             self.btn_a = pygame.Rect(560, 470, 300, 50)
             self.btn_b = pygame.Rect(880, 470, 300, 50)
-            ha = self._button(surf, self.btn_a, L("m.see_oaths"), L("m.see_oaths_sub"), MERCHANT_COLOR,
-                              mouse_pos, "star", hotkey=key_label_short("use"))
+            if sworn:
+                ha = self._button(surf, self.btn_a, L("m.ok"), L("m.one_oath"), MERCHANT_COLOR,
+                                  mouse_pos, "star", hotkey=key_label_short("use"))
+            else:
+                ha = self._button(surf, self.btn_a, L("m.see_oaths"), L("m.see_oaths_sub"), MERCHANT_COLOR,
+                                  mouse_pos, "star", hotkey=key_label_short("use"))
             hb = self._button(surf, self.btn_b, L("m.later"), L("m.later_sub"), (150, 160, 190),
                               mouse_pos, "cross", hotkey="ESC")
             use_edge = False
@@ -31728,6 +33527,8 @@ class MerchantOverlay(LevelUpOverlay):
             if (clicked and ha) or (use_edge and t - self.t0 > 0.3):
                 if not done:
                     self.t0 -= 99.0          # önce yazıyı bitir
+                elif sworn:
+                    result = ("close", None)
                 else:
                     self.stage = "oaths"
                     self.enter_t0 = None
@@ -31743,34 +33544,34 @@ class MerchantOverlay(LevelUpOverlay):
             sfx("levelup", 0.3, 0.2)
         draw_text(surf, L("dr.title_oath"), (VIRTUAL_W / 2, 60), 38, GOLD, bold=True, center=True)
         draw_text(surf, L("dr.sub_oath"), (VIRTUAL_W / 2, 98), 14, (226, 214, 196), center=True, shadow=False)
-        n = max(1, len(oaths))
+        n = max(1, len(hand))
         cw, chh, gap = 272, 344, 26
         x0 = VIRTUAL_W / 2 - (n * cw + (n - 1) * gap) / 2
         top = 130
-        self.cards = [(pygame.Rect(int(x0 + i * (cw + gap)), top, cw, chh), k, i) for i, k in enumerate(oaths)]
-        for rect, key, i in self.cards:
+        self.cards = [(pygame.Rect(int(x0 + i * (cw + gap)), top, cw, chh), kt, i) for i, kt in enumerate(hand)]
+        for rect, (key, tier), i in self.cards:
             k = ease_out_cubic(clamp((t - self.enter_t0 - 0.08 * i) / 0.36, 0.0, 1.0))
             hover = rect.collidepoint(mouse_pos) and k > 0.95
             bob = math.sin(t * 3 + rect.x * 0.01) * 3 - (6 if hover else 0)
             r2 = rect.move(0, bob + (1.0 - k) * 100)
-            self._oath_card(surf, r2, key, t, hover)
+            self._oath_card(surf, r2, key, t, hover, tier)
             kb = pygame.Rect(r2.x + 10, r2.bottom - 30, 22, 20)
             pygame.draw.rect(surf, (10, 11, 18), kb, border_radius=6)
             pygame.draw.rect(surf, (90, 96, 130), kb, width=1, border_radius=6)
             draw_text(surf, str(i + 1), kb.center, 12, (200, 206, 230), bold=True, center=True, shadow=False)
             if hover and clicked:
-                result = ("oath", key)
+                result = ("oath", (key, tier))
         for i, kc in enumerate((pygame.K_1, pygame.K_2, pygame.K_3)):
             if self._key_edge(kc) and i < len(self.cards) and result is None:
                 result = ("oath", self.cards[i][1])
         self.btn_a = pygame.Rect(VIRTUAL_W / 2 - 262, top + chh + 22, 250, 46)
         self.btn_b = pygame.Rect(VIRTUAL_W / 2 + 12, top + chh + 22, 250, 46)
-        ha = self._button(surf, self.btn_a, L("dr.no_oath"), L("dr.no_oath_sub"), (150, 160, 190),
+        ha = self._button(surf, self.btn_a, L("m.later"), L("m.later_sub"), (150, 160, 190),
                           mouse_pos, "cross")
         hb = self._button(surf, self.btn_b, L("m.back"), "", (150, 160, 190), mouse_pos, "dash")
         if result is None and clicked:
             if ha:
-                result = ("oath", None)
+                result = ("close", None)
             elif hb:
                 self.stage = "talk"
                 self.t0 = t - 99.0
@@ -32866,6 +34667,237 @@ def draw_armory_bg(surf, t):
         blit_disc(surf, x, y, 1.0 + 1.4 * k, (255, 170 + int(60 * k), 80), int(220 * k))
 
 
+def _vignette(wall):
+    vg = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+    for k in range(18):
+        pygame.draw.rect(vg, (0, 0, 0, 10), vg.get_rect().inflate(-k * 26, -k * 16), width=14,
+                         border_radius=60)
+    wall.blit(vg, (0, 0))
+
+
+def _candelabra(surf, cx, cy, t, seed=0.0):
+    """Üç kollu pirinç şamdan; mumlar titreşerek yanar."""
+    brass, dark = (176, 132, 64), (92, 66, 34)
+    pygame.draw.rect(surf, dark, pygame.Rect(cx - 13, cy + 54, 26, 7), border_radius=3)
+    pygame.draw.rect(surf, brass, pygame.Rect(cx - 3, cy + 6, 6, 50))
+    pygame.draw.arc(surf, brass, pygame.Rect(cx - 22, cy - 6, 44, 30), math.pi, math.tau, 3)
+    for k, dx in enumerate((-21, 0, 21)):
+        top = cy - (14 if dx == 0 else 2)
+        pygame.draw.rect(surf, brass, pygame.Rect(cx + dx - 6, top + 6, 12, 4), border_radius=2)
+        pygame.draw.rect(surf, (236, 228, 206), pygame.Rect(cx + dx - 3, top - 12, 6, 18), border_radius=2)
+        fl = 0.75 + 0.25 * math.sin(t * 10 + k * 2.1 + seed) * math.sin(t * 6.7 + k)
+        add_glow(surf, cx + dx, top - 18, 34 * fl, (255, 190, 100), 0.5)
+        h = 13 * fl
+        sway = math.sin(t * 8 + k + seed) * 1.5
+        poly_aa(surf, [(cx + dx - 3.5, top - 13), (cx + dx + 3.5, top - 13), (cx + dx + sway, top - 13 - h)],
+                (255, 170, 60))
+        poly_aa(surf, [(cx + dx - 2, top - 13), (cx + dx + 2, top - 13), (cx + dx + sway * 0.6, top - 13 - h * 0.55)],
+                (255, 240, 180))
+
+
+def draw_library_bg(surf, t):
+    """KİTAPLIK arka planı (v3.36): tavana kadar uzanan ahşap kitap rafları,
+    iki yanda yanan şamdanlar, havada süzülen sayfalar ve yükselen mor büyü
+    tozu. Raflar bir kez çizilip saklanır."""
+    wall = _HALL_CACHE.get("library")
+    if wall is None:
+        wall = pygame.Surface((VIRTUAL_W, VIRTUAL_H)).convert()
+        for y in range(VIRTUAL_H):
+            pygame.draw.line(wall, mix_col((40, 26, 30), (16, 11, 16), y / VIRTUAL_H), (0, y), (VIRTUAL_W, y))
+        rnd = random.Random(23)
+        shelf_h = 112
+        cols = [(128, 42, 50), (54, 76, 128), (48, 98, 66), (138, 100, 42), (96, 50, 118),
+                (156, 124, 84), (66, 64, 78), (148, 74, 42), (40, 96, 104)]
+        for row_y in range(-20, VIRTUAL_H, shelf_h):
+            base = row_y + shelf_h - 10
+            x = 0
+            while x < VIRTUAL_W:
+                if rnd.random() < 0.05:
+                    x += rnd.randint(10, 26)
+                    continue
+                bw = rnd.randint(10, 22)
+                bh = rnd.randint(int(shelf_h * 0.52), int(shelf_h * 0.84))
+                col = scale_col(rnd.choice(cols), 0.62 + 0.30 * rnd.random())
+                if rnd.random() < 0.06 and x > 30:
+                    # yaslanmış kitap
+                    pts = [(x, base), (x + bw, base), (x + bw + bh * 0.32, base - bh * 0.95),
+                           (x + bh * 0.32, base - bh * 0.95)]
+                    pygame.draw.polygon(wall, col, pts)
+                    pygame.draw.polygon(wall, scale_col(col, 0.55), pts, 1)
+                    x += bw + int(bh * 0.34) + 2
+                    continue
+                r = pygame.Rect(x, base - bh, bw, bh)
+                pygame.draw.rect(wall, col, r)
+                pygame.draw.rect(wall, scale_col(col, 0.55), r, 1)
+                pygame.draw.line(wall, lighten(col, 0.18), (r.x + 2, r.y + 2), (r.x + 2, r.bottom - 3), 1)
+                if rnd.random() < 0.75:
+                    gold = mix_col(col, (236, 204, 120), 0.55)
+                    for fy in (0.14, 0.86):
+                        yy = r.y + int(bh * fy)
+                        pygame.draw.line(wall, gold, (r.x + 3, yy), (r.right - 3, yy), 1)
+                    if bw >= 15 and rnd.random() < 0.5:
+                        pygame.draw.rect(wall, scale_col(col, 0.7),
+                                         pygame.Rect(r.x + 4, r.y + int(bh * 0.36), bw - 8, int(bh * 0.20)))
+                x += bw + 1
+            plank = pygame.Rect(0, base, VIRTUAL_W, 13)
+            pygame.draw.rect(wall, (74, 46, 30), plank)
+            pygame.draw.line(wall, (110, 72, 46), plank.topleft, plank.topright, 2)
+            pygame.draw.line(wall, (28, 18, 12), plank.bottomleft, plank.bottomright, 3)
+        for x in range(0, VIRTUAL_W + 1, 213):
+            pygame.draw.rect(wall, (60, 38, 26), (x - 8, 0, 16, VIRTUAL_H))
+            pygame.draw.line(wall, (94, 62, 42), (x - 7, 0), (x - 7, VIRTUAL_H), 2)
+            pygame.draw.line(wall, (30, 20, 14), (x + 7, 0), (x + 7, VIRTUAL_H), 2)
+        dk = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+        dk.fill((10, 6, 16, 118))
+        wall.blit(dk, (0, 0))
+        _vignette(wall)
+        _HALL_CACHE["library"] = wall
+    surf.blit(wall, (0, 0))
+    # sıcak mum ışığı + şamdanlar
+    for (cx, cy) in ((38, 286), (VIRTUAL_W - 38, 286)):
+        fl = 0.8 + 0.2 * math.sin(t * 9 + cx) * math.sin(t * 5.3)
+        add_glow(surf, cx, cy - 10, 250 * fl, (255, 160, 80), 0.26)
+        _candelabra(surf, cx, cy, t, seed=cx * 0.01)
+    # süzülen sayfalar
+    for i in range(8):
+        ph = (t * (0.018 + 0.006 * (i % 3)) + i * 0.137) % 1.0
+        x = (i * 167.3 + 60 + math.sin(t * 0.5 + i * 1.3) * 46) % VIRTUAL_W
+        y = -40 + ph * (VIRTUAL_H + 80)
+        ang = math.sin(t * 0.9 + i * 2.0) * 0.7
+        ca, sa = math.cos(ang), math.sin(ang)
+        hw, hh = 9.0, 12.0
+
+        def rot(px, py):
+            return (x + px * ca - py * sa, y + px * sa + py * ca)
+        pts = [rot(-hw, -hh), rot(hw, -hh), rot(hw, hh), rot(-hw, hh)]
+        poly_aa(surf, pts, (226, 214, 186))
+        for k in range(4):
+            yy = -hh + 5 + k * 5
+            pygame.draw.line(surf, (150, 136, 112), rot(-hw + 3, yy), rot(hw - 3 - (k % 2) * 4, yy), 1)
+    # mor büyü tozu
+    for i in range(40):
+        spd = 16 + (i * 7) % 22
+        x = (i * 89.7 + math.sin(t * 0.7 + i) * 20) % VIRTUAL_W
+        y = VIRTUAL_H + 20 - ((t * spd + i * 41.3) % (VIRTUAL_H + 40))
+        k = 0.5 + 0.5 * math.sin(t * 2.4 + i * 1.7)
+        c = (196, 150, 255) if i % 3 else (255, 214, 140)
+        blit_disc(surf, x, y, 1.0 + 1.4 * k, c, int(50 + 130 * k))
+
+
+def draw_wardrobe_bg(surf, t):
+    """KIYAFET MARKET arka planı (v3.36): şık bir butik — damgalı duvar
+    kâğıdı, ahşap lambri, tepede askılı kıyafet rayı, iki yanda altın
+    çerçeveli boy aynaları ve kadife perdeler, gezinen spot ışıkları ve
+    parıltılar. Duvar bir kez çizilip saklanır."""
+    wall = _HALL_CACHE.get("wardrobe")
+    if wall is None:
+        wall = pygame.Surface((VIRTUAL_W, VIRTUAL_H)).convert()
+        for y in range(VIRTUAL_H):
+            pygame.draw.line(wall, mix_col((20, 40, 50), (10, 18, 28), y / VIRTUAL_H), (0, y), (VIRTUAL_W, y))
+        # damgalı duvar kâğıdı: dikey şeritler + baklava motifleri
+        for x in range(0, VIRTUAL_W, 64):
+            pygame.draw.line(wall, (24, 48, 58), (x, 0), (x, 520), 1)
+        for row in range(0, 9):
+            for x in range(0, VIRTUAL_W + 64, 64):
+                cx, cy = x + (32 if row % 2 else 0), 30 + row * 58
+                pygame.draw.polygon(wall, (28, 56, 68), [(cx, cy - 13), (cx + 9, cy), (cx, cy + 13), (cx - 9, cy)], 1)
+                pygame.draw.circle(wall, (30, 60, 72), (cx, cy), 3)
+                for dx, dy in ((0, -20), (0, 20), (-14, 0), (14, 0)):
+                    pygame.draw.circle(wall, (26, 50, 62), (cx + dx, cy + dy), 1)
+        # lambri
+        lam = pygame.Rect(0, 520, VIRTUAL_W, VIRTUAL_H - 520)
+        pygame.draw.rect(wall, (38, 26, 30), lam)
+        pygame.draw.rect(wall, (150, 116, 64), (0, 516, VIRTUAL_W, 6))
+        pygame.draw.line(wall, (196, 160, 90), (0, 516), (VIRTUAL_W, 516), 1)
+        for x in range(10, VIRTUAL_W, 128):
+            p = pygame.Rect(x, 536, 110, 150)
+            pygame.draw.rect(wall, (46, 32, 36), p, border_radius=4)
+            pygame.draw.rect(wall, (28, 18, 22), p, 2, border_radius=4)
+            pygame.draw.rect(wall, (58, 42, 44), p.inflate(-16, -16), 1, border_radius=3)
+        # kıyafet rayı (tepede): pirinç boru + askılar + asılı kıyafetler
+        rail_y = 108
+        pygame.draw.line(wall, (90, 70, 40), (0, rail_y + 2), (VIRTUAL_W, rail_y + 2), 6)
+        pygame.draw.line(wall, (206, 170, 96), (0, rail_y), (VIRTUAL_W, rail_y), 3)
+        rnd = random.Random(7)
+        garment_cols = [(170, 50, 70), (60, 110, 170), (220, 200, 160), (60, 140, 110), (120, 70, 160),
+                        (200, 120, 60), (40, 44, 60)]
+        x = 24
+        while x < VIRTUAL_W - 20:
+            col = scale_col(rnd.choice(garment_cols), 0.55)
+            hook = (x, rail_y)
+            pygame.draw.arc(wall, (180, 180, 190), pygame.Rect(x - 5, rail_y - 8, 10, 12), 0, math.pi, 2)
+            pygame.draw.lines(wall, (170, 170, 180), False, [(x - 16, rail_y + 18), hook, (x + 16, rail_y + 18)], 2)
+            kind = rnd.randrange(3)
+            if kind == 0:   # gömlek
+                body = [(x - 16, rail_y + 18), (x + 16, rail_y + 18), (x + 22, rail_y + 34), (x + 14, rail_y + 38),
+                        (x + 13, rail_y + 80), (x - 13, rail_y + 80), (x - 14, rail_y + 38), (x - 22, rail_y + 34)]
+            elif kind == 1:  # pelerin
+                body = [(x - 14, rail_y + 18), (x + 14, rail_y + 18), (x + 24, rail_y + 92), (x - 24, rail_y + 92)]
+            else:            # elbise
+                body = [(x - 12, rail_y + 18), (x + 12, rail_y + 18), (x + 8, rail_y + 46), (x + 22, rail_y + 96),
+                        (x - 22, rail_y + 96), (x - 8, rail_y + 46)]
+            pygame.draw.polygon(wall, col, body)
+            pygame.draw.polygon(wall, scale_col(col, 0.6), body, 2)
+            pygame.draw.line(wall, lighten(col, 0.15), (x, rail_y + 22), (x, rail_y + 70), 1)
+            x += rnd.randint(40, 58)
+        # iki yanda altın çerçeveli boy aynaları
+        for cx in (40, VIRTUAL_W - 40):
+            fr = pygame.Rect(0, 0, 74, 300)
+            fr.center = (cx, 390)
+            pygame.draw.ellipse(wall, (90, 66, 30), fr.inflate(10, 10))
+            pygame.draw.ellipse(wall, (210, 170, 90), fr.inflate(4, 4))
+            pygame.draw.ellipse(wall, (120, 160, 176), fr)
+            pygame.draw.ellipse(wall, (70, 100, 116), fr.inflate(-14, -14))
+            pygame.draw.ellipse(wall, (236, 204, 120), fr.inflate(4, 4), 2)
+        # kadife perde (köşelerden sarkan)
+        for side in (0, 1):
+            for k in range(7):
+                xx = (k * 9) if side == 0 else VIRTUAL_W - 1 - k * 9
+                shade = (110, 24, 40) if k % 2 == 0 else (84, 16, 30)
+                ln = 260 - k * 26
+                pygame.draw.line(wall, shade, (xx, 0), (xx, ln), 9)
+            swag = ([(0, 0), (130, 0), (70, 36), (0, 64)] if side == 0
+                    else [(VIRTUAL_W, 0), (VIRTUAL_W - 130, 0), (VIRTUAL_W - 70, 36), (VIRTUAL_W, 64)])
+            pygame.draw.polygon(wall, (124, 30, 48), swag)
+            pygame.draw.lines(wall, (226, 186, 96), False, swag[1:], 3)
+            tx = 64 if side == 0 else VIRTUAL_W - 64
+            pygame.draw.circle(wall, (226, 186, 96), (tx, 236), 6)
+            pygame.draw.line(wall, (226, 186, 96), (tx, 242), (tx, 262), 3)
+        dk = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+        dk.fill((6, 10, 16, 70))
+        wall.blit(dk, (0, 0))
+        _vignette(wall)
+        _HALL_CACHE["wardrobe"] = wall
+    surf.blit(wall, (0, 0))
+    # gezinen spot ışıkları
+    lay = _HALL_CACHE.get("wardrobe_cone")
+    if lay is None:
+        lay = pygame.Surface((520, VIRTUAL_H), pygame.SRCALPHA)
+        for k in range(10):
+            f = k / 10.0
+            pygame.draw.polygon(lay, (200, 255, 255, int(13 * (1 - f))),
+                                [(260 - 24 - 30 * f, 0), (260 + 24 + 30 * f, 0),
+                                 (260 + 120 + 140 * f, VIRTUAL_H), (260 - 120 - 140 * f, VIRTUAL_H)])
+        _HALL_CACHE["wardrobe_cone"] = lay
+    for i, base in enumerate((150, VIRTUAL_W - 150)):
+        x = base + math.sin(t * 0.45 + i * 2.4) * 90
+        surf.blit(lay, (int(x - 260), 0))
+    # aynalarda kayan parıltı
+    for cx in (40, VIRTUAL_W - 40):
+        ph = (t * 0.25 + (0.5 if cx > 640 else 0.0)) % 1.6
+        if ph < 1.0:
+            y0 = 250 + ph * 280
+            pygame.draw.line(surf, (230, 250, 255), (cx - 20, y0 + 14), (cx + 16, y0 - 10), 3)
+            pygame.draw.line(surf, (180, 220, 236), (cx - 20, y0 + 26), (cx + 10, y0 + 6), 1)
+    # parıltılar
+    for i in range(34):
+        x = (i * 113.7 + math.sin(t * 0.3 + i) * 24) % VIRTUAL_W
+        y = (i * 71.3 + t * (6 + i % 5)) % VIRTUAL_H
+        k = max(0.0, math.sin(t * 2.0 + i * 1.9))
+        c = CYAN if i % 3 else (255, 220, 140)
+        _sparkle(surf, x, y, 1.0 + 4.0 * k * k, c)
+
+
 # =====================================================================
 # 30 SANİYELİK TANITIM FİLMİ ("ev reklamı")  (v3.26)
 # ---------------------------------------------------------------------
@@ -33817,7 +35849,6 @@ class GameTour:
         run = sh.run
         # v3.34: filmde hep TAŞ ARENA; başlangıç seçimi, görev ve sunak yok
         run.set_map_theme("stone")
-        run.calm = False
         run.merchant = None
         run.quests = []
         run.ach = None                  # filmde başarım bildirimi çıkmasın
@@ -34776,11 +36807,12 @@ class App:
         # menü farklı yerlerden kuşandırabiliyor; tek doğru kaynak kayıttır.
         self.selected_skin = self.save.equipped_skin_id()
         self.run = RunState(self.save, self.selected_skin, self.diff, self.ach)
-        # v3.35: harita OYNA ekranında seçilir (varsayılan TAŞ MEYDAN). Koşu
-        # DALGA 0 ile başlar: haritada GEZGİN TÜCCAR bekler (yemin satar).
+        # v3.35: harita OYNA ekranında seçilir (varsayılan TAŞ MEYDAN).
+        # v3.36: GEZGİN TÜCCAR haritanın bir yerinde belirir ve koşu boyunca
+        # kalır; dalga hemen başlar, konuşmak isteğe bağlı.
         self.run.set_map_theme(self.selected_map())
         self.run.roll_quests()
-        self.run.start_calm()
+        self.run.spawn_merchant()
         self.merchant_ui.reset()
         self.restart_hold = 0.0
         self.restart_armed = False
@@ -34788,20 +36820,61 @@ class App:
         audio.set_music("battle")
 
     def open_map_select(self):
-        """OYNA: önce harita seçimi (v3.35)."""
+        """OYNA: önce harita seçimi (v3.35); kartlar kapalı (yakınlaşma yok) açılır."""
+        self._ms_zoom = None
         self.goto(STATE_MAP_SELECT)
+
+    # ---- v3.36 kartın büyüyüp ayrıntı penceresine dönüşmesi ----
+    def ms_open_zoom(self, theme, idx):
+        self._ms_zoom = theme
+        self._ms_zoom_from = _ms_card_rect(idx).move(0, -5)
+        self._ms_zoom_t0 = self.t
+        self._ms_zoom_dir = 1
+
+    def ms_close_zoom(self):
+        if getattr(self, "_ms_zoom", None) is None or getattr(self, "_ms_zoom_dir", 1) < 0:
+            return
+        k = self.ms_zoom_k()
+        self._ms_zoom_from = _ms_card_rect(MAP_THEMES.index(self._ms_zoom)).move(0, -5)
+        # yarıda kapatılırsa kaldığı yerden geri küçülür
+        self._ms_zoom_t0 = self.t - (1.0 - k) * MS_ZOOM_TIME
+        self._ms_zoom_dir = -1
+        sfx("click", 0.4, 0.0)
+
+    def ms_zoom_k(self):
+        """Pencerenin açıklık oranı 0..1 (kapanış bitince yakınlaşma sıfırlanır)."""
+        if getattr(self, "_ms_zoom", None) is None:
+            return 0.0
+        k = clamp((self.t - self._ms_zoom_t0) / MS_ZOOM_TIME, 0.0, 1.0)
+        if self._ms_zoom_dir < 0:
+            k = 1.0 - k
+            if k <= 0.0:
+                self._ms_zoom = None
+        return k
 
     def update_map_select(self, dt, mouse_pos, clicked):
         canvas = self.display.canvas
         self.bg.update(dt * 0.2)
-        # önizlemeler: karede en çok BİR tanesi hazırlanır (takılma olmasın)
-        for th in MAP_THEMES:
-            if th not in _MAP_THUMBS:
+        # manzaralar: karede en çok BİR tanesi çizilir (takılma olmasın)
+        busy = False
+        for size in (MS_CARD_SCENE, MS_BIG_SCENE):
+            todo = [th for th in MAP_THEMES if (th, size[0], size[1]) not in _MAP_SCENES]
+            if todo:
                 try:
-                    map_thumb(th)
+                    map_scene(todo[0], size[0], size[1])
                 except Exception:
-                    _MAP_THUMBS[th] = pygame.Surface((264, 118))
+                    _MAP_SCENES[(todo[0], size[0], size[1])] = pygame.Surface(size)
+                busy = True
                 break
+        if not busy:
+            # ayrıntı penceresinin armaları da önceden (karede bir tane)
+            for th in MAP_THEMES:
+                w_ = next((w for w, _a in ms_weapons_for(th)
+                           if w is not None and (w["key"], 24, not self.save.owns_weapon(w["key"])) not in _MS_EMB),
+                          None)
+                if w_ is not None:
+                    ms_weapon_emblem(None, 0, 0, 24, w_, not self.save.owns_weapon(w_["key"]))
+                    break
         act = draw_map_select(self, canvas, mouse_pos, clicked, self.t)
         # klavye: <- -> seç, ENTER başla
         keys = pygame.key.get_pressed()
@@ -34813,10 +36886,12 @@ class App:
             return down and not was
         self._ms_keys = edge
         i = MAP_THEMES.index(self.selected_map())
-        if hit(pygame.K_LEFT):
-            self.set_selected_map(MAP_THEMES[(i - 1) % len(MAP_THEMES)])
-        elif hit(pygame.K_RIGHT):
-            self.set_selected_map(MAP_THEMES[(i + 1) % len(MAP_THEMES)])
+        step = -1 if hit(pygame.K_LEFT) else (1 if hit(pygame.K_RIGHT) else 0)
+        if step:
+            th = MAP_THEMES[(i + step) % len(MAP_THEMES)]
+            self.set_selected_map(th)
+            if getattr(self, "_ms_zoom", None) is not None and self._ms_zoom_dir > 0:
+                self._ms_zoom = th          # açık pencere de yeni haritaya geçer
         elif hit(pygame.K_RETURN) and act is None:
             act = ("start", self.selected_map())
         if act:
@@ -34824,8 +36899,10 @@ class App:
             if kind == "start":
                 self.set_selected_map(th)
                 sfx("click", 0.7, 0.0)
+                self._ms_zoom = None
                 self.start_run()
             else:
+                self._ms_zoom = None
                 self.state = STATE_MENU
 
     def selected_map(self):
@@ -35179,9 +37256,14 @@ class App:
             self.splash_t = max(self.splash_t, self.SPLASH_TIME - self.SPLASH_FADE)
             return
         if self.state == STATE_PLAY: self.state = STATE_PAUSE
-        elif self.state == STATE_MAP_SELECT: self.state = STATE_MENU
+        elif self.state == STATE_MAP_SELECT:
+            # açık ayrıntı penceresi önce kapanır, sonra menüye dönülür
+            if getattr(self, "_ms_zoom", None) is not None:
+                self.ms_close_zoom()
+            else:
+                self.state = STATE_MENU
         elif self.state == STATE_MERCHANT:
-            # Mağaradan çık (yemin seçilmedi): dalga 0 sürerken geri gelinebilir.
+            # Mağaradan çık: tüccar yerinde durur, sonra yine konuşulabilir.
             self.run.merchant_open = False
             self.state = STATE_PLAY
         elif self.state == STATE_PAUSE: self.resume_run()
@@ -35430,9 +37512,15 @@ class App:
         if not act:
             return
         kind, val = act
-        if kind == "oath":
-            run.choose_oath(val)
-            sfx("levelup" if val else "click", 0.6, 0.1)
+        if kind == "oath" and val:
+            key, tier = val
+            run.choose_oath(key, tier)
+            sfx("levelup", 0.6, 0.1)
+            if tier >= 3:
+                sfx("second", 0.7, 0.0)
+            p = run.player
+            run.fx.popup(p.x, p.y - 90, "%s · %s" % (L("oath.%s.name" % key), rarity_name(tier)),
+                         rarity_color(tier), 20 + tier, life=2.2)
         else:
             run.merchant_open = False
             sfx("click", 0.6, 0.0)
@@ -35519,7 +37607,7 @@ class App:
         cx = VIRTUAL_W / 2
         # Panel, SES kaydırıcıları eklendiği için uzadı (v3.20): oyuncu
         # müziği ve efekt sesini oyundan çıkmadan ayarlayabiliyor.
-        pr = pygame.Rect(0, 0, 720, 456)
+        pr = pygame.Rect(0, 0, 720, 512)       # v3.36: GÖREVLER satırı eklendi
         pr.center = (cx, VIRTUAL_H / 2 + 6)
         panel(canvas, pr, bg=(16, 18, 30), edge=(72, 82, 124), alpha=243, radius=18, edge_w=2)
 
@@ -35606,6 +37694,23 @@ class App:
         # v3.30: SOL ÜST PANEL boyutu (silah + kitap şeritleri)
         self._hud_slider(canvas, pygame.Rect(rx, y + 4 * (bh + bgap) + 4, colw, 50),
                          mouse_pos, down)
+        # v3.36: KOŞU GÖREVLERİ kutusunu oyun içinden gizle / göster
+        qr = pygame.Rect(rx, y + 4 * (bh + bgap) + 62, colw, 48)
+        self.pause_quest_rect = qr          # testler bu satıra tıklar
+        on = bool(CFG.get("show_quests", True))
+        hov = qr.collidepoint(mouse_pos)
+        panel(canvas, qr, bg=(32, 36, 54) if hov else (22, 24, 38),
+              edge=CYAN if hov else PANEL_EDGE, alpha=242, radius=10, edge_w=2)
+        draw_text(canvas, L("ui.show_quests"), (qr.x + 16, qr.y + 7), 12, TEXT_DIM, shadow=False)
+        draw_text(canvas, L("ui.on") if on else L("ui.off"), (qr.x + 16, qr.y + 23), 16,
+                  GREEN if on else RED, bold=True, shadow=False)
+        draw_icon(canvas, qr.right - 26, qr.centery, "target", GOLD if on else (110, 116, 140), 9)
+        if clicked and hov:
+            st_ = self.save.data.setdefault("settings", {})
+            st_["show_quests"] = not on
+            self.save.apply_cfg()
+            self.save.save()
+            sfx("click", 0.6, 0.0)
 
         draw_text(canvas, L("ui.pause_hint"),
                   (cx, pr.bottom - 22), 11, TEXT_DIM, center=True, shadow=False)
@@ -38919,7 +41024,7 @@ class App:
         """
         canvas = self.display.canvas
         self.bg.draw(canvas)
-        pr = pygame.Rect(0, 0, 940, 680)        # v3.35: 7 satır sığsın diye uzadı
+        pr = pygame.Rect(0, 0, 940, 626)
         pr.center = (VIRTUAL_W / 2, VIRTUAL_H / 2)
         panel(canvas, pr, alpha=245)
         draw_text(canvas, L("ui.settings"), (pr.centerx, pr.y + 22), 28, CYAN, bold=True, center=True)
@@ -38934,7 +41039,7 @@ class App:
         cw = 420
         lx = pr.centerx - cw - 16
         rx = pr.centerx + 16
-        ROW_H, ROW_STEP = 48, 56          # iki sütunda da AYNI
+        ROW_H, ROW_STEP = 52, 60          # iki sütunda da AYNI
         draw_text(canvas, L("ui.audio_screen"), (lx, pr.y + 62), 15, GOLD, bold=True)
         draw_text(canvas, L("ui.look_perf"), (rx, pr.y + 62), 15, GOLD, bold=True)
 
@@ -38973,9 +41078,6 @@ class App:
         tog(pygame.Rect(lx, y, cw, ROW_H), L("ui.shake"), "shake")
         y += ROW_STEP
         tog(pygame.Rect(lx, y, cw, ROW_H), L("ui.dmg_numbers"), "dmg")
-        y += ROW_STEP
-        # v3.35: sol üstteki KOŞU GÖREVLERİ kutusu gizlenebilir
-        tog(pygame.Rect(lx, y, cw, ROW_H), L("ui.show_quests"), "show_quests")
         col_bottom = y + ROW_H
 
         # ---- SAĞ SÜTUN (5 satır) ----
@@ -40347,7 +42449,8 @@ class App:
 
     def update_book_market(self, dt, mouse_pos, clicked, wheel_y=0):
         canvas = self.display.canvas
-        self.bg.draw(canvas)
+        # v3.36: düz menü zemini yerine KÜTÜPHANE — raflar, şamdanlar, sayfalar.
+        draw_library_bg(canvas, self.t)
 
         owned_n = sum(1 for b in BOOKS if self.save.owns_book(b["key"]))
         rare_n = sum(1 for b in BOOKS if b.get("rare"))
@@ -41106,7 +43209,8 @@ class App:
 
     def update_cosmetic_market(self, dt, mouse_pos, clicked, wheel_y=0):
         canvas = self.display.canvas
-        self.bg.draw(canvas)
+        # v3.36: düz menü zemini yerine BUTİK — askılar, aynalar, spot ışıkları.
+        draw_wardrobe_bg(canvas, self.t)
 
         # ---- üst şerit ----
         top = pygame.Rect(0, 0, VIRTUAL_W, 96)
