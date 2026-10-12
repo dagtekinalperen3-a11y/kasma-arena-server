@@ -636,21 +636,37 @@ def test_v336_merchant_stays_all_run():
     hand = run.merchant_offers()
     assert len(hand) == 3 and len({k for k, _t in hand}) == 3
     assert all(0 <= t_ < K.RARITY_COUNT and k in K.OATH_BY_KEY for k, t_ in hand)
-    # aynı seviyede el DEĞİŞMEZ (konuşup durmak kademe çekmez) ...
+    # v3.38: el BİR KEZ çekilir — konuşup durmak da seviye atlamak da değiştirmez
     for _ in range(30):
         assert run.merchant_offers() == hand
-    # ... seviye atlayınca yenilenir ve tüccarın şansı seviyeyle artar
     luck1 = run.merchant_luck()
     p.level += 5
-    run.merchant_offers()
-    assert run.merchant_hand_lvl == p.level
+    assert run.merchant_offers() == hand
     assert abs(run.merchant_luck() - luck1 - 5 * K.MERCHANT_LUCK_PER_LEVEL) < 1e-9
+    # YENİLEME altınla, en çok 3 kez; her biri pahalanır; altın yetmezse olmaz
+    run.gold_wallet = 0
+    assert run.merchant_reroll() == (False, "gold") and run.merchant_offers() == hand
+    costs = []
+    for i in range(K.MERCHANT_REROLLS):
+        c = run.merchant_reroll_price()
+        costs.append(c)
+        run.gold_wallet = c + 7
+        old_keys = {k for k, _t in run.merchant_hand}
+        assert run.merchant_reroll() == (True, "")
+        assert run.gold_wallet == 7 and run.merchant_reroll_left() == K.MERCHANT_REROLLS - 1 - i
+        new_keys = {k for k, _t in run.merchant_hand}
+        assert len(new_keys) == 3 and not (new_keys & old_keys)      # gerçekten yeni el
+    assert costs[0] < costs[1] < costs[2]
+    run.gold_wallet = 10 ** 6
+    assert run.merchant_reroll() == (False, "none") and run.merchant_reroll_left() == 0
+    hand = run.merchant_offers()
     # yemin: kademesiyle uygulanır, koşuda TEK yemin, tüccar yerinde kalır
     run.choose_oath("glass", 3)
     assert run.oath == "glass" and run.oath_tier == 3 and not run.merchant_open
     assert m.done and run.merchant is m
     run.choose_oath("turtle", 4)
     assert run.oath == "glass" and run.oath_tier == 3
+    assert run.merchant_reroll() == (False, "sworn")
     run.update(1 / 30, dict(_NOINP, use_pressed=True))   # yine konuşulabilir
     assert run.merchant_open
     run.choose_oath(None)
@@ -1278,15 +1294,21 @@ def test_v337_boot_waits_for_sleeping_server_and_says_why():
         def __exit__(self, *a):
             return False
 
+    import threading
     saved = (urllib.request.urlopen, K.time.sleep, K.SaveManager.on_progress_change,
              K.SaveManager.on_ban)
     calls = []
+    main_thread = threading.get_ident()
 
     def boot(*outcomes):
         seq = list(outcomes)
         calls.clear()
 
         def fake(url, *a, **k):
+            # Önceki testlerin App'leri arka planda kendi yoklamasını yapıyor
+            # olabilir: yalnız BU testin iş parçacığı sayılır.
+            if threading.get_ident() != main_thread:
+                raise urllib.error.URLError(OSError("başka test"))
             assert url.endswith("/auth/status")
             calls.append(k.get("timeout"))
             out = seq.pop(0)
@@ -1377,6 +1399,291 @@ def test_v337_server_down_screen_shows_reason():
             app.update_world_leaderboard(1 / 30, (0, 0), False)
     finally:
         K.set_lang("tr")
+
+
+
+# ---------------------------------------------------------------------
+# v3.38 — EKONOMİ, HIZ, TÜCCAR, SANDIK, YARATIKLAR, PATRONLAR, CEHENNEM
+# ---------------------------------------------------------------------
+def test_v338_economy_and_score():
+    # mıknatıs %15, seviye taşı net %10 seyrek
+    assert abs(K.MAGNET_DROP_CHANCE / 0.0018 - 0.85) < 1e-9
+    assert abs(K.MAGNET_DROP_CHANCE * K.LEVEL_STONE_RATE / (0.0018 * 0.70) - 0.90) < 0.01
+    assert K.MAGNET_PITY_FROM < K.MAGNET_PITY_TO
+    # skor yarı yarıya: 12 puanlık yaratık 6 verir; dalga hedefleri de yarıda
+    assert K.SCORE_GAIN == 0.5
+    assert K.wave_score_goal(1) == 300 and K.wave_score_goal(2) == 1150
+    run = _run()
+    e = K.Enemy("red", run.player.x + 500, run.player.y, 1.0, 1.0, wave=1)
+    run.enemies.append(e)
+    e.alive = False
+    run.on_enemy_killed(e)
+    assert run.score == 6, run.score
+    # küsurat kaybolmaz: 6 puanlık yarasa iki kez = 6
+    for _ in range(2):
+        b = K.Enemy("blue", 0, 0, 1.0, 1.0, wave=1)
+        b.alive = False
+        run.on_enemy_killed(b)
+    assert run.score == 12, run.score
+    # elmas %30 az
+    assert K.QUEST_GEMS == (18, 35, 70) and abs(K.RUN_GEM_RATE - 0.084) < 1e-9
+    # dürüst koşu yeni (yarım) skorlarla da hiçbir denetime takılmaz
+    r2 = _run()
+    r2.kills, r2.run_time = 900, 900.0
+    r2.waves.wave = 18
+    r2.score = int(sum(K.wave_score_goal(w) for w in range(1, 19)) * 1.4)
+    assert K.run_score_plausible(r2)
+
+
+def test_v338_speed_soft_cap():
+    run = _run()
+    p = run.player
+    base = p.eff_speed()
+    assert abs(base - K.BASE_SPEED) < 1e-6
+    p.run_spd_mult = 1.10                       # ilk %15 tam işler
+    assert abs(p.eff_speed() - K.BASE_SPEED * 1.10) < 1e-6
+    p.run_spd_mult = 2.0                        # üstü azalan getiriyle
+    assert K.BASE_SPEED * 1.15 < p.eff_speed() < K.BASE_SPEED * 1.5
+    p.run_spd_mult, p.frenzy_stacks = 5.0, 60   # ne alırsan al en çok +%50
+    assert abs(p.eff_speed() - K.BASE_SPEED * K.SPEED_RUN_MAX) < 1e-6
+    # kısa süreli yetenek hızı tavana girmez
+    p.add_temp_buff(6.0, run_spd_mult=0.35)
+    assert abs(p.eff_speed() - K.BASE_SPEED * (K.SPEED_RUN_MAX + 0.35)) < 1e-6
+    # kitap kartı GERÇEK hızı gösterir
+    p.temp_buffs.clear()
+    p.run_spd_mult -= 0.35
+    p.run_spd_mult, p.frenzy_stacks = 1.0, 0
+    b, _k = p.book_stat_view("spd")
+    a, _k = p.book_stat_view("spd", 2.0)
+    assert b == 0.0 and 0.15 < a <= K.SPEED_RUN_MAX - 1.0 + 1e-9
+    # hile denetimi hız yüzünden dürüst koşuyu işaretlemez
+    p.run_spd_mult, p.frenzy_stacks = 9.0, 99
+    assert not K.run_integrity_check(run)
+
+
+def test_v338_cursed_chests_three_per_run():
+    run = _run()
+    NO = dict(_NOINP)
+    run.update(1 / 30, NO)
+    assert run.cursed_spawns == 1 and run.cursed_shrine is not None      # 1) başta
+    first = run.cursed_shrine
+    for _ in range(60):
+        run.update(1 / 30, NO)
+    assert run.cursed_spawns == 1 and run.cursed_shrine is first          # ara yok
+    run.waves.wave = 9
+    run.update(1 / 30, NO)
+    assert run.cursed_spawns == 1
+    run.bosses_killed = 1                                                 # 2) ilk patron
+    first.discovered = True                    # bulunmuş, açılmamış mağara bekletir
+    run.update(1 / 30, NO)
+    assert run.cursed_spawns == 1 and run.cursed_shrine is first
+    first.discovered = False                   # bulunmamış ve yeterince eski: yer değiştirir
+    run.run_time += K.CURSED_MIN_LIFE
+    run.update(1 / 30, NO)
+    assert run.cursed_spawns == 2 and run.cursed_shrine is not first
+    second = run.cursed_shrine                 # iki olay üst üste: yeni mağara boşa gitmez
+    run.open_hell_portal()
+    run.update(1 / 30, NO)
+    assert run.cursed_spawns == 2 and run.cursed_shrine is second
+    run.hell_portal = None
+    run.cursed_shrine.alive = False
+    run.update(1 / 30, NO)
+    run.waves.wave = 22
+    for _ in range(30):
+        run.update(1 / 30, NO)
+    assert run.cursed_spawns == 2 and run.cursed_shrine is None
+    run.open_hell_portal()                                                # 3) kapı
+    run.update(1 / 30, NO)
+    assert run.cursed_spawns == 3 and run.cursed_shrine is not None
+    run.cursed_shrine.alive = False
+    run.bosses_killed = 9
+    for _ in range(30):
+        run.update(1 / 30, NO)
+    assert run.cursed_spawns == 3 and run.cursed_shrine is None           # en çok 3
+    # öbür haritalarda 3. mağara ölüm duvarıyla gelir
+    r2 = _run()
+    r2.map_theme = "desert"
+    r2.cursed_spawns, r2.bosses_killed = 2, 4
+    assert not r2._cursed_due()
+    r2.doom_warned = True
+    assert r2._cursed_due()
+    # cehennemde mağara yok
+    r2.biome = "hell"
+    assert not r2._cursed_due()
+
+
+def test_v338_kamikaze_pierce_and_rage():
+    run = _run()
+    p = run.player
+    # yalnız 20. dalgadan sonra doğar
+    wm = run.waves
+    random.seed(5)
+    wm.wave = 19
+    assert "kamikaze" not in {wm.pick_base_kind() for _ in range(3000)}
+    wm.wave = 24
+    assert "kamikaze" in {wm.pick_base_kind() for _ in range(3000)}
+    # dibine gelince fitil, sonra patlama: ödül yok, oyuncu hasar alır
+    hp0 = p.hp = p.max_hp = 1000.0
+    e = K.Enemy("kamikaze", p.x + 60, p.y, 1.0, 1.0, wave=22)
+    e.spawn_t = 1.0
+    run.enemies = [e]
+    kills0 = run.kills
+    for _ in range(60):
+        run.update(1 / 30, dict(_NOINP))
+        if not e.alive:
+            break
+    assert e.exploded and not e.alive and p.hp < hp0 and run.kills == kills0
+    # fitil yanarken öldürülürse patlamaz ve sayılır
+    e2 = K.Enemy("kamikaze", p.x + 60, p.y, 1.0, 1.0, wave=22)
+    e2.spawn_t = 1.0
+    run.enemies = [e2]
+    run.update(1 / 30, dict(_NOINP))
+    assert e2.fuse_t > 0
+    hp1 = p.hp
+    e2.take_damage(1e9, False, run.fx)
+    run.on_enemy_killed(e2)
+    for _ in range(30):
+        run.update(1 / 30, dict(_NOINP))
+    assert not e2.exploded and run.kills == kills0 + 1 and p.hp >= hp1 - 1e-6
+    # ZIRH DELME: 12. dalgaya kadar yok, sonra artar; cehennemde daha fazla
+    assert K.enemy_armor_pierce(12) == 0.0 and K.enemy_armor_pierce(20) > 0.2
+    assert K.enemy_armor_pierce(60) == K.PIERCE_MAX
+    assert K.enemy_armor_pierce(1, "hell") >= 0.3 and K.enemy_armor_pierce(99, "hell") == K.PIERCE_HELL_MAX
+    p.base_armor, p.run_armor_bonus = 0.5, 0.0
+    p.hp = p.max_hp = 1000.0
+    p.armor_pierce = 0.0
+    d0 = p.take_damage(100, run.fx)
+    p.invuln = 0
+    p.armor_pierce = 0.45
+    d1 = p.take_damage(100, run.fx)
+    assert d1 > d0 * 1.3, (d0, d1)
+    run.waves.wave = 20
+    run.update(1 / 30, dict(_NOINP))
+    assert abs(p.armor_pierce - K.enemy_armor_pierce(20)) < 1e-9
+    # KUDURMA: 25'e kadar yok; sonra kızıl / yarasa mor; cehennemde yok
+    assert K.rage_level(25) == 0.0 and 0 < K.rage_level(27) < 1 and K.rage_level(40) == 1.0
+    assert K.rage_level(40, "hell") == 0.0
+    red, bat = K.Enemy("red", 0, 0, 1, 1.0, wave=31), K.Enemy("blue", 0, 0, 1, 1.0, wave=31)
+    assert red.rage_col == K.RAGE_FIRE and bat.rage_col == K.RAGE_BAT
+    assert bat.color[2] > bat.color[1] and red.color[0] > 200
+    surf = pygame.Surface((400, 300))
+    for k in ("red", "blue", "kamikaze", "tank", "stinger"):
+        en = K.Enemy(k, 200, 150, 1, 1.0, wave=31)
+        en.spawn_t = 1.0
+        en.fuse_t = 0.3 if k == "kamikaze" else 0.0
+        en.draw(surf, 1.0)
+    for lg in LANGS:
+        K.set_lang(lg)
+        for key in ("th.pierce", "th.kamikaze", "th.rage", "th.hell_pierce", "en.kamikaze"):
+            assert K.L(key) and key not in K.L(key)
+    K.set_lang("tr")
+
+
+def test_v338_map_boss_skills_champion_and_hell():
+    sets = {}
+    for theme in ("stone", "frost", "jungle", "desert"):
+        for kind in K.BOSS_ORDER:
+            b = K.Boss(kind, 0, 0, 1.0, 1.0, 15, theme=None if theme == "stone" else theme)
+            sets[(theme, kind)] = b.skills
+            assert len(b.skills) == 3 and set(b.skills) <= set(K.BOSS_SKILL_SETS["warlord"]
+                                                              + K.BOSS_SKILL_SETS["witch"]
+                                                              + ("quake", "harvest", "swarm"))
+            assert b.element == K.MAP_BOSS_ELEMENT.get(theme)
+    # her haritada her patronun takımı başka
+    for kind in K.BOSS_ORDER:
+        combos = {frozenset(sets[(th, kind)]) for th in ("stone", "frost", "jungle", "desert")}
+        assert len(combos) == 4, kind
+    # cehennemde her patrona +2 yetenek
+    for kind in K.HELL_BOSS_ORDER:
+        hb = K.Boss(kind, 0, 0, 1.0, 1.0, 10, hellish=True)
+        assert len(hb.skills) == len(K.BOSS_SKILL_SETS[kind]) + 2
+    # element vuruşta işler
+    run = _run()
+    p = run.player
+    fb = K.Boss("reaper", 0, 0, 1.0, 1.0, 15, theme="frost")
+    fb.afflict(p)
+    assert p.slow_t > 0
+    # 20. dalga: 2 patron yerine TEK ŞAMPİYON (ödülü ve sandığı 2 kat)
+    run = _run()
+    run.player.take_damage = lambda *a, **k: 0
+    run.waves.wave = 20
+    run.waves.boss_pending = True
+    run.update(1 / 30, dict(_NOINP))
+    assert len(run.bosses) == 1 and run.bosses[0].champion == 2
+    champ = run.bosses[0]
+    single = K.Boss(champ.kind, 0, 0, 1.0, 1.0, 20)
+    assert champ.dmg > single.dmg and champ.radius > single.radius and champ.score == single.score * 2
+    champ.hp = 0
+    champ.alive = False
+    chests0, kb0 = len(run.chests), int(getattr(run, "bosses_killed", 0))
+    run.update(1 / 30, dict(_NOINP))
+    assert len(run.chests) == chests0 + 2 and run.bosses_killed == kb0 + 2
+    # CEHENNEM 40 dalga: son patron 40'ta, sonra ölüm duvarı
+    wm = K.WaveManager("normal", biome="hell")
+    assert [w for w in range(1, 60) if wm.is_boss_wave(w)] == list(range(5, 41, 5))
+    assert K.hell_pressure(41)[0] > K.hell_pressure(40)[0] * K.DOOM_HP * 1.05
+    he = K.Enemy(None, 0, 0, 1.0, 1.0, wave=1, variant=K.hell_pick_kind(1), biome="hell")
+    assert he.armor >= K.HELL_ARMOR_BASE
+    for lg in LANGS:
+        K.set_lang(lg)
+        assert K.L("hell.end") and K.L("ui.champ_boss") and "ui." not in K.L("ui.champ_boss")
+    K.set_lang("tr")
+
+
+def test_v338_screens_draw():
+    app = K.App()
+    canvas = app.display.canvas
+    for t in (0.0, 2.5, 61.0):
+        K.draw_skin_market_bg(canvas, t)
+    app.state = K.STATE_SKIN_MARKET
+    app.update_skin_market(1 / 30, (0, 0), False)
+    # Taş Meydan zemini + alevler
+    world = pygame.Surface((K.VIRTUAL_W, K.VIRTUAL_H))
+    floor = K.floor_surface("arena")
+    assert floor.get_size() == (K.ARENA_RECT.w, K.ARENA_RECT.h)
+    assert len(K.stone_fire_spots()) >= 8
+    cam = pygame.Rect(K.ARENA_RECT.centerx - 640, K.ARENA_RECT.centery - 360, 1280, 720)
+    K.draw_world_floor(world, cam, "arena", 1.0)
+    # HUD: arena (zırh delme rozeti) ve cehennem (dalga n/40)
+    app.start_run()
+    r = app.run
+    r.waves.wave = 22
+    r.player.armor_pierce = K.enemy_armor_pierce(22)
+    K.draw_hud(canvas, r, 1.0)
+    r.biome = "hell"
+    K.draw_hud(canvas, r, 1.0)
+    r.biome = "arena"
+    # seviye atlama ekranı (kurdele + defne)
+    r.pending_levelups = 1
+
+    class _Keys:
+        def __getitem__(self, i):
+            return False
+    app.update_play(1 / 30, _Keys(), (640, 360), False, False, False)
+    assert app.state == K.STATE_LEVELUP
+    for _ in range(14):
+        app.t += 1 / 30
+        app.update_levelup(1 / 30, (0, 0), False)
+    # tüccarın YENİLE düğmesi
+    app.state = K.STATE_PLAY
+    r.merchant_open = True
+    r.gold_wallet = 5000
+    app.merchant_ui.reset()
+    app.merchant_ui.stage = "oaths"
+    app.state = K.STATE_MERCHANT
+    r.merchant_offers()
+    hand = list(r.merchant_hand)
+    for _ in range(12):
+        app.t += 1 / 30
+        app.update_merchant(1 / 30, (0, 0), False)
+    app.update_merchant(1 / 30, app.merchant_ui.btn_c.center, True)
+    assert r.merchant_rerolls == 1 and r.merchant_hand != hand and app.state == K.STATE_MERCHANT
+    for lg in LANGS:
+        K.set_lang(lg)
+        for key in ("m.reroll", "m.reroll_none", "ui.pierce_chip", "ui.portal_open_hud",
+                    "ui.next_boss_hud"):
+            assert K.L(key, 1, 2) and key not in K.L(key, 1, 2)
+    K.set_lang("tr")
 
 
 if __name__ == "__main__":
