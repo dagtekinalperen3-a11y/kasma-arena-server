@@ -2272,6 +2272,11 @@ SHOP_PRODUCTS = {
     "1002": {"kind": "gems", "gems": 1320, "price": 5900, "name": "1.320 Elmas"},
     "1003": {"kind": "gems", "gems": 3120, "price": 11900, "name": "3.120 Elmas"},
     "1004": {"kind": "gems", "gems": 9450, "price": 27900, "name": "9.450 Elmas"},
+    # v3.40: 4 yeni paket (oyundaki GEM_PACKS ile aynı; gems = bonus dahil toplam)
+    "1005": {"kind": "gems", "gems": 120, "price": 900, "name": "120 Elmas"},
+    "1006": {"kind": "gems", "gems": 6250, "price": 18900, "name": "6.250 Elmas"},
+    "1007": {"kind": "gems", "gems": 18200, "price": 49900, "name": "18.200 Elmas"},
+    "1008": {"kind": "gems", "gems": 37500, "price": 89900, "name": "37.500 Elmas"},
     "2001": {"kind": "skin", "item": "web_master", "price": 7900, "name": "Ağ Ustası (skin)"},
     "2002": {"kind": "skin", "item": "ash_warrior", "price": 7900, "name": "Kül Savaşçısı (skin)"},
     "2003": {"kind": "skin", "item": "green_titan", "price": 9900, "name": "Yeşil Dev (skin)"},
@@ -2284,7 +2289,8 @@ SHOP_PRODUCTS = {
     "3006": {"kind": "pet", "item": "pet_owl", "price": 4900, "name": "Baykuş (PET)"},
     "3007": {"kind": "pet", "item": "pet_drone", "price": 5900, "name": "Mini Drone (PET)"},
     "3008": {"kind": "pet", "item": "pet_dragon", "price": 7900, "name": "Yavru Ejderha (PET)"},
-    CUSTOM_PET_PRODUCT: {"kind": "custom_pet", "price": 15900, "name": "Kendi PET'in (özel tasarım)"},
+    # v3.40: adda kesme işareti yok (ödeme sağlayıcısının ürün adı alanı için)
+    CUSTOM_PET_PRODUCT: {"kind": "custom_pet", "price": 15900, "name": "Ozel Tasarim PET"},
 }
 
 # ÖZEL PET PARÇALARI — oyundaki CUSTOM_PET_PARTS ile BİREBİR aynı olmalı.
@@ -2309,25 +2315,26 @@ def _clean_pet_design(d):
     if not isinstance(d, dict):
         return None
     out = {}
+    # v3.40: tanınmayan parça SİPARİŞİ DÜŞÜRMEZ, o parça varsayılana döner.
+    # Eskiden tek bir bilinmeyen parça (ör. oyunun daha yeni sürümünden)
+    # bütün satın almayı "PET tasarımı geçersiz" diye reddediyordu.
     for key, allowed in CUSTOM_PET_PARTS.items():
         v = str(d.get(key, allowed[0]))
-        if v not in allowed:
-            return None
-        out[key] = v
-    for key in CUSTOM_PET_COLORS:
+        out[key] = v if v in allowed else allowed[0]
+    for key, fallback in zip(CUSTOM_PET_COLORS, ([255, 168, 92], [255, 236, 212], [64, 150, 255])):
         c = d.get(key)
-        if not (isinstance(c, (list, tuple)) and len(c) == 3):
-            return None
         try:
+            if not (isinstance(c, (list, tuple)) and len(c) == 3):
+                raise ValueError
             out[key] = [max(0, min(255, int(x))) for x in c]
         except (TypeError, ValueError):
-            return None
+            out[key] = list(fallback)
     try:
         size = float(d.get("size", 1.0))
     except (TypeError, ValueError):
-        return None
+        size = 1.0
     if not math.isfinite(size):
-        return None
+        size = 1.0
     out["size"] = round(max(0.8, min(1.3, size)), 2)
     name = CUSTOM_PET_NAME_RE.sub("", str(d.get("name", "") or ""))[:14].strip()
     out["name"] = name or "Petim"
