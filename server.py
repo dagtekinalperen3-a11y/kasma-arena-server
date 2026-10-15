@@ -619,11 +619,11 @@ _reset_lock = threading.Lock()
 _RESET_KEY = secrets.token_bytes(32)
 
 RESET_MAIL = {
-    "tr": ("ARENA BONK şifre sıfırlama kodun",
+    "tr": ("EvolveArena şifre sıfırlama kodun",
            "Merhaba {name},\n\nŞifre sıfırlama kodun: {code}\n\n"
            "Kod 15 dakika geçerli. Bu isteği sen yapmadıysan bu e-postayı yok say; "
            "şifren değişmez."),
-    "en": ("Your ARENA BONK password reset code",
+    "en": ("Your EvolveArena password reset code",
            "Hi {name},\n\nYour password reset code: {code}\n\n"
            "It is valid for 15 minutes. If you didn't ask for this, ignore this "
            "email; your password stays the same."),
