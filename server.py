@@ -585,6 +585,219 @@ def auth_login():
         return _oops(e)
 
 
+# =====================================================================
+# ŞİFREMİ UNUTTUM (v3.39)
+# ---------------------------------------------------------------------
+#   POST /auth/forgot {who, lang}
+#       Hesabın kayıtlı e-postasına 6 haneli, 15 dakikalık bir kod yollar.
+#       Cevap HER ZAMAN {"success": true}: hesap var mı, e-postası var mı
+#       dışarıdan öğrenilemez (/auth/login'deki ilkeyle aynı).
+#   POST /auth/reset {who, code, password, device, device_legacy}
+#       Kod doğruysa şifre değişir, hesabın BÜTÜN oturumları kapanır ve bu
+#       cihaza yeni oturum verilir. Cevap /auth/login ile aynı biçimde.
+#
+# Kodlar bellekte KARILMIŞ olarak durur (veritabanında yeni tablo gerekmez).
+# Sunucu yeniden başlarsa bekleyen kodlar düşer; oyuncu "kodu yeniden
+# gönder"e basar. Bir koda en çok 5 yanlış deneme: 10^6 ihtimale karşı
+# kaba kuvvet imkânsız.
+#
+# E-POSTA (Render > Environment, biri yeter):
+#   BREVO_API_KEY  + MAIL_FROM   brevo.com — ücretsiz, alan adı gerekmez;
+#                                MAIL_FROM'u Brevo'da "sender" olarak doğrula.
+#   RESEND_API_KEY + MAIL_FROM   resend.com — kendi alan adın doğrulanmalı.
+#   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, MAIL_FROM
+#                                (Render'ın ücretsiz planı SMTP portlarını
+#                                kapatıyor olabilir; HTTP API'ler önerilir.)
+#   MAIL_FROM_NAME (isteğe bağlı, varsayılan "ARENA BONK")
+# Hiçbiri yoksa /auth/forgot kod üretmez, günlüğe uyarı yazar.
+# =====================================================================
+RESET_CODE_TTL = 15 * 60
+RESET_MAX_TRIES = 5
+RESET_RESEND_GAP = 60
+_reset_codes = {}               # account_id -> {"h", "exp", "tries", "sent"}
+_reset_lock = threading.Lock()
+_RESET_KEY = secrets.token_bytes(32)
+
+RESET_MAIL = {
+    "tr": ("ARENA BONK şifre sıfırlama kodun",
+           "Merhaba {name},\n\nŞifre sıfırlama kodun: {code}\n\n"
+           "Kod 15 dakika geçerli. Bu isteği sen yapmadıysan bu e-postayı yok say; "
+           "şifren değişmez."),
+    "en": ("Your ARENA BONK password reset code",
+           "Hi {name},\n\nYour password reset code: {code}\n\n"
+           "It is valid for 15 minutes. If you didn't ask for this, ignore this "
+           "email; your password stays the same."),
+}
+
+
+def _mail_configured():
+    return bool(os.environ.get("MAIL_FROM") and (
+        os.environ.get("BREVO_API_KEY") or os.environ.get("RESEND_API_KEY")
+        or os.environ.get("SMTP_HOST")))
+
+
+def _send_mail(to, subject, text):
+    """Düz metin e-posta. Önce Brevo, sonra Resend, sonra SMTP."""
+    sender = os.environ.get("MAIL_FROM", "")
+    sender_name = os.environ.get("MAIL_FROM_NAME", "ARENA BONK")
+    brevo = os.environ.get("BREVO_API_KEY", "")
+    resend_key = os.environ.get("RESEND_API_KEY", "")
+    if brevo:
+        req = urllib.request.Request(
+            "https://api.brevo.com/v3/smtp/email",
+            data=json.dumps({"sender": {"email": sender, "name": sender_name},
+                             "to": [{"email": to}], "subject": subject,
+                             "textContent": text}).encode("utf-8"),
+            headers={"api-key": brevo, "Content-Type": "application/json",
+                     "Accept": "application/json"})
+        urllib.request.urlopen(req, timeout=20).read()
+        return
+    if resend_key:
+        req = urllib.request.Request(
+            "https://api.resend.com/emails",
+            data=json.dumps({"from": f"{sender_name} <{sender}>", "to": [to],
+                             "subject": subject, "text": text}).encode("utf-8"),
+            headers={"Authorization": f"Bearer {resend_key}",
+                     "Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=20).read()
+        return
+    import smtplib
+    import ssl
+    from email.message import EmailMessage
+    msg = EmailMessage()
+    msg["From"] = f"{sender_name} <{sender}>"
+    msg["To"] = to
+    msg["Subject"] = subject
+    msg.set_content(text)
+    host = os.environ.get("SMTP_HOST", "")
+    port = int(os.environ.get("SMTP_PORT", "587") or 587)
+    ctx = ssl.create_default_context()
+    if port == 465:
+        with smtplib.SMTP_SSL(host, port, context=ctx, timeout=20) as s:
+            s.login(os.environ.get("SMTP_USER", ""), os.environ.get("SMTP_PASS", ""))
+            s.send_message(msg)
+    else:
+        with smtplib.SMTP(host, port, timeout=20) as s:
+            s.starttls(context=ctx)
+            s.login(os.environ.get("SMTP_USER", ""), os.environ.get("SMTP_PASS", ""))
+            s.send_message(msg)
+
+
+def _reset_hash(account_id, code):
+    return hmac.new(_RESET_KEY, f"{account_id}:{code}".encode("utf-8"),
+                    hashlib.sha256).hexdigest()
+
+
+def _find_account_by_who(who):
+    """Kullanıcı adı YA DA e-postadan hesap (bkz. /auth/login aramasıyla aynı)."""
+    who = str(who or "").strip()
+    if not who:
+        return None
+    if "@" in who:
+        rows = supabase.table("accounts").select("*").eq("email", who.lower()).execute()
+        return rows.data[0] if rows.data else None
+    rows = supabase.table("accounts").select("*").execute()
+    low = who.lower()
+    for rrow in rows.data or []:
+        if str(rrow.get("username") or "").lower() == low:
+            return rrow
+    return None
+
+
+@app.route("/auth/forgot", methods=["POST"])
+def auth_forgot():
+    if not _accounts_enabled():
+        return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
+    if not _rate_ok("fp:" + _client_ip(), max_n=6):
+        return jsonify({"success": False, "error": "çok fazla deneme, biraz bekle"}), 429
+    data = request.json or {}
+    who = str(data.get("who") or "").strip()[:96]
+    lang = "tr" if str(data.get("lang") or "tr") == "tr" else "en"
+    ok = jsonify({"success": True})
+    if not who:
+        return ok
+    if not _mail_configured():
+        app.logger.warning("[sifre] /auth/forgot geldi ama e-posta ayarı yok "
+                           "(BREVO_API_KEY / RESEND_API_KEY / SMTP_HOST + MAIL_FROM)")
+        return ok
+    try:
+        acc = _find_account_by_who(who)
+    except Exception as e:
+        return _oops(e)
+    email = str((acc or {}).get("email") or "").strip()
+    if not acc or not EMAIL_RE.match(email):
+        return ok                       # dışarıdan ayırt edilemesin
+    aid = str(acc["id"])
+    now = time.time()
+    with _reset_lock:
+        cur = _reset_codes.get(aid)
+        if cur and now - cur["sent"] < RESET_RESEND_GAP:
+            return ok
+        code = f"{secrets.randbelow(10 ** 6):06d}"
+        _reset_codes[aid] = {"h": _reset_hash(aid, code), "exp": now + RESET_CODE_TTL,
+                             "tries": 0, "sent": now}
+        if len(_reset_codes) > 4096:
+            for k in [k for k, v in _reset_codes.items() if v["exp"] < now]:
+                _reset_codes.pop(k, None)
+    subject, body = RESET_MAIL[lang]
+    text = body.format(name=acc.get("username") or acc.get("name") or "", code=code)
+
+    def worker():
+        try:
+            _send_mail(email, subject, text)
+        except Exception:
+            app.logger.exception("[sifre] e-posta gönderilemedi (hesap %s)", aid)
+    threading.Thread(target=worker, daemon=True).start()
+    return ok
+
+
+@app.route("/auth/reset", methods=["POST"])
+def auth_reset():
+    if not _accounts_enabled():
+        return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
+    if not _rate_ok("fpr:" + _client_ip()):
+        return jsonify({"success": False, "error": "çok fazla deneme, biraz bekle"}), 429
+    data = request.json or {}
+    who = str(data.get("who") or "").strip()[:96]
+    code = str(data.get("code") or "").strip()
+    new_pw = str(data.get("password") or "")
+    bad = (jsonify({"success": False, "error": "kod yanlış ya da süresi dolmuş"}), 400)
+    if len(new_pw) < PW_MIN_LEN:
+        return jsonify({"success": False,
+                        "error": f"şifre en az {PW_MIN_LEN} karakter olmalı"}), 400
+    if not (len(code) == 6 and code.isdigit()):
+        return bad
+    try:
+        acc = _find_account_by_who(who)
+    except Exception as e:
+        return _oops(e)
+    if not acc:
+        return bad
+    aid = str(acc["id"])
+    with _reset_lock:
+        cur = _reset_codes.get(aid)
+        if not cur or time.time() > cur["exp"] or cur["tries"] >= RESET_MAX_TRIES:
+            _reset_codes.pop(aid, None)
+            return bad
+        if not hmac.compare_digest(cur["h"], _reset_hash(aid, code)):
+            cur["tries"] += 1
+            return bad
+        _reset_codes.pop(aid, None)     # kod tek kullanımlık
+    try:
+        supabase.table("accounts").update(
+            {"password_hash": _hash_password(new_pw)}).eq("id", acc["id"]).execute()
+        # Şifre neden sıfırlanıyorsa (unutuldu / çalındı) eski oturumlar gider.
+        supabase.table("sessions").delete().eq("account_id", acc["id"]).execute()
+        tok = _new_session(acc["id"], data.get("device"))
+    except Exception as e:
+        return _oops(e)
+    _login_ok(str(acc.get("username") or "").lower())
+    _login_ok(str(acc.get("email") or "").lower())
+    # artık şifresi var (Google hesabı da şifre kazanmış olur)
+    pub = _public_account(dict(acc, password_hash="x"))
+    return jsonify({"success": True, "token": tok, "account": pub})
+
+
 class _GoogleError(Exception):
     """Google tarafında bir şey tutmadı. Metni oyuncuya gösterilebilir."""
 
@@ -801,7 +1014,9 @@ PROGRESS_STATS = ("runs", "best_score", "total_kills", "total_time", "bosses",
                   "frost_kills", "frost_bosses", "best_frost_wave", "frost_shots",
                   "desert_dashes", "best_desert_wind", "best_desert_wave", "desert_kills",
                   "desert_bonk_hits", "jungle_snakes", "jungle_bosses", "best_jungle_time",
-                  "jungle_kills")
+                  "jungle_kills",
+                  # v3.39 HARİTA KİLİDİ: haritaların en iyi dalgası, Taş Meydan bitti mi
+                  "best_stone_wave", "best_jungle_wave", "stone_cleared")
 
 
 
@@ -1202,7 +1417,7 @@ AD_REWARD_GEMS = 300           # v3.27: 50 -> 250, v3.33: 300
 AD_DAILY_LIMIT = 5
 AD_COOLDOWN = 90.0
 AD_MIN_WATCH = 105.0                 # oyundaki tanıtım filmi 120 sn (v3.33)
-DAILY_GIFT_GEMS = (20, 25, 30, 35, 40, 50, 75)
+DAILY_GIFT_GEMS = (150, 250, 350, 450, 550, 650, 750)   # v3.39 (oyunla aynı)
 
 
 def _server_day(offset_days=0):
