@@ -154,7 +154,7 @@ USERNAME_RE = _re.compile(r"^[A-Za-z0-9ÇĞİÖŞÜçğıöşü_]{3,14}$")
 
 # Oyuncunun adını çalmaya çalışan "admin / moderator" gibi adlar kapalı.
 USERNAME_BLOCK = {"admin", "administrator", "moderator", "mod", "sistem", "system",
-                  "kasma", "kasmaarena", "root", "null", "undefined", "anonim",
+                  "kasma", "kasmaarena", "evolve", "evolvearena", "arenabonk", "root", "null", "undefined", "anonim",
                   "isimsiz", "server", "sunucu", "support", "destek"}
 
 
@@ -608,7 +608,7 @@ def auth_login():
 #   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, MAIL_FROM
 #                                (Render'ın ücretsiz planı SMTP portlarını
 #                                kapatıyor olabilir; HTTP API'ler önerilir.)
-#   MAIL_FROM_NAME (isteğe bağlı, varsayılan "ARENA BONK")
+#   MAIL_FROM_NAME (isteğe bağlı, varsayılan "EvolveArena")
 # Hiçbiri yoksa /auth/forgot kod üretmez, günlüğe uyarı yazar.
 # =====================================================================
 RESET_CODE_TTL = 15 * 60
@@ -639,7 +639,7 @@ def _mail_configured():
 def _send_mail(to, subject, text):
     """Düz metin e-posta. Önce Brevo, sonra Resend, sonra SMTP."""
     sender = os.environ.get("MAIL_FROM", "")
-    sender_name = os.environ.get("MAIL_FROM_NAME", "ARENA BONK")
+    sender_name = os.environ.get("MAIL_FROM_NAME", "EvolveArena")
     brevo = os.environ.get("BREVO_API_KEY", "")
     resend_key = os.environ.get("RESEND_API_KEY", "")
     if brevo:
@@ -2772,7 +2772,7 @@ def _shopier_start(order, prod, acc):
         "random_nr": rnd, "signature": sig,
     }
     inputs = "".join(f"<input type='hidden' name='{_esc(k)}' value='{_esc(v)}'>" for k, v in f.items())
-    body = (f"<h1>ARENA BONK</h1><p>{_esc(prod['name'])}</p><div class='p'>₺{_tl(order['amount'])}</div>"
+    body = (f"<h1>EvolveArena</h1><p>{_esc(prod['name'])}</p><div class='p'>₺{_tl(order['amount'])}</div>"
             f"<form id='f' method='post' action='{SHOPIER_PAY_URL}'>{inputs}"
             "<button class='ok' type='submit'>GÜVENLİ ÖDEMEYE GEÇ</button></form>"
             "<small>Shopier güvenli ödeme sayfasına yönlendiriliyorsun...</small>"
