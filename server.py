@@ -84,12 +84,49 @@ supabase: Client = None
 if SUPABASE_URL and SUPABASE_KEY:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+def _body():
+    """İstek gövdesi — HER ZAMAN sözlük (v3.42).
+
+    Eskiden `_body()` kullanılıyordu: gövde ["x"] gibi bir LİSTE
+    ya da bozuk JSON olunca .get() AttributeError atıyor, uç 500 dönüyordu."""
+    d = request.get_json(silent=True)
+    return d if isinstance(d, dict) else {}
+
+
+def _int(v, default=0):
+    """Güvenli tamsayı: "abc", None, 1e400, NaN -> default (500 yerine)."""
+    try:
+        f = float(v)
+        return int(f) if math.isfinite(f) else default
+    except (TypeError, ValueError, OverflowError):
+        return default
+
+
+def _num(v, default=0.0):
+    try:
+        f = float(v)
+        return f if math.isfinite(f) else default
+    except (TypeError, ValueError, OverflowError):
+        return default
+
+
+# SABİT DOSYALAR (v3.42): eskiden sunucu klasöründeki HER dosya servis
+# ediliyordu — GET /server.py kaynak kodun tamamını veriyordu. Artık yalnız
+# web sayfası türleri, gizli (.) dosyalar hariç.
+STATIC_EXT = (".html", ".htm", ".css", ".js", ".png", ".jpg", ".jpeg", ".gif",
+              ".svg", ".ico", ".webp", ".txt", ".woff", ".woff2")
+
+
 @app.route("/")
 def index():
     return send_from_directory(".", "index.html")
 
 @app.route("/<path:path>")
 def static_files(path):
+    name = path.replace("\\", "/").rsplit("/", 1)[-1]
+    if (not path.lower().endswith(STATIC_EXT) or name.startswith(".")
+            or any(part.startswith(".") for part in path.split("/"))):
+        return jsonify({"error": "bulunamadı"}), 404
     return send_from_directory(".", path)
 
 # =====================================================================
@@ -325,13 +362,27 @@ def _clean_username(u):
     return True, u
 
 
+def _accounts_by_username(u, cols="*"):
+    """Kullanıcı adına (büyük/küçük harf duyarsız) uyan hesaplar.
+
+    v3.42: eskiden BÜTÜN hesaplar çekilip Python'da aranıyordu; Supabase bir
+    sorguda en çok 1000 satır döndürdüğü için 1000. hesaptan sonrakiler
+    kullanıcı adıyla GİRİŞ YAPAMIYOR, aynı ad ikinci kez alınabiliyordu.
+    Artık ILIKE ile (joker karakterler kaçırılarak) yalnız o ad sorulur."""
+    low = str(u or "").strip().lower()
+    if not low:
+        return []
+    pat = low.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    q = supabase.table("accounts").select(cols)
+    try:
+        rows = q.ilike("username", pat).execute().data or []
+    except AttributeError:          # ilike'ı olmayan (eski / sahte) istemci
+        rows = supabase.table("accounts").select(cols).execute().data or []
+    return [r for r in rows if str(r.get("username") or "").lower() == low]
+
+
 def _username_taken(u, except_id=None):
-    rows = supabase.table("accounts").select("id,username").execute()
-    low = u.lower()
-    for r in rows.data or []:
-        if str(r.get("username") or "").lower() == low and r.get("id") != except_id:
-            return True
-    return False
+    return any(r.get("id") != except_id for r in _accounts_by_username(u, "id,username"))
 
 
 def _b64url_json(part):
@@ -370,7 +421,17 @@ def _find_or_create_account(email, name, provider, password_hash=None, google_su
     rows = supabase.table("accounts").select("*").eq("email", email).execute()
     if rows.data:
         acc = rows.data[0]
-        # Google ile giren, daha önce şifreyle açılmış hesabına bağlanabilir.
+        # v3.42 HESAP ÖN-ELE GEÇİRME KAPANDI: kayıtta yazılan e-posta
+        # doğrulanmıyor. Eskiden biri BAŞKASININ Gmail adresiyle şifreli hesap
+        # açınca, o kişi Google ile girdiğinde saldırganın hesabına
+        # bağlanıyordu (satın aldıkları da oraya gidiyordu). Google girişi
+        # artık yalnız (a) aynı Google kimliğine, (b) Google ile açılmış ya da
+        # (c) şifresi olmayan hesaba bağlanır.
+        if google_sub:
+            same = str(acc.get("google_sub") or "") == str(google_sub)
+            if not same:
+                if acc.get("google_sub") or acc.get("password_hash"):
+                    raise _LinkRefused()
         patch = {}
         if google_sub and not acc.get("google_sub"):
             patch["google_sub"] = google_sub
@@ -444,7 +505,7 @@ def diag():
         try:
             supabase.table(tbl).select("*").limit(1).execute()
             info["var"] = True
-        except Exception as e:
+        except Exception:
             # Ham Supabase metni DEĞİL: yalnızca "yok" bilgisi. Ayrıntı
             # Render günlüğünde.
             try:
@@ -496,15 +557,19 @@ def auth_register():
     src = _client_ip()
     if not _rate_ok("auth:" + src):
         return jsonify({"success": False, "error": "çok fazla deneme"}), 429
-    data = request.json or {}
-    # KULLANICI ADI ile kayıt: e-posta İSTEĞE BAĞLI. Oyuncu Gmail'siz de
-    # hesap açabilsin diye. (E-posta verilirse şifre kurtarmada işe yarar.)
+    data = _body()
+    # KULLANICI ADI ile kayıt. v3.42: KURTARMA E-POSTASI ZORUNLU — şifresini
+    # unutan oyuncuya /auth/forgot ile kod gönderebilmek için. (Eskiden
+    # isteğe bağlıydı; e-postasız açılan hesaplar /auth/email ile ekler.)
     ok, uname = _clean_username(data.get("username"))
     if not ok:
         return jsonify({"success": False, "error": uname}), 400
     password = str(data.get("password", ""))
     email = str(data.get("email", "")).strip().lower()
-    if email and not EMAIL_RE.match(email):
+    if not email:
+        return jsonify({"success": False,
+                        "error": "kurtarma e-postası gerekli"}), 400
+    if len(email) > 254 or not EMAIL_RE.match(email):
         return jsonify({"success": False, "error": "e-posta geçersiz"}), 400
     if len(password) < PW_MIN_LEN:
         return jsonify({"success": False,
@@ -540,7 +605,7 @@ def auth_login():
     src = _client_ip()
     if not _rate_ok("auth:" + src):
         return jsonify({"success": False, "error": "çok fazla deneme"}), 429
-    data = request.json or {}
+    data = _body()
     # Oyuncu kullanıcı adını DA e-postasını DA yazabilir; ikisi de aynı
     # kutudan gelir (bkz. oyundaki giriş ekranı).
     who = str(data.get("username") or data.get("email") or "").strip()
@@ -558,12 +623,8 @@ def auth_login():
                 "email", who.lower()).execute()
             acc = rows.data[0] if rows.data else None
         else:
-            rows = supabase.table("accounts").select("*").execute()
-            low = who.lower()
-            for rrow in rows.data or []:
-                if str(rrow.get("username") or "").lower() == low:
-                    acc = rrow
-                    break
+            found = _accounts_by_username(who)
+            acc = found[0] if found else None
         # "Kullanıcı yok" ile "şifre yanlış" AYNI hatayı döndürür: saldırgan
         # hangi adların kayıtlı olduğunu öğrenemesin. METİN aynıydı ama ZAMAN
         # sızdırıyordu: hesap yoksa scrypt hiç çalışmıyor (hızlı yanıt),
@@ -614,6 +675,9 @@ def auth_login():
 RESET_CODE_TTL = 15 * 60
 RESET_MAX_TRIES = 5
 RESET_RESEND_GAP = 60
+RESET_DAY = 24 * 3600
+RESET_DAY_SENDS = 6             # v3.42: hesap başına günde en çok kod
+RESET_DAY_TRIES = 10            # v3.42: hesap başına günde en çok yanlış deneme
 _reset_codes = {}               # account_id -> {"h", "exp", "tries", "sent"}
 _reset_lock = threading.Lock()
 _RESET_KEY = secrets.token_bytes(32)
@@ -696,12 +760,8 @@ def _find_account_by_who(who):
     if "@" in who:
         rows = supabase.table("accounts").select("*").eq("email", who.lower()).execute()
         return rows.data[0] if rows.data else None
-    rows = supabase.table("accounts").select("*").execute()
-    low = who.lower()
-    for rrow in rows.data or []:
-        if str(rrow.get("username") or "").lower() == low:
-            return rrow
-    return None
+    found = _accounts_by_username(who)
+    return found[0] if found else None
 
 
 @app.route("/auth/forgot", methods=["POST"])
@@ -710,7 +770,7 @@ def auth_forgot():
         return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
     if not _rate_ok("fp:" + _client_ip(), max_n=6):
         return jsonify({"success": False, "error": "çok fazla deneme, biraz bekle"}), 429
-    data = request.json or {}
+    data = _body()
     who = str(data.get("who") or "").strip()[:96]
     lang = "tr" if str(data.get("lang") or "tr") == "tr" else "en"
     ok = jsonify({"success": True})
@@ -733,9 +793,18 @@ def auth_forgot():
         cur = _reset_codes.get(aid)
         if cur and now - cur["sent"] < RESET_RESEND_GAP:
             return ok
+        # v3.42: yeniden gönderim deneme sayacını SIFIRLAMAZ. Eskiden her yeni
+        # kodla 5 hak tazeleniyordu; IP değiştiren biri dakikada 5 tahminle
+        # zamanla kodu tutturabilirdi. Hesap başına 24 saatlik kota.
+        day0 = cur.get("day0", now) if cur and now - cur.get("day0", now) < RESET_DAY else now
+        sends = (cur.get("sends", 1) + 1) if cur and day0 != now else 1
+        day_tries = cur.get("day_tries", 0) if cur and day0 != now else 0
+        if sends > RESET_DAY_SENDS or day_tries >= RESET_DAY_TRIES:
+            return ok
         code = f"{secrets.randbelow(10 ** 6):06d}"
         _reset_codes[aid] = {"h": _reset_hash(aid, code), "exp": now + RESET_CODE_TTL,
-                             "tries": 0, "sent": now}
+                             "tries": 0, "sent": now, "day0": day0, "sends": sends,
+                             "day_tries": day_tries}
         if len(_reset_codes) > 4096:
             for k in [k for k, v in _reset_codes.items() if v["exp"] < now]:
                 _reset_codes.pop(k, None)
@@ -757,7 +826,7 @@ def auth_reset():
         return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
     if not _rate_ok("fpr:" + _client_ip()):
         return jsonify({"success": False, "error": "çok fazla deneme, biraz bekle"}), 429
-    data = request.json or {}
+    data = _body()
     who = str(data.get("who") or "").strip()[:96]
     code = str(data.get("code") or "").strip()
     new_pw = str(data.get("password") or "")
@@ -776,11 +845,15 @@ def auth_reset():
     aid = str(acc["id"])
     with _reset_lock:
         cur = _reset_codes.get(aid)
-        if not cur or time.time() > cur["exp"] or cur["tries"] >= RESET_MAX_TRIES:
-            _reset_codes.pop(aid, None)
+        if (not cur or not cur.get("h") or time.time() > cur["exp"]
+                or cur["tries"] >= RESET_MAX_TRIES
+                or cur.get("day_tries", 0) >= RESET_DAY_TRIES):
+            if cur:
+                cur["h"] = ""           # kod öldü; günlük sayaç DURUR (silinmez)
             return bad
         if not hmac.compare_digest(cur["h"], _reset_hash(aid, code)):
             cur["tries"] += 1
+            cur["day_tries"] = cur.get("day_tries", 0) + 1
             return bad
         _reset_codes.pop(aid, None)     # kod tek kullanımlık
     try:
@@ -800,6 +873,10 @@ def auth_reset():
 
 class _GoogleError(Exception):
     """Google tarafında bir şey tutmadı. Metni oyuncuya gösterilebilir."""
+
+
+class _LinkRefused(Exception):
+    """Google girişi şifreyle açılmış başka bir hesaba bağlanamaz (v3.42)."""
 
 
 def _exchange_google_code(code, verifier, redirect_uri):
@@ -840,7 +917,7 @@ def auth_google():
     src = _client_ip()
     if not _rate_ok("auth:" + src):
         return jsonify({"success": False, "error": "çok fazla deneme"}), 429
-    data = request.json or {}
+    data = _body()
     code = str(data.get("code", ""))
     verifier = str(data.get("code_verifier", ""))
     redirect_uri = str(data.get("redirect_uri", ""))
@@ -861,6 +938,10 @@ def auth_google():
         tok = _new_session(acc["id"], data.get("device"))
         return jsonify({"success": True, "token": tok, "new": created,
                         "account": _public_account(acc)})
+    except _LinkRefused:
+        return jsonify({"success": False,
+                        "error": "bu e-posta kullanıcı adı + şifreyle açılmış bir hesapta kayıtlı; "
+                                 "kullanıcı adın ve şifrenle giriş yap"}), 409
     except Exception as e:
         return _oops(e)
 
@@ -869,7 +950,7 @@ def auth_google():
 def auth_me():
     if not _accounts_enabled():
         return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
-    data = request.json or {}
+    data = _body()
     acc = _acct(data)
     if not acc:
         return jsonify({"success": False, "error": "oturum geçersiz"}), 401
@@ -887,7 +968,7 @@ def auth_set_username():
     """
     if not _accounts_enabled():
         return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
-    data = request.json or {}
+    data = _body()
     acc = _acct(data)
     if not acc:
         return jsonify({"success": False, "error": "oturum geçersiz"}), 401
@@ -1016,7 +1097,17 @@ PROGRESS_STATS = ("runs", "best_score", "total_kills", "total_time", "bosses",
                   "desert_bonk_hits", "jungle_snakes", "jungle_bosses", "best_jungle_time",
                   "jungle_kills",
                   # v3.39 HARİTA KİLİDİ: haritaların en iyi dalgası, Taş Meydan bitti mi
-                  "best_stone_wave", "best_jungle_wave", "stone_cleared")
+                  "best_stone_wave", "best_jungle_wave", "stone_cleared",
+                  # v3.42: oyunun büyüyen sayaçlarıyla EŞİTLENDİ. Bunlar sunucuda
+                  # yoktu; başka bilgisayarda giren oyuncunun kitap/başarım
+                  # ilerlemesi (kritik, iyileşme, BONK, dash, kombo ...) sıfırlanıyordu.
+                  "best_combo", "best_run_heal", "best_run_kills", "total_bonks",
+                  "total_crits", "total_dashes", "total_healed",
+                  # v3.42 anahtarlar / efsanevi sandık
+                  "total_keys", "legend_chests")
+# v3.42: oyundan KALDIRILAN kitaplar (Çoğalma Kitabı). Eski istemciler
+# göndermeye devam edebilir; sunucu bunları saklamaz.
+REMOVED_BOOKS = frozenset({"r_multi"})
 
 
 
@@ -1151,9 +1242,12 @@ def _merge_progress(old, new, gem_cap=GEM_GAIN_CAP_PER_PUSH):
     out = dict(old)
     for k in PROGRESS_LISTS:
         merged = list(old.get(k) or [])
-        for v in (new.get(k) or []):
+        nv = new.get(k)
+        for v in (nv if isinstance(nv, list) else []):
             if isinstance(v, str) and v not in merged and not _is_paid(k, v):
                 merged.append(v)
+        if k == "books_owned":
+            merged = [v for v in merged if v not in REMOVED_BOOKS]
         out[k] = merged[:400]
     for k in ("equipped_skin",):
         if new.get(k):
@@ -1182,10 +1276,6 @@ def _merge_progress(old, new, gem_cap=GEM_GAIN_CAP_PER_PUSH):
         except Exception:
             pass
     out["stats"] = st_old
-    # ustalık: kademe geri gitmez, tavanı var ve ÖDENMİŞ olmalı
-    out["mastery"] = _merge_mastery(old.get("mastery"), new.get("mastery"),
-                                    max(int(old.get("gems_spent", 0) or 0),
-                                        int(new.get("gems_spent", 0) or 0)))
     # ---- KALICI SIRALAMA YASAĞI (v3.25 — BAŞKA HESABA SIZAN YASAK) ----
     # ESKİDEN: new.get("board_banned") de buraya karışıyordu — yani BU
     # UÇTAN (/player/save), oyuncunun kendi İMZASIZ/doğrulanmamış yerel
@@ -1218,16 +1308,34 @@ def _merge_progress(old, new, gem_cap=GEM_GAIN_CAP_PER_PUSH):
         ach.setdefault(str(k)[:40], v)
     out["achievements"] = ach
     # --- elmas defteri ---
-    earned_old = int(old.get("gems_earned", 0) or 0)
-    spent_old = int(old.get("gems_spent", 0) or 0)
-    earned_new = int(new.get("gems_earned", 0) or 0)
-    spent_new = int(new.get("gems_spent", 0) or 0)
+    earned_old = _int(old.get("gems_earned", 0))
+    spent_old = _int(old.get("gems_spent", 0))
+    earned_new = max(0, _int(new.get("gems_earned", 0)))
+    spent_new = max(0, _int(new.get("gems_spent", 0)))
     cap = int(max(0, min(GEM_GAIN_CAP_PER_PUSH, gem_cap)))
     earned = max(earned_old, min(earned_new, earned_old + cap))
     spent = max(spent_old, spent_new)
     out["gems_earned"] = earned
     out["gems_spent"] = min(spent, earned)
     out["gems"] = max(0, out["gems_earned"] - out["gems_spent"])
+    # ustalık: kademe geri gitmez, tavanı var ve ÖDENMİŞ olmalı.
+    # v3.42: bütçe artık DEFTERİN SONUCU (kazanılanla sınırlı harcama).
+    # Eskiden istemcinin ham gems_spent'i kullanılıyordu: hiç elması olmayan
+    # bir hesap gems_spent=1e15 yazıp bütün ustalığı bedavaya alıyordu.
+    out["mastery"] = _merge_mastery(old.get("mastery"), new.get("mastery"),
+                                    out["gems_spent"])
+    # v3.42: KAPATILAN silah / kitaplar (elmasla alınan ustalık hakkı) artık
+    # sunucuda da saklanır; başka bilgisayarda kayboluyordu. En çok, alınmış
+    # hak kadar (bedava 4 / 6 + ustalık).
+    for k, m, free in (("weapons_muted", "m_wmute", 4), ("books_muted", "m_bmute", 6)):
+        lst = new.get(k)
+        if isinstance(lst, list):
+            room = free + _int((out["mastery"] or {}).get(m, 0))
+            out[k] = [str(x)[:40] for x in lst if isinstance(x, str)][:room]
+        elif isinstance(old.get(k), list):
+            out[k] = list(old[k])
+    if isinstance(out.get("books_muted"), list):
+        out["books_muted"] = [b for b in out["books_muted"] if b not in REMOVED_BOOKS]
     return out
 
 
@@ -1236,7 +1344,7 @@ def player_load():
     """Hesabın ilerlemesini döndürür. Yeni hesapta her şey SIFIR."""
     if not _accounts_enabled():
         return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
-    data = request.json or {}
+    data = _body()
     acc = _acct(data)
     if not acc:
         return jsonify({"success": False, "error": "oturum geçersiz"}), 401
@@ -1345,7 +1453,7 @@ def player_save():
     """Oyundaki ilerlemeyi hesaba yazar (birleştirerek)."""
     if not _accounts_enabled():
         return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
-    data = request.json or {}
+    data = _body()
     acc = _acct(data)
     if not acc:
         return jsonify({"success": False, "error": "oturum geçersiz"}), 401
@@ -1386,7 +1494,7 @@ CHEAT_REPORT_REASONS = ("cheat_code", "gems", "stats", "run")
 def player_report_cheat():
     if not _accounts_enabled():
         return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
-    data = request.json or {}
+    data = _body()
     acc = _acct(data)
     if not acc:
         return jsonify({"success": False, "error": "oturum geçersiz"}), 401
@@ -1429,7 +1537,7 @@ def _reward_ctx():
     """Ortak giriş denetimi: (hesap, istek verisi) ya da hata."""
     if not _accounts_enabled():
         return None, (jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503)
-    data = request.json or {}
+    data = _body()
     acc = _acct(data)
     if not acc:
         return None, (jsonify({"success": False, "error": "oturum geçersiz"}), 401)
@@ -1534,7 +1642,7 @@ def _claim_locked(acc, data):
 def auth_logout():
     if not _accounts_enabled():
         return jsonify({"success": True})
-    tok = str((request.json or {}).get("token", ""))
+    tok = str((_body()).get("token", ""))
     if tok:
         try:
             supabase.table("sessions").delete().eq(
@@ -1554,7 +1662,7 @@ def auth_logout_all():
     """
     if not _accounts_enabled():
         return jsonify({"success": True})
-    data = request.json or {}
+    data = _body()
     acc = _acct(data)
     if not acc:
         return jsonify({"success": False, "error": "oturum geçersiz"}), 401
@@ -1563,6 +1671,49 @@ def auth_logout_all():
     except Exception as e:
         return _oops(e)
     return jsonify({"success": True})
+
+
+@app.route("/auth/email", methods=["POST"])
+def auth_email():
+    """KURTARMA E-POSTASI EKLE / DEĞİŞTİR (v3.42).
+
+    Kurallar şifre değiştirmeyle aynı mantıkta:
+      - Oturum jetonu + cihaz zorunlu.
+      - Hesabın şifresi varsa MEVCUT ŞİFRE istenir: jetonu çalan biri
+        e-postayı kendi adresine çevirip /auth/forgot ile hesabı
+        devralamasın.
+      - Adres başka bir hesapta kayıtlıysa reddedilir (giriş "kullanıcı adı
+        ya da e-posta" ile yapılabildiği için e-posta TEKİL olmalı).
+      - Google hesabının e-postası Google'dan gelir; değiştirilmez.
+    """
+    if not _accounts_enabled():
+        return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
+    if not _rate_ok("email:" + _client_ip()):
+        return jsonify({"success": False, "error": "çok fazla deneme"}), 429
+    data = _body()
+    acc = _acct(data)
+    if not acc:
+        return jsonify({"success": False, "error": "oturum geçersiz"}), 401
+    if acc.get("provider") == "google":
+        return jsonify({"success": False,
+                        "error": "Google hesabının e-postası değiştirilemez"}), 400
+    email = str(data.get("email", "")).strip().lower()
+    if len(email) > 254 or not EMAIL_RE.match(email):
+        return jsonify({"success": False, "error": "e-posta geçersiz"}), 400
+    cur_hash = str(acc.get("password_hash") or "")
+    if cur_hash and not _verify_password(str(data.get("password", "")), cur_hash):
+        _login_failed(str(acc.get("username") or "").lower())
+        return jsonify({"success": False, "error": "mevcut şifre hatalı"}), 403
+    try:
+        rows = supabase.table("accounts").select("id").eq("email", email).execute()
+        if any(str(r.get("id")) != str(acc["id"]) for r in (rows.data or [])):
+            return jsonify({"success": False,
+                            "error": "bu e-posta zaten kayıtlı"}), 409
+        supabase.table("accounts").update({"email": email}).eq("id", acc["id"]).execute()
+        acc = dict(acc, email=email)
+    except Exception as e:
+        return _oops(e)
+    return jsonify({"success": True, "account": _public_account(acc)})
 
 
 @app.route("/auth/password", methods=["POST"])
@@ -1585,7 +1736,7 @@ def auth_password():
         return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
     if not _rate_ok("pw:" + _client_ip()):
         return jsonify({"success": False, "error": "çok fazla deneme"}), 429
-    data = request.json or {}
+    data = _body()
     acc = _acct(data)
     if not acc:
         return jsonify({"success": False, "error": "oturum geçersiz"}), 401
@@ -1886,13 +2037,20 @@ def add_score():
     if not supabase:
         return jsonify({"error": "Supabase bağlantısı yapılandırılmamış!"}), 500
     try:
-        data = request.json or {}
+        data = _body()
         name = str(data.get("name", "Anonim"))[:14]
-        score = int(data.get("score", 0))
-        kills = int(data.get("kills", 0))
-        wave = int(data.get("wave", 0))
-        run_time = float(data.get("run_time", 0))
-        created_at = float(data.get("created_at", 0))
+        try:
+            score = int(data.get("score", 0))
+            kills = int(data.get("kills", 0))
+            wave = int(data.get("wave", 0))
+            run_time = float(data.get("run_time", 0))
+            created_at = float(data.get("created_at", 0))
+        except (TypeError, ValueError, OverflowError):
+            return jsonify({"success": False, "error": "geçersiz gönderi"}), 400
+        # v3.42: NaN/inf süzülür — abs(now - nan) > pencere YANLIŞ döndüğü için
+        # zaman penceresi atlanabiliyordu.
+        if not (math.isfinite(run_time) and math.isfinite(created_at)):
+            return jsonify({"success": False, "error": "geçersiz gönderi"}), 400
         # ZORLUK: sıralamada görünür, o yüzden imzanın içinde. Bilinmeyen bir
         # değer gelirse "normal" sayılır (uydurma etiket yazılamasın).
         diff = str(data.get("diff", "normal"))
@@ -2016,12 +2174,24 @@ def add_score():
 
 # --- 2. STEAM OYUNCU & İLERLEME ENDPOINT'LERİ (Gems, Skinler vb.) ---
 
+# v3.42: ESKİ STEAM uçları (oyun artık kullanmıyor) varsayılan KAPALI: kimlik
+# doğrulamaları yoktu (herkes her steam_id'nin skinini değiştirebiliyordu).
+# Gerekirse Render'da LEGACY_STEAM_API=1.
+LEGACY_STEAM_API = os.environ.get("LEGACY_STEAM_API") == "1"
+
+
+def _legacy_off():
+    return jsonify({"success": False, "error": "bu uç kapalı"}), 404
+
+
 @app.route("/get_player", methods=["POST"])
 def get_player():
+    if not LEGACY_STEAM_API:
+        return _legacy_off()
     if not supabase:
         return jsonify({"error": "Supabase bağlantısı yok!"}), 500
     try:
-        data = request.json
+        data = _body()
         steam_id = data.get("steam_id")
         name = data.get("name", "Steam Oyuncusu")
         
@@ -2049,10 +2219,12 @@ def get_player():
 
 @app.route("/update_player", methods=["POST"])
 def update_player():
+    if not LEGACY_STEAM_API:
+        return _legacy_off()
     if not supabase:
         return jsonify({"error": "Supabase bağlantısı yok!"}), 500
     try:
-        data = request.json or {}
+        data = _body()
         steam_id = data.get("steam_id")
         selected_skin = data.get("selected_skin")
 
@@ -2117,13 +2289,15 @@ def _steam_post(endpoint, fields):
 
 @app.route("/begin_purchase", methods=["POST"])
 def begin_purchase():
+    if not LEGACY_STEAM_API:
+        return _legacy_off()
     if not _purchases_enabled():
         return jsonify({
             "success": False,
             "message": "Satın alma yapılandırılmamış (STEAM_PUBLISHER_KEY / STEAM_APP_ID eksik).",
         }), 503
     try:
-        data = request.json or {}
+        data = _body()
         steam_id = str(data.get("steam_id") or "").strip()
         item_id = int(data.get("item_id") or 0)
         if not steam_id.isdigit():
@@ -2169,10 +2343,12 @@ def begin_purchase():
 
 @app.route("/finalize_purchase", methods=["POST"])
 def finalize_purchase():
+    if not LEGACY_STEAM_API:
+        return _legacy_off()
     if not _purchases_enabled():
         return jsonify({"success": False, "message": "Satın alma yapılandırılmamış."}), 503
     try:
-        data = request.json or {}
+        data = _body()
         orderid = str(data.get("orderid") or "").strip()
         if not orderid.isdigit():
             return jsonify({"success": False, "message": "Geçersiz orderid"}), 400
@@ -2327,7 +2503,7 @@ def _clean_pet_design(d):
             if not (isinstance(c, (list, tuple)) and len(c) == 3):
                 raise ValueError
             out[key] = [max(0, min(255, int(x))) for x in c]
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             out[key] = list(fallback)
     try:
         size = float(d.get("size", 1.0))
@@ -2411,7 +2587,7 @@ def shop_checkout():
     """Sipariş açar ve ödeme sayfasının adresini döndürür."""
     if not _shop_enabled():
         return jsonify({"success": False, "error": "satın alma şu an kapalı"}), 503
-    data = request.json or {}
+    data = _body()
     acc = _acct(data)
     if not acc:
         return jsonify({"success": False, "error": "satın almak için giriş yap"}), 401
@@ -2425,6 +2601,26 @@ def shop_checkout():
         return jsonify({"success": False, "error": "deneme mağazası bu hesaba kapalı"}), 403
     payload = {"k": secrets.token_urlsafe(18), "ip": _client_ip()}
     prog = _stored_progress(_player_row(acc["id"]))
+    # v3.42: açık (ödenmemiş / teslim bekleyen) siparişler. Aynı skin / PET için
+    # ikinci bir sipariş açılmaz — oyuncu iki sekmede iki kez ödeyip tek ürün
+    # alıyordu; yarım kalan sipariş varsa AYNI ödeme sayfası geri verilir.
+    try:
+        open_rows = (supabase.table("shop_orders").select("*")
+                     .eq("account_id", acc["id"]).execute().data or [])
+    except Exception:
+        open_rows = []
+    now_ = time.time()
+    open_rows = [o for o in open_rows if o.get("status") in ("pending", "paid")
+                 and now_ - _num(o.get("created_at"), 0) < ORDER_TTL]
+    if prod["kind"] in ("skin", "pet"):
+        for o in open_rows:
+            if str(o.get("product_id")) == pid and o.get("status") == "pending":
+                k_ = _order_payload(o).get("k", "")
+                return jsonify({"success": True, "order_id": o["id"], "reused": True,
+                                "pay_url": f"{_base_url()}/shop/pay/{o['id']}?k={k_}",
+                                "price_text": "₺" + _tl(prod["price"]), "name": prod["name"]})
+            if str(o.get("product_id")) == pid and o.get("status") == "paid":
+                return jsonify({"success": False, "error": "bu ürünün ödemesi alındı, teslim ediliyor"}), 409
     if prod["kind"] == "skin" and prod["item"] in (prog.get("skins_owned") or []):
         return jsonify({"success": False, "error": "bu skin zaten sende"}), 409
     if prod["kind"] == "pet" and prod["item"] in (prog.get("cosmetics_owned") or []):
@@ -2433,7 +2629,8 @@ def shop_checkout():
         design = _clean_pet_design(data.get("design"))
         if design is None:
             return jsonify({"success": False, "error": "PET tasarımı geçersiz"}), 400
-        if len(prog.get("custom_pets") or []) >= CUSTOM_PET_MAX:
+        waiting = sum(1 for o in open_rows if o.get("kind") == "custom_pet")
+        if len(prog.get("custom_pets") or []) + waiting >= CUSTOM_PET_MAX:
             return jsonify({"success": False, "error": "özel PET sınırına ulaştın"}), 409
         payload["design"] = design
     oid = "AB" + time.strftime("%y%m%d") + secrets.token_hex(6).upper()
@@ -2454,7 +2651,7 @@ def shop_checkout():
 @app.route("/shop/order_status", methods=["POST"])
 def shop_order_status():
     """Oyun siparişi buradan izler. Teslim edildiyse güncel ilerleme de gelir."""
-    data = request.json or {}
+    data = _body()
     acc = _acct(data)
     if not acc:
         return jsonify({"success": False, "error": "oturum geçersiz"}), 401
@@ -2500,11 +2697,15 @@ def _grant_order(order_id, provider_ref=None):
         return False, "sipariş yok"
     if order.get("status") == "granted":
         return True, "zaten teslim edildi"
-    if order.get("status") == "pending":
+    st0 = order.get("status")
+    if st0 in ("pending", "failed", "cancelled"):
+        # v3.42: aynı siparişin başka sekmede reddedilen denemesi siparişi
+        # "failed" yapmış olabilir; sonra DOĞRULANMIŞ başarılı bir ödeme
+        # gelirse para çekilmiş demektir — ürün yine teslim edilir.
         f = {"status": "paid", "paid_at": time.time()}
         if provider_ref:
             f["provider_ref"] = str(provider_ref)[:120]
-        _mark_order(order_id, f, only_status="pending")
+        _mark_order(order_id, f, only_status=st0)
         order = _order_row(order_id) or order
     if order.get("status") != "paid":
         return order.get("status") == "granted", str(order.get("status"))
@@ -2543,7 +2744,9 @@ def _grant_order(order_id, provider_ref=None):
                 if not any(isinstance(x, dict) and x.get("id") == pet_id for x in pets):
                     pets.append({"id": pet_id, "design": design, "order": order_id,
                                  "at": time.time()})
-                merged["custom_pets"] = pets[-CUSTOM_PET_MAX:]
+                # v3.42: kırpma YOK — ödenmiş bir tasarım asla silinmez
+                # (sınır siparişte, bekleyen siparişler dahil denetlenir).
+                merged["custom_pets"] = pets
                 lst = list(before.get("cosmetics_owned") or [])
                 if pet_id not in lst:
                     lst.append(pet_id)
@@ -2629,6 +2832,11 @@ def shop_pay(order_id):
     acc = acc_rows.data[0] if acc_rows.data else {}
     try:
         if SHOP_PROVIDER == "iyzico":
+            # v3.42: sayfa yeniden açılınca YENİ form açılmaz (iki sekmede iki
+            # kez ödeme olmasın); 25 dk içindeki form aynen kullanılır.
+            pl = _order_payload(order)
+            if pl.get("pay_page") and time.time() - _num(pl.get("pay_page_at"), 0) < 25 * 60:
+                return "", 302, {"Location": pl["pay_page"], "Cache-Control": "no-store"}
             return _iyzico_start(order, prod, acc)
         if SHOP_PROVIDER == "shopier":
             return _shopier_start(order, prod, acc)
@@ -2710,7 +2918,10 @@ def _iyzico_start(order, prod, acc):
         app.logger.warning("iyzico başlatma reddi %s: %s", order["id"],
                            res.get("errorMessage"))
         return _result_page(False, "Ödeme sağlayıcısı siparişi kabul etmedi.")
-    _mark_order(order["id"], {"provider_ref": str(res.get("token", ""))[:120]},
+    pl = dict(_order_payload(order))
+    pl["pay_page"] = str(res["paymentPageUrl"])[:400]
+    pl["pay_page_at"] = time.time()
+    _mark_order(order["id"], {"provider_ref": str(res.get("token", ""))[:120], "payload": pl},
                 only_status="pending")
     return "", 302, {"Location": res["paymentPageUrl"], "Cache-Control": "no-store"}
 
@@ -2759,6 +2970,10 @@ def _shopier_start(order, prod, acc):
     uname, email = _buyer_fields(acc)
     total = f"{int(order['amount']) // 100}.{int(order['amount']) % 100:02d}"
     rnd = str(secrets.randbelow(900000) + 100000)
+    # v3.42: verilen random_nr siparişe yazılır; geri dönüşte AYNISI olmalı.
+    pl = dict(_order_payload(order))
+    pl["rnd"] = rnd
+    _mark_order(order["id"], {"payload": pl}, only_status="pending")
     currency = "0"                                   # 0 = TL
     data = rnd + order["id"] + total + currency
     sig = base64.b64encode(hmac.new(SHOPIER_API_SECRET.encode("utf-8"), data.encode("utf-8"),
@@ -2803,10 +3018,31 @@ def shop_callback_shopier():
     order = _order_row(oid)
     if not order:
         return _result_page(False, "Sipariş bulunamadı.")
+    # v3.42 SERTLEŞTİRME. Shopier'in imzası yalnız (random_nr + sipariş no)
+    # kapsıyor, "status" alanını KAPSAMIYOR. Önlemler:
+    #   * random_nr bizim bu sipariş için verdiğimiz olmalı,
+    #   * başarıda payment_id dolu olmalı ve başka bir siparişte kullanılmamış olmalı,
+    #   * aynı siparişin ilk geri dönüşü belirleyicidir (başarısız dönüşten
+    #     sonra aynı imzayla gelen "success" kabul edilmez).
+    pl = _order_payload(order)
+    if not pl.get("rnd") or not hmac.compare_digest(str(pl.get("rnd")), rnd):
+        return _result_page(False, "Ödeme imzası doğrulanamadı.")
+    if order.get("status") in ("failed", "cancelled"):
+        return _result_page(False, "Ödeme tamamlanmadı.")
     if status != "success":
         _fail_order(oid, "shopier: " + status)
         return _result_page(False, "Ödeme tamamlanmadı.")
-    ok, msg = _grant_order(oid, provider_ref=request.form.get("payment_id") or "")
+    pay_id = str(request.form.get("payment_id") or "").strip()[:80]
+    if not pay_id:
+        _fail_order(oid, "shopier: payment_id yok")
+        return _result_page(False, "Ödeme doğrulanamadı.")
+    try:
+        dup = supabase.table("shop_orders").select("id").eq("provider_ref", pay_id).execute().data or []
+    except Exception:
+        dup = []
+    if any(str(d.get("id")) != oid for d in dup):
+        return _result_page(False, "Bu ödeme başka bir siparişte kullanıldı.")
+    ok, msg = _grant_order(oid, provider_ref=pay_id)
     return _result_page(ok, SHOP_PRODUCTS.get(str(order["product_id"]), {}).get("name", "") +
                         (" hesabına eklendi." if ok else " — " + msg))
 
