@@ -494,7 +494,7 @@ def diag():
                         "skin_count", "pet_count", "data", "updated_at"],
         "player_events": ["account_id", "at", "kind", "delta", "total", "note"],
         "scores": ["name", "score", "kills", "wave", "run_time", "created_at",
-                   "account_id"],
+                   "account_id", "skin", "details"],      # v3.43: supabase_leaderboard.sql
         # v3.28: gerçek para (TL) siparişleri — bkz. README_ODEME.md
         "shop_orders": ["id", "account_id", "product_id", "kind", "amount", "currency",
                         "status", "provider", "provider_ref", "payload", "created_at",
@@ -1381,6 +1381,8 @@ def _public_progress(prog):
     rw = dict(out.get("rewards") or {})
     rw.pop("ad_nonce", None)
     rw.pop("ad_started", None)
+    rw.pop("snow_nonce", None)          # v3.43: kartopu bileti de gizli
+    rw.pop("snow_started", None)
     out["rewards"] = rw
     return out
 
@@ -1526,6 +1528,14 @@ AD_DAILY_LIMIT = 5
 AD_COOLDOWN = 90.0
 AD_MIN_WATCH = 105.0                 # oyundaki tanıtım filmi 120 sn (v3.33)
 DAILY_GIFT_GEMS = (150, 250, 350, 450, 550, 650, 750)   # v3.39 (oyunla aynı)
+# v3.43 KARTOPU SAVAŞI (kardan adam etkinliği): günde 3 oyun, 30 sn; vurulan
+# her düşman 1 elmas (altın goblin 3). Süre SUNUCU saatiyle ölçülür: bilet
+# /rewards/snow_start'ta verilir, en erken 30 sn sonra bozdurulur; isabet
+# sayısı tavanlıdır; bilet tek kullanımlıktır.
+SNOW_DAILY = 3
+SNOW_TIME = 30.0
+SNOW_MAX_GEMS = 90              # tek oyunda en çok (dürüst oyunun üst ucu ~70)
+SNOW_MAX_ELAPSED = 15 * 60
 
 
 def _server_day(offset_days=0):
@@ -1555,6 +1565,34 @@ def _reward_row(account_id):
 
 def _ads_used_today(rw):
     return int(rw.get("ad_count", 0) or 0) if rw.get("ad_day") == _server_day() else 0
+
+
+def _snow_used_today(rw):
+    return int(rw.get("snow_count", 0) or 0) if rw.get("snow_day") == _server_day() else 0
+
+
+@app.route("/rewards/snow_start", methods=["POST"])
+def rewards_snow_start():
+    """KARTOPU SAVAŞI başlıyor: tek kullanımlık bilet + sunucu saati."""
+    ctx, err = _reward_ctx()
+    if err:
+        return err
+    acc, _data = ctx
+    with _acct_lock(acc["id"]):
+        row, before, rw = _reward_row(acc["id"])
+        used = _snow_used_today(rw)
+        if used >= SNOW_DAILY:
+            return jsonify({"success": False, "error": "bugünkü kartopu hakkın bitti",
+                            "left": 0}), 429
+        nonce = secrets.token_hex(12)
+        rw["snow_nonce"] = nonce
+        rw["snow_started"] = time.time()
+        merged = dict(before)
+        merged["rewards"] = rw
+        e = _store_progress(acc["id"], row, before, merged)
+        if e is not None:
+            return e
+    return jsonify({"success": True, "ticket": nonce, "left": SNOW_DAILY - used})
 
 
 @app.route("/rewards/ad_start", methods=["POST"])
@@ -1624,6 +1662,25 @@ def _claim_locked(acc, data):
         rw.pop("ad_started", None)
         amount = AD_REWARD_GEMS
         note = "reklam"
+    elif kind == "snow":
+        ticket = str(data.get("ticket") or "")
+        if not ticket or not hmac.compare_digest(ticket, str(rw.get("snow_nonce") or "")):
+            return jsonify({"success": False, "error": "oyun bileti geçersiz"}), 403
+        el = now - _num(rw.get("snow_started"), 0)
+        if el < SNOW_TIME - 1.0:
+            return jsonify({"success": False, "error": "oyun süresi dolmadan bozdurulamaz"}), 403
+        if el > SNOW_MAX_ELAPSED:
+            rw.pop("snow_nonce", None)
+            return jsonify({"success": False, "error": "oyun biletinin süresi doldu"}), 403
+        if _snow_used_today(rw) >= SNOW_DAILY:
+            return jsonify({"success": False, "error": "bugünkü kartopu hakkın bitti"}), 429
+        amount = max(0, min(SNOW_MAX_GEMS, _int(data.get("hits"), 0)))
+        rw["snow_count"] = _snow_used_today(rw) + 1
+        rw["snow_day"] = today
+        rw["snow_best"] = max(_int(rw.get("snow_best"), 0), amount)
+        rw.pop("snow_nonce", None)      # bilet bir kez kullanılır
+        rw.pop("snow_started", None)
+        note = "kartopu"
     else:
         return jsonify({"success": False, "error": "bilinmeyen ödül"}), 400
     merged = dict(before)
@@ -1946,7 +2003,98 @@ def _submit_once(sig):
 
 
 SCORE_PUBLIC_FIELDS = ("name", "score", "kills", "wave", "run_time", "diff",
-                       "created_at")
+                       "created_at", "skin", "build")
+
+# =====================================================================
+# KOŞU KARTI (v3.43) — dünya sıralamasında bir skora tıklayınca açılan
+# ayrıntı: skin, silahlar, kitaplar, hasar dökümü, istatistikler.
+# ---------------------------------------------------------------------
+# GÜVENLİK: kart oyuncunun bilgisayarından gelir; o yüzden
+#   * özeti ("build" = sha256) İMZAYA girer (bkz. _expected_sig),
+#   * sunucu kartı alan alan SÜZER: yalnız bilinen silah / kitap / hasar
+#     kaynağı anahtarları, seviye ve sayı TAVANLARI, bilinen istatistikler;
+#     serbest metin YOK (adlar oyunda anahtardan çevrilir),
+#   * skin hesabın SAHİP OLDUĞU skinler arasında değilse "default" yazılır,
+#   * kart yalnız /submit'te, skorla aynı satıra yazılır; değiştiren ya da
+#     silen bir uç YOKTUR.
+# =====================================================================
+BUILD_WEAPONS = frozenset((
+    "axe", "book", "pentagram", "whip", "zemzem", "shoe", "frost", "emanet", "cloak",
+    "tornado", "ghost_swords", "wolves", "tesla", "meteor", "beam", "hawk", "bats",
+    "nova", "knives", "quake"))
+BUILD_BOOKS = frozenset((
+    "r_armor", "r_aspd", "r_bonk", "r_bosshunter", "r_clover", "r_coin", "r_crit",
+    "r_critd", "r_dashslow", "r_dmg", "r_echo", "r_evade", "r_execute", "r_hp",
+    "r_hp_big", "r_killheal", "r_lasthope", "r_luck", "r_mag", "r_pierce", "r_poison",
+    "r_rage", "r_regen", "r_roar", "r_spd", "r_swarm", "r_vamp", "r_wspd", "r_xp"))
+BUILD_DMG_EXTRA = frozenset(("gun", "bonk", "storm", "ult", "orbit", "other"))
+BUILD_MAPS = frozenset(("stone", "frost", "jungle", "desert"))
+BUILD_WEAPON_MAX = 6            # oyunda 4 yuva (+ pay)
+BUILD_BOOK_MAX = 8              # 4 normal + 1 nadir (+ pay)
+BUILD_LEVEL_CAP = 40            # silah tavanı 25, kitap tavanı 30
+# istatistik: (alt, üst) — üst sınırlar dürüst oyunun çok üstünde, saçmalığı keser
+BUILD_STATS = {
+    "hp": (1, 100000), "regen": (0, 5000), "armor": (0, 1.0), "vamp": (0, 5.0),
+    "dmg": (0, 1000), "crit": (0, 1.0), "critd": (0, 100), "aspd": (0, 100),
+    "dps": (0, 1e6), "multi": (1, 50), "pierce": (0, 200), "speed": (0, 20),
+    "dash": (0, 50), "bonk": (0, 50), "pickup": (0, 5000), "gold": (0, 100),
+    "xp": (0, 100), "luck": (0, 50), "lvl": (1, 999), "bosses": (0, 500),
+}
+BUILD_RAW_MAX = 6000            # karta ayrılan en büyük JSON boyu (bayt)
+_KEY_RE = _re.compile(r"^[a-z0-9_]{1,40}$")
+
+
+def _build_hash(details):
+    """İstemcideki build_hash() ile BİREBİR aynı kanonik JSON özeti."""
+    raw = json.dumps(details, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32], len(raw)
+
+
+def _clean_build(d, owned_skins):
+    """Koşu kartını süzer. Geçersizse None (skor yine yazılır, kartsız)."""
+    if not isinstance(d, dict):
+        return None, "default"
+    out = {"v": 1}
+    sk = str(d.get("skin") or "default")
+    skin = sk if (_KEY_RE.match(sk) and (sk == "default" or sk in owned_skins)) else "default"
+    out["skin"] = skin
+    mp = str(d.get("map") or "stone")
+    out["map"] = mp if mp in BUILD_MAPS else "stone"
+    out["hell"] = bool(d.get("hell"))
+
+    def pairs(lst, allowed, cap_n, cap_v, as_int=True):
+        res, seen = [], set()
+        if not isinstance(lst, list):
+            return res
+        for it in lst[:cap_n * 3]:
+            if not (isinstance(it, (list, tuple)) and len(it) == 2):
+                continue
+            k = str(it[0])
+            if k not in allowed or k in seen:
+                continue
+            v = _num(it[1], -1)
+            if v < 0:
+                continue
+            v = min(v, cap_v)
+            res.append([k, int(v) if as_int else round(v, 3)])
+            seen.add(k)
+            if len(res) >= cap_n:
+                break
+        return res
+
+    out["w"] = [p_ for p_ in pairs(d.get("w"), BUILD_WEAPONS, BUILD_WEAPON_MAX, BUILD_LEVEL_CAP) if p_[1] >= 1]
+    out["b"] = [p_ for p_ in pairs(d.get("b"), BUILD_BOOKS, BUILD_BOOK_MAX, BUILD_LEVEL_CAP) if p_[1] >= 1]
+    out["d"] = pairs(d.get("d"), BUILD_WEAPONS | BUILD_DMG_EXTRA, 24, 1e13)
+    out["d"].sort(key=lambda x: -x[1])
+    st_in = d.get("st") if isinstance(d.get("st"), dict) else {}
+    st = {}
+    for k, (lo, hi) in BUILD_STATS.items():
+        if k in st_in:
+            v = _num(st_in.get(k), None)
+            if v is not None:
+                st[k] = round(max(lo, min(hi, v)), 3)
+    out["st"] = st
+    return out, skin
 
 
 def _public_score(row):
@@ -1959,8 +2107,12 @@ def _public_score(row):
 
 
 def _expected_sig(payload):
-    """İmza, istemcideki sign_submit() ile BİREBİR aynı sırayı kullanır."""
-    msg = "|".join(str(payload.get(k, "")) for k in SUBMIT_SIG_FIELDS)
+    """İmza, istemcideki sign_submit() ile BİREBİR aynı sırayı kullanır.
+
+    v3.43: gönderi KOŞU KARTI (details) taşıyorsa onun özeti ("build") da
+    imzaya girer — kart, imzalı skordan ayrılıp değiştirilemez."""
+    fields = SUBMIT_SIG_FIELDS + (("build",) if payload.get("build") else ())
+    msg = "|".join(str(payload.get(k, "")) for k in fields)
     return hmac.new(SUBMIT_SECRET.encode("utf-8"), msg.encode("utf-8"),
                     hashlib.sha256).hexdigest()
 
@@ -2025,10 +2177,34 @@ def get_scores():
         # alanlar vardı. account_id'nin sızması hesap numaralarını
         # numaralandırmayı ve hangi hesabın hangi adla eşleştiğini öğrenmeyi
         # kolaylaştırıyordu. Oyun bu altı alandan fazlasını kullanmıyor.
-        response = supabase.table("scores").select(
-            "name,score,kills,wave,run_time,diff,created_at"
-        ).order("score", desc=True).limit(10).execute()
-        return jsonify([_public_score(r) for r in (response.data or [])])
+        # v3.43: skin + koşu kartı da gelir; her oyuncunun yalnız EN İYİ
+        # skoru listelenir (bir oyuncu tabloyu tek başına dolduramasın).
+        try:
+            response = supabase.table("scores").select(
+                "name,score,kills,wave,run_time,diff,created_at,skin,details"
+            ).order("score", desc=True).limit(200).execute()
+        except Exception:
+            response = supabase.table("scores").select(
+                "name,score,kills,wave,run_time,diff,created_at"
+            ).order("score", desc=True).limit(200).execute()
+        out, seen = [], set()
+        for r in (response.data or []):
+            key = str(r.get("name") or "").lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            row = dict(r)
+            if isinstance(row.get("details"), str):
+                try:
+                    row["details"] = json.loads(row["details"])
+                except Exception:
+                    row["details"] = None
+            row["build"] = row.pop("details", None)
+            row["skin"] = str(row.get("skin") or (row["build"] or {}).get("skin") or "default")[:40]
+            out.append(_public_score(row))
+            if len(out) >= 10:
+                break
+        return jsonify(out)
     except Exception as e:
         return _oops(e)
 
@@ -2066,10 +2242,15 @@ def add_score():
         # ---- SÜZGEÇ 1: İMZA ----
         sig = str(data.get("sig") or "")
         if REQUIRE_SIGNATURE:
+            build_h = ""
+            if data.get("details") is not None:
+                build_h, raw_len = _build_hash(data.get("details"))
+                if raw_len > BUILD_RAW_MAX or str(data.get("build") or "") != build_h:
+                    return jsonify({"success": False, "error": "koşu kartı doğrulanamadı"}), 403
             want = _expected_sig({
                 "name": name, "score": score, "kills": kills, "wave": wave,
                 "run_time": run_time, "created_at": created_at,
-                "diff": str(data.get("diff", "normal")),
+                "diff": str(data.get("diff", "normal")), "build": build_h,
             })
             if not sig or not hmac.compare_digest(sig, want):
                 return jsonify({"success": False, "error": "imza doğrulanamadı"}), 403
@@ -2165,9 +2346,25 @@ def add_score():
         }
         if account_id is not None:
             payload["account_id"] = account_id
-
-        response = supabase.table("scores").insert(payload).execute()
-        return jsonify({"success": True, "data": response.data})
+        # v3.43 KOŞU KARTI: süzülmüş hâliyle (bkz. _clean_build)
+        if data.get("details") is not None:
+            owned = set(_stored_progress(_player_row(account_id)).get("skins_owned") or [])
+            build, skin = _clean_build(data.get("details"), owned)
+            if build is not None:
+                payload["details"] = build
+                payload["skin"] = skin
+        try:
+            supabase.table("scores").insert(payload).execute()
+        except Exception as e:
+            # Supabase'e "details"/"skin" sütunları henüz eklenmemişse
+            # (bkz. supabase_leaderboard.sql) skor kartsız yine yazılsın.
+            if "details" in payload and ("details" in str(e) or "skin" in str(e) or "column" in str(e)):
+                payload.pop("details", None)
+                payload.pop("skin", None)
+                supabase.table("scores").insert(payload).execute()
+            else:
+                raise
+        return jsonify({"success": True})
     except Exception as e:
         return _oops(e)
 
