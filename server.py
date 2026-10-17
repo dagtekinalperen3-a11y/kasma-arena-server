@@ -21,6 +21,52 @@ app = Flask(__name__, static_folder=".")
 # tarayıcısını kullanarak bu uçlara istek atabiliyordu. Oyun bir MASAÜSTÜ
 # uygulaması; CORS'a tabi değil, yani hiç gerek yoktu. İleride bir web
 # paneli eklenirse SADECE onun kökeni ve SADECE gereken uçlar açılmalı.
+#
+# v3.45 MOBİL: oyunun telefon sürümü bir WEB SAYFASI (GitHub Pages). Tarayıcı
+# başka bir siteden gelen isteğe ancak sunucu izin verirse cevap verir. İzin
+# YALNIZCA oyunun kendi sayfasının kökenine ve YALNIZCA oyunun kullandığı
+# uçlara verilir (/diag ve eski Steam uçları kapalı kalır). Çerez/oturum
+# çerezi KULLANILMIYOR (jeton isteğin gövdesinde), yani izin verilmiş bir
+# köken bile başkasının hesabı adına istek atamaz.
+#   Render > Environment:  PLAY_ORIGINS = https://KULLANICIADIN.github.io
+#   (virgülle birden fazla yazılabilir). Boşsa yalnızca *.github.io
+#   sayfalarına izin verilir.
+PLAY_ORIGINS = [o.strip().rstrip("/").lower()
+                for o in (os.environ.get("PLAY_ORIGINS") or "").split(",") if o.strip()]
+CORS_PATHS = ("/auth/", "/player/", "/shop/", "/reward", "/rewards", "/ad/", "/gift",
+              "/scores", "/submit", "/contact", "/snow", "/event")
+CORS_BLOCKED = ("/diag", "/get_player", "/update_player", "/admin")
+
+
+def _origin_ok(origin):
+    o = (origin or "").strip().rstrip("/").lower()
+    if PLAY_ORIGINS:
+        return o in PLAY_ORIGINS          # yalnızca elle yazılmış kökenler
+    if not o.startswith("https://") or len(o) > 200:
+        return False
+    host = o[len("https://"):]
+    return (host.endswith(".github.io") and "/" not in host and ":" not in host
+            and host.count(".") == 2)
+
+
+def _cors_path_ok(path):
+    p = path or ""
+    if any(p.startswith(b) for b in CORS_BLOCKED):
+        return False
+    return any(p.startswith(a) for a in CORS_PATHS)
+
+
+@app.after_request
+def _cors(resp):
+    origin = request.headers.get("Origin")
+    if origin and _origin_ok(origin) and _cors_path_ok(request.path):
+        resp.headers["Access-Control-Allow-Origin"] = origin.strip().rstrip("/")
+        resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        resp.headers["Access-Control-Max-Age"] = "600"
+    if origin:
+        resp.headers["Vary"] = "Origin"
+    return resp
 
 # GÖVDE BOYUTU: sınırsız gövde, tek istekle belleği doldurmaya izin
 # veriyordu. Oyunun en büyük isteği (/player/save, bütün ilerleme) birkaç
@@ -2184,6 +2230,9 @@ def _expected_sig(payload):
     v3.43: gönderi KOŞU KARTI (details) taşıyorsa onun özeti ("build") da
     imzaya girer — kart, imzalı skordan ayrılıp değiştirilemez."""
     fields = SUBMIT_SIG_FIELDS + (("build",) if payload.get("build") else ())
+    # v3.45: mobil gönderide "platform" alanı da imzalı (skor tablo değiştiremez)
+    if payload.get("platform"):
+        fields = fields + ("platform",)
     msg = "|".join(str(payload.get(k, "")) for k in fields)
     return hmac.new(SUBMIT_SECRET.encode("utf-8"), msg.encode("utf-8"),
                     hashlib.sha256).hexdigest()
@@ -2253,14 +2302,33 @@ def get_scores():
         # v3.44: bir oyuncu tabloda BİRDEN FAZLA kez yer alabilir (1. de 2. de
         # olabilir): her geçerli koşu kendi satırıdır. Sıralama sayısal
         # yapılır (sütun metin tipinde açılmış olsa bile doğru sıra).
-        try:
-            response = supabase.table("scores").select(
-                "name,score,kills,wave,run_time,diff,created_at,skin,details"
-            ).order("score", desc=True).limit(100).execute()
-        except Exception:
-            response = supabase.table("scores").select(
-                "name,score,kills,wave,run_time,diff,created_at"
-            ).order("score", desc=True).limit(100).execute()
+        # v3.45: ?platform=mobile -> TELEFON sıralaması; yoksa / pc -> PC.
+        mobile = request.args.get("platform") == "mobile"
+
+        def _q(cols, plat=True):
+            q = supabase.table("scores").select(cols)
+            if plat:
+                # SQL 5. bölümden sonra sütun NOT NULL, varsayılan 'pc'.
+                q = q.eq("platform", "mobile") if mobile else q.neq("platform", "mobile")
+            return q.order("score", desc=True).limit(100).execute()
+        COLS = ("name,score,kills,wave,run_time,diff,created_at,skin,details",
+                "name,score,kills,wave,run_time,diff,created_at")
+        response = None
+        for plat in (True, False):
+            for cols in COLS:
+                try:
+                    response = _q(cols, plat)
+                    break
+                except Exception:
+                    continue       # sütun eksik (skin/details/platform): dar sorgu
+            if response is not None:
+                break
+            if mobile:
+                # "platform" sütunu yok (SQL 5. bölüm çalışmamış): mobil
+                # tablo boş görünür, PC skorları ona KARIŞMAZ.
+                return jsonify([])
+        if response is None:
+            raise RuntimeError("scores okunamadı")
 
         def _sc(r):
             try:
@@ -2327,6 +2395,7 @@ def add_score():
                 "name": name, "score": score, "kills": kills, "wave": wave,
                 "run_time": run_time, "created_at": created_at,
                 "diff": str(data.get("diff", "normal")), "build": build_h,
+                "platform": "mobile" if data.get("platform") == "mobile" else "",
             })
             if not sig or not hmac.compare_digest(sig, want):
                 return jsonify({"success": False, "error": "imza doğrulanamadı"}), 403
@@ -2422,6 +2491,9 @@ def add_score():
         }
         if account_id is not None:
             payload["account_id"] = account_id
+        # v3.45: MOBİL skorlar ayrı tabloya (aynı tablo, "platform" sütunu)
+        platform = "mobile" if data.get("platform") == "mobile" else "pc"
+        payload["platform"] = platform
         # v3.43 KOŞU KARTI: süzülmüş hâliyle (bkz. _clean_build)
         if data.get("details") is not None:
             owned = set(_stored_progress(_player_row(account_id)).get("skins_owned") or [])
@@ -2432,9 +2504,19 @@ def add_score():
         try:
             supabase.table("scores").insert(payload).execute()
         except Exception as e:
+            es = str(e)
+            if "platform" in es:
+                # "platform" sütunu henüz yok (SQL'in 5. bölümü çalıştırılmamış).
+                # PC skoru eskisi gibi yazılır; MOBİL skor PC tablosuna
+                # KARIŞMASIN diye reddedilir.
+                if platform == "mobile":
+                    return jsonify({"success": False,
+                                    "error": "mobil sıralama henüz açılmadı"}), 503
+                payload.pop("platform", None)
+                supabase.table("scores").insert(payload).execute()
             # Supabase'e "details"/"skin" sütunları henüz eklenmemişse
             # (bkz. supabase_leaderboard.sql) skor kartsız yine yazılsın.
-            if "details" in payload and ("details" in str(e) or "skin" in str(e) or "column" in str(e)):
+            elif "details" in payload and ("details" in es or "skin" in es or "column" in es):
                 payload.pop("details", None)
                 payload.pop("skin", None)
                 supabase.table("scores").insert(payload).execute()
