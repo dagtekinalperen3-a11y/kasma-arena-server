@@ -1526,7 +1526,7 @@ REWARD_TZ_OFFSET = 3 * 3600          # Türkiye (UTC+3)
 AD_REWARD_GEMS = 300           # v3.27: 50 -> 250, v3.33: 300
 AD_DAILY_LIMIT = 5
 AD_COOLDOWN = 90.0
-AD_MIN_WATCH = 105.0                 # oyundaki tanıtım filmi 120 sn (v3.33)
+AD_MIN_WATCH = 80.0                  # v3.44: reklam = 90 sn tanıtım filmi (yedek oyun turu 120 sn)
 DAILY_GIFT_GEMS = (150, 250, 350, 450, 550, 650, 750)   # v3.39 (oyunla aynı)
 # v3.43 KARTOPU SAVAŞI (kardan adam etkinliği): günde 3 oyun, 30 sn; vurulan
 # her düşman 1 elmas (altın goblin 3). Süre SUNUCU saatiyle ölçülür: bilet
@@ -1569,6 +1569,78 @@ def _ads_used_today(rw):
 
 def _snow_used_today(rw):
     return int(rw.get("snow_count", 0) or 0) if rw.get("snow_day") == _server_day() else 0
+
+
+# =====================================================================
+# İLETİŞİM / DESTEK (v3.44)
+# ---------------------------------------------------------------------
+# Oyundaki giriş ekranından "İLETİŞİM" ile gelen sorun / öneri mesajları
+# Supabase'deki "feedback" tablosuna yazılır (bkz. supabase_leaderboard.sql:
+# admin.feedback görünümü). Girişliyse hesap adı sunucudan eklenir; IP
+# yalnızca tuzlanmış özet olarak tutulur. Spam'e karşı IP ve hesap başına
+# kısa ve günlük sınır var; mesaj boyu sınırlı, denetim karakterleri atılır.
+# =====================================================================
+CONTACT_KINDS = ("sorun", "oneri", "diger")
+CONTACT_MIN = 10
+CONTACT_MAX = 1500
+CONTACT_SHORT = (3, 600.0)          # 10 dakikada en çok 3 mesaj (IP)
+CONTACT_DAY = (12, 86400.0)         # günde en çok 12 mesaj (IP)
+CONTACT_ACC_DAY = (8, 86400.0)      # günde en çok 8 mesaj (hesap)
+_CONTACT_SALT = os.environ.get("CONTACT_SALT", "evolve-contact-v1")
+
+
+def _clean_text(txt, limit):
+    out = []
+    for ch in str(txt or "")[:limit * 2]:
+        if ch == "\n" or ch == "\t" or (ch.isprintable() and ch not in "\u200b\u200e\u200f\u202e"):
+            out.append(" " if ch == "\t" else ch)
+    t = "".join(out).strip()
+    while "\n\n\n" in t:
+        t = t.replace("\n\n\n", "\n\n")
+    return t[:limit]
+
+
+@app.route("/contact", methods=["POST"])
+def contact_message():
+    if not supabase:
+        return jsonify({"success": False, "error": "sunucu hazır değil"}), 500
+    try:
+        data = _body()
+        kind = str(data.get("kind") or "diger")
+        if kind not in CONTACT_KINDS:
+            kind = "diger"
+        msg = _clean_text(data.get("message"), CONTACT_MAX)
+        if len(msg) < CONTACT_MIN:
+            return jsonify({"success": False,
+                            "error": "mesaj çok kısa (en az %d harf)" % CONTACT_MIN}), 400
+        email = str(data.get("email") or "").strip().lower()[:254]
+        if email and not EMAIL_RE.match(email):
+            return jsonify({"success": False, "error": "e-posta adresi geçersiz"}), 400
+        ip = (_client_ip() or "").split(",")[0].strip()
+        if not (_rate_ok("contact:s:" + ip, *CONTACT_SHORT) and _rate_ok("contact:d:" + ip, *CONTACT_DAY)):
+            return jsonify({"success": False,
+                            "error": "çok sık mesaj gönderdin, biraz sonra tekrar dene"}), 429
+        acc = _acct(data) if data.get("token") else None
+        if acc and not _rate_ok("contact:a:%s" % acc.get("id"), *CONTACT_ACC_DAY):
+            return jsonify({"success": False, "error": "bugünlük mesaj sınırına ulaştın"}), 429
+        row = {
+            "created_at": time.time(),
+            "kind": kind,
+            "message": msg,
+            "email": email or ((acc or {}).get("email") or ""),
+            "account_id": (acc or {}).get("id"),
+            "username": str((acc or {}).get("username") or "")[:32],
+            "ip_hash": hashlib.sha256((_CONTACT_SALT + ip).encode()).hexdigest()[:16],
+            "version": _clean_text(data.get("version"), 16),
+            "status": "yeni",
+        }
+        try:
+            supabase.table("feedback").insert(row).execute()
+        except Exception as e:
+            return _oops(e, "mesaj kaydedilemedi")
+        return jsonify({"success": True})
+    except Exception as e:
+        return _oops(e)
 
 
 @app.route("/rewards/snow_start", methods=["POST"])
@@ -2177,22 +2249,26 @@ def get_scores():
         # alanlar vardı. account_id'nin sızması hesap numaralarını
         # numaralandırmayı ve hangi hesabın hangi adla eşleştiğini öğrenmeyi
         # kolaylaştırıyordu. Oyun bu altı alandan fazlasını kullanmıyor.
-        # v3.43: skin + koşu kartı da gelir; her oyuncunun yalnız EN İYİ
-        # skoru listelenir (bir oyuncu tabloyu tek başına dolduramasın).
+        # v3.43: skin + koşu kartı da gelir.
+        # v3.44: bir oyuncu tabloda BİRDEN FAZLA kez yer alabilir (1. de 2. de
+        # olabilir): her geçerli koşu kendi satırıdır. Sıralama sayısal
+        # yapılır (sütun metin tipinde açılmış olsa bile doğru sıra).
         try:
             response = supabase.table("scores").select(
                 "name,score,kills,wave,run_time,diff,created_at,skin,details"
-            ).order("score", desc=True).limit(200).execute()
+            ).order("score", desc=True).limit(100).execute()
         except Exception:
             response = supabase.table("scores").select(
                 "name,score,kills,wave,run_time,diff,created_at"
-            ).order("score", desc=True).limit(200).execute()
-        out, seen = [], set()
-        for r in (response.data or []):
-            key = str(r.get("name") or "").lower()
-            if key in seen:
-                continue
-            seen.add(key)
+            ).order("score", desc=True).limit(100).execute()
+
+        def _sc(r):
+            try:
+                return float(r.get("score") or 0)
+            except (TypeError, ValueError):
+                return 0.0
+        out = []
+        for r in sorted(response.data or [], key=_sc, reverse=True):
             row = dict(r)
             if isinstance(row.get("details"), str):
                 try:
