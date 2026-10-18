@@ -2233,6 +2233,9 @@ def _expected_sig(payload):
     # v3.45: mobil gönderide "platform" alanı da imzalı (skor tablo değiştiremez)
     if payload.get("platform"):
         fields = fields + ("platform",)
+    # v3.47: süreli dalga kipi de imzalı (eski istemciler bu alanı göndermez)
+    if payload.get("wmode"):
+        fields = fields + ("wmode",)
     msg = "|".join(str(payload.get(k, "")) for k in fields)
     return hmac.new(SUBMIT_SECRET.encode("utf-8"), msg.encode("utf-8"),
                     hashlib.sha256).hexdigest()
@@ -2251,7 +2254,49 @@ def _wave_goal(wave):
     return 4100 + 5.9 * (w - 5) * (900 + 60 * (w - 5))
 
 
-def score_is_plausible(name, score, kills, wave, run_time):
+# v3.47 SÜRELİ DALGALAR — oyundaki takvimin birebir kopyası (kasma_arena13.py
+# wave_length / wave_start_time). Dalgalar artık skorla değil SÜREYLE
+# ilerliyor; bu yüzden ulaşılan dalga koşu süresine sığmalı.
+WAVE_PLAN_COUNT = 25
+WAVE_PLAN_GROW = 0.07
+WAVE_PLAN_TOTAL = {
+    "arena": {"normal": 35 * 60.0, "hard": 30 * 60.0, "nightmare": 20 * 60.0},
+    "hell": {"normal": 40 * 60.0, "hard": 40 * 60.0 * 30 / 35, "nightmare": 40 * 60.0 * 20 / 35},
+}
+_WAVE_PLAN_W = sum(1.0 + WAVE_PLAN_GROW * (i - 1) for i in range(1, WAVE_PLAN_COUNT + 1))
+
+
+def _wave_len(w, diff, biome):
+    tbl = WAVE_PLAN_TOTAL["hell" if biome == "hell" else "arena"]
+    w = min(WAVE_PLAN_COUNT, max(1, int(w)))
+    return tbl.get(diff, tbl["normal"]) * (1.0 + WAVE_PLAN_GROW * (w - 1)) / _WAVE_PLAN_W
+
+
+def _wave_start(w, diff, biome):
+    w = max(1, int(w))
+    t = 0.0
+    for i in range(1, min(w, WAVE_PLAN_COUNT + 1)):
+        t += _wave_len(i, diff, biome)
+    if w > WAVE_PLAN_COUNT + 1:
+        t += (w - WAVE_PLAN_COUNT - 1) * _wave_len(WAVE_PLAN_COUNT, diff, biome)
+    return t
+
+
+def _time_wave_ok(wave, run_time, diff):
+    """Toplam dalgaya (arena + cehennem) bu sürede ulaşılabilir mi?
+    (1 dalga + 10 sn pay; en kısa yol: arena ya da 25'te cehenneme geçiş)"""
+    w = max(1, min(int(wave), MAX_WAVE))
+    if w <= 2:
+        return True
+    w -= 1
+    need = _wave_start(w, diff, "arena")
+    if w > WAVE_PLAN_COUNT:
+        need = min(need, _wave_start(WAVE_PLAN_COUNT, diff, "arena")
+                   + _wave_start(w - WAVE_PLAN_COUNT, diff, "hell"))
+    return need <= float(run_time) + 10.0
+
+
+def score_is_plausible(name, score, kills, wave, run_time, wmode=""):
     """Gönderilen skor oyunun kuralları içinde üretilebilir mi?
 
     Dönüş: (uygun_mu, sebep)
@@ -2279,7 +2324,9 @@ def score_is_plausible(name, score, kills, wave, run_time):
         return False, "saniyelik skor imkânsız"
     # Dalga-hedefi denetimi YALNIZCA yüksek skorlarda: ilk dalgalarda
     # hedefler küçük olduğu için bu denetim yanlış pozitif verebiliyor.
-    if score >= SCORE_FLOOR:
+    # v3.47: süreli dalgalı istemcide dalga skorla bağlı DEĞİL; o gönderilerde
+    # bu denetim yapılmaz (dalga/süre uyumu ayrıca, ban'sız denetlenir).
+    if score >= SCORE_FLOOR and wmode != "time":
         goal_sum = sum(_wave_goal(w) for w in range(1, int(wave) + 2))
         if score > (goal_sum * 2.5 + SCORE_FLOOR + run_time * SCORE_TIME_SLACK) * CURSE_SCORE_ROOM:
             return False, "skor ulaşılan dalgaya göre imkânsız"
@@ -2396,6 +2443,7 @@ def add_score():
                 "run_time": run_time, "created_at": created_at,
                 "diff": str(data.get("diff", "normal")), "build": build_h,
                 "platform": "mobile" if data.get("platform") == "mobile" else "",
+                "wmode": "time" if data.get("wmode") == "time" else "",
             })
             if not sig or not hmac.compare_digest(sig, want):
                 return jsonify({"success": False, "error": "imza doğrulanamadı"}), 403
@@ -2427,7 +2475,17 @@ def add_score():
         # değiştirildiği anlamına gelir. O yüzden yalnızca reddedilmiyor:
         # hesap KALICI olarak sıralama dışına alınıyor ve oradaki eski
         # skorları da siliniyor (v3.24).
-        ok, why = score_is_plausible(name, score, kills, wave, run_time)
+        # v3.47: 2 KİŞİLİK (BETA) koşular dünya sıralamasına girmez. Ban
+        # denetiminden ÖNCE reddedilir: iki oyuncunun skoru tek kişilik
+        # tavanlara takılıp dürüst bir hesabı yakmasın.
+        if str(data.get("mode") or "") == "coop":
+            return jsonify({"success": False, "error": "2 kişilik koşular sıralamaya girmez"}), 422
+        wmode = "time" if data.get("wmode") == "time" else ""
+        # Süreli dalgada dalga/süre uyumsuzluğu BAN sebebi değildir (saat
+        # oynaması, yavaş makine vb.); skor yalnızca reddedilir.
+        if wmode == "time" and not _time_wave_ok(wave, run_time, diff):
+            return jsonify({"success": False, "error": "skor reddedildi: dalga süreye sığmıyor"}), 422
+        ok, why = score_is_plausible(name, score, kills, wave, run_time, wmode)
         if not ok:
             bad_acc = _acct(data)
             if bad_acc:
@@ -3431,6 +3489,382 @@ def shop_mock_result():
     ok, msg = _grant_order(oid, provider_ref="mock")
     return _result_page(ok, "DENEME: " + SHOP_PRODUCTS.get(str(order["product_id"]), {}).get("name", "") +
                         (" hesabına eklendi." if ok else " — " + msg))
+
+
+# =====================================================================
+# 2 KİŞİLİK (BETA) — ODA + WEBSOCKET AKTARICI (v3.47)
+# ---------------------------------------------------------------------
+# Oyunu ODA KURAN oyuncunun bilgisayarı yönetir (bütün simülasyon orada);
+# katılan oyuncu yalnızca kendi tuşlarını gönderir, ev sahibinin gönderdiği
+# anlık görüntüyü çizer. Bu sunucu ikisinin arasında yalnızca TAŞIYICIDIR:
+# oyun mesajlarının içine bakmaz, değiştirmez, saklamaz.
+#
+# GÜVENLİK:
+#   * Oda kurmak ve katılmak GİRİŞ gerektirir (oturum + cihaz denetimi).
+#   * Oda KODU (6 karakter) tek başına bağlantıya yetmez: kuran da katılan da
+#     kendi uzun, tahmin edilemez BİLETİNİ alır (token_urlsafe(24)); websocket
+#     yalnızca biletle açılır, bilet sabit sürede karşılaştırılır.
+#   * Kod deneme yanılmaya kapalı: hesap ve IP başına katılma sınırı var,
+#     32^6 kodun içinde en çok COOP_MAX_ROOMS oda yaşar.
+#   * Mesaj boyutu, saniyedeki mesaj ve bayt sayısı bağlantı başına
+#     sınırlı (jeton kovası); aşan mesaj düşürülür, ısrar eden bağlantı kapanır.
+#   * İstemciden gelen METİN çerçeveleri aktarılmaz (yalnızca "ping");
+#     sunucu mesajları METİN, oyuncu mesajları İKİLİ çerçevedir. Böylece bir
+#     oyuncu "sunucu mesajı" taklit edemez; oyuncu adları HESAPTAN gelir.
+#   * Tarayıcıdan gelen bağlantılar (Origin başlığı) yalnızca izinli
+#     kökenlerden kabul edilir; masaüstü oyun Origin göndermez.
+#   * Oda 45 sn sessiz kalınca ya da en geç 3 saatte kapanır. Odalar yalnızca
+#     BELLEKTE durur (yeniden başlatmada düşer) — veritabanına hiçbir şey
+#     yazılmaz, 2 kişilik koşular hiçbir ödül/sıralama vermez.
+#
+# KURULUM (Render): requirements'a `flask-sock` eklenir ve başlatma komutu
+#   gunicorn server:app --worker-class gthread -w 1 --threads 64 --timeout 120
+# olur. Tek işçi ŞART (odalar işçinin belleğinde). Sunucu çok iş parçacıklı
+# değilse (eski komut) oda kurma kibarca reddedilir — açık bir websocket
+# bütün sunucuyu kilitlemesin.
+# =====================================================================
+try:
+    from flask_sock import Sock as _Sock
+    _coop_sock = _Sock(app)
+    app.config["SOCK_SERVER_OPTIONS"] = {"ping_interval": 20, "max_message_size": 128 * 1024}
+except Exception:            # flask-sock kurulu değil: 2 kişilik kapalı
+    _coop_sock = None
+
+COOP_MAX_ROOMS = max(1, min(200, int(os.environ.get("COOP_MAX_ROOMS", "24") or 24)))
+COOP_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"     # karışmayan harfler
+COOP_CODE_RE = _re.compile(r"^[A-HJ-NP-Z2-9]{6}$")
+COOP_KEY_RE = _re.compile(r"^[A-Za-z0-9_\-]{20,64}$")
+COOP_IDLE = 45.0              # bu kadar sessizlikte oda kapanır
+COOP_RECONNECT = 25.0         # kopan oyuncunun geri dönme payı
+COOP_MAX_AGE = 3 * 3600.0
+COOP_MSG_MAX = {"host": 96 * 1024, "guest": 4 * 1024}
+# jeton kovası: (mesaj/sn, mesaj tavanı, bayt/sn, bayt tavanı)
+COOP_BUCKET = {"host": (70.0, 140.0, 320 * 1024.0, 640 * 1024.0),
+               "guest": (70.0, 140.0, 32 * 1024.0, 64 * 1024.0)}
+COOP_VER_RE = _re.compile(r"^[0-9][0-9.]{0,9}$")
+
+_COOP_ROOMS = {}
+_coop_lock = threading.Lock()
+_coop_reaper_started = [False]
+
+
+class _CoopConn:
+    """Bir websocket bağlantısı + gönderme kilidi + jeton kovası."""
+
+    def __init__(self, ws, role):
+        self.ws = ws
+        self.role = role
+        self.lock = threading.Lock()
+        r, cap, br, bcap = COOP_BUCKET[role]
+        self.rate, self.cap, self.brate, self.bcap = r, cap, br, bcap
+        self.tok, self.btok = cap, bcap
+        self.t = time.time()
+        self.drops = 0
+        self.closed = False
+
+    def allow(self, n):
+        now = time.time()
+        dt = max(0.0, now - self.t)
+        self.t = now
+        self.tok = min(self.cap, self.tok + dt * self.rate)
+        self.btok = min(self.bcap, self.btok + dt * self.brate)
+        if self.tok < 1.0 or self.btok < n:
+            self.drops += 1
+            return False
+        self.tok -= 1.0
+        self.btok -= n
+        self.drops = max(0, self.drops - 1) if self.drops else 0
+        return True
+
+    def send(self, data):
+        if self.closed:
+            return False
+        try:
+            with self.lock:
+                self.ws.send(data)
+            return True
+        except Exception:
+            self.closed = True
+            return False
+
+    def close(self):
+        self.closed = True
+        try:
+            self.ws.close()
+        except Exception:
+            pass
+
+
+def _coop_name(acc):
+    return str(acc.get("username") or acc.get("name") or "Oyuncu")[:14]
+
+
+def _coop_ctrl(conn, ev, **kw):
+    if conn is not None:
+        msg = {"t": "srv", "ev": ev}
+        msg.update(kw)
+        conn.send(json.dumps(msg, ensure_ascii=False))
+
+
+def _coop_close_room(code, why="closed"):
+    """Odayı kapatır (kilit DIŞINDA çağrılır)."""
+    with _coop_lock:
+        room = _COOP_ROOMS.pop(code, None)
+    if not room:
+        return
+    for role in ("host", "guest"):
+        c = room.get(role + "_ws")
+        if c is not None:
+            _coop_ctrl(c, "closed", why=why)
+            c.close()
+
+
+def _coop_reap():
+    now = time.time()
+    dead = []
+    with _coop_lock:
+        for code, room in _COOP_ROOMS.items():
+            live = room.get("host_ws") is not None or room.get("guest_ws") is not None
+            if now - room["created"] > COOP_MAX_AGE:
+                dead.append((code, "too_old"))
+            elif not live and now - room["last"] > COOP_IDLE:
+                dead.append((code, "idle"))
+            elif room.get("host_ws") is None and room.get("host_seen") \
+                    and now - room.get("host_left", now) > COOP_RECONNECT:
+                dead.append((code, "host_left"))
+    for code, why in dead:
+        _coop_close_room(code, why)
+
+
+def _coop_reaper():
+    while True:
+        time.sleep(5.0)
+        try:
+            _coop_reap()
+        except Exception:
+            pass
+
+
+def _coop_start_reaper():
+    with _coop_lock:
+        if _coop_reaper_started[0]:
+            return
+        _coop_reaper_started[0] = True
+    threading.Thread(target=_coop_reaper, daemon=True).start()
+
+
+def _coop_ready():
+    """2 kişilik bu sunucuda çalışabilir mi? (flask-sock + çok iş parçacığı)"""
+    if _coop_sock is None:
+        return "sunucuda 2 kişilik modül (flask-sock) kurulu değil"
+    if not request.environ.get("wsgi.multithread"):
+        return "sunucu ayarı eksik (gthread başlatma komutu)"
+    return ""
+
+
+def _coop_ver(data):
+    v = str(data.get("ver") or "")
+    return v if COOP_VER_RE.match(v) else ""
+
+
+@app.route("/coop/create", methods=["POST"])
+def coop_create():
+    why = _coop_ready()
+    if why:
+        return jsonify({"success": False, "error": why}), 503
+    data = _body()
+    if not _rate_ok("coopci:" + _client_ip(), 30, 300):
+        return jsonify({"success": False, "error": "çok sık deneme"}), 429
+    acc = _acct(data)
+    if not acc:
+        return jsonify({"success": False, "error": "giriş gerekli"}), 401
+    aid = str(acc.get("id"))
+    if not _rate_ok("coopc:" + aid, 12, 300):
+        return jsonify({"success": False, "error": "çok sık oda kuruldu, biraz bekle"}), 429
+    ver = _coop_ver(data)
+    if not ver:
+        return jsonify({"success": False, "error": "geçersiz sürüm"}), 400
+    _coop_start_reaper()
+    _coop_reap()
+    # Hesap başına TEK oda: eskisi (kurduğu ya da katıldığı) kapanır.
+    with _coop_lock:
+        olds = [c for c, r in _COOP_ROOMS.items()
+                if r["host_acct"] == aid or r.get("guest_acct") == aid]
+    for c in olds:
+        _coop_close_room(c, "replaced")
+    with _coop_lock:
+        if len(_COOP_ROOMS) >= COOP_MAX_ROOMS:
+            return jsonify({"success": False, "error": "sunucu dolu, birazdan tekrar dene"}), 503
+        for _ in range(50):
+            code = "".join(secrets.choice(COOP_CODE_CHARS) for _ in range(6))
+            if code not in _COOP_ROOMS:
+                break
+        else:
+            return jsonify({"success": False, "error": "oda kodu üretilemedi"}), 503
+        key = secrets.token_urlsafe(24)
+        now = time.time()
+        _COOP_ROOMS[code] = {
+            "code": code, "ver": ver, "created": now, "last": now,
+            "host_acct": aid, "host_name": _coop_name(acc), "host_key": key,
+            "guest_acct": None, "guest_name": "", "guest_key": None,
+            "host_ws": None, "guest_ws": None, "host_seen": False,
+        }
+    return jsonify({"success": True, "code": code, "key": key, "name": _coop_name(acc)})
+
+
+@app.route("/coop/join", methods=["POST"])
+def coop_join():
+    why = _coop_ready()
+    if why:
+        return jsonify({"success": False, "error": why}), 503
+    data = _body()
+    if not _rate_ok("coopji:" + _client_ip(), 40, 300):
+        return jsonify({"success": False, "error": "çok sık deneme"}), 429
+    acc = _acct(data)
+    if not acc:
+        return jsonify({"success": False, "error": "giriş gerekli"}), 401
+    aid = str(acc.get("id"))
+    if not _rate_ok("coopj:" + aid, 20, 300):
+        return jsonify({"success": False, "error": "çok sık deneme, biraz bekle"}), 429
+    code = str(data.get("code") or "").strip().upper()[:12]
+    ver = _coop_ver(data)
+    if not COOP_CODE_RE.match(code):
+        return jsonify({"success": False, "error": "oda kodu 6 karakter olmalı"}), 400
+    _coop_reap()
+    with _coop_lock:
+        room = _COOP_ROOMS.get(code)
+        if room is None:
+            return jsonify({"success": False, "error": "oda bulunamadı"}), 404
+        if room["host_acct"] == aid:
+            return jsonify({"success": False, "error": "kendi odana katılamazsın"}), 400
+        if room.get("guest_acct") and room["guest_acct"] != aid:
+            return jsonify({"success": False, "error": "oda dolu"}), 409
+        if ver != room["ver"]:
+            return jsonify({"success": False,
+                            "error": "oyun sürümleri farklı (v%s / v%s)" % (room["ver"], ver or "?")}), 409
+        if room.get("guest_acct") != aid or not room.get("guest_key"):
+            room["guest_key"] = secrets.token_urlsafe(24)
+        room["guest_acct"] = aid
+        room["guest_name"] = _coop_name(acc)
+        room["last"] = time.time()
+        key, host_name = room["guest_key"], room["host_name"]
+        host_ws = room.get("host_ws")
+    _coop_ctrl(host_ws, "joined", name=_coop_name(acc))
+    return jsonify({"success": True, "code": code, "key": key, "host": host_name,
+                    "name": _coop_name(acc)})
+
+
+@app.route("/coop/leave", methods=["POST"])
+def coop_leave():
+    data = _body()
+    code = str(data.get("code") or "").strip().upper()[:12]
+    key = str(data.get("key") or "")[:80]
+    if not (COOP_CODE_RE.match(code) and COOP_KEY_RE.match(key)):
+        return jsonify({"success": False}), 400
+    with _coop_lock:
+        room = _COOP_ROOMS.get(code)
+        role = None
+        if room:
+            if hmac.compare_digest(key, room["host_key"]):
+                role = "host"
+            elif room.get("guest_key") and hmac.compare_digest(key, room["guest_key"]):
+                role = "guest"
+        if role == "guest":
+            c = room.get("guest_ws")
+            room["guest_ws"] = None
+            room["guest_acct"] = None
+            room["guest_key"] = None
+            room["guest_name"] = ""
+            hw = room.get("host_ws")
+        else:
+            c = hw = None
+    if role == "host":
+        _coop_close_room(code, "host_left")
+    elif role == "guest":
+        if c is not None:
+            c.close()
+        _coop_ctrl(hw, "left")
+    return jsonify({"success": bool(role)})
+
+
+if _coop_sock is not None:
+    @_coop_sock.route("/coop/ws")
+    def coop_ws(ws):
+        origin = request.headers.get("Origin")
+        if origin and not _origin_ok(origin):
+            return
+        code = str(request.args.get("code") or "").strip().upper()[:12]
+        key = str(request.args.get("key") or "")[:80]
+        if not (COOP_CODE_RE.match(code) and COOP_KEY_RE.match(key)):
+            return
+        if not _rate_ok("coopw:" + _client_ip(), 60, 300):
+            return
+        with _coop_lock:
+            room = _COOP_ROOMS.get(code)
+            role = None
+            if room:
+                if hmac.compare_digest(key, room["host_key"]):
+                    role = "host"
+                elif room.get("guest_key") and hmac.compare_digest(key, room["guest_key"]):
+                    role = "guest"
+            if role is None:
+                room = None
+            else:
+                other = "guest" if role == "host" else "host"
+                conn = _CoopConn(ws, role)
+                old = room.get(role + "_ws")
+                room[role + "_ws"] = conn
+                room["last"] = time.time()
+                if role == "host":
+                    room["host_seen"] = True
+                hello = {"role": role, "code": code, "host": room["host_name"],
+                         "guest": room.get("guest_name") or "",
+                         "peer": room.get(other + "_ws") is not None}
+                peer = room.get(other + "_ws")
+        if room is None:
+            time.sleep(0.5)                    # bilet deneme hızını keser
+            return
+        if old is not None:
+            old.close()
+        _coop_ctrl(conn, "hello", **hello)
+        _coop_ctrl(peer, "peer_on", role=role)
+        try:
+            while True:
+                data = ws.receive(timeout=COOP_IDLE)
+                with _coop_lock:
+                    alive = _COOP_ROOMS.get(code) is room and room.get(role + "_ws") is conn
+                    if alive:
+                        room["last"] = time.time()
+                        peer = room.get(other + "_ws")
+                if not alive or conn.closed:
+                    break
+                if data is None:
+                    continue                    # sessizlik: odayı bekçi kapatır
+                if isinstance(data, str):
+                    if data == "ping":
+                        _coop_ctrl(conn, "pong")
+                    continue                    # oyuncu METİN mesajı aktarılmaz
+                n = len(data)
+                if n > COOP_MSG_MAX[role] or not conn.allow(n):
+                    if conn.drops > 400:
+                        break                   # sel: bağlantı kapanır
+                    continue
+                if peer is not None:
+                    peer.send(data)
+        except Exception:
+            pass
+        finally:
+            with _coop_lock:
+                still = _COOP_ROOMS.get(code) is room and room.get(role + "_ws") is conn
+                if still:
+                    room[role + "_ws"] = None
+                    room["last"] = time.time()
+                    if role == "host":
+                        room["host_left"] = time.time()
+                    peer = room.get(other + "_ws")
+            conn.closed = True
+            if still:
+                _coop_ctrl(peer, "peer_off", role=role)
 
 
 if __name__ == "__main__":
