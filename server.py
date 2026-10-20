@@ -303,7 +303,19 @@ def _new_session(account_id, device=""):
     Oturum, girişin yapıldığı CİHAZA bağlanır: jeton bir başkasının eline
     geçse (kayıt dosyası paylaşıldı, dosya çalındı) başka bir makinede
     kabul edilmez.
+
+    TEK OTURUM (v3.49): "hesapta biri varken başka biri giremesin" — bir
+    hesabın AYNI ANDA yalnızca bir geçerli oturumu olur. Yeni bir girişte
+    (giriş/kayıt/Google/şifre sıfırlama) o hesaba ait BÜTÜN eski oturumlar
+    hemen silinir; eski cihaz bir sonraki sunucu isteğinde "oturum geçersiz"
+    alır ve oyun onu otomatik çıkışa yönlendirir (bkz. arenae.py tarafında
+    _handle_session_kicked). Yani iki kişi aynı hesaba aynı anda GİREMEZ;
+    sonradan giren öncekini oturumdan düşürür.
     """
+    try:
+        supabase.table("sessions").delete().eq("account_id", account_id).execute()
+    except Exception:
+        pass        # silinemezse bile yeni oturum açılsın; en kötü ihtimalle eski kalır
     tok = secrets.token_urlsafe(32)
     supabase.table("sessions").insert({
         "token_hash": _token_hash(tok),
@@ -2358,7 +2370,20 @@ def get_scores():
             if plat:
                 # SQL 5. bölümden sonra sütun NOT NULL, varsayılan 'pc'.
                 q = q.eq("platform", "mobile") if mobile else q.neq("platform", "mobile")
-            return q.order("score", desc=True).limit(100).execute()
+            # v3.49 DÜZELTME — "skorlarım 1-2-3'e yansıyor, 4-5'e yansımıyor":
+            # "score" sütunu bazı kurulumlarda hâlâ METİN tipinde kalmış
+            # olabilir (bkz. aşağıdaki Python sıralaması). Öyle bir durumda
+            # BURADAKİ .order() SQL tarafında METİN gibi (sözlük sırasıyla)
+            # çalışır — "9000" "15000"'den BÜYÜK görünür. Eskiden limit 100
+            # idi: tablo 100 satırı geçince, gerçekte ilk 10'a girmesi
+            # gereken bazı skorlar bu YANLIŞ ön-sıralama yüzünden hiç
+            # çekilen 100'ün içine girmiyor, podyumun hemen altında (4., 5.
+            # sıra) "kayboluyormuş" gibi görünüyordu. limit(1000) —
+            # Supabase'in tek sorguda verdiği tavan — ile pratikte TABLODAKİ
+            # HER SATIR çekilir; asıl doğru sıralama zaten aşağıda Python
+            # tarafında sayısal olarak yapılıyor, böylece DB'nin sıralaması
+            # artık SEÇİMİ etkilemiyor, yalnızca ilk eskiz sırası oluyor.
+            return q.order("score", desc=True).limit(1000).execute()
         COLS = ("name,score,kills,wave,run_time,diff,created_at,skin,details",
                 "name,score,kills,wave,run_time,diff,created_at")
         response = None
