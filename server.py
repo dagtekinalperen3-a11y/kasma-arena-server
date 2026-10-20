@@ -2290,9 +2290,10 @@ def _time_wave_ok(wave, run_time, diff):
         return True
     w -= 1
     need = _wave_start(w, diff, "arena")
-    if w > WAVE_PLAN_COUNT:
-        need = min(need, _wave_start(WAVE_PLAN_COUNT, diff, "arena")
-                   + _wave_start(w - WAVE_PLAN_COUNT, diff, "hell"))
+    # Cehenneme arenanın HERHANGİ bir a >= 25. dalgasında geçilebilir (v3.48:
+    # eskiden yalnız 25 deneniyordu; geç geçen dürüst oyuncunun skoru düşüyordu).
+    for a in range(WAVE_PLAN_COUNT, w):
+        need = min(need, _wave_start(a, diff, "arena") + _wave_start(w - a, diff, "hell"))
     return need <= float(run_time) + 10.0
 
 
@@ -3539,7 +3540,10 @@ COOP_RECONNECT = 25.0         # kopan oyuncunun geri dönme payı
 COOP_MAX_AGE = 3 * 3600.0
 COOP_MSG_MAX = {"host": 96 * 1024, "guest": 4 * 1024}
 # jeton kovası: (mesaj/sn, mesaj tavanı, bayt/sn, bayt tavanı)
-COOP_BUCKET = {"host": (70.0, 140.0, 320 * 1024.0, 640 * 1024.0),
+# v3.48: ev sahibi büyük tam görüntüyü PARÇALAR halinde yollar ve kendi
+# akışını konuğun onayına göre ayarlar; kova bu patlamayı kaldırmalı, yoksa
+# sessizce düşen tek bir parça konuğun görüntüsünü bozuyordu.
+COOP_BUCKET = {"host": (120.0, 400.0, 768 * 1024.0, 2048 * 1024.0),
                "guest": (70.0, 140.0, 32 * 1024.0, 64 * 1024.0)}
 COOP_VER_RE = _re.compile(r"^[0-9][0-9.]{0,9}$")
 
@@ -3823,6 +3827,12 @@ if _coop_sock is not None:
                 peer = room.get(other + "_ws")
         if room is None:
             time.sleep(0.5)                    # bilet deneme hızını keser
+            # İstemci "oda yok"u bilsin: yoksa her yeniden denemeyi başarılı
+            # sanıp sonsuza dek "yeniden bağlanılıyor" ekranında kalıyordu.
+            try:
+                ws.send(json.dumps({"t": "srv", "ev": "closed", "why": "no_room"}))
+            except Exception:
+                pass
             return
         if old is not None:
             old.close()
