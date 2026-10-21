@@ -3,7 +3,10 @@
  * Oyunun içerik metinleri (silah, kitap, skin, başarım adları...) Python
  * sürümünün STRINGS tablosundan gelir (gamedata.json).
  */
+import { CONTENT_STRINGS } from "./strings_content";
+
 export const UI_STRINGS: Record<string, string[]> = {
+  ...CONTENT_STRINGS,
   // --- genel ---
   "c.back": ["GERİ", "BACK", "ATRÁS", "ZURÜCK", "НАЗАД"],
   "c.close": ["KAPAT", "CLOSE", "CERRAR", "SCHLIESSEN", "ЗАКРЫТЬ"],
@@ -303,4 +306,30 @@ export const UI_STRINGS: Record<string, string[]> = {
   "trait.hive": ["ZEHİRLİ SPOR", "TOXIC SPORES", "ESPORAS TÓXICAS", "GIFTSPOREN", "ЯДОВИТЫЕ СПОРЫ"],
   "trait.dragon": ["EJDER ATEŞİ", "DRAGONFIRE", "FUEGO DE DRAGÓN", "DRACHENFEUER", "ДРАКОНИЙ ОГОНЬ"],
   "rar.short.0": ["Yaygın", "Common", "Común", "Gewöhnlich", "Обычный"],
+  // --- kilit şartları ---
+  "rq.ach": ["«{0}» başarımını aç", "Unlock the “{0}” achievement", "Consigue el logro «{0}»", "Erfolg „{0}“ freischalten", "Получи достижение «{0}»"],
+  "rq.book": ["Önce {0} açılmalı", "Unlock {0} first", "Desbloquea antes {0}", "Zuerst {0} freischalten", "Сначала открой {0}"],
+  "rq.weapon": ["{0} silahını aç", "Unlock the {0} weapon", "Desbloquea el arma {0}", "Waffe {0} freischalten", "Открой оружие {0}"],
+  "rq.shop": ["Markette {0} Sv {1}", "Get {0} to Lv {1} in the shop", "Sube {0} a Nv {1} en la tienda", "{0} im Laden auf St {1}", "Прокачай {0} до ур. {1} в магазине"],
+  "rq.best_combo": ["{0}'lık bir kombo yap", "Reach a {0} combo", "Logra un combo de {0}", "Erreiche eine {0}er-Kombo", "Сделай комбо {0}"],
+  "rq.best_run_dashes": ["Tek koşuda {0} dash", "{0} dashes in one run", "{0} dashes en una partida", "{0} Dashes in einem Lauf", "{0} рывков за забег"],
+  "rq.best_run_gold": ["Tek koşuda {0} altın", "{0} gold in one run", "{0} de oro en una partida", "{0} Gold in einem Lauf", "{0} золота за забег"],
+  "rq.best_run_heal": ["Tek koşuda {0} can yenile", "Heal {0} HP in one run", "Cura {0} PV en una partida", "{0} LP in einem Lauf heilen", "Вылечи {0} ОЗ за забег"],
+  "rq.best_run_kills": ["Tek koşuda {0} öldürme", "{0} kills in one run", "{0} bajas en una partida", "{0} Kills in einem Lauf", "{0} убийств за забег"],
+  "rq.best_wave": ["{0}. dalgaya ulaş", "Reach wave {0}", "Llega a la oleada {0}", "Erreiche Welle {0}", "Дойди до {0}-й волны"],
+  "rq.bosses": ["Toplam {0} patron devir", "Defeat {0} bosses", "Derrota {0} jefes", "Besiege {0} Bosse", "Победи {0} боссов"],
+  "rq.runs": ["{0} koşu tamamla", "Finish {0} runs", "Completa {0} partidas", "Beende {0} Läufe", "Заверши {0} забегов"],
+  "rq.total_bonk_hits": ["BONK ile {0} vuruş", "Hit {0} enemies with BONK", "Golpea a {0} con BONK", "Triff {0} Gegner mit BONK", "Ударь {0} врагов БОНКОМ"],
+  "rq.total_bonks": ["Toplam {0} kez BONK", "Use BONK {0} times", "Usa BONK {0} veces", "Nutze BONK {0}-mal", "Используй БОНК {0} раз"],
+  "rq.total_chests": ["Toplam {0} sandık aç", "Open {0} chests", "Abre {0} cofres", "Öffne {0} Truhen", "Открой {0} сундуков"],
+  "rq.total_crits": ["Toplam {0} kritik vuruş", "Land {0} critical hits", "Consigue {0} críticos", "Lande {0} kritische Treffer", "Нанеси {0} критов"],
+  "rq.total_dashes": ["Toplam {0} dash", "Dash {0} times", "Haz {0} dashes", "{0}-mal dashen", "Сделай {0} рывков"],
+  "rq.total_gold": ["Toplam {0} altın topla", "Collect {0} gold", "Recoge {0} de oro", "Sammle {0} Gold", "Собери {0} золота"],
+  "rq.total_healed": ["Toplam {0} can yenile", "Heal {0} HP in total", "Cura {0} PV en total", "Heile insgesamt {0} LP", "Вылечи всего {0} ОЗ"],
+  "rq.total_kills": ["Toplam {0} yaratık öldür", "Slay {0} monsters", "Mata {0} monstruos", "Besiege {0} Monster", "Убей {0} монстров"],
+  "rq.total_lifesteal": ["Can çalarak {0} can kazan", "Steal {0} HP with lifesteal", "Roba {0} PV con robo de vida", "Stiehl {0} LP", "Укради {0} ОЗ вампиризмом"],
+  "rq.total_shots": ["Toplam {0} mermi at", "Fire {0} shots", "Dispara {0} veces", "Feuere {0} Schüsse", "Сделай {0} выстрелов"],
+  "rq.total_time": ["Toplam {0} dakika oyna", "Play {0} minutes", "Juega {0} minutos", "Spiele {0} Minuten", "Играй {0} минут"],
+  "rq.progress": ["{0} / {1}", "{0} / {1}", "{0} / {1}", "{0} / {1}", "{0} / {1}"],
 };
+

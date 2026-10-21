@@ -258,7 +258,9 @@ export class FX {
     g.alpha = 1;
   }
 
+  static shakeOn = true;
   shake(amount: number, dur = 0.2) {
+    if (!FX.shakeOn) return;
     if (amount > this.shakeAmt * (this.shakeT > 0 ? 1 : 0)) {
       this.shakeAmt = amount;
       this.shakeT = dur;

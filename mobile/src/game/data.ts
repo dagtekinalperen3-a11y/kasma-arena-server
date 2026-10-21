@@ -147,7 +147,7 @@ export const ENEMY_COLORS: Record<string, Col> = GD.ENEMY_COLORS;
 export const MAP_ENEMIES: Record<string, VariantDef> = GD.MAP_ENEMIES;
 export const HELL_ENEMIES: Record<string, VariantDef> = GD.HELL_ENEMIES;
 export const MAP_ROSTER: Record<string, Record<string, string>> = GD.MAP_ROSTER;
-export const ACHIEVEMENTS: AchDef[] = GD.ACHIEVEMENTS;
+export const ACHIEVEMENTS: AchDef[] = [...GD.ACHIEVEMENTS, ...(GD.MAP_ACHS || []).filter((m: AchDef) => !GD.ACHIEVEMENTS.some((a: AchDef) => a.id === m.id))];
 export const ACH_BY_ID: Record<string, AchDef> = Object.fromEntries(ACHIEVEMENTS.map((a) => [a.id, a]));
 export const BOSS_DEFS: Record<string, { name: string; hp: number; speed: number; dmg: number; radius: number; color: Col }> =
   GD.BOSS_DEFS;

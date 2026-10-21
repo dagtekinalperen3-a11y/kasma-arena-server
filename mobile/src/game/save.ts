@@ -4,7 +4,7 @@
  */
 import { storeGet, storeSet } from "../core/native";
 import { stackBonus } from "../core/util";
-import { GD, WEAPONS, BOOKS, ACHIEVEMENTS, ACH_BY_ID, SKIN_BY_ID, MASTERY, Req, WEAPON_BY_KEY, BOOK_BY_KEY } from "./data";
+import { GD, WEAPONS, BOOKS, ACHIEVEMENTS, ACH_BY_ID, SKIN_BY_ID, MASTERY, Req, WEAPON_BY_KEY, BOOK_BY_KEY, SkinDef } from "./data";
 import type { RunMeta } from "./run";
 
 const C = GD;
@@ -87,7 +87,7 @@ function defaults(): SaveData {
       shake: true,
       dmgNumbers: true,
       autoAim: true,
-      zoom: 560,
+      zoom: 440,
       quality: 1,
       leftHanded: false,
       fpsCounter: false,
@@ -113,6 +113,13 @@ export function masteryBonusAt(m: any, lvl: number) {
   return base + stackBonus(m.soft, lvl - T, m.cap_soft);
 }
 
+/** Eski sürümde gerçek parayla satılan özel karakterler artık elmasla açılır
+ * (mağaza kuralları: oyun içi satın alma yalnız mağazanın ödeme sistemiyle). */
+const PREMIUM_GEMS: Record<string, number> = { web_master: 1500, ash_warrior: 1600, green_titan: 1800, immortal_merc: 2000 };
+export function skinCost(sk: SkinDef) {
+  return sk.premium ? PREMIUM_GEMS[sk.id] ?? 1800 : sk.cost || 0;
+}
+
 export class Save implements RunMeta {
   data: SaveData = defaults();
   onAch: ((id: string) => void) | null = null;
@@ -127,6 +134,7 @@ export class Save implements RunMeta {
         const def = defaults();
         this.data = { ...def, ...d, settings: { ...def.settings, ...(d.settings || {}) }, daily: { ...def.daily, ...(d.daily || {}) } };
         if (!this.data.skins.includes("default")) this.data.skins.push("default");
+        if (![360, 440, 540].includes(this.data.settings.zoom)) this.data.settings.zoom = 440;
       }
     } catch (e) {
       console.warn("save load", e);
@@ -176,6 +184,18 @@ export class Save implements RunMeta {
   }
   mutedBooks() {
     return this.data.mutedBooks;
+  }
+  /** Silahı / kitabı seviye kartlarından çıkarır ya da geri koyar. */
+  toggleMute(kind: "w" | "b", key: string) {
+    const arr = kind === "w" ? this.data.mutedWeapons : this.data.mutedBooks;
+    const i = arr.indexOf(key);
+    if (i >= 0) arr.splice(i, 1);
+    else {
+      if (arr.length >= this.muteLimit(kind)) return false;
+      arr.push(key);
+    }
+    this.persist();
+    return true;
   }
   ownsBook(k: string) {
     return this.data.booksOwned.includes(k);
@@ -233,8 +253,8 @@ export class Save implements RunMeta {
   }
   buySkin(id: string) {
     const sk = SKIN_BY_ID[id];
-    if (!sk || sk.premium || this.ownsSkin(id)) return false;
-    const cost = sk.cost || 0;
+    if (!sk || this.ownsSkin(id)) return false;
+    const cost = skinCost(sk);
     if (this.data.gems < cost) return false;
     this.data.gems -= cost;
     this.data.skins.push(id);

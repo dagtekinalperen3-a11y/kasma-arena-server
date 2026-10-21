@@ -51,6 +51,7 @@ export class Input {
   isTouch = false;
   private keys = new Set<string>();
   leftZone = 0.45; // ekranın sol kısmı joystick
+  mirror = false; // solak: joystick sağda
   onAnyTouch: (() => void) | null = null;
 
   constructor(private el: HTMLElement) {
@@ -145,7 +146,8 @@ export class Input {
       return;
     }
     const w = window.innerWidth;
-    if (x < w * this.leftZone && this.joyId < 0) {
+    const inJoy = this.mirror ? x > w * (1 - this.leftZone) : x < w * this.leftZone;
+    if (inJoy && this.joyId < 0) {
       this.joyId = e.pointerId;
       this.joyActive = true;
       this.joyBaseX = x;

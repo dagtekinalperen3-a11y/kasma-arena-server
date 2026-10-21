@@ -28,8 +28,9 @@ export function detectLang(): string {
 
 function fmt(s: string, args: any[]) {
   if (!args.length) return s;
-  return s.replace(/\{(\d+)\}/g, (_, i) => {
-    const v = args[+i];
+  let auto = 0;
+  return s.replace(/\{(\d*)\}/g, (_, i) => {
+    const v = args[i === "" ? auto++ : +i];
     return v === undefined ? "" : String(v);
   });
 }

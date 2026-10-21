@@ -413,7 +413,7 @@ export class WorldRenderer {
         (e as any)._tk = 1;
       }
       const tx = (e as any)._tex as Texture[];
-      const flash = e.hitFlash > 0;
+      const flash = e.hitFlash > 0.055;
       s.texture = flash ? tx[2] : tx[Math.floor(e.walk * 1.3) % 2];
       const R = Math.max(9, Math.round(r));
       const base = r / R;

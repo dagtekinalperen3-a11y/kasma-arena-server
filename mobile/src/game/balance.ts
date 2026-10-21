@@ -375,6 +375,7 @@ export function shopItemCost(item: { cost: number; cost_mult: number; hell_only?
   const k = item.hell_only || item.instant ? 1 : C.SHOP_COST_SCALE;
   return Math.ceil(item.cost * k * Math.pow(item.cost_mult, level));
 }
+export const tierUnlockWave = (tier: number): number => C.TIER_UNLOCK_WAVE[String(tier)] ?? 0;
 export function shopItemUnlocked(item: { tier: number; hell_only?: boolean }, wave: number, biome: Biome) {
   if (item.hell_only) return biome === "hell";
   return wave >= (C.TIER_UNLOCK_WAVE[String(item.tier)] ?? 0);

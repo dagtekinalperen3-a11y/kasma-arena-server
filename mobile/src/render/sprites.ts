@@ -21,8 +21,8 @@ export function enemyTextures(shape: string, col: RGB | number[], r: number): Te
   const tf = makeTex("ef|" + ck, size, size, (g) => {
     art(g, R, c, 0);
     g.globalCompositeOperation = "source-atop";
-    g.fillStyle = "rgba(255,255,255,0.92)";
+    g.fillStyle = "rgba(255,255,255,0.62)";
     g.fillRect(0, 0, size, size);
-  }, 1.5);
+  }, 2);
   return [t0, t1, tf];
 }
