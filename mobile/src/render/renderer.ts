@@ -456,7 +456,8 @@ export class WorldRenderer {
       }, this.entityLayer);
       const s = v.obj as Sprite;
       const R = Math.round(b.radius);
-      const tex = A.bossTex(b.kind, b.color, b.theme, b.hellish, R, b.hitFlash > 0);
+      // yalnız ilk anda kısa bir parlama (sürekli vurulan patron bembeyaz kalmasın)
+      const tex = A.bossTex(b.kind, b.color, b.theme, b.hellish, R, b.hitFlash > 0.07 && this.frame % 2 === 0);
       s.texture = tex;
       const spawn = clamp(b.spawnT / 0.6, 0, 1);
       const breathe = 1 + Math.sin(b.gait * 2) * 0.03;

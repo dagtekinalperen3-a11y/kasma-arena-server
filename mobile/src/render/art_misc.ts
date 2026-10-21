@@ -911,8 +911,8 @@ export function bossTex(kind: string, col: RGB, theme: string | null, hellish: b
     }
     if (flash) {
       g.globalCompositeOperation = "source-atop";
-      g.fillStyle = "rgba(255,255,255,0.9)";
+      g.fillStyle = "rgba(255,255,255,0.45)";
       g.fillRect(0, 0, S, S);
     }
-  }, flash ? 1 : 2);
+  }, flash ? 1.5 : 2);
 }

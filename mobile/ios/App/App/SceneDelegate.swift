@@ -23,11 +23,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 }
 
-/// Oyun ekranı: durum çubuğu gizli, ana ekran çizgisi kendiliğinden kaybolur,
+/// Oyun ekranı: durum çubuğu gizli (ana ekran çizgisini SystemBars eklentisi gizler),
 /// kenardan kaydırma hareketleri oyunu bölmez (ilk kaydırma oyuna gider).
 class GameViewController: CAPBridgeViewController {
     override var prefersStatusBarHidden: Bool { true }
-    override var prefersHomeIndicatorAutoHidden: Bool { true }
     override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge { .all }
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .landscape }
 
@@ -40,7 +39,6 @@ class GameViewController: CAPBridgeViewController {
         webView?.scrollView.contentInsetAdjustmentBehavior = .never
         webView?.scrollView.bounces = false
         UIApplication.shared.isIdleTimerDisabled = true
-        setNeedsUpdateOfHomeIndicatorAutoHidden()
         setNeedsUpdateOfScreenEdgesDeferringSystemGestures()
     }
 }

@@ -33,6 +33,7 @@ jobs:
     timeout-minutes: 60
     defaults:
       run:
+        shell: bash   # -eo pipefail: "| tail" hatayı yutmasın
         working-directory: mobile
     steps:
       - uses: actions/checkout@v4

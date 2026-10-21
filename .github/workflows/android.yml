@@ -38,6 +38,7 @@ jobs:
     timeout-minutes: 40
     defaults:
       run:
+        shell: bash   # -eo pipefail: "| tail" hatayı yutmasın
         working-directory: mobile
     env:
       APP_VERSION_CODE: ${{ github.run_number }}
