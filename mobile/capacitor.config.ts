@@ -15,6 +15,11 @@ const config: CapacitorConfig = {
     scrollEnabled: false,
   },
   plugins: {
+    // Yerel HTTP: sunucu istekleri tarayıcı CORS kısıtına takılmaz.
+    CapacitorHttp: { enabled: true },
+    // Güvenli alanı MainActivity kendisi verir; Capacitor'ın kenar
+    // boşluğu (siyah şerit) eklemesini kapat.
+    SystemBars: { insetsHandling: "disable", hidden: true },
     SplashScreen: {
       launchShowDuration: 600,
       launchAutoHide: true,

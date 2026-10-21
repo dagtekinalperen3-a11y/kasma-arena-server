@@ -20,10 +20,15 @@
   --fs: clamp(12px, 2.25vh + 0.35vw, 17px);
   --head: "Lilita One", "Rubik", system-ui, sans-serif;
   --body: "Rubik", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --sl: max(env(safe-area-inset-left), 12px);
-  --sr: max(env(safe-area-inset-right), 12px);
-  --st: max(env(safe-area-inset-top), 8px);
-  --sb: max(env(safe-area-inset-bottom), 8px);
+  /* güvenli alan: iOS env(), Android MainActivity'nin verdiği --app-inset-* */
+  --ail: max(env(safe-area-inset-left, 0px), var(--app-inset-left, 0px));
+  --air: max(env(safe-area-inset-right, 0px), var(--app-inset-right, 0px));
+  --ait: max(env(safe-area-inset-top, 0px), var(--app-inset-top, 0px));
+  --aib: max(env(safe-area-inset-bottom, 0px), var(--app-inset-bottom, 0px));
+  --sl: max(var(--ail), 12px);
+  --sr: max(var(--air), 12px);
+  --st: max(var(--ait), 8px);
+  --sb: max(var(--aib), 8px);
 }
 * {
   box-sizing: border-box;
@@ -74,7 +79,7 @@ body {
 .safe-probe {
   position: fixed;
   visibility: hidden;
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  padding: var(--ait) var(--air) var(--aib) var(--ail);
 }
 .ic {
   display: inline-block;
@@ -2600,6 +2605,101 @@ body.portrait::after {
   flex-direction: column;
   gap: 6px;
 }
+.world-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.empty.small {
+  padding: 3vh 0;
+}
+.rec-table tr.me td {
+  background: rgba(76, 157, 255, 0.22);
+}
+.rec-table .nm {
+  font-weight: 800;
+  max-width: 28vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.acc-box {
+  background: var(--panel2);
+  border-radius: 16px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.acc-need {
+  color: #c9d0ee;
+  font-size: 0.9em;
+}
+.acc-form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.inp {
+  flex: 1 1 180px;
+  min-width: 0;
+  height: 46px;
+  border-radius: 12px;
+  border: 0;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 16px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 0 0 1.5px var(--line2);
+  user-select: text;
+  -webkit-user-select: text;
+  touch-action: manipulation;
+  outline: none;
+}
+.inp:focus {
+  box-shadow: inset 0 0 0 2px var(--blue);
+}
+.acc-row {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.link {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: #8fb8ff;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+  min-height: 40px;
+}
+.acc-msg {
+  color: #ffb0b0;
+  font-weight: 700;
+  font-size: 0.9em;
+  min-height: 1em;
+}
+.acc-note {
+  color: var(--muted);
+  font-size: 0.75em;
+}
+.go-world {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.8em;
+  color: #c9d0ee;
+  min-height: 1.2em;
+  text-align: center;
+}
 
 /* ---------------------------------------------------------------- ayarlar */
 .set-wrap {
@@ -2662,4 +2762,11 @@ body.portrait::after {
   .mm-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+}
+.doc-frame {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: #0b0d18;
+  touch-action: pan-y;
 }

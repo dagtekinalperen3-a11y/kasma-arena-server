@@ -60,6 +60,7 @@ export interface SaveData {
   settings: Settings;
   tutorialDone: boolean;
   installId: string;
+  account: { token: string; username: string } | null;
 }
 
 function defaults(): SaveData {
@@ -96,6 +97,7 @@ function defaults(): SaveData {
       controlsHint: true,
     },
     tutorialDone: false,
+    account: null,
     installId: Math.random().toString(36).slice(2) + Date.now().toString(36),
   };
 }
@@ -425,8 +427,10 @@ export class Save implements RunMeta {
 
   resetAll() {
     const keep = this.data.settings;
+    const acc = this.data.account;
     this.data = defaults();
     this.data.settings = keep;
+    this.data.account = acc;
     this.persist(true);
   }
 }

@@ -29,8 +29,8 @@ function fs(g: G, fill: string | CanvasGradient, lw = 2.2) {
 }
 
 /** Gövde: 96x96 tuval, merkez (48,52), r=16 -> çizim ölçeği 1.25 */
-export function heroBodyTex(sk: SkinDef): Texture {
-  return makeTex("hero|" + sk.id, 96, 96, (g) => {
+export function heroBodyTex(sk: SkinDef, res?: number): Texture {
+  return makeTex("hero|" + sk.id + (res ? "|" + res : ""), 96, 96, (g) => {
     const R = 20; // görsel yarıçap
     const cx = 48, cy = 54;
     const col = (sk.id === "prism" ? hueCol(0.9) : sk.color) as RGB;
@@ -238,7 +238,7 @@ export function heroBodyTex(sk: SkinDef): Texture {
       g.lineWidth = 4;
       g.stroke();
     }
-  }, 3);
+  }, res || 3);
 }
 
 function crown(g: G, x: number, y: number, w: number, col: string) {
@@ -269,8 +269,8 @@ function witchHat(g: G, x: number, y: number, R: number, c: RGB) {
 }
 
 /** Gözler: 2 göz, merkez (16,12). */
-export function heroEyesTex(glow = false): Texture {
-  return makeTex("heroeyes" + (glow ? "g" : ""), 32, 24, (g) => {
+export function heroEyesTex(glow = false, res?: number): Texture {
+  return makeTex("heroeyes" + (glow ? "g" : "") + (res ? "|" + res : ""), 32, 24, (g) => {
     for (const x of [9, 23]) {
       if (glow) {
         g.shadowColor = "#c08aff";
@@ -290,26 +290,26 @@ export function heroEyesTex(glow = false): Texture {
       g.lineWidth = 1.2;
       g.stroke();
     }
-  }, 3);
+  }, res || 3);
 }
-export function pupilTex(): Texture {
-  return makeTex("pupil", 8, 8, (g) => {
+export function pupilTex(res?: number): Texture {
+  return makeTex("pupil" + (res ? "|" + res : ""), 8, 8, (g) => {
     g.fillStyle = "#151a2c";
     circ(g, 4, 4, 2.6);
     g.fill();
     g.fillStyle = "#fff";
     circ(g, 3, 3, 0.9);
     g.fill();
-  }, 3);
+  }, res || 3);
 }
 
 /**
  * Silah dokusu: sağa bakar, sap (0,0) noktası tuvalde (16, H/2).
  * Döndürme pivotu bu noktadır.
  */
-export function weaponTex(kind: string, col: RGB, acc: RGB): { tex: Texture; ax: number; ay: number } {
+export function weaponTex(kind: string, col: RGB, acc: RGB, res?: number): { tex: Texture; ax: number; ay: number } {
   const W = 72, H = 72, ox = 16, oy = 36;
-  const tex = makeTex(`wpn|${kind}|${col}|${acc}`, W, H, (g) => {
+  const tex = makeTex(`wpn|${kind}|${col}|${acc}` + (res ? "|" + res : ""), W, H, (g) => {
     g.translate(ox, oy);
     const poly = (pts: number[][], fill: string, stroke?: string, lw = 1.6) => {
       g.beginPath();
@@ -466,6 +466,6 @@ export function weaponTex(kind: string, col: RGB, acc: RGB): { tex: Texture; ax:
       default:
         poly([[0, -4], [24, -4], [24, 4], [0, 4]], C);
     }
-  }, 3);
+  }, res || 3);
   return { tex, ax: ox / W, ay: oy / H };
 }

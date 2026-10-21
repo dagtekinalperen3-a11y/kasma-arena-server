@@ -12,6 +12,8 @@ import { heroPortrait } from "../render/portrait";
 import { h, btn, tap, esc, short } from "./dom";
 import { icon } from "./icons";
 import { Layer, confirmBox } from "./overlays";
+import { renderWorld } from "./world";
+import { online } from "../net/online";
 
 const C = GD;
 export const VERSION = "4.0.0";
@@ -521,7 +523,7 @@ export class Menus {
   // ------------------------------------------------------------------
   // REKORLAR
   // ------------------------------------------------------------------
-  showRecords(world?: (el: HTMLElement) => void) {
+  showRecords(world: (el: HTMLElement) => void = renderWorld) {
     const s = this.save;
     const { body } = this.panel(t("rec.title"), "medal", "records");
     const tabs = h("div", "tabs");
@@ -534,7 +536,7 @@ export class Menus {
         ["local", t("rec.local")],
         ["life", t("rec.lifetime")],
       ];
-      if (world) tl.push(["world", t("rec.world")]);
+      tl.push(["world", t("rec.world")]);
       for (const [k, label] of tl) {
         const b = h("button", "tab" + (k === tab ? " on" : ""), esc(label));
         tap(b, () => {
@@ -566,7 +568,7 @@ export class Menus {
           ["gem", t("c.gems"), short(s.data.gemsEarned)],
         ];
         content.innerHTML = `<div class="life-grid">${rows.map(([ic, k, v]) => `<div class="life">${icon(ic, 26, "#9fd8ff")}<span>${esc(k)}</span><b>${esc(v)}</b></div>`).join("")}</div>`;
-      } else if (world) world(content);
+      } else world(content);
     };
     render();
   }
@@ -680,6 +682,8 @@ export class Menus {
       }
       qr.append(qg);
       toggle(t("set.fps"), "info", "fpsCounter");
+      const ar = row(t("acc.account"), "user");
+      ar.insertAdjacentHTML("beforeend", `<span class="muted-t">${esc(online.loggedIn ? t("acc.signed", online.account!.username) : t("acc.guest"))}</span>`);
       extra?.(wrap);
       const foot = h("div", "set-foot");
       const reset = btn(`${icon("refresh", 18)}<span>${esc(t("set.reset"))}</span>`, "danger small", () =>
@@ -695,11 +699,20 @@ export class Menus {
         foot.append(
           btn(`${icon("close", 18)}<span>${esc(t("m.quit"))}</span>`, "ghost small", () => confirmBox(this.host, t("m.quit_q"), () => exitApp())),
         );
-      foot.insertAdjacentHTML("beforeend", `<div class="ver">EvolveArena · ${esc(t("set.version", VERSION))} · <a href="https://kasma-arena-server.onrender.com/privacy" target="_blank" rel="noopener">${esc(t("set.privacy"))}</a></div>`);
+      foot.append(btn(`${icon("info", 18)}<span>${esc(t("set.privacy"))}</span>`, "ghost small", () => this.showPrivacy()));
+      foot.insertAdjacentHTML("beforeend", `<div class="ver">EvolveArena · ${esc(t("set.version", VERSION))}</div>`);
       wrap.append(foot);
     };
     render();
     return L;
+  }
+
+  /** Gizlilik politikası (uygulamanın içinde, çevrim dışı da açılır). */
+  showPrivacy() {
+    const { body } = this.panel(t("set.privacy"), "info", "privacy");
+    const fr = h("iframe", "doc-frame") as HTMLIFrameElement;
+    fr.src = "privacy.html";
+    body.append(fr);
   }
 
   // ------------------------------------------------------------------

@@ -38,8 +38,17 @@ CORS_PATHS = ("/auth/", "/player/", "/shop/", "/reward", "/rewards", "/ad/", "/g
 CORS_BLOCKED = ("/diag", "/get_player", "/update_player", "/admin")
 
 
+# v4.0 MOBİL UYGULAMA (Google Play / App Store): oyun Capacitor ile paketli;
+# Android'de sayfa kökeni https://localhost, iOS'ta capacitor://localhost.
+# Yerel HTTP katmanı (CapacitorHttp) zaten Origin göndermez; bu liste
+# yalnız WebView'in kendi fetch'ine düştüğü durumlar için.
+APP_ORIGINS = ("https://localhost", "capacitor://localhost", "ionic://localhost")
+
+
 def _origin_ok(origin):
     o = (origin or "").strip().rstrip("/").lower()
+    if o in APP_ORIGINS:
+        return True
     if PLAY_ORIGINS:
         return o in PLAY_ORIGINS          # yalnızca elle yazılmış kökenler
     if not o.startswith("https://") or len(o) > 200:
@@ -1837,6 +1846,43 @@ def auth_logout():
         except Exception:
             pass
     return jsonify({"success": True})
+
+
+@app.route("/auth/delete", methods=["POST"])
+def auth_delete():
+    """HESABI KALICI OLARAK SİL (v4.0 — Google Play ve App Store kuralı).
+
+    Uygulama içinde hesap açılabiliyorsa silinebilmesi de ZORUNLU. Şifreli
+    hesaplarda şifre yeniden istenir (ele geçmiş bir jetonla hesap
+    silinemesin). Silinenler: skorlar, ilerleme, oturumlar ve hesabın
+    kendisi. Ödeme kayıtları (shop_orders) yasal saklama için kalır.
+    """
+    if not _accounts_enabled():
+        return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
+    src = _client_ip()
+    if not _rate_ok("auth:" + src):
+        return jsonify({"success": False, "error": "çok fazla deneme"}), 429
+    data = _body()
+    acc = _acct(data)
+    if not acc:
+        return jsonify({"success": False, "error": "oturum geçersiz"}), 401
+    try:
+        full = supabase.table("accounts").select("*").eq("id", acc["id"]).execute()
+        row = full.data[0] if full.data else None
+        if row and row.get("password_hash"):
+            if not _verify_password(str(data.get("password", "")), row["password_hash"]):
+                return jsonify({"success": False, "error": "şifre hatalı"}), 401
+        aid = acc["id"]
+        _wipe_scores(aid)
+        for table in ("player_data", "sessions"):
+            try:
+                supabase.table(table).delete().eq("account_id", aid).execute()
+            except Exception:
+                pass
+        supabase.table("accounts").delete().eq("id", aid).execute()
+        return jsonify({"success": True})
+    except Exception as e:
+        return _oops(e)
 
 
 @app.route("/auth/logout_all", methods=["POST"])

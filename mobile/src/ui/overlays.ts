@@ -11,6 +11,7 @@ import type { Run } from "../game/run";
 import type { Offer } from "../game/levelup";
 import type { Save } from "../game/save";
 import { h, btn, tap, esc, short } from "./dom";
+import { online } from "../net/online";
 import { icon } from "./icons";
 
 export class Layer {
@@ -327,7 +328,17 @@ export function showGameOver(
       ${stat("star", "#ffd34d", t("go.level"), String(s.level))}
       ${stat("coin", "#ffd34d", t("go.gold"), short(s.gold))}
     </div>
-    <div class="go-gems">${icon("gem", 28, "#6ef0ff")}<b>${esc(t("go.gems", s.gems))}</b><small>${icon("gem", 14, "#6ef0ff")} ${short(save.data.gems)}</small></div>`;
+    <div class="go-gems">${icon("gem", 28, "#6ef0ff")}<b>${esc(t("go.gems", s.gems))}</b><small>${icon("gem", 14, "#6ef0ff")} ${short(save.data.gems)}</small></div>
+    <div class="go-world"></div>`;
+  const gw = left.querySelector(".go-world") as HTMLElement;
+  const worldLine = () => {
+    const st = online.lastSubmit;
+    const txt =
+      st === "sending" ? t("go.world_send") : st === "ok" ? t("go.world_ok") : st === "fail" ? t("go.world_fail", online.lastError) : st === "skip_login" ? t("go.world_login") : "";
+    gw.innerHTML = txt ? `${icon("globe", 16, st === "ok" ? "#7ef0b0" : st === "fail" ? "#ff8a8a" : "#9fb3e8")}<span>${esc(txt)}</span>` : "";
+    if (st === "sending" && gw.isConnected) setTimeout(worldLine, 500);
+  };
+  worldLine();
   const right = h("div", "go-right scroll");
   const dmg = Object.entries(s.dmgLog).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 8);
   const tot = dmg.reduce((a, [, v]) => a + v, 0) || 1;

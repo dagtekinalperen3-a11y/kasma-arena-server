@@ -110,6 +110,7 @@ class Game {
       onBack: () => this.onBack(),
     });
     window.addEventListener("resize", () => this.onResize());
+    window.addEventListener("appinsets", () => this.onResize());
     window.addEventListener("orientationchange", () => setTimeout(() => this.onResize(), 250));
     window.addEventListener("keydown", (e) => {
       if (e.code === "Escape" && this.state === "menu") this.onBack();
