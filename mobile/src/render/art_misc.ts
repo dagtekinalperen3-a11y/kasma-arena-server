@@ -3,7 +3,7 @@
  */
 import { Texture } from "pixi.js";
 import { makeTex } from "./tex";
-import { RGB, rgbCss, lighten, darken, TAU } from "../core/util";
+import { RGB, rgbCss, lighten, darken, TAU, mulberry32 } from "../core/util";
 import { eyes } from "./tex";
 
 const OUT = "rgba(12,10,20,0.95)";
@@ -915,4 +915,204 @@ export function bossTex(kind: string, col: RGB, theme: string | null, hellish: b
       g.fillRect(0, 0, S, S);
     }
   }, flash ? 1.5 : 2);
+}
+
+// ------------------------------------------------------------------
+// GEZGİN TÜCCAR: tenteli tezgâh + pelerinli tüccar (anchor: ayak hizası)
+// ------------------------------------------------------------------
+export function merchantTex(): Texture {
+  return makeTex("merchant", 220, 180, (g) => {
+    const fy = 150; // zemin
+    // gölge
+    g.fillStyle = "rgba(0,0,0,0.28)";
+    g.beginPath();
+    g.ellipse(120, fy + 4, 92, 14, 0, 0, Math.PI * 2);
+    g.fill();
+    // tezgâh direkleri
+    const sx = 112, sw = 96;
+    g.fillStyle = "#5a3c20";
+    g.fillRect(sx + 6, fy - 92, 6, 92);
+    g.fillRect(sx + sw - 12, fy - 92, 6, 92);
+    // tente
+    for (let i = 0; i < 6; i++) {
+      const x0 = sx - 10 + (i * (sw + 20)) / 6, x1 = sx - 10 + ((i + 1) * (sw + 20)) / 6;
+      g.fillStyle = i % 2 ? "#ead6bc" : "#c2465c";
+      g.beginPath();
+      g.moveTo(x0, fy - 88);
+      g.lineTo(x1, fy - 88);
+      g.lineTo(x1 - 2, fy - 112);
+      g.lineTo(x0 + 2, fy - 112);
+      g.closePath();
+      g.fill();
+      g.beginPath();
+      g.arc((x0 + x1) / 2, fy - 88, (x1 - x0) / 2, 0, Math.PI);
+      g.fill();
+    }
+    g.strokeStyle = OUT;
+    g.lineWidth = 2.5;
+    g.strokeRect(sx - 10, fy - 112, sw + 20, 24);
+    // tezgâh
+    g.fillStyle = "#8a5e38";
+    g.beginPath();
+    g.roundRect(sx, fy - 40, sw, 40, 5);
+    g.fill();
+    g.stroke();
+    g.fillStyle = "#6a4626";
+    g.fillRect(sx + 4, fy - 26, sw - 8, 3);
+    // iksirler
+    [["#ff6e6e", 0], ["#6ee182", 1], ["#9696ff", 2]].forEach(([c, i]) => {
+      const bx = sx + 18 + (i as number) * 22;
+      glow(g, bx, fy - 52, 14, c === "#ff6e6e" ? [255, 110, 110] : c === "#6ee182" ? [110, 225, 130] : [150, 150, 255], 0.5);
+      g.fillStyle = c as string;
+      g.beginPath();
+      g.roundRect(bx - 6, fy - 62, 12, 20, 4);
+      g.fill();
+      g.strokeStyle = OUT;
+      g.lineWidth = 2;
+      g.stroke();
+      g.fillStyle = "#e8e8f0";
+      g.fillRect(bx - 3, fy - 67, 6, 5);
+    });
+    // altın mühür
+    g.fillStyle = "#ffc46e";
+    g.beginPath();
+    g.arc(sx + sw - 18, fy - 50, 9, 0, Math.PI * 2);
+    g.fill();
+    g.stroke();
+    // TÜCCAR (pelerin + kukuleta + büyük sırt çantası)
+    const mx = 62;
+    g.fillStyle = "#6a4a2a"; // çanta
+    g.beginPath();
+    g.roundRect(mx - 40, fy - 92, 34, 58, 9);
+    g.fill();
+    g.strokeStyle = OUT;
+    g.lineWidth = 2.5;
+    g.stroke();
+    g.fillStyle = "#8a6a40";
+    g.fillRect(mx - 36, fy - 70, 26, 5);
+    const robe = g.createLinearGradient(mx - 30, 0, mx + 30, 0);
+    robe.addColorStop(0, "#3a5aa8");
+    robe.addColorStop(1, "#2a3e7a");
+    g.fillStyle = robe;
+    g.beginPath();
+    g.moveTo(mx - 30, fy);
+    g.quadraticCurveTo(mx - 34, fy - 60, mx, fy - 84);
+    g.quadraticCurveTo(mx + 34, fy - 60, mx + 30, fy);
+    g.closePath();
+    g.fill();
+    g.stroke();
+    // kemer
+    g.fillStyle = "#e8b84a";
+    g.fillRect(mx - 26, fy - 40, 52, 6);
+    // yüz
+    g.fillStyle = "#f2c79a";
+    g.beginPath();
+    g.arc(mx, fy - 92, 19, 0, Math.PI * 2);
+    g.fill();
+    g.stroke();
+    // kukuleta / şapka
+    g.fillStyle = "#c2465c";
+    g.beginPath();
+    g.moveTo(mx - 26, fy - 94);
+    g.quadraticCurveTo(mx - 4, fy - 150, mx + 30, fy - 132);
+    g.quadraticCurveTo(mx + 14, fy - 112, mx + 24, fy - 96);
+    g.quadraticCurveTo(mx, fy - 108, mx - 26, fy - 94);
+    g.fill();
+    g.stroke();
+    // gözler + bıyık
+    g.fillStyle = "#1b1b2a";
+    g.beginPath();
+    g.arc(mx - 7, fy - 92, 3, 0, Math.PI * 2);
+    g.arc(mx + 7, fy - 92, 3, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = "#6a4020";
+    g.lineWidth = 3.5;
+    g.beginPath();
+    g.moveTo(mx - 10, fy - 82);
+    g.quadraticCurveTo(mx, fy - 87, mx + 10, fy - 82);
+    g.stroke();
+  }, 2);
+}
+
+// ------------------------------------------------------------------
+// LANETLİ MAĞARA: taş kemer, mor parıltılı karanlık ağız, zincirli sandık
+// ------------------------------------------------------------------
+export function shrineTex(open: boolean): Texture {
+  return makeTex("shrine|" + open, 200, 170, (g) => {
+    const cx = 100, fy = 138;
+    g.fillStyle = "rgba(0,0,0,0.3)";
+    g.beginPath();
+    g.ellipse(cx, fy + 6, 92, 16, 0, 0, Math.PI * 2);
+    g.fill();
+    // mağara ağzı
+    const mouth = g.createRadialGradient(cx, fy - 30, 4, cx, fy - 30, 70);
+    mouth.addColorStop(0, open ? "#7a3ac8" : "#3a1a5a");
+    mouth.addColorStop(0.6, "#160a24");
+    mouth.addColorStop(1, "#08040e");
+    g.fillStyle = mouth;
+    g.beginPath();
+    g.moveTo(cx - 62, fy);
+    g.arc(cx, fy, 62, Math.PI, 0);
+    g.closePath();
+    g.fill();
+    // taş kemer
+    const rnd = mulberry32(77);
+    for (let i = 0; i < 11; i++) {
+      const a = Math.PI + (i * Math.PI) / 10;
+      const rr = 66 + rnd() * 8;
+      const x = cx + Math.cos(a) * rr, y = fy + Math.sin(a) * rr;
+      const s = 13 + rnd() * 6;
+      g.fillStyle = i % 2 ? "#6a6478" : "#585266";
+      g.beginPath();
+      g.ellipse(x, y, s, s * (0.8 + rnd() * 0.3), a, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = OUT;
+      g.lineWidth = 2;
+      g.stroke();
+    }
+    // mor kafatası parıltısı
+    glow(g, cx, fy - 64, 26, [178, 92, 255], 0.8);
+    g.fillStyle = "#ecc4ff";
+    g.beginPath();
+    g.arc(cx, fy - 66, 9, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = "#3a1a5a";
+    g.beginPath();
+    g.arc(cx - 3.5, fy - 67, 2.4, 0, Math.PI * 2);
+    g.arc(cx + 3.5, fy - 67, 2.4, 0, Math.PI * 2);
+    g.fill();
+    // sandık
+    const bx = cx - 26, by = fy - 30, bw = 52, bh = 30;
+    g.fillStyle = "#3e2a5a";
+    g.beginPath();
+    g.roundRect(bx, by, bw, bh, 5);
+    g.fill();
+    g.strokeStyle = OUT;
+    g.lineWidth = 2.5;
+    g.stroke();
+    g.fillStyle = "#b25cff";
+    g.fillRect(bx + bw / 2 - 4, by + 6, 8, 10);
+    // kapak
+    g.save();
+    g.translate(bx, by);
+    if (open) g.rotate(-0.55);
+    g.fillStyle = "#4e3470";
+    g.beginPath();
+    g.roundRect(0, -16, bw, 18, [8, 8, 2, 2]);
+    g.fill();
+    g.stroke();
+    g.restore();
+    if (open) glow(g, cx, by - 6, 30, [236, 196, 255], 0.9);
+    // zincirler
+    if (!open) {
+      g.strokeStyle = "#a8a2b8";
+      g.lineWidth = 3;
+      for (const d of [-1, 1]) {
+        g.beginPath();
+        g.moveTo(cx + d * 30, by - 10);
+        g.lineTo(cx - d * 30, by + bh);
+        g.stroke();
+      }
+    }
+  }, 2);
 }

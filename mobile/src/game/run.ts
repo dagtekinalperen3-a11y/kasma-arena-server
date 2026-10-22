@@ -17,6 +17,7 @@ import { applyShopItem } from "./shop";
 import { sfx, audio } from "../core/audio";
 import { haptic } from "../core/native";
 import { t } from "../core/i18n";
+import { RunExtras } from "./extras";
 
 const C = GD;
 const GOLD: RGB = [232, 186, 90];
@@ -159,6 +160,9 @@ export class Run {
   beatenBossWave = 0;
   storedEvents: string[] = [];
   onEvent: (ev: string, data?: any) => void = () => {};
+  /** görevler, tüccar/yeminler, lanetli mağara */
+  ex!: RunExtras;
+  private exStarted = false;
   goblinTimer = 0;
 
   constructor(public meta: RunMeta, skinId: string, diff: B.Diff, theme: string, cosmeticPerks: Record<string, number>[] = []) {
@@ -172,6 +176,7 @@ export class Run {
     this.waves = new WaveManager(diff, "arena", () => this.nearCameraPoint());
     this.setMapTheme(theme);
     this.levelup = new LevelUp(this);
+    this.ex = new RunExtras(this);
     this.bestAtStart = meta.bestScore();
     DMG.log = this.dmgLog;
   }
@@ -194,8 +199,8 @@ export class Run {
   }
   applyWaveMods() {
     const arena = this.biome !== "hell";
-    this.waves.enemySpeedMult = arena ? this.themeSpeed : 1;
-    this.waves.spawnRateMult = arena ? this.themeSpawn : 1;
+    this.waves.enemySpeedMult = (arena ? this.themeSpeed : 1) * (this.ex?.oathSpeed ?? 1);
+    this.waves.spawnRateMult = (arena ? this.themeSpawn : 1) * (this.ex?.oathSpawn ?? 1);
     this.waves.theme = arena ? this.theme : "stone";
     this.waves.doom = arena && this.theme !== "stone";
   }
@@ -609,6 +614,7 @@ export class Run {
   onEnemyKilled(e: Target) {
     if (e.deathCounted) return;
     e.deathCounted = true;
+    this.ex.onDeath(e);
     const p = this.player;
     if (e.kind === "bomber") {
       this.hazards.push(new Hazard(e.x, e.y, C.BOMBER_RADIUS, C.BOMBER_DELAY, e.dmg * C.BOMBER_DMG_MULT, null, ENEMY_COLORS.bomber, "bomber"));
@@ -1152,6 +1158,14 @@ export class Run {
       for (let i = 0; i < this.enemies.length; i++) this.enemies[i].update(dt, ectx);
       this.separateEnemies();
     }
+    // hazine goblini GOBLIN_LIFE saniyede yakalanmazsa kaçar (ganimet yok)
+    for (const e of this.enemies) {
+      if (e.alive && e.kind === "goblin" && e.spawnT > C.GOBLIN_LIFE) {
+        e.alive = false;
+        this.fx.burst(e.x, e.y, [200, 200, 200], 12, 150, 0.5, 3.5);
+        this.fx.popup(e.x, e.y - 30, t("fx.goblin_escaped"), [200, 200, 210], 16, 1.2, true);
+      }
+    }
     this.enemies = this.enemies.filter((e) => e.alive);
     if (!frozen) {
       this.repositionStragglers(dt);
@@ -1200,10 +1214,19 @@ export class Run {
     if (this.coinsEarned >= 1500) this.meta.unlockAch("rich");
     if (p.dash_count >= 40) this.meta.unlockAch("dasher");
 
+    let portalUsed = false;
     if (this.hellPortal) {
       this.hellPortal.update(dt);
-      if (p.alive && this.hellPortal.inRange(p) && inp.use) this.enterHell();
+      if (p.alive && this.hellPortal.inRange(p) && inp.use) {
+        portalUsed = true;
+        this.enterHell();
+      }
     }
+    if (!this.exStarted) {
+      this.exStarted = true;
+      this.ex.start();
+    }
+    this.ex.update(dt, inp.use && !portalUsed);
     this.combo.update(dt);
     this.fx.update(dt);
     if (!p.alive && !this.gameOver) {
@@ -1225,7 +1248,7 @@ export class Run {
     if (Math.random() >= C.GOBLIN_CHANCE) return;
     const [x, y] = this.nearCameraPoint(80);
     const g = new Enemy("goblin", x, y, this.waveHpMult(this.waves.wave), 1, this.waves.wave, null, this.biome);
-    (g as any).goblinLife = C.GOBLIN_LIFE;
+    g.speed = Math.min(g.speed, B.BASE_SPEED * 0.8); // yakalanabilir kalsın
     this.enemies.push(g);
     this.fx.popup(this.player.x, this.player.y - 100, t("fx.goblin"), C.GOBLIN_COLOR, 22, 2.2, true);
     sfx("coin", 0.8);
@@ -1501,8 +1524,13 @@ export class Run {
   /** Koşu bitince kalıcı istatistiklere yazılacak özet. */
   summary() {
     const p = this.player;
-    const gems = Math.floor(this.gemCoins * C.RUN_GEM_RATE * p.gem_mult);
+    this.ex.updateQuests();
+    const questGems = this.ex.questGemsDue();
+    const gems = Math.floor(this.gemCoins * C.RUN_GEM_RATE * p.gem_mult) + questGems;
     return {
+      questGems,
+      cursed: this.ex.cursedTaken,
+      oath: this.ex.oath,
       score: this.score,
       kills: this.kills,
       wave: this.totalWave(),

@@ -384,6 +384,8 @@ export class Save implements RunMeta {
     st.total_bonk_hits = this.stat("total_bonk_hits") + s.bonkHits;
     st.total_chests = this.stat("total_chests") + s.chests;
     st.total_goblins = this.stat("total_goblins") + s.goblins;
+    st.total_cursed = this.stat("total_cursed") + s.cursed;
+    this.maxStat("best_curse", s.cursed);
     const sm = (st.shop_max ||= {});
     for (const [k, l] of Object.entries(s.shopLevels)) if ((l as number) > (sm[k] || 0)) sm[k] = l;
     for (const [k, v] of Object.entries(mapStats)) {

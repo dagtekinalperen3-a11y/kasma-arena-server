@@ -341,9 +341,16 @@ export class Hud {
     this.setBtn("dash", dcd);
     this.setBtn("bonk", bcd);
     const portal = !!(run.hellPortal && p.alive && run.hellPortal.inRange(p));
+    const target = portal ? "portal" : p.alive ? run.ex.useTarget() : null;
     const ub = inp.btn("use");
-    if (ub) ub.visible = portal;
-    setStyle(this.btnEls.use, "display", portal ? "flex" : "none");
+    if (ub) ub.visible = !!target;
+    setStyle(this.btnEls.use, "display", target ? "flex" : "none");
+    if (target) {
+      const lbl = this.btnEls.use.querySelector(".ab-l") as HTMLElement;
+      setText(lbl, target === "merchant" ? t("btn.talk") : target === "shrine" ? t("btn.open") : t("btn.use"));
+      setClass(this.btnEls.use, "merchant", target === "merchant");
+      setClass(this.btnEls.use, "shrine", target === "shrine");
+    }
   }
 
   private setBtn(id: string, cd: number) {

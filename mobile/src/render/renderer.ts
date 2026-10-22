@@ -822,6 +822,30 @@ export class WorldRenderer {
       s.alpha = k.taken ? clamp(1 - k.takeT / 0.6, 0, 1) : 1;
       s.rotation = Math.sin(k.t * 2) * 0.2;
     }
+    // gezgin tüccar ve lanetli mağara
+    const ex = run.ex;
+    if (ex?.merchant) {
+      const m = ex.merchant;
+      const s = this.spriteFor(m, "merchant", this.entityLayer, 62 / 220, 150 / 180);
+      s.texture = A.merchantTex();
+      s.position.set(m.x, m.y);
+      s.zIndex = m.y;
+      if (!m.done) {
+        const by = m.y - 150 + Math.sin(m.t * 4) * 5;
+        this.dynAbove.circle(m.x, by, 15).fill({ color: 0x0c0a14 }).circle(m.x, by, 12.5).fill({ color: 0xffc46e });
+        this.dynAbove.roundRect(m.x - 2, by - 7.5, 4, 9, 2).fill({ color: 0x3c220a }).circle(m.x, by + 5, 2.2).fill({ color: 0x3c220a });
+      }
+    }
+    if (ex?.shrine) {
+      const sh = ex.shrine;
+      const s = this.spriteFor(sh, "shrine", this.entityLayer, 0.5, 138 / 170);
+      s.texture = A.shrineTex(sh.lid > 0.5);
+      const fade = sh.used ? clamp(1 - sh.dieT / 1.6, 0, 1) : 1;
+      s.position.set(sh.x + (sh.used ? Math.sin(sh.t * 50) * 3 * fade : 0), sh.y + (1 - fade) * 20);
+      s.alpha = fade;
+      s.zIndex = sh.y;
+      if (!sh.used) this.dynBelow.circle(sh.x, sh.y + 30, 104).stroke({ width: 3, color: 0xb25cff, alpha: 0.18 + 0.12 * Math.sin(sh.t * 3) });
+    }
     if (run.hellPortal) {
       const hp = run.hellPortal;
       const s = this.spriteFor(hp, "portal", this.decalLayer);
@@ -847,6 +871,9 @@ export class WorldRenderer {
     const k = run.nearestKey();
     if (k) items.push([k.x, k.y, 0xffd65a]);
     if (run.hellPortal) items.push([run.hellPortal.x, run.hellPortal.y, 0xb256ff]);
+    // mağara: bulunduktan sonra; tüccar: mobilde harita olmadığı için hep (yemin edilene dek)
+    if (run.ex?.shrine?.discovered && !run.ex.shrine.used) items.push([run.ex.shrine.x, run.ex.shrine.y, 0xb25cff]);
+    if (run.ex?.merchant && !run.ex.merchant.done) items.push([run.ex.merchant.x, run.ex.merchant.y, 0xffc46e]);
     for (const d of run.bigDrops) items.push([d.x, d.y, d.kind === "magnet" ? 0xff5460 : 0xb26eff]);
     const m = 34;
     for (const [x, y, col] of items) {

@@ -22,9 +22,10 @@ import { MenuScene } from "./render/menuscene";
 import { Hud } from "./ui/hud";
 import { Menus } from "./ui/menus";
 import { Layer, showLevelUp, showShop, showPause, showGameOver } from "./ui/overlays";
+import { showMerchant, showCurse } from "./ui/extras_ui";
 import { online } from "./net/online";
 
-type Overlay = "none" | "levelup" | "shop" | "pause" | "gameover" | "settings";
+type Overlay = "none" | "levelup" | "shop" | "pause" | "gameover" | "settings" | "merchant" | "curse";
 
 class Game {
   app = new Application();
@@ -47,6 +48,7 @@ class Game {
   private lastDiff: "normal" | "hard" | "nightmare" = "normal";
   private inp: RunInput = { mx: 0, my: 0, aimX: 0, aimY: 0, aimManual: false, fire: false, dash: false, bonk: false, use: false };
   private bgPaused = false;
+  private sideCtl: { close(): void } | null = null;
 
   async boot() {
     const bar = document.querySelector("#boot .boot-bar i") as HTMLElement | null;
@@ -385,6 +387,8 @@ class Game {
         this.overlayLayer?.close(() => this.resume());
       } else if (this.overlay === "shop") {
         (this as any)._shopCtl?.close();
+      } else if (this.overlay === "merchant" || this.overlay === "curse") {
+        this.sideCtl?.close();
       }
       return;
     }
@@ -448,6 +452,14 @@ class Game {
       if (run.gameOver) {
         this.deathT -= dt;
         if (this.deathT <= 0) this.finishRun(true);
+      } else if (run.ex.curseOffers && p.alive) {
+        this.setOverlay("curse");
+        audio.duck(0.5, 0.2);
+        this.sideCtl = showCurse(this.layer, run, () => this.resume());
+      } else if (run.ex.merchantOpen && p.alive) {
+        this.setOverlay("merchant");
+        audio.duck(0.5, 0.2);
+        this.sideCtl = showMerchant(this.layer, run, () => this.resume());
       } else if (run.pendingLevelups > 0 && p.alive) this.openLevelUp();
     } else if (this.overlay !== "gameover") {
       // durakken de efektler hafifçe akmasın; yalnız çiz

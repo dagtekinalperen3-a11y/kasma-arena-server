@@ -65,6 +65,10 @@ export const UI_STRINGS: Record<string, string[]> = {
   "btn.dash": ["DASH", "DASH", "DASH", "DASH", "РЫВОК"],
   "btn.bonk": ["BONK", "BONK", "BONK", "BONK", "БОНК"],
   "btn.use": ["GİR", "ENTER", "ENTRAR", "BETRETEN", "ВОЙТИ"],
+  "btn.talk": ["KONUŞ", "TALK", "HABLAR", "REDEN", "ГОВОРИТЬ"],
+  "btn.open": ["AÇ", "OPEN", "ABRIR", "ÖFFNEN", "ОТКРЫТЬ"],
+  "m.hint_m": ["Haritada bir GEZGİN TÜCCAR var — sarı oku takip et", "A WANDERING MERCHANT is on the map — follow the yellow arrow", "Hay un MERCADER ERRANTE en el mapa — sigue la flecha amarilla", "Ein WANDERHÄNDLER ist auf der Karte — folge dem gelben Pfeil", "На карте есть СТРАНСТВУЮЩИЙ ТОРГОВЕЦ — следуй за жёлтой стрелкой"],
+  "q.hud": ["GÖREVLER", "QUESTS", "MISIONES", "AUFGABEN", "ЗАДАНИЯ"],
   "btn.shop": ["MARKET", "SHOP", "TIENDA", "LADEN", "МАГАЗИН"],
   "hud.ult": ["YETENEK", "ULTIMATE", "DEFINITIVA", "ULTIMATE", "УЛЬТА"],
 

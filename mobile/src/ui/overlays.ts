@@ -12,6 +12,7 @@ import type { Offer } from "../game/levelup";
 import type { Save } from "../game/save";
 import { h, btn, tap, esc, short } from "./dom";
 import { online } from "../net/online";
+import { QUEST_DEFS, QUEST_GEMS, QUEST_TIER_COLORS } from "../game/extras";
 import { icon } from "./icons";
 
 export class Layer {
@@ -259,6 +260,27 @@ export function buildList(run: Run) {
   return items.join("");
 }
 
+/** Koşu görevleri + yemin (duraklatma ekranı). */
+export function questsHtml(run: Run) {
+  const ex = run.ex;
+  if (!ex) return "";
+  const rows = ex.quests
+    .map((q) => {
+      const def = QUEST_DEFS[q.key];
+      const cur = Math.min(q.goal, ex.questValue(q.key));
+      const col = rgbCss(QUEST_TIER_COLORS[q.tier]);
+      return `<div class="quest${q.done ? " done" : ""}" style="--qc:${col}">${icon(q.done ? "check" : def[0], 20, q.done ? "#7ef0b0" : rgbCss(def[1]))}
+        <div class="q-body"><div class="q-t"><span>${esc(t("q." + q.key, q.goal))}</span><em>${esc(t("q.tier" + q.tier))}</em></div>
+        <div class="rq-bar"><i style="width:${((cur / q.goal) * 100).toFixed(1)}%;background:${col}"></i></div></div>
+        <div class="q-gem">${icon("gem", 14, "#6ef0ff")}${QUEST_GEMS[q.tier]}</div></div>`;
+    })
+    .join("");
+  const oath = ex.oath
+    ? `<div class="oath-line">${icon("star", 16, "#ffc46e")} <b>${esc(t(`oath.${ex.oath}.name`))}</b> · ${esc(t("rar." + ex.oathTier))}</div>`
+    : "";
+  return `<div class="sec-t">${esc(t("q.title"))}</div><div class="quests">${rows}</div><div class="panel-note">${esc(t("q.note"))}</div>${oath}`;
+}
+
 export function showPause(host: HTMLElement, run: Run, h2: { resume(): void; restart(): void; quit(): void; settings(): void }) {
   const L = new Layer(host, "pause");
   const wrap = h("div", "pause-wrap");
@@ -276,7 +298,7 @@ export function showPause(host: HTMLElement, run: Run, h2: { resume(): void; res
   );
   left.append(col);
   const right = h("div", "pause-right scroll");
-  right.innerHTML = `<div class="sec-t">${esc(t("p.build"))}</div><div class="build">${buildList(run) || "—"}</div>
+  right.innerHTML = `${questsHtml(run)}<div class="sec-t">${esc(t("p.build"))}</div><div class="build">${buildList(run) || "—"}</div>
     <div class="sec-t">${esc(t("p.stats"))}</div><div class="stats">${statRows(run)
       .map(([k, v]) => `<div class="srow"><span>${esc(k)}</span><b>${esc(v)}</b></div>`)
       .join("")}</div>`;
@@ -329,6 +351,7 @@ export function showGameOver(
       ${stat("coin", "#ffd34d", t("go.gold"), short(s.gold))}
     </div>
     <div class="go-gems">${icon("gem", 28, "#6ef0ff")}<b>${esc(t("go.gems", s.gems))}</b><small>${icon("gem", 14, "#6ef0ff")} ${short(save.data.gems)}</small></div>
+    ${s.questGems ? `<div class="go-quest">${icon("check", 16, "#7ef0b0")} ${esc(t("q.paid", s.questGems))}</div>` : ""}
     <div class="go-world"></div>`;
   const gw = left.querySelector(".go-world") as HTMLElement;
   const worldLine = () => {
