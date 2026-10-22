@@ -605,8 +605,8 @@ VIRTUAL_W, VIRTUAL_H = SCREEN_W - 2 * SAFE_X, 720
 
 # ---- yılbaşı teması ----
 # Ana menüye mevsimlik kar tanesi + ışık dizisi + "YENİ YILIN KUTLU OLSUN" süsü
-# ekler:
-# - 7 Ocak); NEW_YEAR_FORCE ile elle açıp kapatmak (test etmek) mümkün:
+# ekler. Tarihe göre kendiliğinden açılır/kapanır (7 Ekim - 7 Ocak).
+# NEW_YEAR_FORCE: None = tarihe bak, True = hep açık, False = hep kapalı.
 NEW_YEAR_FORCE = None
 
 
@@ -11753,7 +11753,8 @@ BOOKS = [
      "color": (210, 70, 100), "icon": "drop", "rare": False,
      "unlock": dict(text="Kanla beslen: toplam 4.000 can çal",
                     reqs=[rq_stat("total_lifesteal", 4000, "Kan Emici ile toplam 4.000 can çal")])},
-    # bir mermi hattında 16 yaratığın dizilmesi pratikte hiç olmuyor.
+    # max=5: daha fazlası boşa. Arenada tek bir mermi hattında 16 yaratığın
+    # dizilmesi pratikte hiç olmuyor.
     {"key": "r_pierce", "name": "Delgi Kitabı", "max": 5,
      "desc": "Mermilerin daha çok düşmanı deler (Lv.5'e kadar)",
      "color": (220, 140, 90), "icon": "sword", "rare": False,
@@ -18593,6 +18594,7 @@ class Enemy:
         self.hit_flash = 0.14
         self.knock_x += kx
         self.knock_y += ky
+        # quiet=True: alan hasarı (su / ateş / pentagram / kitap). Bu alanlar
         # saniyede birkaç kez vurduğu için hasar sayısı basmaz - yoksa ekran
         # okunmaz hâle geliyor. Geri bildirim yaratığın beyaz parlamasıdır.
         col = (255, 230, 120) if crit else WHITE
@@ -24512,8 +24514,8 @@ WAVE_BREATHER_STEP = 150    # her sonraki dalgada üstüne eklenen skor
 # İlk dalgaların skor hedefleri elle belirlenir: oyunun açılışı burada
 # şekillendiği için formüle bırakılmaz.
 WAVE_GOAL_TABLE = {1: 600, 2: 2300, 3: 2900, 4: 3500, 5: 4100, 6: 4250}
-# değerlerle sürekli (kesintisiz) hâle getirir:
 # 6. dalgadan sonrası formülle devam eder; bu çarpan, formülü tablodaki
+# değerlerle sürekli (kesintisiz) hâle getirir:
 #   Büyütürsen -> dalgalar daha uzun sürer
 #   Küçültürsen -> dalgalar daha hızlı geçer
 WAVE_GOAL_SCALE = 5.9
@@ -24606,8 +24608,8 @@ BOSS_WAVE_TIMEOUT = 30.0
 WAVE_MIN_TIME_BANDS = ((None, 15.0),)
 WAVE_MIN_TIME_HELL = 15.0
 # Zorluk asgari süreyi değiştirmez: kabusta kalabalık çok daha yoğundur ama
-# kabus 11.6 dk). Ayar gerekirse zorluk başına çarpan buradan verilir:
 # 20. dalgaya yine ~12 dakikada gelinir (ölçüm: güçlü bot, normal 12.7 dk,
+# kabus 11.6 dk). Ayar gerekirse zorluk başına çarpan buradan verilir:
 WAVE_MIN_TIME_DIFF = {"normal": 1.0, "hard": 1.0, "nightmare": 1.0}
 
 
@@ -28330,8 +28332,8 @@ class RunState:
                 return False
         if n == 1:
             return int(getattr(self, "bosses_killed", 0)) >= 1
-        # haritalarda ölüm duvarı başlar (doom_warned) - ikisi de aynı an:
         # 25. dalga patronu devrilince: Taş Meydan'da kapı açılır, öbür
+        # haritalarda ölüm duvarı başlar (doom_warned) - ikisi de aynı an.
         return self.hell_portal is not None or bool(getattr(self, "doom_warned", False))
 
     def spawn_cursed_shrine(self):
@@ -33107,7 +33109,8 @@ def sigil_sprite(key, r, col):
         global _GLOW_ON_ALPHA
         _GLOW_ON_ALPHA = True
         try:
-            # Asıl bulanıklık ekran ölçeklemesindeydi.)
+            # 2 kat çizip küçültmek denendi, ince parlamalar sönükleşti.
+            # Asıl bulanıklık ekran ölçeklemesindeydi.
             s = pygame.Surface((pad * 2, pad * 2), pygame.SRCALPHA)
             draw_weapon_sigil(s, pad, pad, r, key, col, 0.0)
         finally:

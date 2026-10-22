@@ -769,7 +769,7 @@ def auth_reset():
         return _oops(e)
     _login_ok(str(acc.get("username") or "").lower())
     _login_ok(str(acc.get("email") or "").lower())
-    # şifresi var (Google hesabı da şifre kazanmış olur)
+    # artık şifresi var (Google hesabı da şifre kazanmış olur)
     pub = _public_account(dict(acc, password_hash="x"))
     return jsonify({"success": True, "token": tok, "account": pub})
 
