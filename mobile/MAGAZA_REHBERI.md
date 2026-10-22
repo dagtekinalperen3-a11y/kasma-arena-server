@@ -75,8 +75,8 @@ sürüm adı `mobile/package.json` içindeki `version`.)
 - **Mağaza girişi**: metinler `store/listing.md` dosyasında hazır (TR + EN).
   - Simge: `store/play-icon-512.png`
   - Öne çıkan görsel: `store/play-feature-graphic-1024x500.png`
-  - Ekran görüntüleri: `store/screenshots/phone/*.png` (en az 2) ve
-    `store/screenshots/tablet/*.png`
+  - Ekran görüntüleri: `store/screenshots/phone/*.jpg` (en az 2; `tr-` Türkçe, `en-` İngilizce) ve
+    `store/screenshots/ipad-13/*.jpg` (tablet)
 - **Gizlilik politikası URL'si**: `https://kasma-arena-server.onrender.com/privacy.html`
   (dosya depodaki `privacy.html`; sunucu yeniden dağıtıldığında yayında olur).
   **Önce** dosyadaki `ILETISIM@ORNEK.COM` yazan iki yeri kendi iletişim e-postanla değiştir
@@ -133,7 +133,7 @@ GitHub → **Actions → iOS → Run workflow**. İş bitince sürüm App Store 
 Xcode bulut imzalaması API anahtarıyla bunları kendisi oluşturur.
 
 ### 3.3 App Store Connect'te doldurulacaklar
-- Ekran görüntüleri: `store/screenshots/iphone-6.9/*.png` ve `store/screenshots/ipad-13/*.png`
+- Ekran görüntüleri: `store/screenshots/iphone-6.9/*.jpg` ve `store/screenshots/ipad-13/*.jpg`
 - Metinler: `store/listing.md`
 - Gizlilik politikası URL'si: yukarıdaki ile aynı
 - **App Privacy** (Gizlilik etiketi): *Contact Info → Email Address* ve *Identifiers → User ID*
