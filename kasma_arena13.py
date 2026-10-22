@@ -12742,6 +12742,9 @@ class Player:
         # yani pelerin alınır alınmaz bir kez çalışır.
         self.invis_t = 0.0
         self.cloak_timer = 0.0
+        # güç sunağı: süreli hasar / hız payı (hile denetimi bunları ayırır)
+        self.shrine_dmg = 0.0
+        self.shrine_spd = 0.0
 
         # ---- skin özel yeteneği (ulti) ----
         # Her skinin bir özel yeteneği var; otomatik çalışır ve bekleme süresi
@@ -12868,7 +12871,7 @@ class Player:
         return soft_speed_mult(m) + tmp
 
     def eff_speed(self):
-        sp = self.base_speed * self.run_speed_mult()
+        sp = self.base_speed * self.run_speed_mult() * (1.0 + self.shrine_spd)
         # Patron yavaşlatması (kolos'un sarsıntısı gibi) hızı doğrudan keser.
         if self.slow_t > 0:
             sp *= self.slow_mult
@@ -12885,7 +12888,7 @@ class Player:
         # pelerin: görünmezken vuruşlar daha ağır.
         if self.invis_t > 0:
             d *= (1.0 + cloak_ambush_bonus(self.weapons.get("cloak", 0)))
-        return d
+        return d * (1.0 + self.shrine_dmg)
 
     def eff_atk_cd(self):
         return max(0.07, self.base_atk_cd / (self.run_aspd_mult * (1.0 + self.skin_aspd)))
@@ -17608,8 +17611,9 @@ def weapon_damage(player, w, level):
     # şans: silahın nadirlik bonusu (sandık / seviye kartı). Tek-atma freni
     # (cap_oneshot) vuruşta ayrıca uygulanır; bonus onu atlamaz.
     boost = 1.0 + float(getattr(player, "weapon_boost", {}).get(w["key"], 0.0))
+    evo = EVO_DMG_MULT if w["key"] in getattr(player, "evolved", ()) else 1.0
     return (player.eff_dmg() * w["dmg"] * WEAPON_DMG_GLOBAL
-            * (1.0 + dpl * WEAPON_DPL_SCALE * weapon_growth(level)) * boost)
+            * (1.0 + dpl * WEAPON_DPL_SCALE * weapon_growth(level)) * boost * evo)
 
 
 # ---- tek-atma freni ----
@@ -17702,6 +17706,8 @@ def cap_oneshot(e, dmg, lvl):
 # verdiği.
 DMG_SRC = ["other"]
 DMG_LOG = [None]
+# evrilmiş silah anahtarları (vuruş anında hızlı bakılsın diye ayrı küme)
+EVO_ON = set()
 
 
 def dmg_note(amount):
@@ -18680,6 +18686,8 @@ class Enemy:
         if self.alive:
             dmg_note(min(amount, max(0.0, self.hp)))
         self.hp -= amount
+        if DMG_SRC[0] in EVO_ON:
+            evo_on_hit(self, amount, fx)
         self.hit_flash = 0.14
         self.knock_x += kx
         self.knock_y += ky
@@ -23531,6 +23539,8 @@ class Boss(MapBossArt):
         if self.alive:
             dmg_note(min(amount, max(0.0, self.hp)))
         self.hp -= amount
+        if DMG_SRC[0] in EVO_ON:
+            evo_on_hit(self, amount, fx)
         self.hit_flash = 0.12
         col = (255, 230, 120) if crit else WHITE
         if not quiet and amount >= 1.0:
@@ -25479,8 +25489,9 @@ def run_integrity_check(run):
     p = run.player
     lvl = max(1, int(getattr(p, "level", 1)))
     try:
-        dmg_ratio = p.eff_dmg() / max(1e-6, BASE_DMG)
-        spd_ratio = p.eff_speed() / max(1e-6, BASE_SPEED)
+        # güç sunağının süreli payı oyunun kendi verdiği bir şey: sayılmaz
+        dmg_ratio = p.eff_dmg() / (1.0 + getattr(p, "shrine_dmg", 0.0)) / max(1e-6, BASE_DMG)
+        spd_ratio = p.eff_speed() / (1.0 + getattr(p, "shrine_spd", 0.0)) / max(1e-6, BASE_SPEED)
         hp = float(p.max_hp)
     except Exception:
         return None
@@ -25525,7 +25536,898 @@ def run_score_plausible(run):
     return True
 
 
-class RunState:
+# ---- güç sunakları ----
+# Haritada arada bir taş bir sunak belirir. Üstünde iki saniye durursan
+# yanar ve 25 saniyelik bir güç verir (ya da anında bir iyilik yapar).
+# Oyuncuya "dur mu, koş mu" kararı verdirir: sunağın başında beklerken
+# kalabalık üstüne gelir. 2 kişilik modda yok.
+SHRINE_FIRST = 55.0             # ilk sunağın koşudaki saniyesi
+SHRINE_GAP = (70.0, 100.0)      # sunaklar arası (saniye)
+SHRINE_LIFE = 50.0              # kullanılmazsa bu kadar sonra söner
+SHRINE_R = 54.0                 # üstünde durulacak daire
+SHRINE_CHARGE = 2.0             # dolma süresi
+SHRINE_BUFF_T = 25.0
+SHRINE_RAGE = 0.40
+SHRINE_HASTE = 0.30
+# tür -> (renk, simge)
+SHRINE_KINDS = {
+    "rage":   ((255, 96, 70), "fist"),
+    "haste":  ((110, 236, 200), "boot"),
+    "blood":  ((236, 60, 96), "heart"),
+    "gold":   ((255, 206, 80), "coin"),
+    "magnet": ((255, 110, 120), "magnet"),
+    "guard":  ((150, 196, 255), "shield"),
+}
+# anında etki eden sunaklar süre çubuğuna girmez
+SHRINE_INSTANT = ("magnet", "guard")
+
+STRINGS.update({
+    "sh.rage":   _T("ÖFKE SUNAĞI", "SHRINE OF RAGE", "SANTUARIO DE FURIA", "ALTAR DES ZORNS", "АЛТАРЬ ЯРОСТИ"),
+    "sh.haste":  _T("RÜZGÂR SUNAĞI", "SHRINE OF WIND", "SANTUARIO DEL VIENTO", "ALTAR DES WINDES", "АЛТАРЬ ВЕТРА"),
+    "sh.blood":  _T("KAN SUNAĞI", "SHRINE OF BLOOD", "SANTUARIO DE SANGRE", "ALTAR DES BLUTES", "АЛТАРЬ КРОВИ"),
+    "sh.gold":   _T("ALTIN SUNAĞI", "SHRINE OF GOLD", "SANTUARIO DEL ORO", "ALTAR DES GOLDES", "АЛТАРЬ ЗОЛОТА"),
+    "sh.magnet": _T("MIKNATIS SUNAĞI", "SHRINE OF PULL", "SANTUARIO DEL IMÁN", "ALTAR DES MAGNETS", "АЛТАРЬ МАГНИТА"),
+    "sh.guard":  _T("KALKAN SUNAĞI", "SHRINE OF WARDS", "SANTUARIO DEL ESCUDO", "ALTAR DES SCHILDES", "АЛТАРЬ ЩИТА"),
+    "sh.rage.d":   _T("+%40 hasar", "+40% damage", "+40% de daño", "+40% Schaden", "+40% урона"),
+    "sh.haste.d":  _T("+%30 hız ve atış hızı", "+30% speed & fire rate", "+30% velocidad y cadencia",
+                      "+30% Tempo & Feuerrate", "+30% скорости и темпа"),
+    "sh.blood.d":  _T("her öldürme can verir", "every kill heals", "cada muerte cura", "jeder Kill heilt",
+                      "каждое убийство лечит"),
+    "sh.gold.d":   _T("altın x2", "gold x2", "oro x2", "Gold x2", "золото x2"),
+    "sh.magnet.d": _T("haritadaki her şey sana uçar", "everything on the map flies to you",
+                      "todo el mapa vuela hacia ti", "alles auf der Karte fliegt zu dir",
+                      "всё с карты летит к тебе"),
+    "sh.guard.d":  _T("+3 kalkan", "+3 shields", "+3 escudos", "+3 Schilde", "+3 щита"),
+    "sh.appear":   _T("Haritada bir sunak belirdi", "A shrine appeared on the map",
+                      "Apareció un santuario en el mapa", "Ein Altar ist erschienen",
+                      "На карте появился алтарь"),
+    "sh.stand":    _T("üstünde dur", "stand on it", "quédate encima", "drauf stehen", "встань на него"),
+    "sh.faded":    _T("SUNAK SÖNDÜ", "SHRINE FADED", "SANTUARIO APAGADO", "ALTAR ERLOSCHEN", "АЛТАРЬ ПОГАС"),
+    # ---- dalga olayları ----
+    "ev.gold_rain":  _T("ALTIN YAĞMURU", "GOLD RAIN", "LLUVIA DE ORO", "GOLDREGEN", "ЗОЛОТОЙ ДОЖДЬ"),
+    "ev.blood_moon": _T("KAN AYI", "BLOOD MOON", "LUNA DE SANGRE", "BLUTMOND", "КРОВАВАЯ ЛУНА"),
+    "ev.meteors":    _T("GÖKTAŞI YAĞMURU", "METEOR SHOWER", "LLUVIA DE METEOROS", "METEORSCHAUER",
+                        "МЕТЕОРИТНЫЙ ДОЖДЬ"),
+    "ev.gold_rain.d":  _T("gökten altın yağıyor, topla!", "gold falls from the sky - grab it!",
+                          "¡cae oro del cielo, recógelo!", "Gold fällt vom Himmel - schnapp es dir!",
+                          "с неба падает золото - собирай!"),
+    "ev.blood_moon.d": _T("elitler geliyor, tecrübe x2", "elites incoming, XP x2", "llegan élites, EXP x2",
+                          "Elite kommen, EP x2", "идёт элита, опыт x2"),
+    "ev.meteors.d":    _T("kırmızı dairelerden kaç - yaratıkları da ezer", "dodge the red circles - they crush monsters too",
+                          "esquiva los círculos rojos - aplastan monstruos", "weich den roten Kreisen aus - sie zerquetschen auch Monster",
+                          "уходи от красных кругов - они давят и монстров"),
+})
+
+# ---- dalga olayları ----
+# Bazı dalgaların başında süreli bir olay: koşular birbirine benzemesin.
+EVENT_FROM_WAVE = 4
+EVENT_EVERY = 3                 # her 3 dalgada bir zar atılır
+EVENT_CHANCE = 0.65
+# olay -> (süre, renk, simge)
+EVENTS = {
+    "gold_rain":  (16.0, (255, 206, 80), "coin"),
+    "blood_moon": (30.0, (220, 50, 70), "skull"),
+    "meteors":    (18.0, (255, 120, 50), "flame"),
+}
+METEOR_EVERY = 0.55
+METEOR_WARN = 1.1
+METEOR_R = 74.0
+
+
+_SHRINE_BEAM = {}
+
+
+def _shrine_beam(col):
+    img = _SHRINE_BEAM.get(col)
+    if img is None:
+        img = pygame.Surface((26, 150), pygame.SRCALPHA)
+        for k in range(150):
+            pygame.draw.line(img, (*col, int(70 * k / 150.0)), (13 - 6 * k / 150, k), (13 + 6 * k / 150, k))
+        _SHRINE_BEAM[col] = img
+    return img
+
+
+class PowerShrine:
+    def __init__(self, x, y, kind, born):
+        self.x, self.y = x, y
+        self.kind = kind
+        self.born = born
+        self.charge = 0.0
+        self.used = False
+        self.fade = 0.0                 # kullanıldıktan / söndükten sonra kaybolma
+
+    def color(self):
+        return SHRINE_KINDS[self.kind][0]
+
+    def draw(self, surf, t):
+        col = self.color()
+        x, y = self.x, self.y
+        a = 1.0 - clamp(self.fade / 0.8, 0.0, 1.0)
+        if a <= 0:
+            return
+        # zemindeki rün çemberi
+        rr = SHRINE_R
+        ring = pygame.Surface((int(rr * 2 + 8), int(rr * 2 + 8)), pygame.SRCALPHA)
+        c = rr + 4
+        pygame.draw.circle(ring, (*col, int(40 * a)), (int(c), int(c)), int(rr))
+        pygame.draw.circle(ring, (*INK, int(160 * a)), (int(c), int(c)), int(rr), 3)
+        pygame.draw.circle(ring, (*col, int(200 * a)), (int(c), int(c)), int(rr - 3), 2)
+        for i in range(8):
+            ang = t * 0.5 + i * math.tau / 8
+            px, py = c + math.cos(ang) * (rr - 12), c + math.sin(ang) * (rr - 12)
+            pygame.draw.circle(ring, (*lighten(col, 0.3), int(170 * a)), (int(px), int(py)), 3)
+        surf.blit(ring, (int(x - c), int(y - c)))
+        # dolum yayı
+        if self.charge > 0 and not self.used:
+            rect = pygame.Rect(0, 0, int(rr * 2 + 10), int(rr * 2 + 10))
+            rect.center = (int(x), int(y))
+            pygame.draw.arc(surf, WHITE, rect, math.pi / 2,
+                            math.pi / 2 + math.tau * clamp(self.charge / SHRINE_CHARGE, 0, 1), 5)
+        # gökyüzüne uzanan ışık sütunu (uzaktan görünsün)
+        if not self.used:
+            beam = _shrine_beam(col)
+            beam.set_alpha(int(255 * a * (0.7 + 0.3 * math.sin(t * 3))))
+            surf.blit(beam, (int(x - 13), int(y - 168)))
+        # taş kaide
+        base = pygame.Rect(0, 0, 40, 22)
+        base.midbottom = (int(x), int(y + 10))
+        pygame.draw.rect(surf, INK, base.inflate(6, 6), border_radius=6)
+        pygame.draw.rect(surf, (96, 84, 80), base, border_radius=5)
+        pygame.draw.rect(surf, (128, 114, 106), (base.x + 3, base.y + 2, base.w - 6, 5), border_radius=3)
+        top = pygame.Rect(0, 0, 30, 10)
+        top.midbottom = base.midtop
+        pygame.draw.rect(surf, INK, top.inflate(6, 6), border_radius=4)
+        pygame.draw.rect(surf, (112, 100, 94), top, border_radius=3)
+        # süzülen kristal + simge
+        bob = math.sin(t * 2.4 + self.born) * 4
+        cy = y - 38 + bob
+        if not self.used:
+            add_glow(surf, x, cy, 40, col, 0.40 * a)
+        pts = [(x, cy - 17), (x + 12, cy), (x, cy + 17), (x - 12, cy)]
+        pygame.draw.polygon(surf, INK, [(px * 1.0 + (2 if px > x else -2 if px < x else 0),
+                                         py + (2 if py > cy else -2 if py < cy else 0)) for px, py in pts])
+        pygame.draw.polygon(surf, col if not self.used else scale_col(col, 0.4), pts)
+        pygame.draw.polygon(surf, lighten(col, 0.5), [(x, cy - 17), (x + 5, cy - 3), (x, cy)])
+        draw_icon(surf, x, cy + 1, SHRINE_KINDS[self.kind][1], INK, 6)
+
+
+class WorldExtrasMixin:
+    """RunState'e güç sunakları ve dalga olayları (karışım sınıf)."""
+
+    def extras_init(self):
+        self.shrine = None
+        self.shrine_next = SHRINE_FIRST
+        self.shrine_buffs = []          # [tür, bitiş zamanı]
+        self.shrines_used = 0
+        self.event = None               # [tür, başlangıç, bitiş]
+        self.event_banner = None        # (başlangıç, tür)
+        self.event_meteors = []         # [x, y, kalan]
+        self.event_t = 0.0
+
+    def extras_active(self):
+        return not getattr(self, "is_coop", False)
+
+    # ---- sunak ----
+    def _spawn_shrine(self):
+        p = self.player
+        x = y = 0.0
+        for _ in range(60):
+            a = random.uniform(0, math.tau)
+            d = random.uniform(380, 760)
+            x = clamp(p.x + math.cos(a) * d, ARENA_RECT.left + 120, ARENA_RECT.right - 120)
+            y = clamp(p.y + math.sin(a) * d, ARENA_RECT.top + 160, ARENA_RECT.bottom - 120)
+            if dist(x, y, p.x, p.y) > 340:
+                break
+        kinds = list(SHRINE_KINDS)
+        # can azken kan/kalkan sunağı biraz daha sık
+        w = [1.0, 1.0, 1.4 if p.hp < p.max_hp * 0.5 else 1.0, 1.0, 0.8, 1.2 if p.hp < p.max_hp * 0.5 else 0.8]
+        kind = random.choices(kinds, weights=w, k=1)[0]
+        self.shrine = PowerShrine(x, y, kind, self.run_time)
+        self.fx.popup(p.x, p.y - 132, L("sh.appear"), SHRINE_KINDS[kind][0], 16, life=2.2)
+        sfx("second", 0.5, 0.0)
+
+    def _claim_shrine(self, sh):
+        p = self.player
+        sh.used = True
+        self.shrines_used += 1
+        col = sh.color()
+        k = sh.kind
+        if k == "rage":
+            p.add_temp_buff(SHRINE_BUFF_T, shrine_dmg=SHRINE_RAGE)
+        elif k == "haste":
+            p.add_temp_buff(SHRINE_BUFF_T, shrine_spd=SHRINE_HASTE, run_aspd_mult=SHRINE_HASTE)
+        elif k == "blood":
+            p.add_temp_buff(SHRINE_BUFF_T, kill_heal=max(2.0, p.max_hp * 0.012))
+        elif k == "gold":
+            p.add_temp_buff(SHRINE_BUFF_T, run_coin_mult=1.0)
+        elif k == "magnet":
+            self.collect_all_pickups()
+        elif k == "guard":
+            p.shield_charges += 3
+        if k not in SHRINE_INSTANT:
+            self.shrine_buffs = [b for b in self.shrine_buffs if b[0] != k]
+            self.shrine_buffs.append([k, self.run_time + SHRINE_BUFF_T])
+        self.fx.popup(p.x, p.y - 84, L("sh." + k), col, 26, life=1.8)
+        self.fx.popup(p.x, p.y - 60, L("sh.%s.d" % k), lighten(col, 0.3), 16, life=1.8)
+        self.fx.shockwave(sh.x, sh.y, 200, col, 0.5, 6)
+        self.fx.ring(sh.x, sh.y, col, n=30, speed=300, life=0.6, r=3.5)
+        self.fx.burst(sh.x, sh.y - 38, lighten(col, 0.4), n=24, speed=200, life=0.7, r=3.2, gravity=-60)
+        self.fx.do_flash(col, 0.25)
+        sfx("buy", 0.9, 0.0)
+        sfx("levelup", 0.5, 0.0)
+
+    def _update_shrine(self, dt):
+        p = self.player
+        if self.shrine is None:
+            if self.run_time >= self.shrine_next and not self.waves.boss_active:
+                self._spawn_shrine()
+            return
+        sh = self.shrine
+        if sh.used or self.run_time - sh.born > SHRINE_LIFE:
+            if not sh.used and sh.fade == 0.0:
+                self.fx.popup(sh.x, sh.y - 60, L("sh.faded"), (190, 180, 170), 14, life=1.2)
+            sh.fade += dt
+            if sh.fade > 0.8:
+                self.shrine = None
+                self.shrine_next = self.run_time + random.uniform(*SHRINE_GAP)
+            return
+        if p.alive and dist(p.x, p.y, sh.x, sh.y) < SHRINE_R:
+            sh.charge += dt
+            if random.random() < dt * 14:
+                a = random.uniform(0, math.tau)
+                self.fx.spark(sh.x + math.cos(a) * SHRINE_R, sh.y + math.sin(a) * SHRINE_R,
+                              sh.color(), -math.cos(a) * 90, -math.sin(a) * 90, 0.5, 2.6)
+            if sh.charge >= SHRINE_CHARGE:
+                self._claim_shrine(sh)
+        else:
+            sh.charge = max(0.0, sh.charge - dt * 1.5)
+
+    # ---- olay ----
+    def _roll_event(self):
+        w = int(self.waves.wave)
+        if (w < EVENT_FROM_WAVE or w % EVENT_EVERY != 1 or self.event is not None
+                or self.waves.boss_pending or self.waves.boss_active or self.waves.is_boss_wave(w)):
+            return
+        if random.random() > EVENT_CHANCE:
+            return
+        self.start_event(random.choice(list(EVENTS)))
+
+    def start_event(self, kind):
+        dur, col, _ic = EVENTS[kind]
+        self.event = [kind, self.run_time, self.run_time + dur]
+        self.event_banner = (self.run_time, kind)
+        self.event_t = 0.0
+        p = self.player
+        if kind == "blood_moon":
+            p.add_temp_buff(dur, run_xp_mult=1.0)
+            for i in range(3):
+                x, y = self.near_camera_point()
+                try:
+                    self.enemies.append(self._make_enemy("elite", x, y))
+                except Exception:
+                    pass
+        self.fx.do_flash(col, 0.3)
+        sfx("wave", 0.9, 0.0)
+        sfx("second", 0.6, 0.0)
+
+    def _update_event(self, dt):
+        ev = self.event
+        p = self.player
+        for m in self.event_meteors:
+            m[2] -= dt
+            if m[2] <= 0:
+                self._meteor_hit(m[0], m[1])
+        self.event_meteors = [m for m in self.event_meteors if m[2] > 0]
+        if ev is None:
+            return
+        kind, t0, t1 = ev
+        if self.run_time >= t1:
+            self.event = None
+            return
+        self.event_t -= dt
+        if kind == "gold_rain" and self.event_t <= 0:
+            # 16 sn'de ~50 kese: bir hazine goblini kadar altın
+            self.event_t = 0.30
+            a = random.uniform(0, math.tau)
+            d = random.uniform(40, 420)
+            x = clamp(p.x + math.cos(a) * d, ARENA_RECT.left + 40, ARENA_RECT.right - 40)
+            y = clamp(p.y + math.sin(a) * d, ARENA_RECT.top + 40, ARENA_RECT.bottom - 40)
+            w = max(1, int(self.waves.wave))
+            val = scaled_coin_gain(2 + 0.6 * w, p.eff_coin_mult(), self.biome)
+            self.drop_pickup(x, y, "coin", val)
+            self.fx.spark(x, y - 30, (255, 220, 120), 0, 120, 0.25, 2.5)
+        elif kind == "meteors" and self.event_t <= 0:
+            self.event_t = METEOR_EVERY
+            # yarısı oyuncunun yakınına, yarısı kalabalığın içine
+            tgt = None
+            if self.enemies and random.random() < 0.6:
+                e = random.choice(self.enemies)
+                if e.alive and dist(e.x, e.y, p.x, p.y) < 650:
+                    tgt = (e.x, e.y)
+            if tgt is None:
+                a = random.uniform(0, math.tau)
+                d = random.uniform(60, 380)
+                tgt = (p.x + math.cos(a) * d, p.y + math.sin(a) * d)
+            self.event_meteors.append([tgt[0], tgt[1], METEOR_WARN])
+
+    def _meteor_hit(self, x, y):
+        p = self.player
+        col = EVENTS["meteors"][1]
+        self.fx.shockwave(x, y, METEOR_R * 1.3, col, 0.4, 7)
+        self.fx.burst(x, y, (255, 200, 120), n=18, speed=260, life=0.5, r=4)
+        self.fx.burst(x, y, (90, 70, 60), n=10, speed=140, life=0.7, r=5)
+        self.fx.shake(5, 0.15)
+        sfx("explosion", 0.5, 0.05)
+        w = max(1, int(self.total_wave() if hasattr(self, "total_wave") else self.waves.wave))
+        dmg_e = 60.0 * self.wave_hp_mult(self.waves.wave)
+        prev = DMG_SRC[0]
+        DMG_SRC[0] = "other"
+        for e in self.enemies:
+            if e.alive and (e.x - x) ** 2 + (e.y - y) ** 2 < METEOR_R * METEOR_R:
+                if e.take_damage(dmg_e, False, self.fx, quiet=False):
+                    self.on_enemy_killed(e)
+        DMG_SRC[0] = prev
+        if p.alive and dist(p.x, p.y, x, y) < METEOR_R:
+            p.take_damage(8.0 + 1.6 * w, self.fx, x, y, src="meteor")
+
+    def extras_wave_changed(self):
+        if self.extras_active():
+            self._roll_event()
+
+    def extras_update(self, dt):
+        if not self.extras_active():
+            return
+        self._update_shrine(dt)
+        self._update_event(dt)
+        if self.shrine_buffs:
+            self.shrine_buffs = [b for b in self.shrine_buffs if b[1] > self.run_time]
+
+
+def draw_world_extras(world, run, cam, t):
+    """Zemindeki sunak ve göktaşı uyarı daireleri."""
+    sh = getattr(run, "shrine", None)
+    if sh is not None and cam.inflate(400, 400).collidepoint(sh.x, sh.y):
+        sh.draw(world, t)
+    mets = getattr(run, "event_meteors", None)
+    if mets:
+        col = EVENTS["meteors"][1]
+        for x, y, left in mets:
+            k = 1.0 - clamp(left / METEOR_WARN, 0.0, 1.0)
+            s = pygame.Surface((int(METEOR_R * 2 + 6), int(METEOR_R * 2 + 6)), pygame.SRCALPHA)
+            c = int(METEOR_R + 3)
+            pygame.draw.circle(s, (220, 40, 30, int(40 + 70 * k)), (c, c), int(METEOR_R))
+            pygame.draw.circle(s, (255, 80, 60, 220), (c, c), int(METEOR_R), 3)
+            pygame.draw.circle(s, (255, 200, 140, 200), (c, c), max(2, int(METEOR_R * k)), 2)
+            world.blit(s, (int(x - c), int(y - c)))
+            # düşen taş
+            fy = y - 420 * (1.0 - k)
+            fx_ = x + 120 * (1.0 - k)
+            add_glow(world, fx_, fy, 30, col, 0.5)
+            pygame.draw.circle(world, INK, (int(fx_), int(fy)), 11)
+            pygame.draw.circle(world, (120, 84, 70), (int(fx_), int(fy)), 9)
+            pygame.draw.circle(world, (255, 170, 80), (int(fx_ - 2), int(fy - 2)), 4)
+
+
+def _buff_ring(surf, cx, cy, r, col, frac, icon):
+    """Süre halkalı güç simgesi."""
+    pygame.draw.circle(surf, INK, (int(cx), int(cy)), r + 3)
+    pygame.draw.circle(surf, scale_col(col, 0.35), (int(cx), int(cy)), r)
+    if frac > 0:
+        rect = pygame.Rect(0, 0, r * 2 + 2, r * 2 + 2)
+        rect.center = (int(cx), int(cy))
+        pygame.draw.arc(surf, col, rect, math.pi / 2, math.pi / 2 + math.tau * frac, 3)
+    draw_icon(surf, cx, cy, icon, lighten(col, 0.3), 8)
+
+
+def draw_extras_hud(surf, run, t):
+    """Güç simgeleri, olay süre çubuğu ve olay duyurusu."""
+    if not hasattr(run, "shrine_buffs"):
+        return
+    now = run.run_time
+    # güçler: dalga panelinin altında, ortada
+    buffs = run.shrine_buffs
+    ev = run.event
+    y = 124
+    items = []
+    for k, t_end in buffs:
+        col, icon = SHRINE_KINDS[k]
+        items.append((col, icon, clamp((t_end - now) / SHRINE_BUFF_T, 0, 1), L("sh." + k)))
+    if items:
+        n = len(items)
+        x0 = VIRTUAL_W / 2 - (n - 1) * 22
+        for i, (col, icon, frac, nm) in enumerate(items):
+            blink = frac > 0.15 or int(t * 6) % 2 == 0
+            if blink:
+                _buff_ring(surf, x0 + i * 44, y, 15, col, frac, icon)
+        y += 30
+    if ev is not None:
+        kind, t0, t1 = ev
+        dur, col, icon = EVENTS[kind]
+        frac = clamp((t1 - now) / max(0.1, t1 - t0), 0, 1)
+        r = pygame.Rect(0, 0, 230, 26)
+        r.midtop = (VIRTUAL_W // 2, y)
+        surf.blit(hand_card(r.w, r.h, (40, 28, 30), edge=col, rad=8, alpha=220), r.topleft)
+        bar = pygame.Rect(r.x + 30, r.bottom - 8, r.w - 40, 4)
+        pygame.draw.rect(surf, (20, 14, 15), bar)
+        pygame.draw.rect(surf, col, (bar.x, bar.y, int(bar.w * frac), bar.h))
+        draw_icon(surf, r.x + 16, r.centery, icon, col, 7)
+        draw_text(surf, L("ev." + kind), (r.x + 30, r.y + 3), 12, lighten(col, 0.3), bold=True, shadow=False)
+    # kan ayı: ekran kızıla çalar
+    if ev is not None and ev[0] == "blood_moon":
+        k = clamp(min(now - ev[1], ev[2] - now) / 1.5, 0, 1)
+        ov = _blood_overlay()
+        ov.set_alpha(int(60 * k))
+        surf.blit(ov, (0, 0))
+    eb = run.event_banner
+    if eb is not None:
+        st = now - eb[0]
+        life = 3.0
+        if 0 <= st <= life:
+            kind = eb[1]
+            col = EVENTS[kind][1]
+            k = ease_out_cubic(min(1.0, st / 0.3))
+            a = min(1.0, (life - st) / 0.5)
+            yy = 200
+            band = pygame.Surface((VIRTUAL_W, 96), pygame.SRCALPHA)
+            band.fill((22, 14, 18, int(190 * a * k)))
+            surf.blit(band, (0, yy - 48))
+            for sgn in (-1, 1):
+                pygame.draw.line(surf, scale_col(col, 0.4 + 0.5 * a), (0, yy + sgn * 48),
+                                 (VIRTUAL_W, yy + sgn * 48), 3)
+            draw_text(surf, L("ev." + kind), (VIRTUAL_W / 2, yy - 12), int(44 + 20 * (1 - k)), col,
+                      bold=True, center=True, alpha=int(255 * a))
+            draw_text(surf, L("ev.%s.d" % kind), (VIRTUAL_W / 2, yy + 24), 15, TEXT, bold=True,
+                      center=True, alpha=int(255 * a))
+
+
+_BLOOD_OV = [None]
+
+
+def _blood_overlay():
+    if _BLOOD_OV[0] is None:
+        s = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+        s.fill((150, 10, 30, 255))
+        # kenarlar daha koyu
+        edge = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+        for i in range(12):
+            pygame.draw.rect(edge, (40, 0, 8, 22), (i * 10, i * 8, VIRTUAL_W - i * 20, VIRTUAL_H - i * 16), 10)
+        s.blit(edge, (0, 0))
+        _BLOOD_OV[0] = s
+    return _BLOOD_OV[0]
+
+
+# ---- silah evrimi ----
+# Oyunun adı EvolveArena ama silahlar yalnızca seviye atlıyordu. Evrim:
+# silah EVO_LEVEL'a gelince ve eşi olan kitap da elindeyse, seviye atlama
+# elinde bir EVRİM kartı çıkar. Seçilen silah yeni bir ad, %50 hasar ve bir
+# vuruş etkisi kazanır (yakma, dondurma, zincir, can çalma, patlama, zehir).
+# 2 kişilik modda kapalı: el ağ üzerinden eşitleniyor, yeni kart türü oraya
+# girmesin.
+EVO_LEVEL = 8
+EVO_DMG_MULT = 1.5
+EVO_PROC_CD = 0.4               # aynı yaratıkta etkinin yeniden tutması için bekleme
+EVO_CHAIN_CHANCE = 0.30
+EVO_CHAIN_R = 170.0
+EVO_CHAIN_DMG = 0.45
+EVO_BLAST_R = 82.0
+EVO_BLAST_DMG = 0.8
+EVO_BLAST_PER_SEC = 8           # ekran patlamadan geçilmesin
+EVO_BANNER_T = 2.8
+
+# silah -> (eş kitap, etki, renk)
+EVOLUTIONS = {
+    "axe":          ("r_critd",       "blast",  (255, 150, 60)),
+    "book":         ("r_armor",       "chill",  (170, 214, 255)),
+    "pentagram":    ("r_killheal",    "leech",  (255, 60, 100)),
+    "whip":         ("r_crit",        "burn",   (255, 120, 50)),
+    "zemzem":       ("r_regen",       "chill",  (120, 220, 255)),
+    "shoe":         ("r_bonk",        "blast",  (255, 160, 70)),
+    "frost":        ("r_wspd",        "chill",  (150, 230, 255)),
+    "emanet":       ("r_luck",        "chain",  (255, 236, 130)),
+    "cloak":        ("r_evade",       "shroud", (150, 120, 240)),
+    "tornado":      ("r_mag",         "chain",  (200, 236, 255)),
+    "ghost_swords": ("r_aspd",        "leech",  (140, 240, 255)),
+    "wolves":       ("r_swarm",       "poison", (170, 180, 255)),
+    "tesla":        ("r_echo",        "chain",  (255, 240, 120)),
+    "meteor":       ("r_dmg",         "burn",   (255, 110, 40)),
+    "beam":         ("r_xp",          "burn",   (255, 214, 110)),
+    "hawk":         ("r_bosshunter",  "burn",   (255, 140, 60)),
+    "bats":         ("r_vamp",        "leech",  (220, 90, 255)),
+    "nova":         ("r_hp",          "chill",  (160, 236, 255)),
+    "knives":       ("r_pierce",      "poison", (150, 236, 110)),
+    "quake":        ("r_hp_big",      "blast",  (240, 160, 80)),
+}
+EVO_PERK_COLOR = {
+    "burn": (255, 120, 40), "chill": (130, 210, 255), "chain": (255, 236, 120),
+    "leech": (255, 70, 110), "blast": (255, 170, 60), "poison": (140, 230, 90),
+    "shroud": (170, 130, 255),
+}
+EVO_PERK_ICON = {"burn": "flame", "chill": "snow", "chain": "bolt", "leech": "drop",
+                 "blast": "star", "poison": "skull", "shroud": "ghost"}
+
+STRINGS.update({
+    "evo.name.axe":          _T("KIYAMET BALTASI", "DOOM AXE", "HACHA DEL FIN", "UNTERGANGSAXT", "ТОПОР РОКА"),
+    "evo.name.book":         _T("TUNÇ KALE", "BRONZE BASTION", "BASTIÓN DE BRONCE", "BRONZEBASTION", "БРОНЗОВЫЙ БАСТИОН"),
+    "evo.name.pentagram":    _T("KAN AYİNİ", "BLOOD RITE", "RITO DE SANGRE", "BLUTRITUS", "КРОВАВЫЙ ОБРЯД"),
+    "evo.name.whip":         _T("EJDER KAMÇISI", "DRAGON LASH", "LÁTIGO DE DRAGÓN", "DRACHENPEITSCHE", "ДРАКОНИЙ КНУТ"),
+    "evo.name.zemzem":       _T("KUTSAL PINAR", "HOLY SPRING", "MANANTIAL SAGRADO", "HEILIGE QUELLE", "СВЯТОЙ ИСТОЧНИК"),
+    "evo.name.shoe":         _T("ANNE TERLİĞİ", "MOM'S SLIPPER", "LA CHANCLA DE MAMÁ", "MAMAS PANTOFFEL", "МАМИН ТАПОК"),
+    "evo.name.frost":        _T("KUTUP İZİ", "POLAR TRAIL", "RASTRO POLAR", "POLARSPUR", "ПОЛЯРНЫЙ СЛЕД"),
+    "evo.name.emanet":       _T("ATA YADİGÂRI", "ANCESTOR'S BLADE", "HOJA ANCESTRAL", "AHNENKLINGE", "КЛИНОК ПРЕДКОВ"),
+    "evo.name.cloak":        _T("GECE PELERİNİ", "NIGHT SHROUD", "MANTO NOCTURNO", "NACHTSCHLEIER", "НОЧНОЙ ПОКРОВ"),
+    "evo.name.tornado":      _T("KASIRGA", "HURRICANE", "HURACÁN", "ORKAN", "УРАГАН"),
+    "evo.name.ghost_swords": _T("RUH KILIÇLARI", "SOUL BLADES", "ESPADAS DEL ALMA", "SEELENKLINGEN", "КЛИНКИ ДУШ"),
+    "evo.name.wolves":       _T("AY KURTLARI", "MOON WOLVES", "LOBOS LUNARES", "MONDWÖLFE", "ЛУННЫЕ ВОЛКИ"),
+    "evo.name.tesla":        _T("FIRTINA TACI", "STORM CROWN", "CORONA DE TORMENTA", "STURMKRONE", "КОРОНА БУРИ"),
+    "evo.name.meteor":       _T("KIYAMET YILDIZI", "DOOMSTAR", "ESTRELLA FUNESTA", "UNHEILSSTERN", "ЗВЕЗДА РОКА"),
+    "evo.name.beam":         _T("GÜNEŞ MIZRAĞI", "SUN LANCE", "LANZA SOLAR", "SONNENLANZE", "СОЛНЕЧНОЕ КОПЬЁ"),
+    "evo.name.hawk":         _T("ANKA KUŞU", "PHOENIX", "FÉNIX", "PHÖNIX", "ФЕНИКС"),
+    "evo.name.bats":         _T("VAMPİR SÜRÜSÜ", "VAMPIRE SWARM", "ENJAMBRE VAMPIRO", "VAMPIRSCHWARM", "ВАМПИРСКИЙ РОЙ"),
+    "evo.name.nova":         _T("BUZUL KALBİ", "GLACIER HEART", "CORAZÓN GLACIAL", "GLETSCHERHERZ", "СЕРДЦЕ ЛЕДНИКА"),
+    "evo.name.knives":       _T("ZEHİRLİ YELPAZE", "VENOM FAN", "ABANICO VENENOSO", "GIFTFÄCHER", "ЯДОВИТЫЙ ВЕЕР"),
+    "evo.name.quake":        _T("YER YARIĞI", "EARTHSPLITTER", "GRIETA TERRESTRE", "ERDSPALTER", "РАЗЛОМ ЗЕМЛИ"),
+    "evo.perk.burn":   _T("vuruşlar tutuşturur", "hits set enemies on fire", "los golpes incendian",
+                          "Treffer setzen in Brand", "удары поджигают"),
+    "evo.perk.chill":  _T("vuruşlar dondurup yavaşlatır", "hits chill and slow", "los golpes congelan y frenan",
+                          "Treffer frieren ein", "удары замедляют"),
+    "evo.perk.chain":  _T("vuruş yakındaki 2 yaratığa sıçrar", "hits jump to 2 nearby enemies",
+                          "los golpes saltan a 2 enemigos", "Treffer springen auf 2 Gegner",
+                          "удар перескакивает на 2 врагов"),
+    "evo.perk.leech":  _T("vurduğunun bir kısmı can olur", "part of the damage heals you",
+                          "parte del daño te cura", "ein Teil des Schadens heilt", "часть урона лечит"),
+    "evo.perk.blast":  _T("öldürdüğü yaratık patlar", "enemies it kills explode", "los enemigos que mata explotan",
+                          "getötete Gegner explodieren", "убитые враги взрываются"),
+    "evo.perk.poison": _T("vuruşlar zehirler", "hits poison", "los golpes envenenan", "Treffer vergiften",
+                          "удары отравляют"),
+    "evo.perk.shroud": _T("görünmezken çevreni zehirler", "poisons around you while invisible",
+                          "envenena a tu alrededor siendo invisible", "vergiftet die Umgebung, solange unsichtbar",
+                          "в невидимости травит всех вокруг"),
+    "evo.band":   _T("EVRİM", "EVOLUTION", "EVOLUCIÓN", "EVOLUTION", "ЭВОЛЮЦИЯ"),
+    "evo.banner": _T("EVRİM!", "EVOLVED!", "¡EVOLUCIÓN!", "EVOLUTION!", "ЭВОЛЮЦИЯ!"),
+    "evo.dmg":    _T("Hasar", "Damage", "Daño", "Schaden", "Урон"),
+    "evo.need":   _T("Evrim: Lv.{0} + {1}", "Evolves: Lv.{0} + {1}", "Evoluciona: Nv.{0} + {1}",
+                     "Evolution: St.{0} + {1}", "Эволюция: ур.{0} + {1}"),
+    "evo.ready":  _T("EVRİME HAZIR", "READY TO EVOLVE", "LISTO PARA EVOLUCIONAR", "BEREIT ZUR EVOLUTION",
+                     "ГОТОВ К ЭВОЛЮЦИИ"),
+    "evo.pick":   _T("EVRİLT", "EVOLVE", "EVOLUCIONAR", "ENTWICKELN", "ЭВОЛЮЦИЯ"),
+    "evo.short":  _T("EVO", "EVO", "EVO", "EVO", "ЭВО"),
+    "evo.stat":   _T("Evrim", "Evolutions", "Evoluciones", "Evolutionen", "Эволюции"),
+})
+
+
+def evo_name(key):
+    return L("evo.name." + key)
+
+
+def evo_book_name(key):
+    bk = BOOK_BY_KEY.get(EVOLUTIONS[key][0])
+    return bk_name(bk) if bk else EVOLUTIONS[key][0]
+
+
+def evo_ready_keys(p):
+    """Evrime hazır silahlar: seviyesi yeten, eş kitabı elde olan, henüz evrilmemiş."""
+    done = getattr(p, "evolved", ())
+    out = []
+    for key, lvl in p.weapons.items():
+        ev = EVOLUTIONS.get(key)
+        if ev is None or key in done or lvl < EVO_LEVEL:
+            continue
+        if p.books.get(ev[0], 0) > 0:
+            out.append(key)
+    return out
+
+
+# Vuruş anında hangi koşunun etkileri işliyor: koşu her karede kendini yazar.
+EVO_CTX = [None]
+EVO_BUSY = [False]
+
+
+def evo_on_hit(e, amount, fx):
+    """Evrilmiş silahın vuruş etkisi. Enemy / Boss take_damage içinden çağrılır."""
+    run = EVO_CTX[0]
+    if run is None or EVO_BUSY[0] or amount <= 0:
+        return
+    key = DMG_SRC[0]
+    perk = run.evo_perks.get(key)
+    if perk is None:
+        return
+    if perk == "blast":
+        if e.hp <= 0 and e.alive:
+            run.evo_blast(e, amount, key)
+        return
+    now = run.run_time
+    if now < getattr(e, "_evo_t", -1.0):
+        return
+    e._evo_t = now + EVO_PROC_CD
+    col = EVO_PERK_COLOR[perk]
+    if perk == "burn":
+        e.apply_burn(max(1.0, amount * 0.30), 2.5)
+        fx.burst(e.x, e.y - 4, col, n=4, speed=70, life=0.35, r=2.4, gravity=-60)
+    elif perk == "chill":
+        e.apply_slow(0.55, 1.6)
+        fx.burst(e.x, e.y, col, n=4, speed=60, life=0.4, r=2.2)
+    elif perk == "poison":
+        if not getattr(e, "_evo_poison", False):
+            e._evo_poison = True
+            e.apply_poison(max(0.5, amount * 0.10))
+            fx.burst(e.x, e.y, col, n=5, speed=50, life=0.5, r=2.6, gravity=-30)
+    elif perk == "leech":
+        run.player.lifesteal(amount * 0.04)
+    elif perk == "chain" and random.random() < EVO_CHAIN_CHANCE:
+        run.evo_chain(e, amount, key)
+
+
+class EvoMixin:
+    """RunState'e evrim davranışı (karışım sınıf: RunState zaten çok uzun)."""
+
+
+    def evo_init(self):
+        self.evo_perks = {}            # evrilmiş silah -> etki
+        self.evo_banner = None         # (başlangıç zamanı, silah)
+        self.evo_blast_t = 0.0
+        self.evo_blasts = 0
+        self.player.evolved = set()
+        EVO_ON.clear()
+
+    def evo_update(self, dt):
+        """Kareye bağlı evrim etkileri (pelerin: vuruşu olmayan silah)."""
+        p = self.player
+        if "cloak" in p.evolved and getattr(p, "invis_t", 0.0) > 0:
+            self.evo_shroud_t = getattr(self, "evo_shroud_t", 0.0) - dt
+            if self.evo_shroud_t <= 0:
+                self.evo_shroud_t = 0.5
+                col = EVO_PERK_COLOR["shroud"]
+                dmg = weapon_damage(p, WEAPON_BY_KEY["emanet"], max(1, p.weapons.get("cloak", 1))) * 0.12
+                self.fx.ring(p.x, p.y, col, n=12, speed=160, life=0.4, r=2.6)
+                for e in self.enemies:
+                    if e.alive and not getattr(e, "_evo_poison", False) and \
+                            (e.x - p.x) ** 2 + (e.y - p.y) ** 2 < 220 * 220:
+                        e._evo_poison = True
+                        e.apply_poison(max(0.5, dmg))
+                        self.fx.burst(e.x, e.y, col, n=4, speed=50, life=0.45, r=2.4, gravity=-30)
+
+    def evo_offer(self, key):
+        w = WEAPON_BY_KEY[key]
+        book, perk, col = EVOLUTIONS[key]
+        return dict(kind="evo", key=key, w=w, color=col, perk=perk, book=BOOK_BY_KEY.get(book),
+                    name=evo_name(key), lvl=self.player.weapons.get(key, 1),
+                    desc=L("evo.perk." + perk))
+
+    def evo_inject(self, chosen):
+        """Evrime hazır silah varsa elin bir kartı EVRİM kartı olur."""
+        if getattr(self, "is_coop", False):
+            return chosen
+        ready = evo_ready_keys(self.player)
+        if not ready or any(c.get("kind") == "evo" for c in chosen):
+            return chosen
+        off = self.evo_offer(random.choice(ready))
+        if len(chosen) < 3:
+            return chosen + [off]
+        # aynı silahın seviye kartını, yoksa son kartı değiştirir
+        victim = len(chosen) - 1
+        for i, c in enumerate(chosen):
+            if c.get("kind") == "weapon" and c.get("key") == off["key"]:
+                victim = i
+                break
+        chosen = list(chosen)
+        chosen[victim] = off
+        return chosen
+
+    def evolve_weapon(self, key):
+        p = self.player
+        book, perk, col = EVOLUTIONS[key]
+        p.evolved.add(key)
+        EVO_ON.add(key)
+        if key == "cloak" and getattr(p, "invis_t", 0.0) <= 0:
+            p.cloak_timer = min(getattr(p, "cloak_timer", 0.0), 1.0)
+        self.evo_perks[key] = perk
+        self.evo_banner = (self.run_time, key)
+        self.evo_count = getattr(self, "evo_count", 0) + 1
+        fx = self.fx
+        fx.do_flash(col, 0.55)
+        fx.shake(9, 0.3)
+        for k in range(3):
+            fx.shockwave(p.x, p.y, 120 + 90 * k, col if k != 1 else WHITE, 0.45 + 0.1 * k, 6 - k)
+        fx.ring(p.x, p.y, col, n=40, speed=320, life=0.7, r=4)
+        fx.burst(p.x, p.y, lighten(col, 0.4), n=30, speed=220, life=0.8, r=3.5, gravity=-40)
+        # evrim dalgası: çevredeki yaratıkları iter
+        for e in self.enemies:
+            if e.alive:
+                d = dist(e.x, e.y, p.x, p.y)
+                if 1.0 < d < 260:
+                    k = (1.0 - d / 260.0) * 520.0
+                    e.knock_x += (e.x - p.x) / d * k
+                    e.knock_y += (e.y - p.y) / d * k
+        sfx("levelup", 1.0, 0.0)
+        sfx("second", 0.8, 0.0)
+
+    def evo_chain(self, src, amount, key):
+        cands = []
+        for e in self.enemies:
+            if e is src or not e.alive or getattr(e, "phased", False):
+                continue
+            d2 = (e.x - src.x) ** 2 + (e.y - src.y) ** 2
+            if d2 < EVO_CHAIN_R * EVO_CHAIN_R:
+                cands.append((d2, e))
+        if not cands:
+            return
+        cands.sort(key=lambda c: c[0])
+        col = EVO_PERK_COLOR["chain"]
+        EVO_BUSY[0] = True
+        try:
+            prev = src
+            for _d, e in cands[:2]:
+                self.fx.bolt(zigzag(prev.x, prev.y, e.x, e.y, 6, 9), col, 0.22)
+                if e.take_damage(amount * EVO_CHAIN_DMG, False, self.fx, quiet=True):
+                    self.on_enemy_killed(e)
+                prev = e
+        finally:
+            EVO_BUSY[0] = False
+
+    def evo_blast(self, src, amount, key):
+        sec = int(self.run_time)
+        if sec != self.evo_blast_t:
+            self.evo_blast_t, self.evo_blasts = sec, 0
+        if self.evo_blasts >= EVO_BLAST_PER_SEC:
+            return
+        self.evo_blasts += 1
+        col = EVO_PERK_COLOR["blast"]
+        self.fx.shockwave(src.x, src.y, EVO_BLAST_R, col, 0.3, 4)
+        self.fx.burst(src.x, src.y, col, n=10, speed=200, life=0.35, r=3.2)
+        dmg = amount * EVO_BLAST_DMG
+        EVO_BUSY[0] = True
+        try:
+            for e in self.enemies:
+                if e is src or not e.alive:
+                    continue
+                if (e.x - src.x) ** 2 + (e.y - src.y) ** 2 < EVO_BLAST_R * EVO_BLAST_R:
+                    if e.take_damage(dmg, False, self.fx, quiet=True):
+                        self.on_enemy_killed(e)
+        finally:
+            EVO_BUSY[0] = False
+
+
+def draw_evo_orbs(world, run, t):
+    """Evrilmiş her silah için oyuncunun çevresinde dönen küçük bir taş."""
+    p = run.player
+    keys = [k for k in BOSS_WEAPONS_ORDER if k in getattr(p, "evolved", ())]
+    if not keys or not p.alive:
+        return
+    n = len(keys)
+    for i, key in enumerate(keys):
+        a = t * 1.6 + i * math.tau / n
+        x = p.x + math.cos(a) * (p.radius + 20)
+        y = p.y + math.sin(a) * (p.radius + 20) * 0.55 - 6
+        col = EVOLUTIONS[key][2]
+        add_glow(world, x, y, 16, col, 0.35)
+        pts = [(x, y - 6), (x + 4, y), (x, y + 6), (x - 4, y)]
+        pygame.draw.polygon(world, INK, [(px + (1 if px > x else -1), py + (1 if py > y else -1))
+                                         for px, py in pts])
+        pygame.draw.polygon(world, col, pts)
+        pygame.draw.line(world, lighten(col, 0.6), (x - 1, y - 4), (x - 2, y), 1)
+
+
+def draw_evo_banner(surf, run, t):
+    """Evrim anında ekranın ortasına inen şerit: "EVRİM!" + "BALTA → KIYAMET BALTASI"."""
+    eb = getattr(run, "evo_banner", None)
+    if not eb:
+        return
+    st = run.run_time - eb[0]
+    if st < 0 or st > EVO_BANNER_T:
+        return
+    key = eb[1]
+    col = EVOLUTIONS[key][2]
+    y = 250
+    k = ease_out_cubic(min(1.0, st / 0.3))
+    a = min(1.0, (EVO_BANNER_T - st) / 0.5)
+    band = pygame.Surface((VIRTUAL_W, 128), pygame.SRCALPHA)
+    band.fill((22, 14, 18, int(205 * a * k)))
+    surf.blit(band, (0, y - 64))
+    for sgn in (-1, 1):
+        pygame.draw.line(surf, scale_col(col, 0.4 + 0.5 * a), (0, y + sgn * 64), (VIRTUAL_W, y + sgn * 64), 3)
+    # iki yanda dönen ışın yıldızları
+    for sgn in (-1, 1):
+        cx = VIRTUAL_W / 2 + sgn * 330
+        for i in range(8):
+            ang = t * 1.4 * sgn + i * math.tau / 8
+            r1 = 22 + 6 * math.sin(t * 5 + i)
+            pygame.draw.line(surf, col, (cx + math.cos(ang) * 8, y - 12 + math.sin(ang) * 8),
+                             (cx + math.cos(ang) * r1, y - 12 + math.sin(ang) * r1), 3)
+        blit_sigil(surf, cx, y - 12, 13, key, lighten(col, 0.3))
+    size = int(58 + 30 * (1 - k))
+    draw_text(surf, L("evo.banner"), (VIRTUAL_W / 2, y - 18), size, col, bold=True, center=True,
+              alpha=int(255 * a))
+    w = WEAPON_BY_KEY[key]
+    sub = "%s  →  %s" % (w_name(w), evo_name(key))
+    draw_text(surf, sub, (VIRTUAL_W / 2, y + 28), 20, TEXT, bold=True, center=True, alpha=int(255 * a))
+    draw_text(surf, L("evo.perk." + EVOLUTIONS[key][1]), (VIRTUAL_W / 2, y + 50), 13,
+              lighten(col, 0.3), center=True, shadow=False, alpha=int(255 * a))
+
+
+def draw_evo_card(surf, r2, ch, run, t, hover):
+    """Seviye elindeki EVRİM kartı: öteki kartlardan belirgin şekilde ayrı."""
+    key = ch["key"]
+    col = tuple(ch["color"])
+    perk = ch["perk"]
+    pcol = EVO_PERK_COLOR[perk]
+    pulse = 0.5 + 0.5 * math.sin(t * 4.0)
+    surf.blit(_panel_shadow(r2.w, r2.h, 18), (r2.x - 6, r2.y - 2))
+    surf.blit(_lu_card_bg(r2.w, r2.h, col, 4), r2.topleft)
+    # arkada dönen ışınlar
+    ecx, ecy = r2.centerx, r2.y + 92
+    prev = surf.get_clip()
+    surf.set_clip(r2.inflate(-6, -6).clip(prev) if prev else r2.inflate(-6, -6))
+    rs = pygame.Surface((r2.w, r2.h), pygame.SRCALPHA)
+    for i in range(12):
+        a = t * 0.55 + i * math.tau / 12
+        pts = [(ecx - r2.x, ecy - r2.y),
+               (ecx - r2.x + math.cos(a - 0.08) * 170, ecy - r2.y + math.sin(a - 0.08) * 170),
+               (ecx - r2.x + math.cos(a + 0.08) * 170, ecy - r2.y + math.sin(a + 0.08) * 170)]
+        pygame.draw.polygon(rs, (*col, 34), pts)
+    surf.blit(rs, r2.topleft)
+    surf.set_clip(prev)
+    ink_frame(surf, r2, lighten(col, 0.2 * pulse), 18, 4)
+    ink_frame(surf, r2.inflate(-10, -10), scale_col(col, 0.5), 14, 1)
+    # üst şerit
+    band = pygame.Rect(r2.x + 3, r2.y + 3, r2.w - 6, 30)
+    pygame.draw.rect(surf, scale_col(col, 0.55), band, border_top_left_radius=15, border_top_right_radius=15)
+    pygame.draw.rect(surf, col, band.inflate(0, -6).move(0, -3), border_top_left_radius=14,
+                     border_top_right_radius=14)
+    bt = L("evo.band")
+    draw_text(surf, bt, (band.centerx, band.centery - 2), 16, (28, 18, 20), bold=True, center=True,
+              shadow=False)
+    tw_ = text_width(bt, 16, True)
+    for s_ in (-1, 1):
+        _sparkle(surf, band.centerx + s_ * (tw_ / 2 + 14), band.centery - 2, 5 + pulse * 1.5,
+                 (28, 18, 20))
+    # arma: silah ve çevresinde dönen taç dişleri
+    hh = 92 if hover else 86
+    for i in range(14):
+        a = t * 0.9 + i * math.tau / 14
+        r0, r1 = hh * 0.56, hh * (0.66 + 0.04 * math.sin(t * 3 + i))
+        thick_line(surf, (ecx + math.cos(a) * r0, ecy + math.sin(a) * r0),
+                   (ecx + math.cos(a) * r1, ecy + math.sin(a) * r1), 3, col)
+    draw_weapon_emblem(surf, ecx, ecy, hh, ch["w"], t)
+    for i in range(6):
+        ph = (t * 0.7 + i * 0.29) % 1.0
+        a = i * math.tau / 6 + t * 0.3
+        _sparkle(surf, ecx + math.cos(a) * (60 + 10 * ph), ecy + math.sin(a) * (60 + 10 * ph) - 18 * ph,
+                 4.5 * math.sin(ph * math.pi), lighten(col, 0.5))
+    # ad
+    nm, nsz = ms_fit(ch["name"], 19, r2.w - 24, True)
+    draw_text(surf, nm, (r2.centerx, r2.y + 152), nsz, lighten(col, 0.35), bold=True, center=True)
+    pill = "%s  →  %s" % (_fit_text(w_name(ch["w"]), 11, (r2.w - 60) // 2, True), L("evo.short"))
+    pw_ = text_width(pill, 11, True) + 18
+    pr_ = pygame.Rect(0, 0, pw_, 18)
+    pr_.center = (r2.centerx, r2.y + 174)
+    pygame.draw.rect(surf, (23, 17, 18), pr_, border_radius=9)
+    ink_frame(surf, pr_, scale_col(col, 0.8), 9, 1)
+    draw_text(surf, pill, pr_.center, 11, lighten(col, 0.2), bold=True, center=True, shadow=False)
+    # satırlar: hasar + etki + tarif
+    box = pygame.Rect(r2.x + 14, r2.y + 190, r2.w - 28, 94)
+    pygame.draw.rect(surf, (20, 15, 15), box, border_radius=10)
+    ink_frame(surf, box, scale_col(col, 0.45), 10, 1)
+    draw_text(surf, L("evo.dmg"), (box.x + 10, box.y + 9), 13, (176, 170, 160), shadow=False)
+    draw_text(surf, "x%.1f" % EVO_DMG_MULT, (box.right - 10, box.y + 8), 15, GREEN, bold=True,
+              right=True, shadow=False)
+    draw_icon(surf, box.x + 18, box.y + 44, EVO_PERK_ICON[perk], pcol, 8)
+    for i, ln in enumerate(wrap_text(ch["desc"], 13, box.w - 44)[:2]):
+        draw_text(surf, ln, (box.x + 32, box.y + 36 + i * 16), 13, pcol, bold=True, shadow=False)
+    bk = ch.get("book")
+    req = L("evo.need", EVO_LEVEL, bk_name(bk) if bk else "?")
+    draw_text(surf, _fit_text(req, 11, box.w - 16), (box.centerx, box.bottom - 15), 11, TEXT_DIM,
+              center=True, shadow=False)
+    if hover:
+        br = pygame.Rect(r2.x + 18, r2.bottom - 44, r2.w - 36, 32)
+        face = key_button(surf, br, col, True, rad=10)
+        draw_text(surf, L("evo.pick"), face.center, 16, (28, 18, 20), bold=True, center=True,
+                  shadow=False)
+    else:
+        draw_text(surf, L("evo.ready"), (r2.centerx, r2.bottom - 28), 12, lighten(col, 0.2 * pulse),
+                  bold=True, center=True, shadow=False)
+
+
+class RunState(EvoMixin, WorldExtrasMixin):
     def __init__(self, save, skin_id, diff="normal", ach=None):
         self.save = save
         self.diff = diff
@@ -25542,6 +26444,8 @@ class RunState:
         self.player_projectiles = []
         self.dmg_log = {}           # kaynak -> verilen toplam hasar
         self.fx = EffectSystem()
+        self.evo_init()
+        self.extras_init()
         self.waves = WaveManager(diff)
         # Düşmanlar dünyanın kenarından değil, kameranın hemen dışından gelir.
         self.waves.spawn_pos_fn = self.near_camera_point
@@ -26896,7 +27800,7 @@ class RunState:
             if p.invis_t > 0:
                 p.invis_t = max(0.0, p.invis_t - dt)
                 if p.invis_t <= 0:
-                    p.cloak_timer = cloak_cooldown(clvl)
+                    p.cloak_timer = cloak_cooldown(clvl) * (0.7 if "cloak" in p.evolved else 1.0)
                     self.fx.ring(p.x, p.y, CLOAK_COLOR2, n=18, speed=260,
                                  life=0.45, r=3)
                     self.fx.popup(p.x, p.y - 46, "GÖRÜNDÜN", CLOAK_COLOR2, 16,
@@ -26906,7 +27810,7 @@ class RunState:
                 p.cloak_timer -= dt
                 if p.cloak_timer <= 0:
                     p.invis_t = cloak_duration(clvl)
-                    p.cloak_timer = cloak_cooldown(clvl)
+                    p.cloak_timer = cloak_cooldown(clvl) * (0.7 if "cloak" in p.evolved else 1.0)
                     self.fx.popup(p.x, p.y - 64, L("ui.cloak_on"), CLOAK_COLOR2, 26,
                                   life=1.4)
                     self.fx.ring(p.x, p.y, CLOAK_COLOR, n=26, speed=320,
@@ -28049,6 +28953,7 @@ class RunState:
         p = self.player
         DMG_LOG[0] = self.dmg_log
         DMG_SRC[0] = "other"
+        EVO_CTX[0] = self
         self.run_time += dt
         # koşu görevleri: yarım saniyede bir bakılır.
         self.quest_t -= dt
@@ -28080,6 +28985,9 @@ class RunState:
         if self.time_stop > 0:
             self.time_stop = max(0.0, self.time_stop - dt)
         p.update(dt, input_state, self.fx)
+        if self.evo_perks:
+            self.evo_update(dt)
+        self.extras_update(dt)
         self.update_camera(dt)
         # Skin yeteneği: süresi dolduysa kendiliğinden çalışır (ve zamanı
         # durdurabilir).
@@ -28298,6 +29206,7 @@ class RunState:
             self.spawn_mini_boss()
         if wave_changed:
             self._roll_goblin()
+            self.extras_wave_changed()
         self._update_goblins()
 
         if self.coins_earned >= 1500 and self.ach:
@@ -29081,6 +29990,7 @@ class RunState:
                     if kinds.count(c["kind"]) > 1:
                         victim = i
                 chosen[victim] = rare
+        chosen = self.evo_inject(chosen)
         random.shuffle(chosen)
         for c in chosen:
             self.offer_seen[c["key"]] = self.offer_seen.get(c["key"], 0) + 1
@@ -29122,7 +30032,10 @@ class RunState:
             return
         ch = self.levelup_choices[idx]
         p = self.player
-        if ch["kind"] == "book":
+        if ch["kind"] == "evo":
+            col = ch["color"]
+            self.evolve_weapon(ch["key"])
+        elif ch["kind"] == "book":
             col = ch["color"]
             lvl = p.take_book(ch["key"], int(ch.get("rarity") or 0))
             if lvl > 0 and ch.get("rarity"):
@@ -31487,6 +32400,13 @@ def draw_minimap(surf, run, t, big=False):
                                max(2, int(k * (4 + pulse * 0.4))))
             pygame.draw.circle(surf, WHITE, (int(px), int(py)), max(1, int(k * 2)))
 
+    # güç sunağı
+    _psh = getattr(run, "shrine", None)
+    if _psh is not None and not _psh.used:
+        px, py = mp(_psh.x, _psh.y)
+        pulse = 0.5 + 0.5 * math.sin(t * 5)
+        pygame.draw.circle(surf, INK, (int(px), int(py)), max(3, int(k * (5 + pulse))))
+        pygame.draw.circle(surf, _psh.color(), (int(px), int(py)), max(2, int(k * (4 + pulse))))
     # mıknatıs - nadir eşya, küçük haritada nabız gibi atar ki kaçırılmasın
     for mg in run.magnets:
         px, py = mp(mg.x, mg.y)
@@ -31628,6 +32548,9 @@ def draw_offscreen_markers(surf, run, cam, t):
     _csh = getattr(run, "cursed_shrine", None)
     if _csh is not None and not _csh.used and getattr(_csh, "discovered", False):
         marks.append((_csh.x, _csh.y, CURSE_COLOR, "skull"))
+    _psh = getattr(run, "shrine", None)
+    if _psh is not None and not _psh.used:
+        marks.append((_psh.x, _psh.y, _psh.color(), SHRINE_KINDS[_psh.kind][1]))
     # hazine goblini: kaçan ganimet ekran dışındaysa ok göster
     for e in run.enemies:
         if e.alive and e.kind == "goblin":
@@ -31982,6 +32905,8 @@ def draw_weapon_slots(surf, run, t):
               (back.x + 14 + text_width(L("ui.weapons"), 10, True), y0 - 15), 10,
               hcol if full else (104, 110, 136), bold=True, shadow=False)
 
+    evolved = getattr(p, "evolved", ())
+    ready_evo = evo_ready_keys(p) if not getattr(run, "is_coop", False) else ()
     for i in range(n):
         r = pygame.Rect(x0 + i * (cell + gap), y0, cell, cell)
         if i >= n_filled:
@@ -31991,7 +32916,8 @@ def draw_weapon_slots(surf, run, t):
         key = keys[i]
         w = WEAPON_BY_KEY[key]
         lvl = p.weapons[key]
-        col = tuple(w["color"])
+        is_evo = key in evolved
+        col = EVOLUTIONS[key][2] if is_evo else tuple(w["color"])
         passive = bool(w.get("passive"))
         timed = bool(w.get("timed"))
         invis_now = timed and getattr(p, "invis_t", 0.0) > 0
@@ -32048,7 +32974,15 @@ def draw_weapon_slots(surf, run, t):
         # Rozet üst sağ köşede: alttaki ad yazısının üstüne binmesin.
         _level_badge(surf, r.right - 1, r.y + 1, lvl, col,
                      maxed=lvl >= weapon_max_level(w), h=17)
-        name = _fit_text(w_name(w), 8, cell + gap - 7, bold=True)
+        if is_evo or key in ready_evo:
+            # evrilmiş: sol üstte EVO etiketi; evrime hazır: yanıp sönen ok
+            tag = L("evo.short") if is_evo else "!"
+            tr_ = pygame.Rect(r.x - 4, r.y - 6, text_width(tag, 9, True) + 8, 14)
+            if is_evo or pulse > 0.4:
+                pygame.draw.rect(surf, col if is_evo else GOLD, tr_, border_radius=4)
+                pygame.draw.rect(surf, INK, tr_, width=1, border_radius=4)
+                draw_text(surf, tag, tr_.center, 9, INK, bold=True, center=True, shadow=False)
+        name = _fit_text(evo_name(key) if is_evo else w_name(w), 8, cell + gap - 7, bold=True)
         ncol = (CLOAK_COLOR2 if invis_now else
                 (lighten(col, 0.25) if ready else (118, 124, 148)))
         draw_text(surf, name, (r.centerx, r.bottom + 3), 8, ncol, bold=True,
@@ -33042,6 +33976,7 @@ def draw_run(surf, run, t, aim_pos=None, shake=(0, 0)):
     _csh = getattr(run, "cursed_shrine", None)
     if _csh is not None and cam.inflate(400, 400).collidepoint(_csh.x, _csh.y):
         _csh.draw(world, t)
+    draw_world_extras(world, run, cam, t)
     # gezgin tüccar (haritada işaretlenmez; oyuncu bulur)
     _mer = getattr(run, "merchant", None)
     if _mer is not None and cam.inflate(400, 400).collidepoint(_mer.x, _mer.y):
@@ -33149,6 +34084,7 @@ def draw_run(surf, run, t, aim_pos=None, shake=(0, 0)):
             run.player.draw(world, t)
     # ---- pet: oyuncunun yanında gezer (yalnızca görünüş) ----
     draw_run_pet(world, run, t)
+    draw_evo_orbs(world, run, t)
     # ---- oyuncunun üstüne çizilenler ----
     if _fxm != "off":
         _snap = _wfx_begin(world, cam, _pw.get("book", 0) > 0 or bool(run.flying_axes)
@@ -33224,6 +34160,8 @@ def draw_run(surf, run, t, aim_pos=None, shake=(0, 0)):
     if getattr(run, "show_map", False):
         draw_minimap(surf, run, t, big=True)
     draw_team_strips(surf, run, t)
+    draw_extras_hud(surf, run, t)
+    draw_evo_banner(surf, run, t)
     if not MOBILE:
         draw_skill_bar(surf, run, t)     # telefonda düğmeler sağ altta (TouchUI)
     # istatistik paneli en üstte çizilir: açıkken küçük haritayı örter.
@@ -34159,6 +35097,9 @@ def _sparkle(surf, x, y, r, col):
 
 def draw_levelup_card(surf, r2, ch, run, t, hover):
     """Tek bir seviye kartını çizer (tasarımı)."""
+    if ch["kind"] == "evo":
+        draw_evo_card(surf, r2, ch, run, t, hover)
+        return
     p = run.player
     is_weapon = ch["kind"] == "weapon"
     rare_book = (not is_weapon) and ch.get("rare")
@@ -42485,6 +43426,7 @@ class CoopRunState(RunState):
             self.spawn_mini_boss()
         if wave_changed:
             self._roll_goblin()
+            self.extras_wave_changed()
         self._update_goblins()
 
         # ---- 11) kapı, mağara, tüccar: E'ye basan oyuncunun bağlamında ----
@@ -50946,6 +51888,18 @@ class App:
                 draw_text(canvas, ln, (rx, yy), 14, TEXT_DIM, shadow=False)
                 yy += 19
             yy += 12
+        ev = EVOLUTIONS.get(key)
+        if ev is not None:
+            # evrim tarifi: hangi kitapla, neye dönüşür, ne kazanır
+            ecol = ev[2]
+            draw_text(canvas, L("evo.band"), (rx, yy), 12, ecol, bold=True, shadow=False)
+            draw_text(canvas, L("evo.need", EVO_LEVEL, evo_book_name(key)),
+                      (rx + text_width(L("evo.band"), 12, True) + 10, yy), 12, TEXT_DIM, shadow=False)
+            yy += 20
+            blit_sigil(canvas, rx + 9, yy + 9, 8, key, ecol)
+            draw_text(canvas, "%s  -  %s" % (evo_name(key), L("evo.perk." + ev[1])), (rx + 24, yy + 1),
+                      13, lighten(ecol, 0.25), bold=True, shadow=False)
+            yy += 30
 
         if owned:
             draw_text(canvas, L("ui.unlocked"), (rx, yy), 13, GREEN, bold=True, shadow=False)

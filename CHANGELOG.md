@@ -3,6 +3,14 @@
 Kısa notlar, en yenisi üstte.
 
 ## sıradaki sürüm
+- SİLAH EVRİMİ: silah 8. seviyeye gelince ve eşi olan kitap da elindeyse seviye
+  atlama elinde EVRİM kartı çıkar. Her silahın kendi evrimi var (Papuç -> Anne
+  Terliği, Balta -> Kıyamet Baltası...): x1.5 hasar + yakma, dondurma, zincir
+  şimşek, can çalma, patlama ya da zehir. Tarifler Silahlık'ta yazıyor.
+- GÜÇ SUNAKLARI: haritada arada bir sunak belirir, üstünde 2 sn durunca 25 sn
+  güç verir (öfke, rüzgâr, kan, altın) ya da anında iş görür (mıknatıs, kalkan)
+- DALGA OLAYLARI: 4. dalgadan sonra arada bir Altın Yağmuru, Kan Ayı (elitler +
+  tecrübe x2) ya da Göktaşı Yağmuru
 - arayüz baştan çizildi: yeni yazı tipi, kalın konturlu kartlar ve düğmeler, sıcak renkler
 - düğme yazısı sığmazsa küçülüyor (Rusça/Almanca taşmaları)
 - ₺ işareti kare kutu çıkıyordu, artık "TL" yazıyor
