@@ -114,8 +114,10 @@ export class WorldRenderer {
     const cv = document.createElement("canvas");
     cv.width = cv.height = 256;
     const g = cv.getContext("2d")!;
-    const gr = g.createRadialGradient(128, 128, 60, 128, 128, 180);
+    // yalnız kenarlar kızarsın; ortadaki oyun alanı temiz kalsın
+    const gr = g.createRadialGradient(128, 128, 96, 128, 128, 182);
     gr.addColorStop(0, "rgba(255,0,0,0)");
+    gr.addColorStop(0.55, "rgba(255,30,40,0.25)");
     gr.addColorStop(1, "rgba(255,30,40,0.85)");
     g.fillStyle = gr;
     g.fillRect(0, 0, 256, 256);
@@ -228,7 +230,7 @@ export class WorldRenderer {
     } else this.flash.alpha = 0;
     const p = run.player;
     const low = p.alive ? clamp(1 - p.hp / p.max_hp, 0, 1) : 1;
-    this.vignette.alpha = Math.max(p.hurt_vig * 0.5, low > 0.65 ? (low - 0.65) * 1.2 * (0.7 + 0.3 * Math.sin(this.t * 6)) : 0);
+    this.vignette.alpha = Math.max(p.hurt_vig * 0.35, low > 0.65 ? (low - 0.65) * 1.2 * (0.7 + 0.3 * Math.sin(this.t * 6)) : 0);
   }
 
   private sweep() {
