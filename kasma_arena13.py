@@ -700,7 +700,7 @@ def L(key, *args, **kw):
     if row is None:
         return key
     i = _LANG_IDX.get(lang(), 0)
-    txt = row[i] if i < len(row) and row[i] else row[0]
+    txt = row[i] if i < len(row) and row[i] else (row[1] if i > 1 and len(row) > 1 and row[1] else row[0])
     if args or kw:
         try:
             return txt.format(*args, **kw)
@@ -713,13 +713,172 @@ def LX(key, fallback):
     """İçerik metni: çeviri varsa onu, yoksa tablodaki Türkçe değeri verir."""
     row = STRINGS.get(key)
     if row is None:
-        return fallback
+        return TRX(fallback)
     i = _LANG_IDX.get(lang(), 0)
-    return (row[i] if i < len(row) and row[i] else row[0]) or fallback
+    txt = row[i] if i < len(row) and row[i] else (row[1] if i > 1 and len(row) > 1 and row[1] else row[0])
+    return txt or TRX(fallback)
+
+
+# Türkçe metin -> (en, es, de, ru). Tablolardaki içerik metinleri ve birkaç
+# sabit yazı için; dosyanın sonunda doldurulur.
+TEXT_TR = {}
+
+
+def TRX(text):
+    """Türkçe metnin seçili dildeki karşılığı (yoksa olduğu gibi)."""
+    if not text:
+        return text
+    i = _LANG_IDX.get(lang(), 0)
+    if i == 0:
+        return text
+    try:
+        row = TEXT_TR.get(text)
+    except TypeError:
+        return text
+    if row is None:
+        return text
+    return row[i - 1] or row[0] or text
 
 
 # ---- içerik okuyucuları ----
 # Tablolardaki Türkçe metni, varsa çevirisiyle değiştirir.
+
+
+def _pick(t):
+    """(tr, en, es, de, ru) demetinden seçili dilin metni; boşsa İngilizce."""
+    i = _LANG_IDX.get(lang(), 0)
+    return (t[i] if i < len(t) and t[i] else "") or t[1] or t[0]
+
+
+# nasıl oynanır: (başlık, açıklama), her biri 5 dilde
+HOWTO_KEYS = [
+    (("WASD / OK TUŞLARI", "WASD / ARROWS", "WASD / FLECHAS", "WASD / PFEILTASTEN", "WASD / СТРЕЛКИ"),
+     ("Yürü, kaç", "Move and dodge", "Muévete y esquiva", "Laufen und ausweichen", "Двигайся и уклоняйся")),
+    (("FARE + SOL TIK", "MOUSE + LEFT CLICK", "RATÓN + CLIC IZQ.", "MAUS + LINKSKLICK", "МЫШЬ + ЛКМ"),
+     ("Nişan al, basılı tutunca ateş eder", "Aim, hold to shoot", "Apunta, mantén para disparar",
+      "Zielen, halten zum Schießen", "Целься, держи для стрельбы")),
+    (("SPACE", "SPACE", "ESPACIO", "LEERTASTE", "ПРОБЕЛ"),
+     ("BONK: çevrendeki herkese vurur", "BONK: hits everything around you", "BONK: golpea todo a tu alrededor",
+      "BONK: trifft alles um dich herum", "БОНК: бьёт всех вокруг")),
+    (("SHIFT / SAĞ TIK", "SHIFT / RIGHT CLICK", "MAYÚS / CLIC DER.", "UMSCHALT / RECHTSKLICK", "SHIFT / ПКМ"),
+     ("Dash: kısa bir an hasar almazsın", "Dash: briefly untouchable", "Impulso: un instante invulnerable",
+      "Dash: kurz unverwundbar", "Рывок: ненадолго неуязвим")),
+    (("B", "B", "B", "B", "B"),
+     ("Market (oyun durur)", "Shop (pauses the game)", "Tienda (pausa el juego)", "Shop (pausiert das Spiel)",
+      "Магазин (игра на паузе)")),
+    (("TAB", "TAB", "TAB", "TAB", "TAB"),
+     ("İstatistiklerin", "Your stats", "Tus estadísticas", "Deine Werte", "Твоя статистика")),
+    (("E", "E", "E", "E", "E"),
+     ("Portal, tüccar, sandık", "Portal, merchant, chest", "Portal, mercader, cofre", "Portal, Händler, Truhe",
+      "Портал, торговец, сундук")),
+    (("ESC", "ESC", "ESC", "ESC", "ESC"),
+     ("Mola ve ayarlar", "Pause and settings", "Pausa y ajustes", "Pause und Einstellungen", "Пауза и настройки")),
+]
+HOWTO_TOUCH = [
+    (("SOL TARAF = JOYSTICK", "LEFT SIDE = JOYSTICK", "IZQUIERDA = JOYSTICK", "LINKS = JOYSTICK", "СЛЕВА = ДЖОЙСТИК"),
+     ("Ekranın soluna bas ve kaydır", "Touch the left side and drag", "Toca la izquierda y arrastra",
+      "Links tippen und ziehen", "Коснись слева и веди")),
+    (("OTOMATİK NİŞAN", "AUTO AIM", "AUTOAPUNTADO", "AUTO-ZIELEN", "АВТОПРИЦЕЛ"),
+     ("Sağa dokunmazsan en yakın düşmana ateş eder", "Shoots the nearest enemy unless you touch the right side",
+      "Si no tocas la derecha, dispara al más cercano", "Ohne Finger rechts: Schuss auf den nächsten Gegner",
+      "Не трогаешь справа: стреляет в ближайшего")),
+    (("SAĞ TARAF = NİŞAN", "RIGHT SIDE = AIM", "DERECHA = APUNTAR", "RECHTS = ZIELEN", "СПРАВА = ПРИЦЕЛ"),
+     ("Basılı tut, parmağının olduğu yere ateş et", "Hold to shoot where your finger is",
+      "Mantén para disparar donde está tu dedo", "Halten, um dorthin zu schießen", "Держи, чтобы стрелять под палец")),
+    (("BONK", "BONK", "BONK", "BONK", "БОНК"),
+     ("Sağ alttaki turuncu düğme", "The orange button bottom right", "El botón naranja abajo a la derecha",
+      "Der orange Knopf unten rechts", "Оранжевая кнопка справа внизу")),
+    (("DASH", "DASH", "IMPULSO", "DASH", "РЫВОК"),
+     ("Sağ alttaki büyük düğme", "The big button bottom right", "El botón grande abajo a la derecha",
+      "Der große Knopf unten rechts", "Большая кнопка справа внизу")),
+    (("$ - MARKET", "$ - SHOP", "$ - TIENDA", "$ - SHOP", "$ - МАГАЗИН"),
+     ("DASH'in üstündeki altın düğme", "The gold button above DASH", "El botón dorado sobre IMPULSO",
+      "Der goldene Knopf über DASH", "Золотая кнопка над РЫВКОМ")),
+    (("E", "E", "E", "E", "E"),
+     ("Portal, tüccar ya da sandığın yanında çıkar", "Shows up next to a portal, merchant or chest",
+      "Aparece junto a un portal, mercader o cofre", "Erscheint bei Portal, Händler oder Truhe",
+      "Появляется у портала, торговца или сундука")),
+    (("II / HARİTA / ⋮", "II / MAP / ⋮", "II / MAPA / ⋮", "II / KARTE / ⋮", "II / КАРТА / ⋮"),
+     ("Mola, büyük harita, istatistik", "Pause, big map, stats", "Pausa, mapa grande, estadísticas",
+      "Pause, große Karte, Werte", "Пауза, большая карта, статистика")),
+]
+HOWTO_GAME = [
+    (("DALGALAR", "WAVES", "OLEADAS", "WELLEN", "ВОЛНЫ"),
+     ("Süreyle ilerler. 25 dalga: normal 35 dk, zor 30, kabus 20",
+      "Advance with time. 25 waves: normal 35 min, hard 30, nightmare 20",
+      "Avanzan con el tiempo. 25 oleadas: normal 35 min, difícil 30, pesadilla 20",
+      "Laufen nach Zeit. 25 Wellen: normal 35 Min., schwer 30, Albtraum 20",
+      "Идут по времени. 25 волн: обычная 35 мин, сложная 30, кошмар 20")),
+    (("SEVİYE ATLAYINCA", "ON LEVEL UP", "AL SUBIR DE NIVEL", "BEIM AUFSTIEG", "НОВЫЙ УРОВЕНЬ"),
+     ("3 karttan birini seç: silah, kitap ya da yükseltme", "Pick 1 of 3 cards: weapon, book or upgrade",
+      "Elige 1 de 3 cartas: arma, libro o mejora", "Wähle 1 von 3 Karten: Waffe, Buch oder Upgrade",
+      "Выбери 1 из 3 карт: оружие, книга или улучшение")),
+    (("TAKIM", "LOADOUT", "EQUIPO", "AUSRÜSTUNG", "СНАРЯЖЕНИЕ"),
+     ("{w} silah, {b} kitap, {r} nadir kitap", "{w} weapons, {b} books, {r} rare book",
+      "{w} armas, {b} libros, {r} libro raro", "{w} Waffen, {b} Bücher, {r} seltenes Buch",
+      "{w} оружия, {b} книги, {r} редкая книга")),
+    (("SİLAHLAR", "WEAPONS", "ARMAS", "WAFFEN", "ОРУЖИЕ"),
+     ("Ana silah hariç hepsi kendi kendine çalışır", "Everything but your main gun fires on its own",
+      "Todas salvo la principal disparan solas", "Alles außer der Hauptwaffe feuert von selbst",
+      "Всё, кроме основного, стреляет само")),
+    (("PATRONLAR", "BOSSES", "JEFES", "BOSSE", "БОССЫ"),
+     ("10. dalgadan sonra her 5 dalgada bir; sandık bırakır", "Every 5 waves from wave 10; they drop a chest",
+      "Cada 5 oleadas desde la 10; sueltan un cofre", "Alle 5 Wellen ab Welle 10; lassen eine Truhe fallen",
+      "Каждые 5 волн с 10-й; оставляют сундук")),
+    (("PATRONDAN KAÇILMAZ", "NO RUNNING FROM BOSSES", "NO HUYAS DEL JEFE", "KEINE FLUCHT", "ОТ БОССА НЕ УБЕЖАТЬ"),
+     ("Uzaklaşırsan seni kovalar, hem de senden hızlı", "Run away and it hunts you down, faster than you",
+      "Si te alejas, te caza y corre más que tú", "Läufst du weg, jagt er dich und ist schneller",
+      "Отойдёшь, и он погонится, причём быстрее тебя")),
+    (("ALTIN", "GOLD", "ORO", "GOLD", "ЗОЛОТО"),
+     ("Yerden topla, yaklaşınca sana akar. Hiçbir şey kaybolmaz",
+      "Pick it up, it flies to you when close. Nothing despawns",
+      "Recógelo, vuela hacia ti al acercarte. Nada desaparece",
+      "Aufsammeln, es fliegt zu dir, wenn du nah bist. Nichts verschwindet",
+      "Подбирай, вблизи оно летит к тебе. Ничего не исчезает")),
+    (("MARKET", "SHOP", "TIENDA", "SHOP", "МАГАЗИН"),
+     ("Çekirdeklerin sınırı yok, altın hep işe yarar", "Cores have no cap, gold is always useful",
+      "Los núcleos no tienen tope, el oro siempre sirve", "Kerne haben kein Limit, Gold lohnt sich immer",
+      "У ядер нет предела, золото всегда пригодится")),
+    (("ÖLÜRSEN", "WHEN YOU DIE", "SI MUERES", "WENN DU STIRBST", "ЕСЛИ УМРЁШЬ"),
+     ("Koşuda aldıkların gider, elmasların ve açtıkların kalır",
+      "Run items are lost; gems and unlocks stay",
+      "Pierdes lo de la partida; gemas y desbloqueos se quedan",
+      "Lauf-Items sind weg, Edelsteine und Freischaltungen bleiben",
+      "Вещи забега пропадут, кристаллы и открытия останутся")),
+    (("CEHENNEM", "HELL", "INFIERNO", "HÖLLE", "АД"),
+     ("25. dalga patronunu yen, mor portalda E'ye bas", "Beat the wave 25 boss, press E at the purple portal",
+      "Vence al jefe de la oleada 25 y pulsa E en el portal morado",
+      "Besiege den Boss in Welle 25 und drück E am lila Portal",
+      "Победи босса 25-й волны и нажми E у фиолетового портала")),
+    (("DİĞER HARİTALAR", "OTHER MAPS", "OTROS MAPAS", "ANDERE KARTEN", "ДРУГИЕ КАРТЫ"),
+     ("Taş Meydan'ı bitirince açılır, başarımları yeni silah verir",
+      "Unlock after Stone Plaza; their achievements give new weapons",
+      "Se abren tras la Plaza; sus logros dan armas nuevas",
+      "Nach dem Steinplatz frei; ihre Erfolge geben neue Waffen",
+      "Открываются после Площади; их достижения дают оружие")),
+    (("TÜCCAR", "MERCHANT", "MERCADER", "HÄNDLER", "ТОРГОВЕЦ"),
+     ("Haritada bir yerde. E ile konuş, bir yemin seç", "Somewhere on the map. Press E, pick an oath",
+      "En algún lugar del mapa. Pulsa E y elige un juramento",
+      "Irgendwo auf der Karte. Drück E und wähle einen Schwur",
+      "Где-то на карте. Нажми E и выбери клятву")),
+    (("KİTAPLIK / SİLAHLIK", "LIBRARY / ARMORY", "BIBLIOTECA / ARMERÍA", "BIBLIOTHEK / WAFFEN", "КНИГИ / ОРУЖИЕ"),
+     ("Hepsi görevle açılır, istemediğini kapatabilirsin", "Unlock through tasks; turn off what you don't want",
+      "Se abren con tareas; desactiva lo que no quieras", "Über Aufgaben frei; Unerwünschtes sperren",
+      "Открываются заданиями; ненужное можно отключить")),
+    (("SKİNLER", "SKINS", "SKINS", "SKINS", "СКИНЫ"),
+     ("Her skinin kendi silahı ve otomatik yeteneği var", "Each skin has its own weapon and auto ability",
+      "Cada skin tiene su arma y habilidad automática", "Jeder Skin hat eigene Waffe und Auto-Fähigkeit",
+      "У каждого скина своё оружие и авто-способность")),
+    (("KIYAFETLER", "OUTFITS", "ROPA", "OUTFITS", "ОДЕЖДА"),
+     ("Şapka, gözlük, pelerin: her biri küçük bir bonus", "Hats, glasses, capes: each gives a small bonus",
+      "Sombreros, gafas, capas: cada uno da un bonus", "Hüte, Brillen, Umhänge: je ein kleiner Bonus",
+      "Шляпы, очки, плащи: у каждого свой бонус")),
+    (("İPUCU", "TIP", "CONSEJO", "TIPP", "СОВЕТ"),
+     ("Kaçarken dikkat: arkada kalanlar önüne ışınlanır", "Careful when fleeing: stragglers teleport ahead of you",
+      "Ojo al huir: los rezagados aparecen delante", "Vorsicht beim Fliehen: Nachzügler tauchen vor dir auf",
+      "Осторожно при бегстве: отставшие появятся впереди")),
+]
+
 
 def w_name(w):
     return LX(f"w.{w['key']}.name", w["name"])
@@ -871,7 +1030,7 @@ STRINGS = {
     # ---- ayarlar ----
     "ui.audio_screen": _T("SES & EKRAN", "AUDIO & SCREEN", "SONIDO Y PANTALLA", "TON & BILD", "ЗВУК И ЭКРАН"),
     "ui.look_perf":   _T("GÖRÜNÜM & PERFORMANS", "VISUALS & PERFORMANCE", "GRÁFICOS Y RENDIMIENTO", "OPTIK & LEISTUNG", "ГРАФИКА И ПРОИЗВОДИТЕЛЬНОСТЬ"),
-    "st.max_hp": _T("Azami Can", "Max Health", "Vida máxima", "Max. Leben", "Макс. здоровье"),
+    "st.max_hp": _T("Maks Can", "Max Health", "Vida máxima", "Max. Leben", "Макс. здоровье"),
     "st.regen": _T("Can Yenileme", "Regen", "Regeneración", "Regeneration", "Реген"),
     "st.armor": _T("Zırh", "Armor", "Armadura", "Rüstung", "Броня"),
     "st.vamp": _T("Can Çalma", "Lifesteal", "Robo de vida", "Lebensraub", "Вампиризм"),
@@ -1168,7 +1327,7 @@ STRINGS = {
     # ---- yeminler (koşu başında: bir güç + bir bedel) ----
     "oath.glass.name": _T("CAM TOP", "GLASS CANNON", "CAÑÓN DE CRISTAL", "GLASKANONE", "СТЕКЛЯННАЯ ПУШКА"),
     "oath.glass.up": _T('{} hasar', '{} damage', '{} de daño', '{} Schaden', '{} урона'),
-    "oath.glass.down": _T("-%25 azami can", "-25% max HP", "-25% de vida máx.", "-25% max. LP", "-25% макс. здоровья"),
+    "oath.glass.down": _T("-%25 maks can", "-25% max HP", "-25% de vida máx.", "-25% max. LP", "-25% макс. здоровья"),
     "oath.gold_fever.name": _T("ALTIN HUMMASI", "GOLD FEVER", "FIEBRE DEL ORO", "GOLDFIEBER", "ЗОЛОТАЯ ЛИХОРАДКА"),
     "oath.gold_fever.up": _T('{} altın', '{} gold', '{} de oro', '{} Gold', '{} золота'),
     "oath.gold_fever.down": _T("Yaratıklar %10 dayanıklı", "Monsters have +10% HP", "Monstruos +10% de vida",
@@ -1182,7 +1341,7 @@ STRINGS = {
     "oath.scholar.down": _T("-%12 hasar", "-12% damage", "-12% de daño", "-12% Schaden", "-12% урона"),
     "oath.gambler.name": _T("KUMARBAZ", "GAMBLER", "APOSTADOR", "SPIELER", "ИГРОК"),
     "oath.gambler.up": _T('{} şans', '{} luck', '{} de suerte', '{} Glück', '{} удачи'),
-    "oath.gambler.down": _T("-%15 azami can", "-15% max HP", "-15% de vida máx.", "-15% max. LP",
+    "oath.gambler.down": _T("-%15 maks can", "-15% max HP", "-15% de vida máx.", "-15% max. LP",
                             "-15% макс. здоровья"),
     "oath.blood.name": _T("KAN YEMİNİ", "BLOOD OATH", "JURAMENTO DE SANGRE", "BLUTSCHWUR", "КЛЯТВА КРОВИ"),
     "oath.blood.up": _T('Can çalma {}', 'Lifesteal {}', 'Robo de vida {}', 'Lebensraub {}', 'Вампиризм {}'),
@@ -1314,7 +1473,7 @@ STRINGS = {
     "key.shop":  _T("MARKET", "SHOP", "TIENDA", "LADEN", "МАГАЗИН"),
     "ui.mastery":    _T("ARENA USTALIĞI", "ARENA MASTERY", "MAESTRÍA DE ARENA",
                         "ARENA-MEISTERSCHAFT", "МАСТЕРСТВО АРЕНЫ"),
-    "ui.mastery_sub": _T("Elmasla alınan kalıcı yükseltmeler. Her koşunun başından itibaren seninle.",
+    "ui.mastery_sub": _T("Elmasla alınan kalıcı güçler. Her koşuda baştan seninle.",
                          "Permanent upgrades bought with gems - they are with you from the start of every run.",
                          "Mejoras PERMANENTES compradas con gemas - te acompañan desde el inicio de cada partida.",
                          "DAUERHAFTE Upgrades für Edelsteine - ab dem Start jedes Laufs dabei.",
@@ -1325,7 +1484,7 @@ STRINGS = {
     "ui.mastery_spent": _T("ustalığa yatırılan: {0}", "invested in mastery: {0}",
                            "invertido en maestría: {0}", "in Meisterschaft investiert: {0}",
                            "вложено в мастерство: {0}"),
-    "ui.mastery_hint": _T("5. kademeden sonra prestij başlar: sonsuza kadar yükseltebilirsin, ama her kademe daha az katar.",
+    "ui.mastery_hint": _T("5. kademeden sonra prestij: sınırsız yükselir ama her kademe daha az katar.",
                           "After tier 5 prestige begins: you can keep upgrading forever, but each tier adds less.",
                           "Tras el nivel 5 empieza el PRESTIGIO: puedes seguir mejorando siempre, pero cada nivel aporta menos.",
                           "Ab Stufe 5 beginnt PRESTIGE: du kannst ewig aufrüsten, aber jede Stufe bringt weniger.",
@@ -1335,7 +1494,7 @@ STRINGS = {
                              "Todo tu daño aumenta", "Dein gesamter Schaden steigt",
                              "Весь твой урон растёт"),
     "mastery.m_hp.name": _T("DAYANIKLILIK", "VITALITY", "VITALIDAD", "VITALITÄT", "ЖИВУЧЕСТЬ"),
-    "mastery.m_hp.desc": _T("Azami canın artar", "Max health increases",
+    "mastery.m_hp.desc": _T("Maks canın artar", "Max health increases",
                             "Tu vida máxima aumenta", "Max. Leben steigt",
                             "Макс. здоровье растёт"),
     "mastery.m_armor.name": _T("ZIRH", "ARMOR", "ARMADURA", "RÜSTUNG", "БРОНЯ"),
@@ -1396,7 +1555,7 @@ STRINGS = {
                          "AKTUELLES PASSWORT", "ТЕКУЩИЙ ПАРОЛЬ"),
     "ui.acc_pw_new":  _T("YENİ ŞİFRE", "NEW PASSWORD", "NUEVA CONTRASEÑA",
                          "NEUES PASSWORT", "НОВЫЙ ПАРОЛЬ"),
-    "ui.acc_pw_why":  _T("Şifreni değiştirince bütün cihazlardaki oturumlar kapanır, şifren sızdıysa tam olarak bunu istersin.",
+    "ui.acc_pw_why":  _T("Şifreni değiştirince bütün cihazlarda oturum kapanır.",
                          "Changing your password signs you out everywhere - exactly what you want if it leaked.",
                          "Al cambiar la contraseña se cierran todas las sesiones - justo lo que quieres si se filtró.",
                          "Mit dem Passwortwechsel werden alle Sitzungen beendet - genau richtig, wenn es geleakt ist.",
@@ -1482,12 +1641,12 @@ STRINGS = {
                          "se ajusta en el juego con ESC - el daño no cambia",
                          "im Spiel mit ESC einstellbar - Schaden bleibt gleich",
                          "настраивается в игре по ESC — урон не меняется"),
-    "ui.note_fx":     _T("Eşya efekti yalnızca görüntüyü soluklaştırır, hasar hiç değişmez. Oyun içinde ESC ile de ayarlanır.",
+    "ui.note_fx":     _T("Eşya efekti sadece görüntüyü soluklaştırır, hasar değişmez. Oyunda ESC ile de ayarlanır.",
                           "Item effects only dims the visuals - damage never changes. Also adjustable in-game with ESC.",
                           "EFECTOS DE OBJETOS solo atenúa los visuales: el daño nunca cambia. También se ajusta en partida con ESC.",
                           "ITEM-EFFEKTE dämpft nur die Optik - der Schaden ändert sich nie. Auch im Spiel mit ESC einstellbar.",
                           "ЭФФЕКТЫ ПРЕДМЕТОВ лишь приглушают картинку — урон не меняется. Также настраивается в игре по ESC."),
-    "ui.note_fps":    _T("FPS sınırı: ekranının yenileme hızından fazlası görünmez. 240 için güçlü bir PC gerekir.",
+    "ui.note_fps":    _T("FPS sınırı: ekranının yenileme hızından fazlası görünmez. 240 için güçlü PC lazım.",
                          "FPS limit: anything above your monitor's refresh rate is invisible. 240 needs a strong PC.",
                          "Límite de FPS: por encima de tu monitor no se nota. 240 exige un PC potente.",
                          "FPS-Grenze: mehr als die Bildwiederholrate sieht man nicht. 240 braucht einen starken PC.",
@@ -1532,6 +1691,7 @@ STRINGS = {
     "ui.poison":      _T("ZEHİR", "POISON", "VENENO", "GIFT", "ЯД"),
     "ui.slow":        _T("YAVAŞ", "SLOW", "LENTO", "LANGSAM", "ЗАМЕДЛЕНИЕ"),
     "ui.invisible":   _T("GÖRÜNMEZ", "INVISIBLE", "INVISIBLE", "UNSICHTBAR", "НЕВИДИМКА"),
+    "ui.cloak_on":    _T("GÖRÜNMEZSİN!", "YOU'RE INVISIBLE!", "¡ERES INVISIBLE!", "DU BIST UNSICHTBAR!", "ТЫ НЕВИДИМ!"),
     "ui.map_arena":   _T("ARENA HARİTASI", "ARENA MAP", "MAPA DE LA ARENA", "ARENA-KARTE", "КАРТА АРЕНЫ"),
     "ui.map_hell":    _T("CEHENNEM HARİTASI", "HELL MAP", "MAPA DEL INFIERNO", "HÖLLENKARTE", "КАРТА АДА"),
     "ui.map_info":    _T("DALGA {0} - {1} yaratık", "WAVE {0} - {1} enemies", "OLEADA {0} - {1} enemigos", "WELLE {0} - {1} Gegner", "ВОЛНА {0} - {1} врагов"),
@@ -1569,12 +1729,12 @@ STRINGS = {
                          "Ya tomaste tu libro raro - no saldrán más esta partida.",
                          "Du hast dein seltenes Buch - in diesem Lauf kommt kein weiteres.",
                          "Редкая книга взята — больше в этом забеге не выпадет."),
-    "ui.slots_full":  _T("Yuvaların dolu, artık yalnızca yükseltme gelir.",
+    "ui.slots_full":  _T("Yuvaların dolu, artık sadece yükseltme gelir.",
                          "Your slots are full - only upgrades from now on.",
                          "Tus huecos están llenos - solo mejoras a partir de ahora.",
                          "Deine Plätze sind voll - ab jetzt nur noch Upgrades.",
                          "Слоты заполнены — дальше только улучшения."),
-    "ui.books_hint":  _T("Kitabın kazancı seviye kartının nadirliğine bağlı (Yaygın küçük, Efsanevi çok büyük; şans yükseltir). Kitaplar 30. seviyeye kadar büyür; nadir kitaptan yalnızca bir tane alırsın.",
+    "ui.books_hint":  _T("Kitabın gücü kartın nadirliğine bağlı (şans yükseltir). Kitaplar 30. seviyeye kadar büyür, nadir kitaptan sadece bir tane alınır.",
                          "A book's gain depends on the level-up card's rarity (Common small, Legendary huge; Luck helps). Books grow to level 30; you may take only one rare book.",
                          "La ganancia de un libro depende de la rareza de la carta (Común poca, Legendaria enorme; la suerte ayuda). Suben a nivel 30; solo un libro raro.",
                          "Der Gewinn eines Buchs hängt von der Seltenheit der Karte ab (Gewöhnlich klein, Legendär riesig; Glück hilft). Bis Stufe 30; nur ein seltenes Buch.",
@@ -1600,7 +1760,7 @@ STRINGS = {
 
     # ---- market (oyun içi) ----
     "ui.market":      _T("MARKET", "MARKET", "MERCADO", "MARKT", "РЫНОК"),
-    "ui.market_note": _T("Sadece bu koşu için geçerli, kaybedersen silinir.",
+    "ui.market_note": _T("Sadece bu koşu için, ölürsen gider.",
                          "This run only - lost when you die.",
                          "Solo para esta partida - se pierde al morir.",
                          "Nur für diesen Lauf - bei Tod verloren.",
@@ -1754,7 +1914,7 @@ STRINGS = {
     "ui.row_empty":   _T("bu sıra boş, sahibini bekliyor", "this spot is open - waiting for an owner", "este puesto está libre", "dieser Platz ist frei", "место свободно"),
     "ui.empty":       _T("boş", "empty", "vacío", "leer", "пусто"),
     "ui.waiting_owner": _T("sahibini bekliyor", "waiting for an owner", "esperando dueño", "wartet auf einen Besitzer", "ждёт хозяина"),
-    "ui.world_top":   _T("EN İYİ {0} - her koşudan sonra otomatik gönderilir", "TOP {0} - sent automatically after each run", "TOP {0} - se envía tras cada partida", "TOP {0} - nach jedem Lauf gesendet", "ТОП {0} - отправляется после забега"),
+    "ui.world_top":   _T("EN İYİ {0} - skorun koşu bitince kendiliğinden gider", "TOP {0} - sent automatically after each run", "TOP {0} - se envía tras cada partida", "TOP {0} - nach jedem Lauf gesendet", "ТОП {0} - отправляется после забега"),
     "ui.lb_col_name": _T("İsim", "Name", "Nombre", "Name", "Имя"),
     "ui.lb_loading":  _T("Sıralama yükleniyor", "Loading ranking", "Cargando ranking", "Rangliste wird geladen", "Загрузка рейтинга"),
     "ui.lb_none":     _T("Henüz çevrimiçi skor yok.", "No online scores yet.", "Aún no hay puntuaciones en línea.", "Noch keine Online-Scores.", "Онлайн-рекордов пока нет."),
@@ -1763,7 +1923,7 @@ STRINGS = {
     "ui.lb_wave_k":   _T("Dalga {0} - {1} öldürme", "Wave {0} - {1} kills", "Oleada {0} - {1} bajas", "Welle {0} - {1} Kills", "Волна {0} - {1} убийств"),
 
     # ---- başarımlar ----
-    "ui.ach_hint":    _T("Bir başarıma tıkla: nasıl kazanılacağını, ilerlemeni ve ödülünü gösterir.",
+    "ui.ach_hint":    _T("Ayrıntı için bir başarıma tıkla.",
                          "Click an achievement to see how to earn it, your progress and the reward.",
                          "Haz clic en un logro para ver cómo conseguirlo y su recompensa.",
                          "Klicke auf einen Erfolg: Bedingung, Fortschritt und Belohnung.",
@@ -1821,7 +1981,7 @@ STRINGS = {
     "ui.tasks_of":    _T("{0} / {1} tamam", "{0} / {1} done", "{0} / {1} hechas", "{0} / {1} erledigt", "{0} / {1} готово"),
     "ui.basic_book":  _T("Temel Kitap", "Basic Book", "Libro básico", "Grundbuch", "Базовая книга"),
     "ui.std_book":    _T("Standart Kitap", "Standard Book", "Libro estándar", "Standardbuch", "Обычная книга"),
-    "ui.rare_only_one": _T("Bir koşuda yalnızca bir nadir kitap alabilirsin.", "Only one rare book per run.", "Solo UN libro raro por partida.", "Nur EIN seltenes Buch pro Lauf.", "Только ОДНА редкая книга за забег."),
+    "ui.rare_only_one": _T("Bir koşuda sadece bir nadir kitap alabilirsin.", "Only one rare book per run.", "Solo UN libro raro por partida.", "Nur EIN seltenes Buch pro Lauf.", "Только ОДНА редкая книга за забег."),
     "ui.grows_to":    _T("Seviye atladıkça Lv.{0}'e kadar büyür.", "Grows up to Lv.{0} as you level.", "Sube hasta Nv.{0} al subir de nivel.", "Wächst bis St.{0}.", "Растёт до Ур.{0}."),
 
     # ---- skin / kıyafet ----
@@ -1838,7 +1998,7 @@ STRINGS = {
     "ui.premium_price": _T("PREMİUM - {0}", "PREMIUM - {0}", "PREMIUM - {0}", "PREMIUM - {0}", "ПРЕМИУМ - {0}"),
     "ui.premium_skin_price": _T("PREMİUM SKİN - {0}", "PREMIUM SKIN - {0}", "SKIN PREMIUM - {0}", "PREMIUM-SKIN - {0}", "ПРЕМИУМ-СКИН - {0}"),
     "ui.perks":       _T("ÖZELLİKLER", "PERKS", "VENTAJAS", "BONI", "БОНУСЫ"),
-    "ui.no_ult":      _T("Bu skin özel bir yetenek içermez, yalnızca görünüm değiştirir.",
+    "ui.no_ult":      _T("Bu skin özel bir yetenek içermez, sadece görünüm değiştirir.",
                          "This skin has no special ability - it only changes how you look.",
                          "Este skin no tiene habilidad - solo cambia tu aspecto.",
                          "Dieser Skin hat keine Fähigkeit - nur Optik.",
@@ -1846,12 +2006,12 @@ STRINGS = {
     "ui.slot_empty":  _T("Bu slot için parça yok.", "Nothing for this slot.", "Nada para este hueco.", "Nichts für diesen Platz.", "Для этого слота ничего нет."),
     "ui.own_costume": _T("Kendi kostümüyle gelir", "Comes with its own costume", "Viene con su propio traje", "Bringt sein eigenes Kostüm mit", "Идёт со своим костюмом"),
     "ui.pet_equip_note": _T("Kıyafet Market > PET sekmesinden de kuşanılır", "Also equipped in Wardrobe > Pet", "También se equipa en Vestuario > Mascota", "Auch in Garderobe > Haustier", "Также надевается в Гардеробе"),
-    "ui.cos_hint":    _T("Şapka, gözlük ve pelerinle karakterini kişiselleştir.",
+    "ui.cos_hint":    _T("Şapka, gözlük, pelerin: karakterini giydir.",
                          "Personalise your character with hats, eyewear and capes.",
                          "Personaliza tu personaje con sombreros, gafas y capas.",
                          "Gestalte deinen Charakter mit Hut, Brille und Umhang.",
                          "Настрой героя шляпами, очками и плащами."),
-    "ui.cos_pet_hint": _T("Petler MAĞAZA'dan alınır; burada yalnızca kuşanılır.",
+    "ui.cos_pet_hint": _T("Petler MAĞAZA'dan alınır, burada sadece kuşanılır.",
                           "Pets are bought in the STORE; here you only equip them.",
                           "Las mascotas se compran en la TIENDA; aquí solo se equipan.",
                           "Haustiere kauft man im SHOP; hier nur ausrüsten.",
@@ -1862,7 +2022,7 @@ STRINGS = {
     "ui.slot_pet":    _T("PET", "PET", "MASCOTA", "HAUSTIER", "ПИТОМЕЦ"),
 
     # ---- mağaza ----
-    "ui.store_sub":   _T("Elmas paketleri, premium skinler ve petler oyunun gücünü değil, görünüşünü değiştirir.",
+    "ui.store_sub":   _T("Elmas, premium skin ve petler: güç değil, sadece görünüş.",
                          "Gem packs, premium skins and pets - they change how you look, never how strong you are.",
                          "Packs de gemas, skins premium y mascotas - cambian tu aspecto, no tu poder.",
                          "Edelsteinpakete, Premium-Skins und Haustiere - nur Optik, keine Stärke.",
@@ -1888,7 +2048,7 @@ STRINGS = {
                          "KASMA_FAKE_PURCHASE ist an. Im Release muss es aus sein.",
                          "KASMA_FAKE_PURCHASE включён. В релизе должен быть выключен."),
     "ui.pay_steam":   _T("TL ile kartla güvenli ödeme", "Secure card payment - in TRY", "Pago seguro con tarjeta - en TRY", "Sichere Kartenzahlung - in TRY", "Безопасная оплата картой — в TRY"),
-    "ui.pay_note":    _T("Ödeme sayfası tarayıcında açılır; ödeme bitince ürün kendiliğinden hesabına gelir.",
+    "ui.pay_note":    _T("Ödeme tarayıcıda açılır, bitince ürün hesabına kendiliğinden gelir.",
                          "The payment page opens in your browser; the item lands on your account by itself.",
                          "La página de pago se abre en tu navegador; el artículo llega solo a tu cuenta.",
                          "Die Zahlungsseite öffnet sich im Browser; der Artikel landet von selbst im Konto.",
@@ -1960,7 +2120,7 @@ STRINGS = {
                           "{0} skins premium - {1} mascotas", "{0} Premium-Skins - {1} Haustiere",
                           "{0} премиум-скинов - {1} питомцев"),
     "ui.hell_market":  _T("CEHENNEM MARKETİ", "HELL MARKET", "MERCADO INFERNAL", "HÖLLENMARKT", "АДСКИЙ РЫНОК"),
-    "ui.market_note_hell": _T("Cehennem eşyaları yalnızca burada satılır, kaybedersen silinir.",
+    "ui.market_note_hell": _T("Cehennem eşyaları sadece burada var, ölürsen gider.",
                               "Hell items are sold only here - lost when you die.",
                               "Los objetos infernales solo se venden aquí - se pierden al morir.",
                               "Höllen-Gegenstände gibt es nur hier - bei Tod verloren.",
@@ -1973,7 +2133,7 @@ STRINGS = {
     "cat.cursed":  _T("LANETLİ", "CURSED", "MALDITO", "VERFLUCHT", "ПРОКЛЯТОЕ"),
     "cat.legendary": _T("EFSANE", "LEGEND", "LEYENDA", "LEGENDE", "ЛЕГЕНДА"),
     "cat.hell":    _T("CEHENNEM", "HELL", "INFIERNO", "HÖLLE", "АД"),
-    "ui.books_sub":  _T("Kitaplar görevle açılır, açtığın kitaplar seviye atlayınca karşına çıkar. İstemediğin en fazla {0} kitabı kapatabilirsin ({1} tanesi nadir olabilir).",
+    "ui.books_sub":  _T("Kitaplar görevle açılır ve seviye atlayınca çıkar. İstemediğin {0} kitabı kapatabilirsin ({1} tanesi nadir olabilir).",
                         "Books unlock through tasks and then appear on level up. You may mute up to {0} you don't want ({1} of them may be rare).",
                         "Los libros se abren con tareas y aparecen al subir de nivel. Puedes silenciar hasta {0} ({1} puede ser raro).",
                         "Bücher werden durch Aufgaben frei und erscheinen beim Aufstieg. Du kannst bis zu {0} sperren ({1} davon selten).",
@@ -1994,7 +2154,7 @@ STRINGS = {
     "ui.nickname":     _T("GÖRÜNEN AD", "DISPLAY NAME", "NOMBRE VISIBLE", "ANZEIGENAME", "ИМЯ В ИГРЕ"),
     "ui.have_account": _T("Hesabın var mı? GİRİŞ YAP", "Already have an account? SIGN IN", "¿Ya tienes cuenta? INICIAR SESIÓN", "Schon ein Konto? ANMELDEN", "Уже есть аккаунт? ВОЙТИ"),
     "ui.no_account":   _T("Hesabın yok mu? KAYIT OL", "No account? SIGN UP", "¿Sin cuenta? REGÍSTRATE", "Kein Konto? REGISTRIEREN", "Нет аккаунта? РЕГИСТРАЦИЯ"),
-    "ui.acc_why":      _T("Giriş yapmak zorunlu değil. Oyunu hesapsız da oynayabilirsin. Hesap yalnızca dünya sıralamasına girmek için gerekir.",
+    "ui.acc_why":      _T("Giriş zorunlu değil, hesapsız da oynanır. Hesap sadece dünya sıralaması için lazım.",
                           "Signing in is optional - you can play without an account. It is only needed for the world ranking.",
                           "Iniciar sesión es OPCIONAL - puedes jugar sin cuenta. Solo hace falta para el RANKING MUNDIAL.",
                           "Anmelden ist FREIWILLIG - du kannst ohne Konto spielen. Nur für die WELTRANGLISTE nötig.",
@@ -2077,7 +2237,7 @@ STRINGS = {
                           "EXPULSADO DEL RANKING MUNDIAL",
                           "AUS DER WELTRANGLISTE ENTFERNT",
                           "ИСКЛЮЧЁН ИЗ МИРОВОГО РЕЙТИНГА"),
-    "ui.banned_body":  _T("Bu hesap kalıcı olarak dünya sıralamasının dışında. Skorların sunucuya hiç gönderilmiyor, gönderilenler de silindi. Oynamaya devam edebilirsin; skorların yalnızca kendi tablonda görünür.",
+    "ui.banned_body":  _T("Bu hesap dünya sıralamasından kalıcı olarak çıkarıldı. Oynamaya devam edebilirsin, skorların sadece kendi tablonda görünür.",
                           "This account is permanently out of the world ranking. Your scores are never sent to the server, and the ones already there were deleted. You can keep playing; your scores show only in your own table.",
                           "Esta cuenta está PERMANENTEMENTE fuera del ranking mundial. Tus puntuaciones no se envían y las que había fueron borradas. Puedes seguir jugando; solo aparecerán en tu tabla local.",
                           "Dieses Konto ist DAUERHAFT aus der Weltrangliste. Deine Punkte werden nie gesendet, vorhandene wurden gelöscht. Du kannst weiterspielen; die Punkte erscheinen nur in deiner eigenen Tabelle.",
@@ -2096,7 +2256,7 @@ STRINGS = {
                           "Server nicht erreichbar.", "Сервер недоступен."),
     "ui.acc_name_ok":  _T("Ad güncellendi.", "Name updated.", "Nombre actualizado.", "Name aktualisiert.", "Имя обновлено."),
     "ui.acc_working":  _T("Bekleniyor...", "Working...", "Procesando...", "Läuft...", "Ожидание..."),
-    "ui.acc_need":     _T("Giriş yaparsan sıralamadaki ad senin olur, kimse o adla skor gönderemez.",
+    "ui.acc_need":     _T("Giriş yaparsan sıralamadaki adın sana ait olur.",
                           "Sign in and the ranking name is yours - nobody else can post under it.",
                           "Inicia sesión y el nombre del ranking es tuyo - nadie más podrá usarlo.",
                           "Melde dich an und der Ranglistenname gehört dir - niemand sonst kann ihn nutzen.",
@@ -2165,7 +2325,7 @@ STRINGS = {
                                "Die Weltrangliste braucht ein Konto - dein Ergebnis kam in die lokale Tabelle.",
                                "Для мирового рейтинга нужен аккаунт — результат записан в локальную таблицу."),
     "ui.save":         _T("KAYDET", "SAVE", "GUARDAR", "SPEICHERN", "СОХРАНИТЬ"),
-    "ui.weapons_sub": _T("Silahlar görevle açılır. Açtıkların seviye atlayınca karşına çıkar, bir koşuda en fazla {0} silah taşıyabilirsin.",
+    "ui.weapons_sub": _T("Silahlar görevle açılır ve seviye atlayınca çıkar. Bir koşuda en fazla {0} silah.",
                          "Weapons unlock through tasks and appear on level up - you may carry {0} per run.",
                          "Las armas se abren con tareas y aparecen al subir de nivel - llevas {0} por partida.",
                          "Waffen werden durch Aufgaben frei und erscheinen beim Aufstieg - {0} pro Lauf.",
@@ -2173,7 +2333,7 @@ STRINGS = {
     "ui.ach_count":   _T("{0}/{1} BAŞARIM", "{0}/{1} ACHIEVEMENTS", "{0}/{1} LOGROS", "{0}/{1} ERFOLGE", "{0}/{1} ДОСТИЖЕНИЙ"),
     "ui.gems_cap":    _T("{0} ELMAS", "{0} GEMS", "{0} GEMAS", "{0} EDELSTEINE", "{0} КРИСТАЛЛОВ"),
     "ui.n_kills":     _T("{0} öldürme", "{0} kills", "{0} bajas", "{0} Kills", "{0} убийств"),
-    "ui.lb_sub":      _T("EN İYİ {0} - her koşudan sonra otomatik gönderilir",
+    "ui.lb_sub":      _T("EN İYİ {0} - skorun koşu bitince kendiliğinden gider",
                          "TOP {0} - sent automatically after every run",
                          "TOP {0} - se envía tras cada partida",
                          "TOP {0} - nach jedem Lauf automatisch gesendet",
@@ -2381,7 +2541,7 @@ STRINGS.update({
     "b.r_dmg.name": _T("Hasar Kitabı", "Book of Damage", "Libro del Daño", "Buch des Schadens", "Книга Урона"),
     "b.r_dmg.desc": _T("Hasarını artırır", "Increases your damage", "Aumenta tu daño", "Erhöht deinen Schaden", "Увеличивает урон"),
     "b.r_hp.name": _T("Can Kitabı", "Book of Life", "Libro de la Vida", "Buch des Lebens", "Книга Жизни"),
-    "b.r_hp.desc": _T("Azami canını artırır, anında dolar", "Raises max health - fills instantly", "Sube la vida máxima - se llena al instante", "Erhöht max. Leben - sofort gefüllt", "Повышает макс. здоровье — сразу восполняет"),
+    "b.r_hp.desc": _T("Maks canını artırır, anında dolar", "Raises max health - fills instantly", "Sube la vida máxima - se llena al instante", "Erhöht max. Leben - sofort gefüllt", "Повышает макс. здоровье — сразу восполняет"),
     "b.r_armor.name": _T("Zırh Kitabı", "Book of Armour", "Libro de la Armadura", "Buch der Rüstung", "Книга Брони"),
     "b.r_armor.desc": _T("Aldığın hasarı azaltır ve biraz can verir", "Cuts incoming damage and grants some health", "Reduce el daño recibido y da algo de vida", "Senkt erlittenen Schaden und gibt etwas Leben", "Снижает получаемый урон и даёт немного здоровья"),
     "b.r_spd.name": _T("Rüzgâr Kitabı", "Book of Wind", "Libro del Viento", "Buch des Windes", "Книга Ветра"),
@@ -2417,7 +2577,7 @@ STRINGS.update({
     "b.r_multi.name": _T("Çoğalma Kitabı", "Book of Multiplicity", "Libro de la Multiplicidad", "Buch der Vervielfachung", "Книга Умножения"),
     "b.r_multi.desc": _T("Her atışında bir mermi daha çıkar", "Adds one more projectile to every shot", "Añade un proyectil más a cada disparo", "Fügt jedem Schuss ein Geschoss hinzu", "Добавляет ещё один снаряд к выстрелу"),
     "b.r_killheal.name": _T("Kan Kitabı", "Book of Blood", "Libro de la Sangre", "Buch des Blutes", "Книга Крови"),
-    "b.r_killheal.desc": _T("Öldürdüğün her düşman azami canının %3'ü kadar can verir", "Every kill restores 3% of your max health", "Cada muerte restaura el 3% de tu vida máxima", "Jeder Kill heilt 3% deines max. Lebens", "Каждое убийство восстанавливает 3% макс. здоровья"),
+    "b.r_killheal.desc": _T("Öldürdüğün her düşman maks canının %3'ü kadar can verir", "Every kill restores 3% of your max health", "Cada muerte restaura el 3% de tu vida máxima", "Jeder Kill heilt 3% deines max. Lebens", "Каждое убийство восстанавливает 3% макс. здоровья"),
     "b.r_rage.name": _T("Öfke Kitabı", "Book of Rage", "Libro de la Ira", "Buch des Zorns", "Книга Ярости"),
     "b.r_rage.desc": _T("Canın yarısının altındayken hasarın %35 artar", "+35% damage while below half health", "+35% de daño con menos de media vida", "+35% Schaden unter halbem Leben", "+35% урона при здоровье ниже половины"),
     "b.r_execute.name": _T("İnfaz Kitabı", "Book of Execution", "Libro de la Ejecución", "Buch der Hinrichtung", "Книга Казни"),
@@ -2429,7 +2589,7 @@ STRINGS.update({
     "b.r_lasthope.name": _T("Son Umut Kitabı", "Book of Last Hope", "Libro de la Última Esperanza", "Buch der letzten Hoffnung", "Книга Последней Надежды"),
     "b.r_lasthope.desc": _T("Canın %40'ının altındayken aldığın hasar %35 azalır ve saniyede +2 can yenilersin", "Below 40% health: take 35% less damage and regenerate +2 HP/s", "Bajo el 40% de vida: recibes 35% menos de daño y regeneras +2 de vida/s", "Unter 40% Leben: 35% weniger Schaden und +2 Leben/s Regeneration", "Ниже 40% здоровья: на 35% меньше урона и +2 здоровья/с"),
     "b.r_hp_big.name": _T("Dev Kitabı", "Book of the Giant", "Libro del Gigante", "Buch des Riesen", "Книга Великана"),
-    "b.r_hp_big.desc": _T("Azami canın +250 artar ama biraz yavaşlarsın", "Max health +250, but you move a little slower", "Vida máxima +250, pero te mueves más lento", "Max. Leben +250, aber etwas langsamer", "Макс. здоровье +250, но ты чуть медленнее"),
+    "b.r_hp_big.desc": _T("Maks canın +250 artar ama biraz yavaşlarsın", "Max health +250, but you move a little slower", "Vida máxima +250, pero te mueves más lento", "Max. Leben +250, aber etwas langsamer", "Макс. здоровье +250, но ты чуть медленнее"),
     "b.r_luck.name": _T("Şans Kitabı", "Book of Luck", "Libro de la Suerte", "Buch des Glücks", "Книга Удачи"),
     "b.r_luck.desc": _T("Şansını artırır: kartlar, kitaplar, sandıklar ve mağara daha yüksek kademeli çıkar", "Increases Luck - cards, books, chests and the cave roll higher tiers", "Aumenta la suerte - cartas, libros, cofres y la cueva salen de mayor rango", "Erhöht Glück - Karten, Bücher, Truhen und die Höhle fallen hochstufiger aus", "Повышает удачу — карты, книги, сундуки и пещера выпадают выше рангом"),
     "b.r_wspd.name": _T("Soğuma Kitabı", "Book of Cooldown", "Libro de Enfriamiento", "Buch der Abklingzeit", "Книга Перезарядки"),
@@ -2553,7 +2713,7 @@ STRINGS.update({
                             "Tu ranura rara está llena: no habrá más libros raros.",
                             "Dein Seltenplatz ist voll - keine weiteren seltenen Bücher.",
                             "Редкий слот занят — редких книг больше не будет."),
-    "lu.hint_full": _T("Yuvaların dolu, artık yalnızca yükseltme gelir.", "Your slots are full - only upgrades from now on.",
+    "lu.hint_full": _T("Yuvaların dolu, artık sadece yükseltme gelir.", "Your slots are full - only upgrades from now on.",
                        "Tus ranuras están llenas: solo mejoras a partir de ahora.", "Alle Plätze voll - ab jetzt nur Aufwertungen.",
                        "Слоты заполнены — дальше только улучшения."),
     "lu.hint_rare_now": _T("Bu seviyede nadir kitap kartı var!", "A rare book card is in this hand!",
@@ -2570,7 +2730,7 @@ STRINGS.update({
                        "La ganancia depende de la rareza", "Gewinn hängt von der Seltenheit ab",
                        "Прирост зависит от редкости карты"),
     "bs.dmg": _T("Hasar", "Damage", "Daño", "Schaden", "Урон"),
-    "bs.hp": _T("Azami Can", "Max Health", "Vida máx.", "Max. Leben", "Макс. здоровье"),
+    "bs.hp": _T("Maks Can", "Max Health", "Vida máx.", "Max. Leben", "Макс. здоровье"),
     "bs.armor": _T("Zırh", "Armor", "Armadura", "Rüstung", "Броня"),
     "bs.spd": _T("Hareket Hızı", "Move Speed", "Velocidad", "Tempo", "Скорость"),
     "bs.dash": _T("Dash Mesafesi", "Dash Distance", "Dist. de impulso", "Dash-Weite", "Дальность рывка"),
@@ -2634,7 +2794,7 @@ STRINGS.update({
     "cu.r_levels": _T("+{} seviye", "+{} levels", "+{} niveles", "+{} Stufen", "+{} уровней"),
     "cu.r_wlevels": _T("Bütün silahlar +{} seviye", "All weapons +{} levels", "Todas las armas +{} niveles",
                        "Alle Waffen +{} Stufen", "Всё оружие +{} ур."),
-    "cu.r_hp": _T("+{} azami can", "+{} max health", "+{} vida máxima", "+{} max. Leben", "+{} макс. здоровья"),
+    "cu.r_hp": _T("+{} maks can", "+{} max health", "+{} vida máxima", "+{} max. Leben", "+{} макс. здоровья"),
     "cu.r_dmg": _T("+{} hasar", "+{} damage", "+{} daño", "+{} Schaden", "+{} урона"),
     "cu.r_luck": _T("+{} şans", "+{} luck", "+{} suerte", "+{} Glück", "+{} удачи"),
     "cu.r_boost": _T("Silahlara +{} hasar", "Weapons +{} damage", "Armas +{} daño", "Waffen +{} Schaden", "Оружию +{} урона"),
@@ -2648,7 +2808,7 @@ STRINGS.update({
     "cu.gamble_win": _T("Tutma şansı {}, tutarsa ödül x{}", "Win chance {} - win: reward x{}",
                         "Probabilidad {} - si ganas, premio x{}", "Gewinnchance {} - Gewinn: Belohnung x{}",
                         "Шанс {} — при удаче награда x{}"),
-    "cu.blood_cost": _T("Bedel: azami can {} azalır", "Cost: max health -{}", "Coste: vida máxima -{}",
+    "cu.blood_cost": _T("Bedel: maks can {} azalır", "Cost: max health -{}", "Coste: vida máxima -{}",
                         "Preis: max. Leben -{}", "Цена: макс. здоровье -{}"),
     "cu.no_curse": _T("Lanet yok, tuzak yok.", "No curse, no trap.", "Sin maldición ni trampa.",
                       "Kein Fluch, keine Falle.", "Ни проклятия, ни ловушки."),
@@ -2699,7 +2859,7 @@ STRINGS.update({
     "cu.won": _T("ZAR TUTTU! ÖDÜL x2", "JACKPOT! REWARD x2", "¡PREMIO! RECOMPENSA x2", "TREFFER! BELOHNUNG x2", "ДЖЕКПОТ! НАГРАДА x2"),
     "cu.lost": _T("ZAR TUTMADI...", "THE DICE BETRAYED YOU...", "LOS DADOS TE TRAICIONARON...",
                   "DIE WÜRFEL HABEN VERRATEN...", "КОСТИ ПОДВЕЛИ..."),
-    "cu.maxhp": _T("azami can", "max health", "vida máx.", "max. Leben", "макс. здоровья"),
+    "cu.maxhp": _T("maks can", "max health", "vida máx.", "max. Leben", "макс. здоровья"),
     "cu.trap": _T("TUZAK!", "IT'S A TRAP!", "¡TRAMPA!", "FALLE!", "ЛОВУШКА!"),
     "cu.hud": _T("LANET  skor x{}", "CURSED  score x{}", "MALDITO  puntos x{}", "VERFLUCHT  Punkte x{}", "ПРОКЛЯТ  очки x{}"),
     "fx.raise": _T("DİRİLİŞ!", "RISE!", "¡LEVÁNTATE!", "ERHEBT EUCH!", "ВОССТАНЬ!"),
@@ -2718,7 +2878,7 @@ STRINGS.update({
                      "Cazador del cielo: derrota 8 jefes en total.", "Jäger des Himmels: besiege insgesamt 8 Bosse.",
                      "Охотник небес: одолей всего 8 боссов."),
     "w.bats.name": _T("YARASA SÜRÜSÜ", "BAT SWARM", "ENJAMBRE DE MURCIÉLAGOS", "FLEDERMAUSSCHWARM", "СТАЯ ЛЕТУЧИХ МЫШЕЙ"),
-    "w.bats.desc": _T("Çevrene sarmal çizerek açılan yarasalar; her biri üç yaratığa kadar ısırır ve her ısırık sana biraz can verir (saniyede en çok azami canın %1,5'i).",
+    "w.bats.desc": _T("Çevrene sarmal çizerek açılan yarasalar; her biri üç yaratığa kadar ısırır ve her ısırık sana biraz can verir (saniyede en çok maks canın %1,5'i).",
                       "Bats spiral out around you; each bites up to three creatures and every bite heals you a little (at most 1.5% of max health per second).",
                       "Murciélagos salen en espiral; cada uno muerde hasta tres criaturas y cada mordisco te cura un poco (máx. 1,5% de la vida máxima por segundo).",
                       "Fledermäuse fliegen spiralförmig hinaus; jede beißt bis zu drei Kreaturen, jeder Biss heilt dich etwas (max. 1,5% des max. Lebens pro Sekunde).",
@@ -2730,7 +2890,7 @@ STRINGS.update({
                      "Aliméntate de sangre: roba 2.000 de vida con Chupasangre.", "Nähre dich von Blut: stiehl 2.000 Leben mit Blutsauger.",
                      "Питайся кровью: укради 2 000 здоровья Кровососом."),
     "w.nova.name": _T("AYAZ PATLAMASI", "FROST NOVA", "NOVA DE ESCARCHA", "FROSTNOVA", "ЛЕДЯНАЯ НОВА"),
-    "w.nova.desc": _T("Çevrene buz dalgası salar: dalgadaki her şey hasar alır, sıradan yaratıklar bir an donar (patronlar yalnızca yavaşlar). Sıkışınca nefes aldırır.",
+    "w.nova.desc": _T("Çevrene buz dalgası salar: dalgadaki her şey hasar alır, sıradan yaratıklar bir an donar (patronlar sadece yavaşlar). Sıkışınca nefes aldırır.",
                       "Releases a wave of ice: everything in it is hit and ordinary creatures freeze for a moment (bosses only slow). A breather when you are surrounded.",
                       "Suelta una ola de hielo: todo recibe daño y las criaturas normales se CONGELAN un momento (los jefes solo se ralentizan).",
                       "Löst eine Eiswelle aus: alles wird getroffen, normale Kreaturen ERSTARREN kurz (Bosse werden nur langsamer).",
@@ -2838,7 +2998,7 @@ STRINGS.update({
  "s.core_speed.name": _T("Hız Çekirdeği","Speed Core","Núcleo de Velocidad","Tempokern","Ядро Скорости"),
  "s.core_speed.desc": _T("Atış hızı +%6 (tavanı yok)","Attack speed +6% (no cap)","Cadencia +6% (sin tope)","Angriffsrate +6% (kein Limit)","Скорость атаки +6% (без предела)"),
  "s.core_vitality.name": _T("Can Çekirdeği","Vitality Core","Núcleo de Vitalidad","Lebenskern","Ядро Жизни"),
- "s.core_vitality.desc": _T("Azami can +30 ve anında dolar (tavanı yok)","Max health +30, fills instantly (no cap)","Vida máx +30, se llena al instante (sin tope)","Max. Leben +30, sofort gefüllt (kein Limit)","Макс. здоровье +30, сразу восполняет (без предела)"),
+ "s.core_vitality.desc": _T("Maks can +30 ve anında dolar (tavanı yok)","Max health +30, fills instantly (no cap)","Vida máx +30, se llena al instante (sin tope)","Max. Leben +30, sofort gefüllt (kein Limit)","Макс. здоровье +30, сразу восполняет (без предела)"),
  "s.core_crit.name": _T("Keskinlik Çekirdeği","Edge Core","Núcleo de Filo","Schärfekern","Ядро Остроты"),
  "s.core_crit.desc": _T("Kritik şans +%3, kritik hasar +%6 (tavanı yok)","Crit chance +3%, crit damage +6% (no cap)","Prob. crítica +3%, daño crítico +6% (sin tope)","Kritchance +3%, Kritschaden +6% (kein Limit)","Шанс крита +3%, крит. урон +6% (без предела)"),
  "s.core_guard.name": _T("Koruma Çekirdeği","Guard Core","Núcleo de Guardia","Schutzkern","Ядро Защиты"),
@@ -2850,7 +3010,7 @@ STRINGS.update({
  "s.quickdraw.name": _T("Seri El","Quickdraw","Mano Rápida","Schnellzug","Быстрая Рука"),
  "s.quickdraw.desc": _T("Atış hızı +%7 ve kritik şans +%2","Attack speed +7% and crit chance +2%","Cadencia +7% y prob. crítica +2%","Angriffsrate +7% und Kritchance +2%","Скорость атаки +7% и шанс крита +2%"),
  "s.bandage.name": _T("Sargı Bezi","Bandage","Vendaje","Verband","Бинт"),
- "s.bandage.desc": _T("Saniyede +0.6 can yenilenmesi ve +12 azami can","+0.6 health regen per second and +12 max health","+0,6 de regeneración por segundo y +12 de vida máx","+0,6 Leben pro Sekunde und +12 max. Leben","+0,6 здоровья в секунду и +12 к максимуму"),
+ "s.bandage.desc": _T("Saniyede +0.6 can yenilenmesi ve +12 maks can","+0.6 health regen per second and +12 max health","+0,6 de regeneración por segundo y +12 de vida máx","+0,6 Leben pro Sekunde und +12 max. Leben","+0,6 здоровья в секунду и +12 к максимуму"),
  "s.lucky_coin.name": _T("Uğurlu Akçe","Lucky Coin","Moneda de la Suerte","Glücksmünze","Счастливая Монета"),
  "s.lucky_coin.desc": _T("Altın +%15, kritik şans +%2 ve Şans +%10","Gold +15%, crit chance +2% and Luck +10%","Oro +15%, prob. crítica +2% y Suerte +10%","Gold +15%, Kritchance +2% und Glück +10%","Золото +15%, шанс крита +2% и Удача +10%"),
  "s.core_luck.name": _T("Şans Çekirdeği","Luck Core","Núcleo de Suerte","Glückskern","Ядро Удачи"),
@@ -2862,7 +3022,7 @@ STRINGS.update({
  "s.war_drum.name": _T("Savaş Davulu","War Drum","Tambor de Guerra","Kriegstrommel","Боевой Барабан"),
  "s.war_drum.desc": _T("BONK hasarı +%20, alanı +%8 ve hareket hızı +%4","BONK damage +20%, radius +8% and move speed +4%","Daño BONK +20%, radio +8% y velocidad +4%","BONK-Schaden +20%, Radius +8% und Tempo +4%","Урон БОНК +20%, радиус +8% и скорость +4%"),
  "s.iron_will.name": _T("Demir İrade","Iron Will","Voluntad de Hierro","Eiserner Wille","Железная Воля"),
- "s.iron_will.desc": _T("Aldığın hasar %5 azalır ve +20 azami can","Take 5% less damage and +20 max health","Recibes 5% menos de daño y +20 de vida máx","5% weniger Schaden und +20 max. Leben","Урон по тебе −5% и +20 к максимуму здоровья"),
+ "s.iron_will.desc": _T("Aldığın hasar %5 azalır ve +20 maks can","Take 5% less damage and +20 max health","Recibes 5% menos de daño y +20 de vida máx","5% weniger Schaden und +20 max. Leben","Урон по тебе −5% и +20 к максимуму здоровья"),
  "s.frost_core.name": _T("Ayaz Çekirdeği","Frost Core","Núcleo de Escarcha","Frostkern","Ядро Мороза"),
  "s.frost_core.desc": _T("Buz etkisi +1 kademe ve hasar +%5","Ice effect +1 tier and damage +5%","Efecto de hielo +1 nivel y daño +5%","Eiseffekt +1 Stufe und Schaden +5%","Эффект льда +1 ступень и урон +5%"),
  "s.hunters_mark.name": _T("Avcı Nişanı","Hunter's Mark","Marca del Cazador","Jägermal","Метка Охотника"),
@@ -2900,7 +3060,7 @@ STRINGS.update({
  "s.dash_cd.name": _T("Sis Adımı","Mist Step","Paso de Niebla","Nebelschritt","Туманный Шаг"),
  "s.dash_cd.desc": _T("Dash bekleme -%18, mesafe +%3","Dash cooldown -18%, distance +3%","Espera de impulso -18%, distancia +3%","Dash-Abklingzeit -18%, Weite +3%","Откат рывка -18%, дальность +3%"),
  "s.blood_pact.name": _T("Kan Sözleşmesi","Blood Pact","Pacto de Sangre","Blutpakt","Кровавый Пакт"),
- "s.blood_pact.desc": _T("Hasar +%40 ama azami can -%25","Damage +40% but max health -25%","Daño +40% pero vida máx -25%","Schaden +40%, aber max. Leben -25%","Урон +40%, но макс. здоровье -25%"),
+ "s.blood_pact.desc": _T("Hasar +%40 ama maks can -%25","Damage +40% but max health -25%","Daño +40% pero vida máx -25%","Schaden +40%, aber max. Leben -25%","Урон +40%, но макс. здоровье -25%"),
  "s.glass.name": _T("Cam Top","Glass Cannon","Cañón de Cristal","Glaskanone","Стеклянная Пушка"),
  "s.glass.desc": _T("Atış hızı +%30 ama gelen hasar +%25","Attack speed +30% but incoming damage +25%","Cadencia +30% pero daño recibido +25%","Angriffsrate +30%, aber erlittener Schaden +25%","Скорость атаки +30%, но урон по тебе +25%"),
  "s.devil.name": _T("Şeytan Pazarlığı","Devil's Bargain","Trato del Diablo","Teufelspakt","Сделка с Дьяволом"),
@@ -2922,7 +3082,7 @@ STRINGS.update({
  "s.brimstone.name": _T("Kükürt Mermisi","Brimstone Shot","Disparo de Azufre","Schwefelschuss","Серный Выстрел"),
  "s.brimstone.desc": _T("Hasar +%25 (cehennem çeliğiyle dövülmüş mermi)","Damage +25% (forged from hellsteel)","Daño +25% (forjado en acero infernal)","Schaden +25% (aus Höllenstahl geschmiedet)","Урон +25% (выковано из адской стали)"),
  "s.hell_ward.name": _T("Kor Muskası","Ember Ward","Amuleto de Brasa","Glutamulett","Оберег Углей"),
- "s.hell_ward.desc": _T("Zırh +%6 ve +40 azami can, cehennem ateşine karşı","Armour +6% and +40 max health - against hellfire","Armadura +6% y +40 de vida - contra el fuego infernal","Rüstung +6% und +40 Leben - gegen Höllenfeuer","Броня +6% и +40 здоровья — против адского пламени"),
+ "s.hell_ward.desc": _T("Zırh +%6 ve +40 maks can, cehennem ateşine karşı","Armour +6% and +40 max health - against hellfire","Armadura +6% y +40 de vida - contra el fuego infernal","Rüstung +6% und +40 Leben - gegen Höllenfeuer","Броня +6% и +40 здоровья — против адского пламени"),
  "s.holy_flame.name": _T("Kutsal Alev","Holy Flame","Llama Sagrada","Heilige Flamme","Священное Пламя"),
  "s.holy_flame.desc": _T("Vuruşların düşmanı kutsal ateşle yakar (çok güçlü yanık)","Your hits set enemies alight with holy fire (very strong burn)","Tus golpes prenden fuego sagrado (quemadura muy fuerte)","Deine Treffer entzünden heiliges Feuer (sehr starker Brand)","Твои удары зажигают священный огонь (очень сильный ожог)"),
  "s.soul_harvest.name": _T("Ruh Hasadı","Soul Harvest","Cosecha de Almas","Seelenernte","Жатва Душ"),
@@ -2936,7 +3096,7 @@ STRINGS.update({
  "s.cursed_dagger.name": _T("Lanet Hançeri","Cursed Dagger","Daga Maldita","Verfluchter Dolch","Проклятый Кинжал"),
  "s.cursed_dagger.desc": _T("Kritik şans +%8 ve kritik hasar +%30","Crit chance +8% and crit damage +30%","Prob. crítica +8% y daño crítico +30%","Kritchance +8% und Kritschaden +30%","Шанс крита +8% и крит. урон +30%"),
  "s.dragon_heart.name": _T("Ejderha Kalbi","Dragon Heart","Corazón de Dragón","Drachenherz","Сердце Дракона"),
- "s.dragon_heart.desc": _T("Azami can +80 ve saniyede +2 can yenilenmesi","Max health +80 and +2 health regen per second","Vida máx +80 y +2 de regeneración por segundo","Max. Leben +80 und +2 Leben pro Sekunde","Макс. здоровье +80 и +2 здоровья в секунду"),
+ "s.dragon_heart.desc": _T("Maks can +80 ve saniyede +2 can yenilenmesi","Max health +80 and +2 health regen per second","Vida máx +80 y +2 de regeneración por segundo","Max. Leben +80 und +2 Leben pro Sekunde","Макс. здоровье +80 и +2 здоровья в секунду"),
  "s.flame_orbit.name": _T("Alev Yörüngesi","Flame Orbit","Órbita de Llamas","Flammenorbit","Орбита Пламени"),
  "s.flame_orbit.desc": _T("Çevrende dönen bir alev topu daha + vuruşların yakar","One more orbiting flame + your hits burn","Una bola de fuego más en órbita + tus golpes queman","Eine Flammenkugel mehr + deine Treffer brennen","Ещё один огненный шар на орбите + твои удары жгут"),
  "s.soul_lantern.name": _T("Ruh Feneri","Soul Lantern","Linterna de Almas","Seelenlaterne","Фонарь Душ"),
@@ -3029,43 +3189,43 @@ STRINGS.update({
  "a.wave25.how": _T("Oyunun en zor hedeflerinden biri; nadir kitap ve efsanevi eşya şart.","One of the hardest goals; rare books and legendary items are a must.","Uno de los objetivos más duros; libros raros y objetos legendarios.","Eines der härtesten Ziele; seltene Bücher und legendäre Items nötig.","Одна из сложнейших целей; нужны редкие книги и легендарные предметы."),
  "a.buz_kiran.name": _T('Buz Kıran', 'Icebreaker', 'Rompehielos', 'Eisbrecher', 'Ледокол'),
  "a.buz_kiran.desc": _T("Buzul Vadisi'nde toplam 1.000 düşman öldür.", 'Slay 1,000 monsters in Frozen Valley.', 'Derrota 1.000 monstruos en el Valle Helado.', 'Besiege 1.000 Monster im Eistal.', 'Убей 1000 монстров в Ледяной долине.'),
- "a.buz_kiran.how": _T('Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
+ "a.buz_kiran.how": _T('Sadece o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
  "a.ayaz_kalbi.name": _T('Ayaz Kalbi', 'Heart of Frost', 'Corazón de Escarcha', 'Frostherz', 'Сердце стужи'),
  "a.ayaz_kalbi.desc": _T("Buzul Vadisi'nde toplam 3 patron devir.", 'Defeat 3 bosses in Frozen Valley.', 'Derrota 3 jefes en el Valle Helado.', 'Besiege 3 Bosse im Eistal.', 'Победи 3 боссов в Ледяной долине.'),
- "a.ayaz_kalbi.how": _T('Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
+ "a.ayaz_kalbi.how": _T('Sadece o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
  "a.donmus_simsek.name": _T('Donmuş Şimşek', 'Frozen Lightning', 'Rayo Congelado', 'Gefrorener Blitz', 'Замёрзшая молния'),
  "a.donmus_simsek.desc": _T("Buzul Vadisi'nde 12. dalgaya ulaş.", 'Reach wave 12 in Frozen Valley.', 'Llega a la oleada 12 en el Valle Helado.', 'Erreiche Welle 12 im Eistal.', 'Дойди до 12-й волны в Ледяной долине.'),
- "a.donmus_simsek.how": _T('Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
+ "a.donmus_simsek.how": _T('Sadece o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
  "a.buz_sarkiti.name": _T('Buz Sarkıtı', 'Icicle Rain', 'Lluvia de Carámbanos', 'Eiszapfenregen', 'Дождь сосулек'),
  "a.buz_sarkiti.desc": _T("Buzul Vadisi'nde toplam 5.000 mermi at.", 'Fire 5,000 shots in Frozen Valley.', 'Dispara 5.000 veces en el Valle Helado.', 'Feuere 5.000 Schüsse im Eistal ab.', 'Сделай 5000 выстрелов в Ледяной долине.'),
- "a.buz_sarkiti.how": _T('Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
+ "a.buz_sarkiti.how": _T('Sadece o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
  "a.kum_firtinasi.name": _T('Kum Fırtınası', 'Sandstorm', 'Tormenta de Arena', 'Sandsturm', 'Песчаная буря'),
  "a.kum_firtinasi.desc": _T("Kızıl Çöl'de toplam 300 dash at.", 'Dash 300 times in Crimson Desert.', 'Esquiva 300 veces en el Desierto Carmesí.', 'Sprinte 300-mal in der Roten Wüste.', 'Сделай 300 рывков в Красной пустыне.'),
- "a.kum_firtinasi.how": _T('Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
+ "a.kum_firtinasi.how": _T('Sadece o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
  "a.col_ruzgari.name": _T('Çöl Rüzgârı', 'Desert Wind', 'Viento del Desierto', 'Wüstenwind', 'Ветер пустыни'),
  "a.col_ruzgari.desc": _T("Kızıl Çöl'de bir koşuda Rüzgâr Kitabı'nı Lv.5'e çıkar.", 'Raise the Book of Wind to Lv.5 in one Crimson Desert run.', 'Sube el Libro del Viento a Nv.5 en una partida del Desierto Carmesí.', 'Bring das Buch des Windes in einem Lauf in der Roten Wüste auf St.5.', 'Прокачай Книгу Ветра до ур.5 за забег в Красной пустыне.'),
- "a.col_ruzgari.how": _T('Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
+ "a.col_ruzgari.how": _T('Sadece o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
  "a.gunes_yakici.name": _T('Güneş Yakıcı', 'Sunscorched', 'Abrasado por el Sol', 'Sonnenverbrannt', 'Опалённый солнцем'),
  "a.gunes_yakici.desc": _T("Kızıl Çöl'de 10. dalgaya ulaş.", 'Reach wave 10 in Crimson Desert.', 'Llega a la oleada 10 en el Desierto Carmesí.', 'Erreiche Welle 10 in der Roten Wüste.', 'Дойди до 10-й волны в Красной пустыне.'),
- "a.gunes_yakici.how": _T('Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
+ "a.gunes_yakici.how": _T('Sadece o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
  "a.serap.name": _T('Serap', 'Mirage', 'Espejismo', 'Fata Morgana', 'Мираж'),
  "a.serap.desc": _T("Kızıl Çöl'de toplam 1.500 düşman öldür.", 'Slay 1,500 monsters in Crimson Desert.', 'Derrota 1.500 monstruos en el Desierto Carmesí.', 'Besiege 1.500 Monster in der Roten Wüste.', 'Убей 1500 монстров в Красной пустыне.'),
- "a.serap.how": _T('Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
+ "a.serap.how": _T('Sadece o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
  "a.kum_tepesi.name": _T('Kum Tepesi', 'Dune Breaker', 'Rompedunas', 'Dünenbrecher', 'Сокрушитель дюн'),
  "a.kum_tepesi.desc": _T("Kızıl Çöl'de BONK ile toplam 800 düşmana vur.", 'Hit 800 monsters with BONK in Crimson Desert.', 'Golpea 800 monstruos con BONK en el Desierto Carmesí.', 'Triff 800 Monster mit BONK in der Roten Wüste.', "Ударь BONK'ом 800 монстров в Красной пустыне."),
- "a.kum_tepesi.how": _T('Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
+ "a.kum_tepesi.how": _T('Sadece o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
  "a.yilan_avcisi.name": _T('Yılan Avcısı', 'Snake Hunter', 'Cazador de Serpientes', 'Schlangenjäger', 'Охотник на змей'),
  "a.yilan_avcisi.desc": _T("Zümrüt Orman'da 200 yılan öldür.", 'Slay 200 snakes in Emerald Jungle.', 'Derrota 200 serpientes en la Selva Esmeralda.', 'Besiege 200 Schlangen im Smaragdwald.', 'Убей 200 змей в Изумрудном лесу.'),
- "a.yilan_avcisi.how": _T('Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
+ "a.yilan_avcisi.how": _T('Sadece o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
  "a.orman_kanunu.name": _T('Orman Kanunu', 'Law of the Jungle', 'Ley de la Selva', 'Gesetz des Waldes', 'Закон леса'),
  "a.orman_kanunu.desc": _T("Zümrüt Orman'da toplam 2 patron devir.", 'Defeat 2 bosses in Emerald Jungle.', 'Derrota 2 jefes en la Selva Esmeralda.', 'Besiege 2 Bosse im Smaragdwald.', 'Победи 2 боссов в Изумрудном лесу.'),
- "a.orman_kanunu.how": _T('Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
+ "a.orman_kanunu.how": _T('Sadece o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
  "a.gece_avcisi.name": _T('Gece Avcısı', 'Night Hunter', 'Cazador Nocturno', 'Nachtjäger', 'Ночной охотник'),
  "a.gece_avcisi.desc": _T("Zümrüt Orman'da tek koşuda 8 dakika hayatta kal.", 'Survive 8 minutes in one Emerald Jungle run.', 'Sobrevive 8 minutos en una partida de la Selva Esmeralda.', 'Überlebe 8 Minuten in einem Lauf im Smaragdwald.', 'Продержись 8 минут за забег в Изумрудном лесу.'),
- "a.gece_avcisi.how": _T('Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
+ "a.gece_avcisi.how": _T('Sadece o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
  "a.ruh_agaci.name": _T('Ruh Ağacı', 'Spirit Tree', 'Árbol de Almas', 'Geisterbaum', 'Древо духов'),
  "a.ruh_agaci.desc": _T("Zümrüt Orman'da toplam 1.500 düşman öldür.", 'Slay 1,500 monsters in Emerald Jungle.', 'Derrota 1.500 monstruos en la Selva Esmeralda.', 'Besiege 1.500 Monster im Smaragdwald.', 'Убей 1500 монстров в Изумрудном лесу.'),
- "a.ruh_agaci.how": _T('Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
+ "a.ruh_agaci.how": _T('Sadece o haritada kazanılır: OYNA ekranında haritayı seç.', 'Only earned on that map: pick it on the PLAY screen.', 'Solo se consigue en ese mapa: elígelo en la pantalla JUGAR.', 'Nur auf dieser Karte erreichbar: wähle sie im SPIELEN-Bildschirm.', 'Только на этой карте: выбери её на экране ИГРАТЬ.'),
  "wq.buz_kiran": _T("«Buz Kıran» başarımı: Buzul Vadisi'nde toplam 1.000 düşman öldür", '“Icebreaker” achievement: Slay 1,000 monsters in Frozen Valley', 'Logro «Rompehielos»: Derrota 1.000 monstruos en el Valle Helado', 'Erfolg „Eisbrecher“: Besiege 1.000 Monster im Eistal', 'Достижение «Ледокол»: Убей 1000 монстров в Ледяной долине'),
  "wq.ayaz_kalbi": _T("«Ayaz Kalbi» başarımı: Buzul Vadisi'nde toplam 3 patron devir", '“Heart of Frost” achievement: Defeat 3 bosses in Frozen Valley', 'Logro «Corazón de Escarcha»: Derrota 3 jefes en el Valle Helado', 'Erfolg „Frostherz“: Besiege 3 Bosse im Eistal', 'Достижение «Сердце стужи»: Победи 3 боссов в Ледяной долине'),
  "wq.donmus_simsek": _T("«Donmuş Şimşek» başarımı: Buzul Vadisi'nde 12. dalgaya ulaş", '“Frozen Lightning” achievement: Reach wave 12 in Frozen Valley', 'Logro «Rayo Congelado»: Llega a la oleada 12 en el Valle Helado', 'Erfolg „Gefrorener Blitz“: Erreiche Welle 12 im Eistal', 'Достижение «Замёрзшая молния»: Дойди до 12-й волны в Ледяной долине'),
@@ -3521,6 +3681,7 @@ def _render(text, size, bold, color):
 
 def draw_text(surf, text, pos, size=20, color=TEXT, bold=False,
               center=False, shadow=True, alpha=255, right=False, tiny=False):
+    text = TRX(text)
     size = ui_font_size(size, tiny)
     color = (int(color[0]), int(color[1]), int(color[2]))
     alpha = int(clamp(alpha, 0, 255))
@@ -3548,6 +3709,7 @@ _WRAP_CACHE = {}
 
 def text_width(text, size=20, bold=False, tiny=False):
     # Ölçüm saf bir işlem: aynı yazı/punto hep aynı genişliği verir.
+    text = TRX(text)
     key = (text, size, bold, tiny)
     w = _TW_CACHE.get(key)
     if w is None:
@@ -3564,6 +3726,7 @@ def text_height(size, bold=False, tiny=False):
 
 
 def wrap_text(text, size, max_w, bold=False):
+    text = TRX(text)
     key = (text, size, max_w, bold)
     out = _WRAP_CACHE.get(key)
     if out is None:
@@ -5893,7 +6056,7 @@ ACHIEVEMENTS = [
     dict(id="hell_boss", name="Cehennem Fatihi", desc="Cehennemde bir patron devir.",
          how="Cehennem'e indikten sonra 5. dalgada ilk cehennem patronu gelir. "
              "Cehennem yaratıkları arenanın 25. dalgası kadar güçlüdür - markette "
-             "yalnızca cehennemde açılan Cehennem kademesindeki eşyaları al.",
+             "sadece cehennemde açılan Cehennem kademesindeki eşyaları al.",
          icon="flame", tier="efsane", gems=150),
     dict(id="wave25", name="Ölümsüz", desc="25. dalgaya ulaş.",
          how="Oyunun en zor hedeflerinden biri. Nadir kitaplar, efsanevi market "
@@ -5901,43 +6064,43 @@ ACHIEVEMENTS = [
          icon="shield", tier="efsane", gems=120, track=dict(stat="best_wave", need=25)),
     # ---- harita başarımları: yalnız o haritada kazanılır, silah açar ----
     dict(id="buz_kiran", name="Buz Kıran", desc="Buzul Vadisi'nde toplam 1.000 düşman öldür.",
-         how="Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.", map="frost",
+         how="Sadece o haritada kazanılır: OYNA ekranında haritayı seç.", map="frost",
          icon="snow", tier="gumus", gems=40, track=dict(stat="frost_kills", need=1000)),
     dict(id="ayaz_kalbi", name="Ayaz Kalbi", desc="Buzul Vadisi'nde toplam 3 patron devir.",
-         how="Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.", map="frost",
+         how="Sadece o haritada kazanılır: OYNA ekranında haritayı seç.", map="frost",
          icon="snow", tier="altin", gems=60, track=dict(stat="frost_bosses", need=3)),
     dict(id="donmus_simsek", name="Donmuş Şimşek", desc="Buzul Vadisi'nde 12. dalgaya ulaş.",
-         how="Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.", map="frost",
+         how="Sadece o haritada kazanılır: OYNA ekranında haritayı seç.", map="frost",
          icon="bolt", tier="gumus", gems=40, track=dict(stat="best_frost_wave", need=12)),
     dict(id="buz_sarkiti", name="Buz Sarkıtı", desc="Buzul Vadisi'nde toplam 5.000 mermi at.",
-         how="Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.", map="frost",
+         how="Sadece o haritada kazanılır: OYNA ekranında haritayı seç.", map="frost",
          icon="target", tier="gumus", gems=40, track=dict(stat="frost_shots", need=5000)),
     dict(id="kum_firtinasi", name="Kum Fırtınası", desc="Kızıl Çöl'de toplam 300 dash at.",
-         how="Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.", map="desert",
+         how="Sadece o haritada kazanılır: OYNA ekranında haritayı seç.", map="desert",
          icon="dash", tier="gumus", gems=40, track=dict(stat="desert_dashes", need=300)),
     dict(id="col_ruzgari", name="Çöl Rüzgârı", desc="Kızıl Çöl'de bir koşuda Rüzgâr Kitabı'nı Lv.5'e çıkar.",
-         how="Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.", map="desert",
+         how="Sadece o haritada kazanılır: OYNA ekranında haritayı seç.", map="desert",
          icon="boot", tier="gumus", gems=40, track=dict(stat="best_desert_wind", need=5)),
     dict(id="gunes_yakici", name="Güneş Yakıcı", desc="Kızıl Çöl'de 10. dalgaya ulaş.",
-         how="Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.", map="desert",
+         how="Sadece o haritada kazanılır: OYNA ekranında haritayı seç.", map="desert",
          icon="flame", tier="gumus", gems=40, track=dict(stat="best_desert_wave", need=10)),
     dict(id="serap", name="Serap", desc="Kızıl Çöl'de toplam 1.500 düşman öldür.",
-         how="Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.", map="desert",
+         how="Sadece o haritada kazanılır: OYNA ekranında haritayı seç.", map="desert",
          icon="star", tier="gumus", gems=40, track=dict(stat="desert_kills", need=1500)),
     dict(id="kum_tepesi", name="Kum Tepesi", desc="Kızıl Çöl'de BONK ile toplam 800 düşmana vur.",
-         how="Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.", map="desert",
+         how="Sadece o haritada kazanılır: OYNA ekranında haritayı seç.", map="desert",
          icon="fist", tier="gumus", gems=40, track=dict(stat="desert_bonk_hits", need=800)),
     dict(id="yilan_avcisi", name="Yılan Avcısı", desc="Zümrüt Orman'da 200 yılan öldür.",
-         how="Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.", map="jungle",
+         how="Sadece o haritada kazanılır: OYNA ekranında haritayı seç.", map="jungle",
          icon="target", tier="gumus", gems=40, track=dict(stat="jungle_snakes", need=200)),
     dict(id="orman_kanunu", name="Orman Kanunu", desc="Zümrüt Orman'da toplam 2 patron devir.",
-         how="Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.", map="jungle",
+         how="Sadece o haritada kazanılır: OYNA ekranında haritayı seç.", map="jungle",
          icon="skull", tier="altin", gems=60, track=dict(stat="jungle_bosses", need=2)),
     dict(id="gece_avcisi", name="Gece Avcısı", desc="Zümrüt Orman'da tek koşuda 8 dakika hayatta kal.",
-         how="Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.", map="jungle",
+         how="Sadece o haritada kazanılır: OYNA ekranında haritayı seç.", map="jungle",
          icon="drop", tier="gumus", gems=40, track=dict(stat="best_jungle_time", need=480)),
     dict(id="ruh_agaci", name="Ruh Ağacı", desc="Zümrüt Orman'da toplam 1.500 düşman öldür.",
-         how="Yalnızca o haritada kazanılır: OYNA ekranında haritayı seç.", map="jungle",
+         how="Sadece o haritada kazanılır: OYNA ekranında haritayı seç.", map="jungle",
          icon="ghost", tier="gumus", gems=40, track=dict(stat="jungle_kills", need=1500)),
     dict(id="legend", name="Arena Efsanesi", desc="Diğer bütün başarımları aç.",
          how="Listedeki diğer başarımların hepsini tamamla. Sonuncusunu açtığın anda "
@@ -7349,7 +7512,7 @@ SKINS = [
          desc="Şişesinde kendi kanını taşır. Her vuruşta biraz can çalar.",
          perks=["Kan Emme Lv.2 ile başlar", "Can Yenilenmesi +0.8/sn",
                 "Her 15 seviyede Kan Emme +1 (en çok Lv.5)",
-                "Her seviye: saniyede azami canın %0.012'si yenilenir (en çok %0.6)"],
+                "Her seviye: saniyede maks canın %0.012'si yenilenir (en çok %0.6)"],
          perk_set=dict(vamp_level=2),
          perk_add=dict(base_regen=0.8),
          perk_every=dict(vamp_level=(15, 5)),
@@ -7377,7 +7540,7 @@ SKINS = [
          desc="Zehirli şişesiyle yakın dövüşe girer, teması bile acıtır.",
          perks=["Dikenler Lv.1 ile başlar (temas hasarına karşılık verir)", "Can Yenilenmesi +0.5/sn",
                 "Her 12 seviyede Dikenler +1 (en çok Lv.5)",
-                "Her seviye: saniyede azami canın %0.01'i yenilenir (en çok %0.5)"],
+                "Her seviye: saniyede maks canın %0.01'i yenilenir (en çok %0.5)"],
          perk_set=dict(thorns_level=1),
          perk_add=dict(base_regen=0.5),
          perk_every=dict(thorns_level=(12, 5)),
@@ -7451,7 +7614,7 @@ SKINS = [
          desc="Tepeden tırnağa pembe. Stiliyle olduğu kadar gücüyle de göz doldurur. "
               "Pembe şapka, gözlük ve pelerinle tamamla.",
          perks=["Can Yenilenmesi +0.6/sn", "Kritik Şans +%10", "Toplama Menzili +25",
-                "Her seviye: saniyede azami canın %0.01'i yenilenir, Kritik Şans +%0.1"],
+                "Her seviye: saniyede maks canın %0.01'i yenilenir, Kritik Şans +%0.1"],
          perk_add=dict(base_regen=0.6, crit_chance=0.10, base_pickup=25),
          perk_level=dict(regen_pct=(0.0001, 0.005), crit_chance=(0.001, 0.06))),
 
@@ -7523,7 +7686,7 @@ def skin_gem_cost(sk):
 SKIN_ULTS = {
     "default": dict(name="KALKAN PROTOKOLÜ", icon="shield", color=(120, 200, 255), cd=26.0,
                     kind="guard", mode="auto",
-                    desc="2 kalkan yükü verir ve azami canının %15'ini yeniler."),
+                    desc="2 kalkan yükü verir ve maks canının %15'ini yeniler."),
     "ranger": dict(name="ÖNCÜ ATILIMI", icon="boot", color=(150, 230, 170), cd=22.0,
                    kind="sprint", mode="auto",
                    desc="6 saniye boyunca %35 daha hızlı koşar, %25 daha hızlı ateş edersin."),
@@ -7598,7 +7761,7 @@ SKIN_ULTS = {
                         "içine çeker ve öğütür, sonra patlayarak büyük hasar verir."),
     "pink_dream": dict(name="RÜYA PATLAMASI", icon="heart", color=(255, 140, 210), cd=20.0,
                        kind="dream", mode="auto", radius=300, duration=6.0,
-                       desc="Azami canının %25'ini yeniler, 6 saniye kritik şansın %25 artar ve "
+                       desc="Maks canının %25'ini yeniler, 6 saniye kritik şansın %25 artar ve "
                             "çevredeki düşmanlar korkup kaçar."),
 }
 
@@ -11001,7 +11164,7 @@ SHOP_ITEMS = [
      "cost": 70,  "cost_mult": 1.28, "max": 999, "endless": True, "icon": "sword",  "color": (240, 110, 110), "tier": 1, "cat": "core"},
     {"key": "core_speed",    "name": "Hız Çekirdeği",       "desc": "Atış hızı +%6 (tavanı yok)",
      "cost": 80,  "cost_mult": 1.30, "max": 999, "endless": True, "icon": "boot",   "color": (130, 230, 170), "tier": 1, "cat": "core"},
-    {"key": "core_vitality", "name": "Can Çekirdeği",       "desc": "Azami can +30 ve anında dolar (tavanı yok)",
+    {"key": "core_vitality", "name": "Can Çekirdeği",       "desc": "Maks can +30 ve anında dolar (tavanı yok)",
      "cost": 60,  "cost_mult": 1.26, "max": 999, "endless": True, "icon": "heart",  "color": (235, 120, 150), "tier": 1, "cat": "core"},
     {"key": "core_crit",     "name": "Keskinlik Çekirdeği", "desc": "Kritik şans +%3, kritik hasar +%6 (tavanı yok)",
      "cost": 85,  "cost_mult": 1.29, "max": 999, "endless": True, "icon": "clover", "color": (230, 220, 120), "tier": 1, "cat": "core"},
@@ -11028,7 +11191,7 @@ SHOP_ITEMS = [
      "cost": 55, "cost_mult": 1.52, "max": 6, "icon": "dash", "color": (150, 235, 200),
      "tier": 1, "cat": "weapon"},
     {"key": "bandage",    "name": "Sargı Bezi",
-     "desc": "Saniyede +0.6 can yenilenmesi ve +12 azami can",
+     "desc": "Saniyede +0.6 can yenilenmesi ve +12 maks can",
      "cost": 45, "cost_mult": 1.45, "max": 6, "icon": "cross", "color": (140, 225, 175),
      "tier": 1, "cat": "defense"},
     {"key": "lucky_coin", "name": "Uğurlu Akçe",
@@ -11044,7 +11207,7 @@ SHOP_ITEMS = [
      "cost": 85, "cost_mult": 1.66, "max": 5, "icon": "fist", "color": (236, 148, 86),
      "tier": 2, "cat": "weapon"},
     {"key": "iron_will",  "name": "Demir İrade",
-     "desc": "Aldığın hasar %5 azalır ve +20 azami can",
+     "desc": "Aldığın hasar %5 azalır ve +20 maks can",
      "cost": 95, "cost_mult": 1.70, "max": 5, "icon": "shield", "color": (170, 186, 214),
      "tier": 2, "cat": "defense"},
     {"key": "frost_core", "name": "Ayaz Çekirdeği",
@@ -11089,7 +11252,7 @@ SHOP_ITEMS = [
     {"key": "vampiric",  "name": "Kan Emici",       "desc": "Verdiğin hasarın %2'si cana döner (seviye başı)", "cost": 85, "cost_mult": 1.7, "max": 5, "icon": "heart", "color": (220, 60, 90), "tier": 2, "cat": "utility"},
     {"key": "thorns",    "name": "Dikenli Zırh",    "desc": "Sana vuran düşman geri hasar alır", "cost": 60, "cost_mult": 1.55, "max": 6, "icon": "shield", "color": (170, 125, 90), "tier": 2, "cat": "defense"},
     {"key": "dash_cd",   "name": "Sis Adımı",       "desc": "Dash bekleme -%18, mesafe +%3", "cost": 60, "cost_mult": 1.55, "max": 5, "icon": "dash", "color": (140, 230, 190), "tier": 2, "cat": "utility"},
-    {"key": "blood_pact", "name": "Kan Sözleşmesi", "desc": "Hasar +%40 ama azami can -%25", "cost": 60, "cost_mult": 1.5, "max": 2, "icon": "skull", "color": (215, 50, 70), "tier": 2, "cat": "cursed", "cursed": True},
+    {"key": "blood_pact", "name": "Kan Sözleşmesi", "desc": "Hasar +%40 ama maks can -%25", "cost": 60, "cost_mult": 1.5, "max": 2, "icon": "skull", "color": (215, 50, 70), "tier": 2, "cat": "cursed", "cursed": True},
     {"key": "glass",     "name": "Cam Top",         "desc": "Atış hızı +%30 ama gelen hasar +%25", "cost": 70, "cost_mult": 1.5, "max": 2, "icon": "skull", "color": (200, 90, 220), "tier": 2, "cat": "cursed", "cursed": True},
     {"key": "devil",     "name": "Şeytan Pazarlığı", "desc": "Altın +%20, XP +%15 ama düşmanlar +%12 dayanıklı", "cost": 120, "cost_mult": 1.9, "max": 2, "icon": "skull", "color": (255, 120, 60), "tier": 2, "cat": "cursed", "cursed": True},
     # ---- Tier 3 (Dalga 6+) ----
@@ -11115,7 +11278,7 @@ SHOP_ITEMS = [
      "cost": 300, "cost_mult": 1.85, "max": 5, "icon": "flame", "color": (255, 120, 60),
      "tier": 5, "cat": "hell", "hell_only": True},
     {"key": "hell_ward", "name": "Kor Muskası",
-     "desc": "Zırh +%6 ve +40 azami can, cehennem ateşine karşı",
+     "desc": "Zırh +%6 ve +40 maks can, cehennem ateşine karşı",
      "cost": 280, "cost_mult": 1.80, "max": 5, "icon": "shield", "color": (255, 170, 90),
      "tier": 5, "cat": "hell", "hell_only": True},
     {"key": "holy_flame", "name": "Kutsal Alev",
@@ -11147,7 +11310,7 @@ SHOP_ITEMS = [
      "cost": 330, "cost_mult": 1.86, "max": 4, "icon": "sword", "color": (255, 120, 180),
      "tier": 5, "cat": "hell", "hell_only": True},
     {"key": "dragon_heart", "name": "Ejderha Kalbi",
-     "desc": "Azami can +80 ve saniyede +2 can yenilenmesi",
+     "desc": "Maks can +80 ve saniyede +2 can yenilenmesi",
      "cost": 350, "cost_mult": 1.88, "max": 4, "icon": "heart", "color": (255, 88, 70),
      "tier": 5, "cat": "hell", "hell_only": True},
     {"key": "flame_orbit", "name": "Alev Yörüngesi",
@@ -11525,7 +11688,7 @@ BOOKS = [
      "unlock": dict(text="Arenaya alış: 60 düşman öldür",
                     reqs=[rq_stat("total_kills", 60, "Toplam 60 düşman öldür")])},
     {"key": "r_hp", "name": "Can Kitabı",
-     "desc": "Azami canını artırır, anında dolar",
+     "desc": "Maks canını artırır, anında dolar",
      "color": (230, 110, 130), "icon": "heart", "rare": False, "basic": True,
      "unlock": dict(text="3 koşu tamamla ve 4. dalgayı gör",
                     reqs=[rq_stat("runs", 3, "3 koşu tamamla"),
@@ -11653,7 +11816,7 @@ BOOKS = [
                     reqs=[rq_stat("total_shots", 30000, "Toplam 30.000 mermi at"),
                           rq_stat("best_wave", 10, "10. dalgaya ulaş")])},
     {"key": "r_killheal", "name": "Kan Kitabı",
-     "desc": "Öldürdüğün her düşman azami canının %3'ü kadar can verir",
+     "desc": "Öldürdüğün her düşman maks canının %3'ü kadar can verir",
      "color": (220, 60, 90), "icon": "heart", "rare": True,
      "unlock": dict(text="Kan Emici'yi Lv.4'e çıkar ve 6.000 can çal",
                     reqs=[rq_shop("vampiric", 4, "Kan Emici'yi markette Lv.4'e çıkar"),
@@ -11699,7 +11862,7 @@ BOOKS = [
                           rq_stat("total_chests", 30, "Toplam 30 patron sandığı aç"),
                           rq_stat("best_wave", 15, "15. dalgaya ulaş")])},
     {"key": "r_hp_big", "name": "Dev Kitabı",
-     "desc": "Azami canın +250 artar ama biraz yavaşlarsın",
+     "desc": "Maks canın +250 artar ama biraz yavaşlarsın",
      "color": (200, 140, 90), "icon": "skull", "rare": True,
      "unlock": dict(text="Devleşecek kadar dayan",
                     reqs=[rq_stat("best_combo", 40, "40'lık bir kombo yap"),
@@ -16811,7 +16974,7 @@ BOSS_WEAPONS = [
     # * tek-atma freninden geçiyor: hiçbir seviyede tankı tek atamaz.
     dict(key="whip", name="KIRBAÇ", icon="dash", color=WHIP_COLOR,
          cd=1.25, dmg=2.75, style=None, dpl=0.055,
-         up="erişimi uzar, yayı genişler ve daha sert savurur - birkaç "
+         up="erişimi uzar, yayı genişler ve daha sert savurur, birkaç "
             "seviyede bir yenisi eklenir",
          desc="Baktığın yöne şaklar, vurur ve savurur. Yakın başlar ama her "
               "seviyede gözle görülür biçimde uzar; birkaç seviyede bir de "
@@ -16953,7 +17116,7 @@ BOSS_WEAPONS = [
          cd=2.4, dmg=2.6, style=None, dpl=0.060,
          up="daha çok yarasa salınır ve daha sık, her isabet can verir",
          desc="Çevrene sarmal çizerek açılan yarasalar; her biri üç yaratığa kadar "
-              "ısırır ve her ısırık sana biraz can verir (saniyede en çok azami "
+              "ısırır ve her ısırık sana biraz can verir (saniyede en çok maks "
               "canın %1,5'i).",
          how="Kanla beslen: Kan Emici ile toplam 2.000 can çal.",
          unlock=dict(text="Zümrüt Orman'da tek koşuda 8 dakika hayatta kal", tkey="wu.bats",
@@ -16962,7 +17125,7 @@ BOSS_WEAPONS = [
          cd=4.2, dmg=2.4, style=None, dpl=0.060,
          up="buz dalgası büyür, daha uzun dondurur ve daha sık patlar",
          desc="Çevrene buz dalgası salar: dalgadaki her şey hasar alır, sıradan "
-              "yaratıklar bir an donar (patronlar yalnızca yavaşlar). Sıkışınca "
+              "yaratıklar bir an donar (patronlar sadece yavaşlar). Sıkışınca "
               "nefes aldırır.",
          how="Önce buzu taşı: Buz İzi'ni aç ve 15. dalgaya ulaş.",
          unlock=dict(text="Buzul Vadisi'nde toplam 3 patron devir", tkey="wu.nova",
@@ -26574,7 +26737,7 @@ class RunState:
                 if p.cloak_timer <= 0:
                     p.invis_t = cloak_duration(clvl)
                     p.cloak_timer = cloak_cooldown(clvl)
-                    self.fx.popup(p.x, p.y - 64, "GÖRÜNMEZSİN!", CLOAK_COLOR2, 26,
+                    self.fx.popup(p.x, p.y - 64, L("ui.cloak_on"), CLOAK_COLOR2, 26,
                                   life=1.4)
                     self.fx.ring(p.x, p.y, CLOAK_COLOR, n=26, speed=320,
                                  life=0.6, r=3.4)
@@ -27303,7 +27466,7 @@ class RunState:
         self.fx.ring(p.x, p.y, col, n=22, speed=260, life=0.45, r=3.5)
         self.fx.shake(6, 0.2)
         p.ult_fx_t = 0.5
-        name = ult.get("name", "YETENEK")
+        name = TRX(ult.get("name", "YETENEK"))
 
         # ---- klasik mavi: kalkan protokolü ----
         if kind == "guard":
@@ -28806,7 +28969,7 @@ class RunState:
                 self.fx.popup(p.x, p.y - 64, f"{bk['name']}", col, 24, life=1.6)
             else:
                 self.fx.popup(p.x, p.y - 64,
-                              f"{bk['name']}" + ("" if lvl <= 1 else f"  Lv.{lvl}"),
+                              bk_name(bk) + ("" if lvl <= 1 else f"  Lv.{lvl}"),
                               col, 22, life=1.3)
         else:
             key = ch["key"]
@@ -28818,7 +28981,7 @@ class RunState:
                 p.weapon_timers[key] = weapon_cooldown(w, 1) * 0.35
             col = ch["color"]
             self.fx.popup(p.x, p.y - 64,
-                          f"{w['name']}" + ("" if first else f" SEVİYE {p.weapons[key]}"),
+                          w_name(w) + ("" if first else " " + L("ui.level_up_n", p.weapons[key])),
                           col, 24, life=1.4)
             # şans: kartın nadirlik bonusu (yeni silah kartında da).
             if ch.get("boost"):
@@ -28862,7 +29025,7 @@ class RunState:
                 lucky = True
                 cost = 0
         if cost > self.gold_wallet:
-            return False, f"{cost} altın gerek"
+            return False, L("ui.need_gold", cost)
         if cost:
             self.gold_wallet -= cost
         if bonus:
@@ -28880,13 +29043,13 @@ class RunState:
             p = self.player
             self.fx.popup(p.x, p.y - 90, L("ui.luck_free"), GREEN, 18, life=1.4)
             return True, L("ui.luck_free")
-        return True, ("bedava yenileme" if cost == 0 else f"-{cost} altın")
+        return True, (L("ui.free_reroll") if cost == 0 else L("ui.minus_gold", cost))
 
     def skip_levelup(self):
         """Bu seviyeyi pas geçer."""
         cost = self.skip_cost()
         if cost > self.gold_wallet:
-            return False, f"{cost} altın gerek"
+            return False, L("ui.need_gold", cost)
         if cost:
             self.gold_wallet -= cost
         self.skip_used += 1
@@ -28895,7 +29058,7 @@ class RunState:
         self.pending_levelups -= 1
         sfx("hover", 0.8, 0.0)
         self._next_levelup_or_close()
-        return True, ("bedava pas" if cost == 0 else f"-{cost} altın")
+        return True, (L("ui.free_skip") if cost == 0 else L("ui.minus_gold", cost))
 
     def run_is_clean(self):
         """Bu koşu sıralamalara yazılabilir mi?"""
@@ -29323,7 +29486,7 @@ STRINGS.update({
     "ui.ach_pending": _T("{0} elmas seni bekliyor", "{0} gems are waiting", "{0} gemas te esperan",
                          "{0} Edelsteine warten", "Тебя ждут {0} кристаллов"),
     "ui.go_ach":      _T("BAŞARIMLARA GİT", "GO TO ACHIEVEMENTS", "IR A LOGROS", "ZU DEN ERFOLGEN", "К ДОСТИЖЕНИЯМ"),
-    "ui.free_note":   _T("Bedava elmasla skin, kıyafet ve Arena Ustalığı alabilirsin. Premium skin ve petler gerçek parayla satılır.",
+    "ui.free_note":   _T("Bedava elmasla skin, kıyafet ve Arena Ustalığı alınır. Premium skin ve petler parayla.",
                          "Spend free gems on skins, outfits and Arena Mastery. Premium skins and pets are sold for real money.",
                          "Usa las gemas gratis en skins, ropa y MAESTRÍA. Skins premium y mascotas se venden con dinero real.",
                          "Gratis-Edelsteine für Skins, Outfits und ARENA-MEISTERSCHAFT. Premium-Skins und Haustiere gibt es für Echtgeld.",
@@ -31407,6 +31570,7 @@ _wslot_panel_cache = {}
 
 def _fit_text(txt, size, max_w, bold=False):
     """Metni verilen genişliğe sığdırır; sığmıyorsa sonunu kısaltır."""
+    txt = TRX(txt)
     if text_width(txt, size, bold) <= max_w:
         return txt
     for n in range(len(txt) - 1, 1, -1):
@@ -35275,6 +35439,7 @@ def ms_records(save, theme):
 
 def ms_fit(text, size, max_w, bold=False):
     """Metni genişliğe sığdır (gerekirse küçült, en son '...' ile kes)."""
+    text = TRX(text)
     sz = size
     while sz > 9 and text_width(text, sz, bold) > max_w:
         sz -= 1
@@ -35699,7 +35864,7 @@ def _ms_draw_detail(app, canvas, theme, mouse_pos, clicked, t, k):
         # patronun üstüne gelince bu haritadaki yetenekleri yazar
         sk = boss_skill_set(hov_boss, theme if theme != "stone" else None, False)
         ln = "%s: %s" % (ms_boss_name(theme, hov_boss),
-                          ", ".join(BOSS_SKILL_LABELS.get(k, k) for k in sk))
+                          ", ".join(TRX(BOSS_SKILL_LABELS.get(k, k)) for k in sk))
         hov_kind = hov_boss
     elif hov_kind:
         ln = "%s: %s" % (ms_creature_name(theme, hov_kind), L("ms.role.%s" % hov_kind))
@@ -36346,7 +36511,7 @@ class RunShopOverlay:
 
     def _draw_header(self, surf, run, hellish, t):
         if hellish:
-            title, tcol = "CEHENNEM MARKETİ", (255, 132, 56)
+            title, tcol = L("ui.hell_market"), (255, 132, 56)
             pulse = 0.55 + 0.45 * math.sin(t * 2.6)
             add_glow(surf, VIRTUAL_W / 2, 48, 210, (255, 90, 40), 0.18 + 0.10 * pulse)
             # başlığın iki yanında alev dilleri
@@ -38959,7 +39124,7 @@ class GameTour:
         self.cap(_tc("EFSANEVİ HASAR KİTABI: +%40!", "LEGENDARY DAMAGE BOOK: +40%!",
                      "LIBRO DE DAÑO LEGENDARIO: ¡+40%!", "LEGENDÄRES SCHADENSBUCH: +40%!",
                      "ЛЕГЕНДАРНАЯ КНИГА УРОНА: +40%!"),
-                 _tc("Aynı kitap Yaygın gelseydi yalnızca +%5 verirdi.",
+                 _tc("Aynı kitap Yaygın gelseydi sadece +%5 verirdi.",
                      "The same book as a Common card would give just +5%.",
                      "El mismo libro en carta Común daría solo +5%.",
                      "Dasselbe Buch als gewöhnliche Karte gäbe nur +5%.",
@@ -40530,7 +40695,7 @@ STRINGS.update({
 
 # Telefonda tuş adları yerine düğme adları yazar ("[E] ile konuş" -> "[E]").
 MOBILE_KEY_LABELS = {
-    "use": "E", "dash": "DASH", "bonk": "BONK", "shop": "$", "map": "HARİTA",
+    "use": "E", "dash": "DASH", "bonk": "BONK", "shop": "$", "map": "MAP",
     "stats": "⋮", "restart": "-", "fire": "OTO",
 }
 
@@ -43533,6 +43698,420 @@ _coop_static_tables()
 
 
 RUN_OVERLAY_STATES = (STATE_PAUSE, STATE_LEVELUP, STATE_CURSE, STATE_MERCHANT, STATE_RUN_SHOP)
+
+
+
+STRINGS.update({
+    "ui.f_all":       _T("TÜMÜ ({0})", "ALL ({0})", "TODOS ({0})", "ALLE ({0})", "ВСЕ ({0})"),
+    "ui.f_got":       _T("AÇILDI ({0})", "UNLOCKED ({0})", "LOGRADOS ({0})", "FREI ({0})", "ОТКРЫТО ({0})"),
+    "ui.f_open":      _T("AÇIK ({0})", "UNLOCKED ({0})", "ABIERTOS ({0})", "FREI ({0})", "ОТКРЫТО ({0})"),
+    "ui.f_locked":    _T("KİLİTLİ ({0})", "LOCKED ({0})", "BLOQUEADOS ({0})", "GESPERRT ({0})", "ЗАКРЫТО ({0})"),
+    "ui.f_near":      _T("YAKIN ({0})", "CLOSE ({0})", "CERCA ({0})", "FAST ({0})", "БЛИЗКО ({0})"),
+    "ui.f_muted":     _T("KAPALI ({0})", "MUTED ({0})", "SILENCIADOS ({0})", "AUS ({0})", "ОТКЛ. ({0})"),
+    "ui.f_rare":      _T("NADİR ({0})", "RARE ({0})", "RAROS ({0})", "SELTEN ({0})", "РЕДКИЕ ({0})"),
+    "tier.bronz":     _T("BRONZ", "BRONZE", "BRONCE", "BRONZE", "БРОНЗА"),
+    "tier.gumus":     _T("GÜMÜŞ", "SILVER", "PLATA", "SILBER", "СЕРЕБРО"),
+    "tier.altin":     _T("ALTIN", "GOLD", "ORO", "GOLD", "ЗОЛОТО"),
+    "tier.efsane":    _T("EFSANE", "LEGEND", "LEYENDA", "LEGENDE", "ЛЕГЕНДА"),
+    "ui.tier_badge":  _T("{0} BAŞARIM", "{0} ACHIEVEMENT", "LOGRO DE {0}", "{0}-ERFOLG", "ДОСТИЖЕНИЕ: {0}"),
+    "ui.prog_left":   _T("{0} / {1}   -   {2} kaldı  ({3})", "{0} / {1}   -   {2} to go  ({3})",
+                         "{0} / {1}   -   faltan {2}  ({3})", "{0} / {1}   -   noch {2}  ({3})",
+                         "{0} / {1}   -   осталось {2}  ({3})"),
+    "ui.prog_left2":  _T("{0} / {1}  ({2}, {3} kaldı)", "{0} / {1}  ({2}, {3} to go)", "{0} / {1}  ({2}, faltan {3})",
+                         "{0} / {1}  ({2}, noch {3})", "{0} / {1}  ({2}, осталось {3})"),
+    "ui.muted_state": _T("KAPALI - seviye atlarken çıkmaz", "MUTED - won't show on level up",
+                         "SILENCIADA - no sale al subir de nivel", "GESPERRT - erscheint nicht beim Aufstieg",
+                         "ОТКЛЮЧЕНО - не выпадает при повышении"),
+    "ui.every_for":   _T("{0} saniyede bir {1} saniye", "{1} s every {0} s", "{1} s cada {0} s", "{1} s alle {0} s",
+                         "{1} с каждые {0} с"),
+    "ui.no_cd":       _T("bekleme yok, hep açık", "no cooldown, always on", "sin espera, siempre activo",
+                         "keine Abklingzeit, immer an", "без перезарядки, всегда активно"),
+    "ui.cd_lbl":      _T("BEKLEME", "COOLDOWN", "ESPERA", "ABKLINGZEIT", "ПЕРЕЗАРЯДКА"),
+    "ui.n_secs":      _T("{0} saniye", "{0} s", "{0} s", "{0} s", "{0} с"),
+    "ui.max_lbl":     _T("EN ÇOK", "MAX", "MÁXIMO", "MAXIMAL", "МАКСИМУМ"),
+    "ui.level_n":     _T("Seviye {0}", "Level {0}", "Nivel {0}", "Stufe {0}", "Уровень {0}"),
+    "ui.no_levels":   _T("Seviye atlamaz", "Doesn't level up", "No sube de nivel", "Steigt nicht auf", "Не повышается"),
+    "ui.ult_auto":    _T("otomatik - {0} saniyede bir", "auto - every {0} s", "automática - cada {0} s",
+                         "automatisch - alle {0} s", "авто - раз в {0} с"),
+    "ui.ult_trigger": _T("şartı oluşunca - {0} saniyede bir", "when triggered - every {0} s",
+                         "al activarse - cada {0} s", "bei Auslösung - alle {0} s", "по условию - раз в {0} с"),
+    "ui.level_up_n":  _T("SEVİYE {0}", "LEVEL {0}", "NIVEL {0}", "STUFE {0}", "УРОВЕНЬ {0}"),
+    "ui.free_reroll": _T("bedava yenileme", "free reroll", "renovación gratis", "kostenlos neu", "бесплатно"),
+    "ui.free_skip":   _T("bedava pas", "free skip", "salto gratis", "kostenlos übersprungen", "пропуск бесплатно"),
+    "ui.need_gold":   _T("{0} altın gerek", "need {0} gold", "necesitas {0} de oro", "{0} Gold nötig", "нужно {0} золота"),
+})
+
+
+# içerik çevirileri: Türkçe metin -> (en, es, de, ru)
+TEXT_TR.update({
+    'Toplam 150 yaratık öldür': ('Kill 150 monsters in total', 'Mata 150 monstruos en total', 'Töte insgesamt 150 Monster', 'Убей всего 150 монстров'),
+    'Elini kirlet: 150 yaratık devir': ('Get your hands dirty: kill 150 monsters', 'Mánchate las manos: mata 150 monstruos', 'Mach dir die Hände schmutzig: 150 Monster', 'Испачкай руки: убей 150 монстров'),
+    '8. dalgaya ulaş': ('Reach wave 8', 'Llega a la oleada 8', 'Erreiche Welle 8', 'Дойди до 8-й волны'),
+    'Ayakta kal: 8. dalgaya ulaş': ('Stay standing: reach wave 8', 'Aguanta: llega a la oleada 8', 'Bleib stehen: erreiche Welle 8', 'Устои: дойди до 8-й волны'),
+    '1 patron devir': ('Defeat 1 boss', 'Derrota 1 jefe', 'Besiege 1 Boss', 'Победи 1 босса'),
+    'Toplam 400 yaratık öldür': ('Kill 400 monsters in total', 'Mata 400 monstruos en total', 'Töte insgesamt 400 Monster', 'Убей всего 400 монстров'),
+    'Bir patron devir ve 400 yaratık öldür': ('Defeat a boss and kill 400 monsters', 'Derrota un jefe y mata 400 monstruos', 'Besiege einen Boss und töte 400 Monster', 'Победи босса и убей 400 монстров'),
+    'Yakın dövüşe alış: toplam 40 dash at': ('Get used to close combat: dash 40 times', 'Acostúmbrate al cuerpo a cuerpo: 40 impulsos', 'Gewöhn dich an den Nahkampf: 40 Dashes', 'Привыкни к ближнему бою: 40 рывков'),
+    'Tek koşuda 400 can yenile': ('Heal 400 HP in one run', 'Cura 400 de vida en una partida', 'Heile 400 LP in einem Lauf', 'Восстанови 400 здоровья за забег'),
+    'Bir koşuda 400 can yenile': ('Heal 400 HP in one run', 'Cura 400 de vida en una partida', 'Heile 400 LP in einem Lauf', 'Восстанови 400 здоровья за забег'),
+    'Toplam 25 dakika oyna': ('Play 25 minutes in total', 'Juega 25 minutos en total', 'Spiele insgesamt 25 Minuten', 'Сыграй всего 25 минут'),
+    'Sahada toplam 25 dakika geçir': ('Spend 25 minutes in the arena', 'Pasa 25 minutos en la arena', 'Verbringe 25 Minuten in der Arena', 'Проведи на арене 25 минут'),
+    'Papuç silahını aç': ('Unlock the Ember Boot', 'Desbloquea la Bota Ardiente', 'Schalte den Glutschuh frei', 'Открой Огненный башмак'),
+    '6 patron devir': ('Defeat 6 bosses', 'Derrota 6 jefes', 'Besiege 6 Bosse', 'Победи 6 боссов'),
+    'Toplam 1.000 yaratık öldür': ('Kill 1,000 monsters in total', 'Mata 1.000 monstruos en total', 'Töte insgesamt 1.000 Monster', 'Убей всего 1 000 монстров'),
+    '6 patron devir ve 1.000 yaratık öldür': ('Defeat 6 bosses and kill 1,000 monsters', 'Derrota 6 jefes y mata 1.000 monstruos', 'Besiege 6 Bosse und töte 1.000 Monster', 'Победи 6 боссов и убей 1 000 монстров'),
+    '12. dalgaya ulaş': ('Reach wave 12', 'Llega a la oleada 12', 'Erreiche Welle 12', 'Дойди до 12-й волны'),
+    '12. dalgaya ulaş ve toplam 800 dash at': ('Reach wave 12 and dash 800 times', 'Llega a la oleada 12 y haz 800 impulsos', 'Erreiche Welle 12 und mach 800 Dashes', 'Дойди до 12-й волны и сделай 800 рывков'),
+    'Buz İzi silahını aç': ('Unlock Frost Trail', 'Desbloquea el Rastro Helado', 'Schalte die Frostspur frei', 'Открой Ледяной след'),
+    'Arenaya alış: 60 düşman öldür': ('Warm up: kill 60 enemies', 'Calienta: mata 60 enemigos', 'Aufwärmen: töte 60 Gegner', 'Разминка: убей 60 врагов'),
+    'Toplam 60 düşman öldür': ('Kill 60 enemies in total', 'Mata 60 enemigos en total', 'Töte insgesamt 60 Gegner', 'Убей всего 60 врагов'),
+    '3 koşu tamamla ve 4. dalgayı gör': ('Finish 3 runs and see wave 4', 'Termina 3 partidas y llega a la oleada 4', 'Beende 3 Läufe und sieh Welle 4', 'Заверши 3 забега и дойди до 4-й волны'),
+    '3 koşu tamamla': ('Finish 3 runs', 'Termina 3 partidas', 'Beende 3 Läufe', 'Заверши 3 забега'),
+    '4. dalgaya ulaş': ('Reach wave 4', 'Llega a la oleada 4', 'Erreiche Welle 4', 'Дойди до 4-й волны'),
+    '500 altın topla ve 5. dalgaya ulaş': ('Collect 500 gold and reach wave 5', 'Recoge 500 de oro y llega a la oleada 5', 'Sammle 500 Gold und erreiche Welle 5', 'Собери 500 золота и дойди до 5-й волны'),
+    'Toplam 500 altın topla': ('Collect 500 gold in total', 'Recoge 500 de oro en total', 'Sammle insgesamt 500 Gold', 'Собери всего 500 золота'),
+    '5. dalgaya ulaş': ('Reach wave 5', 'Llega a la oleada 5', 'Erreiche Welle 5', 'Дойди до 5-й волны'),
+    'Dash ustası ol': ('Become a dash master', 'Domina el impulso', 'Werde Dash-Meister', 'Стань мастером рывка'),
+    'Tek koşuda 40 kez dash at': ('Dash 40 times in one run', 'Haz 40 impulsos en una partida', 'Mach 40 Dashes in einem Lauf', 'Сделай 40 рывков за забег'),
+    'Tetiği bırakma: 12.000 mermi at': ('Keep shooting: fire 12,000 shots', 'No sueltes el gatillo: 12.000 disparos', 'Nicht loslassen: 12.000 Schüsse', 'Не отпускай курок: 12 000 выстрелов'),
+    'Toplam 12.000 mermi at': ('Fire 12,000 shots in total', 'Dispara 12.000 balas en total', 'Feuere insgesamt 12.000 Schüsse', 'Сделай всего 12 000 выстрелов'),
+    'Kritik vuruşla tanış': ('Meet the critical hit', 'Conoce el crítico', 'Lerne den Krit kennen', 'Познакомься с критом'),
+    'Toplam 600 kritik vuruş yap': ('Land 600 crits in total', 'Haz 600 críticos en total', 'Lande insgesamt 600 Krits', 'Нанеси всего 600 критов'),
+    '7. dalgaya ulaş': ('Reach wave 7', 'Llega a la oleada 7', 'Erreiche Welle 7', 'Дойди до 7-й волны'),
+    'Kritik hasarda uzmanlaş': ('Master critical damage', 'Domina el daño crítico', 'Meistere Kritschaden', 'Освой критический урон'),
+    'Toplam 3.000 kritik vuruş yap': ('Land 3,000 crits in total', 'Haz 3.000 críticos en total', 'Lande insgesamt 3.000 Krits', 'Нанеси всего 3 000 критов'),
+    '«Kombo Kralı» başarımını aç': ('Unlock the «Combo King» achievement', 'Consigue el logro «Rey del Combo»', 'Schalte den Erfolg «Combo-König» frei', 'Получи достижение «Король Комбо»'),
+    'Yaralarını sar': ('Bind your wounds', 'Venda tus heridas', 'Verbinde deine Wunden', 'Перевяжи раны'),
+    'Tek koşuda 1.200 can yenile': ('Heal 1,200 HP in one run', 'Cura 1.200 de vida en una partida', 'Heile 1.200 LP in einem Lauf', 'Восстанови 1 200 здоровья за забег'),
+    'Toplam 6.000 can yenile': ('Heal 6,000 HP in total', 'Cura 6.000 de vida en total', 'Heile insgesamt 6.000 LP', 'Восстанови всего 6 000 здоровья'),
+    'Kasanı doldur: tek koşuda 1.500 altın': ('Fill the vault: 1,500 gold in one run', 'Llena la caja: 1.500 de oro en una partida', 'Füll die Kasse: 1.500 Gold in einem Lauf', 'Набей казну: 1 500 золота за забег'),
+    'Tek koşuda 1.500 altın kazan': ('Earn 1,500 gold in one run', 'Gana 1.500 de oro en una partida', 'Verdiene 1.500 Gold in einem Lauf', 'Заработай 1 500 золота за забег'),
+    'Tecrübeyle büyü: bir koşuda 10. seviyeye çık': ('Grow with experience: reach level 10 in a run', 'Crece con la experiencia: nivel 10 en una partida', 'Wachse mit Erfahrung: Stufe 10 in einem Lauf', 'Расти с опытом: 10-й уровень за забег'),
+    '«Tecrübeli» başarımını aç': ('Unlock the «Seasoned» achievement', 'Consigue el logro «Veterano»', 'Schalte den Erfolg «Erfahren» frei', 'Получи достижение «Опытный»'),
+    '8 koşu tamamla': ('Finish 8 runs', 'Termina 8 partidas', 'Beende 8 Läufe', 'Заверши 8 забегов'),
+    'Yerdekini bırakma: toplam 12.000 altın topla': ('Leave nothing behind: collect 12,000 gold', 'No dejes nada: recoge 12.000 de oro', 'Lass nichts liegen: sammle 12.000 Gold', 'Ничего не оставляй: собери 12 000 золота'),
+    'Toplam 12.000 altın topla': ('Collect 12,000 gold in total', 'Recoge 12.000 de oro en total', 'Sammle insgesamt 12.000 Gold', 'Собери всего 12 000 золота'),
+    'Kanla beslen: toplam 4.000 can çal': ('Feed on blood: steal 4,000 HP', 'Aliméntate de sangre: roba 4.000 de vida', 'Nähr dich von Blut: stiehl 4.000 LP', 'Питайся кровью: укради 4 000 здоровья'),
+    'Kan Emici ile toplam 4.000 can çal': ('Steal 4,000 HP with Vampiric', 'Roba 4.000 de vida con Vampírico', 'Stiehl 4.000 LP mit Blutsauger', 'Укради 4 000 здоровья Вампиризмом'),
+    'Sırayı dizip tek mermiyle biç: 8. dalgaya ulaş': ('Line them up and mow them down: reach wave 8', 'Ponlos en fila y siégalos: oleada 8', 'Reih sie auf und mäh sie um: Welle 8', 'Выстрой в ряд и скоси: 8-я волна'),
+    'Toplam 15.000 mermi at': ('Fire 15,000 shots in total', 'Dispara 15.000 balas en total', 'Feuere insgesamt 15.000 Schüsse', 'Сделай всего 15 000 выстрелов'),
+    'Yumruğunla konuş': ('Let your fists talk', 'Habla con los puños', 'Lass die Fäuste sprechen', 'Говори кулаками'),
+    'BONK ile toplam 2.500 düşmana vur': ('Hit 2,500 enemies with BONK', 'Golpea a 2.500 enemigos con BONK', 'Triff 2.500 Gegner mit BONK', 'Ударь 2 500 врагов БОНКом'),
+    'Kalabalığın ortasında yaşa': ('Live in the middle of the crowd', 'Vive en medio de la multitud', 'Leb mitten in der Menge', 'Живи в гуще толпы'),
+    'Tek koşuda 250 düşman öldür': ('Kill 250 enemies in one run', 'Mata 250 enemigos en una partida', 'Töte 250 Gegner in einem Lauf', 'Убей 250 врагов за забег'),
+    '«Katliam» başarımını aç': ('Unlock the «Massacre» achievement', 'Consigue el logro «Masacre»', 'Schalte den Erfolg «Massaker» frei', 'Получи достижение «Бойня»'),
+    'Patron avına çık': ('Go boss hunting', 'Sal a cazar jefes', 'Geh auf Bossjagd', 'Выйди на охоту за боссами'),
+    '«Dev Avcısı» başarımını aç': ('Unlock the «Giant Slayer» achievement', 'Consigue el logro «Matagigantes»', 'Schalte den Erfolg «Riesentöter» frei', 'Получи достижение «Победитель Гигантов»'),
+    'Sandıkların tadına bak: 10 patron sandığı aç': ('Taste the loot: open 10 boss chests', 'Prueba el botín: abre 10 cofres de jefe', 'Koste die Beute: öffne 10 Bosstruhen', 'Вкус добычи: открой 10 сундуков боссов'),
+    'Toplam 10 patron sandığı aç': ('Open 10 boss chests in total', 'Abre 10 cofres de jefe en total', 'Öffne insgesamt 10 Bosstruhen', 'Открой всего 10 сундуков боссов'),
+    '9. dalgaya ulaş': ('Reach wave 9', 'Llega a la oleada 9', 'Erreiche Welle 9', 'Дойди до 9-й волны'),
+    'Cephaneliği kur: 3.000 düşman öldür ve 8. dalgaya ulaş': ('Build the arsenal: kill 3,000 enemies and reach wave 8', 'Monta el arsenal: mata 3.000 enemigos y llega a la oleada 8', 'Bau das Arsenal: töte 3.000 Gegner und erreiche Welle 8', 'Собери арсенал: убей 3 000 врагов и дойди до 8-й волны'),
+    'Toplam 3.000 düşman öldür': ('Kill 3,000 enemies in total', 'Mata 3.000 enemigos en total', 'Töte insgesamt 3.000 Gegner', 'Убей всего 3 000 врагов'),
+    'Darbeden sıyrıl: 800 dash at ve 6. dalgaya ulaş': ('Slip the blow: dash 800 times and reach wave 6', 'Esquiva el golpe: 800 impulsos y oleada 6', 'Weich aus: 800 Dashes und Welle 6', 'Уйди от удара: 800 рывков и 6-я волна'),
+    '6. dalgaya ulaş': ('Reach wave 6', 'Llega a la oleada 6', 'Erreiche Welle 6', 'Дойди до 6-й волны'),
+    'Binlerce düşmanı devir, birini bile kaçırma': ('Take down thousands, miss none', 'Derriba a miles, no se te escape ninguno', 'Fälle Tausende, verpasse keinen', 'Сразись с тысячами, никого не упусти'),
+    'Toplam 4.000 düşman öldür': ('Kill 4,000 enemies in total', 'Mata 4.000 enemigos en total', 'Töte insgesamt 4.000 Gegner', 'Убей всего 4 000 врагов'),
+    'Tek koşuda 300 düşman öldür': ('Kill 300 enemies in one run', 'Mata 300 enemigos en una partida', 'Töte 300 Gegner in einem Lauf', 'Убей 300 врагов за забег'),
+    'Tetiği bırakma: 30.000 mermi at': ('Keep shooting: fire 30,000 shots', 'No sueltes el gatillo: 30.000 disparos', 'Nicht loslassen: 30.000 Schüsse', 'Не отпускай курок: 30 000 выстрелов'),
+    'Toplam 30.000 mermi at': ('Fire 30,000 shots in total', 'Dispara 30.000 balas en total', 'Feuere insgesamt 30.000 Schüsse', 'Сделай всего 30 000 выстрелов'),
+    '10. dalgaya ulaş': ('Reach wave 10', 'Llega a la oleada 10', 'Erreiche Welle 10', 'Дойди до 10-й волны'),
+    "Kan Emici'yi Lv.4'e çıkar ve 6.000 can çal": ('Get Vampiric to Lv.4 and steal 6,000 HP', 'Sube Vampírico a Nv.4 y roba 6.000 de vida', 'Bring Blutsauger auf St.4 und stiehl 6.000 LP', 'Прокачай Вампиризм до ур. 4 и укради 6 000 здоровья'),
+    "Kan Emici'yi markette Lv.4'e çıkar": ('Get Vampiric to Lv.4 in the shop', 'Sube Vampírico a Nv.4 en la tienda', 'Bring Blutsauger im Shop auf St.4', 'Прокачай Вампиризм в магазине до ур. 4'),
+    'Kan Emici ile toplam 6.000 can çal': ('Steal 6,000 HP with Vampiric', 'Roba 6.000 de vida con Vampírico', 'Stiehl 6.000 LP mit Blutsauger', 'Укради 6 000 здоровья Вампиризмом'),
+    'Patronların kâbusu ol': ("Be the bosses' nightmare", 'Sé la pesadilla de los jefes', 'Sei der Albtraum der Bosse', 'Стань кошмаром боссов'),
+    'Tek koşuda 350 düşman öldür': ('Kill 350 enemies in one run', 'Mata 350 enemigos en una partida', 'Töte 350 Gegner in einem Lauf', 'Убей 350 врагов за забег'),
+    'Bitirmeyi öğren: 16. dalgaya ulaş': ('Learn to finish: reach wave 16', 'Aprende a rematar: llega a la oleada 16', 'Lerne zu vollenden: erreiche Welle 16', 'Научись добивать: дойди до 16-й волны'),
+    '16. dalgaya ulaş': ('Reach wave 16', 'Llega a la oleada 16', 'Erreiche Welle 16', 'Дойди до 16-й волны'),
+    'Toplam 5.000 düşman öldür': ('Kill 5,000 enemies in total', 'Mata 5.000 enemigos en total', 'Töte insgesamt 5.000 Gegner', 'Убей всего 5 000 врагов'),
+    'Arena senin kükremeni tanısın': ('Let the arena know your roar', 'Que la arena conozca tu rugido', 'Lass die Arena dein Brüllen kennen', 'Пусть арена знает твой рык'),
+    'BONK ile toplam 3.500 düşmana vur': ('Hit 3,500 enemies with BONK', 'Golpea a 3.500 enemigos con BONK', 'Triff 3.500 Gegner mit BONK', 'Ударь 3 500 врагов БОНКом'),
+    "Önce BONK Kitabı'nı aç": ('Unlock the Book of BONK first', 'Primero desbloquea el Libro del BONK', 'Schalte zuerst das Buch des BONK frei', 'Сначала открой Книгу БОНК'),
+    'Zamanla yarış': ('Race against time', 'Corre contra el tiempo', 'Wettlauf gegen die Zeit', 'Гонка со временем'),
+    '11. dalgaya ulaş': ('Reach wave 11', 'Llega a la oleada 11', 'Erreiche Welle 11', 'Дойди до 11-й волны'),
+    "Önce Rüzgâr Kitabı'nı aç": ('Unlock the Book of Wind first', 'Primero desbloquea el Libro del Viento', 'Schalte zuerst das Buch des Windes frei', 'Сначала открой Книгу Ветра'),
+    'Ölümün kıyısında ayakta kal': ('Stand firm on the edge of death', 'Aguanta al borde de la muerte', 'Bleib am Rand des Todes stehen', 'Устои на краю смерти'),
+    '14. dalgaya ulaş': ('Reach wave 14', 'Llega a la oleada 14', 'Erreiche Welle 14', 'Дойди до 14-й волны'),
+    "Kalkan'ı markette Lv.5'e çıkar": ('Get Shield to Lv.5 in the shop', 'Sube Escudo a Nv.5 en la tienda', 'Bring Schild im Shop auf St.5', 'Прокачай Щит в магазине до ур. 5'),
+    'Şansın kendisi ol': ('Become luck itself', 'Sé la suerte misma', 'Werde das Glück selbst', 'Стань самой удачей'),
+    "Önce Şans Kitabı'nı aç": ('Unlock the Book of Luck first', 'Primero desbloquea el Libro de la Suerte', 'Schalte zuerst das Buch des Glücks frei', 'Сначала открой Книгу Удачи'),
+    'Toplam 30 patron sandığı aç': ('Open 30 boss chests in total', 'Abre 30 cofres de jefe en total', 'Öffne insgesamt 30 Bosstruhen', 'Открой всего 30 сундуков боссов'),
+    '15. dalgaya ulaş': ('Reach wave 15', 'Llega a la oleada 15', 'Erreiche Welle 15', 'Дойди до 15-й волны'),
+    'Devleşecek kadar dayan': ("Hold out until you're a giant", 'Aguanta hasta volverte gigante', 'Halte durch, bis du ein Riese bist', 'Держись, пока не станешь гигантом'),
+    "40'lık bir kombo yap": ('Hit a 40 combo', 'Haz un combo de 40', 'Schaffe eine 40er-Combo', 'Сделай комбо 40'),
+    'Toplam 5.000 can yenile': ('Heal 5,000 HP in total', 'Cura 5.000 de vida en total', 'Heile insgesamt 5.000 LP', 'Восстанови всего 5 000 здоровья'),
+    '«Hayatta Kalan» başarımını aç': ('Unlock the «Survivor» achievement', 'Consigue el logro «Superviviente»', 'Schalte den Erfolg «Überlebender» frei', 'Получи достижение «Выживший»'),
+    'Hasar Alma -%4 (yeni başlayan dostu)': ('Damage Taken -4% (beginner friendly)', 'Daño recibido -4% (para novatos)', 'Erlittener Schaden -4% (anfängerfreundlich)', 'Получаемый урон -4% (для новичков)'),
+    'Her seviye: Hasar +%0.3, Hasar Alma -%0.3 (en çok %15)': ('Per level: Damage +0.3%, Damage Taken -0.3% (max 15%)', 'Por nivel: Daño +0.3%, daño recibido -0.3% (máx. 15%)', 'Pro Stufe: Schaden +0.3%, erlittener Schaden -0.3% (max. 15%)', 'За уровень: урон +0.3%, получаемый урон -0.3% (макс. 15%)'),
+    'KALKAN PROTOKOLÜ': ('SHIELD PROTOCOL', 'PROTOCOLO ESCUDO', 'SCHILDPROTOKOLL', 'ПРОТОКОЛ ЩИТА'),
+    "2 kalkan yükü verir ve maks canının %15'ini yeniler.": ('Gives 2 shield charges and heals 15% of your max HP.', 'Da 2 cargas de escudo y cura el 15% de tu vida máx.', 'Gibt 2 Schildladungen und heilt 15% deiner max. LP.', 'Даёт 2 заряда щита и лечит 15% макс. здоровья.'),
+    'Toplama Menzili +20': ('Pickup Range +20', 'Alcance de recogida +20', 'Aufsammelweite +20', 'Радиус подбора +20'),
+    'Hareket Hızı +10': ('Move Speed +10', 'Velocidad +10', 'Tempo +10', 'Скорость +10'),
+    'Her seviye: Atış Hızı +%0.6 (en çok %30)': ('Per level: Attack Speed +0.6% (max 30%)', 'Por nivel: Vel. de ataque +0.6% (máx. 30%)', 'Pro Stufe: Angriffstempo +0.6% (max. 30%)', 'За уровень: скорость атаки +0.6% (макс. 30%)'),
+    'ÖNCÜ ATILIMI': ('VANGUARD RUSH', 'EMBESTIDA PIONERA', 'VORHUT-ANSTURM', 'РЫВОК АВАНГАРДА'),
+    '6 saniye boyunca %35 daha hızlı koşar, %25 daha hızlı ateş edersin.': ('For 6 seconds you run 35% faster and shoot 25% faster.', 'Durante 6 segundos corres un 35% y disparas un 25% más rápido.', '6 Sekunden lang läufst du 35% und schießt 25% schneller.', '6 секунд бежишь на 35% и стреляешь на 25% быстрее.'),
+    'Mermi Hızı +%12': ('Bullet Speed +12%', 'Vel. de bala +12%', 'Geschosstempo +12%', 'Скорость пуль +12%'),
+    'Her seviye: Kritik Hasar +%1.2 (en çok %60), Hasar +%0.4 (en çok %24)': ('Per level: Crit Damage +1.2% (max 60%), Damage +0.4% (max 24%)', 'Por nivel: Daño crítico +1.2% (máx. 60%), Daño +0.4% (máx. 24%)', 'Pro Stufe: Krit-Schaden +1.2% (max. 60%), Schaden +0.4% (max. 24%)', 'За уровень: урон крита +1.2% (макс. 60%), урон +0.4% (макс. 24%)'),
+    'ŞAHİN YAĞMURU': ('HAWK RAIN', 'LLUVIA DE HALCÓN', 'FALKENREGEN', 'ЯСТРЕБИНЫЙ ДОЖДЬ'),
+    'Çevrene 20 delici tüy oku yağdırır.': ('Rains 20 piercing feather arrows around you.', 'Hace llover 20 flechas de pluma perforantes a tu alrededor.', 'Lässt 20 durchschlagende Federpfeile um dich regnen.', 'Обрушивает вокруг 20 пробивающих перьевых стрел.'),
+    'Deneyim Kazancı +%10': ('XP Gain +10%', 'Ganancia de XP +10%', 'XP-Gewinn +10%', 'Прирост опыта +10%'),
+    'Kritik Hasar +%10': ('Crit Damage +10%', 'Daño crítico +10%', 'Krit-Schaden +10%', 'Урон крита +10%'),
+    'Her seviye: Kritik Hasar +%1 (en çok %50)': ('Per level: Crit Damage +1% (max 50%)', 'Por nivel: Daño crítico +1% (máx. 50%)', 'Pro Stufe: Krit-Schaden +1% (max. 50%)', 'За уровень: урон крита +1% (макс. 50%)'),
+    'KRALİYET FERMANI': ('ROYAL DECREE', 'DECRETO REAL', 'KÖNIGLICHER ERLASS', 'КОРОЛЕВСКИЙ УКАЗ'),
+    'Rastgele 7 düşmanın tepesine yıldız düşer.': ('Stars fall on 7 random enemies.', 'Caen estrellas sobre 7 enemigos al azar.', 'Sterne fallen auf 7 zufällige Gegner.', 'Звёзды падают на 7 случайных врагов.'),
+    'Zincir Yıldırım Lv.2 ile başlar': ('Starts with Chain Shock Lv.2', 'Empieza con Descarga en Cadena Nv.2', 'Startet mit Kettenschock St.2', 'Начинает с Цепным разрядом ур. 2'),
+    'Her 15 seviyede Zincir Yıldırım +1 (en çok Lv.5)': ('Chain Shock +1 every 15 levels (max Lv.5)', 'Descarga en Cadena +1 cada 15 niveles (máx. Nv.5)', 'Kettenschock +1 alle 15 Stufen (max. St.5)', 'Цепной разряд +1 каждые 15 уровней (макс. ур. 5)'),
+    'Her seviye: Hasar +%0.3': ('Per level: Damage +0.3%', 'Por nivel: Daño +0.3%', 'Pro Stufe: Schaden +0.3%', 'За уровень: урон +0.3%'),
+    'YILDIRIM FIRTINASI': ('LIGHTNING STORM', 'TORMENTA ELÉCTRICA', 'BLITZSTURM', 'ГРОЗОВАЯ БУРЯ'),
+    "Haritadaki herkese yıldırım düşer: düşmanların canının %20'si gider (patronlara Lv.3 yıldırım hasarı).": ('Lightning strikes everyone on the map: enemies lose 20% HP (bosses take Lv.3 lightning damage).', 'Un rayo cae sobre todos en el mapa: los enemigos pierden el 20% de vida (a los jefes, daño de rayo Nv.3).', 'Blitze treffen alle auf der Karte: Gegner verlieren 20% LP (Bosse nehmen Blitzschaden St.3).', 'Молния бьёт всех на карте: враги теряют 20% здоровья (боссы получают урон молнии ур. 3).'),
+    'Dash Mesafesi +%20': ('Dash Distance +20%', 'Distancia de impulso +20%', 'Dash-Weite +20%', 'Дальность рывка +20%'),
+    'Mermi Delme +1': ('Bullet Pierce +1', 'Perforación +1', 'Durchschlag +1', 'Пробитие +1'),
+    'Her seviye: Kritik Şans +%0.2 (en çok %12)': ('Per level: Crit Chance +0.2% (max 12%)', 'Por nivel: Prob. crítico +0.2% (máx. 12%)', 'Pro Stufe: Krit-Chance +0.2% (max. 12%)', 'За уровень: шанс крита +0.2% (макс. 12%)'),
+    'GÖLGE DURUŞU': ('SHADOW STANCE', 'POSTURA SOMBRÍA', 'SCHATTENHALTUNG', 'ТЕНЕВАЯ СТОЙКА'),
+    "Ölümcül darbede canını 1'e sabitler ve 5 saniye zamanı durdurur - sen serbestçe hareket edersin.": ('On a fatal blow, locks your HP at 1 and stops time for 5 seconds - you move freely.', 'Ante un golpe mortal, fija tu vida en 1 y detiene el tiempo 5 segundos; tú te mueves libre.', 'Bei einem tödlichen Treffer bleibt dein Leben bei 1 und die Zeit steht 5 Sekunden still - du bewegst dich frei.', 'При смертельном ударе здоровье фиксируется на 1 и время останавливается на 5 секунд, а ты двигаешься.'),
+    'BONK Yarıçapı +%15': ('BONK Radius +15%', 'Radio de BONK +15%', 'BONK-Radius +15%', 'Радиус БОНК +15%'),
+    'BONK Hasarı +%10': ('BONK Damage +10%', 'Daño de BONK +10%', 'BONK-Schaden +10%', 'Урон БОНК +10%'),
+    'Her seviye: Hasar +%0.5 (en çok %30), BONK Hasarı +%1': ('Per level: Damage +0.5% (max 30%), BONK Damage +1%', 'Por nivel: Daño +0.5% (máx. 30%), Daño de BONK +1%', 'Pro Stufe: Schaden +0.5% (max. 30%), BONK-Schaden +1%', 'За уровень: урон +0.5% (макс. 30%), урон БОНК +1%'),
+    'ALEV HALKASI': ('RING OF FIRE', 'ANILLO DE FUEGO', 'FEUERRING', 'КОЛЬЦО ОГНЯ'),
+    'Çevrene genişleyen bir alev halkası salar; değdiği düşman yanar.': ('Releases an expanding ring of fire around you; enemies it touches burn.', 'Lanza un anillo de fuego que se expande; los enemigos que toca arden.', 'Entfesselt einen wachsenden Feuerring; berührte Gegner brennen.', 'Выпускает расходящееся кольцо огня; задетые враги горят.'),
+    'Altın Kazancı +%20': ('Gold Gain +20%', 'Ganancia de oro +20%', 'Goldgewinn +20%', 'Прирост золота +20%'),
+    'Her seviye: Hasar +%0.4, Şans +%0.2 (en çok %24 / %12)': ('Per level: Damage +0.4%, Luck +0.2% (max 24% / 12%)', 'Por nivel: Daño +0.4%, Suerte +0.2% (máx. 24% / 12%)', 'Pro Stufe: Schaden +0.4%, Glück +0.2% (max. 24% / 12%)', 'За уровень: урон +0.4%, удача +0.2% (макс. 24% / 12%)'),
+    'ALTIN DOKUNUŞ': ('GOLDEN TOUCH', 'TOQUE DORADO', 'GOLDENE BERÜHRUNG', 'ЗОЛОТОЕ КАСАНИЕ'),
+    'Çevredeki düşmanlara hasar verir ve her birinden fazladan altın düşürür.': ('Damages nearby enemies and makes each drop extra gold.', 'Daña a los enemigos cercanos y cada uno suelta oro extra.', 'Schadet Gegnern in der Nähe, jeder lässt extra Gold fallen.', 'Ранит врагов рядом, и каждый роняет лишнее золото.'),
+    'Çoklu Atış Lv. +1': ('Multishot Lv. +1', 'Disparo Múltiple Nv. +1', 'Mehrfachschuss St. +1', 'Мультивыстрел ур. +1'),
+    'Mermi Hızı +%10': ('Bullet Speed +10%', 'Vel. de bala +10%', 'Geschosstempo +10%', 'Скорость пуль +10%'),
+    'Her seviye: Hasar +%0.4 (en çok %24)': ('Per level: Damage +0.4% (max 24%)', 'Por nivel: Daño +0.4% (máx. 24%)', 'Pro Stufe: Schaden +0.4% (max. 24%)', 'За уровень: урон +0.4% (макс. 24%)'),
+    'PRİZMA PATLAMASI': ('PRISM BURST', 'ESTALLIDO PRISMÁTICO', 'PRISMA-EXPLOSION', 'ПРИЗМЕННЫЙ ВЗРЫВ'),
+    '18 delici prizma ışınını her yöne saçar.': ('Fires 18 piercing prism beams in every direction.', 'Lanza 18 rayos prismáticos perforantes en todas direcciones.', 'Feuert 18 durchschlagende Prismastrahlen in alle Richtungen.', 'Выпускает 18 пробивающих призменных лучей во все стороны.'),
+    'Hareket Hızı +30': ('Move Speed +30', 'Velocidad +30', 'Tempo +30', 'Скорость +30'),
+    'Dash Bekleme Süresi -%15': ('Dash Cooldown -15%', 'Espera de impulso -15%', 'Dash-Abklingzeit -15%', 'Перезарядка рывка -15%'),
+    'Her seviye: Kritik Şans +%0.2, Atış Hızı +%0.3': ('Per level: Crit Chance +0.2%, Attack Speed +0.3%', 'Por nivel: Prob. crítico +0.2%, Vel. de ataque +0.3%', 'Pro Stufe: Krit-Chance +0.2%, Angriffstempo +0.3%', 'За уровень: шанс крита +0.2%, скорость атаки +0.3%'),
+    'SESSİZ PUSU': ('SILENT AMBUSH', 'EMBOSCADA SILENCIOSA', 'STILLER HINTERHALT', 'ТИХАЯ ЗАСАДА'),
+    '4 saniye dokunulmaz olursun ve bu sürede her vuruşun kritik gelir.': ("You're untouchable for 4 seconds and every hit is a crit.", 'Eres intocable 4 segundos y cada golpe es crítico.', '4 Sekunden unberührbar, jeder Treffer ist ein Krit.', '4 секунды ты неуязвим, и каждый удар критический.'),
+    'Buz Lv.2 ile başlar (yavaşlatma)': ('Starts with Ice Lv.2 (slow)', 'Empieza con Hielo Nv.2 (ralentiza)', 'Startet mit Eis St.2 (verlangsamt)', 'Начинает со Льдом ур. 2 (замедление)'),
+    'Kritik Vuruş Şansı +%8': ('Crit Chance +8%', 'Prob. crítico +8%', 'Krit-Chance +8%', 'Шанс крита +8%'),
+    'Her 15 seviyede Buz +1 (en çok Lv.5)': ('Ice +1 every 15 levels (max Lv.5)', 'Hielo +1 cada 15 niveles (máx. Nv.5)', 'Eis +1 alle 15 Stufen (max. St.5)', 'Лёд +1 каждые 15 уровней (макс. ур. 5)'),
+    'BUZ ÇAĞI': ('ICE AGE', 'ERA DE HIELO', 'EISZEIT', 'ЛЕДНИКОВЫЙ ПЕРИОД'),
+    'Bütün düşmanları 2.5 saniye dondurur, sonrasında 5 saniye yavaşlatır.': ('Freezes all enemies for 2.5 seconds, then slows them for 5.', 'Congela a todos los enemigos 2.5 segundos y luego los ralentiza 5.', 'Friert alle Gegner 2,5 Sekunden ein und verlangsamt sie dann 5 Sekunden.', 'Замораживает всех врагов на 2.5 секунды, затем замедляет на 5.'),
+    'Kan Emme Lv.2 ile başlar': ('Starts with Lifesteal Lv.2', 'Empieza con Robo de vida Nv.2', 'Startet mit Lebensraub St.2', 'Начинает с Вампиризмом ур. 2'),
+    'Can Yenilenmesi +0.8/sn': ('Health Regen +0.8/s', 'Regeneración +0.8/s', 'Regeneration +0.8/s', 'Регенерация +0.8/с'),
+    'Her 15 seviyede Kan Emme +1 (en çok Lv.5)': ('Lifesteal +1 every 15 levels (max Lv.5)', 'Robo de vida +1 cada 15 niveles (máx. Nv.5)', 'Lebensraub +1 alle 15 Stufen (max. St.5)', 'Вампиризм +1 каждые 15 уровней (макс. ур. 5)'),
+    "Her seviye: saniyede maks canın %0.012'si yenilenir (en çok %0.6)": ('Per level: regen 0.012% of max HP per second (max 0.6%)', 'Por nivel: regenera el 0.012% de la vida máx. por segundo (máx. 0.6%)', 'Pro Stufe: 0.012% der max. LP pro Sekunde (max. 0.6%)', 'За уровень: 0.012% макс. здоровья в секунду (макс. 0.6%)'),
+    'KAN AYİNİ': ('BLOOD RITE', 'RITO DE SANGRE', 'BLUTRITUAL', 'КРОВАВЫЙ ОБРЯД'),
+    'Çevredeki düşmanların canını emer; emilen canın yarısı sana geçer.': ("Drains nearby enemies; half of what's drained heals you.", 'Drena a los enemigos cercanos; la mitad te cura.', 'Saugt Gegnern in der Nähe Leben ab; die Hälfte heilt dich.', 'Высасывает здоровье врагов рядом; половина лечит тебя.'),
+    'Zırh +%8 (hasar azaltma)': ('Armor +8% (damage reduction)', 'Armadura +8% (reduce daño)', 'Rüstung +8% (Schadensreduktion)', 'Броня +8% (снижение урона)'),
+    'Hareket Hızı -15 (ağır zırh)': ('Move Speed -15 (heavy armor)', 'Velocidad -15 (armadura pesada)', 'Tempo -15 (schwere Rüstung)', 'Скорость -15 (тяжёлая броня)'),
+    'Her seviye: Can +6 (en çok +360), Hasar Alma -%0.3 (en çok %18)': ('Per level: HP +6 (max +360), Damage Taken -0.3% (max 18%)', 'Por nivel: Vida +6 (máx. +360), daño recibido -0.3% (máx. 18%)', 'Pro Stufe: LP +6 (max. +360), erlittener Schaden -0.3% (max. 18%)', 'За уровень: здоровье +6 (макс. +360), получаемый урон -0.3% (макс. 18%)'),
+    'ZIRH KİLİDİ': ('ARMOR LOCK', 'BLOQUEO DE ARMADURA', 'PANZERSPERRE', 'БРОНЕЗАМОК'),
+    '6 saniye aldığın hasar %55 azalır ve çevrendeki düşmanları savurursun.': ('For 6 seconds you take 55% less damage and knock nearby enemies away.', 'Durante 6 segundos recibes un 55% menos de daño y empujas a los enemigos cercanos.', '6 Sekunden lang nimmst du 55% weniger Schaden und schleuderst Gegner weg.', '6 секунд получаешь на 55% меньше урона и отбрасываешь врагов рядом.'),
+    'Fırtına Lv.1 ile başlar (periyodik alan hasarı)': ('Starts with Storm Lv.1 (periodic area damage)', 'Empieza con Tormenta Nv.1 (daño de área periódico)', 'Startet mit Sturm St.1 (periodischer Flächenschaden)', 'Начинает с Бурей ур. 1 (периодический урон по области)'),
+    'Mermi Hızı +%18': ('Bullet Speed +18%', 'Vel. de bala +18%', 'Geschosstempo +18%', 'Скорость пуль +18%'),
+    'Her 12 seviyede Fırtına +1 (en çok Lv.5)': ('Storm +1 every 12 levels (max Lv.5)', 'Tormenta +1 cada 12 niveles (máx. Nv.5)', 'Sturm +1 alle 12 Stufen (max. St.5)', 'Буря +1 каждые 12 уровней (макс. ур. 5)'),
+    'GÖK GÜRÜLTÜSÜ': ('THUNDERCLAP', 'TRUENO', 'DONNERSCHLAG', 'РАСКАТ ГРОМА'),
+    'Arka arkaya 6 yıldırım, rastgele düşmanların tepesine iner.': ('6 lightning bolts in a row strike random enemies.', '6 rayos seguidos caen sobre enemigos al azar.', '6 Blitze hintereinander treffen zufällige Gegner.', '6 молний подряд бьют случайных врагов.'),
+    'Dikenler Lv.1 ile başlar (temas hasarına karşılık verir)': ('Starts with Thorns Lv.1 (hits back on contact)', 'Empieza con Espinas Nv.1 (devuelve el daño de contacto)', 'Startet mit Dornen St.1 (schlägt bei Kontakt zurück)', 'Начинает с Шипами ур. 1 (отвечают на контактный урон)'),
+    'Can Yenilenmesi +0.5/sn': ('Health Regen +0.5/s', 'Regeneración +0.5/s', 'Regeneration +0.5/s', 'Регенерация +0.5/с'),
+    'Her 12 seviyede Dikenler +1 (en çok Lv.5)': ('Thorns +1 every 12 levels (max Lv.5)', 'Espinas +1 cada 12 niveles (máx. Nv.5)', 'Dornen +1 alle 12 Stufen (max. St.5)', 'Шипы +1 каждые 12 уровней (макс. ур. 5)'),
+    "Her seviye: saniyede maks canın %0.01'i yenilenir (en çok %0.5)": ('Per level: regen 0.01% of max HP per second (max 0.5%)', 'Por nivel: regenera el 0.01% de la vida máx. por segundo (máx. 0.5%)', 'Pro Stufe: 0.01% der max. LP pro Sekunde (max. 0.5%)', 'За уровень: 0.01% макс. здоровья в секунду (макс. 0.5%)'),
+    'DİKEN TARLASI': ('THORN FIELD', 'CAMPO DE ESPINAS', 'DORNENFELD', 'ПОЛЕ ШИПОВ'),
+    '6 saniye boyunca çevrendeki düşmanlar sürekli zehir hasarı alır.': ('For 6 seconds, nearby enemies take constant poison damage.', 'Durante 6 segundos, los enemigos cercanos reciben veneno constante.', '6 Sekunden lang nehmen Gegner in der Nähe ständig Giftschaden.', '6 секунд враги рядом постоянно получают урон ядом.'),
+    'Yönelme Lv.1 ile başlar (mermiler hedefe yönelir)': ('Starts with Homing Lv.1 (bullets seek targets)', 'Empieza con Teledirigido Nv.1 (las balas buscan objetivo)', 'Startet mit Zielsuche St.1 (Geschosse suchen Ziele)', 'Начинает с Самонаведением ур. 1 (пули ищут цель)'),
+    'Dash Bekleme Süresi -%10': ('Dash Cooldown -10%', 'Espera de impulso -10%', 'Dash-Abklingzeit -10%', 'Перезарядка рывка -10%'),
+    'Her 15 seviyede Yönelme +1 (en çok Lv.4)': ('Homing +1 every 15 levels (max Lv.4)', 'Teledirigido +1 cada 15 niveles (máx. Nv.4)', 'Zielsuche +1 alle 15 Stufen (max. St.4)', 'Самонаведение +1 каждые 15 уровней (макс. ур. 4)'),
+    'GÜDÜMLÜ SALVO': ('GUIDED SALVO', 'SALVA GUIADA', 'GELENKTE SALVE', 'УПРАВЛЯЕМЫЙ ЗАЛП'),
+    'Hedefi şaşmayan 9 güdümlü ok fırlatır.': ('Fires 9 homing arrows that never miss.', 'Lanza 9 flechas teledirigidas que nunca fallan.', 'Feuert 9 zielsuchende Pfeile, die nie verfehlen.', 'Выпускает 9 самонаводящихся стрел без промаха.'),
+    'Çılgınlık Lv.1 ile başlar (ardışık vuruşta güçlenir)': ('Starts with Frenzy Lv.1 (stronger on consecutive hits)', 'Empieza con Frenesí Nv.1 (más fuerte con golpes seguidos)', 'Startet mit Raserei St.1 (stärker bei Trefferserien)', 'Начинает с Яростью ур. 1 (сильнее при серии ударов)'),
+    'Her 15 seviyede Çılgınlık +1 (en çok Lv.4)': ('Frenzy +1 every 15 levels (max Lv.4)', 'Frenesí +1 cada 15 niveles (máx. Nv.4)', 'Raserei +1 alle 15 Stufen (max. St.4)', 'Ярость +1 каждые 15 уровней (макс. ур. 4)'),
+    'Her seviye: Can +3 (en çok +180)': ('Per level: HP +3 (max +180)', 'Por nivel: Vida +3 (máx. +180)', 'Pro Stufe: LP +3 (max. +180)', 'За уровень: здоровье +3 (макс. +180)'),
+    'KAN ÇILGINLIĞI': ('BLOOD FRENZY', 'FRENESÍ SANGRIENTO', 'BLUTRAUSCH', 'КРОВАВАЯ ЯРОСТЬ'),
+    '7 saniye hasarın %40, atış hızın %30 artar.': ('For 7 seconds your damage rises 40% and attack speed 30%.', 'Durante 7 segundos tu daño sube un 40% y tu vel. de ataque un 30%.', '7 Sekunden lang +40% Schaden und +30% Angriffstempo.', '7 секунд урон +40%, скорость атаки +30%.'),
+    'Yörünge Lv.1 ile başlar (etrafında dönen mermi)': ('Starts with Orbit Lv.1 (bullets circle you)', 'Empieza con Órbita Nv.1 (balas que giran a tu alrededor)', 'Startet mit Orbit St.1 (Geschosse kreisen um dich)', 'Начинает с Орбитой ур. 1 (пули кружат вокруг)'),
+    'Zırh +%5': ('Armor +5%', 'Armadura +5%', 'Rüstung +5%', 'Броня +5%'),
+    'Her 12 seviyede Yörünge +1 (en çok Lv.5)': ('Orbit +1 every 12 levels (max Lv.5)', 'Órbita +1 cada 12 niveles (máx. Nv.5)', 'Orbit +1 alle 12 Stufen (max. St.5)', 'Орбита +1 каждые 12 уровней (макс. ур. 5)'),
+    'Her seviye: Hasar Alma -%0.2 (en çok %12)': ('Per level: Damage Taken -0.2% (max 12%)', 'Por nivel: daño recibido -0.2% (máx. 12%)', 'Pro Stufe: erlittener Schaden -0.2% (max. 12%)', 'За уровень: получаемый урон -0.2% (макс. 12%)'),
+    'YÖRÜNGE KALKANI': ('ORBIT SHIELD', 'ESCUDO ORBITAL', 'ORBITSCHILD', 'ОРБИТАЛЬНЫЙ ЩИТ'),
+    '8 saniye 3 ek yörünge bıçağı döner ve 1 kalkan yükü alırsın.': ('For 8 seconds 3 extra orbit blades spin and you gain 1 shield charge.', 'Durante 8 segundos giran 3 cuchillas orbitales extra y ganas 1 carga de escudo.', '8 Sekunden lang kreisen 3 extra Orbitklingen und du bekommst 1 Schildladung.', '8 секунд вращаются 3 доп. орбитальных клинка, и ты получаешь 1 заряд щита.'),
+    'Buz Oku Lv.6 ile başlar (markette en fazla Lv.5 alınabilir)': ('Starts with Ice Shot Lv.6 (the shop only goes to Lv.5)', 'Empieza con Disparo de Hielo Nv.6 (la tienda llega a Nv.5)', 'Startet mit Eisschuss St.6 (im Shop max. St.5)', 'Начинает с Ледяным выстрелом ур. 6 (в магазине макс. ур. 5)'),
+    'Kendi maskesi ve kostümüyle gelir': ('Comes with its own mask and costume', 'Viene con su propia máscara y traje', 'Kommt mit eigener Maske und Kostüm', 'Идёт со своей маской и костюмом'),
+    'AĞ TUZAĞI': ('NET TRAP', 'TRAMPA DE RED', 'NETZFALLE', 'СЕТЬ-ЛОВУШКА'),
+    'Geniş bir ağ atar: yakalanan düşmanlar 4 saniye neredeyse yerinde çakılır.': ('Throws a wide net: caught enemies are almost pinned in place for 4 seconds.', 'Lanza una red amplia: los enemigos atrapados quedan casi inmóviles 4 segundos.', 'Wirft ein weites Netz: gefangene Gegner sind 4 Sekunden fast festgenagelt.', 'Бросает широкую сеть: пойманные враги почти прикованы на 4 секунды.'),
+    'Kan Emici Lv.6 ile başlar (markette en fazla Lv.5 alınabilir)': ('Starts with Vampiric Lv.6 (the shop only goes to Lv.5)', 'Empieza con Vampírico Nv.6 (la tienda llega a Nv.5)', 'Startet mit Blutsauger St.6 (im Shop max. St.5)', 'Начинает с Вампиризмом ур. 6 (в магазине макс. ур. 5)'),
+    'Kendi kostümü ve omuz pelerini ile gelir': ('Comes with its own costume and shoulder cape', 'Viene con su propio traje y capa', 'Kommt mit eigenem Kostüm und Schulterumhang', 'Идёт со своим костюмом и плащом'),
+    'KÜL KASIRGASI': ('ASH CYCLONE', 'CICLÓN DE CENIZA', 'ASCHEWIRBEL', 'ПЕПЕЛЬНЫЙ ВИХРЬ'),
+    "Çevrene savurarak vurur; verdiğin hasarın %25'i cana döner.": ('Sweeping strikes around you; 25% of the damage heals you.', 'Golpes giratorios a tu alrededor; el 25% del daño te cura.', 'Wirbelnde Schläge um dich; 25% des Schadens heilen dich.', 'Размашистые удары вокруг; 25% урона лечит тебя.'),
+    "EZİCİ DARBE: 10 sn'de bir tüm arenayı kaplar": ('CRUSHING BLOW: covers the whole arena every 10 s', 'GOLPE DEMOLEDOR: cubre toda la arena cada 10 s', 'VERNICHTUNGSSCHLAG: trifft alle 10 s die ganze Arena', 'СОКРУШАЮЩИЙ УДАР: каждые 10 с по всей арене'),
+    'Ezici darbe patron dışı düşmanların canını yarıya indirir': ('The blow halves the HP of every non-boss enemy', 'El golpe reduce a la mitad la vida de los enemigos que no son jefes', 'Der Schlag halbiert das Leben aller Nicht-Boss-Gegner', 'Удар вдвое снижает здоровье всех врагов, кроме боссов'),
+    "Normal BONK 5 sn'de bir - 150 can ile başlar": ('Normal BONK every 5 s - starts with 150 HP', 'BONK normal cada 5 s - empieza con 150 de vida', 'Normaler BONK alle 5 s - startet mit 150 LP', 'Обычный БОНК раз в 5 с - старт со 150 здоровья'),
+    'YER SARSINTISI': ('EARTHQUAKE', 'TERREMOTO', 'ERDBEBEN', 'ЗЕМЛЕТРЯСЕНИЕ'),
+    'Bütün arenayı sarsar: her düşmanı savurur ve hasar verir.': ('Shakes the whole arena: knocks back and damages every enemy.', 'Sacude toda la arena: empuja y daña a todos los enemigos.', 'Erschüttert die ganze Arena: schleudert und verletzt jeden Gegner.', 'Сотрясает всю арену: отбрасывает и ранит каждого врага.'),
+    'İkinci Nefes ile başlar (öleceğin darbede yarı canla dirilirsin)': ('Starts with Second Wind (revive with half HP on a fatal blow)', 'Empieza con Segundo Aliento (revives con media vida)', 'Startet mit Zweiter Atem (bei tödlichem Treffer mit halbem Leben zurück)', 'Начинает со Вторым дыханием (при смерти воскресаешь с половиной здоровья)'),
+    'KURŞUN YAĞMURU': ('BULLET STORM', 'LLUVIA DE BALAS', 'KUGELHAGEL', 'ГРАД ПУЛЬ'),
+    'İki namludan 22 kurşunu her yöne boşaltır.': ('Empties 22 bullets from two barrels in every direction.', 'Vacía 22 balas de dos cañones en todas direcciones.', 'Feuert 22 Kugeln aus zwei Läufen in alle Richtungen.', 'Выпускает 22 пули из двух стволов во все стороны.'),
+    'Can Yenilenmesi +0.6/sn': ('Health Regen +0.6/s', 'Regeneración +0.6/s', 'Regeneration +0.6/s', 'Регенерация +0.6/с'),
+    'Kritik Şans +%10': ('Crit Chance +10%', 'Prob. crítico +10%', 'Krit-Chance +10%', 'Шанс крита +10%'),
+    'Toplama Menzili +25': ('Pickup Range +25', 'Alcance de recogida +25', 'Aufsammelweite +25', 'Радиус подбора +25'),
+    "Her seviye: saniyede maks canın %0.01'i yenilenir, Kritik Şans +%0.1": ('Per level: regen 0.01% of max HP per second, Crit Chance +0.1%', 'Por nivel: regenera el 0.01% de la vida máx. por segundo, Prob. crítico +0.1%', 'Pro Stufe: 0.01% der max. LP pro Sekunde, Krit-Chance +0.1%', 'За уровень: 0.01% макс. здоровья в секунду, шанс крита +0.1%'),
+    'RÜYA PATLAMASI': ('DREAM BURST', 'ESTALLIDO ONÍRICO', 'TRAUMEXPLOSION', 'ВЗРЫВ ГРЁЗ'),
+    "Maks canının %25'ini yeniler, 6 saniye kritik şansın %25 artar ve çevredeki düşmanlar korkup kaçar.": ('Heals 25% of max HP, +25% crit chance for 6 seconds, and nearby enemies flee in fear.', 'Cura el 25% de la vida máx., +25% de prob. crítico 6 segundos y los enemigos cercanos huyen.', 'Heilt 25% der max. LP, 6 Sekunden +25% Krit-Chance, Gegner in der Nähe fliehen.', 'Лечит 25% макс. здоровья, на 6 секунд +25% шанса крита, враги рядом в страхе бегут.'),
+    'Her seviye: Hasar +%0.2 (en çok %12)': ('Per level: Damage +0.2% (max 12%)', 'Por nivel: Daño +0.2% (máx. 12%)', 'Pro Stufe: Schaden +0.2% (max. 12%)', 'За уровень: урон +0.2% (макс. 12%)'),
+    'TİLKİ KURNAZLIĞI': ('FOX CUNNING', 'ASTUCIA DE ZORRO', 'FUCHSLIST', 'ЛИСЬЯ ХИТРОСТЬ'),
+    'Her seviye: Hasar +%0.7 (en çok %42)': ('Per level: Damage +0.7% (max 42%)', 'Por nivel: Daño +0.7% (máx. 42%)', 'Pro Stufe: Schaden +0.7% (max. 42%)', 'За уровень: урон +0.7% (макс. 42%)'),
+    'Yetenek: Kara Delik (düşmanları içine çeker, sonra patlar)': ('Ability: Black Hole (pulls enemies in, then explodes)', 'Habilidad: Agujero Negro (atrae enemigos y luego explota)', 'Fähigkeit: Schwarzes Loch (zieht Gegner an, dann Explosion)', 'Способность: Чёрная дыра (затягивает врагов, затем взрыв)'),
+    'KARA DELİK': ('BLACK HOLE', 'AGUJERO NEGRO', 'SCHWARZES LOCH', 'ЧЁРНАЯ ДЫРА'),
+    'En kalabalık noktada bir kara delik açar: çevredeki düşmanları 3 saniye içine çeker ve öğütür, sonra patlayarak büyük hasar verir.': ('Opens a black hole at the most crowded spot: pulls in and grinds enemies for 3 seconds, then explodes for big damage.', 'Abre un agujero negro donde hay más enemigos: los atrae y tritura 3 segundos y luego explota con gran daño.', 'Öffnet ein Schwarzes Loch an der vollsten Stelle: zieht Gegner 3 Sekunden an, zermahlt sie und explodiert mit großem Schaden.', 'Открывает чёрную дыру в самой толпе: 3 секунды затягивает и перемалывает врагов, затем взрывается с большим уроном.'),
+    'Kırmızı Şapka': ('Red Cap', 'Gorra Roja', 'Rote Kappe', 'Красная кепка'),
+    'Basit ama şık, siperlikli bir spor şapka.': ('A simple but stylish sporty cap.', 'Una gorra deportiva sencilla pero con estilo.', 'Eine schlichte, aber schicke Sportkappe.', 'Простая, но стильная спортивная кепка.'),
+    'Hareket Hızı +5': ('Move Speed +5', 'Velocidad +5', 'Tempo +5', 'Скорость +5'),
+    'Büyücü Şapkası': ('Wizard Hat', 'Sombrero de Mago', 'Zauberhut', 'Шляпа волшебника'),
+    'Sivri uçlu, ucu parıldayan gizemli bir büyücü şapkası.': ('A pointy, mysterious wizard hat with a glowing tip.', 'Un misterioso sombrero de mago con la punta brillante.', 'Ein spitzer, geheimnisvoller Zauberhut mit leuchtender Spitze.', 'Загадочная остроконечная шляпа со светящимся кончиком.'),
+    'Deneyim Kazancı +%6': ('XP Gain +6%', 'Ganancia de XP +6%', 'XP-Gewinn +6%', 'Прирост опыта +6%'),
+    'Altın Taç': ('Golden Crown', 'Corona Dorada', 'Goldkrone', 'Золотая корона'),
+    'Gerçek bir hükümdar gibi parla, tacınla göz doldur.': ('Shine like a true ruler.', 'Brilla como un verdadero soberano.', 'Glänze wie ein echter Herrscher.', 'Сияй как настоящий правитель.'),
+    'Altın Kazancı +%8': ('Gold Gain +8%', 'Ganancia de oro +8%', 'Goldgewinn +8%', 'Прирост золота +8%'),
+    'Melek Halesi': ('Angel Halo', 'Halo de Ángel', 'Engelsheiligenschein', 'Ангельский нимб'),
+    'Başının üstünde yumuşak, nabız gibi atan bir ışık halesi.': ('A soft halo of light that pulses above your head.', 'Un halo de luz suave que late sobre tu cabeza.', 'Ein sanft pulsierender Lichtring über deinem Kopf.', 'Мягкий пульсирующий нимб над головой.'),
+    'Can Yenilenmesi +0.3/sn': ('Health Regen +0.3/s', 'Regeneración +0.3/s', 'Regeneration +0.3/s', 'Регенерация +0.3/с'),
+    'Gri Bere': ('Grey Beret', 'Boina Gris', 'Graue Baskenmütze', 'Серый берет'),
+    'Sade, rahat, sokak stili gri bir bere.': ('A plain, comfy street-style grey beret.', 'Una boina gris sencilla, de estilo urbano.', 'Eine schlichte, bequeme graue Mütze im Street-Style.', 'Простой уличный серый берет.'),
+    'Altın Kazancı +%3': ('Gold Gain +3%', 'Ganancia de oro +3%', 'Goldgewinn +3%', 'Прирост золота +3%'),
+    'Viking Miğferi': ('Viking Helmet', 'Casco Vikingo', 'Wikingerhelm', 'Шлем викинга'),
+    'Boynuzlu, ağır ve sağlam bir savaşçı miğferi.': ('A heavy, sturdy horned warrior helmet.', 'Un casco de guerrero con cuernos, pesado y sólido.', 'Ein schwerer, robuster Kriegerhelm mit Hörnern.', 'Тяжёлый прочный рогатый шлем воина.'),
+    'Ninja Kukuletası': ('Ninja Hood', 'Capucha Ninja', 'Ninja-Kapuze', 'Капюшон ниндзя'),
+    'Sessiz adımlar için sıkı sarılmış bir kukuleta.': ('A tightly wrapped hood for silent steps.', 'Una capucha bien ceñida para pasos silenciosos.', 'Eine eng gewickelte Kapuze für leise Schritte.', 'Плотно повязанный капюшон для тихих шагов.'),
+    'Dash Mesafesi +%8': ('Dash Distance +8%', 'Distancia de impulso +8%', 'Dash-Weite +8%', 'Дальность рывка +8%'),
+    'Çiçek Tacı': ('Flower Crown', 'Corona de Flores', 'Blumenkranz', 'Венок из цветов'),
+    'Rengarenk küçük çiçeklerden örülmüş bir taç.': ('A crown woven from tiny colorful flowers.', 'Una corona tejida con florecillas de colores.', 'Ein Kranz aus kleinen bunten Blumen.', 'Венок из маленьких разноцветных цветов.'),
+    'Silindir Şapka': ('Top Hat', 'Sombrero de Copa', 'Zylinder', 'Цилиндр'),
+    'Şık, kurdeleli klasik bir silindir şapka.': ('A classy top hat with a ribbon.', 'Un elegante sombrero de copa con cinta.', 'Ein eleganter Zylinder mit Band.', 'Элегантный цилиндр с лентой.'),
+    'Deneyim Kazancı +%5': ('XP Gain +5%', 'Ganancia de XP +5%', 'XP-Gewinn +5%', 'Прирост опыта +5%'),
+    'Pullu, kavisli bir çift ejderha boynuzu.': ('A pair of scaly, curved dragon horns.', 'Un par de cuernos de dragón escamosos y curvos.', 'Ein Paar schuppiger, gebogener Drachenhörner.', 'Пара чешуйчатых изогнутых драконьих рогов.'),
+    'BONK Hasarı +%6': ('BONK Damage +6%', 'Daño de BONK +6%', 'BONK-Schaden +6%', 'Урон БОНК +6%'),
+    'Uzay Kaskı': ('Space Helmet', 'Casco Espacial', 'Raumhelm', 'Космический шлем'),
+    'Camı yıldızları yansıtan bir astronot kaskı.': ('An astronaut helmet with stars reflecting in the visor.', 'Un casco de astronauta que refleja las estrellas.', 'Ein Astronautenhelm, in dessen Visier sich Sterne spiegeln.', 'Шлем астронавта, в стекле отражаются звёзды.'),
+    'Zırh +%3': ('Armor +3%', 'Armadura +3%', 'Rüstung +3%', 'Броня +3%'),
+    'Pembe Fiyonk': ('Pink Bow', 'Lazo Rosa', 'Rosa Schleife', 'Розовый бант'),
+    'Baştan tırnağa pembe görünüm için tatlı bir fiyonk.': ('A cute bow for the all-pink look.', 'Un lazo adorable para el look todo rosa.', 'Eine süße Schleife für den ganz rosa Look.', 'Милый бант для полностью розового образа.'),
+    'Kritik Şans +%3': ('Crit Chance +3%', 'Prob. crítico +3%', 'Krit-Chance +3%', 'Шанс крита +3%'),
+    'Güneş Gözlüğü': ('Sunglasses', 'Gafas de Sol', 'Sonnenbrille', 'Солнечные очки'),
+    'Havalı, koyu camlı klasik bir gözlük.': ('Cool classic shades with dark lenses.', 'Gafas clásicas y molonas de cristal oscuro.', 'Coole klassische Brille mit dunklen Gläsern.', 'Классные очки с тёмными стёклами.'),
+    'Pilot Gözlüğü': ('Pilot Goggles', 'Gafas de Piloto', 'Pilotenbrille', 'Очки пилота'),
+    'Kalın çerçeveli, sağlam koruyucu gözlük.': ('Sturdy protective goggles with thick frames.', 'Gafas protectoras resistentes de montura gruesa.', 'Robuste Schutzbrille mit dickem Rahmen.', 'Прочные защитные очки в толстой оправе.'),
+    'Zırh +%2': ('Armor +2%', 'Armadura +2%', 'Rüstung +2%', 'Броня +2%'),
+    'Tekgöz Monokl': ('Monocle', 'Monóculo', 'Monokel', 'Монокль'),
+    'Zarif, biraz da kibirli görünen tek camlı monokl.': ('An elegant, slightly smug monocle.', 'Un monóculo elegante y algo arrogante.', 'Ein elegantes, leicht hochnäsiges Monokel.', 'Изящный, немного надменный монокль.'),
+    'Deneyim Kazancı +%4': ('XP Gain +4%', 'Ganancia de XP +4%', 'XP-Gewinn +4%', 'Прирост опыта +4%'),
+    'Siber Vizör': ('Cyber Visor', 'Visor Cíber', 'Cyber-Visier', 'Кибер-визор'),
+    'Tek parça, sürekli parıldayan neon bir vizör.': ('A one-piece neon visor that never stops glowing.', 'Un visor de neón de una pieza que siempre brilla.', 'Ein einteiliges Neonvisier, das ständig leuchtet.', 'Цельный неоновый визор, который постоянно светится.'),
+    'Mermi Hızı +%8': ('Bullet Speed +8%', 'Vel. de bala +8%', 'Geschosstempo +8%', 'Скорость пуль +8%'),
+    'Yuvarlak Gözlük': ('Round Glasses', 'Gafas Redondas', 'Runde Brille', 'Круглые очки'),
+    'Küçük, yuvarlak, sakin görünen bir gözlük.': ('Small, round, calm-looking glasses.', 'Gafas pequeñas, redondas y tranquilas.', 'Kleine, runde, ruhig wirkende Brille.', 'Маленькие круглые спокойные очки.'),
+    'Toplama Menzili +8': ('Pickup Range +8', 'Alcance de recogida +8', 'Aufsammelweite +8', 'Радиус подбора +8'),
+    'Kalp Gözlük': ('Heart Glasses', 'Gafas de Corazón', 'Herzbrille', 'Очки-сердечки'),
+    'Camları kalp şeklinde, sevimli bir gözlük.': ('Cute glasses with heart-shaped lenses.', 'Gafas monas con cristales en forma de corazón.', 'Süße Brille mit herzförmigen Gläsern.', 'Милые очки с линзами-сердечками.'),
+    'Steampunk Gözlük': ('Steampunk Goggles', 'Gafas Steampunk', 'Steampunk-Brille', 'Стимпанк-очки'),
+    'Pirinç detaylı, dişlilerle süslü bir gözlük.': ('Brass goggles decorated with gears.', 'Gafas de latón decoradas con engranajes.', 'Messingbrille mit Zahnrädern verziert.', 'Латунные очки с шестерёнками.'),
+    'Mermi Hızı +%5': ('Bullet Speed +5%', 'Vel. de bala +5%', 'Geschosstempo +5%', 'Скорость пуль +5%'),
+    'Kayak Gözlüğü': ('Ski Goggles', 'Gafas de Esquí', 'Skibrille', 'Горнолыжная маска'),
+    'Geniş camlı, sağlam bir kayak gözlüğü.': ('Sturdy ski goggles with a wide lens.', 'Gafas de esquí resistentes de cristal amplio.', 'Robuste Skibrille mit breitem Glas.', 'Прочная маска с широким стеклом.'),
+    'Lazer Vizör': ('Laser Visor', 'Visor Láser', 'Laservisier', 'Лазерный визор'),
+    'Kızıl bir çizgi halinde parlayan taktik vizör.': ('A tactical visor glowing as a single red line.', 'Un visor táctico que brilla como una línea roja.', 'Ein taktisches Visier, das als rote Linie leuchtet.', 'Тактический визор, светящийся красной полосой.'),
+    'Kritik Hasar +%5': ('Crit Damage +5%', 'Daño crítico +5%', 'Krit-Schaden +5%', 'Урон крита +5%'),
+    'Kör Bandı': ('Blindfold', 'Venda', 'Augenbinde', 'Повязка на глаза'),
+    'Görmeden savaşan bir dövüşçünün bandı.': ('The blindfold of a fighter who needs no eyes.', 'La venda de un luchador que pelea sin ver.', 'Die Augenbinde eines Kämpfers, der blind kämpft.', 'Повязка бойца, который сражается вслепую.'),
+    'Kritik Şans +%5': ('Crit Chance +5%', 'Prob. crítico +5%', 'Krit-Chance +5%', 'Шанс крита +5%'),
+    'Yıldız Gözlük': ('Star Glasses', 'Gafas de Estrella', 'Sternenbrille', 'Очки-звёзды'),
+    'Yıldız şeklinde çerçeveli parlak bir gözlük.': ('Shiny glasses with star-shaped frames.', 'Gafas brillantes con montura de estrella.', 'Glänzende Brille mit sternförmigem Rahmen.', 'Блестящие очки в оправе-звёздах.'),
+    'BONK Yarıçapı +%5': ('BONK Radius +5%', 'Radio de BONK +5%', 'BONK-Radius +5%', 'Радиус БОНК +5%'),
+    'Pembe Güneş Gözlüğü': ('Pink Sunglasses', 'Gafas de Sol Rosas', 'Rosa Sonnenbrille', 'Розовые солнечные очки'),
+    'Tam pembe görünüm setini tamamlayan gözlük.': ('Completes the all-pink look.', 'Completa el look todo rosa.', 'Vervollständigt den ganz rosa Look.', 'Завершает полностью розовый образ.'),
+    'Hareket Hızı +8': ('Move Speed +8', 'Velocidad +8', 'Tempo +8', 'Скорость +8'),
+    'Kızıl Pelerin': ('Crimson Cape', 'Capa Carmesí', 'Purpurumhang', 'Багровый плащ'),
+    'Rüzgârda dalgalanan klasik bir kahraman pelerini.': ('A classic hero cape that waves in the wind.', 'Una capa clásica de héroe que ondea al viento.', 'Ein klassischer Heldenumhang, der im Wind weht.', 'Классический плащ героя, развевающийся на ветру.'),
+    'BONK Hasarı +%4': ('BONK Damage +4%', 'Daño de BONK +4%', 'BONK-Schaden +4%', 'Урон БОНК +4%'),
+    'Asil Pelerin': ('Noble Cape', 'Capa Noble', 'Edler Umhang', 'Благородный плащ'),
+    'Altın işlemeli, ağır ve gösterişli bir asalet pelerini.': ('A heavy, showy noble cape with gold embroidery.', 'Una capa noble pesada y vistosa bordada en oro.', 'Ein schwerer, prächtiger Adelsumhang mit Goldstickerei.', 'Тяжёлый роскошный плащ с золотой вышивкой.'),
+    'Altın Kazancı +%5': ('Gold Gain +5%', 'Ganancia de oro +5%', 'Goldgewinn +5%', 'Прирост золота +5%'),
+    'Gölge Pelerini': ('Shadow Cape', 'Capa Sombría', 'Schattenumhang', 'Плащ тени'),
+    'Kenarları karanlık dumana dönüşen esrarengiz bir pelerin.': ('A mysterious cape whose edges turn into dark smoke.', 'Una capa misteriosa cuyos bordes se vuelven humo oscuro.', 'Ein geheimnisvoller Umhang, dessen Ränder zu dunklem Rauch werden.', 'Загадочный плащ, края которого превращаются в тёмный дым.'),
+    'Dash Mesafesi +%10': ('Dash Distance +10%', 'Distancia de impulso +10%', 'Dash-Weite +10%', 'Дальность рывка +10%'),
+    'Melek Kanatları': ('Angel Wings', 'Alas de Ángel', 'Engelsflügel', 'Крылья ангела'),
+    'Sırtından açılan, ışıltılı gerçek bir çift melek kanadı.': ('A real pair of shimmering angel wings on your back.', 'Un par de alas de ángel brillantes que salen de tu espalda.', 'Ein echtes Paar schimmernder Engelsflügel auf deinem Rücken.', 'Настоящая пара сияющих ангельских крыльев за спиной.'),
+    'Can +25, Can Yenilenmesi +0.3/sn': ('HP +25, Health Regen +0.3/s', 'Vida +25, Regeneración +0.3/s', 'LP +25, Regeneration +0.3/s', 'Здоровье +25, регенерация +0.3/с'),
+    'Orman Pelerini': ('Forest Cape', 'Capa del Bosque', 'Waldumhang', 'Лесной плащ'),
+    'Yapraklarla işlenmiş doğal, sessiz bir pelerin.': ('A quiet, natural cape woven with leaves.', 'Una capa natural y silenciosa tejida con hojas.', 'Ein stiller, natürlicher Umhang aus Blättern.', 'Тихий природный плащ, расшитый листьями.'),
+    'Buz Pelerini': ('Frost Cape', 'Capa de Hielo', 'Frostumhang', 'Ледяной плащ'),
+    'Kenarları donmuş, soğuk buhar saçan bir pelerin.': ('A cape with frozen edges that breathes cold mist.', 'Una capa de bordes helados que suelta vapor frío.', 'Ein Umhang mit gefrorenen Rändern, der kalten Dunst verströmt.', 'Плащ с замёрзшими краями, от которого идёт холодный пар.'),
+    'Dash Bekleme Süresi -%5': ('Dash Cooldown -5%', 'Espera de impulso -5%', 'Dash-Abklingzeit -5%', 'Перезарядка рывка -5%'),
+    'Alev Pelerini': ('Flame Cape', 'Capa de Fuego', 'Flammenumhang', 'Огненный плащ'),
+    'Uçları sürekli tütüp közleşen ateşten bir pelerin.': ('A cape of fire with constantly smoldering edges.', 'Una capa de fuego con bordes siempre humeantes.', 'Ein Feuerumhang mit ständig glimmenden Rändern.', 'Огненный плащ с вечно тлеющими краями.'),
+    'BONK Hasarı +%5': ('BONK Damage +5%', 'Daño de BONK +5%', 'BONK-Schaden +5%', 'Урон БОНК +5%'),
+    'Fırtına Pelerini': ('Storm Cape', 'Capa de Tormenta', 'Sturmumhang', 'Грозовой плащ'),
+    'İçinde küçük şimşekler çakan bir fırtına pelerini.': ('A storm cape with tiny lightning flashing inside.', 'Una capa de tormenta con pequeños rayos dentro.', 'Ein Sturmumhang, in dem kleine Blitze zucken.', 'Грозовой плащ, внутри которого сверкают молнии.'),
+    'Mermi Hızı +%6': ('Bullet Speed +6%', 'Vel. de bala +6%', 'Geschosstempo +6%', 'Скорость пуль +6%'),
+    'Yıldız Işığı Pelerini': ('Starlight Cape', 'Capa de Luz Estelar', 'Sternenlichtumhang', 'Плащ звёздного света'),
+    'Üzerinde küçük yıldızların kaydığı gece rengi bir pelerin.': ('A night-colored cape with tiny stars drifting across it.', 'Una capa color noche con estrellas que se deslizan.', 'Ein nachtfarbener Umhang, über den kleine Sterne gleiten.', 'Плащ цвета ночи, по которому скользят звёздочки.'),
+    'Yarasa Pelerini': ('Bat Cape', 'Capa de Murciélago', 'Fledermausumhang', 'Плащ летучей мыши'),
+    'Kenarları yarasa kanadı gibi kesilmiş bir pelerin.': ('A cape with edges cut like bat wings.', 'Una capa con bordes cortados como alas de murciélago.', 'Ein Umhang mit Rändern wie Fledermausflügel.', 'Плащ с краями, как у крыльев летучей мыши.'),
+    'Dash Mesafesi +%6': ('Dash Distance +6%', 'Distancia de impulso +6%', 'Dash-Weite +6%', 'Дальность рывка +6%'),
+    'Altın Kenarlı Pelerin': ('Gold-Trim Cape', 'Capa de Borde Dorado', 'Umhang mit Goldsaum', 'Плащ с золотой каймой'),
+    'Kenarları altın işlemeli, gösterişli bir pelerin.': ('A showy cape with gold-embroidered edges.', 'Una capa vistosa con bordes bordados en oro.', 'Ein prächtiger Umhang mit goldbestickten Rändern.', 'Эффектный плащ с золотой вышивкой по краям.'),
+    'Altın Kazancı +%6': ('Gold Gain +6%', 'Ganancia de oro +6%', 'Goldgewinn +6%', 'Прирост золота +6%'),
+    'Pembe Pelerin': ('Pink Cape', 'Capa Rosa', 'Rosa Umhang', 'Розовый плащ'),
+    'Tam pembe görünüm setini tamamlayan pelerin.': ('Completes the all-pink look.', 'Completa el look todo rosa.', 'Vervollständigt den ganz rosa Look.', 'Завершает полностью розовый образ.'),
+    'Mavi Kasket': ('Blue Cap', 'Gorra Azul', 'Blaue Mütze', 'Синяя кепка'),
+    'Derin mavi, dikişleri belirgin sade bir kasket.': ('A plain deep-blue cap with visible stitching.', 'Una gorra sencilla azul oscuro con costuras visibles.', 'Eine schlichte tiefblaue Mütze mit sichtbaren Nähten.', 'Простая тёмно-синяя кепка с заметными швами.'),
+    'Mermi Hızı +%4': ('Bullet Speed +4%', 'Vel. de bala +4%', 'Geschosstempo +4%', 'Скорость пуль +4%'),
+    'Yaprak Tacı': ('Leaf Crown', 'Corona de Hojas', 'Blätterkrone', 'Венок из листьев'),
+    'Taze yapraklardan örülmüş, ormanın kendi tacı.': ("The forest's own crown, woven from fresh leaves.", 'La corona del propio bosque, tejida con hojas frescas.', 'Die Krone des Waldes, aus frischen Blättern geflochten.', 'Корона самого леса, сплетённая из свежих листьев.'),
+    'Toplama Menzili +10': ('Pickup Range +10', 'Alcance de recogida +10', 'Aufsammelweite +10', 'Радиус подбора +10'),
+    'Karanlıkta parlayan turkuaz bir koşu bandanası.': ('A turquoise running bandana that glows in the dark.', 'Una bandana turquesa que brilla en la oscuridad.', 'Ein türkises Laufbandana, das im Dunkeln leuchtet.', 'Бирюзовая бандана, светящаяся в темноте.'),
+    'Dash Bekleme Süresi -%4': ('Dash Cooldown -4%', 'Espera de impulso -4%', 'Dash-Abklingzeit -4%', 'Перезарядка рывка -4%'),
+    'Köz Boynuzu': ('Ember Horns', 'Cuernos de Brasa', 'Glutenhörner', 'Тлеющие рога'),
+    'Uçları hâlâ közlenen, sıcak turuncu boynuzlar.': ('Hot orange horns with tips still smoldering.', 'Cuernos naranjas y calientes con puntas aún ardiendo.', 'Heiße orange Hörner, deren Spitzen noch glimmen.', 'Горячие оранжевые рога с ещё тлеющими кончиками.'),
+    'BONK Yarıçapı +%6': ('BONK Radius +6%', 'Radio de BONK +6%', 'BONK-Radius +6%', 'Радиус БОНК +6%'),
+    'Ejderha Kaskı': ('Dragon Helm', 'Yelmo de Dragón', 'Drachenhelm', 'Драконий шлем'),
+    'Sırtında yanan bir alev yelesi taşıyan, gözleri kor gibi parlayan ejderha kaskı.': ('A dragon helm with a burning mane and eyes glowing like embers.', 'Un yelmo de dragón con melena de fuego y ojos como brasas.', 'Ein Drachenhelm mit brennender Mähne und glutroten Augen.', 'Драконий шлем с огненной гривой и глазами, горящими как угли.'),
+    'Ölümsüz Miğfer': ('Immortal Helm', 'Yelmo Inmortal', 'Unsterblicher Helm', 'Бессмертный шлем'),
+    'Çevresinde ölümsüzlük runeleri döner. Hiç paslanmaz, hiç kırılmaz.': ('Runes of immortality circle it. Never rusts, never breaks.', 'Lo rodean runas de inmortalidad. Nunca se oxida ni se rompe.', 'Runen der Unsterblichkeit kreisen um ihn. Rostet nie, bricht nie.', 'Вокруг вращаются руны бессмертия. Не ржавеет и не ломается.'),
+    'Zırh +%6, Can +20': ('Armor +6%, HP +20', 'Armadura +6%, Vida +20', 'Rüstung +6%, LP +20', 'Броня +6%, здоровье +20'),
+    'Kâbus Miğferi': ('Nightmare Helm', 'Yelmo de Pesadilla', 'Albtraumhelm', 'Шлем кошмара'),
+    'Mor alevler saçar, ardında kaybolan ruhlar bırakır.': ('Spits purple flames and leaves fading spirits behind.', 'Lanza llamas moradas y deja almas que se desvanecen.', 'Speit lila Flammen und hinterlässt verblassende Geister.', 'Извергает фиолетовое пламя и оставляет тающие души.'),
+    'Hareket Hızı +12': ('Move Speed +12', 'Velocidad +12', 'Tempo +12', 'Скорость +12'),
+    'Kristal Kask': ('Crystal Helm', 'Casco de Cristal', 'Kristallhelm', 'Кристальный шлем'),
+    'Işığı kırarak sürekli renk değiştiren, saydam kristal kask.': ('A clear crystal helm that keeps changing color as it bends light.', 'Un casco de cristal transparente que cambia de color con la luz.', 'Ein klarer Kristallhelm, der ständig die Farbe wechselt.', 'Прозрачный кристальный шлем, переливающийся всеми цветами.'),
+    'Yaprak Vizör': ('Leaf Visor', 'Visor de Hoja', 'Blattvisier', 'Лиственный визор'),
+    'Yaprak damarlarını andıran ince yeşil bir vizör.': ('A thin green visor that looks like leaf veins.', 'Un visor verde y fino que recuerda a las venas de una hoja.', 'Ein dünnes grünes Visier wie Blattadern.', 'Тонкий зелёный визор, похожий на прожилки листа.'),
+    'Can Yenilenmesi +0.2/sn': ('Health Regen +0.2/s', 'Regeneración +0.2/s', 'Regeneration +0.2/s', 'Регенерация +0.2/с'),
+    'Buz Lensi': ('Ice Lens', 'Lente de Hielo', 'Eislinse', 'Ледяная линза'),
+    'Buzdan yontulmuş, kenarları kırağı tutan berrak bir lens.': ('A clear lens carved from ice with frosted edges.', 'Una lente clara tallada en hielo con bordes escarchados.', 'Eine klare Linse aus Eis mit bereiften Rändern.', 'Прозрачная линза из льда с заиндевевшими краями.'),
+    'Köz Gözlüğü': ('Ember Goggles', 'Gafas de Brasa', 'Glutbrille', 'Тлеющие очки'),
+    'Camları için için yanan turuncu bir gözlük.': ('Orange goggles with smoldering lenses.', 'Gafas naranjas con cristales que arden por dentro.', 'Orange Brille mit glimmenden Gläsern.', 'Оранжевые очки с тлеющими стёклами.'),
+    'Kritik Hasar +%4': ('Crit Damage +4%', 'Daño crítico +4%', 'Krit-Schaden +4%', 'Урон крита +4%'),
+    'Çelik Pelerin': ('Steel Cape', 'Capa de Acero', 'Stahlumhang', 'Стальной плащ'),
+    'Dövülmüş çelik plakalardan örülmüş ağır bir pelerin.': ('A heavy cape made of forged steel plates.', 'Una capa pesada de placas de acero forjado.', 'Ein schwerer Umhang aus geschmiedeten Stahlplatten.', 'Тяжёлый плащ из кованых стальных пластин.'),
+    'Sadece görünüş, yanında gezer': ('Cosmetic only, follows you around', 'Solo estético, te acompaña', 'Nur Optik, läuft neben dir her', 'Только внешний вид, ходит рядом'),
+    'ATILIŞ': ('LUNGE', 'EMBESTIDA', 'SPRUNG', 'ВЫПАД'),
+    'YAĞMUR': ('RAIN', 'LLUVIA', 'REGEN', 'ДОЖДЬ'),
+    'ÇEKİM': ('PULL', 'ATRACCIÓN', 'SOG', 'ПРИТЯЖЕНИЕ'),
+    'SARSINTI': ('QUAKE', 'SACUDIDA', 'BEBEN', 'ТОЛЧОК'),
+    'SAVAŞ ÇIĞLIĞI': ('WAR CRY', 'GRITO DE GUERRA', 'KRIEGSSCHREI', 'БОЕВОЙ КЛИЧ'),
+    'RUH BİÇİMİ': ('SOUL REAP', 'SIEGA DE ALMAS', 'SEELENERNTE', 'ЖАТВА ДУШ'),
+    'SÜRÜ': ('SWARM', 'ENJAMBRE', 'SCHWARM', 'РОЙ'),
+    'BARİYER': ('BARRIER', 'BARRERA', 'BARRIERE', 'БАРЬЕР'),
+    'ÖLÜM SARMALI': ('DEATH SPIRAL', 'ESPIRAL MORTAL', 'TODESSPIRALE', 'СПИРАЛЬ СМЕРТИ'),
+    'KIYAMET TARLASI': ('DOOM FIELD', 'CAMPO APOCALÍPTICO', 'UNTERGANGSFELD', 'ПОЛЕ РОКА'),
+    'IŞINLANMA': ('TELEPORT', 'TELETRANSPORTE', 'TELEPORT', 'ТЕЛЕПОРТ'),
+    'GÖRÜNMEZLİK': ('INVISIBILITY', 'INVISIBILIDAD', 'UNSICHTBARKEIT', 'НЕВИДИМОСТЬ'),
+    'DOKUNULMAZLIK': ('INVULNERABILITY', 'INVULNERABILIDAD', 'UNVERWUNDBARKEIT', 'НЕУЯЗВИМОСТЬ'),
+    'HALKA PATLAMASI': ('RING BLAST', 'ESTALLIDO EN ANILLO', 'RINGEXPLOSION', 'КОЛЬЦЕВОЙ ВЗРЫВ'),
+    'KÖK TUZAĞI': ('ROOT TRAP', 'TRAMPA DE RAÍCES', 'WURZELFALLE', 'ЛОВУШКА КОРНЕЙ'),
+    "GÖRÜNMEZ OLDU!": ("VANISHED!", "¡SE HA ESFUMADO!", "UNSICHTBAR!", "ИСЧЕЗ!"),
+    "SAVAŞ LORDU": ("WARLORD", "SEÑOR DE LA GUERRA", "KRIEGSHERR", "ВОЕВОДА"),
+    "GÖLGE CADISI": ("SHADOW WITCH", "BRUJA SOMBRÍA", "SCHATTENHEXE", "ТЕНЕВАЯ ВЕДЬМА"),
+    "KOLOS": ("COLOSSUS", "COLOSO", "KOLOSS", "КОЛОСС"),
+    "ORAK": ("REAPER", "SEGADOR", "SENSENMANN", "ЖНЕЦ"),
+    "KOVAN ANA": ("HIVE MOTHER", "REINA DE LA COLMENA", "STOCKMUTTER", "МАТКА УЛЬЯ"),
+    "EJDERHA": ("DRAGON", "DRAGÓN", "DRACHE", "ДРАКОН"),
+})
 
 
 class App:
@@ -46862,7 +47441,7 @@ class App:
                       bold=True, center=True)
             if owned:
                 btn = Button((rect.x + 16, rect.bottom - 46, rect.w - 32, 34),
-                             "KUŞANILDI" if is_eq else "KUŞAN",
+                             L("ui.equipped") if is_eq else L("ui.equip"),
                              lambda pt=pet: self._equip_store_pet(pt),
                              color=(38, 40, 54) if is_eq else (60, 130, 90),
                              hover_color=(80, 170, 115), enabled=not is_eq, text_size=13)
@@ -48414,73 +48993,9 @@ class App:
         panel_rect.center = (VIRTUAL_W / 2, VIRTUAL_H / 2)
         panel(canvas, panel_rect, alpha=245)
         draw_text(canvas, L("ui.howto"), (panel_rect.centerx, panel_rect.y + 24), 27, CYAN, bold=True, center=True)
-        lines = [
-            ("WASD / OK TUŞLARI", "Hareket et, düşmanlardan kaç"),
-            ("FARE", "Nişan al, namlu her zaman imleci gösterir"),
-            ("SOL TIK (basılı tut)", "Ateş et, nişan aldığın yöne mermi gider"),
-            ("SPACE", "BONK! Çevrene alan hasarı veren yakın vuruş"),
-            ("SHIFT / SAĞ TIK", "DASH - kısa süre hasar almazsın"),
-            ("B", "Büyük MARKET'i aç, dalga ilerledikçe yeni kademeler açılır"),
-            ("TAB - SAĞ ÜST KÖŞE", "İstatistik künyen: hayatta kalma, hasar, hareket, kazanç"),
-            ("L", "Sohbet kutusunu sol altta açar, kutu açıkken oyun durur"),
-            ("DALGALAR SÜREYLE İLERLER", "25 dalga: Normal 35 dk, Zor 30 dk, Kabus 20 dk"),
-            ("İYİ OYNAYAN GÜÇLENİR", "Ne kadar çok kesersen o kadar seviye, altın ve skor"),
-            ("DALGA İÇİNDE HIZLANIR", "Aynı dalgada bile oyalandıkça düşmanlar sıklaşır"),
-            ("MARKET ÇEKİRDEKLERİ", "Çekirdek yükseltmelerinin tavanı yok, altın hep işe yarar"),
-            ("10., 15., 20. DALGA...", "10'dan itibaren her 5 dalgada patron gelir"),
-            ("PATRONLAR CAN ÇALAR", "Patron da vurdukça iyileşir; dövüş yaklaşık 1,5 dakika sürer"),
-            ("HER PATRON FARKLI", "Biri yakar, biri zehirler, biri yavaşlatır, biri kaybolur"),
-            ("PATRONLAR KOVALAR", "Uzaklaşırsan avlanmaya geçer ve senden hızlı koşar"),
-            ("PATRON YETENEKLERİ", "Üstüne atılır, yolunu keser, çevreni kapatır, seni kendine çeker"),
-            ("PATRON SANDIĞI", "Devrilen patron sandık bırakır, içinden silah çıkar"),
-            ("SİLAHLAR OTOMATİK", "Balta/Kalkan/Emanet/Kırbaç/Papuç kendi kendine çalışır"),
-            ("SİLAH + KİTAP TAKIMI",
-             f"{MAX_RUN_WEAPONS} silah  -  {MAX_RUN_BOOKS} kitap (Lv.{BOOK_MAX_LEVEL}'e kadar)"
-             f"  -  {MAX_RUN_RARE_BOOKS} nadir kitap"),
-            ("NADİR KİTAP TEK HAK", "Bir nadir kitap seçince o koşuda başka nadir kitap hiç çıkmaz"),
-            ("HİÇBİR EŞYA TEK ATMAZ", "Hiçbir tank tek vuruşta ölmez; küçükler 10. seviyeden sonra ölür"),
-            ("HER KOŞU FARKLI", "Her koşuda bazı silah ve kitaplar havuzdan çıkar, kombo hep değişir"),
-            ("KAÇARKEN DİKKAT", "Arkanda kalan yaratıklar kaçtığın yöne, yani önüne ışınlanır"),
-            ("KIYAFET MARKET", "Şapka, gözlük ve pelerinlerin her biri küçük kalıcı bonus verir"),
-            ("ÖLÜRSEN", "O koşuda market'ten aldıkların silinir, baştan başlarsın"),
-            ("SKIN MARKET", "Elmasla kalıcı görünümler al, her skinin kendi silahı var"),
-            ("HARİTA 3x3 EKRAN", "Dünya ekrandan büyük, sağ üstte küçük harita var"),
-            ("E - CEHENNEM KAPISI", "25. dalga patronunu devirince açılan mor portala E ile gir"),
-            ("CEHENNEM (2. HARİTA)", "Yaratıklar bambaşka: çok güçlü ama çok yavaş"),
-            ("25'TEN SONRA ARENA", "Yeni patron gelmez; arena her dalgada daha da azar"),
-            ("CEHENNEM MARKETİ", "Kızıl market: yalnızca cehennemde açılan 14 ayrı eşya (2 sayfa)"),
-            ("ALTINI TOPLAMAN LAZIM", "Para yaklaşınca sana akar, tecrübe taşından biraz daha yakından"),
-            ("ALTIN VE TECRÜBE KAYBOLMAZ", "Yerde kalan hiçbir şey silinmez, mıknatısla hepsini çek"),
-            ("EMANET (KILIÇ)", "Saniyede bir yay çizer; zırhlı ve kalkanlıyı zırhını saymadan keser"),
-            ("GÖRÜNMEZLİK PELERİNİ", "Her dakika 5 saniye kaybolursun, patronlar hariç kimse göremez"),
-            ("KİTAPLARI DA KAPATABİLİRSİN",
-             f"Kitaplıkta {MAX_MUTED_BOOKS} kitabı bedava kapat (Arena Ustalığı'ndan elmasla +4); kapalı kitap seviye atlarken çıkmaz"),
-            ("CEHENNEM PATRONU", "İlk patron Ejderha: alev püskürtür, üstüne dalar"),
-            ("SKİN ÖZEL YETENEĞİ", "Her skinin otomatik bir yeteneği var, süresi altta yazar"),
-            ("YETENEK = 0.5 SN DONMA", "Yetenek çalışınca düşmanlar yarım saniye donar"),
-            ("KİTAPLIK", "Kitapların hepsi kilitli, her birinin kendi görevleri var"),
-            ("BAŞARIMLAR", "Başarıma tıkla: nasıl kazanılır, ne kadar kaldı, ödülü ne"),
-            ("AYARLAR", "Ana menüden: ses, FPS sınırı (240'a kadar), görünüm seçenekleri"),
-            ("ESC - EŞYA EFEKTİ", "AYARLAR'dan ya da ESC ile: efekt %0-%100 (hasar değişmez)"),
-            ("PETLER", "MAĞAZA'dan alınır, Kıyafet Market > PET sekmesinden kuşanılır. Sadece görünüş için"),
-            ("MOR SEVİYE TAŞI", "Mıknatıs kadar nadir, aldığın anda bir seviye atlarsın"),
-            ("BÜYÜCÜ - 15. DALGA", "Uzaktan zehirli ok atar, yaklaşmaz, önce onu temizle"),
-            ("ARI - 25. DALGA", "Çok hızlı koşar ama vuruşu çok hafif; panik yapma"),
-        ]
-        if MOBILE:
-            # telefon: klavye/fare maddeleri yerine dokunmatik kontroller.
-            lines = [
-                ("SOL TARAF = JOYSTICK", "Ekranın soluna bas ve kaydır, parmağın neredeyse orada çıkar"),
-                ("OTOMATİK NİŞAN", "Sağ tarafa dokunmazsan en yakın düşmana kendiliğinden ateş eder"),
-                ("SAĞ TARAF = NİŞAN", "Sağ tarafa basılı tut: parmağının olduğu yere ateş edersin"),
-                ("BONK", "Sağ alttaki turuncu düğme, çevrene alan hasarı"),
-                ("DASH", "Sağ alttaki büyük düğme, kısa süre hasar almazsın"),
-                ("$ - MARKET", "DASH'in üstündeki altın düğme, büyük MARKET'i açar"),
-                ("E", "Portal, tüccar ya da lanetli sandığın yanındayken belirir"),
-                ("II  /  HARİTA  /  ⋮", "Üstte mola; küçük haritaya dokun = büyük harita; ⋮ = istatistik"),
-            ] + [ln for ln in lines if ln[0] not in (
-                "WASD / OK TUŞLARI", "FARE", "SOL TIK (basılı tut)", "SPACE", "SHIFT / SAĞ TIK",
-                "B", "TAB - SAĞ ÜST KÖŞE", "L")]
+        w_, b_, r_ = MAX_RUN_WEAPONS, MAX_RUN_BOOKS, MAX_RUN_RARE_BOOKS
+        lines = [(_pick(t).format(w=w_, b=b_, r=r_), _pick(d).format(w=w_, b=b_, r=r_))
+                 for t, d in (HOWTO_TOUCH if MOBILE else HOWTO_KEYS) + HOWTO_GAME]
         # Maddeler üç sütuna bölünür; satır aralığı sütun başına düşen madde
         # sayısına göre hesaplanır, böylece yeni madde eklenince yazılar ne
         # panelin dışına taşar ne de birbirinin üstüne biner.
@@ -48488,16 +49003,16 @@ class App:
         list_top = panel_rect.y + 64
         list_bottom = panel_rect.bottom - 64      # geri düğmesine yer bırak
         per_col = (len(lines) + NCOL - 1) // NCOL
-        step = clamp((list_bottom - list_top) / max(1, per_col), 27, 40)
+        step = clamp((list_bottom - list_top) / max(1, per_col), 27, 66)
         pad = 26
         col_w = (panel_rect.w - pad * 2) / NCOL
         for i, (title, desc) in enumerate(lines):
             ci = min(NCOL - 1, i // per_col)
             cx = panel_rect.x + pad + ci * col_w
             y = list_top + (i % per_col) * step
-            draw_text(canvas, _fit_text(title, 13, col_w - 18, bold=True), (cx, y), 13,
+            draw_text(canvas, _fit_text(title, 14, col_w - 18, bold=True), (cx, y), 14,
                       GOLD, bold=True)
-            draw_text(canvas, _fit_text(desc, 10, col_w - 18), (cx, y + 15), 10,
+            draw_text(canvas, _fit_text(desc, 11, col_w - 18), (cx, y + 18), 11,
                       TEXT_DIM, shadow=False)
             # sütunlar arası ince ayraç
             if ci and i % per_col == 0:
@@ -48773,15 +49288,16 @@ class App:
                   bold=True)
         # kademe rozeti (sağ üst): açıksa dolu, kilitliyse çerçeveli
         tier = ACH_TIERS.get(a.get("tier", "bronz"), ACH_TIERS["bronz"])
-        tw_ = text_width(tier["label"], 10, True) + 16
+        tlab = L("tier." + a.get("tier", "bronz"))
+        tw_ = text_width(tlab, 10, True) + 16
         tr = pygame.Rect(int(rect.right - 14 - tw_), rect.y + 15, int(tw_), 18)
         if got:
             pygame.draw.rect(canvas, tcol, tr, border_radius=9)
-            draw_text(canvas, tier["label"], tr.center, 10, (24, 18, 12), bold=True,
+            draw_text(canvas, tlab, tr.center, 10, (24, 18, 12), bold=True,
                       center=True, shadow=False)
         else:
             pygame.draw.rect(canvas, scale_col(tcol, 0.75), tr, width=1, border_radius=9)
-            draw_text(canvas, tier["label"], tr.center, 10, scale_col(tcol, 0.9), bold=True,
+            draw_text(canvas, tlab, tr.center, 10, scale_col(tcol, 0.9), bold=True,
                       center=True, shadow=False)
 
         for j, ln in enumerate(wrap_text(ach_desc(a), 11, rect.w - 112)[:2]):
@@ -48816,7 +49332,7 @@ class App:
             pygame.draw.rect(canvas, (60, 66, 92), pb, width=1, border_radius=5)
             draw_text(canvas, f"{fmt_num(int(cur))} / {fmt_num(int(need))}",
                       (tx, rect.bottom - 26), 11, TEXT_DIM, shadow=False)
-            draw_text(canvas, f"%{int(frac * 100)}", (pb.right, rect.bottom - 26), 11,
+            draw_text(canvas, fmt_pct(frac * 100), (pb.right, rect.bottom - 26), 11,
                       tcol, bold=True, right=True, shadow=False)
         else:
             draw_padlock(canvas, tx + 6, rect.bottom - 30, 7, (150, 140, 110))
@@ -48983,7 +49499,7 @@ class App:
                   GOLD if all_done else TEXT, bold=True, shadow=False)
         draw_bar(canvas, pygame.Rect(pbx, 40, pbw, 10), got_n / max(1, total_n),
                  GOLD if all_done else (230, 180, 90), radius=5)
-        draw_text(canvas, f"%{int(got_n / max(1, total_n) * 100)}", (pbx + pbw + 8, 38), 11,
+        draw_text(canvas, fmt_pct(got_n / max(1, total_n) * 100), (pbx + pbw + 8, 38), 11,
                   TEXT_DIM, bold=True, shadow=False)
         # kademe dağılımı
         lx = pbx
@@ -49005,10 +49521,10 @@ class App:
             c, n2, _ = ach_progress(self.save, a)
             if n2 and c / n2 >= 0.4:
                 near_n += 1
-        tabs = [("all", f"TÜMÜ ({total_n})"),
-                ("got", f"AÇILDI ({got_n})"),
-                ("locked", f"KİLİTLİ ({total_n - got_n})"),
-                ("near", f"YAKIN ({near_n})")]
+        tabs = [("all", L("ui.f_all", total_n)),
+                ("got", L("ui.f_got", got_n)),
+                ("locked", L("ui.f_locked", total_n - got_n)),
+                ("near", L("ui.f_near", near_n))]
         tab_w, tab_h, tab_gap = 168, 34, 10
         tabs_x = (VIRTUAL_W - (tab_w * len(tabs) + tab_gap * (len(tabs) - 1))) / 2
         for i, (key, label) in enumerate(tabs):
@@ -49073,7 +49589,7 @@ class App:
         draw_text(canvas, ach_name(a), (r.centerx, r.y + 132), 28, TEXT if got else (188, 192, 208),
                   bold=True, center=True)
         # kademe rozeti
-        blab = f"{tier['label']} BAŞARIM"
+        blab = L("ui.tier_badge", L("tier." + a.get("tier", "bronz")))
         bw = text_width(blab, 12, True) + 26
         br = pygame.Rect(0, 0, int(bw), 22)
         br.center = (r.centerx, r.y + 170)
@@ -49109,7 +49625,7 @@ class App:
             y += 20
             kalan = max(0, int(need) - int(cur))
             draw_text(canvas,
-                      f"{fmt_num(int(cur))} / {fmt_num(int(need))}   -   {fmt_num(kalan)} kaldı  (%{int(frac * 100)})",
+                      L("ui.prog_left", fmt_num(int(cur)), fmt_num(int(need)), fmt_num(kalan), fmt_pct(frac * 100)),
                       (r.centerx, y), 13, TEXT_DIM, center=True, shadow=False)
             y += 24
         else:
@@ -50256,15 +50772,15 @@ class App:
                   GOLD if owned_n >= total else TEXT, bold=True, shadow=False)
         draw_bar(canvas, pygame.Rect(pbx, 40, pbw, 10), owned_n / max(1, total),
                  GOLD if owned_n >= total else (238, 150, 100), radius=5)
-        draw_text(canvas, f"%{int(owned_n / max(1, total) * 100)}", (pbx + pbw + 8, 38), 11,
+        draw_text(canvas, fmt_pct(owned_n / max(1, total) * 100), (pbx + pbw + 8, 38), 11,
                   TEXT_DIM, bold=True, shadow=False)
         draw_text(canvas, L("ui.muted_count", len(muted), self.save.max_muted_weapons()), (pbx, 58), 10,
                   (232, 130, 130) if muted else TEXT_DIM, bold=True, shadow=False)
 
-        tabs = [("all", f"TÜMÜ ({total})"),
-                ("owned", f"AÇIK ({owned_n})"),
-                ("locked", f"KİLİTLİ ({total - owned_n})"),
-                ("muted", f"KAPALI ({len(muted)})")]
+        tabs = [("all", L("ui.f_all", total)),
+                ("owned", L("ui.f_open", owned_n)),
+                ("locked", L("ui.f_locked", total - owned_n)),
+                ("muted", L("ui.f_muted", len(muted)))]
         tab_w, tab_h, tab_gap = 168, 34, 10
         tabs_x = (VIRTUAL_W - (tab_w * len(tabs) + tab_gap * (len(tabs) - 1))) / 2
         for i, (key, label) in enumerate(tabs):
@@ -50332,8 +50848,8 @@ class App:
                            locked=not owned, glow=owned)
         draw_text(canvas, w_name(w), (lx, rect.y + 226), 24, TEXT if owned else (150, 148, 168),
                   bold=True, center=True)
-        state_txt = ("KAPALI - seviye atlarken çıkmaz" if is_muted
-                     else ("AÇIK" if owned else "KİLİTLİ"))
+        state_txt = (L("ui.muted_state") if is_muted
+                     else (L("ui.unlocked") if owned else L("ui.locked")))
         state_col = (232, 130, 130) if is_muted else (GREEN if owned else (198, 160, 96))
         draw_text(canvas, state_txt, (lx, rect.y + 254), 13, state_col, bold=True, center=True)
 
@@ -50342,14 +50858,14 @@ class App:
         if w.get("timed"):
             # pelerin gibi "sürekli ama sayaçlı" silahlar: bekleme süreleri
             # weapon_cooldown ile değil kendi tablolarıyla hesaplanır.
-            rows.append(("DÖNGÜ", f"{cloak_cooldown(1):.0f} saniyede bir "
-                                  f"{cloak_duration(1):.0f} saniye"))
+            rows.append((L("ui.cycle"), L("ui.every_for", "%.0f" % cloak_cooldown(1),
+                                                    "%.0f" % cloak_duration(1))))
         elif w.get("passive"):
-            rows.append(("SÜREKLİ", "bekleme süresi yok, hep açık"))
+            rows.append((L("ui.passive"), L("ui.no_cd")))
         else:
-            rows.append(("BEKLEME", f"{weapon_cooldown(w, 1):.1f} saniye"))
+            rows.append((L("ui.cd_lbl"), L("ui.n_secs", "%.1f" % weapon_cooldown(w, 1))))
         mx = weapon_max_level(w)
-        rows.append(("EN ÇOK", f"Seviye {mx}" if mx > 1 else "Seviye atlamaz"))
+        rows.append((L("ui.max_lbl"), L("ui.level_n", mx) if mx > 1 else L("ui.no_levels")))
         yy = rect.y + 284
         for lab, val in rows:
             draw_text(canvas, lab, (lx - 92, yy), 10, TEXT_DIM, bold=True, shadow=False)
@@ -50619,17 +51135,17 @@ class App:
                   GOLD if owned_n >= len(BOOKS) else TEXT, bold=True, shadow=False)
         draw_bar(canvas, pygame.Rect(pbx, 40, pbw, 10), owned_n / max(1, len(BOOKS)),
                  GOLD if owned_n >= len(BOOKS) else (168, 132, 245), radius=5)
-        draw_text(canvas, f"%{int(owned_n / max(1, len(BOOKS)) * 100)}", (pbx + pbw + 8, 38), 11,
+        draw_text(canvas, fmt_pct(owned_n / max(1, len(BOOKS)) * 100), (pbx + pbw + 8, 38), 11,
                   TEXT_DIM, bold=True, shadow=False)
         draw_text(canvas, L("ui.muted_count", len(bmuted), self.save.max_muted_books()), (pbx, 58), 10,
                   (232, 130, 130) if bmuted else TEXT_DIM, bold=True, shadow=False)
 
         # ---- filtre sekmeleri ----
-        tabs = [("all", f"TÜMÜ ({len(BOOKS)})"),
-                ("owned", f"AÇIK ({owned_n})"),
-                ("locked", f"KİLİTLİ ({len(BOOKS) - owned_n})"),
-                ("rare", f"NADİR ({rare_n})"),
-                ("muted", f"KAPALI ({len(bmuted)})")]
+        tabs = [("all", L("ui.f_all", len(BOOKS))),
+                ("owned", L("ui.f_open", owned_n)),
+                ("locked", L("ui.f_locked", len(BOOKS) - owned_n)),
+                ("rare", L("ui.f_rare", rare_n)),
+                ("muted", L("ui.f_muted", len(bmuted)))]
         tab_w, tab_h, tab_gap = 136, 34, 10
         tabs_x = (VIRTUAL_W - (tab_w * len(tabs) + tab_gap * (len(tabs) - 1))) / 2
         for i, (key, label) in enumerate(tabs):
@@ -50729,9 +51245,7 @@ class App:
             draw_icon(canvas, left.centerx - 44, sy + 7, "star", (44, 116, 72), 7)
             draw_text(canvas, L("ui.unlocked"), (left.centerx + 10, sy), 15, (44, 116, 72),
                       bold=True, center=True, shadow=False)
-            hint = ("Bir koşuda yalnızca bir nadir kitap alabilirsin."
-                    if rare else
-                    f"Seviye atladıkça Lv.{book_max_level(bk)}'e kadar büyür.")
+            hint = (L("ui.rare_only_one") if rare else L("ui.grows_to", book_max_level(bk)))
             draw_text(canvas, hint, (left.centerx, sy + 22), 11,
                       (108, 100, 84), center=True, shadow=False)
         else:
@@ -50745,14 +51259,14 @@ class App:
         iy = sy + 56
         pygame.draw.line(canvas, (206, 196, 172), (left.x + 40, iy), (left.right - 40, iy), 1)
         iy += 14
-        rows = [("TÜRÜ", "Nadir Kitap" if rare else
-                 ("Temel Kitap" if bk.get("basic") else "Standart Kitap")),
-                ("NEREDE ÇIKAR", "Seviye atlama ekranı"),
-                ("KOŞU İÇİ TAVAN", "1 seviye, tek hak" if rare
+        rows = [(L("ui.kind"), L("ui.rare_book_b") if rare else
+                 (L("ui.basic_book") if bk.get("basic") else L("ui.std_book"))),
+                (L("ui.where"), L("ui.levelup_screen")),
+                (L("ui.run_cap"), L("ui.one_only") if rare
                  else f"Lv.{book_max_level(bk)}"),
-                ("YUVA", f"Nadir yuvası (1 adet)" if rare
-                 else f"Kitap yuvası ({MAX_RUN_BOOKS} adet)"),
-                ("GÖREV SAYISI", f"{cur} / {need} tamam")]
+                (L("ui.slot"), L("ui.rare_slot") if rare
+                 else L("ui.book_slot_n", MAX_RUN_BOOKS)),
+                (L("ui.task_count"), L("ui.tasks_of", cur, need))]
         for lab, val in rows:
             draw_text(canvas, lab, (left.x + 42, iy), 10, (140, 128, 104), bold=True, shadow=False)
             draw_text(canvas, val, (left.right - 42, iy), 11, (66, 58, 44), bold=True,
@@ -50809,8 +51323,8 @@ class App:
                 draw_bar(canvas, pb, frac, (208, 158, 60),
                          bg=(214, 206, 184), border=(176, 166, 142), radius=4)
                 draw_text(canvas,
-                          f"{fmt_num(int(rcur))} / {fmt_num(int(rneed))}  "
-                          f"(%{int(frac * 100)}  -  {fmt_num(max(0, int(rneed) - int(rcur)))} kaldı)",
+                          L("ui.prog_left2", fmt_num(int(rcur)), fmt_num(int(rneed)), fmt_pct(frac * 100),
+                            fmt_num(max(0, int(rneed) - int(rcur)))),
                           (tx, y + 11), 10, (110, 100, 82), shadow=False)
                 y += 24
             elif not rdone:
@@ -50990,8 +51504,8 @@ class App:
             ucol = tuple(ult.get("color", GOLD))
             uy = rect.y + 152
             draw_icon(canvas, rect.x + 16, uy + 6, ult.get("icon", "star"), ucol, 6)
-            draw_text(canvas, ult["name"], (rect.x + 28, uy), 10, ucol, bold=True, shadow=False)
-            draw_text(canvas, f"{int(round(ult['cd']))} sn", (rect.right - 14, uy), 10,
+            draw_text(canvas, TRX(ult["name"]), (rect.x + 28, uy), 10, ucol, bold=True, shadow=False)
+            draw_text(canvas, L("ui.sec_fmt", int(round(ult["cd"]))), (rect.right - 14, uy), 10,
                       TEXT_DIM, bold=True, right=True, shadow=False)
 
         if is_equipped:
@@ -51096,16 +51610,16 @@ class App:
         ult = get_skin_ult(sk["id"])
         if ult:
             ucol = tuple(ult.get("color", GOLD))
-            ulines = wrap_text(ult["desc"], 11, panel_rect.w - 80)[:3]
+            ulines = wrap_text(TRX(ult["desc"]), 11, panel_rect.w - 80)[:3]
             ub = pygame.Rect(panel_rect.x + 26, int(y), panel_rect.w - 52,
                              40 + len(ulines) * 15)
             add_glow(canvas, ub.centerx, ub.centery, 190, ucol, 0.08)
             pygame.draw.rect(canvas, (22, 24, 36), ub, border_radius=10)
             pygame.draw.rect(canvas, ucol, ub, width=2, border_radius=10)
             draw_icon(canvas, ub.x + 22, ub.y + 20, ult.get("icon", "star"), ucol, 9)
-            draw_text(canvas, ult["name"], (ub.x + 38, ub.y + 11), 15, ucol, bold=True)
-            auto_txt = ("otomatik  -  " if ult.get("mode", "auto") == "auto" else "şartı oluşunca  -  ")
-            draw_text(canvas, auto_txt + f"{int(round(ult['cd']))} saniyede bir",
+            draw_text(canvas, TRX(ult["name"]), (ub.x + 38, ub.y + 11), 15, ucol, bold=True)
+            auto_key = "ui.ult_auto" if ult.get("mode", "auto") == "auto" else "ui.ult_trigger"
+            draw_text(canvas, L(auto_key, int(round(ult["cd"]))),
                       (ub.right - 12, ub.y + 13), 10, TEXT_DIM, right=True, shadow=False)
             uy = ub.y + 34
             for ln in ulines:
@@ -51131,7 +51645,7 @@ class App:
         if owned:
             play_btn = Button((panel_rect.centerx - btn_w - gap / 2, by, btn_w, btn_h), L("ui.play"),
                                self._play_with_detail_skin, color=(60, 130, 90), hover_color=(80, 170, 115))
-            equip_label = "KUŞANILDI" if is_equipped else "KUŞAN"
+            equip_label = L("ui.equipped") if is_equipped else L("ui.equip")
             equip_btn = Button((panel_rect.centerx + gap / 2, by, btn_w, btn_h), equip_label,
                                 self._equip_detail_skin, enabled=not is_equipped)
             for b in (play_btn, equip_btn):
@@ -51235,9 +51749,9 @@ class App:
             draw_text(canvas, L("ui.costume_lock", sk_name),
                       (40, 50), 11, PURPLE, bold=True, shadow=False)
         else:
-            hint = ("Petler MAĞAZA'dan alınır; burada yalnızca kuşanılır."
+            hint = ("Petler MAĞAZA'dan alınır, burada sadece kuşanılır."
                     if self.cosmetic_tab == "pet"
-                    else "Şapka, gözlük ve pelerinle karakterini kişiselleştir.")
+                    else "Şapka, gözlük, pelerin: karakterini giydir.")
             draw_text(canvas, hint, (40, 50), 11, TEXT_DIM, shadow=False)
         gem_txt = f"Elmas: {fmt_num(self.save.get_gems())}"
         gw_ = coin_label_width(gem_txt, 20, 10, gap=8)
@@ -54148,6 +54662,16 @@ UovlE6kl6cTkXOmdb2J40wq2BNAi+jv93+3vChyIt/lG+7sCB+p5iEaIx0MI+Bt7i7Kk1g1bGt6n6LnU
 WwJYI/wsFU1EudH+rsCBKM8MRIPsQDzKja5FGKtBWdFzGUEeF0rqFUHUrqQWyyfSgjx+u6crNwtbAtgExNt89wR8dMzvo2P2lGu8
 zddUIGVFz2VWlHFzPy3I45Ki5yrHt8KYLWxhCxuH/w/q2RLYnN/qTQAAAABJRU5ErkJggg=="""
 )
+
+
+def _index_strings_for_trx():
+    """5 dilli tablodaki her Türkçe metin, ham hâliyle çizildiğinde de çevrilsin."""
+    for row in STRINGS.values():
+        if isinstance(row, tuple) and len(row) >= 2 and row[0] and row[1] and row[0] not in TEXT_TR:
+            TEXT_TR[row[0]] = tuple((row[i] if i < len(row) and row[i] else row[1]) for i in range(1, 5))
+
+
+_index_strings_for_trx()
 
 
 def main():
