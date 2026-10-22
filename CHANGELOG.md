@@ -2,6 +2,12 @@
 
 Kısa notlar, en yenisi üstte.
 
+## sıradaki sürüm
+- arayüz baştan çizildi: yeni yazı tipi, kalın konturlu kartlar ve düğmeler, sıcak renkler
+- düğme yazısı sığmazsa küçülüyor (Rusça/Almanca taşmaları)
+- ₺ işareti kare kutu çıkıyordu, artık "TL" yazıyor
+- skin/kıyafet marketinde elmas sayısı her dilde çevriliyor
+
 ## 3.48
 - 2 kişilikte katılan oyuncunun donma/gecikme sorunu düzeldi (akış denetimi, kopunca yeniden bağlanma, ping göstergesi)
 - patronlar artık can kitabıyla geçiştirilemiyor: asgari darbe + sahada patron varken şifa azalıyor ("yara")
