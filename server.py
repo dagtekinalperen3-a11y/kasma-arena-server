@@ -15,22 +15,12 @@ from supabase import create_client, Client
 
 app = Flask(__name__, static_folder=".")
 
-# CORS KALDIRILDI (v3.22). Eskiden `CORS(app)` vardı ve HİÇBİR kısıtlama
-# verilmediği için /auth/login, /player/save, /submit, /diag dahil BÜTÜN
-# uçları her web sitesine açıyordu: herhangi bir sayfa, ziyaretçilerinin
-# tarayıcısını kullanarak bu uçlara istek atabiliyordu. Oyun bir MASAÜSTÜ
-# uygulaması; CORS'a tabi değil, yani hiç gerek yoktu. İleride bir web
-# paneli eklenirse SADECE onun kökeni ve SADECE gereken uçlar açılmalı.
-#
-# v3.45 MOBİL: oyunun telefon sürümü bir WEB SAYFASI (GitHub Pages). Tarayıcı
-# başka bir siteden gelen isteğe ancak sunucu izin verirse cevap verir. İzin
-# YALNIZCA oyunun kendi sayfasının kökenine ve YALNIZCA oyunun kullandığı
-# uçlara verilir (/diag ve eski Steam uçları kapalı kalır). Çerez/oturum
-# çerezi KULLANILMIYOR (jeton isteğin gövdesinde), yani izin verilmiş bir
-# köken bile başkasının hesabı adına istek atamaz.
-#   Render > Environment:  PLAY_ORIGINS = https://KULLANICIADIN.github.io
-#   (virgülle birden fazla yazılabilir). Boşsa yalnızca *.github.io
-#   sayfalarına izin verilir.
+# CORS: masaüstü oyunun buna ihtiyacı yok, ama telefon sürümü GitHub Pages'ta
+# çalışan bir web sayfası. İzin sadece oyunun kendi sayfasına ve oyunun
+# kullandığı uçlara veriliyor (/diag, eski steam uçları kapalı). Çerez yok,
+# jeton gövdede gidiyor.
+#   Render > Environment: PLAY_ORIGINS = https://KULLANICIADIN.github.io
+#   (virgülle birden fazla yazılabilir; boşsa sadece *.github.io)
 PLAY_ORIGINS = [o.strip().rstrip("/").lower()
                 for o in (os.environ.get("PLAY_ORIGINS") or "").split(",") if o.strip()]
 CORS_PATHS = ("/auth/", "/player/", "/shop/", "/reward", "/rewards", "/ad/", "/gift",
@@ -68,18 +58,12 @@ def _cors(resp):
         resp.headers["Vary"] = "Origin"
     return resp
 
-# GÖVDE BOYUTU: sınırsız gövde, tek istekle belleği doldurmaya izin
-# veriyordu. Oyunun en büyük isteği (/player/save, bütün ilerleme) birkaç
-# on kilobayt; 256 KB bol bol yeter.
+# Oyunun en büyük isteği (/player/save, bütün ilerleme) birkaç on kilobayt; 256
+# KB bol bol yeter.
 app.config["MAX_CONTENT_LENGTH"] = 256 * 1024
 
-# GERÇEK İSTEMCİ IP'Sİ (v3.22) — hız sınırının temeli.
-# Eskiden her uç `request.headers.get("X-Forwarded-For", ...)`'ın İLK
-# değerini anahtar yapıyordu. O başlığı İSTEMCİ yazar: her istekte farklı
-# bir değer yazan biri her istek için yeni bir kova açıyordu, yani hız
-# sınırı tamamen devre dışıydı (ve _rate_hits sözlüğü sınırsız büyüyordu).
-# ProxyFix, x_for=1 ile başlığın SONDAN BİRİNCİ girdisini alır; onu
-# istemci değil, önündeki tek vekil (Render) yazar — taklit edilemez.
+# Hız sınırı gerçek IP'ye bakmalı. X-Forwarded-For'un ilk değerini istemci
+# yazabiliyor; ProxyFix(x_for=1) Render'ın eklediği son değeri alıyor.
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 
@@ -89,16 +73,7 @@ def _client_ip():
 
 
 def _oops(e, msg="sunucu hatası", code=500):
-    """Hatayı SUNUCU GÜNLÜĞÜNE yazar, oyuncuya sabit bir metin + iz kimliği döner.
-
-    Eskiden neredeyse her uçta `return jsonify({"error": str(e)})` vardı.
-    Supabase/PostgREST hataları sütun adlarını, kısıt adlarını, tablo
-    adlarını ve bazen sorgu parçalarını içerir ("column accounts.foo does
-    not exist", "duplicate key value violates unique constraint
-    accounts_username_uidx"). Yani uydurma istek atan biri veritabanı
-    şemasını satır satır öğrenebiliyordu. Artık ayrıntı yalnızca Render
-    günlüğünde; oyuncu bir iz kimliği görür ve onu bildirebilir.
-    """
+    """Hatayı sunucu günlüğüne yazar, oyuncuya sabit bir metin + iz kimliği döner."""
     ref = uuid.uuid4().hex[:8]
     try:
         app.logger.exception("[%s] %s", ref, msg)
@@ -109,13 +84,7 @@ def _oops(e, msg="sunucu hatası", code=500):
 
 @app.errorhandler(Exception)
 def _any_error(e):
-    """YAKALANMAMIŞ her istisna da aynı süzgeçten geçer.
-
-    Uçların try bloklarını tek tek sarmak yetmiyordu: try'dan ÖNCE çağrılan
-    bir şey (örn. _account_by_session) patlarsa Flask'ın kendi işleyicisine
-    düşüyor ve DEBUG açıkken ham izleme kaydı dışarı çıkıyordu. Bu kanca
-    o deliği kapatır.
-    """
+    """Yakalanmamış her istisna da aynı süzgeçten geçer."""
     from werkzeug.exceptions import HTTPException
     if isinstance(e, HTTPException):
         # 404/405/413 gibi normal HTTP yanıtları olduğu gibi kalsın.
@@ -131,10 +100,7 @@ if SUPABASE_URL and SUPABASE_KEY:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def _body():
-    """İstek gövdesi — HER ZAMAN sözlük (v3.42).
-
-    Eskiden `_body()` kullanılıyordu: gövde ["x"] gibi bir LİSTE
-    ya da bozuk JSON olunca .get() AttributeError atıyor, uç 500 dönüyordu."""
+    """İstek gövdesi - her zaman sözlük."""
     d = request.get_json(silent=True)
     return d if isinstance(d, dict) else {}
 
@@ -156,9 +122,7 @@ def _num(v, default=0.0):
         return default
 
 
-# SABİT DOSYALAR (v3.42): eskiden sunucu klasöründeki HER dosya servis
-# ediliyordu — GET /server.py kaynak kodun tamamını veriyordu. Artık yalnız
-# web sayfası türleri, gizli (.) dosyalar hariç.
+# Yalnız web sayfası türleri, gizli (.) dosyalar hariç.
 STATIC_EXT = (".html", ".htm", ".css", ".js", ".png", ".jpg", ".jpeg", ".gif",
               ".svg", ".ico", ".webp", ".txt", ".woff", ".woff2")
 
@@ -175,44 +139,15 @@ def static_files(path):
         return jsonify({"error": "bulunamadı"}), 404
     return send_from_directory(".", path)
 
-# =====================================================================
-# HESAP SİSTEMİ  (v3.19) — GOOGLE İLE GİRİŞ + E-POSTA/ŞİFRE KAYDI
-# ---------------------------------------------------------------------
-# GÜVENLİK TASARIMI — neden böyle kuruldu:
-#
-# 1) ŞİFRE ASLA DÜZ SAKLANMAZ. scrypt ile, kullanıcıya özel rastgele tuzla
-#    karılır (bkz. _hash_password). scrypt bellek-zorlu bir fonksiyondur;
-#    veritabanı çalınsa bile şifreleri kaba kuvvetle çözmek pahalıdır.
-#    Karşılaştırma hmac.compare_digest ile yapılır (zamanlama sızıntısı yok).
-#
-# 2) GOOGLE GİRİŞİNDE "CLIENT SECRET" OYUNDA DURMAZ. Oyun yalnızca
-#    yetkilendirme KODUNU alır ve sunucuya yollar; kodu jetona çeviren ve
-#    kimliği doğrulayan taraf SUNUCUDUR. Oyun dosyası açılsa bile gizli
-#    anahtar çıkmaz. Akış RFC 8252 (native app) + PKCE'dir: oyun rastgele
-#    bir doğrulayıcı üretir, Google'a yalnızca özetini gönderir; kodu
-#    çalan biri doğrulayıcıyı bilmediği için kullanamaz.
-#
-# 3) KİMLİK JETONU GOOGLE'DAN DOĞRUDAN ALINIR. Kod değişimi sunucu ile
-#    Google arasında TLS üzerinden yapıldığı için jeton kanalın kendisiyle
-#    doğrulanmış olur; yine de iss / aud / exp / email_verified alanları
-#    tek tek denetlenir (bkz. _verify_google_id_token).
-#
-# 4) OTURUM JETONU VERİTABANINDA DÜZ DURMAZ. 32 baytlık rastgele bir jeton
-#    üretilir, oyuncuya bir kez verilir, veritabanına yalnızca SHA-256
-#    ÖZETİ yazılır. Veritabanı çalınsa bile oturumlar ele geçirilemez.
-#    Jetonun son kullanma tarihi vardır (SESSION_TTL).
-#
-# 5) GİRİŞ DENEMELERİ SINIRLIDIR (bkz. _rate_ok): aynı kaynaktan şifre
-#    deneyen bir saldırgan kesilir.
-#
-# 6) "Kullanıcı var mı yok mu" SIZDIRILMAZ: yanlış e-posta ile yanlış şifre
-#    aynı hatayı döndürür.
-#
-# KURULUM (bu üçü olmadan Google girişi kapalı kalır, oyun yine çalışır):
-#   GOOGLE_CLIENT_ID      Google Cloud > Kimlik Bilgileri > OAuth istemcisi
-#   GOOGLE_CLIENT_SECRET  (aynı yerden; YALNIZCA sunucuda dursun)
-#   Supabase'de iki tablo gerekir — SQL'i README_ACCOUNTS.md dosyasında.
-# =====================================================================
+# ---- hesaplar: kullanıcı adı/şifre + Google ile giriş ----
+# - şifreler scrypt + hesaba özel tuzla saklanıyor, karşılaştırma sabit zamanlı
+# - Google client secret sadece sunucuda; oyun yalnız yetki kodunu yolluyor
+#   (RFC 8252 loopback + PKCE)
+# - oturum jetonunun veritabanında sadece SHA-256 özeti duruyor, süresi var
+# - giriş denemeleri IP ve hesap başına sınırlı; "kullanıcı yok" ile "şifre
+#   yanlış" aynı cevabı veriyor
+# Gerekenler: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET (yoksa Google girişi
+# kapalı, gerisi çalışır). Tablolar için README_ACCOUNTS.md.
 
 import base64
 import re as _re
@@ -225,14 +160,12 @@ GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 SESSION_TTL = 60 * 60 * 24 * 60          # oturum ömrü: 60 gün
 PW_MIN_LEN = 8
 NAME_MAX = 14
-# scrypt parametreleri. N bellek maliyeti; 2**15 masaüstü/sunucu için
-# makul (yaklaşık 32 MB) ve kaba kuvveti ciddi biçimde pahalılaştırır.
+# scrypt parametreleri. N bellek maliyeti; 2**15 masaüstü/sunucu için makul
+# (yaklaşık 32 MB) ve kaba kuvveti ciddi biçimde pahalılaştırır.
 SCRYPT_N, SCRYPT_R, SCRYPT_P = 2 ** 15, 8, 1
 EMAIL_RE = _re.compile(r"^[^@\s]{1,64}@[^@\s]{1,190}\.[A-Za-z]{2,24}$")
 
-# KULLANICI ADI: sıralamada görünen ad. Bir kez seçilir, BİR DAHA DEĞİŞMEZ.
-# Harf/rakam/alt çizgi; boşluk ve noktalama yok ki sıralamada başkasının adını
-# taklit eden "KASMACI " gibi varyantlar üretilemesin.
+# kullanıcı adı: sıralamada görünen ad. Bir kez seçilir, bir daha değişmez.
 USERNAME_RE = _re.compile(r"^[A-Za-z0-9ÇĞİÖŞÜçğıöşü_]{3,14}$")
 
 # Oyuncunun adını çalmaya çalışan "admin / moderator" gibi adlar kapalı.
@@ -250,7 +183,7 @@ def _google_enabled():
 
 
 def _hash_password(password, salt=None):
-    """Şifreyi scrypt ile karar. Dönüş: saklanabilir tek bir metin."""
+    """Şifreyi scrypt ile karar."""
     salt = salt or secrets.token_bytes(16)
     dk = hashlib.scrypt(password.encode("utf-8"), salt=salt,
                         n=SCRYPT_N, r=SCRYPT_R, p=SCRYPT_P, dklen=32,
@@ -261,7 +194,7 @@ def _hash_password(password, salt=None):
 
 
 def _verify_password(password, stored):
-    """Şifre doğru mu? Sabit zamanlı karşılaştırma."""
+    """Şifre doğru mu?"""
     try:
         algo, n, r, pp, salt_b64, dk_b64 = str(stored).split("$")
         if algo != "scrypt":
@@ -276,9 +209,8 @@ def _verify_password(password, stored):
         return False
 
 
-# KUKLA ÖZET: giriş denemesinde hesap bulunamasa da aynı scrypt maliyetini
-# harcamak için. Uygulama açılışında BİR KEZ üretilir; yoksa her başarısız
-# denemede yeni bir özet üretmek kendi başına bir DoS olurdu.
+# kukla özet: giriş denemesinde hesap bulunamasa da aynı scrypt maliyetini
+# harcamak için.
 _DUMMY_HASH = _hash_password(secrets.token_hex(16))
 
 
@@ -287,31 +219,13 @@ def _token_hash(tok):
 
 
 def _clean_device(d):
-    """İstemciden gelen cihaz kimliği: yalnızca 64 karaktere kadar hex.
-
-    Oyun bunu makine adının SHA-256 özetinden üretir (bkz. device_id);
-    sunucuya gerçek kullanıcı/makine adı hiç gelmez. Biçimi burada da
-    daraltıyoruz ki bu alan serbest metin deposuna dönüşmesin.
-    """
+    """İstemciden gelen cihaz kimliği: yalnızca 64 karaktere kadar hex."""
     d = str(d or "")[:64].strip().lower()
     return d if all(c in "0123456789abcdef" for c in d) and len(d) >= 16 else ""
 
 
 def _new_session(account_id, device=""):
-    """Yeni oturum jetonu. Veritabanına yalnızca ÖZETİ yazılır.
-
-    Oturum, girişin yapıldığı CİHAZA bağlanır: jeton bir başkasının eline
-    geçse (kayıt dosyası paylaşıldı, dosya çalındı) başka bir makinede
-    kabul edilmez.
-
-    TEK OTURUM (v3.49): "hesapta biri varken başka biri giremesin" — bir
-    hesabın AYNI ANDA yalnızca bir geçerli oturumu olur. Yeni bir girişte
-    (giriş/kayıt/Google/şifre sıfırlama) o hesaba ait BÜTÜN eski oturumlar
-    hemen silinir; eski cihaz bir sonraki sunucu isteğinde "oturum geçersiz"
-    alır ve oyun onu otomatik çıkışa yönlendirir (bkz. arenae.py tarafında
-    _handle_session_kicked). Yani iki kişi aynı hesaba aynı anda GİREMEZ;
-    sonradan giren öncekini oturumdan düşürür.
-    """
+    """Yeni oturum jetonu (veritabanına özeti yazılır). Hesabın eski oturumları kapanır."""
     try:
         supabase.table("sessions").delete().eq("account_id", account_id).execute()
     except Exception:
@@ -328,11 +242,7 @@ def _new_session(account_id, device=""):
 
 
 def _acct(data, check_device=True):
-    """İstek gövdesinden hesabı çözer (cihaz denetimi dahil).
-
-    Beş uç aynı üç alanı aynı sırayla geçiriyordu; tek yerde toplandı ki
-    ileride bir alan eklenince bir uç geride kalmasın.
-    """
+    """İstek gövdesinden hesabı çözer (cihaz denetimi dahil)."""
     data = data or {}
     if not check_device:
         return _account_by_session(str(data.get("token", "")))
@@ -342,19 +252,7 @@ def _acct(data, check_device=True):
 
 
 def _account_by_session(tok, device=None, device_legacy=None):
-    """Jetondan hesabı bulur. Süresi dolmuşsa ya da CİHAZ tutmuyorsa None.
-
-    device=None geçilirse cihaz denetimi YAPILMAZ; bu yalnızca skor
-    gönderimi gibi, jetonun tek işinin "adı sahiplenmek" olduğu yerler
-    için. Hesabı okuyan/değiştiren uçlar cihazı mutlaka geçirir.
-
-    device_legacy, v3.22 GEÇİŞİ içindir: o güncellemeden önce açılmış
-    oturumlar ESKİ (tahmin edilebilir) cihaz kimliğine bağlıydı. Oyun
-    ikisini birden gönderiyor; burada ikisinden biri tutarsa oturum kabul
-    edilir, böylece kimse güncelleme yüzünden oturumundan düşmüyor. Yeni
-    oturumlar yalnızca YENİ kimliğe bağlandığı için bu yol oyuncular
-    yeniden giriş yaptıkça kendiliğinden kapanır.
-    """
+    """Jetondan hesabı bulur; süresi geçmişse ya da cihaz tutmuyorsa None."""
     if not tok or not supabase:
         return None
     rows = supabase.table("sessions").select("*").eq(
@@ -371,9 +269,7 @@ def _account_by_session(tok, device=None, device_legacy=None):
         return None
     if device is not None:
         want = str(sess.get("device_hash") or "")
-        # BOŞ device_hash ARTIK KABUL EDİLMİYOR (v3.22). Eskiden "eski
-        # oturumları kırmayalım" diye boş device_hash cihaz denetimini
-        # TAMAMEN atlıyordu, yani o satırlar için cihaz bağı hiç yoktu.
+        # boş device_hash artık kabul edilmiyor.
         if not want:
             return None
         ok_dev = _clean_device(device) == want
@@ -381,19 +277,15 @@ def _account_by_session(tok, device=None, device_legacy=None):
             ok_dev = _clean_device(device_legacy) == want
         if not ok_dev:
             return None
-    # DİKKAT: sütunları TEK TEK saymıyoruz. Daha önce burada sabit bir
-    # liste vardı ve "username" o listede yoktu; sonucu şuydu: oyun yeniden
-    # açıldığında /auth/me kullanıcı adı olmayan bir hesap döndürüyor, oyun
-    # "daha ad seçmemişsin" sanıp DÜNYA SIRALAMASINI KAPATIYORDU. Yeni bir
-    # sütun eklendiğinde aynı hatanın tekrarlamaması için hepsini alıyoruz;
-    # şifre özeti zaten _public_account süzgecinden geçmeden dışarı çıkmıyor.
+    # select("*") bilerek: tek tek sayınca yeni sütun unutuluyor. Dışarı
+    # giden alanları zaten _public_account süzüyor.
     acc = supabase.table("accounts").select("*").eq(
         "id", sess["account_id"]).execute()
     return acc.data[0] if acc.data else None
 
 
 def _public_account(acc):
-    """Oyuncuya DÖNDÜRÜLEBİLİR alanlar. Şifre özeti asla buraya girmez."""
+    """Oyuncuya döndürülebilir alanlar."""
     return {
         "id": acc.get("id"),
         "email": acc.get("email") or "",
@@ -403,15 +295,15 @@ def _public_account(acc):
         "provider": acc.get("provider", "password"),
         # Kullanıcı adı henüz seçilmemişse oyun bir kereye mahsus seçtirir.
         "needs_username": not bool(acc.get("username")),
-        # ŞİFRE ÖZETİ DEĞİL, yalnızca "var mı?": Google ile gelen hesapta
-        # şifre olmayabilir, oyun o zaman "mevcut şifre" kutusunu hiç
-        # göstermez ve ekranda "ŞİFRE BELİRLE" yazar.
+        # şifre özeti değil, yalnızca "var mı?": Google ile gelen hesapta şifre
+        # olmayabilir, oyun o zaman "mevcut şifre" kutusunu hiç göstermez ve
+        # ekranda "ŞİFRE BELİRLE" yazar.
         "has_password": bool(acc.get("password_hash")),
     }
 
 
 def _clean_username(u):
-    """Kullanıcı adını denetler. (ok, temiz_ad_veya_hata) döner."""
+    """Kullanıcı adını denetler."""
     u = str(u or "").strip()
     if not USERNAME_RE.match(u):
         return False, "kullanıcı adı 3-14 karakter olmalı (harf, rakam, _)"
@@ -421,12 +313,7 @@ def _clean_username(u):
 
 
 def _accounts_by_username(u, cols="*"):
-    """Kullanıcı adına (büyük/küçük harf duyarsız) uyan hesaplar.
-
-    v3.42: eskiden BÜTÜN hesaplar çekilip Python'da aranıyordu; Supabase bir
-    sorguda en çok 1000 satır döndürdüğü için 1000. hesaptan sonrakiler
-    kullanıcı adıyla GİRİŞ YAPAMIYOR, aynı ad ikinci kez alınabiliyordu.
-    Artık ILIKE ile (joker karakterler kaçırılarak) yalnız o ad sorulur."""
+    """Kullanıcı adına (büyük/küçük harf duyarsız) uyan hesaplar."""
     low = str(u or "").strip().lower()
     if not low:
         return []
@@ -449,13 +336,7 @@ def _b64url_json(part):
 
 
 def _verify_google_id_token(id_token):
-    """Google kimlik jetonunun İÇERİĞİNİ denetler.
-
-    İMZA ayrıca doğrulanmaz çünkü jeton, SUNUCU ile Google arasında TLS
-    üzerinden yapılan kod değişiminden DOĞRUDAN geldi — araya kimse
-    giremez. (Jeton istemciden gelseydi imza doğrulaması şart olurdu;
-    bu akışta istemci jetonu hiç görmüyor.)
-    """
+    """Google kimlik jetonunun alanlarını denetler. İmzaya bakılmıyor: jeton TLS üstünden doğrudan Google'dan geldi."""
     try:
         payload = _b64url_json(id_token.split(".")[1])
     except Exception:
@@ -479,12 +360,10 @@ def _find_or_create_account(email, name, provider, password_hash=None, google_su
     rows = supabase.table("accounts").select("*").eq("email", email).execute()
     if rows.data:
         acc = rows.data[0]
-        # v3.42 HESAP ÖN-ELE GEÇİRME KAPANDI: kayıtta yazılan e-posta
-        # doğrulanmıyor. Eskiden biri BAŞKASININ Gmail adresiyle şifreli hesap
-        # açınca, o kişi Google ile girdiğinde saldırganın hesabına
-        # bağlanıyordu (satın aldıkları da oraya gidiyordu). Google girişi
-        # artık yalnız (a) aynı Google kimliğine, (b) Google ile açılmış ya da
-        # (c) şifresi olmayan hesaba bağlanır.
+        # Kayıtta yazılan e-posta doğrulanmadığı için Google girişi sadece aynı
+        # Google kimliğine, Google ile açılmış ya da şifresiz bir hesaba
+        # bağlanır. Yoksa biri başkasının Gmail'iyle önceden hesap açıp
+        # bekleyebilirdi.
         if google_sub:
             same = str(acc.get("google_sub") or "") == str(google_sub)
             if not same:
@@ -501,9 +380,8 @@ def _find_or_create_account(email, name, provider, password_hash=None, google_su
         return acc, False
     new = {
         "email": email,
-        # Google'dan gelen ad yalnızca BİLGİ. Sıralamada görünecek
-        # KULLANICI ADINI oyuncu bir kez kendisi seçer (bkz.
-        # /auth/username) ve bir daha değiştiremez.
+        # Google'dan gelen ad yalnızca bilgi. Sıralamada görünecek kullanıcı
+        # adını oyuncu bir kez kendisi seçer ve bir daha değiştiremez.
         "name": (name or "")[:NAME_MAX],
         "provider": provider,
         "created_at": time.time(),
@@ -518,17 +396,7 @@ def _find_or_create_account(email, name, provider, password_hash=None, google_su
 
 @app.route("/diag", methods=["GET"])
 def diag():
-    """KURULUM DOĞRU MU? Tarayıcıda açılıp bakılacak tek adres.
-
-    Eksik bir tablo ya da sütun yüzünden ilerleme sessizce yazılamıyorsa
-    burada görünür. Hiçbir oyuncu verisi döndürmez — yalnızca "var / yok".
-
-    JETON GEREKİR (v3.22). Eskiden uç herkese açıktı ve 5 tablonun, 30'a
-    yakın sütunun tam listesini, hangilerinin eksik olduğunu ve Supabase'in
-    HAM hata metinlerini döküyordu: saldırgan için hazır bir şema haritası.
-    Artık Render'da DIAG_TOKEN ayarlanmış olmalı ve ?key=... ya da
-    X-Diag-Key başlığıyla gönderilmeli. DIAG_TOKEN yoksa uç tamamen kapalı.
-    """
+    """Kurulum kontrolü: hangi tablo/sütun eksik. DIAG_TOKEN gerekir (?key= ya da X-Diag-Key)."""
     want = os.environ.get("DIAG_TOKEN", "")
     got = request.args.get("key") or request.headers.get("X-Diag-Key") or ""
     if not want or not hmac.compare_digest(want, got):
@@ -552,8 +420,8 @@ def diag():
                         "skin_count", "pet_count", "data", "updated_at"],
         "player_events": ["account_id", "at", "kind", "delta", "total", "note"],
         "scores": ["name", "score", "kills", "wave", "run_time", "created_at",
-                   "account_id", "skin", "details"],      # v3.43: supabase_leaderboard.sql
-        # v3.28: gerçek para (TL) siparişleri — bkz. README_ODEME.md
+                   "account_id", "skin", "details"],      # supabase_leaderboard.sql
+        # gerçek para (TL) siparişleri - bkz. README_ODEME.md
         "shop_orders": ["id", "account_id", "product_id", "kind", "amount", "currency",
                         "status", "provider", "provider_ref", "payload", "created_at",
                         "paid_at", "granted_at", "error"],
@@ -564,15 +432,15 @@ def diag():
             supabase.table(tbl).select("*").limit(1).execute()
             info["var"] = True
         except Exception:
-            # Ham Supabase metni DEĞİL: yalnızca "yok" bilgisi. Ayrıntı
-            # Render günlüğünde.
+            # Ham Supabase metni değil: yalnızca "yok" bilgisi. Ayrıntı Render
+            # günlüğünde.
             try:
                 app.logger.exception("diag %s", tbl)
             except Exception:
                 pass
             info["var"] = False
             out["ok"] = False
-            out["yapilacak"].append(f"'{tbl}' tablosu yok — VERITABANI.sql'i çalıştır")
+            out["yapilacak"].append(f"'{tbl}' tablosu yok, VERITABANI.sql'i çalıştır")
             out["tables"][tbl] = info
             continue
         for c in cols:
@@ -587,7 +455,7 @@ def diag():
         out["tables"][tbl] = info
     if not _google_enabled():
         out["yapilacak"].append("Google girişi kapalı (GOOGLE_CLIENT_ID / "
-                                "GOOGLE_CLIENT_SECRET yok) — zorunlu değil")
+                                "GOOGLE_CLIENT_SECRET yok), zorunlu değil")
     shop_problem = _shop_config_problem()
     out["magaza"] = {"saglayici": SHOP_PROVIDER or "(kapalı)",
                      "acik": shop_problem == ""}
@@ -616,9 +484,8 @@ def auth_register():
     if not _rate_ok("auth:" + src):
         return jsonify({"success": False, "error": "çok fazla deneme"}), 429
     data = _body()
-    # KULLANICI ADI ile kayıt. v3.42: KURTARMA E-POSTASI ZORUNLU — şifresini
-    # unutan oyuncuya /auth/forgot ile kod gönderebilmek için. (Eskiden
-    # isteğe bağlıydı; e-postasız açılan hesaplar /auth/email ile ekler.)
+    # kullanıcı adı ile kayıt. kurtarma e-postası zorunlu - şifresini unutan
+    # oyuncuya /auth/forgot ile kod gönderebilmek için.
     ok, uname = _clean_username(data.get("username"))
     if not ok:
         return jsonify({"success": False, "error": uname}), 400
@@ -664,13 +531,13 @@ def auth_login():
     if not _rate_ok("auth:" + src):
         return jsonify({"success": False, "error": "çok fazla deneme"}), 429
     data = _body()
-    # Oyuncu kullanıcı adını DA e-postasını DA yazabilir; ikisi de aynı
-    # kutudan gelir (bkz. oyundaki giriş ekranı).
+    # Oyuncu kullanıcı adını da e-postasını da yazabilir; ikisi de aynı kutudan
+    # gelir.
     who = str(data.get("username") or data.get("email") or "").strip()
     password = str(data.get("password", ""))
-    # HESAP BAZLI KİLİT: belirli bir hesabı deneme yanılma ile kırmaya
-    # çalışan biri IP değiştirerek IP sınırını atlatabilir; bu sayaç
-    # kullanıcı adına baktığı için atlatılamaz.
+    # hesap bazlı kilit: belirli bir hesabı deneme yanılma ile kırmaya çalışan
+    # biri IP değiştirerek IP sınırını atlatabilir; bu sayaç kullanıcı adına
+    # baktığı için atlatılamaz.
     if _login_locked(who.lower()):
         return jsonify({"success": False,
                         "error": "çok fazla hatalı deneme, biraz bekle"}), 429
@@ -683,11 +550,8 @@ def auth_login():
         else:
             found = _accounts_by_username(who)
             acc = found[0] if found else None
-        # "Kullanıcı yok" ile "şifre yanlış" AYNI hatayı döndürür: saldırgan
-        # hangi adların kayıtlı olduğunu öğrenemesin. METİN aynıydı ama ZAMAN
-        # sızdırıyordu: hesap yoksa scrypt hiç çalışmıyor (hızlı yanıt),
-        # varsa ~32 MB'lık scrypt çalışıyordu (belirgin yavaş yanıt). Artık
-        # hesap bulunamasa da aynı maliyet harcanıyor.
+        # Hesap yoksa da scrypt çalışsın: cevap süresinden hangi adların
+        # kayıtlı olduğu anlaşılmasın.
         if not acc or not acc.get("password_hash"):
             _verify_password(password, _DUMMY_HASH)
             _login_failed(who.lower())
@@ -704,38 +568,20 @@ def auth_login():
         return _oops(e)
 
 
-# =====================================================================
-# ŞİFREMİ UNUTTUM (v3.39)
-# ---------------------------------------------------------------------
-#   POST /auth/forgot {who, lang}
-#       Hesabın kayıtlı e-postasına 6 haneli, 15 dakikalık bir kod yollar.
-#       Cevap HER ZAMAN {"success": true}: hesap var mı, e-postası var mı
-#       dışarıdan öğrenilemez (/auth/login'deki ilkeyle aynı).
-#   POST /auth/reset {who, code, password, device, device_legacy}
-#       Kod doğruysa şifre değişir, hesabın BÜTÜN oturumları kapanır ve bu
-#       cihaza yeni oturum verilir. Cevap /auth/login ile aynı biçimde.
-#
-# Kodlar bellekte KARILMIŞ olarak durur (veritabanında yeni tablo gerekmez).
-# Sunucu yeniden başlarsa bekleyen kodlar düşer; oyuncu "kodu yeniden
-# gönder"e basar. Bir koda en çok 5 yanlış deneme: 10^6 ihtimale karşı
-# kaba kuvvet imkânsız.
-#
-# E-POSTA (Render > Environment, biri yeter):
-#   BREVO_API_KEY  + MAIL_FROM   brevo.com — ücretsiz, alan adı gerekmez;
-#                                MAIL_FROM'u Brevo'da "sender" olarak doğrula.
-#   RESEND_API_KEY + MAIL_FROM   resend.com — kendi alan adın doğrulanmalı.
-#   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, MAIL_FROM
-#                                (Render'ın ücretsiz planı SMTP portlarını
-#                                kapatıyor olabilir; HTTP API'ler önerilir.)
-#   MAIL_FROM_NAME (isteğe bağlı, varsayılan "EvolveArena")
-# Hiçbiri yoksa /auth/forgot kod üretmez, günlüğe uyarı yazar.
-# =====================================================================
+# ---- şifremi unuttum ----
+# POST /auth/forgot {who, lang}: kayıtlı e-postaya 15 dakikalık 6 haneli kod.
+#   Cevap hep success (hesap var mı yok mu belli olmasın).
+# POST /auth/reset {who, code, password, device}: şifre değişir, bütün
+#   oturumlar kapanır, bu cihaza yeni oturum verilir.
+# Kodlar bellekte, özet olarak duruyor; sunucu yeniden başlarsa düşer.
+# E-posta için biri yeter: BREVO_API_KEY veya RESEND_API_KEY (+ MAIL_FROM),
+# ya da SMTP_HOST/PORT/USER/PASS + MAIL_FROM. MAIL_FROM_NAME isteğe bağlı.
 RESET_CODE_TTL = 15 * 60
 RESET_MAX_TRIES = 5
 RESET_RESEND_GAP = 60
 RESET_DAY = 24 * 3600
-RESET_DAY_SENDS = 6             # v3.42: hesap başına günde en çok kod
-RESET_DAY_TRIES = 10            # v3.42: hesap başına günde en çok yanlış deneme
+RESET_DAY_SENDS = 6             # hesap başına günde en çok kod
+RESET_DAY_TRIES = 10            # hesap başına günde en çok yanlış deneme
 _reset_codes = {}               # account_id -> {"h", "exp", "tries", "sent"}
 _reset_lock = threading.Lock()
 _RESET_KEY = secrets.token_bytes(32)
@@ -759,7 +605,7 @@ def _mail_configured():
 
 
 def _send_mail(to, subject, text):
-    """Düz metin e-posta. Önce Brevo, sonra Resend, sonra SMTP."""
+    """Düz metin e-posta."""
     sender = os.environ.get("MAIL_FROM", "")
     sender_name = os.environ.get("MAIL_FROM_NAME", "EvolveArena")
     brevo = os.environ.get("BREVO_API_KEY", "")
@@ -811,7 +657,7 @@ def _reset_hash(account_id, code):
 
 
 def _find_account_by_who(who):
-    """Kullanıcı adı YA DA e-postadan hesap (bkz. /auth/login aramasıyla aynı)."""
+    """Kullanıcı adı ya da e-postadan hesap."""
     who = str(who or "").strip()
     if not who:
         return None
@@ -851,9 +697,8 @@ def auth_forgot():
         cur = _reset_codes.get(aid)
         if cur and now - cur["sent"] < RESET_RESEND_GAP:
             return ok
-        # v3.42: yeniden gönderim deneme sayacını SIFIRLAMAZ. Eskiden her yeni
-        # kodla 5 hak tazeleniyordu; IP değiştiren biri dakikada 5 tahminle
-        # zamanla kodu tutturabilirdi. Hesap başına 24 saatlik kota.
+        # yeniden gönderim deneme sayacını sıfırlamaz. Hesap başına 24 saatlik
+        # kota.
         day0 = cur.get("day0", now) if cur and now - cur.get("day0", now) < RESET_DAY else now
         sends = (cur.get("sends", 1) + 1) if cur and day0 != now else 1
         day_tries = cur.get("day_tries", 0) if cur and day0 != now else 0
@@ -907,7 +752,7 @@ def auth_reset():
                 or cur["tries"] >= RESET_MAX_TRIES
                 or cur.get("day_tries", 0) >= RESET_DAY_TRIES):
             if cur:
-                cur["h"] = ""           # kod öldü; günlük sayaç DURUR (silinmez)
+                cur["h"] = ""           # kod öldü; günlük sayaç durur (silinmez)
             return bad
         if not hmac.compare_digest(cur["h"], _reset_hash(aid, code)):
             cur["tries"] += 1
@@ -924,25 +769,21 @@ def auth_reset():
         return _oops(e)
     _login_ok(str(acc.get("username") or "").lower())
     _login_ok(str(acc.get("email") or "").lower())
-    # artık şifresi var (Google hesabı da şifre kazanmış olur)
+    # şifresi var (Google hesabı da şifre kazanmış olur)
     pub = _public_account(dict(acc, password_hash="x"))
     return jsonify({"success": True, "token": tok, "account": pub})
 
 
 class _GoogleError(Exception):
-    """Google tarafında bir şey tutmadı. Metni oyuncuya gösterilebilir."""
+    """Google tarafında bir şey tutmadı."""
 
 
 class _LinkRefused(Exception):
-    """Google girişi şifreyle açılmış başka bir hesaba bağlanamaz (v3.42)."""
+    """Google girişi şifreyle açılmış başka bir hesaba bağlanamaz."""
 
 
 def _exchange_google_code(code, verifier, redirect_uri):
-    """Yetkilendirme kodunu Google'da jetona çevirir ve kimlik iddialarını döndürür.
-
-    client_secret YALNIZCA burada kullanılır; oyun onu hiç görmez.
-    Ayrı bir işlev olmasının ikinci sebebi: test edilebilmesi.
-    """
+    """Yetkilendirme kodunu Google'da jetona çevirir ve kimlik iddialarını döndürür."""
     try:
         body = urllib.parse.urlencode({
             "code": code,
@@ -965,10 +806,7 @@ def _exchange_google_code(code, verifier, redirect_uri):
 
 @app.route("/auth/google", methods=["POST"])
 def auth_google():
-    """Oyundan gelen YETKİLENDİRME KODUNU jetona çevirir (PKCE).
-
-    Oyun hiçbir zaman client secret görmez; kodu jetona çeviren taraf burasıdır.
-    """
+    """Oyundan gelen yetkilendirme kodunu jetona çevirir (PKCE)."""
     if not _google_enabled():
         return jsonify({"success": False,
                         "error": "Google girişi yapılandırılmamış"}), 503
@@ -981,7 +819,7 @@ def auth_google():
     redirect_uri = str(data.get("redirect_uri", ""))
     if not code or not verifier or not redirect_uri:
         return jsonify({"success": False, "error": "eksik bilgi"}), 400
-    # Geri dönüş adresi YALNIZCA yerel olabilir (RFC 8252 loopback).
+    # Geri dönüş adresi yalnızca yerel olabilir (RFC 8252 loopback).
     if not _re.match(r"^http://(127\.0\.0\.1|\[::1\]|localhost):\d{1,5}/?$", redirect_uri):
         return jsonify({"success": False, "error": "geri dönüş adresi geçersiz"}), 400
     try:
@@ -1017,13 +855,7 @@ def auth_me():
 
 @app.route("/auth/username", methods=["POST"])
 def auth_set_username():
-    """Kullanıcı adını BİR KEZ belirler.
-
-    Google ile gelen oyuncunun sıralamada görünecek adı yoktur; onu burada
-    bir kereye mahsus seçer. SEÇİLDİKTEN SONRA DEĞİŞTİRİLEMEZ: dünya
-    sıralamasında bir ad kimdeyse onda kalsın, kimse "geçen haftanın
-    birincisinin" adını üstüne geçirmesin.
-    """
+    """Kullanıcı adını bir kez belirler."""
     if not _accounts_enabled():
         return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
     data = _body()
@@ -1045,31 +877,21 @@ def auth_set_username():
     return jsonify({"success": True, "account": _public_account(acc)})
 
 
-# =====================================================================
-# OYUNCU İLERLEMESİ  (v3.20)
-# ---------------------------------------------------------------------
+# ---- oyuncu ilerlemesi ----
 # Elmas, skinler, petler, kostümler, açılmış kitap/silahlar ve istatistikler
-# HESABA ait. Böylece:
-#   * Yeni hesap SIFIRDAN başlar (misafir oynarken topladıkların gelmez).
-#   * Hesabınla başka bir bilgisayara girdiğinde ilerlemen seninle gelir.
-#   * Kayıt dosyasını düzenleyen biri sunucudaki hesabı şişiremez: elmas
-#     yalnızca MAKUL bir hızla artabilir (bkz. _merge_progress).
-# =====================================================================
+# hesaba ait: yeni hesap sıfırdan başlar, başka bilgisayarda da aynıdır, kayıt
+# dosyasını kurcalayan sunucudaki hesabı şişiremez.
 
-# Bir koşudan kazanılabilecek elmas için CÖMERT bir üst sınır. Amaç oyunu
+# Bir koşudan kazanılabilecek elmas için cömert bir üst sınır. Amaç oyunu
 # kısıtlamak değil, "tek istekle 1.000.000 elmas" yolunu kapatmak.
 GEM_GAIN_CAP_PER_PUSH = 4000
-# ZAMANA BAĞLI ELMAS BÜTÇESİ (v3.26). Tek istek sınırı tek başına yetmiyordu:
-# değiştirilmiş bir oyun aynı isteği art arda atıp her seferinde +4000
-# alabilirdi. Artık hesabın bir "elmas kovası" var: en fazla GEM_BURST dolar,
-# saatte GEM_RATE_PER_HOUR kadar yeniden dolar. Normal oyun bunun çok
-# altında kalır (bir koşu ~100-400 elmas, başarımlar arada bir).
+# zamana bağlı elmas bütçesi. Hesabın bir "elmas kovası" var: en fazla
+# GEM_BURST dolar, saatte GEM_RATE_PER_HOUR kadar yeniden dolar.
 GEM_BURST = 4000
 GEM_RATE_PER_HOUR = 3000
 PROGRESS_LISTS = ("skins_owned", "cosmetics_owned", "books_owned", "weapons_owned")
-# GERÇEK PARAYLA satılan içerik (v3.26): oyunun gönderdiği listeye YENİ
-# eklenmişse kabul edilmez. Sahiplik yalnızca sunucunun kendi kaydından
-# (satın alma onayı) gelir; daha önce sahip olunanlar aynen korunur.
+# gerçek parayla satılan içerik: oyunun gönderdiği listeye yeni eklenmişse
+# kabul edilmez.
 PAID_SKINS = {"web_master", "ash_warrior", "green_titan", "immortal_merc"}
 
 
@@ -1080,22 +902,21 @@ def _is_paid(list_key, item):
         return str(item).startswith("pet_")
     return False
 
-# ---- ARENA USTALIĞI (koşular arası kalıcı yükseltme) ----
-# Oyundaki MASTERY tablosuyla BİREBİR aynı olmalı: sunucu, iddia edilen
-# ustalığın GERÇEKTEN ödenmiş olup olmadığını buradan hesaplıyor.
+# ---- arena ustalığı (koşular arası kalıcı yükseltme) ----
+# Oyundaki mastery tablosuyla birebir aynı olmalı: sunucu, iddia edilen
+# ustalığın gerçekten ödenmiş olup olmadığını buradan hesaplıyor.
 MASTERY_TIERS = 5
 MASTERY_COSTS = {
     "m_dmg": (120, 1.60), "m_hp": (110, 1.60), "m_armor": (140, 1.65),
     "m_speed": (120, 1.60), "m_gem": (150, 1.70), "m_xp": (130, 1.65),
-    "m_luck": (130, 1.65),      # v3.29 UĞUR (kalıcı şans)
-    # v3.33 KAPATMA HAKKI: elmasla +1 silah / +1 kitap kapatma (en çok 4)
+    "m_luck": (130, 1.65),      # uğur (kalıcı şans)
+    # kapatma hakkı: elmasla +1 silah / +1 kitap kapatma (en çok 4)
     "m_wmute": (250, 1.50), "m_bmute": (250, 1.50),
 }
-# Kademesi sınırlı dallar (oyundaki MASTERY satırındaki "max").
+# Kademesi sınırlı dallar (oyundaki mastery satırındaki "max").
 MASTERY_MAX = {"m_wmute": 4, "m_bmute": 4}
-# Kurcalanmış bir istemcinin "kademe 10^9" yazıp sayıyla oynamasını
-# engeller; gerçek oyuncu bu sayıya hiçbir zaman yaklaşamaz (prestij
-# bedeli üstel).
+# Kurcalanmış bir istemcinin "kademe 10^9" yazıp sayıyla oynamasını engeller;
+# gerçek oyuncu bu sayıya hiçbir zaman yaklaşamaz (prestij bedeli üstel).
 MASTERY_LEVEL_CAP = 60
 
 
@@ -1116,15 +937,7 @@ def _mastery_total(key, lvl):
 
 
 def _merge_mastery(old, new, gems_spent):
-    """Ustalığı birleştirir ve ÖDENEBİLİR olduğunu doğrular.
-
-    Ustalık istemcide tutulduğu için "kademe 99" yazan bir kayıt sunucuya
-    gelebilir. İki fren var:
-      1) Kademe hiç geri gitmez ama MASTERY_LEVEL_CAP'i de aşamaz.
-      2) İddia edilen ustalığın TOPLAM BEDELİ, oyuncunun harcadığı elması
-         (gems_spent) aşamaz. Aşıyorsa fazlalık kademe kademe geri alınır.
-    Böylece ustalık, elmas defterinin doğruladığı bir şeye bağlanmış olur.
-    """
+    """Ustalığı birleştirir; toplam bedeli harcanan elması geçemez."""
     out = {}
     for key in MASTERY_COSTS:
         try:
@@ -1149,24 +962,22 @@ PROGRESS_STATS = ("runs", "best_score", "total_kills", "total_time", "bosses",
                   "best_run_gold", "best_run_dashes", "best_run_shots",
                   "total_bonk_hits", "total_chests", "total_cursed", "best_curse",
                   "total_goblins",
-                  # v3.35 HARİTA BAŞARIMI sayaçları (Buzul / Çöl / Orman)
+                  # harita başarımı sayaçları (Buzul / Çöl / Orman)
                   "frost_kills", "frost_bosses", "best_frost_wave", "frost_shots",
                   "desert_dashes", "best_desert_wind", "best_desert_wave", "desert_kills",
                   "desert_bonk_hits", "jungle_snakes", "jungle_bosses", "best_jungle_time",
                   "jungle_kills",
-                  # v3.39 HARİTA KİLİDİ: haritaların en iyi dalgası, Taş Meydan bitti mi
+                  # harita kilidi: haritaların en iyi dalgası, Taş Meydan bitti
+                  # mi
                   "best_stone_wave", "best_jungle_wave", "stone_cleared",
-                  # v3.42: oyunun büyüyen sayaçlarıyla EŞİTLENDİ. Bunlar sunucuda
-                  # yoktu; başka bilgisayarda giren oyuncunun kitap/başarım
-                  # ilerlemesi (kritik, iyileşme, BONK, dash, kombo ...) sıfırlanıyordu.
+                  # oyunun büyüyen sayaçlarıyla eşitlendi.
                   "best_combo", "best_run_heal", "best_run_kills", "total_bonks",
                   "total_crits", "total_dashes", "total_healed",
-                  # v3.42 anahtarlar / efsanevi sandık
+                  # anahtarlar / efsanevi sandık
                   "total_keys", "legend_chests")
-# v3.42: oyundan KALDIRILAN kitaplar (Çoğalma Kitabı). Eski istemciler
-# göndermeye devam edebilir; sunucu bunları saklamaz.
+# oyundan kaldırılan kitaplar (Çoğalma Kitabı). Eski istemciler göndermeye
+# devam edebilir; sunucu bunları saklamaz.
 REMOVED_BOOKS = frozenset({"r_multi"})
-
 
 
 def _player_row(account_id):
@@ -1182,8 +993,8 @@ def _blank_progress():
         "cosmetics_owned": [], "equipped_cosmetics": {},
         "books_owned": [], "weapons_owned": [],
         "achievements": {}, "stats": {}, "mastery": {},
-        # KALICI DÜNYA SIRALAMASI YASAĞI (v3.24). Bir kez True olunca hiçbir
-        # yerde False'a dönmez; oyun da sunucu da aynı bayrağı taşır.
+        # kalıcı dünya sıralaması yasağı. Bir kez True olunca hiçbir yerde
+        # False'a dönmez; oyun da sunucu da aynı bayrağı taşır.
         "board_banned": False, "ban_reasons": [],
     }
 
@@ -1204,7 +1015,7 @@ def _stored_progress(row):
 
 
 def _is_banned(account_id):
-    """Bu hesap dünya sıralamasından KALICI olarak çıkarılmış mı?"""
+    """Bu hesap dünya sıralamasından kalıcı olarak çıkarılmış mı?"""
     try:
         return bool(_stored_progress(_player_row(account_id)).get("board_banned"))
     except Exception:
@@ -1212,7 +1023,7 @@ def _is_banned(account_id):
 
 
 def _wipe_scores(account_id):
-    """Hesabın sıralamadaki BÜTÜN skorlarını siler. Geri alınmaz."""
+    """Hesabın sıralamadaki bütün skorlarını siler."""
     try:
         supabase.table("scores").delete().eq("account_id", account_id).execute()
     except Exception:
@@ -1220,16 +1031,7 @@ def _wipe_scores(account_id):
 
 
 def _ban_account(account_id, reason):
-    """Hesabı KALICI olarak sıralama dışına alır ve skorlarını siler.
-
-    Oyuncunun ilerlemesine (elmas, skin, istatistik) dokunulmaz: ceza
-    yalnızca DÜNYA SIRALAMASI'na. Oyun bu bayrağı /player/load ile
-    öğrenip arayüzde "sıralamadan çıkarıldın" yazıyor.
-
-    v3.35: yazma HESAP KİLİDİ altında. Eskiden aynı anda gelen bir
-    /player/save, yasaktan ÖNCE okuduğu ilerlemeyi yasaktan SONRA yazıp
-    yasağı silebiliyordu (okuma-birleştirme-yazma yarışı).
-    """
+    """Hesabı kalıcı olarak sıralama dışına alır ve skorlarını siler."""
     with _acct_lock(account_id):
         _ban_account_locked(account_id, reason)
     _wipe_scores(account_id)
@@ -1265,10 +1067,9 @@ def _ban_account_locked(account_id, reason):
         pass
 
 
-# HESAP KİLİDİ (v3.26): aynı hesaba aynı anda gelen iki istek (ör. otomatik
-# kayıt + hediye) birbirinin yazdığını ezmesin diye okuma-birleştirme-yazma
-# tek seferde yapılır. Sabit sayıda kilit: bellek büyümez. (Kilit süreç
-# içindedir; gunicorn birden çok işçiyle -w>1 çalıştırılırsa işçi başınadır.)
+# hesap kilidi: aynı hesaba aynı anda gelen iki istek (ör. otomatik kayıt +
+# hediye) birbirinin yazdığını ezmesin diye okuma-birleştirme-yazma tek seferde
+# yapılır. Kilit süreç içi; gunicorn -w 1 ile çalıştır.
 _ACCT_LOCKS = [threading.Lock() for _ in range(64)]
 
 
@@ -1291,12 +1092,7 @@ def _gem_allowance(prog, now=None):
 
 
 def _merge_progress(old, new, gem_cap=GEM_GAIN_CAP_PER_PUSH):
-    """Sunucudaki ilerlemeyi oyundan geleniyle birleştirir.
-
-    KURAL: ilerleme GERİ GİTMEZ, ve elmas defteri bir seferde en fazla
-    GEM_GAIN_CAP_PER_PUSH kadar artabilir. İstemciden gelen sayıya olduğu
-    gibi güvenilmez — oyun dosyası oyuncunun bilgisayarında duruyor.
-    """
+    """İlerlemeyi birleştirir: hiçbir şey geri gitmez, elmas bir seferde en çok GEM_GAIN_CAP_PER_PUSH artar."""
     out = dict(old)
     for k in PROGRESS_LISTS:
         merged = list(old.get(k) or [])
@@ -1313,19 +1109,14 @@ def _merge_progress(old, new, gem_cap=GEM_GAIN_CAP_PER_PUSH):
     if isinstance(new.get("equipped_cosmetics"), dict):
         out["equipped_cosmetics"] = {str(a)[:20]: (str(b)[:40] if b else None)
                                      for a, b in list(new["equipped_cosmetics"].items())[:12]}
-    # istatistikler: her alan yalnızca BÜYÜYEBİLİR
+    # istatistikler: her alan yalnızca büyüyebilir
     st_old = dict(old.get("stats") or {})
     st_new = new.get("stats") or {}
     for k in PROGRESS_STATS:
         try:
             cur = float(st_old.get(k, 0) or 0)
             inc = float(st_new.get(k, 0) or 0)
-            # SONLU OLMAYAN DEĞERİ REDDET. Python'un json.loads'u Infinity,
-            # -Infinity ve NaN değişmezlerini KABUL eder, dolayısıyla
-            # request.json da eder. inf buradan sorunsuz geçiyor, sonra
-            # int(float('inf')) OverflowError atıp /player/save'i 500'le
-            # çökertiyordu — tek bir istekle o hesabın ilerlemesi hiç
-            # kaydedilemez hâle geliyordu.
+            # sonlu olmayan değeri reddet.
             if not math.isfinite(inc):
                 inc = 0.0
             if not math.isfinite(cur):
@@ -1334,38 +1125,22 @@ def _merge_progress(old, new, gem_cap=GEM_GAIN_CAP_PER_PUSH):
         except Exception:
             pass
     out["stats"] = st_old
-    # ---- KALICI SIRALAMA YASAĞI (v3.25 — BAŞKA HESABA SIZAN YASAK) ----
-    # ESKİDEN: new.get("board_banned") de buraya karışıyordu — yani BU
-    # UÇTAN (/player/save), oyuncunun kendi İMZASIZ/doğrulanmamış yerel
-    # kaydında ne yazıyorsa sunucu ona güveniyordu. Bu alan her ufak
-    # değişiklikte (skin kuşanma, elmas kazanma...) otomatik gönderiliyor;
-    # yani yerel kayıttaki board_banned bir şekilde YANLIŞ profile
-    # karışırsa (bkz. kasma_arena13.py _remember notu), o hesap BİR DAHA
-    # AÇILMAYACAK şekilde yanlışlıkla yasaklanabiliyordu — tam da oyuncunun
-    # bildirdiği hata buydu: "alp hesabını yasakladım, başka hesapla
-    # girince o da yasaklı görünüyor."
-    #
-    # ARTIK: bu uçtan YENİ bir yasak hiç konmuz. Var olan yasak (old) aynen
-    # KORUNUR — hileci dosyasını temizleyip geri dönemez — ama YENİ bir
-    # yasak yalnızca sunucunun KENDİ doğruladığı yoldan gelir: /submit'teki
-    # imzalı skor-makullük denetimi (bkz. score_is_plausible → _ban_account)
-    # ya da elle (admin) müdahale. Oyunun kendi hile tespiti (hile kodu vb.)
-    # yine ÇALIŞIR: o oyuncu dünya sıralamasına skor göndermeye kalkışınca
-    # /submit zaten kendi makullük denetiminden geçirip gerçek bir yasak
-    # koyar — yalnızca rutin otomatik kayıt artık bunu tek başına yapamaz.
+    # ---- kalıcı sıralama yasağı (başka hesaba sızan yasak) ----
+    # Var olan yasak (old) aynen korunur - hileci dosyasını temizleyip geri
+    # dönemez - ama yeni bir yasak yalnızca sunucunun kendi doğruladığı yoldan
+    # gelir: /submit'teki imzalı skor-makullük denetimi ya da elle (admin)
+    # müdahale.
     out["board_banned"] = bool(old.get("board_banned"))
     out["ban_reasons"] = list(old.get("ban_reasons") or [])[:8] if out["board_banned"] else []
-    # ÜCRETSİZ ELMAS SAYAÇLARI (v3.26): reklam ve günlük hediye hesaplarda
-    # YALNIZCA SUNUCUDA işler (bkz. /rewards/claim, sunucu saatiyle). Oyunun
-    # gönderdiği sayaçlar YOK SAYILIR: bilgisayarın saatini değiştiren ya da
-    # sayaçları sıfırlayan biri aynı günün hakkını ikinci kez alamaz.
+    # ücretsiz elmas sayaçları: reklam ve günlük hediye hesaplarda yalnızca
+    # sunucuda işler.
     out["rewards"] = dict(old.get("rewards") or {})
     out["_gem_clock"] = dict(old.get("_gem_clock") or {})
     ach = dict(old.get("achievements") or {})
     for k, v in list((new.get("achievements") or {}).items())[:400]:
         ach.setdefault(str(k)[:40], v)
     out["achievements"] = ach
-    # --- elmas defteri ---
+    # ---- elmas defteri ----
     earned_old = _int(old.get("gems_earned", 0))
     spent_old = _int(old.get("gems_spent", 0))
     earned_new = max(0, _int(new.get("gems_earned", 0)))
@@ -1376,15 +1151,11 @@ def _merge_progress(old, new, gem_cap=GEM_GAIN_CAP_PER_PUSH):
     out["gems_earned"] = earned
     out["gems_spent"] = min(spent, earned)
     out["gems"] = max(0, out["gems_earned"] - out["gems_spent"])
-    # ustalık: kademe geri gitmez, tavanı var ve ÖDENMİŞ olmalı.
-    # v3.42: bütçe artık DEFTERİN SONUCU (kazanılanla sınırlı harcama).
-    # Eskiden istemcinin ham gems_spent'i kullanılıyordu: hiç elması olmayan
-    # bir hesap gems_spent=1e15 yazıp bütün ustalığı bedavaya alıyordu.
+    # ustalık: kademe geri gitmez, tavanı var ve ödenmiş olmalı. bütçe defterin
+    # sonucu (kazanılanla sınırlı harcama).
     out["mastery"] = _merge_mastery(old.get("mastery"), new.get("mastery"),
                                     out["gems_spent"])
-    # v3.42: KAPATILAN silah / kitaplar (elmasla alınan ustalık hakkı) artık
-    # sunucuda da saklanır; başka bilgisayarda kayboluyordu. En çok, alınmış
-    # hak kadar (bedava 4 / 6 + ustalık).
+    # kapatılan silah/kitaplar: en çok alınmış hak kadar (bedava 4 / 6 + ustalık)
     for k, m, free in (("weapons_muted", "m_wmute", 4), ("books_muted", "m_bmute", 6)):
         lst = new.get(k)
         if isinstance(lst, list):
@@ -1399,7 +1170,7 @@ def _merge_progress(old, new, gem_cap=GEM_GAIN_CAP_PER_PUSH):
 
 @app.route("/player/load", methods=["POST"])
 def player_load():
-    """Hesabın ilerlemesini döndürür. Yeni hesapta her şey SIFIR."""
+    """Hesabın ilerlemesini döndürür."""
     if not _accounts_enabled():
         return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
     data = _body()
@@ -1410,14 +1181,7 @@ def player_load():
 
 
 def _log_event(account_id, kind, delta, total, note=""):
-    """Oyuncunun ilerlemesindeki her değişikliği ZAMANIYLA kaydeder.
-
-    Amaç: "bu oyuncu ne zaman kaç elmas kazandı, hangi skini ne zaman
-    aldı" sorularına saniyesi saniyesine cevap verebilmek
-    (bkz. player_events tablosu ve gem_history görünümü).
-
-    Günlük yazılamazsa oyun durmaz: kayıt asıl iş değil, iz bırakmaktır.
-    """
+    """Oyuncunun ilerlemesindeki her değişikliği zamanıyla kaydeder."""
     try:
         supabase.table("player_events").insert({
             "account_id": account_id,
@@ -1432,24 +1196,22 @@ def _log_event(account_id, kind, delta, total, note=""):
 
 
 def _public_progress(prog):
-    """Oyuna giden ilerleme: sunucunun iç alanları (elmas kovası, reklam
-    bileti) çıkarılır."""
+    """Oyuna giden ilerleme: sunucunun iç alanları (elmas kovası, reklam bileti) çıkarılır."""
     out = dict(prog)
     out.pop("_gem_clock", None)
     rw = dict(out.get("rewards") or {})
     rw.pop("ad_nonce", None)
     rw.pop("ad_started", None)
-    rw.pop("snow_nonce", None)          # v3.43: kartopu bileti de gizli
+    rw.pop("snow_nonce", None)          # kartopu bileti de gizli
     rw.pop("snow_started", None)
     out["rewards"] = rw
     return out
 
 
 def _store_progress(account_id, row, before, merged):
-    """Birleştirilmiş ilerlemeyi yazar ve olay günlüğünü tutar.
-    Hata olursa bir Flask cevabı, yoksa None döndürür."""
-    # OYUN HİLE BİLDİRDİ: yasak ilk kez burada öğrenildiyse, o hesabın
-    # tablodaki eski skorları da ŞİMDİ silinir (v3.24).
+    """Birleştirilmiş ilerlemeyi yazar ve olay günlüğünü tutar."""
+    # oyun hile bildirdi: yasak ilk kez burada öğrenildiyse, o hesabın
+    # tablodaki eski skorları da şimdi silinir.
     if merged.get("board_banned") and not before.get("board_banned"):
         _wipe_scores(account_id)
         _log_event(account_id, "yasak", 0, 0, "oyun bildirdi")
@@ -1460,8 +1222,8 @@ def _store_progress(account_id, row, before, merged):
         "gems": int(merged["gems"]),
         "gems_earned": int(merged["gems_earned"]),
         "gems_spent": int(merged["gems_spent"]),
-        # Aşağıdaki sütunlar veritabanında TEK BAKIŞTA okunabilsin diye ayrı
-        # duruyor (bkz. player_overview görünümü).
+        # Aşağıdaki sütunlar veritabanında tek bakışta okunabilsin diye ayrı
+        # duruyor.
         "best_score": int(st.get("best_score", 0) or 0),
         "best_wave": int(st.get("best_wave", 0) or 0),
         "total_kills": int(st.get("total_kills", 0) or 0),
@@ -1480,13 +1242,11 @@ def _store_progress(account_id, row, before, merged):
         else:
             supabase.table("player_data").insert(payload).execute()
     except Exception as e:
-        # HATAYI YUTMUYORUZ (oyuncu "elmasım artmıyor" diye bakakalmasın;
-        # oyun bu metni hesap ekranında gösteriyor) ama HAM METNİ de
-        # vermiyoruz: şema sızdırıyordu. Ayrıntı Render günlüğünde, oyuncuda
-        # bildirebileceği bir iz kimliği var; eksik sütunu /diag söyler.
+        # Ayrıntı Render günlüğünde, oyuncuda bildirebileceği bir iz kimliği
+        # var; eksik sütunu /diag söyler.
         return _oops(e, "ilerleme yazılamadı")
 
-    # ---- OLAY GÜNLÜĞÜ ----
+    # ---- olay günlüğü ----
     d_gem = int(merged["gems_earned"]) - int(before.get("gems_earned", 0) or 0)
     if d_gem:
         _log_event(account_id, "gem", d_gem, merged["gems"], "kazanıldı")
@@ -1534,19 +1294,9 @@ def player_save():
     return jsonify({"success": True, "progress": _public_progress(merged)})
 
 
-# OYUNUN KENDİ HİLE İTİRAFI (v3.35)
-# ---------------------------------------------------------------------
-# AÇIK BUYDU: oyun hile kodunu (ya da kurcalanmış elmas defterini)
-# yakalayınca yalnızca YEREL kayda "board_banned" yazıyordu. Sunucu bunu
-# hiç öğrenmiyordu: /player/save bu alana bilerek güvenmiyor (başka hesaba
-# sızan yasak, v3.25) ve yasaklı oyun /submit'e hiç gitmediği için oradaki
-# itiraf kanalı da hiç çalışmıyordu. Yerel bayrak bir şekilde kaybolunca
-# (çıkış/giriş hatası, kayıt silme, başka bilgisayar) hesap yeniden
-# sıralamaya girebiliyordu.
-#
-# ARTIK: oyun yakaladığı anda bu uca bildirir. Hesap, isteğin KENDİ geçerli
-# oturum jetonundan (ve cihazından) çözülür: biri yalnızca KENDİ hesabını
-# itiraf edebilir, başkasınınkini asla. Sebep beyaz listeden gelir.
+# ---- oyunun kendi hile itirafı ----
+# Hesap, isteğin kendi geçerli oturum jetonundan (ve cihazından) çözülür: biri
+# yalnızca kendi hesabını itiraf edebilir, başkasınınkini asla.
 CHEAT_REPORT_REASONS = ("cheat_code", "gems", "stats", "run")
 
 
@@ -1566,30 +1316,18 @@ def player_report_cheat():
     return jsonify({"success": True, "banned": True, "progress": _public_progress(prog)})
 
 
-# =====================================================================
-# ÜCRETSİZ ELMAS: GÜNLÜK HEDİYE + REKLAM  (v3.26 — SUNUCU HAKEMDİR)
-# ---------------------------------------------------------------------
-# Hesaplı oyuncunun ödülleri YALNIZCA burada verilir ve SUNUCUNUN saatiyle
-# sayılır (Türkiye saati). Bilgisayarın tarihini ileri-geri alan biri aynı
-# günün hakkını ikinci kez alamaz; hediye/reklam sayaçları hesaba aittir,
-# başka bilgisayardan girince de aynıdır.
-#
-# REKLAM: oyun reklamı başlatırken /rewards/ad_start ile bir bilet alır;
-# ödül ancak biletle ve reklam süresi (AD_MIN_WATCH) dolduktan sonra
-# verilir. Her bilet bir kez kullanılır.
-# Değerler oyundakilerle (AD_REWARD_GEMS, AD_DAILY_LIMIT, AD_COOLDOWN,
-# DAILY_GIFT_GEMS) BİREBİR aynı olmalı.
-# =====================================================================
+# ---- ücretsiz elmas: günlük hediye + reklam ----
+# Hesaplı oyuncuda sunucunun saatiyle sayılır (bilgisayarın saatini geri alan
+# aynı hakkı iki kez alamaz). Reklam ödülü /rewards/ad_start biletiyle ve
+# AD_MIN_WATCH dolunca verilir. Değerler oyundakilerle aynı olmalı.
 REWARD_TZ_OFFSET = 3 * 3600          # Türkiye (UTC+3)
-AD_REWARD_GEMS = 300           # v3.27: 50 -> 250, v3.33: 300
+AD_REWARD_GEMS = 300
 AD_DAILY_LIMIT = 5
 AD_COOLDOWN = 90.0
-AD_MIN_WATCH = 80.0                  # v3.44: reklam = 90 sn tanıtım filmi (yedek oyun turu 120 sn)
-DAILY_GIFT_GEMS = (150, 250, 350, 450, 550, 650, 750)   # v3.39 (oyunla aynı)
-# v3.43 KARTOPU SAVAŞI (kardan adam etkinliği): günde 3 oyun, 30 sn; vurulan
-# her düşman 1 elmas (altın goblin 3). Süre SUNUCU saatiyle ölçülür: bilet
-# /rewards/snow_start'ta verilir, en erken 30 sn sonra bozdurulur; isabet
-# sayısı tavanlıdır; bilet tek kullanımlıktır.
+AD_MIN_WATCH = 80.0                  # reklam = 90 sn tanıtım filmi (yedek oyun turu 120 sn)
+DAILY_GIFT_GEMS = (150, 250, 350, 450, 550, 650, 750)   # (oyunla aynı)
+# kartopu savaşı (kardan adam etkinliği): günde 3 oyun, 30 sn; vurulan her
+# düşman 1 elmas (altın goblin 3).
 SNOW_DAILY = 3
 SNOW_TIME = 30.0
 SNOW_MAX_GEMS = 90              # tek oyunda en çok (dürüst oyunun üst ucu ~70)
@@ -1615,7 +1353,7 @@ def _reward_ctx():
 
 
 def _reward_row(account_id):
-    """(satır, ilerleme, ödül sözlüğü) — _acct_lock İÇİNDE çağrılmalı."""
+    """(satır, ilerleme, ödül sözlüğü) - _acct_lock içinde çağrılmalı."""
     row = _player_row(account_id)
     before = _stored_progress(row)
     return row, before, dict(before.get("rewards") or {})
@@ -1629,15 +1367,9 @@ def _snow_used_today(rw):
     return int(rw.get("snow_count", 0) or 0) if rw.get("snow_day") == _server_day() else 0
 
 
-# =====================================================================
-# İLETİŞİM / DESTEK (v3.44)
-# ---------------------------------------------------------------------
+# ---- iletişim / destek ----
 # Oyundaki giriş ekranından "İLETİŞİM" ile gelen sorun / öneri mesajları
-# Supabase'deki "feedback" tablosuna yazılır (bkz. supabase_leaderboard.sql:
-# admin.feedback görünümü). Girişliyse hesap adı sunucudan eklenir; IP
-# yalnızca tuzlanmış özet olarak tutulur. Spam'e karşı IP ve hesap başına
-# kısa ve günlük sınır var; mesaj boyu sınırlı, denetim karakterleri atılır.
-# =====================================================================
+# Supabase'deki "feedback" tablosuna yazılır.
 CONTACT_KINDS = ("sorun", "oneri", "diger")
 CONTACT_MIN = 10
 CONTACT_MAX = 1500
@@ -1703,7 +1435,7 @@ def contact_message():
 
 @app.route("/rewards/snow_start", methods=["POST"])
 def rewards_snow_start():
-    """KARTOPU SAVAŞI başlıyor: tek kullanımlık bilet + sunucu saati."""
+    """Kartopu savaşı başlıyor: tek kullanımlık bilet + sunucu saati."""
     ctx, err = _reward_ctx()
     if err:
         return err
@@ -1820,7 +1552,8 @@ def _claim_locked(acc, data):
     e = _store_progress(acc["id"], row, before, merged)
     if e is not None:
         return e
-    # (elmas artışı _store_progress'te "gem / kazanıldı" olarak zaten günlüğe yazıldı)
+    # (elmas artışı _store_progress'te "gem / kazanıldı" olarak zaten günlüğe
+    # yazıldı)
     return jsonify({"success": True, "amount": amount, "note": note,
                     "progress": _public_progress(merged)})
 
@@ -1841,12 +1574,7 @@ def auth_logout():
 
 @app.route("/auth/logout_all", methods=["POST"])
 def auth_logout_all():
-    """BÜTÜN cihazlardan çıkış.
-
-    Eskiden yoktu: /auth/logout yalnızca GÖNDERİLEN jetonu siliyordu, yani
-    jetonu bir kez ele geçiren biri oturum ömrü (SESSION_TTL) boyunca
-    içeride kalabiliyordu ve oyuncunun onu atacak hiçbir yolu yoktu.
-    """
+    """Bütün cihazlardan çıkış."""
     if not _accounts_enabled():
         return jsonify({"success": True})
     data = _body()
@@ -1862,17 +1590,7 @@ def auth_logout_all():
 
 @app.route("/auth/email", methods=["POST"])
 def auth_email():
-    """KURTARMA E-POSTASI EKLE / DEĞİŞTİR (v3.42).
-
-    Kurallar şifre değiştirmeyle aynı mantıkta:
-      - Oturum jetonu + cihaz zorunlu.
-      - Hesabın şifresi varsa MEVCUT ŞİFRE istenir: jetonu çalan biri
-        e-postayı kendi adresine çevirip /auth/forgot ile hesabı
-        devralamasın.
-      - Adres başka bir hesapta kayıtlıysa reddedilir (giriş "kullanıcı adı
-        ya da e-posta" ile yapılabildiği için e-posta TEKİL olmalı).
-      - Google hesabının e-postası Google'dan gelir; değiştirilmez.
-    """
+    """Kurtarma e-postası ekle/değiştir. Şifreli hesapta mevcut şifre istenir."""
     if not _accounts_enabled():
         return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
     if not _rate_ok("email:" + _client_ip()):
@@ -1905,20 +1623,7 @@ def auth_email():
 
 @app.route("/auth/password", methods=["POST"])
 def auth_password():
-    """ŞİFRE DEĞİŞTİRME.
-
-    Eskiden hiç yoktu: şifresi sızan oyuncunun yapabileceği HİÇBİR ŞEY
-    yoktu. Kurallar:
-      - Oturum jetonu + cihaz zorunlu (yani şifreyi yalnızca o an giriş
-        yapmış cihaz değiştirebilir).
-      - MEVCUT şifre de istenir; jetonu çalan biri şifreyi değiştirip
-        hesabı tamamen devralamasın.
-      - Değişiklikte O HESABIN BÜTÜN oturumları silinir ve çağırana yeni
-        bir jeton verilir: şifre neden değiştiriliyorsa (sızıntı) o
-        oturumlar da gitmeli.
-      - Google ile açılmış, şifresi olmayan hesaplarda şifre KURMAYA da
-        yarar; o durumda mevcut şifre istenmez.
-    """
+    """Şifre değiştirme: oturum + cihaz + mevcut şifre ister, bütün oturumları kapatır."""
     if not _accounts_enabled():
         return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
     if not _rate_ok("pw:" + _client_ip()):
@@ -1947,63 +1652,36 @@ def auth_password():
     return jsonify({"success": True, "token": tok})
 
 
-# =====================================================================
-# HİLE KORUMASI  (sunucu tarafı — ASIL koruma burasıdır)
-# ---------------------------------------------------------------------
-# İstemcide çalışan hiçbir koruma mutlak değildir: oyunun dosyası açılabilir,
-# yerleşik anahtar çıkarılabilir. Dünya sıralamasının temizliği bu yüzden
-# SUNUCUDA karara bağlanır. Üç süzgeç var:
-#
-#   1) İMZA       — gönderi, oyunun bildiği gizli anahtarla imzalanmış
-#                   olmalı. İmzasız/yanlış imzalı istek (örn. elle atılan
-#                   bir curl) hiç değerlendirilmez.
-#   2) MAKULLÜK   — skor; öldürme sayısı, dalga ve süreyle TUTARLI olmalı.
-#                   Oyunun kendi kuralları içinde üretilemeyecek bir skor
-#                   reddedilir. Bu süzgeç anahtarı çalmış birini de yakalar:
-#                   imzayı taklit etse bile 10 milyonluk skoru 12 saniyede
-#                   üretemez.
-#   3) HIZ SINIRI — aynı kaynaktan dakikalar içinde yağdırılan gönderiler
-#                   kesilir.
-#
-# ÖNEMLİ: SUBMIT_SECRET ortam değişkeninden okunur ve oyundaki değerle AYNI
-# olmalıdır (kasma_arena13.py / SUBMIT_SECRET). Yayına çıkmadan önce ikisi
-# birden değiştirilmelidir; buradaki varsayılan yalnızca geliştirme içindir.
-# =====================================================================
+# ---- hile koruması ----
+# İstemcideki koruma her zaman aşılabilir, asıl karar burada. Üç süzgeç:
+# imza (SUBMIT_SECRET), makullük (skor; öldürme, dalga ve süreyle tutarlı mı)
+# ve hız sınırı.
+# KASMA_SUBMIT_SECRET Render'da ayarlı olmalı ve oyundaki SUBMIT_SECRET ile
+# aynı olmalı. Buradaki varsayılan sadece geliştirme için.
 
 SUBMIT_SECRET = os.environ.get("KASMA_SUBMIT_SECRET",
                                "kasma-arena-submit-v1:3d7f90ac41be6528")
 # İmza zorunlu mu? Eski istemcilerin bir süre çalışabilmesi için kapatılabilir.
 REQUIRE_SIGNATURE = os.environ.get("KASMA_REQUIRE_SIG", "1") == "1"
 
-# --- MAKULLÜK SINIRLARI ---
+# ---- makullük sınırları ----
 # Hepsi oyunun kendi eğrilerinden türetildi ve dürüst bir oyuncunun asla
 # takılmayacağı kadar geniş bırakıldı.
 MAX_SCORE_PER_KILL = 900.0     # bir öldürmeden çıkabilecek en yüksek skor
-# v3.30 — LANETLİ SANDIK: kabul edilen lanetler skor kazancını en çok x2,5
-# büyütüyor (CURSE_SCORE_ROOM) ve sahaya daha çok yaratık getiriyor
-# (bölünenler, kalabalık). Sunucu laneti göremediği için sınırlar o kadar
-# genişletildi; yoksa lanetli DÜRÜST bir koşu "imkânsız skor" sayılıp hesap
-# kalıcı olarak yasaklanırdı. Ölçüm (başsız bot, bütün lanetler, kabus,
-# 30 dk): saniyede 18 öldürme, 1.307 skor, dalga-hedef oranı eski sınırın 0,81'i.
+# lanetli sandık: kabul edilen lanetler skor kazancını en çok x2,5 büyütüyor
+# (CURSE_SCORE_ROOM) ve sahaya daha çok yaratık getiriyor (bölünenler,
+# kalabalık).
 CURSE_SCORE_ROOM = 2.5
-# v3.33 — "80 karakter öldürüyorum, hile koruması": lanetli cehennemde
-# (bölünenler + kalabalık + cehennem temposu) dürüst ve çok güçlü bir bot
-# SANİYEDE ORTALAMA 64-67, ANLIK ~100 öldürme ve saniyede ~6.700 skor
-# üretti; eski sınırlar (45 / 6.000) bu oyuncuyu "imkânsız skor" sayıp
-# hesabını kalıcı yasaklıyordu. Yeni sınırlar ölçülen uç değerin 2-4 katı.
-# Asıl hile süzgeçleri (imza, öldürme başına skor, dalga-hedef tavanı)
-# değişmedi.
+# Lanetli cehennemde dürüst ama çok güçlü bir koşu saniyede ~100 öldürmeye
+# çıkabiliyor; sınırlar ölçülen uç değerin 2-4 katı.
 MAX_SCORE_PER_SEC = 25000.0    # saniyede üretilebilecek en yüksek skor
 MAX_KILLS_PER_SEC = 200.0      # saniyede devrilebilecek en çok yaratık
 MIN_RUN_TIME = 5.0             # bundan kısa bir koşu skor üretemez
 MAX_RUN_TIME = 6 * 3600.0      # 6 saatten uzun koşu kabul edilmez
 MAX_WAVE = 400
 MAX_SCORE = 500_000_000
-# İSTATİSTİK TAVANLARI (v3.22). İki işe yarar: (1) sonsuz/anlamsız bir
-# değer veritabanına ve oradan player_overview görünümüne yazılamaz;
-# (2) kurcalanmış bir istemci "toplam 10^18 öldürme" yazıp istatistik
-# tablolarını okunamaz hâle getiremez. Değerler GERÇEKÇİ üst sınırlar:
-# en hızlı oyuncu bile bunlara yaklaşamaz.
+# istatistik tavanları: kurcalanmış istemci "10^18 öldürme" yazıp tabloları
+# bozamasın. Gerçek oyuncu bunlara yaklaşamaz.
 STAT_CAP_DEFAULT = 10 ** 9
 STAT_CAP = {
     "runs": 1_000_000,
@@ -2015,23 +1693,19 @@ STAT_CAP = {
     "total_shots": 1_000_000_000,
 }
 SCORE_FLOOR = 6000.0           # bu skorun altında makullük aranmaz
-# v3.28: oyunda dalgaların ASGARİ SÜRESİ var; güçlü oyuncu skor hedefini
-# doldurduktan sonra da kesmeye devam ettiği için dalga başına hedeften
-# fazla skor toplayabilir. Dürüst oyuncu yanlışlıkla yasaklanmasın diye
-# dalga-hedefi tavanına koşu süresiyle büyüyen bir pay eklenir.
+# oyunda dalgaların asgari süresi var; güçlü oyuncu skor hedefini doldurduktan
+# sonra da kesmeye devam ettiği için dalga başına hedeften fazla skor
+# toplayabilir.
 SCORE_TIME_SLACK = 150.0       # koşu saniyesi başına ek skor payı
 
-# --- HIZ SINIRI ---
+# ---- hız sınırı ----
 RATE_WINDOW = 300.0            # saniye
 RATE_MAX = 12                  # bu pencerede aynı kaynaktan en çok kaç gönderi
 _rate_hits = defaultdict(deque)
 _rate_lock = threading.Lock()
 
 
-# HESAP BAZLI GİRİŞ KİLİDİ (v3.22). IP tabanlı hız sınırı vekile güvenir;
-# bir dağıtım yanlışlıkla vekilsiz açılırsa ya da saldırgan çok sayıda IP
-# kullanırsa tek başına yetmez. Bu sayaç KULLANICI ADINA bakar, yani belirli
-# bir hesabı deneme yanılma ile kırmaya çalışan biri IP değiştirse de durur.
+# hesap bazlı giriş kilidi.
 LOGIN_FAIL_MAX = 10            # bu kadar yanlış denemeden sonra
 LOGIN_LOCK_SECS = 60.0         # bu kadar saniye kilitli
 _login_fails = defaultdict(deque)
@@ -2079,11 +1753,7 @@ def _rate_ok(key, max_n=RATE_MAX, window=RATE_WINDOW):
         if len(dq) >= max_n:
             return False
         dq.append(now)
-        # TEMİZLİK (v3.22). Eskiden yalnızca BOŞ kuyruklar atılıyordu, ama
-        # bir anahtarın kuyruğu ancak O ANAHTARA tekrar istek gelince
-        # kırpılıyordu: tek damgalı binlerce anahtar hiç boşalmıyor ve
-        # sözlük sınırsız büyüyordu. Artık ZAMANA bakılıyor (penceresi
-        # geçmiş her anahtar silinir) ve kesin bir üst sınır var.
+        # süresi geçmiş anahtarları at, sözlük sınırsız büyümesin
         if len(_rate_hits) > 4096:
             for k in [k for k, v in _rate_hits.items()
                       if not v or now - v[-1] > RATE_WINDOW]:
@@ -2097,26 +1767,19 @@ def _rate_ok(key, max_n=RATE_MAX, window=RATE_WINDOW):
         return True
 
 
-# Oyundaki SUBMIT_SIG_FIELDS ile BİREBİR aynı olmalı.
+# Oyundaki SUBMIT_SIG_FIELDS ile birebir aynı olmalı.
 SUBMIT_SIG_FIELDS = ("name", "score", "kills", "wave", "run_time", "created_at", "diff")
 
 # Gönderinin created_at'i sunucu saatinden bu kadar sapabilir (saniye).
-# Oyuncunun saati biraz kaymış olabilir ve ağ gecikmesi vardır; 10 dakika
-# bol bol yeter ama yıllar öncesine/sonrasına yazmayı engeller.
 SUBMIT_TIME_WINDOW = 600.0
-# Görülen imzalar: aynı gönderi iki kez sayılmasın. Pencere zaten
-# created_at ile sınırlı olduğu için kısa süre tutmak yeterli.
+# Görülen imzalar: aynı gönderi iki kez sayılmasın. Pencere zaten created_at
+# ile sınırlı olduğu için kısa süre tutmak yeterli.
 _seen_sigs = {}
 _seen_lock = threading.Lock()
 
 
 def _submit_once(sig):
-    """Bu imza ilk kez mi görülüyor? Tekrar oynatma kalkanı.
-
-    İmza alanları determinist olduğu için GEÇERLİ bir gönderi aynen tekrar
-    atılabiliyordu ve sunucuda ne nonce ne tekilleştirme vardı: aynı skor
-    tabloya istenildiği kadar yazılıyordu.
-    """
+    """Bu imza ilk kez mi görülüyor? (aynı gönderi iki kez yazılmasın)"""
     if not sig:
         return True
     now = time.time()
@@ -2135,19 +1798,11 @@ def _submit_once(sig):
 SCORE_PUBLIC_FIELDS = ("name", "score", "kills", "wave", "run_time", "diff",
                        "created_at", "skin", "build")
 
-# =====================================================================
-# KOŞU KARTI (v3.43) — dünya sıralamasında bir skora tıklayınca açılan
-# ayrıntı: skin, silahlar, kitaplar, hasar dökümü, istatistikler.
-# ---------------------------------------------------------------------
-# GÜVENLİK: kart oyuncunun bilgisayarından gelir; o yüzden
-#   * özeti ("build" = sha256) İMZAYA girer (bkz. _expected_sig),
-#   * sunucu kartı alan alan SÜZER: yalnız bilinen silah / kitap / hasar
-#     kaynağı anahtarları, seviye ve sayı TAVANLARI, bilinen istatistikler;
-#     serbest metin YOK (adlar oyunda anahtardan çevrilir),
-#   * skin hesabın SAHİP OLDUĞU skinler arasında değilse "default" yazılır,
-#   * kart yalnız /submit'te, skorla aynı satıra yazılır; değiştiren ya da
-#     silen bir uç YOKTUR.
-# =====================================================================
+# ---- koşu kartı ----
+# Sıralamada bir skora tıklayınca açılan ayrıntı (skin, silahlar, kitaplar,
+# hasar, istatistikler). Kart oyuncudan geldiği için özeti imzaya giriyor ve
+# burada alan alan süzülüyor: sadece bilinen anahtarlar, tavanlı sayılar,
+# serbest metin yok; skin hesapta yoksa "default" yazılıyor.
 BUILD_WEAPONS = frozenset((
     "axe", "book", "pentagram", "whip", "zemzem", "shoe", "frost", "emanet", "cloak",
     "tornado", "ghost_swords", "wolves", "tesla", "meteor", "beam", "hawk", "bats",
@@ -2162,7 +1817,8 @@ BUILD_MAPS = frozenset(("stone", "frost", "jungle", "desert"))
 BUILD_WEAPON_MAX = 6            # oyunda 4 yuva (+ pay)
 BUILD_BOOK_MAX = 8              # 4 normal + 1 nadir (+ pay)
 BUILD_LEVEL_CAP = 40            # silah tavanı 25, kitap tavanı 30
-# istatistik: (alt, üst) — üst sınırlar dürüst oyunun çok üstünde, saçmalığı keser
+# istatistik: (alt, üst) - üst sınırlar dürüst oyunun çok üstünde, saçmalığı
+# keser
 BUILD_STATS = {
     "hp": (1, 100000), "regen": (0, 5000), "armor": (0, 1.0), "vamp": (0, 5.0),
     "dmg": (0, 1000), "crit": (0, 1.0), "critd": (0, 100), "aspd": (0, 100),
@@ -2175,13 +1831,13 @@ _KEY_RE = _re.compile(r"^[a-z0-9_]{1,40}$")
 
 
 def _build_hash(details):
-    """İstemcideki build_hash() ile BİREBİR aynı kanonik JSON özeti."""
+    """İstemcideki build_hash ile birebir aynı kanonik JSON özeti."""
     raw = json.dumps(details, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32], len(raw)
 
 
 def _clean_build(d, owned_skins):
-    """Koşu kartını süzer. Geçersizse None (skor yine yazılır, kartsız)."""
+    """Koşu kartını süzer."""
     if not isinstance(d, dict):
         return None, "default"
     out = {"v": 1}
@@ -2228,24 +1884,17 @@ def _clean_build(d, owned_skins):
 
 
 def _public_score(row):
-    """Sıralama satırının DIŞARI çıkabilen alanları.
-
-    _public_account ile aynı mantık: ileride scores tablosuna yeni bir
-    sütun eklenirse kendiliğinden sızmasın.
-    """
+    """Sıralama satırının dışarı çıkabilen alanları."""
     return {k: row.get(k) for k in SCORE_PUBLIC_FIELDS if k in row}
 
 
 def _expected_sig(payload):
-    """İmza, istemcideki sign_submit() ile BİREBİR aynı sırayı kullanır.
-
-    v3.43: gönderi KOŞU KARTI (details) taşıyorsa onun özeti ("build") da
-    imzaya girer — kart, imzalı skordan ayrılıp değiştirilemez."""
+    """İmza, istemcideki sign_submit ile birebir aynı sırayı kullanır."""
     fields = SUBMIT_SIG_FIELDS + (("build",) if payload.get("build") else ())
-    # v3.45: mobil gönderide "platform" alanı da imzalı (skor tablo değiştiremez)
+    # mobil gönderide "platform" alanı da imzalı (skor tablo değiştiremez)
     if payload.get("platform"):
         fields = fields + ("platform",)
-    # v3.47: süreli dalga kipi de imzalı (eski istemciler bu alanı göndermez)
+    # süreli dalga kipi de imzalı (eski istemciler bu alanı göndermez)
     if payload.get("wmode"):
         fields = fields + ("wmode",)
     msg = "|".join(str(payload.get(k, "")) for k in fields)
@@ -2254,11 +1903,7 @@ def _expected_sig(payload):
 
 
 def _wave_goal(wave):
-    """Oyundaki dalga skor hedefinin kaba karşılığı (bkz. wave_score_goal).
-
-    Birebir aynı olması gerekmez; burada yalnızca ÜST SINIR için kullanılıyor,
-    o yüzden bilerek CÖMERT.
-    """
+    """Oyundaki dalga skor hedefinin kaba karşılığı."""
     w = max(1, int(wave))
     table = {1: 600, 2: 2300, 3: 2900, 4: 3500, 5: 4100}
     if w in table:
@@ -2266,9 +1911,8 @@ def _wave_goal(wave):
     return 4100 + 5.9 * (w - 5) * (900 + 60 * (w - 5))
 
 
-# v3.47 SÜRELİ DALGALAR — oyundaki takvimin birebir kopyası (kasma_arena13.py
-# wave_length / wave_start_time). Dalgalar artık skorla değil SÜREYLE
-# ilerliyor; bu yüzden ulaşılan dalga koşu süresine sığmalı.
+# süreli dalgalar - oyundaki takvimin birebir kopyası (kasma_arena13.py
+# wave_length / wave_start_time).
 WAVE_PLAN_COUNT = 25
 WAVE_PLAN_GROW = 0.07
 WAVE_PLAN_TOTAL = {
@@ -2295,25 +1939,19 @@ def _wave_start(w, diff, biome):
 
 
 def _time_wave_ok(wave, run_time, diff):
-    """Toplam dalgaya (arena + cehennem) bu sürede ulaşılabilir mi?
-    (1 dalga + 10 sn pay; en kısa yol: arena ya da 25'te cehenneme geçiş)"""
+    """Toplam dalgaya (arena + cehennem) bu sürede ulaşılabilir mi?"""
     w = max(1, min(int(wave), MAX_WAVE))
     if w <= 2:
         return True
     w -= 1
     need = _wave_start(w, diff, "arena")
-    # Cehenneme arenanın HERHANGİ bir a >= 25. dalgasında geçilebilir (v3.48:
-    # eskiden yalnız 25 deneniyordu; geç geçen dürüst oyuncunun skoru düşüyordu).
     for a in range(WAVE_PLAN_COUNT, w):
         need = min(need, _wave_start(a, diff, "arena") + _wave_start(w - a, diff, "hell"))
     return need <= float(run_time) + 10.0
 
 
 def score_is_plausible(name, score, kills, wave, run_time, wmode=""):
-    """Gönderilen skor oyunun kuralları içinde üretilebilir mi?
-
-    Dönüş: (uygun_mu, sebep)
-    """
+    """Gönderilen skor oyunun kuralları içinde üretilebilir mi?"""
     if not (0 <= score <= MAX_SCORE):
         return False, "skor aralık dışı"
     if not (0 <= kills <= 2_000_000):
@@ -2322,11 +1960,7 @@ def score_is_plausible(name, score, kills, wave, run_time, wmode=""):
         return False, "dalga aralık dışı"
     if not (0 < run_time <= MAX_RUN_TIME):
         return False, "süre aralık dışı"
-    # TEMEL TUTARLILIK HER GÖNDERİDE ARANIR (v3.22). Eskiden SCORE_FLOOR'un
-    # altındaki her gönderi kills/wave/run_time ilişkisine HİÇ bakılmadan
-    # geçiyordu: run_time=0.0001 ile 5.999 skor, 2.000.000 öldürme ve dalga
-    # 400 yazdırılabiliyordu. Skor tablosu skora göre sıralandığı için bu
-    # satır listeye düşmüyordu ama veritabanına ve istatistiklere giriyordu.
+    # temel tutarlılık her gönderide aranır (düşük skorlarda da)
     if run_time < MIN_RUN_TIME:
         return False, "koşu süresi çok kısa"
     if kills > MAX_KILLS_PER_SEC * run_time + 50:
@@ -2335,10 +1969,10 @@ def score_is_plausible(name, score, kills, wave, run_time, wmode=""):
         return False, "skor öldürme sayısına göre imkânsız"
     if score / run_time > MAX_SCORE_PER_SEC:
         return False, "saniyelik skor imkânsız"
-    # Dalga-hedefi denetimi YALNIZCA yüksek skorlarda: ilk dalgalarda
-    # hedefler küçük olduğu için bu denetim yanlış pozitif verebiliyor.
-    # v3.47: süreli dalgalı istemcide dalga skorla bağlı DEĞİL; o gönderilerde
-    # bu denetim yapılmaz (dalga/süre uyumu ayrıca, ban'sız denetlenir).
+    # Dalga-hedefi denetimi yalnızca yüksek skorlarda: ilk dalgalarda hedefler
+    # küçük olduğu için bu denetim yanlış pozitif verebiliyor. süreli dalgalı
+    # istemcide dalga skorla bağlı değil; o gönderilerde bu denetim yapılmaz
+    # (dalga/süre uyumu ayrıca, ban'sız denetlenir).
     if score >= SCORE_FLOOR and wmode != "time":
         goal_sum = sum(_wave_goal(w) for w in range(1, int(wave) + 2))
         if score > (goal_sum * 2.5 + SCORE_FLOOR + run_time * SCORE_TIME_SLACK) * CURSE_SCORE_ROOM:
@@ -2346,43 +1980,26 @@ def score_is_plausible(name, score, kills, wave, run_time, wmode=""):
     return True, ""
 
 
-# --- 1. SKOR TABLOSU ENDPOINT'LERİ (Liderlik Tablosu) ---
+# ---- skor tablosu ----
 
 @app.route("/scores", methods=["GET"])
 def get_scores():
     if not supabase:
         return jsonify({"error": "Supabase bağlantısı yapılandırılmamış!"}), 500
     try:
-        # YALNIZCA GEREKEN SÜTUNLAR (v3.22). select("*") scores tablosunun
-        # BÜTÜN sütunlarını döndürüyordu; içinde account_id ve id gibi iç
-        # alanlar vardı. account_id'nin sızması hesap numaralarını
-        # numaralandırmayı ve hangi hesabın hangi adla eşleştiğini öğrenmeyi
-        # kolaylaştırıyordu. Oyun bu altı alandan fazlasını kullanmıyor.
-        # v3.43: skin + koşu kartı da gelir.
-        # v3.44: bir oyuncu tabloda BİRDEN FAZLA kez yer alabilir (1. de 2. de
-        # olabilir): her geçerli koşu kendi satırıdır. Sıralama sayısal
-        # yapılır (sütun metin tipinde açılmış olsa bile doğru sıra).
-        # v3.45: ?platform=mobile -> TELEFON sıralaması; yoksa / pc -> PC.
+        # Sadece gereken sütunlar (account_id gibi iç alanlar dışarı çıkmasın).
+        # Bir oyuncu tabloda birden çok kez yer alabilir, her koşu ayrı satır.
+        # ?platform=mobile telefon tablosunu verir.
         mobile = request.args.get("platform") == "mobile"
 
         def _q(cols, plat=True):
             q = supabase.table("scores").select(cols)
             if plat:
-                # SQL 5. bölümden sonra sütun NOT NULL, varsayılan 'pc'.
+                # SQL 5. bölümden sonra sütun not null, varsayılan 'pc'.
                 q = q.eq("platform", "mobile") if mobile else q.neq("platform", "mobile")
-            # v3.49 DÜZELTME — "skorlarım 1-2-3'e yansıyor, 4-5'e yansımıyor":
-            # "score" sütunu bazı kurulumlarda hâlâ METİN tipinde kalmış
-            # olabilir (bkz. aşağıdaki Python sıralaması). Öyle bir durumda
-            # BURADAKİ .order() SQL tarafında METİN gibi (sözlük sırasıyla)
-            # çalışır — "9000" "15000"'den BÜYÜK görünür. Eskiden limit 100
-            # idi: tablo 100 satırı geçince, gerçekte ilk 10'a girmesi
-            # gereken bazı skorlar bu YANLIŞ ön-sıralama yüzünden hiç
-            # çekilen 100'ün içine girmiyor, podyumun hemen altında (4., 5.
-            # sıra) "kayboluyormuş" gibi görünüyordu. limit(1000) —
-            # Supabase'in tek sorguda verdiği tavan — ile pratikte TABLODAKİ
-            # HER SATIR çekilir; asıl doğru sıralama zaten aşağıda Python
-            # tarafında sayısal olarak yapılıyor, böylece DB'nin sıralaması
-            # artık SEÇİMİ etkilemiyor, yalnızca ilk eskiz sırası oluyor.
+            # düzeltme - "skorlarım 1-2-3'e yansıyor, 4-5'e yansımıyor":
+            # "score" sütunu bazı kurulumlarda hâlâ metin tipinde kalmış
+            # olabilir.
             return q.order("score", desc=True).limit(1000).execute()
         COLS = ("name,score,kills,wave,run_time,diff,created_at,skin,details",
                 "name,score,kills,wave,run_time,diff,created_at")
@@ -2397,8 +2014,8 @@ def get_scores():
             if response is not None:
                 break
             if mobile:
-                # "platform" sütunu yok (SQL 5. bölüm çalışmamış): mobil
-                # tablo boş görünür, PC skorları ona KARIŞMAZ.
+                # "platform" sütunu yok (SQL 5. bölüm çalışmamış): mobil tablo
+                # boş görünür, PC skorları ona karışmaz.
                 return jsonify([])
         if response is None:
             raise RuntimeError("scores okunamadı")
@@ -2440,23 +2057,21 @@ def add_score():
             created_at = float(data.get("created_at", 0))
         except (TypeError, ValueError, OverflowError):
             return jsonify({"success": False, "error": "geçersiz gönderi"}), 400
-        # v3.42: NaN/inf süzülür — abs(now - nan) > pencere YANLIŞ döndüğü için
-        # zaman penceresi atlanabiliyordu.
         if not (math.isfinite(run_time) and math.isfinite(created_at)):
             return jsonify({"success": False, "error": "geçersiz gönderi"}), 400
-        # ZORLUK: sıralamada görünür, o yüzden imzanın içinde. Bilinmeyen bir
+        # zorluk: sıralamada görünür, o yüzden imzanın içinde. Bilinmeyen bir
         # değer gelirse "normal" sayılır (uydurma etiket yazılamasın).
         diff = str(data.get("diff", "normal"))
         if diff not in ("normal", "hard", "nightmare"):
             diff = "normal"
 
-        # ---- SÜZGEÇ 3: HIZ SINIRI ----
+        # ---- süzgeç 3: hız sınırı ----
         src = _client_ip()
         src = src.split(",")[0].strip()
         if not _rate_ok(src):
             return jsonify({"success": False, "error": "çok sık gönderim"}), 429
 
-        # ---- SÜZGEÇ 1: İMZA ----
+        # ---- süzgeç 1: imza ----
         sig = str(data.get("sig") or "")
         if REQUIRE_SIGNATURE:
             build_h = ""
@@ -2474,40 +2089,29 @@ def add_score():
             if not sig or not hmac.compare_digest(sig, want):
                 return jsonify({"success": False, "error": "imza doğrulanamadı"}), 403
 
-        # ---- SÜZGEÇ 2a: TARİH ----
-        # created_at istemciden geliyor ve İMZANIN İÇİNDE, o yüzden imza
-        # doğrulaması için gerekli; ama veritabanına YAZILMAZ. Eskiden
-        # yazılıyordu: 0, geçmiş ya da yıllar sonrası bir tarih
-        # gönderilebiliyor, sıralamanın tarih gösterimi bozuluyordu.
-        # Ayrıca pencere dışı bir tarih, eski bir gönderinin yeniden
-        # oynatıldığının en açık işareti.
+        # ---- süzgeç 2a: tarih ----
+        # created_at istemciden geliyor ve imzanın içinde, o yüzden imza
+        # doğrulaması için gerekli; ama veritabanına yazılmaz.
         now = time.time()
         if abs(now - created_at) > SUBMIT_TIME_WINDOW:
             return jsonify({"success": False,
                             "error": "gönderi zamanı geçersiz"}), 422
 
-        # ---- SÜZGEÇ 2b: TEKRAR OYNATMA ----
-        # İmza alanları determinist olduğu için GEÇERLİ bir gönderi aynen
-        # tekrar tekrar atılabiliyordu: ne nonce ne tekilleştirme vardı,
-        # aynı skor tabloya istenildiği kadar yazılıyordu. Görülen imzalar
-        # kısa süre akılda tutuluyor (pencere zaten created_at ile sınırlı).
+        # ---- süzgeç 2b: tekrar oynatma ----
+        # Görülen imzalar kısa süre akılda tutuluyor (pencere zaten created_at
+        # ile sınırlı).
         if REQUIRE_SIGNATURE and not _submit_once(sig):
             return jsonify({"success": False,
                             "error": "bu gönderi zaten alındı"}), 409
 
-        # ---- SÜZGEÇ 2c: MAKULLÜK ----
-        # Buradaki denetimler "oyunun ÜRETEMEYECEĞİ sayı" denetimleri. İmza
-        # geçtiği hâlde bunlara takılan bir gönderi, oyunun kendi sayılarının
-        # değiştirildiği anlamına gelir. O yüzden yalnızca reddedilmiyor:
-        # hesap KALICI olarak sıralama dışına alınıyor ve oradaki eski
-        # skorları da siliniyor (v3.24).
-        # v3.47: 2 KİŞİLİK (BETA) koşular dünya sıralamasına girmez. Ban
-        # denetiminden ÖNCE reddedilir: iki oyuncunun skoru tek kişilik
-        # tavanlara takılıp dürüst bir hesabı yakmasın.
+        # ---- süzgeç 2c: makullük ----
+        # İmzası doğru ama oyunun üretemeyeceği sayılar = kurcalanmış oyun.
+        # Reddedilmekle kalmaz, hesap sıralamadan kalıcı çıkar. 2 kişilik
+        # koşular bundan önce elenir (tek kişilik tavanlara takılmasınlar).
         if str(data.get("mode") or "") == "coop":
             return jsonify({"success": False, "error": "2 kişilik koşular sıralamaya girmez"}), 422
         wmode = "time" if data.get("wmode") == "time" else ""
-        # Süreli dalgada dalga/süre uyumsuzluğu BAN sebebi değildir (saat
+        # Süreli dalgada dalga/süre uyumsuzluğu ban sebebi değildir (saat
         # oynaması, yavaş makine vb.); skor yalnızca reddedilir.
         if wmode == "time" and not _time_wave_ok(wave, run_time, diff):
             return jsonify({"success": False, "error": "skor reddedildi: dalga süreye sığmıyor"}), 422
@@ -2519,12 +2123,8 @@ def add_score():
             return jsonify({"success": False, "error": f"skor reddedildi: {why}",
                             "banned": bool(bad_acc)}), 422
 
-        # ---- HESAP ZORUNLU ----
-        # DÜNYA SIRALAMASI yalnızca giriş yapmış oyunculara açık. Sebebi
-        # tek cümleyle: sıralamadaki bir ad kime aitse onda kalsın ve
-        # hileci bir hesapla birlikte engellenebilsin. Girişsiz oynayan
-        # oyuncu oyunun tamamını oynar, skoru yalnızca KENDİ bilgisayarındaki
-        # yerel tabloya yazılır (oyun bunu sonuç ekranında söylüyor).
+        # ---- hesap zorunlu ----
+        # dünya sıralaması yalnızca giriş yapmış oyunculara açık.
         acc = _acct(data)
         if not acc:
             return jsonify({"success": False,
@@ -2534,10 +2134,8 @@ def add_score():
                             "error": "önce kullanıcı adı seçmelisin"}), 409
         account_id = acc.get("id")
 
-        # ---- KALICI SIRALAMA YASAĞI ----
-        # Hilesi yakalanmış hesap bir daha ASLA tabloya yazılmaz. Üstelik
-        # her denemede eski satırları da yeniden siliniyor: yasak konmadan
-        # önce girmiş bir skor varsa o da gider.
+        # ---- kalıcı sıralama yasağı ----
+        # Hilesi yakalanmış hesap bir daha asla tabloya yazılmaz.
         if _is_banned(account_id):
             _wipe_scores(account_id)
             return jsonify({"success": False, "banned": True,
@@ -2545,21 +2143,14 @@ def add_score():
                                      "kalıcı olarak çıkarıldı"}), 403
 
         # Oyun kendi denetiminde hile yakaladıysa bunu dürüstçe bildirir.
-        # Suçun İTİRAFINA güveniriz, masumiyet iddiasına değil: "tainted"
-        # gelirse yasaklarız, gelmemesi hiçbir şeyi aklamaz. BU KANAL
-        # /player/save'deki genel senkronizasyondan FARKLI ve GÜVENLİDİR:
-        # account_id burada da az önce _acct(data) ile, yani BU isteğin
-        # KENDİ geçerli oturum jetonundan çözüldü — biri yalnızca KENDİ
-        # hesabını "itiraf" edebilir, başkasınınkini asla (bkz. yukarıdaki
-        # _merge_progress notu: oradaki genel kanal artık bunu yapamıyor).
         if data.get("tainted") or data.get("board_banned"):
             _ban_account(account_id, "oyun_hile_bildirdi")
             return jsonify({"success": False, "banned": True,
                             "error": "bu hesap dünya sıralamasından "
                                      "kalıcı olarak çıkarıldı"}), 403
 
-        # Ad SUNUCUDAN gelir, istemciden değil: kimse başkasının adıyla
-        # skor gönderemez.
+        # Ad sunucudan gelir, istemciden değil: kimse başkasının adıyla skor
+        # gönderemez.
         name = str(acc.get("username"))[:14]
 
         payload = {
@@ -2568,17 +2159,17 @@ def add_score():
             "kills": kills,
             "wave": wave,
             "run_time": run_time,
-            # Tarihi SUNUCU koyar; istemciden gelen değer yalnızca imza
+            # Tarihi sunucu koyar; istemciden gelen değer yalnızca imza
             # doğrulamasında kullanıldı.
             "created_at": now,
             "diff": diff,
         }
         if account_id is not None:
             payload["account_id"] = account_id
-        # v3.45: MOBİL skorlar ayrı tabloya (aynı tablo, "platform" sütunu)
+        # mobil skorlar ayrı tabloya (aynı tablo, "platform" sütunu)
         platform = "mobile" if data.get("platform") == "mobile" else "pc"
         payload["platform"] = platform
-        # v3.43 KOŞU KARTI: süzülmüş hâliyle (bkz. _clean_build)
+        # koşu kartı: süzülmüş hâliyle
         if data.get("details") is not None:
             owned = set(_stored_progress(_player_row(account_id)).get("skins_owned") or [])
             build, skin = _clean_build(data.get("details"), owned)
@@ -2590,16 +2181,16 @@ def add_score():
         except Exception as e:
             es = str(e)
             if "platform" in es:
-                # "platform" sütunu henüz yok (SQL'in 5. bölümü çalıştırılmamış).
-                # PC skoru eskisi gibi yazılır; MOBİL skor PC tablosuna
-                # KARIŞMASIN diye reddedilir.
+                # "platform" sütunu henüz yok (SQL'in 5. bölümü
+                # çalıştırılmamış). PC skoru eskisi gibi yazılır; mobil skor PC
+                # tablosuna karışmasın diye reddedilir.
                 if platform == "mobile":
                     return jsonify({"success": False,
                                     "error": "mobil sıralama henüz açılmadı"}), 503
                 payload.pop("platform", None)
                 supabase.table("scores").insert(payload).execute()
-            # Supabase'e "details"/"skin" sütunları henüz eklenmemişse
-            # (bkz. supabase_leaderboard.sql) skor kartsız yine yazılsın.
+            # Supabase'e "details"/"skin" sütunları henüz eklenmemişse skor
+            # kartsız yine yazılsın.
             elif "details" in payload and ("details" in es or "skin" in es or "column" in es):
                 payload.pop("details", None)
                 payload.pop("skin", None)
@@ -2611,10 +2202,8 @@ def add_score():
         return _oops(e)
 
 
-# --- 2. STEAM OYUNCU & İLERLEME ENDPOINT'LERİ (Gems, Skinler vb.) ---
+# ---- eski steam uçları (oyun artık kullanmıyor, varsayılan kapalı) ----
 
-# v3.42: ESKİ STEAM uçları (oyun artık kullanmıyor) varsayılan KAPALI: kimlik
-# doğrulamaları yoktu (herkes her steam_id'nin skinini değiştirebiliyordu).
 # Gerekirse Render'da LEGACY_STEAM_API=1.
 LEGACY_STEAM_API = os.environ.get("LEGACY_STEAM_API") == "1"
 
@@ -2643,7 +2232,8 @@ def get_player():
         if response.data and len(response.data) > 0:
             return jsonify({"success": True, "data": response.data[0]})
         else:
-            # Oyuncu ilk defa giriyorsa sıfır elmas ve default skinle kayıt açıyoruz
+            # Oyuncu ilk defa giriyorsa sıfır elmas ve default skinle kayıt
+            # açıyoruz
             new_player = {
                 "steam_id": steam_id,
                 "name": name,
@@ -2670,14 +2260,7 @@ def update_player():
         if not steam_id:
             return jsonify({"error": "steam_id gereklidir!"}), 400
 
-        # HİLE KORUMASI: bu uç nokta ARTIK "gems" ve "skins" KABUL ETMİYOR.
-        # Eskiden istemci kendi elmas sayısını ve sahip olduğu skinleri
-        # doğrudan yazabiliyordu; yani oyunu hiç açmadan atılan tek bir
-        # istekle sınırsız elmas yazdırmak mümkündü. Elmas yalnızca
-        # /finalize_purchase içinde (Steam ödemeyi onayladıktan SONRA)
-        # sunucu tarafında artar; skin sahipliği de aynı yoldan yazılır.
-        # Burada yalnızca KUŞANILAN skin değişebilir ve o da oyuncunun
-        # gerçekten sahip olduğu skinlerden biri olmalıdır.
+        # hile koruması: bu uç nokta artık "gems" ve "skins" kabul etmiyor.
         payload = {}
         if selected_skin is not None:
             row = supabase.table("players").select("skins").eq(
@@ -2698,9 +2281,7 @@ def update_player():
         return _oops(e)
 
 
-# =====================================================================
-# 3. ELMAS SATIN ALMA  (Steam Microtransactions / ISteamMicroTxn)
-# ---------------------------------------------------------------------
+# ---- steam ile elmas satın alma (ISteamMicroTxn) ----
 
 STEAM_PUBLISHER_KEY = os.environ.get("STEAM_PUBLISHER_KEY")
 STEAM_APP_ID = os.environ.get("STEAM_APP_ID")
@@ -2827,41 +2408,21 @@ def purchase_status():
         "packs": {str(k): {"gems": v[0], "desc": v[1]} for k, v in GEM_PACKS.items()},
     })
 
-# =====================================================================
-# 4. MAĞAZA — GERÇEK PARA (TL) İLE SATIN ALMA  (v3.28)
-# ---------------------------------------------------------------------
-# Akış (oyun içinden):
-#   1) Oyun POST /shop/checkout  -> sunucu bir SİPARİŞ açar (shop_orders),
-#      fiyatı KENDİ kataloğundan alır (oyunun gönderdiği fiyata bakılmaz) ve
-#      bir ödeme adresi döndürür: /shop/pay/<sipariş>?k=<anahtar>.
-#   2) Oyun bu adresi oyuncunun TARAYICISINDA açar. Sayfa ödeme
-#      sağlayıcısına (iyzico ya da Shopier) yönlendirir; kart bilgisi
-#      hiçbir zaman oyuna ya da bu sunucuya gelmez.
-#   3) Ödeme bitince sağlayıcı tarayıcıyı /shop/callback/<sağlayıcı>'ya
-#      döndürür. Sunucu ödemeyi SAĞLAYICIYA SORARAK (iyzico) ya da imzasını
-#      doğrulayarak (Shopier) teyit eder, tutarı siparişle karşılaştırır ve
-#      ürünü HESABA yazar (elmas defteri, skin, PET, özel PET).
-#   4) Oyun POST /shop/order_status ile siparişi izler; "granted" olunca
-#      sunucunun ilerlemesini indirir. Oyun kapalıyken biten ödeme de
-#      kaybolmaz: ürün hesaptadır, oyun açılınca gelir.
-#
-# GÜVENLİK
-#   * Ürün YALNIZCA sunucunun doğruladığı ödemeyle verilir; oyunun "aldım"
-#     demesi hiçbir şey vermez (bkz. _is_paid / _merge_progress).
-#   * Her sipariş TEK KEZ teslim edilir: durum geçişi (paid -> granted)
-#     veritabanında koşullu güncellemeyle yapılır, iki geri dönüş aynı anda
-#     gelse bile ürün iki kez yazılmaz.
-#   * Banka / IBAN bilgisi BU KODA GİRMEZ. Sağlayıcının paneline girilir;
-#     para oradan banka hesabına aktarılır. Sunucu yalnızca API anahtarlarını
-#     ortam değişkeni olarak bilir. Kurulum: README_ODEME.md.
-# =====================================================================
+# ---- mağaza: TL ile satın alma ----
+# 1) oyun /shop/checkout ile sipariş açar; fiyat sunucunun kataloğundan gelir
+# 2) oyun /shop/pay/<sipariş> sayfasını tarayıcıda açar -> iyzico / Shopier
+#    (kart bilgisi ne oyuna ne bu sunucuya gelir)
+# 3) sağlayıcı /shop/callback/<sağlayıcı>'ya döner, ödeme doğrulanır ve ürün
+#    hesaba yazılır (her sipariş bir kez: pending -> paid -> granted)
+# 4) oyun /shop/order_status ile bekler
+# Anahtarlar ortam değişkeninde, kurulum README_ODEME.md'de.
 SHOP_PROVIDER = os.environ.get("PAYMENT_PROVIDER", "").strip().lower()
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").strip().rstrip("/")
 SHOP_FALLBACK_EMAIL = os.environ.get("SHOP_FALLBACK_EMAIL", "").strip()
 
 IYZICO_API_KEY = os.environ.get("IYZICO_API_KEY", "").strip()
 IYZICO_SECRET_KEY = os.environ.get("IYZICO_SECRET_KEY", "").strip()
-# Canlı: https://api.iyzipay.com   Deneme: https://sandbox-api.iyzipay.com
+# Canlı: https://api.iyzipay.com Deneme: https://sandbox-api.iyzipay.com
 IYZICO_BASE_URL = os.environ.get("IYZICO_BASE_URL", "https://api.iyzipay.com").strip().rstrip("/")
 
 SHOPIER_API_KEY = os.environ.get("SHOPIER_API_KEY", "").strip()
@@ -2869,25 +2430,23 @@ SHOPIER_API_SECRET = os.environ.get("SHOPIER_API_SECRET", "").strip()
 SHOPIER_WEBSITE_INDEX = os.environ.get("SHOPIER_WEBSITE_INDEX", "1").strip() or "1"
 SHOPIER_PAY_URL = "https://www.shopier.com/ShowProduct/api_pay4.php"
 
-# DENEME SAĞLAYICISI: gerçek para yok, "ÖDE" düğmesiyle sipariş tamamlanır.
-# Yalnızca PAYMENT_PROVIDER=mock iken VE yalnızca burada adı yazan hesaplar
-# için çalışır (virgülle ayrılmış kullanıcı adları). Canlıda KULLANMA.
+# deneme sağlayıcısı: gerçek para yok, "ÖDE" düğmesiyle sipariş tamamlanır.
+# Sadece PAYMENT_PROVIDER=mock iken ve MOCK_PAY_USERS'taki hesaplar için.
+# Canlıda kullanma.
 MOCK_PAY_USERS = {u.strip().lower() for u in
                   os.environ.get("MOCK_PAY_USERS", "").split(",") if u.strip()}
 
 ORDER_TTL = 6 * 3600              # bu kadar eski "pending" sipariş ödenemez
 CUSTOM_PET_PRODUCT = "3100"
-CUSTOM_PET_MAX = 24               # bir hesapta en çok kaç özel PET
+CUSTOM_PET_MAX = 24               # bir hesapta en çok kaç özel pet
 
-# KATALOG — fiyat KURUŞ cinsinden. Oyundaki item_id'lerle birebir aynı.
-# Fiyatı değiştirmek için yalnızca burayı değiştirmek yeter: oyun fiyatı
-# /shop/catalog'dan okur.
+# katalog - fiyat kuruş cinsinden. Oyundaki item_id'lerle birebir aynı.
 SHOP_PRODUCTS = {
     "1001": {"kind": "gems", "gems": 500, "price": 2900, "name": "500 Elmas"},
     "1002": {"kind": "gems", "gems": 1320, "price": 5900, "name": "1.320 Elmas"},
     "1003": {"kind": "gems", "gems": 3120, "price": 11900, "name": "3.120 Elmas"},
     "1004": {"kind": "gems", "gems": 9450, "price": 27900, "name": "9.450 Elmas"},
-    # v3.40: 4 yeni paket (oyundaki GEM_PACKS ile aynı; gems = bonus dahil toplam)
+    # 4 yeni paket (oyundaki GEM_PACKS ile aynı; gems = bonus dahil toplam)
     "1005": {"kind": "gems", "gems": 120, "price": 900, "name": "120 Elmas"},
     "1006": {"kind": "gems", "gems": 6250, "price": 18900, "name": "6.250 Elmas"},
     "1007": {"kind": "gems", "gems": 18200, "price": 49900, "name": "18.200 Elmas"},
@@ -2904,11 +2463,11 @@ SHOP_PRODUCTS = {
     "3006": {"kind": "pet", "item": "pet_owl", "price": 4900, "name": "Baykuş (PET)"},
     "3007": {"kind": "pet", "item": "pet_drone", "price": 5900, "name": "Mini Drone (PET)"},
     "3008": {"kind": "pet", "item": "pet_dragon", "price": 7900, "name": "Yavru Ejderha (PET)"},
-    # v3.40: adda kesme işareti yok (ödeme sağlayıcısının ürün adı alanı için)
+    # adda kesme işareti yok (ödeme sağlayıcısının ürün adı alanı için)
     CUSTOM_PET_PRODUCT: {"kind": "custom_pet", "price": 15900, "name": "Ozel Tasarim PET"},
 }
 
-# ÖZEL PET PARÇALARI — oyundaki CUSTOM_PET_PARTS ile BİREBİR aynı olmalı.
+# özel pet parçaları - oyundaki CUSTOM_PET_PARTS ile birebir aynı olmalı.
 # Tasarım veritabanına girmeden önce bu listeyle süzülür.
 CUSTOM_PET_PARTS = {
     "body": ("round", "chubby", "tall", "bean", "blob"),
@@ -2926,13 +2485,11 @@ CUSTOM_PET_NAME_RE = _re.compile(r"[^0-9A-Za-zÇĞİÖŞÜçğıöşü _\-]")
 
 
 def _clean_pet_design(d):
-    """Oyundan gelen PET tasarımını süzer. Geçersizse None."""
+    """Oyundan gelen pet tasarımını süzer."""
     if not isinstance(d, dict):
         return None
     out = {}
-    # v3.40: tanınmayan parça SİPARİŞİ DÜŞÜRMEZ, o parça varsayılana döner.
-    # Eskiden tek bir bilinmeyen parça (ör. oyunun daha yeni sürümünden)
-    # bütün satın almayı "PET tasarımı geçersiz" diye reddediyordu.
+    # tanınmayan parça siparişi düşürmez, o parça varsayılana döner.
     for key, allowed in CUSTOM_PET_PARTS.items():
         v = str(d.get(key, allowed[0]))
         out[key] = v if v in allowed else allowed[0]
@@ -2957,7 +2514,7 @@ def _clean_pet_design(d):
 
 
 def _shop_config_problem():
-    """Mağaza açılabilir mi? Açılamıyorsa sebebi (Türkçe), yoksa ''."""
+    """Mağaza açılabilir mi?"""
     if not supabase:
         return "Supabase bağlı değil"
     if not SHOP_PROVIDER:
@@ -3040,9 +2597,8 @@ def shop_checkout():
         return jsonify({"success": False, "error": "deneme mağazası bu hesaba kapalı"}), 403
     payload = {"k": secrets.token_urlsafe(18), "ip": _client_ip()}
     prog = _stored_progress(_player_row(acc["id"]))
-    # v3.42: açık (ödenmemiş / teslim bekleyen) siparişler. Aynı skin / PET için
-    # ikinci bir sipariş açılmaz — oyuncu iki sekmede iki kez ödeyip tek ürün
-    # alıyordu; yarım kalan sipariş varsa AYNI ödeme sayfası geri verilir.
+    # aynı ürün için açık sipariş varsa yenisi açılmaz, aynı ödeme sayfası döner
+    # (iki sekmede iki kez ödenmesin)
     try:
         open_rows = (supabase.table("shop_orders").select("*")
                      .eq("account_id", acc["id"]).execute().data or [])
@@ -3089,7 +2645,7 @@ def shop_checkout():
 
 @app.route("/shop/order_status", methods=["POST"])
 def shop_order_status():
-    """Oyun siparişi buradan izler. Teslim edildiyse güncel ilerleme de gelir."""
+    """Oyun siparişi buradan izler."""
     data = _body()
     acc = _acct(data)
     if not acc:
@@ -3114,7 +2670,7 @@ def shop_order_status():
 
 
 def _mark_order(order_id, fields, only_status=None):
-    """Siparişi KOŞULLU günceller; değişen satır varsa True."""
+    """Siparişi koşullu günceller; değişen satır varsa True."""
     q = supabase.table("shop_orders").update(fields).eq("id", order_id)
     if only_status is not None:
         q = q.eq("status", only_status)
@@ -3123,14 +2679,7 @@ def _mark_order(order_id, fields, only_status=None):
 
 
 def _grant_order(order_id, provider_ref=None):
-    """Ödemesi doğrulanmış siparişi HESABA yazar. Her sipariş TEK KEZ.
-
-    Önce pending -> paid (ödeme teyidi), sonra paid -> granted (teslim
-    hakkı) koşullu güncellemeyle alınır; teslim hakkını alan tek çağrı
-    ilerlemeyi yazar. Yazma başarısız olursa sipariş 'paid'e geri döner ve
-    /shop/order_status bir sonraki soruşta yeniden dener.
-    Dönüş: (ok, mesaj)
-    """
+    """Ödemesi doğrulanmış siparişi hesaba yazar. Her sipariş bir kez (paid -> granted)."""
     order = _order_row(order_id)
     if not order:
         return False, "sipariş yok"
@@ -3138,9 +2687,9 @@ def _grant_order(order_id, provider_ref=None):
         return True, "zaten teslim edildi"
     st0 = order.get("status")
     if st0 in ("pending", "failed", "cancelled"):
-        # v3.42: aynı siparişin başka sekmede reddedilen denemesi siparişi
-        # "failed" yapmış olabilir; sonra DOĞRULANMIŞ başarılı bir ödeme
-        # gelirse para çekilmiş demektir — ürün yine teslim edilir.
+        # aynı siparişin başka sekmede reddedilen denemesi siparişi "failed"
+        # yapmış olabilir; sonra doğrulanmış başarılı bir ödeme gelirse para
+        # çekilmiş demektir - ürün yine teslim edilir.
         f = {"status": "paid", "paid_at": time.time()}
         if provider_ref:
             f["provider_ref"] = str(provider_ref)[:120]
@@ -3183,8 +2732,8 @@ def _grant_order(order_id, provider_ref=None):
                 if not any(isinstance(x, dict) and x.get("id") == pet_id for x in pets):
                     pets.append({"id": pet_id, "design": design, "order": order_id,
                                  "at": time.time()})
-                # v3.42: kırpma YOK — ödenmiş bir tasarım asla silinmez
-                # (sınır siparişte, bekleyen siparişler dahil denetlenir).
+                # kırpma yok - ödenmiş bir tasarım asla silinmez (sınır
+                # siparişte, bekleyen siparişler dahil denetlenir).
                 merged["custom_pets"] = pets
                 lst = list(before.get("cosmetics_owned") or [])
                 if pet_id not in lst:
@@ -3213,7 +2762,7 @@ def _fail_order(order_id, reason):
     _mark_order(order_id, {"status": "failed", "error": str(reason)[:200]}, only_status="pending")
 
 
-# ---------------- ödeme sayfası (tarayıcıda açılır) ----------------
+# ---- ödeme sayfası (tarayıcıda açılır) ----
 _PAGE_CSS = ("body{font-family:system-ui,Segoe UI,Arial;background:#14121f;color:#eee;"
              "display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}"
              ".k{background:#1f1c30;border:2px solid #6a5cff;border-radius:18px;padding:32px 40px;"
@@ -3241,7 +2790,7 @@ def _esc(t):
 def _result_page(ok, msg):
     if ok:
         return _html_page("Ödeme tamam", "<h1>ÖDEME TAMAM!</h1>"
-                          f"<p>{_esc(msg)}</p><p>Oyuna dönebilirsin — ürün hesabına geldi.</p>"
+                          f"<p>{_esc(msg)}</p><p>Oyuna dönebilirsin, ürün hesabına geldi.</p>"
                           "<small>Bu sekmeyi kapatabilirsin.</small>")
     return _html_page("Ödeme tamamlanmadı", "<h1>ÖDEME TAMAMLANMADI</h1>"
                       f"<p>{_esc(msg)}</p><p>Hesabından para çekilmediyse oyundan yeniden "
@@ -3271,8 +2820,8 @@ def shop_pay(order_id):
     acc = acc_rows.data[0] if acc_rows.data else {}
     try:
         if SHOP_PROVIDER == "iyzico":
-            # v3.42: sayfa yeniden açılınca YENİ form açılmaz (iki sekmede iki
-            # kez ödeme olmasın); 25 dk içindeki form aynen kullanılır.
+            # sayfa yeniden açılınca yeni form açılmaz (iki sekmede iki kez
+            # ödeme olmasın); 25 dk içindeki form aynen kullanılır.
             pl = _order_payload(order)
             if pl.get("pay_page") and time.time() - _num(pl.get("pay_page_at"), 0) < 25 * 60:
                 return "", 302, {"Location": pl["pay_page"], "Cache-Control": "no-store"}
@@ -3296,7 +2845,7 @@ def _buyer_fields(acc):
     return uname, email
 
 
-# ---------------- iyzico (Checkout Form) ----------------
+# ---- iyzico (Checkout Form) ----
 def _iyzico_price(kurus):
     """iyzico fiyat biçimi: 15900 -> '159.0', 2990 -> '29.9', 2995 -> '29.95'."""
     k = int(kurus)
@@ -3307,7 +2856,7 @@ def _iyzico_price(kurus):
 
 
 def _iyzico_call(path, body):
-    """iyzico IYZWSv2 imzalı istek. Gövde, imzalanan metnin AYNISI gönderilir."""
+    """iyzico IYZWSv2 imzalı istek."""
     rnd = str(int(time.time() * 1000)) + secrets.token_hex(4)
     body_str = json.dumps(body)
     sig = hmac.new(IYZICO_SECRET_KEY.encode("utf-8"), (rnd + path + body_str).encode("utf-8"),
@@ -3367,11 +2916,7 @@ def _iyzico_start(order, prod, acc):
 
 @app.route("/shop/callback/iyzico", methods=["POST"])
 def shop_callback_iyzico():
-    """iyzico ödeme sonrası tarayıcıyı buraya döndürür (form: token).
-
-    Gelen veriye GÜVENİLMEZ: sonuç iyzico'ya sorulur (detail), sepet
-    kimliği, tutar, para birimi ve dolandırıcılık durumu tek tek denetlenir.
-    """
+    """iyzico dönüşü. Gelen veriye güvenmiyoruz, sonucu iyzico'ya soruyoruz."""
     if SHOP_PROVIDER != "iyzico":
         return _result_page(False, "Sağlayıcı kapalı.")
     token = str(request.form.get("token") or request.args.get("token") or "")[:200]
@@ -3401,15 +2946,15 @@ def shop_callback_iyzico():
         return _result_page(False, "Ödeme tamamlanmadı.")
     ok, msg = _grant_order(oid, provider_ref=res.get("paymentId") or token)
     return _result_page(ok, SHOP_PRODUCTS.get(str(order["product_id"]), {}).get("name", "") +
-                        (" hesabına eklendi." if ok else " — " + msg))
+                        (" hesabına eklendi." if ok else " - " + msg))
 
 
-# ---------------- Shopier ----------------
+# ---- Shopier ----
 def _shopier_start(order, prod, acc):
     uname, email = _buyer_fields(acc)
     total = f"{int(order['amount']) // 100}.{int(order['amount']) % 100:02d}"
     rnd = str(secrets.randbelow(900000) + 100000)
-    # v3.42: verilen random_nr siparişe yazılır; geri dönüşte AYNISI olmalı.
+    # verilen random_nr siparişe yazılır; geri dönüşte aynısı olmalı.
     pl = dict(_order_payload(order))
     pl["rnd"] = rnd
     _mark_order(order["id"], {"payload": pl}, only_status="pending")
@@ -3443,7 +2988,7 @@ def _shopier_start(order, prod, acc):
 
 @app.route("/shop/callback/shopier", methods=["POST"])
 def shop_callback_shopier():
-    """Shopier ödeme sonrası buraya döner. İmza (HMAC-SHA256) doğrulanır."""
+    """Shopier dönüşü, HMAC-SHA256 imzası kontrol edilir."""
     if SHOP_PROVIDER != "shopier":
         return _result_page(False, "Sağlayıcı kapalı.")
     oid = str(request.form.get("platform_order_id") or "")[:40]
@@ -3457,12 +3002,9 @@ def shop_callback_shopier():
     order = _order_row(oid)
     if not order:
         return _result_page(False, "Sipariş bulunamadı.")
-    # v3.42 SERTLEŞTİRME. Shopier'in imzası yalnız (random_nr + sipariş no)
-    # kapsıyor, "status" alanını KAPSAMIYOR. Önlemler:
-    #   * random_nr bizim bu sipariş için verdiğimiz olmalı,
-    #   * başarıda payment_id dolu olmalı ve başka bir siparişte kullanılmamış olmalı,
-    #   * aynı siparişin ilk geri dönüşü belirleyicidir (başarısız dönüşten
-    #     sonra aynı imzayla gelen "success" kabul edilmez).
+    # Shopier'in imzası sadece random_nr + sipariş no'yu kapsıyor, status'u
+    # değil. O yüzden: random_nr bizim verdiğimiz olmalı, başarıda payment_id
+    # dolu ve başka siparişte kullanılmamış olmalı, ilk dönüş belirleyici.
     pl = _order_payload(order)
     if not pl.get("rnd") or not hmac.compare_digest(str(pl.get("rnd")), rnd):
         return _result_page(False, "Ödeme imzası doğrulanamadı.")
@@ -3483,10 +3025,10 @@ def shop_callback_shopier():
         return _result_page(False, "Bu ödeme başka bir siparişte kullanıldı.")
     ok, msg = _grant_order(oid, provider_ref=pay_id)
     return _result_page(ok, SHOP_PRODUCTS.get(str(order["product_id"]), {}).get("name", "") +
-                        (" hesabına eklendi." if ok else " — " + msg))
+                        (" hesabına eklendi." if ok else " - " + msg))
 
 
-# ---------------- DENEME (mock) ----------------
+# ---- deneme (mock) ----
 def _mock_start(order, prod, acc):
     k = _order_payload(order).get("k", "")
     body = (f"<h1>DENEME ÖDEMESİ</h1><p>{_esc(prod['name'])}</p>"
@@ -3514,41 +3056,16 @@ def shop_mock_result():
         return _result_page(False, "İptal edildi.")
     ok, msg = _grant_order(oid, provider_ref="mock")
     return _result_page(ok, "DENEME: " + SHOP_PRODUCTS.get(str(order["product_id"]), {}).get("name", "") +
-                        (" hesabına eklendi." if ok else " — " + msg))
+                        (" hesabına eklendi." if ok else " - " + msg))
 
 
-# =====================================================================
-# 2 KİŞİLİK (BETA) — ODA + WEBSOCKET AKTARICI (v3.47)
-# ---------------------------------------------------------------------
-# Oyunu ODA KURAN oyuncunun bilgisayarı yönetir (bütün simülasyon orada);
-# katılan oyuncu yalnızca kendi tuşlarını gönderir, ev sahibinin gönderdiği
-# anlık görüntüyü çizer. Bu sunucu ikisinin arasında yalnızca TAŞIYICIDIR:
-# oyun mesajlarının içine bakmaz, değiştirmez, saklamaz.
-#
-# GÜVENLİK:
-#   * Oda kurmak ve katılmak GİRİŞ gerektirir (oturum + cihaz denetimi).
-#   * Oda KODU (6 karakter) tek başına bağlantıya yetmez: kuran da katılan da
-#     kendi uzun, tahmin edilemez BİLETİNİ alır (token_urlsafe(24)); websocket
-#     yalnızca biletle açılır, bilet sabit sürede karşılaştırılır.
-#   * Kod deneme yanılmaya kapalı: hesap ve IP başına katılma sınırı var,
-#     32^6 kodun içinde en çok COOP_MAX_ROOMS oda yaşar.
-#   * Mesaj boyutu, saniyedeki mesaj ve bayt sayısı bağlantı başına
-#     sınırlı (jeton kovası); aşan mesaj düşürülür, ısrar eden bağlantı kapanır.
-#   * İstemciden gelen METİN çerçeveleri aktarılmaz (yalnızca "ping");
-#     sunucu mesajları METİN, oyuncu mesajları İKİLİ çerçevedir. Böylece bir
-#     oyuncu "sunucu mesajı" taklit edemez; oyuncu adları HESAPTAN gelir.
-#   * Tarayıcıdan gelen bağlantılar (Origin başlığı) yalnızca izinli
-#     kökenlerden kabul edilir; masaüstü oyun Origin göndermez.
-#   * Oda 45 sn sessiz kalınca ya da en geç 3 saatte kapanır. Odalar yalnızca
-#     BELLEKTE durur (yeniden başlatmada düşer) — veritabanına hiçbir şey
-#     yazılmaz, 2 kişilik koşular hiçbir ödül/sıralama vermez.
-#
-# KURULUM (Render): requirements'a `flask-sock` eklenir ve başlatma komutu
+# ---- 2 kişilik (beta): oda + websocket aktarıcı ----
+# Oyunu odayı kuranın bilgisayarı yönetir, konuk sadece tuşlarını yollar. Bu
+# sunucu ikisinin arasında mesaj taşır, içine bakmaz, hiçbir şey saklamaz.
+# Oda kurmak/katılmak giriş ister; websocket oda kodu + uzun biletle açılır;
+# mesaj boyu ve hızı sınırlı. Odalar bellekte, 45 sn sessiz kalınca kapanır.
+# Render başlatma komutu (tek işçi şart, odalar işçinin belleğinde):
 #   gunicorn server:app --worker-class gthread -w 1 --threads 64 --timeout 120
-# olur. Tek işçi ŞART (odalar işçinin belleğinde). Sunucu çok iş parçacıklı
-# değilse (eski komut) oda kurma kibarca reddedilir — açık bir websocket
-# bütün sunucuyu kilitlemesin.
-# =====================================================================
 try:
     from flask_sock import Sock as _Sock
     _coop_sock = _Sock(app)
@@ -3564,10 +3081,6 @@ COOP_IDLE = 45.0              # bu kadar sessizlikte oda kapanır
 COOP_RECONNECT = 25.0         # kopan oyuncunun geri dönme payı
 COOP_MAX_AGE = 3 * 3600.0
 COOP_MSG_MAX = {"host": 96 * 1024, "guest": 4 * 1024}
-# jeton kovası: (mesaj/sn, mesaj tavanı, bayt/sn, bayt tavanı)
-# v3.48: ev sahibi büyük tam görüntüyü PARÇALAR halinde yollar ve kendi
-# akışını konuğun onayına göre ayarlar; kova bu patlamayı kaldırmalı, yoksa
-# sessizce düşen tek bir parça konuğun görüntüsünü bozuyordu.
 COOP_BUCKET = {"host": (120.0, 400.0, 768 * 1024.0, 2048 * 1024.0),
                "guest": (70.0, 140.0, 32 * 1024.0, 64 * 1024.0)}
 COOP_VER_RE = _re.compile(r"^[0-9][0-9.]{0,9}$")
@@ -3636,7 +3149,7 @@ def _coop_ctrl(conn, ev, **kw):
 
 
 def _coop_close_room(code, why="closed"):
-    """Odayı kapatır (kilit DIŞINDA çağrılır)."""
+    """Odayı kapatır (kilit dışında çağrılır)."""
     with _coop_lock:
         room = _COOP_ROOMS.pop(code, None)
     if not room:
@@ -3683,7 +3196,7 @@ def _coop_start_reaper():
 
 
 def _coop_ready():
-    """2 kişilik bu sunucuda çalışabilir mi? (flask-sock + çok iş parçacığı)"""
+    """2 kişilik bu sunucuda çalışabilir mi?"""
     if _coop_sock is None:
         return "sunucuda 2 kişilik modül (flask-sock) kurulu değil"
     if not request.environ.get("wsgi.multithread"):
@@ -3715,7 +3228,7 @@ def coop_create():
         return jsonify({"success": False, "error": "geçersiz sürüm"}), 400
     _coop_start_reaper()
     _coop_reap()
-    # Hesap başına TEK oda: eskisi (kurduğu ya da katıldığı) kapanır.
+    # Hesap başına tek oda: eskisi (kurduğu ya da katıldığı) kapanır.
     with _coop_lock:
         olds = [c for c, r in _COOP_ROOMS.items()
                 if r["host_acct"] == aid or r.get("guest_acct") == aid]
@@ -3852,8 +3365,6 @@ if _coop_sock is not None:
                 peer = room.get(other + "_ws")
         if room is None:
             time.sleep(0.5)                    # bilet deneme hızını keser
-            # İstemci "oda yok"u bilsin: yoksa her yeniden denemeyi başarılı
-            # sanıp sonsuza dek "yeniden bağlanılıyor" ekranında kalıyordu.
             try:
                 ws.send(json.dumps({"t": "srv", "ev": "closed", "why": "no_room"}))
             except Exception:
@@ -3878,7 +3389,7 @@ if _coop_sock is not None:
                 if isinstance(data, str):
                     if data == "ping":
                         _coop_ctrl(conn, "pong")
-                    continue                    # oyuncu METİN mesajı aktarılmaz
+                    continue                    # oyuncu metin mesajı aktarılmaz
                 n = len(data)
                 if n > COOP_MSG_MAX[role] or not conn.allow(n):
                     if conn.drops > 400:
