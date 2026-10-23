@@ -12,7 +12,7 @@ from collections import defaultdict, deque
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.middleware.proxy_fix import ProxyFix
 from supabase import create_client, Client
-from flask_socketio import SocketIO, emit  # <-- İŞTE BU EKSİKTİ (SOCKET İMPORTU)
+from flask_socketio import SocketIO, emit
 
 # Flask uygulamasını static_folder ayarıyla tek seferde tanımlıyoruz:
 app = Flask(__name__, static_folder=".")
@@ -38,12 +38,7 @@ def handle_disconnect():
     print(f"Oyuncu ayrıldı! Kalan Online: {online_players}")
     emit('online_count_update', online_players, broadcast=True)
 
-# CORS: masaüstü oyunun buna ihtiyacı yok, ama telefon sürümü GitHub Pages'ta
-# çalışan bir web sayfası. İzin sadece oyunun kendi sayfasına ve oyunun
-# kullandığı uçlara veriliyor (/diag, eski steam uçları kapalı). Çerez yok,
-# jeton gövdede gidiyor.
-# Render > Environment: PLAY_ORIGINS = https://KULLANICIADIN.github.io
-# (virgülle birden fazla yazılabilir; boşsa sadece *.github.io)
+# CORS ayarları
 PLAY_ORIGINS = [o.strip().rstrip("/").lower()
                 for o in os.environ.get("PLAY_ORIGINS", "").split(",") if o.strip()]
 CORS_PATHS = ("/auth/", "/player/", "/shop/", "/reward/", "/rewards/", "/ad/", "/gift/",
@@ -55,14 +50,8 @@ def _origin_ok(origin):
     if PLAY_ORIGINS:
         return n in PLAY_ORIGINS   # yalnızca elle yazılmış kökenler
     if not n.startswith("https://") or len(n) > 280:
-
-
-def _origin_ok(origin):
-    o = (origin or "").strip().rstrip("/").lower()
-    if PLAY_ORIGINS:
-        return o in PLAY_ORIGINS          # yalnızca elle yazılmış kökenler
-    if not o.startswith("https://") or len(o) > 200:
         return False
+    return True
     host = o[len("https://"):]
     return (host.endswith(".github.io") and "/" not in host and ":" not in host
             and host.count(".") == 2)
