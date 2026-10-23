@@ -12,15 +12,26 @@ Kısa notlar, en yenisi üstte.
   dalgası, işaretleme, sersemletme, buz kesme, infaz, savurma, ruh yığını,
   kanama, artçı sarsıntı...). Şart Lv.10 + eş kitap Lv.3 (nadir kitap: elde
   olsun) + en az 3 silah; koşuda en çok 2 evrim; hasar payı x1.25
-- GÖK İŞARETİ: her koşu bir işaretle başlar (Bereket, Şanslı Yıldız, Kızıl
-  Gök, Kuraklık, Ağır Adım, Fırtına Öncesi, Durgun Gök)
+- HARİTA BULGULARI (iyi koşu / kötü koşu): her koşuda bazıları çıkar, bazıları
+  hiç gelmez. SİLAH RAFI (erken, uzakta: epik silah kartları), TAŞTAKİ KILIÇ
+  (4 sn başında dur: koşu boyunca +%15 hasar), DEMİRCİ ÖRSÜ (bir silahına +2
+  seviye), MEYDAN OKUMA TAŞI (25 sn elit dalgasına dayan: sandık), HAZİNE
+  HARİTASI (uzaktaki X'i kaz: altın + sandık). Küçük haritada ve kenar
+  oklarında görünürler; kaçırılan bulgu bir süre sonra kaybolur
+- Gök İşareti kaldırıldı
 - KAYIP KERVAN: bazı koşularda 2-4. dalga arası haritadan bir kervan geçer;
   yakalarsan altın + bir el efsanevi kart, kaçarsa gider
 - güç sunakları kaldı; altın yağmuru / kan ayı / göktaşı yağmuru kaldırıldı
 - daha sakin ekran: flaş ve sarsıntı yarıya yakın, kalabalıkta küçük hasar
   sayıları ve parçacıklar kısıldı (düşman sayısı/hızı aynı)
-- arayüz: düğmeler kâğıt etiket, kutuların kenarları düz, büyük başlıklarda
-  harf aralığı, yazı konturu inceldi
+- arayüz: kutuların kenarları düz, büyük başlıklarda harf aralığı, yazı
+  konturu inceldi; düğmeler yine koyu, basılabilir eski hâlinde
+- silahlık ayrıntısında uzun yazılar taşıyordu (Kasırga vb.), pencere artık
+  yazıya göre büyüyor ve satır kırıyor
+- kalabalıkta yaratıkların bir kısmı eski yöne bakıyordu (çizim sırası
+  sondakilere hiç gelmiyordu); artık hepsi yürürken oyuncuya döner
+- üstteki duyuru satırları koyu zemin üstünde: süzülen yazılar altına girse de
+  okunuyor
 - gözlük gözü kapatır, göz ve gözlük aynı yöne bakar; şapka/gözlüklere
   kontur ve ışıltı; markette eşya kendi karakterinde denenir
 - Taş Meydan yaratıklarına arena donanımı (miğfer, sorguç, kalkan, tasma)

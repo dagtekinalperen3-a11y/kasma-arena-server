@@ -18420,6 +18420,7 @@ class Enemy:
         # ---- gövde önbelleği ----
         self._spr = None            # son çizilmiş gövde yüzeyi
         self._spr_key = None        # o yüzeyin ait olduğu görünüş anahtarı
+        self._spr_fn = 0            # gövdenin en son çizildiği kare
         self._spr_pad = 0           # yüzeyin merkez kaydırması
         self._spr_off = (0, 0)      # yüzeyin sol üst köşesinin merkeze uzaklığı
         self._blink = None          # önbelleğe çizerken sabitlenen göz kırpma
@@ -19958,7 +19959,10 @@ class Enemy:
         SPR_WALK_STEP, SPR_TIME_HZ, SPR_BUDGET, SPR_BUDGET_MAX = 0.42, 1.0, 5, 9
     _spr_budget = [22]
     _spr_tick = [0]              # telefon: denetimi karelere yaymak için
-    _spr_frame = [None, 0]       # [t, bu karede yapılan yeniden çizim]
+    _spr_frame = [None, 0, 0]    # [t, bu karede yapılan yeniden çizim, kare sayacı]
+    # Bütçe hep listenin başındakilere gidiyordu; sondakiler hiç tazelenmeyip
+    # eski yöne bakıyordu. Bu kadar kare bekleyen yaratık sırayı beklemez.
+    SPR_STARVE = 4
 
     def _blink_at(self, t):
         """Göz kırpma katsayısı (1.0 = tam açık). ~4 saniyede bir, her yaratık kendi fazında."""
@@ -20047,9 +20051,14 @@ class Enemy:
             fr = Enemy._spr_frame
             if fr[0] != t:
                 fr[0], fr[1] = t, 0
+                fr[2] += 1
             old = self._spr_key
+            steps = self.SPR_FACE_STEPS
+            turn = abs(old[0] - key[0]) % steps
             urgent = (len(old) != len(key) or old[3] != key[3]
-                      or old[4] != key[4])                     # boy / hasar parlaması
+                      or old[4] != key[4]                      # boy / hasar parlaması
+                      or min(turn, steps - turn) >= 2          # oyuncuya dönüyor
+                      or fr[2] - getattr(self, "_spr_fn", 0) >= self.SPR_STARVE)
             if not urgent and fr[1] >= Enemy._spr_budget[0]:
                 key = old                                     # bütçe doldu: eskisini bas
             else:
@@ -20086,6 +20095,7 @@ class Enemy:
             self._spr, self._spr_key, self._spr_pad = mob_rle(spr), key, pad
             self._spr_off = off
             self._spr_shared = False
+            self._spr_fn = Enemy._spr_frame[2]
 
     # telefon: ortak gövde atlası Aynı türden yaratıklar aynı karelerden oluşan
     # ortak bir depoyu paylaşır.
@@ -20128,8 +20138,10 @@ class Enemy:
             fr = Enemy._atlas_frame
             if fr[0] != t:
                 fr[0], fr[1] = t, 0
+            ok = self._spr_key or (0,) * 7
+            turn = abs(ok[6] - fb) % 16
             if (self._spr is not None and fr[1] >= Enemy.ATLAS_BUDGET
-                    and int(r * 2) == (self._spr_key or (0,) * 5)[4]):
+                    and int(r * 2) == ok[4] and min(turn, 16 - turn) < 2):
                 return                    # bütçe doldu: eski kare bir an daha
             fr[1] += 1
             ent = self._render_shared(key, r)
@@ -25516,49 +25528,6 @@ def hand_card(w, h, fill, edge=None, rad=12, alpha=255, ink=3, seed=0, lip=0):
     return s
 
 
-# ---- kâğıt ----
-# Düğmeler ve küçük notlar krem kâğıt: lif dokulu, düz kenarlı, mürekkep
-# çerçeveli. Koyu paneller kitap kapağı, düğmeler üstlerine yapıştırılmış
-# etiket gibi dursun.
-PAPER = (236, 222, 190)
-PAPER_DARK = (204, 184, 146)
-PAPER_INK = (54, 38, 32)
-PAPER_INK_DIM = (112, 90, 72)
-_paper_cache = {}
-
-
-def paper_card(w, h, seed=0, tint=None, fold=True):
-    """Kâğıt etiket (önbellekli). tint verilirse kâğıt o renge hafifçe boyanır."""
-    w, h = int(w), int(h)
-    key = (w, h, seed, tint, fold)
-    s = _paper_cache.get(key)
-    if s is not None:
-        return s
-    if len(_paper_cache) > 300:
-        _paper_cache.clear()
-    base = mix_col(PAPER, tint, 0.28) if tint else PAPER
-    s = pygame.Surface((w, h), pygame.SRCALPHA)
-    pygame.draw.rect(s, (*INK, 255), s.get_rect(), border_radius=5)
-    body = s.get_rect().inflate(-4, -4)
-    pygame.draw.rect(s, (*scale_col(base, 0.80), 255), body, border_radius=4)
-    pygame.draw.rect(s, (*base, 255), body.inflate(0, -3).move(0, -1), border_radius=4)
-    # lif dokusu: kısa, soluk çizgiler
-    rnd = random.Random(seed * 131 + w * 7 + h)
-    for _ in range(max(6, w * h // 70)):
-        x = rnd.randint(body.x + 2, max(body.x + 2, body.right - 4))
-        y = rnd.randint(body.y + 2, max(body.y + 2, body.bottom - 5))
-        c = scale_col(base, rnd.uniform(0.86, 0.95)) if rnd.random() < 0.7 else lighten(base, 0.35)
-        pygame.draw.line(s, c, (x, y), (x + rnd.randint(1, 4), y + rnd.choice((0, 0, 1))), 1)
-    if fold and w > 60 and h > 26:
-        # sağ üst köşe hafif kıvrık
-        f = 9
-        pygame.draw.polygon(s, scale_col(base, 0.72), [(body.right - f, body.y), (body.right, body.y + f),
-                                                       (body.right - f, body.y + f)])
-        pygame.draw.line(s, INK, (body.right - f, body.y), (body.right, body.y + f), 1)
-    _paper_cache[key] = s
-    return s
-
-
 _hand_shadow_cache = {}
 
 
@@ -25608,20 +25577,16 @@ class Button:
             g = sum(col) // 3
             col = mix_col(col, (g, g, g), 0.75)
             col = scale_col(col, 0.7)
-        # kâğıt üstüne mürekkep: açık renkli yazı kâğıtta okunmaz
-        tc = self.text_color if (self.text_color and sum(self.text_color[:3]) < 330) else PAPER_INK
-        if not self.enabled:
-            tc = (140, 128, 112)
+        tc = self.text_color or (TEXT if self.enabled else (126, 116, 108))
         return col, tc
 
     def _paint(self, surf, x, y, col, tc, step):
-        """Kâğıt etiket düğme: düğmenin rengi kâğıda siner ve altta kalınlık
-        şeridi olur; üzerine gelince 2 piksel kalkar."""
+        """Basılabilir tuş: altta koyu dudak, üzerine gelince 2 piksel kalkar."""
         w, h = self.rect.w, self.rect.h
-        face = paper_button(surf, x, y, w, h, col, step, self.enabled)
+        face = dark_button(surf, x, y, w, h, col, step)
         label, sz = _fit_size(TRX(self.text), self.text_size, w - 18, True,
                               min_size=min(12, self.text_size))
-        draw_text(surf, label, face.center, sz, tc, bold=True, center=True, shadow=False)
+        draw_text(surf, label, face.center, sz, tc, bold=True, center=True)
         if self.subtitle:
             draw_text(surf, self.subtitle, (x + w // 2, y + h + 13), 13, TEXT_DIM,
                       center=True, shadow=False)
@@ -25705,26 +25670,21 @@ def _button_body(w, h, col, anim, rad):
     return hand_card(w, h, col, rad=min(int(rad), 14), ink=3, lip=5 if h >= 30 else 3)
 
 
-def paper_button(surf, x, y, w, h, col, lift=0, enabled=True):
-    """Kâğıt etiket düğme gövdesi; yazının ortalanacağı yüzü döndürür."""
+def dark_button(surf, x, y, w, h, col, lift=0):
+    """Koyu, basılabilir tuş gövdesi (düz kenar, altta dudak). Yazının
+    ortalanacağı yüzü döndürür."""
     lip = 5 if h >= 30 else 3
-    base = ui_warm(col)
-    surf.blit(hand_shadow(w, h, 6, alpha=130), (x + 3, y + 4))
-    body = pygame.Rect(x, y - lift, w, h)
-    pygame.draw.rect(surf, INK, body, border_radius=6)
-    pygame.draw.rect(surf, scale_col(base, 0.9) if enabled else (96, 90, 86), body.inflate(-4, -4),
-                     border_radius=5)
-    tint = (lighten(base, 0.15) if lift else base) if enabled else (130, 126, 122)
-    face = pygame.Rect(x, y - lift, w, h - lip)
-    surf.blit(paper_card(w, h - lip, seed=(w * 3 + h) % 11, tint=tint, fold=False), face.topleft)
-    return face
+    c = lighten(ui_warm(col), 0.08) if lift else ui_warm(col)
+    surf.blit(hand_shadow(w, h, 10, alpha=140), (x + 3, y + 4))
+    surf.blit(hand_card(w, h, c, rad=10, ink=3, lip=lip), (x, y - lift))
+    return pygame.Rect(x, y - lift, w, h - lip)
 
 
 def key_button(surf, rect, col, hover=False, rad=10):
-    """Button sınıfı dışında elle çizilen düğmeler için aynı kâğıt düğme.
-    Yazının ortalanacağı dikdörtgeni döndürür (yazı PAPER_INK ile)."""
+    """Button sınıfı dışında elle çizilen düğmeler için aynı tuş gövdesi.
+    Yazının ortalanacağı dikdörtgeni döndürür."""
     rect = pygame.Rect(rect)
-    return paper_button(surf, rect.x, rect.y, rect.w, rect.h, col, 2 if hover else 0)
+    return dark_button(surf, rect.x, rect.y, rect.w, rect.h, col, 2 if hover else 0)
 
 
 def panel(surf, rect, bg=PANEL_BG, edge=PANEL_EDGE, alpha=235, radius=16, edge_w=2):
@@ -25876,34 +25836,37 @@ STRINGS.update({
                       "На карте появился алтарь"),
     "sh.stand":    _T("üstünde dur", "stand on it", "quédate encima", "drauf stehen", "встань на него"),
     "sh.faded":    _T("SUNAK SÖNDÜ", "SHRINE FADED", "SANTUARIO APAGADO", "ALTAR ERLOSCHEN", "АЛТАРЬ ПОГАС"),
-    # ---- gök işareti ----
-    "om.title":    _T("GÖK İŞARETİ", "OMEN", "PRESAGIO", "OMEN", "ЗНАМЕНИЕ"),
-    "om.calm":     _T("Durgun Gök", "Still Sky", "Cielo Quieto", "Stiller Himmel", "Тихое небо"),
-    "om.calm.d":   _T("bu koşuda gök bir şey söylemiyor", "the sky says nothing this run",
-                      "el cielo no dice nada esta vez", "der Himmel schweigt diesmal", "небо молчит в этот раз"),
-    "om.plenty":   _T("Bereket", "Plenty", "Abundancia", "Fülle", "Изобилие"),
-    "om.plenty.d": _T("+%25 altın, +%15 tecrübe", "+25% gold, +15% XP", "+25% oro, +15% EXP",
-                      "+25% Gold, +15% EP", "+25% золота, +15% опыта"),
-    "om.lucky":    _T("Şanslı Yıldız", "Lucky Star", "Estrella de la Suerte", "Glücksstern", "Счастливая звезда"),
-    "om.lucky.d":  _T("+%25 şans, 2 bedava yenileme", "+25% luck, 2 free rerolls", "+25% suerte, 2 cambios gratis",
-                      "+25% Glück, 2 Gratis-Neuwürfe", "+25% удачи, 2 бесплатные замены"),
-    "om.redsky":   _T("Kızıl Gök", "Red Sky", "Cielo Rojo", "Roter Himmel", "Красное небо"),
-    "om.redsky.d": _T("yaratıklar +%20 canlı, ama +%40 altın ve tecrübe",
-                      "monsters +20% HP, but +40% gold and XP",
-                      "monstruos +20% vida, pero +40% oro y EXP",
-                      "Monster +20% LP, aber +40% Gold und EP",
-                      "монстры +20% здоровья, но +40% золота и опыта"),
-    "om.drought":  _T("Kuraklık", "Drought", "Sequía", "Dürre", "Засуха"),
-    "om.drought.d": _T("kalp düşmez, ama +%20 hasar", "no hearts drop, but +20% damage",
-                       "no caen corazones, pero +20% de daño", "keine Herzen, aber +20% Schaden",
-                       "сердца не падают, но +20% урона"),
-    "om.heavy":    _T("Ağır Adım", "Heavy Step", "Paso Pesado", "Schwerer Schritt", "Тяжёлый шаг"),
-    "om.heavy.d":  _T("-%10 hız, ama +%12 zırh", "-10% speed, but +12% armor", "-10% velocidad, pero +12% armadura",
-                      "-10% Tempo, aber +12% Rüstung", "-10% скорости, но +12% брони"),
-    "om.storm":    _T("Fırtına Öncesi", "Before the Storm", "Antes de la Tormenta", "Vor dem Sturm", "Перед бурей"),
-    "om.storm.d":  _T("+%25 atış hızı, yaratıklar +%10 canlı", "+25% fire rate, monsters +10% HP",
-                      "+25% cadencia, monstruos +10% vida", "+25% Feuerrate, Monster +10% LP",
-                      "+25% темпа, монстры +10% здоровья"),
+    # ---- harita bulguları ----
+    "fd.rack":     _T("SİLAH RAFI", "WEAPON RACK", "ARMERO", "WAFFENGESTELL", "ОРУЖЕЙНАЯ СТОЙКА"),
+    "fd.rack.d":   _T("nadir silahlardan birini seç", "pick one of the rare weapons", "elige un arma rara",
+                      "wähle eine seltene Waffe", "выбери редкое оружие"),
+    "fd.rack.hand": _T("SİLAH RAFI - BİRİNİ AL", "WEAPON RACK - TAKE ONE", "ARMERO - TOMA UNA",
+                       "WAFFENGESTELL - NIMM EINE", "СТОЙКА - БЕРИ ОДНО"),
+    "fd.sword":    _T("TAŞTAKİ KILIÇ", "SWORD IN THE STONE", "ESPADA EN LA PIEDRA", "SCHWERT IM STEIN",
+                      "МЕЧ В КАМНЕ"),
+    "fd.sword.d":  _T("+%15 hasar, koşu boyunca", "+15% damage for the whole run", "+15% de daño toda la partida",
+                      "+15% Schaden für den ganzen Lauf", "+15% урона до конца забега"),
+    "fd.anvil":    _T("DEMİRCİ ÖRSÜ", "BLACKSMITH'S ANVIL", "YUNQUE DEL HERRERO", "SCHMIEDEAMBOSS",
+                      "НАКОВАЛЬНЯ КУЗНЕЦА"),
+    "fd.anvil.d":  _T("bir silahına +2 seviye", "+2 levels to one of your weapons", "+2 niveles a una de tus armas",
+                      "+2 Stufen für eine deiner Waffen", "+2 уровня одному оружию"),
+    "fd.anvil.hand": _T("ÖRS - BİR SİLAHI DÖV", "ANVIL - FORGE ONE", "YUNQUE - FORJA UNA",
+                        "AMBOSS - SCHMIEDE EINE", "НАКОВАЛЬНЯ - КУЙ ОДНО"),
+    "fd.trial":    _T("MEYDAN OKUMA TAŞI", "CHALLENGE STONE", "PIEDRA DEL DESAFÍO", "PRÜFSTEIN", "КАМЕНЬ ВЫЗОВА"),
+    "fd.trial.d":  _T("25 sn elitlere dayan, sandığı kap", "survive 25 s of elites, win a chest",
+                      "aguanta 25 s de élites, gana un cofre", "überlebe 25 s Elite, hol dir eine Truhe",
+                      "продержись 25 с против элиты - сундук твой"),
+    "fd.trial.on": _T("MEYDAN OKUMA", "CHALLENGE", "DESAFÍO", "PRÜFUNG", "ВЫЗОВ"),
+    "fd.trial.won": _T("DAYANDIN! Sandık senin", "YOU HELD ON! The chest is yours", "¡AGUANTASTE! El cofre es tuyo",
+                       "GESCHAFFT! Die Truhe gehört dir", "ВЫСТОЯЛ! Сундук твой"),
+    "fd.map":      _T("HAZİNE HARİTASI", "TREASURE MAP", "MAPA DEL TESORO", "SCHATZKARTE", "КАРТА СОКРОВИЩ"),
+    "fd.map.d":    _T("X işaretine git, kaz", "go to the X and dig", "ve a la X y cava", "geh zum X und grab",
+                      "иди к X и копай"),
+    "fd.dig":      _T("GÖMÜLÜ HAZİNE", "BURIED TREASURE", "TESORO ENTERRADO", "VERGRABENER SCHATZ", "ЗАРЫТЫЙ КЛАД"),
+    "fd.dig.d":    _T("altın + sandık", "gold + a chest", "oro + un cofre", "Gold + eine Truhe", "золото + сундук"),
+    "fd.appear":   _T("Haritada bir şey var: {0}", "Something on the map: {0}", "Algo en el mapa: {0}",
+                      "Etwas auf der Karte: {0}", "Что-то на карте: {0}"),
+    "fd.gone":     _T("kaçırdın: {0}", "missed: {0}", "perdido: {0}", "verpasst: {0}", "упущено: {0}"),
     # ---- kayıp kervan ----
     "cv.appear":   _T("KAYIP KERVAN geçiyor - yakala!", "A LOST CARAVAN is passing - catch it!",
                       "¡Pasa una CARAVANA PERDIDA, atrápala!", "Eine VERLORENE KARAWANE zieht vorbei - schnapp sie!",
@@ -25915,23 +25878,6 @@ STRINGS.update({
     "cv.gone":     _T("kervan gitti...", "the caravan is gone...", "la caravana se fue...",
                       "die Karawane ist weg...", "караван ушёл..."),
 })
-
-# ---- gök işareti ----
-# Her koşu bir işaretle başlar: iyi, kötü ya da karışık. Kötü gelen oyuncu
-# "bu koşu olmaz" deyip baştan başlayabilir, iyi gelen "iyi başladık" der -
-# anahtarlı sandığın verdiği his. Değerler hile denetiminin dışında kalan
-# alanlara yazılır (shrine_dmg / shrine_spd ayrı tutuluyor).
-# işaret -> (ağırlık, renk, simge)
-OMENS = {
-    "calm":    (3.0, (180, 176, 200), "star"),
-    "plenty":  (1.2, (255, 206, 90), "coin"),
-    "lucky":   (1.2, (120, 230, 140), "clover"),
-    "redsky":  (1.0, (236, 80, 80), "skull"),
-    "drought": (1.0, (230, 170, 90), "flame"),
-    "heavy":   (1.0, (160, 170, 200), "shield"),
-    "storm":   (1.0, (140, 200, 255), "bolt"),
-}
-OMEN_SHOW_T = 7.0               # başta gösterilen kartın süresi
 
 # ---- kayıp kervan ----
 # Koşuların bir kısmında 2-4. dalga arasında haritanın bir ucundan öbürüne
@@ -26114,24 +26060,233 @@ class PowerShrine:
         draw_icon(surf, x, cy + 1, SHRINE_KINDS[self.kind][1], INK, 6)
 
 
+# ---- harita bulguları ----
+# Koşuyu iyi ya da kötü yapan, haritada rastgele çıkan şeyler. Her koşuda
+# hepsi gelmez: biri rafı erkenden bulur, öbürü hiçbirini görmez. Hepsi
+# oyuncuyu yürütür; uzakta durur, başında beklemek ister.
+# tür -> (koşuda çıkma olasılığı, en erken dalga, en geç dalga, bekleme
+#        süresi, ömür, renk, simge)
+FIND_KINDS = {
+    "rack":  (0.45, 1, 3, 1.2, 150.0, (214, 170, 110), "sword"),
+    "map":   (0.35, 2, 6, 0.0, 180.0, (232, 206, 150), "target"),
+    "sword": (0.35, 3, 7, 4.0, 220.0, (196, 214, 240), "sword"),
+    "trial": (0.40, 4, 11, 1.0, 180.0, (236, 90, 80), "skull"),
+    "anvil": (0.40, 5, 10, 2.0, 200.0, (255, 150, 70), "fist"),
+    "dig":   (0.0, 0, 0, 3.0, 150.0, (226, 120, 80), "target"),
+}
+FIND_R = 58.0
+FIND_SWORD_DMG = 0.15
+FIND_TRIAL_T = 25.0
+FIND_TRIAL_EVERY = 3.0
+FIND_LABEL_D = 330.0            # bu kadar yakındayken adı ve ödülü yazar
+
+
+class MapFind:
+    def __init__(self, kind, x, y, born):
+        self.kind = kind
+        self.x, self.y = x, y
+        self.born = born
+        self.charge = 0.0
+        self.used = False
+        self.fade = 0.0
+
+    def spec(self):
+        return FIND_KINDS[self.kind]
+
+    def color(self):
+        return FIND_KINDS[self.kind][5]
+
+    def need(self):
+        return FIND_KINDS[self.kind][3]
+
+    def draw(self, surf, t, near):
+        a = 1.0 - clamp(self.fade / 0.8, 0.0, 1.0)
+        if a <= 0:
+            return
+        col = self.color()
+        x, y = self.x, self.y
+        k = self.kind
+        if self.need() > 0 and not self.used:
+            rr = FIND_R
+            ring = pygame.Surface((int(rr * 2 + 8), int(rr * 2 + 8)), pygame.SRCALPHA)
+            c = rr + 4
+            pygame.draw.circle(ring, (*col, int(30 * a)), (int(c), int(c)), int(rr))
+            pygame.draw.circle(ring, (*INK, int(140 * a)), (int(c), int(c)), int(rr), 3)
+            pygame.draw.circle(ring, (*col, int(170 * a)), (int(c), int(c)), int(rr - 3), 2)
+            surf.blit(ring, (int(x - c), int(y - c)))
+            if self.charge > 0:
+                rect = pygame.Rect(0, 0, int(rr * 2 + 10), int(rr * 2 + 10))
+                rect.center = (int(x), int(y))
+                pygame.draw.arc(surf, WHITE, rect, math.pi / 2,
+                                math.pi / 2 + math.tau * clamp(self.charge / self.need(), 0, 1), 5)
+        pygame.draw.ellipse(surf, (0, 0, 0), (int(x - 30), int(y + 6), 60, 14))
+        getattr(self, "_draw_" + k)(surf, x, y, t, col, a)
+        if near and not self.used:
+            # adı altta: oyuncunun üstünde çıkan yazılarla çakışmasın
+            ly = y + FIND_R + 14
+            draw_text(surf, L("fd." + k), (x, ly), 15, lighten(col, 0.25), bold=True, center=True)
+            draw_text(surf, L("fd.%s.d" % k), (x, ly + 19), 12, TEXT, center=True)
+
+    def _draw_rack(self, surf, x, y, t, col, a):
+        wood, dark = (150, 102, 62), (104, 68, 40)
+        for px in (-26, 26):
+            pygame.draw.line(surf, INK, (x + px, y + 8), (x + px * 0.8, y - 46), 9)
+            pygame.draw.line(surf, wood, (x + px, y + 8), (x + px * 0.8, y - 46), 5)
+        for by in (-38, -6):
+            pygame.draw.line(surf, INK, (x - 30, y + by), (x + 30, y + by), 8)
+            pygame.draw.line(surf, wood, (x - 29, y + by), (x + 29, y + by), 4)
+            pygame.draw.line(surf, dark, (x - 29, y + by + 1), (x + 29, y + by + 1), 1)
+        if self.used:
+            return
+        steel = (206, 214, 226)
+        # kılıç
+        pygame.draw.line(surf, INK, (x - 14, y + 4), (x - 10, y - 58), 7)
+        pygame.draw.line(surf, steel, (x - 14, y + 2), (x - 10, y - 56), 3)
+        pygame.draw.line(surf, INK, (x - 20, y - 6), (x - 4, y - 7), 6)
+        pygame.draw.line(surf, (226, 186, 90), (x - 19, y - 6), (x - 5, y - 7), 3)
+        # balta
+        pygame.draw.line(surf, INK, (x + 2, y + 6), (x + 4, y - 52), 7)
+        pygame.draw.line(surf, wood, (x + 2, y + 4), (x + 4, y - 50), 3)
+        head = [(x + 4, y - 50), (x + 18, y - 58), (x + 20, y - 40), (x + 4, y - 40)]
+        pygame.draw.polygon(surf, INK, head)
+        pygame.draw.polygon(surf, steel, [(x + 6, y - 48), (x + 16, y - 54), (x + 17, y - 43), (x + 6, y - 43)])
+        # mızrak
+        pygame.draw.line(surf, INK, (x + 16, y + 6), (x + 22, y - 66), 6)
+        pygame.draw.line(surf, wood, (x + 16, y + 4), (x + 22, y - 64), 2)
+        tip = [(x + 22, y - 78), (x + 27, y - 64), (x + 18, y - 64)]
+        pygame.draw.polygon(surf, INK, [(px, py) for px, py in tip], 0)
+        pygame.draw.polygon(surf, steel, [(x + 22, y - 74), (x + 25, y - 65), (x + 19, y - 65)])
+        tw = 0.5 + 0.5 * math.sin(t * 3 + self.born)
+        pygame.draw.circle(surf, WHITE, (int(x - 10), int(y - 50)), max(1, int(1 + tw * 2)))
+
+    def _draw_sword(self, surf, x, y, t, col, a):
+        pull = clamp(self.charge / self.need(), 0, 1) * 16 if not self.used else 0
+        if not self.used:
+            add_glow(surf, x, y - 40, 44, col, 0.25 + 0.1 * math.sin(t * 2))
+            bx = x
+            by = y - 30 - pull
+            pygame.draw.line(surf, INK, (bx, by + 22), (bx, by - 34), 10)
+            pygame.draw.line(surf, (214, 222, 236), (bx, by + 22), (bx, by - 32), 6)
+            pygame.draw.line(surf, WHITE, (bx - 1, by + 18), (bx - 1, by - 28), 2)
+            pygame.draw.line(surf, INK, (bx - 15, by - 34), (bx + 15, by - 34), 9)
+            pygame.draw.line(surf, (230, 190, 90), (bx - 13, by - 34), (bx + 13, by - 34), 5)
+            pygame.draw.line(surf, INK, (bx, by - 36), (bx, by - 52), 9)
+            pygame.draw.line(surf, (120, 70, 50), (bx, by - 37), (bx, by - 50), 5)
+            pygame.draw.circle(surf, INK, (int(bx), int(by - 55)), 6)
+            pygame.draw.circle(surf, (230, 190, 90), (int(bx), int(by - 55)), 4)
+        rock = [(x - 34, y + 8), (x - 30, y - 14), (x - 12, y - 26), (x + 14, y - 24),
+                (x + 32, y - 10), (x + 36, y + 8)]
+        pygame.draw.polygon(surf, INK, [(px + (2 if px > x else -2), py - (2 if py < y else 0)) for px, py in rock])
+        pygame.draw.polygon(surf, (126, 124, 134), rock)
+        pygame.draw.polygon(surf, (150, 148, 160), [(x - 26, y - 12), (x - 10, y - 22), (x + 10, y - 20), (x - 4, y - 8)])
+        pygame.draw.line(surf, (96, 94, 104), (x + 6, y - 4), (x + 18, y + 4), 2)
+        pygame.draw.line(surf, (96, 94, 104), (x - 20, y), (x - 12, y + 6), 2)
+
+    def _draw_anvil(self, surf, x, y, t, col, a):
+        stump = pygame.Rect(0, 0, 34, 24)
+        stump.midbottom = (int(x), int(y + 10))
+        pygame.draw.rect(surf, INK, stump.inflate(6, 6), border_radius=5)
+        pygame.draw.rect(surf, (128, 86, 52), stump, border_radius=4)
+        pygame.draw.line(surf, (96, 62, 38), (stump.x + 4, stump.y + 8), (stump.right - 4, stump.y + 8), 2)
+        top = y - 14
+        body = [(x - 34, top - 18), (x + 26, top - 18), (x + 40, top - 26), (x + 30, top - 10),
+                (x + 12, top - 6), (x + 10, top + 2), (x - 10, top + 2), (x - 12, top - 6), (x - 30, top - 8)]
+        pygame.draw.polygon(surf, INK, [(px + (2 if px > x else -2), py + (2 if py > top - 12 else -2)) for px, py in body])
+        pygame.draw.polygon(surf, (78, 82, 96), body)
+        pygame.draw.line(surf, (128, 134, 150), (x - 30, top - 16), (x + 26, top - 16), 3)
+        if not self.used:
+            hot = 0.5 + 0.5 * math.sin(t * 4 + self.born)
+            add_glow(surf, x, top - 22, 30, col, 0.35 + 0.2 * hot)
+            pygame.draw.ellipse(surf, (255, 180, 90), (int(x - 10), int(top - 23), 20, 6))
+            for i in range(3):
+                ph = (t * 0.9 + i * 0.33 + self.born) % 1.0
+                sx = x - 6 + i * 6 + math.sin(t * 5 + i) * 4
+                sy = top - 24 - ph * 34
+                pygame.draw.circle(surf, lighten(col, 0.4), (int(sx), int(sy)), max(1, int(2.5 * (1 - ph))))
+            # çekiç
+            pygame.draw.line(surf, INK, (x + 22, y + 8), (x + 34, y - 8), 7)
+            pygame.draw.line(surf, (150, 102, 62), (x + 22, y + 7), (x + 33, y - 7), 3)
+            hd = pygame.Rect(0, 0, 18, 10)
+            hd.center = (int(x + 36), int(y - 11))
+            pygame.draw.rect(surf, INK, hd.inflate(4, 4), border_radius=3)
+            pygame.draw.rect(surf, (110, 114, 128), hd, border_radius=2)
+
+    def _draw_trial(self, surf, x, y, t, col, a):
+        pulse = 0.5 + 0.5 * math.sin(t * 3 + self.born)
+        if not self.used:
+            add_glow(surf, x, y - 40, 50, col, 0.22 + 0.18 * pulse)
+        st = [(x - 18, y + 8), (x - 14, y - 62), (x, y - 74), (x + 14, y - 62), (x + 18, y + 8)]
+        pygame.draw.polygon(surf, INK, [(px + (3 if px > x else -3 if px < x else 0), py + (3 if py > y - 30 else -3))
+                                        for px, py in st])
+        pygame.draw.polygon(surf, (58, 52, 64), st)
+        pygame.draw.polygon(surf, (78, 72, 86), [(x - 13, y + 4), (x - 10, y - 58), (x, y - 68), (x - 2, y + 4)])
+        rc = col if not self.used else (110, 90, 90)
+        draw_icon(surf, x, y - 34, "skull", rc, 9)
+        for i in range(3):
+            pygame.draw.line(surf, rc, (x - 8, y - 12 + i * 6), (x + 8, y - 12 + i * 6), 2)
+
+    def _draw_map(self, surf, x, y, t, col, a):
+        bob = math.sin(t * 2.6 + self.born) * 3
+        cy = y - 18 + bob
+        add_glow(surf, x, cy, 34, col, 0.3)
+        r = pygame.Rect(0, 0, 40, 28)
+        r.center = (int(x), int(cy))
+        pygame.draw.rect(surf, INK, r.inflate(6, 6), border_radius=4)
+        pygame.draw.rect(surf, (236, 218, 172), r, border_radius=3)
+        for ex in (r.x, r.right):
+            pygame.draw.ellipse(surf, INK, (ex - 6, r.y - 4, 12, r.h + 8))
+            pygame.draw.ellipse(surf, (214, 192, 140), (ex - 4, r.y - 2, 8, r.h + 4))
+        pygame.draw.line(surf, (170, 140, 100), (r.x + 6, r.y + 8), (r.x + 18, r.y + 18), 2)
+        pygame.draw.line(surf, (170, 140, 100), (r.x + 18, r.y + 18), (r.x + 24, r.y + 10), 2)
+        pygame.draw.line(surf, (200, 60, 50), (r.right - 14, r.y + 6), (r.right - 6, r.y + 14), 3)
+        pygame.draw.line(surf, (200, 60, 50), (r.right - 6, r.y + 6), (r.right - 14, r.y + 14), 3)
+
+    def _draw_dig(self, surf, x, y, t, col, a):
+        pygame.draw.ellipse(surf, INK, (int(x - 34), int(y - 12), 68, 26))
+        pygame.draw.ellipse(surf, (122, 90, 62), (int(x - 31), int(y - 10), 62, 21))
+        pygame.draw.ellipse(surf, (98, 70, 46), (int(x - 18), int(y - 5), 36, 11))
+        if self.used:
+            return
+        s = 1.0 + 0.08 * math.sin(t * 4)
+        for sgn in (1, -1):
+            p0 = (x - 18 * s, y - 2 - sgn * 10 * s)
+            p1 = (x + 18 * s, y - 2 + sgn * 10 * s)
+            pygame.draw.line(surf, INK, p0, p1, 11)
+            pygame.draw.line(surf, (214, 64, 54), p0, p1, 6)
+        # kürek
+        pygame.draw.line(surf, INK, (x + 26, y - 4), (x + 38, y - 44), 6)
+        pygame.draw.line(surf, (150, 102, 62), (x + 26, y - 5), (x + 37, y - 43), 2)
+        bl = [(x + 20, y + 2), (x + 30, y + 2), (x + 30, y - 12), (x + 22, y - 12)]
+        pygame.draw.polygon(surf, INK, bl, 0)
+        pygame.draw.polygon(surf, (150, 156, 170), [(x + 22, y), (x + 28, y), (x + 28, y - 10), (x + 23, y - 10)])
+
+
 class WorldExtrasMixin:
-    """RunState'e güç sunakları, gök işareti ve kayıp kervan (karışım sınıf)."""
+    """RunState'e güç sunakları, harita bulguları ve kayıp kervan (karışım sınıf)."""
 
     def extras_init(self):
         self.shrine = None
         self.shrine_next = SHRINE_FIRST
         self.shrine_buffs = []          # [tür, bitiş zamanı]
         self.shrines_used = 0
-        self.omen = None
-        self.omen_t0 = 0.0
+        self.finds = []
+        self.find_plan = []             # [zaman, tür], sıralı
+        self.find_hands = []            # bekleyen raf / örs elleri
+        self.find_note = None           # (zaman, metin, renk)
+        self.trial = None               # [bitiş, sonraki elit]
         self.caravan = None
         self.caravan_note = None        # (zaman, metin anahtarı)
         self.caravan_at = None
-        self.omen_rolled = False
         if self.extras_active():
+            d = getattr(self, "diff", "normal")
             if random.random() < CARAVAN_CHANCE:
-                d = getattr(self, "diff", "normal")
                 self.caravan_at = random.uniform(wave_start_time(2, d), wave_start_time(4, d))
+            for kind, sp in FIND_KINDS.items():
+                if random.random() < sp[0]:
+                    self.find_plan.append([random.uniform(wave_start_time(sp[1], d) + 25.0,
+                                                          wave_start_time(sp[2], d)), kind])
+            self.find_plan.sort()
+
     def extras_active(self):
         return not getattr(self, "is_coop", False)
 
@@ -26210,30 +26365,160 @@ class WorldExtrasMixin:
         else:
             sh.charge = max(0.0, sh.charge - dt * 1.5)
 
-    # ---- gök işareti ----
-    def _roll_omen(self):
-        keys = list(OMENS)
-        k = random.choices(keys, weights=[OMENS[o][0] for o in keys], k=1)[0]
-        self.omen = k
+    # ---- harita bulguları ----
+    def _find_spot(self, dmin, dmax):
         p = self.player
-        if k == "plenty":
-            p.run_coin_mult += 0.25
-            p.run_xp_mult += 0.15
-        elif k == "lucky":
-            p.luck += 0.25
-            self.reroll_bonus = getattr(self, "reroll_bonus", 0) + 2
-        elif k == "redsky":
-            p.enemy_hp_curse += 0.20
-            p.run_coin_mult += 0.40
-            p.run_xp_mult += 0.40
-        elif k == "drought":
-            p.shrine_dmg += 0.20
-        elif k == "heavy":
-            p.shrine_spd -= 0.10
-            p.run_armor_bonus += 0.12
-        elif k == "storm":
-            p.run_aspd_mult += 0.25
-            p.enemy_hp_curse += 0.10
+        x, y = p.x, p.y
+        for _ in range(80):
+            a = random.uniform(0, math.tau)
+            d = random.uniform(dmin, dmax)
+            x = clamp(p.x + math.cos(a) * d, ARENA_RECT.left + 140, ARENA_RECT.right - 140)
+            y = clamp(p.y + math.sin(a) * d, ARENA_RECT.top + 180, ARENA_RECT.bottom - 140)
+            if dist(x, y, p.x, p.y) < dmin * 0.7:
+                continue
+            busy = [self.shrine] + list(self.finds)
+            if all(o is None or dist(x, y, o.x, o.y) > 260 for o in busy):
+                break
+        return x, y
+
+    def _spawn_find(self, kind, x=None, y=None):
+        if x is None:
+            x, y = self._find_spot(620, 1150)
+        f = MapFind(kind, x, y, self.run_time)
+        self.finds.append(f)
+        if kind != "dig":
+            self.find_note = (self.run_time, L("fd.appear", L("fd." + kind)), f.color())
+        sfx("second", 0.5, 0.0)
+        return f
+
+    def _claim_find(self, f):
+        p = self.player
+        f.used = True
+        k = f.kind
+        col = f.color()
+        self.finds_used = getattr(self, "finds_used", 0) + 1
+        if k == "rack":
+            self.find_hands.append("rack")
+            self.pending_levelups += 1
+        elif k == "anvil":
+            if self._anvil_offers():
+                self.find_hands.append("anvil")
+                self.pending_levelups += 1
+            else:
+                gold = scaled_coin_gain(80 + 30 * max(1, int(self.waves.wave)), p.eff_coin_mult(), self.biome)
+                for i in range(6):
+                    a = i * math.tau / 6
+                    self.drop_pickup(f.x + math.cos(a) * 30, f.y + math.sin(a) * 30, "coin", gold / 6)
+        elif k == "sword":
+            p.shrine_dmg += FIND_SWORD_DMG
+        elif k == "trial":
+            self.trial = [self.run_time + FIND_TRIAL_T, self.run_time + 0.8]
+            self.find_note = (self.run_time, L("fd.trial.d"), col)
+            sfx("boss", 0.35, 0.0)
+        elif k == "map":
+            x, y = self._find_spot(900, 1500)
+            self._spawn_find("dig", x, y)
+            self.find_note = (self.run_time, L("fd.map.d"), col)
+        elif k == "dig":
+            w = max(1, int(self.waves.wave))
+            gold = scaled_coin_gain(180 + 40 * w, p.eff_coin_mult(), self.biome)
+            for i in range(10):
+                a = i * math.tau / 10
+                self.drop_pickup(f.x + math.cos(a) * 34, f.y + math.sin(a) * 34, "coin", gold / 10)
+            # sandık bir adım ötede: oyuncu gidip açsın, yazılar üst üste binmesin
+            self.chests.append(BossChest(f.x, f.y - 84, "dig"))
+            self.fx.burst(f.x, f.y, (122, 90, 62), n=26, speed=220, life=0.7, r=3.5, gravity=260)
+        if k not in ("trial", "map"):
+            # oyuncunun tepesinde başka yazılar da çıkıyor (silah adı, sandık):
+            # bu not üstteki satıra yazılır
+            self.find_note = (self.run_time, "%s  ·  %s" % (L("fd." + k), L("fd.%s.d" % k)), col)
+        self.fx.ring(f.x, f.y, col, n=26, speed=260, life=0.6, r=3.5)
+        self.fx.do_flash(col, 0.2)
+        sfx("buy", 0.9, 0.0)
+
+    def _update_finds(self, dt):
+        while self.find_plan and self.run_time >= self.find_plan[0][0]:
+            self._spawn_find(self.find_plan.pop(0)[1])
+        p = self.player
+        keep = []
+        for f in self.finds:
+            if f.used or self.run_time - f.born > f.spec()[4]:
+                if not f.used and f.fade == 0.0:
+                    self.find_note = (self.run_time, L("fd.gone", L("fd." + f.kind)), (190, 180, 170))
+                f.fade += dt
+                if f.fade <= 0.8:
+                    keep.append(f)
+                continue
+            keep.append(f)
+            if not p.alive or self.trial is not None and f.kind == "trial":
+                continue
+            if dist(p.x, p.y, f.x, f.y) < FIND_R:
+                f.charge += dt
+                if f.need() > 0 and random.random() < dt * 12:
+                    a = random.uniform(0, math.tau)
+                    self.fx.spark(f.x + math.cos(a) * FIND_R, f.y + math.sin(a) * FIND_R,
+                                  f.color(), -math.cos(a) * 90, -math.sin(a) * 90, 0.5, 2.6)
+                if f.charge >= f.need():
+                    self._claim_find(f)
+            else:
+                f.charge = max(0.0, f.charge - dt * 1.5)
+        self.finds = keep
+        tr = self.trial
+        if tr is not None:
+            if not p.alive:
+                self.trial = None
+            elif self.run_time >= tr[0]:
+                self.trial = None
+                self.trials_won = getattr(self, "trials_won", 0) + 1
+                self.chests.append(BossChest(p.x + 70, p.y, "trial"))
+                self.find_note = (self.run_time, L("fd.trial.won"), FIND_KINDS["trial"][5])
+                self.fx.ring(p.x, p.y, GOLD, n=28, speed=260, life=0.7, r=4)
+                sfx("levelup", 0.6, 0.0)
+            elif self.run_time >= tr[1]:
+                tr[1] += FIND_TRIAL_EVERY
+                x, y = self.near_camera_point(80)
+                e = self._make_enemy("elite", x, y)
+                self.enemies.append(e)
+
+    def _anvil_offers(self):
+        p = self.player
+        out = []
+        for key, lvl in p.weapons.items():
+            w = WEAPON_BY_KEY.get(key)
+            if w is None or lvl >= weapon_max_level(w):
+                continue
+            o = self._weapon_offer(w, min(weapon_max_level(w), lvl + 2), False)
+            o["extra"] = o["lvl"] - lvl - 1
+            o["find"] = "anvil"
+            out.append(o)
+        return out
+
+    def _rack_offers(self):
+        offers, _ = self.levelup_pool()
+        tier = RARITY_COUNT - 2
+        out = []
+        for o in offers:
+            if o["kind"] != "weapon":
+                continue
+            o["rarity"] = tier
+            o["boost"] = rarity_boost(tier, "card")
+            o["find"] = "rack"
+            out.append(o)
+        return out
+
+    def find_hand(self):
+        """Raf / örs eli (verecek kart yoksa boş liste)."""
+        kind = self.find_hands[0]
+        offers = self._anvil_offers() if kind == "anvil" else self._rack_offers()
+        random.shuffle(offers)
+        # rafta önce yeni silahlar: rafın tadı orada
+        if kind == "rack":
+            offers.sort(key=lambda o: not o.get("new"))
+        return offers[:3]
+
+    def find_hand_used(self, choices):
+        if any(c.get("find") for c in choices) and self.find_hands:
+            self.find_hands.pop(0)
 
     # ---- kayıp kervan ----
     def _spawn_caravan(self):
@@ -26292,18 +26577,19 @@ class WorldExtrasMixin:
     def extras_update(self, dt):
         if not self.extras_active():
             return
-        if not self.omen_rolled:
-            # koşu kurulumu bitince atılır (kurulum bazı alanları sıfırlıyor)
-            self.omen_rolled = True
-            self._roll_omen()
         self._update_shrine(dt)
+        self._update_finds(dt)
         self._update_caravan(dt)
         if self.shrine_buffs:
             self.shrine_buffs = [b for b in self.shrine_buffs if b[1] > self.run_time]
 
 
 def draw_world_extras(world, run, cam, t):
-    """Zemindeki sunak ve kervan."""
+    """Zemindeki sunak, bulgular ve kervan."""
+    p = run.player
+    for f in getattr(run, "finds", ()):
+        if cam.inflate(400, 400).collidepoint(f.x, f.y):
+            f.draw(world, t, dist(p.x, p.y, f.x, f.y) < FIND_LABEL_D)
     sh = getattr(run, "shrine", None)
     if sh is not None and cam.inflate(400, 400).collidepoint(sh.x, sh.y):
         sh.draw(world, t)
@@ -26323,8 +26609,20 @@ def _buff_ring(surf, cx, cy, r, col, frac, icon):
     draw_icon(surf, cx, cy, icon, lighten(col, 0.3), 8)
 
 
+def _hud_note(surf, text, y, col, a):
+    """Üstteki duyuru satırı: koyu zemin üstünde (dünyada süzülen yazılar altta kalsa da okunur)."""
+    w_ = text_width(text, 17, True) + 34
+    r = pygame.Rect(0, 0, w_, 28)
+    r.center = (VIRTUAL_W // 2, int(y))
+    bg = pygame.Surface(r.size, pygame.SRCALPHA)
+    pygame.draw.rect(bg, (*INK, int(150 * a / 255)), bg.get_rect(), border_radius=8)
+    pygame.draw.rect(bg, (24, 20, 30, int(215 * a / 255)), bg.get_rect().inflate(-4, -4), border_radius=7)
+    surf.blit(bg, r.topleft)
+    draw_text(surf, text, r.center, 17, col, bold=True, center=True, alpha=a)
+
+
 def draw_extras_hud(surf, run, t):
-    """Güç simgeleri, gök işareti kartı ve kervan notları."""
+    """Güç simgeleri, meydan okuma sayacı, bulgu ve kervan notları."""
     if not hasattr(run, "shrine_buffs"):
         return
     now = run.run_time
@@ -26341,42 +26639,36 @@ def draw_extras_hud(surf, run, t):
         for i, (col, icon, frac, nm) in enumerate(items):
             if frac > 0.15 or int(t * 6) % 2 == 0:
                 _buff_ring(surf, x0 + i * 44, y, 15, col, frac, icon)
-    om = getattr(run, "omen", None)
-    if om:
-        col, icon = OMENS[om][1], OMENS[om][2]
-        st = now - 1.5
-        if 0 <= st <= OMEN_SHOW_T:
-            # koşunun başında sakin bir kart: kâğıt etiket, yetenek çubuğunun
-            # üstünde (haritayı, duyuruları örtmesin)
-            k = ease_out_cubic(min(1.0, st / 0.4))
-            a = min(1.0, (OMEN_SHOW_T - st) / 0.6)
-            w_ = max(300, text_width(L("om.%s.d" % om), 13) + 70)
-            r = pygame.Rect(0, 0, w_, 66)
-            r.midbottom = (VIRTUAL_W // 2, int(626 + 30 * (1 - k)))
-            card = paper_card(r.w, r.h, seed=7)
-            card.set_alpha(int(255 * a))
-            surf.blit(card, r.topleft)
-            draw_icon(surf, r.x + 26, r.centery, icon, scale_col(col, 0.7), 11)
-            draw_text(surf, L("om.title"), (r.x + 50, r.y + 10), 11, PAPER_INK_DIM, bold=True,
-                      shadow=False, alpha=int(255 * a))
-            draw_text(surf, L("om." + om), (r.x + 50, r.y + 24), 17, PAPER_INK, bold=True,
-                      shadow=False, alpha=int(255 * a))
-            draw_text(surf, L("om.%s.d" % om), (r.x + 50, r.y + 45), 12, PAPER_INK_DIM,
-                      shadow=False, alpha=int(255 * a))
-        elif st > OMEN_SHOW_T and om != "calm":
-            # sonra yalnız küçük bir simge: haritanın altında
-            cx, cy = VIRTUAL_W - 34, 238
-            pygame.draw.circle(surf, INK, (cx, cy), 13)
-            pygame.draw.circle(surf, scale_col(col, 0.45), (cx, cy), 11)
-            draw_icon(surf, cx, cy, icon, lighten(col, 0.2), 7)
+    ny = 168
     note = getattr(run, "caravan_note", None)
     if note is not None:
         st = now - note[0]
         if 0 <= st <= 3.2:
             a = min(1.0, st / 0.3, (3.2 - st) / 0.6)
-            msg = L(note[1])
-            draw_text(surf, msg, (VIRTUAL_W / 2, 168), 18, CARAVAN_COLOR, bold=True, center=True,
-                      alpha=int(255 * a))
+            _hud_note(surf, L(note[1]), 168, CARAVAN_COLOR, int(255 * a))
+            ny = 200
+    fn = getattr(run, "find_note", None)
+    if fn is not None:
+        st = now - fn[0]
+        if 0 <= st <= 3.2:
+            a = min(1.0, st / 0.3, (3.2 - st) / 0.6)
+            _hud_note(surf, fn[1], ny, fn[2], int(255 * a))
+            ny += 32
+    tr = getattr(run, "trial", None)
+    if tr is not None:
+        left = max(0.0, tr[0] - now)
+        col = FIND_KINDS["trial"][5]
+        w_ = 260
+        r = pygame.Rect(0, 0, w_, 12)
+        r.midtop = (VIRTUAL_W // 2, ny + 14)
+        draw_text(surf, "%s  %d" % (L("fd.trial.on"), int(math.ceil(left))), (VIRTUAL_W / 2, ny),
+                  16, lighten(col, 0.2), bold=True, center=True)
+        pygame.draw.rect(surf, INK, r.inflate(6, 6), border_radius=6)
+        pygame.draw.rect(surf, scale_col(col, 0.3), r, border_radius=5)
+        fill = r.copy()
+        fill.w = max(0, int(r.w * left / FIND_TRIAL_T))
+        if fill.w > 0:
+            pygame.draw.rect(surf, col, fill, border_radius=5)
 
 
 # ---- silah evrimi ----
@@ -27011,8 +27303,7 @@ def draw_evo_card(surf, r2, ch, run, t, hover):
     if hover:
         br = pygame.Rect(r2.x + 18, r2.bottom - 44, r2.w - 36, 32)
         face = key_button(surf, br, col, True, rad=10)
-        draw_text(surf, L("evo.pick"), face.center, 16, (28, 18, 20), bold=True, center=True,
-                  shadow=False)
+        draw_text(surf, L("evo.pick"), face.center, 16, WHITE, bold=True, center=True)
     else:
         draw_text(surf, L("evo.ready"), (r2.centerx, r2.bottom - 28), 12, lighten(col, 0.2 * pulse),
                   bold=True, center=True, shadow=False)
@@ -29509,8 +29800,7 @@ class RunState(EvoMixin, WorldExtrasMixin):
             self.drop_pickup(e.x, e.y, "coin", coin_gain)
             self.drop_pickup(e.x, e.y, "xp", xp_gain)
         self._on_cursed_death(e)
-        if (random.random() < HEART_DROP_CHANCE and p.hp < p.max_hp * 0.9
-                and getattr(self, "omen", None) != "drought"):
+        if random.random() < HEART_DROP_CHANCE and p.hp < p.max_hp * 0.9:
             self.pickups.append(Pickup(e.x, e.y, "heart", 26))
         # mıknatıs: binde 2.5 düşer (kötü şansa karşı kademeli garanti için).
         can_stone = self.level_drops_total < self.magnets_dropped
@@ -30548,6 +30838,12 @@ class RunState(EvoMixin, WorldExtrasMixin):
                 self.levelup_choices = hand
                 return
             self.legend_hands = 0          # verecek efsanevi kart yok: normal ele düş
+        while getattr(self, "find_hands", None):
+            hand = self.find_hand()
+            if hand:
+                self.levelup_choices = hand
+                return
+            self.find_hands.pop(0)
         offers, weights = self.levelup_pool()
         pool = [(o, w) for o, w in zip(offers, weights) if w > 0]
         if not pool:
@@ -30673,7 +30969,7 @@ class RunState(EvoMixin, WorldExtrasMixin):
             key = ch["key"]
             w = ch["w"]
             first = key not in p.weapons
-            p.weapons[key] = p.weapons.get(key, 0) + 1
+            p.weapons[key] = min(weapon_max_level(w), p.weapons.get(key, 0) + 1 + int(ch.get("extra", 0)))
             if first:
                 # Yeni silah hemen ateşlemesin diye kısa bir ilk bekleme.
                 p.weapon_timers[key] = weapon_cooldown(w, 1) * 0.35
@@ -30695,6 +30991,8 @@ class RunState(EvoMixin, WorldExtrasMixin):
                         self.fx.do_flash(rc, 0.2 + 0.05 * tier)
         if ch.get("legend"):
             self.legend_hands = max(0, getattr(self, "legend_hands", 0) - 1)
+        if ch.get("find"):
+            self.find_hand_used([ch])
         self.pending_levelups -= 1
         self.fx.ring(p.x, p.y, col, n=16, speed=190, life=0.45, r=3)
         sfx("buy", 0.8, 0.0)
@@ -30753,6 +31051,8 @@ class RunState(EvoMixin, WorldExtrasMixin):
         self.skip_used += 1
         if any(c.get("legend") for c in self.levelup_choices):
             self.legend_hands = max(0, getattr(self, "legend_hands", 0) - 1)
+        if hasattr(self, "find_hands"):
+            self.find_hand_used(self.levelup_choices)
         self.pending_levelups -= 1
         sfx("hover", 0.8, 0.0)
         self._next_levelup_or_close()
@@ -33021,6 +33321,15 @@ def draw_minimap(surf, run, t, big=False):
         px, py = mp(_cv.x, _cv.y)
         pygame.draw.rect(surf, INK, (int(px) - 4, int(py) - 3, 9, 7))
         pygame.draw.rect(surf, CARAVAN_COLOR, (int(px) - 3, int(py) - 2, 7, 5))
+    # harita bulguları
+    for _f in getattr(run, "finds", ()):
+        if _f.used:
+            continue
+        px, py = mp(_f.x, _f.y)
+        pulse = 0.5 + 0.5 * math.sin(t * 5 + _f.born)
+        pygame.draw.rect(surf, INK, (int(px) - 5, int(py) - 5, 11, 11))
+        pygame.draw.rect(surf, _f.color(), (int(px) - 4 + int(pulse), int(py) - 4 + int(pulse),
+                                             9 - 2 * int(pulse), 9 - 2 * int(pulse)))
     # güç sunağı
     _psh = getattr(run, "shrine", None)
     if _psh is not None and not _psh.used:
@@ -33175,6 +33484,9 @@ def draw_offscreen_markers(surf, run, cam, t):
     _cv = getattr(run, "caravan", None)
     if _cv is not None and not (_cv.stopped or _cv.gone):
         marks.append((_cv.x, _cv.y, CARAVAN_COLOR, "coin"))
+    for _f in getattr(run, "finds", ()):
+        if not _f.used:
+            marks.append((_f.x, _f.y, _f.color(), _f.spec()[6]))
     # hazine goblini: kaçan ganimet ekran dışındaysa ok göster
     for e in run.enemies:
         if e.alive and e.kind == "goblin":
@@ -36471,6 +36783,9 @@ class LevelUpOverlay:
         # ---- başlık + seviye rozeti ----
         legend = any(c.get("legend") for c in (run.levelup_choices or ()))
         title = L("ui.legend_hand") if legend else L("ui.levelup")
+        fk = next((c["find"] for c in (run.levelup_choices or ()) if c.get("find")), None)
+        if fk:
+            title = L("fd.%s.hand" % fk)
         pop = ease_out_cubic(clamp((t - self.enter_t0) / 0.35, 0.0, 1.0))
         if legend:
             add_glow(surf, VIRTUAL_W / 2, VIRTUAL_H / 2, 520, LEGEND_COLOR2, 0.16)
@@ -36488,7 +36803,7 @@ class LevelUpOverlay:
             rx_, ry_ = 420, 64
             circle_aa(surf, VIRTUAL_W / 2 + math.cos(a_) * rx_, top - 112 + math.sin(a_) * ry_,
                       1.6 + 0.8 * math.sin(t * 3 + i), mix_col(GOLD, (255, 250, 220), (i % 3) / 3.0))
-        if legend:
+        if legend or fk:
             tsz = int(tsz * 0.78)
         draw_text(surf, title, (VIRTUAL_W / 2, top - 112), tsz,
                   LEGEND_COLOR if legend else (255, 232, 150), bold=True, center=True)
@@ -37584,7 +37899,7 @@ def _ms_draw_detail(app, canvas, theme, mouse_pos, clicked, t, k):
         hov = rect.collidepoint(mouse_pos)
         face = key_button(canvas, rect, c_, hov, rad=12)
         lab, lsz = ms_fit(label, 19, rect.w - 16, True)
-        draw_text(canvas, lab, face.center, lsz, PAPER_INK, bold=True, center=True, shadow=False)
+        draw_text(canvas, lab, face.center, lsz, WHITE, bold=True, center=True)
         if hov and clicked and k >= 1.0:
             result = kind
     return result
@@ -37636,7 +37951,7 @@ def draw_map_select(app, canvas, mouse_pos, clicked, t):
             hov = rect.collidepoint(mouse_pos) and zoom is None
             face = key_button(canvas, rect, c_, hov, rad=12)
             lab, lsz = ms_fit(label, 19, rect.w - 16, True)
-            draw_text(canvas, lab, face.center, lsz, PAPER_INK, bold=True, center=True, shadow=False)
+            draw_text(canvas, lab, face.center, lsz, WHITE, bold=True, center=True)
             if hov and clicked and result is None:
                 result = (kind, sel)
     if zoom is not None:
@@ -52438,6 +52753,91 @@ class App:
         if self.weapon_detail:
             self._draw_weapon_detail(canvas, dt, mouse_pos, clicked and not opened_now)
 
+    def _wd_right(self, canvas, w, rx, top, rw, owned, cur, need, draw):
+        """Silah detayının sağ sütunu. draw=False iken yalnız yüksekliği ölçer
+        (pencere boyu buna göre). Dönüş: sütunun bittiği y (top'a göre)."""
+        key = w["key"]
+        col = tuple(w["color"])
+
+        def T(text, pos, size, color, **kw):
+            if draw:
+                draw_text(canvas, text, pos, size, color, **kw)
+
+        yy = top + 40
+        T(L("ui.what_does"), (rx, yy), 12, col, bold=True, shadow=False)
+        yy += 22
+        for ln in wrap_text(w_desc(w), 15, rw):
+            T(ln, (rx, yy), 15, TEXT, shadow=False)
+            yy += 21
+        yy += 12
+        if w.get("up"):
+            T(L("ui.on_levelup"), (rx, yy), 12, col, bold=True, shadow=False)
+            yy += 22
+            for ln in wrap_text(w["up"], 14, rw):
+                T(ln, (rx, yy), 14, TEXT_DIM, shadow=False)
+                yy += 19
+            yy += 12
+        ev = EVOLUTIONS.get(key)
+        if ev is not None:
+            # evrim tarifi: hangi kitapla, neye dönüşür, ne kazanır
+            ecol = ev[2]
+            lab = L("evo.band")
+            T(lab, (rx, yy), 12, ecol, bold=True, shadow=False)
+            lw = text_width(lab, 12, True) + 10
+            T(_fit_text(L("evo.need", EVO_LEVEL, evo_book_name(key), evo_book_need(key)), 12, rw - lw),
+              (rx + lw, yy), 12, TEXT_DIM, shadow=False)
+            yy += 18
+            for ln in wrap_text(L("evo.rule", EVO_MIN_WEAPONS, EVO_MAX_PER_RUN), 11, rw):
+                T(ln, (rx, yy), 11, (150, 140, 130), shadow=False)
+                yy += 16
+            yy += 2
+            if draw:
+                blit_sigil(canvas, rx + 9, yy + 9, 8, key, ecol)
+            for i_, ln in enumerate(wrap_text("%s  -  %s" % (evo_name(key), L("evo.perk." + ev[1])), 13, rw - 24)[:2]):
+                T(ln, (rx + 24, yy + 1), 13, lighten(ecol, 0.25), bold=True, shadow=False)
+                yy += 18
+            yy += 12
+        if owned:
+            T(L("ui.unlocked"), (rx, yy), 13, GREEN, bold=True, shadow=False)
+            yy += 24
+            if w.get("how"):
+                for ln in wrap_text(w["how"], 13, rw):
+                    T(ln, (rx, yy), 13, TEXT_DIM, shadow=False)
+                    yy += 18
+        else:
+            unl = w.get("unlock") or {}
+            T(L("ui.how_unlock"), (rx, yy), 12, (222, 186, 110), bold=True, shadow=False)
+            yy += 22
+            for ln in wrap_text(w_how(w) or unlock_text(unl), 14, rw):
+                T(ln, (rx, yy), 14, (226, 206, 150), shadow=False)
+                yy += 19
+            yy += 8
+            for rq in weapon_reqs(w):
+                rc, rn, rdone, rtext = book_req_state(self.save, rq)
+                cnt = f"{min(rc, rn)} / {rn}" if rn > 1 else ""
+                # sayı sütunu sağda; yazı ona girmeden sarılır
+                tw_ = rw - 20 - (text_width(cnt, 12, True) + 14 if cnt else 0)
+                lines = wrap_text(rtext, 13, tw_)[:3]
+                if draw:
+                    dot = GREEN if rdone else (92, 86, 112)
+                    pygame.draw.circle(canvas, dot, (int(rx + 6), int(yy + 7)), 5)
+                    if rdone:
+                        pygame.draw.line(canvas, (26, 19, 19), (rx + 3, yy + 7), (rx + 5, yy + 9), 2)
+                        pygame.draw.line(canvas, (26, 19, 19), (rx + 5, yy + 9), (rx + 9, yy + 4), 2)
+                for j_, ln in enumerate(lines):
+                    T(ln, (rx + 20, yy + j_ * 17), 13, TEXT if rdone else TEXT_DIM, shadow=False)
+                if cnt:
+                    T(cnt, (rx + rw, yy), 12, GREEN if rdone else TEXT_DIM, bold=True, shadow=False, right=True)
+                yy += 17 * len(lines) + 6
+            yy += 6
+            if draw:
+                frac = weapon_frac(self.save, w)
+                draw_bar(canvas, pygame.Rect(rx, yy, rw, 11), frac, (215, 175, 90), radius=5)
+                draw_text(canvas, L("ui.task_prog", cur, need, fmt_pct(frac * 100)),
+                          (rx, yy + 16), 11, TEXT_DIM, shadow=False)
+            yy += 32
+        return yy - top
+
     def _draw_weapon_detail(self, canvas, dt, mouse_pos, clicked):
         """Silaha tıklayınca açılan tanıtım penceresi."""
         w = WEAPON_BY_KEY.get(self.weapon_detail)
@@ -52458,7 +52858,12 @@ class App:
         pygame.draw.rect(ov, (4, 5, 10, int(210 * k)), ov.get_rect())
         canvas.blit(ov, (0, 0))
 
-        pw, ph = 760, 430
+        pw = 760
+        # Sağ sütun önce ölçülür, pencere içeriğe göre uzar (sabit boyda
+        # uzun dillerde / evrim satırlarıyla yazılar düğmelerin üstüne
+        # taşıyordu).
+        need_h = self._wd_right(canvas, w, 0, 0, pw - 318 - 34, owned, cur, need, False) + 70
+        ph = int(clamp(max(430, need_h), 430, VIRTUAL_H - 24))
         rect = pygame.Rect(0, 0, int(pw * (0.86 + 0.14 * k)), int(ph * (0.86 + 0.14 * k)))
         rect.center = (VIRTUAL_W // 2, VIRTUAL_H // 2)
         panel(canvas, rect, bg=(37, 27, 28), edge=edge, alpha=248, radius=18, edge_w=3)
@@ -52499,70 +52904,8 @@ class App:
         # ---- sağ: anlatım ----
         rx = rect.x + 318
         rw = rect.right - rx - 34
-        yy = rect.y + 40
-        draw_text(canvas, L("ui.what_does"), (rx, yy), 12, col, bold=True, shadow=False)
-        yy += 22
-        for ln in wrap_text(w_desc(w), 15, rw):
-            draw_text(canvas, ln, (rx, yy), 15, TEXT, shadow=False)
-            yy += 21
-        yy += 12
-        if w.get("up"):
-            draw_text(canvas, L("ui.on_levelup"), (rx, yy), 12, col, bold=True, shadow=False)
-            yy += 22
-            for ln in wrap_text(w["up"], 14, rw):
-                draw_text(canvas, ln, (rx, yy), 14, TEXT_DIM, shadow=False)
-                yy += 19
-            yy += 12
-        ev = EVOLUTIONS.get(key)
-        if ev is not None:
-            # evrim tarifi: hangi kitapla, neye dönüşür, ne kazanır
-            ecol = ev[2]
-            draw_text(canvas, L("evo.band"), (rx, yy), 12, ecol, bold=True, shadow=False)
-            draw_text(canvas, L("evo.need", EVO_LEVEL, evo_book_name(key), evo_book_need(key)),
-                      (rx + text_width(L("evo.band"), 12, True) + 10, yy), 12, TEXT_DIM, shadow=False)
-            yy += 18
-            draw_text(canvas, L("evo.rule", EVO_MIN_WEAPONS, EVO_MAX_PER_RUN), (rx, yy), 11,
-                      (150, 140, 130), shadow=False)
-            yy += 18
-            blit_sigil(canvas, rx + 9, yy + 9, 8, key, ecol)
-            draw_text(canvas, "%s  -  %s" % (evo_name(key), L("evo.perk." + ev[1])), (rx + 24, yy + 1),
-                      13, lighten(ecol, 0.25), bold=True, shadow=False)
-            yy += 30
-
-        if owned:
-            draw_text(canvas, L("ui.unlocked"), (rx, yy), 13, GREEN, bold=True, shadow=False)
-            yy += 24
-            if w.get("how"):
-                for ln in wrap_text(w["how"], 13, rw):
-                    draw_text(canvas, ln, (rx, yy), 13, TEXT_DIM, shadow=False)
-                    yy += 18
-        else:
-            unl = w.get("unlock") or {}
-            draw_text(canvas, L("ui.how_unlock"), (rx, yy), 12, (222, 186, 110), bold=True,
-                      shadow=False)
-            yy += 22
-            for ln in wrap_text(w_how(w) or unlock_text(unl), 14, rw):
-                draw_text(canvas, ln, (rx, yy), 14, (226, 206, 150), shadow=False)
-                yy += 19
-            yy += 8
-            for rq in weapon_reqs(w):
-                rc, rn, rdone, rtext = book_req_state(self.save, rq)
-                dot = GREEN if rdone else (92, 86, 112)
-                pygame.draw.circle(canvas, dot, (int(rx + 6), int(yy + 7)), 5)
-                if rdone:
-                    pygame.draw.line(canvas, (26, 19, 19), (rx + 3, yy + 7), (rx + 5, yy + 9), 2)
-                    pygame.draw.line(canvas, (26, 19, 19), (rx + 5, yy + 9), (rx + 9, yy + 4), 2)
-                draw_text(canvas, rtext, (rx + 20, yy), 13,
-                          TEXT if rdone else TEXT_DIM, shadow=False)
-                if rn > 1:
-                    draw_text(canvas, f"{min(rc, rn)} / {rn}", (rect.right - 96, yy), 12,
-                              GREEN if rdone else TEXT_DIM, bold=True, shadow=False)
-                yy += 22
-            yy += 6
-            frac = weapon_frac(self.save, w)
-            draw_bar(canvas, pygame.Rect(rx, yy, rw, 11), frac, (215, 175, 90), radius=5)
-            draw_text(canvas, L("ui.task_prog", cur, need, fmt_pct(frac * 100)),
-                      (rx, yy + 16), 11, TEXT_DIM, shadow=False)
+        if k >= 1.0:
+            self._wd_right(canvas, w, rx, rect.y, rw, owned, cur, need, True)
 
         # ---- alt düğmeler ----
         if owned:
@@ -52583,7 +52926,7 @@ class App:
         cb = pygame.Rect(rect.centerx + 30, rect.bottom - 52, 200, 34)
         chov = cb.collidepoint(mouse_pos)
         face = key_button(canvas, cb, (120, 100, 90), chov)
-        draw_text(canvas, L("ui.close"), face.center, 13, PAPER_INK, bold=True, center=True, shadow=False)
+        draw_text(canvas, L("ui.close"), face.center, 13, TEXT, bold=True, center=True, shadow=False)
         if clicked and (chov or not rect.collidepoint(mouse_pos)):
             self.weapon_detail = None
             sfx("click", 0.45, 0.0)
@@ -53011,7 +53354,7 @@ class App:
         cb.center = (book_rect.centerx, book_rect.bottom + 34)
         hov = cb.collidepoint(mouse_pos)
         face = key_button(canvas, cb, (120, 100, 90), hov)
-        draw_text(canvas, L("ui.close_esc"), face.center, 15, PAPER_INK, bold=True, center=True)
+        draw_text(canvas, L("ui.close_esc"), face.center, 15, TEXT, bold=True, center=True)
 
         if clicked and (hov or not book_rect.collidepoint(mouse_pos)):
             self.book_detail = None
