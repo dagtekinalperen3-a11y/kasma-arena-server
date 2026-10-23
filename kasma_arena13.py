@@ -29828,6 +29828,8 @@ class RunState(EvoMixin, WorldExtrasMixin):
             self.fx.do_flash(MAGNET_COLOR, 0.30)
             sfx("magnet", 0.85, 0.0)
         if self.combo.count > 0 and self.combo.count % 10 == 0:
+            # kalabalıkta onluklar art arda gelir: eskisi silinir, üst üste binmesin
+            self.fx.texts[:] = [ft for ft in self.fx.texts if not ft.text.startswith("COMBO x")]
             self.fx.popup(p.x, p.y - 50, f"COMBO x{self.combo.count}!", CYAN, 24, life=1.0)
         if self.combo.count >= 30 and self.ach:
             self.ach.unlock("combo30")

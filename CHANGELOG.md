@@ -32,6 +32,7 @@ Kısa notlar, en yenisi üstte.
   sondakilere hiç gelmiyordu); artık hepsi yürürken oyuncuya döner
 - üstteki duyuru satırları koyu zemin üstünde: süzülen yazılar altına girse de
   okunuyor
+- art arda gelen "COMBO x50! / x60!" yazıları üst üste binmiyor (eskisi silinir)
 - gözlük gözü kapatır, göz ve gözlük aynı yöne bakar; şapka/gözlüklere
   kontur ve ışıltı; markette eşya kendi karakterinde denenir
 - Taş Meydan yaratıklarına arena donanımı (miğfer, sorguç, kalkan, tasma)
