@@ -3,6 +3,15 @@
 Kısa notlar, en yenisi üstte.
 
 ## sıradaki sürüm
+- 2 KİŞİLİK, KONUK TARAFI GECİKME HİSSİ:
+  - konuğun ana silahı artık ev sahibini beklemeden anında ateşlenir: mermi
+    o an senin namlundan çıkar, sesi o an çalar (hasarı yine ev sahibi verir,
+    onun gönderdiği geç kopya gizlenir)
+  - kırbaç, kılıç, ışın, hayalet kılıçlar, yarasalar ve deprem artık
+    karakterinin geride kalmış hâlinde değil, şimdiki yerinde çizilir
+    (doğrudan bağlantıda ~25 px, sunucu üstünde ~95 px kayma gitti)
+  - doğrudan bağlantıda görüntü sıklığı 30 -> 45/sn: öbür oyuncu ve
+    yaratıklar daha az geriden gelir
 - YETENEK: oyun artık "4 silah al, düz koş" ile kazanılmıyor
   - ODAK (oyuncunun altındaki çubuk): elle nişan alıp vurdukça, kusursuz
     kaçış ve savuşturmayla dolar; ateşi bırakınca ve vurulunca düşer.

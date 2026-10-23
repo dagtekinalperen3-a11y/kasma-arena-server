@@ -28525,17 +28525,22 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin):
             ang = base_ang + offset
             vx, vy = math.cos(ang) * speed, math.sin(ang) * speed
             hits = p.eff_pierce_hits()
-            self.player_projectiles.append(PlayerProjectile(
+            pr = PlayerProjectile(
                 p.x + aim_dx * (p.radius + sk["wlen"] * 0.55), p.y + aim_dy * (p.radius + sk["wlen"] * 0.55),
                 vx, vy, p.eff_dmg() * atk_mult, hits, p.eff_crit_chance(), p.eff_crit_dmg(),
-                homing=p.homing_level, style=sk["proj"], color=sk["color"], accent=sk["accent"]))
+                homing=p.homing_level, style=sk["proj"], color=sk["color"], accent=sk["accent"])
+            pr.gun = 1          # ana silah: konuk kendi mermisini kendisi çizer (tahmin)
+            self.player_projectiles.append(pr)
         p.run_shots += n
         p.recoil = 1.0
         p.flash_t = 0.08
         if echo_shot:
             self.fx.ring(p.x, p.y, (255, 235, 150), n=10, speed=190, life=0.28, r=2.5)
         self.fx.spark(p.x + aim_dx * p.radius, p.y + aim_dy * p.radius, sk["accent"], aim_dx * 40, aim_dy * 40, .15, 2)
-        sfx("shoot_" + sk["sfx"], 0.5, 0.035)
+        if getattr(self, "is_coop", False) and getattr(self, "cur", 0) == 1:
+            audio.play("shoot_" + sk["sfx"], 0.5, 0.035)   # konuk bu sesi zaten kendisi çaldı
+        else:
+            sfx("shoot_" + sk["sfx"], 0.5, 0.035)
 
     def _titan_smash_fx(self, p):
         """Ezici darbe'nin görsel/işitsel gösterisi."""
@@ -43661,6 +43666,10 @@ COOP_CAP_MAX = 240
 COOP_BOSS_HP = 1.25               # patron canı (iki oyuncunun toplam gücü üstüne)
 COOP_MENU_SHIELD = 4.0            # pencere açıkken en çok bu kadar sn hasar yok
 COOP_SNAP_HZ = 30.0               # ev sahibi -> konuk anlık görüntü sıklığı
+COOP_SNAP_HZ_DIRECT = 45.0        # doğrudan yolda daha sık (çizim tamponu kısalır)
+COOP_PREDICT_GUN = True           # konuk ana silah mermisini anında kendisi çizer
+COOP_PRED_MAX = 90                # tahmin edilen mermi sınırı
+COOP_LAG_SHIFT = ("whip_lashes", "sword_slashes", "ghost_blades", "beams", "bats", "quakes")
 COOP_INPUT_HZ = 60.0              # konuk -> ev sahibi girdi sıklığı (doğrudan yolda)
 COOP_INPUT_HZ_RELAY = 45.0        # sunucu yolunda (sunucunun mesaj sınırı)
 COOP_MAX_RAW = 2 * 1024 * 1024    # açılmış bir mesajın en büyük boyu
@@ -46176,6 +46185,13 @@ class GuestRun(CoopRunState):
         self._prev_ht = None
         self._cur_ht = 0.0
         self._fxq = []                 # (zaman, efektler, sesler) - zamanı gelince oynar
+        # kendi ana silahım: ev sahibini beklemeden burada ateşlenir ve çizilir
+        # (hasarı yine ev sahibi verir; onun gönderdiği kopya gizlenir)
+        self.pred_shots = []
+        self.pred_cd = 0.0
+        self._pp_real = None
+        # ev sahibinin benim için bildiği konum geçmişi: (ev sahibi zamanı, x, y)
+        self._me_hist = collections.deque(maxlen=40)
 
     # ---- komutlar (pencere eylemleri) ----
     def _cmd(self, c, **kw):
@@ -46430,6 +46446,12 @@ class GuestRun(CoopRunState):
                     me._hy = self._dec(fields.get("y", getattr(me, "_hy", me.y)))
                 continue
             self._set_fields(obj, fields, track_pos=not isinstance(obj, Player) or True)
+        hx, hy = getattr(me, "_hx", None), getattr(me, "_hy", None)
+        if type(hx) in (int, float) and type(hy) in (int, float):
+            if self._me_hist and self._cur_ht <= self._me_hist[-1][0] + 1e-6:
+                self._me_hist[-1] = (self._me_hist[-1][0], float(hx), float(hy))
+            else:
+                self._me_hist.append((self._cur_ht, float(hx), float(hy)))
         # 3) listeler
         for name, nids in L_.items():
             if not isinstance(name, str):
@@ -46600,6 +46622,12 @@ class GuestRun(CoopRunState):
             except Exception:
                 pass
             self.update_camera(dt)
+            self.pred_cd -= dt
+            if inp.get("mouse_down") and COOP_PREDICT_GUN:
+                if self.pred_cd <= 0:
+                    self._pred_fire(me)
+            else:
+                self.pred_cd = max(self.pred_cd, 0.0)
         else:
             mate = self.players[0]
             tx = clamp(mate.x - VIEW_RECT.w / 2, ARENA_RECT.left, ARENA_RECT.right - VIEW_RECT.w)
@@ -46631,6 +46659,8 @@ class GuestRun(CoopRunState):
                         self._interp_pos(ob, d, h, rt)
                     except (AttributeError, TypeError, ValueError):
                         pass
+        self._lag_shift(rt)
+        self._pred_update(dt)
         # zaman sayaçları (görüntü aralarında da aksın)
         for p in self.players:
             if p is not me and p.alive:
@@ -46640,6 +46670,118 @@ class GuestRun(CoopRunState):
             self.combo.update(0.0)
         except Exception:
             pass
+
+    # ---- kendi ana silahım: tahmin ----
+    def _pred_fire(self, me):
+        """Ev sahibinin do_player_attack'ıyla aynı geometri; yalnız görüntü."""
+        try:
+            cd = float(me.eff_atk_cd())
+        except Exception:
+            cd = BASE_ATK_CD
+        # basılı tutarken aralık kaymasın (kare süresi taşarsa bir sonrakinden düşülür)
+        self.pred_cd = max(self.pred_cd + cd, cd * 0.5)
+        if len(self.pred_shots) >= COOP_PRED_MAX:
+            return
+        aim_dx, aim_dy = me.aim_dir
+        sk = me.skin
+        try:
+            n = 1 + int(me.multishot_level)
+            speed = 660 * float(me.proj_speed_mult)
+            hits = int(me.eff_pierce_hits())
+            homing = me.homing_level
+        except Exception:
+            n, speed, hits, homing = 1, 660.0, 1, 0
+        base_ang = math.atan2(aim_dy, aim_dx)
+        off = me.radius + sk["wlen"] * 0.55
+        for i in range(min(n, 12)):
+            ang = base_ang + (i - (n - 1) / 2) * math.radians(9)
+            pr = PlayerProjectile(me.x + aim_dx * off, me.y + aim_dy * off,
+                                  math.cos(ang) * speed, math.sin(ang) * speed, 0, max(1, hits), 0, 1,
+                                  homing=homing, style=sk["proj"], color=sk["color"], accent=sk["accent"])
+            self.pred_shots.append(pr)
+        me.recoil = 1.0
+        me.flash_t = 0.08
+        self.fx.spark(me.x + aim_dx * me.radius, me.y + aim_dy * me.radius, sk["accent"],
+                      aim_dx * 40, aim_dy * 40, .15, 2)
+        sfx("shoot_" + sk["sfx"], 0.5, 0.035)
+
+    def _pred_update(self, dt):
+        if not self.pred_shots:
+            return
+        targets = [e for e in list(self.enemies) + list(self.bosses)
+                   if getattr(e, "alive", False) and not getattr(e, "phased", False)
+                   and type(getattr(e, "x", None)) in (int, float)]
+        for pr in self.pred_shots:
+            if pr.homing > 0 and targets:
+                best = min(targets, key=lambda e: (e.x - pr.x) ** 2 + (e.y - pr.y) ** 2)
+                pr.steer_toward(best.x, best.y, dt)
+            pr.update(dt)
+            if not pr.alive:
+                continue
+            pr.emit(self.fx, dt)
+            for e in targets:
+                if id(e) in pr.hit_set:
+                    continue
+                er = getattr(e, "hit_r", None) or getattr(e, "radius", 14) or 14
+                if (pr.x - e.x) ** 2 + (pr.y - e.y) ** 2 < (pr.r + er + max(3.0, pr.r * 0.35)) ** 2:
+                    pr.hit_set.add(id(e))
+                    pr.hits_left -= 1
+                    if pr.hits_left <= 0:
+                        pr.alive = False
+                        break
+        self.pred_shots = [pr for pr in self.pred_shots if pr.alive]
+
+    def _me_host_at(self, rt):
+        """Ev sahibinin rt anında benim için bildiği konum (yoksa None)."""
+        h = self._me_hist
+        if rt is None or not h:
+            return None
+        if rt >= h[-1][0]:
+            return h[-1][1], h[-1][2]
+        if rt <= h[0][0]:
+            return h[0][1], h[0][2]
+        for i in range(len(h) - 1, 0, -1):
+            a_, b_ = h[i - 1], h[i]
+            if a_[0] <= rt:
+                sp = b_[0] - a_[0]
+                k = (rt - a_[0]) / sp if sp > 1e-6 else 1.0
+                return a_[1] + (b_[1] - a_[1]) * k, a_[2] + (b_[2] - a_[2]) * k
+        return h[0][1], h[0][2]
+
+    def _lag_shift(self, rt):
+        """Bana bağlı silahlar (kırbaç, kılıç, ışın, yörünge) ev sahibinin
+        geçmişteki konumumda değil, şimdiki yerimde çizilsin."""
+        me = self.player
+        if not me.alive:
+            return
+        hp = self._me_host_at(rt)
+        if hp is None:
+            return
+        sx, sy = me.x - hp[0], me.y - hp[1]
+        if abs(sx) + abs(sy) < 0.5 or abs(sx) + abs(sy) > 300:
+            return
+        for name in COOP_LAG_SHIFT:
+            for ob in self.ctx_get(1, name) or []:
+                d = getattr(ob, "__dict__", None)
+                if d is None or not d.get("_hist"):
+                    continue          # konumu her kare yeniden yazılmayan nesne kaydırılmaz
+                x, y = d.get("x"), d.get("y")
+                if type(x) in (int, float) and type(y) in (int, float):
+                    d["x"], d["y"] = x + sx, y + sy
+
+    def view_begin(self, i):
+        if COOP_PREDICT_GUN:
+            own = self.__dict__.get("player_projectiles") or []
+            self._pp_real = own
+            self.__dict__["player_projectiles"] = (
+                [pr for pr in own if not getattr(pr, "gun", 0)] + self.pred_shots)
+        CoopRunState.view_begin(self, i)
+
+    def view_end(self):
+        CoopRunState.view_end(self)
+        if self._pp_real is not None:
+            self.__dict__["player_projectiles"] = self._pp_real
+            self._pp_real = None
 
     def _interp_pos(self, ob, d, h, rt):
         """Ev sahibi zamanı rt'de nesnenin yeri: iki örnek arası doğrusal"""
@@ -55242,7 +55384,7 @@ class CoopSession:
                 self.snap_t = 1.0 / 120.0           # yol açılınca hemen
                 self.congested = getattr(self, "congested", 0) + 1
             else:
-                self.snap_t = 1.0 / COOP_SNAP_HZ
+                self.snap_t = 1.0 / (COOP_SNAP_HZ_DIRECT if self.link.direct() else COOP_SNAP_HZ)
                 self.sync.fx_log = run.fx.log or []
                 run.fx.log = []
                 self.sync.sfx_log = _SFX_TAP[0] or []
