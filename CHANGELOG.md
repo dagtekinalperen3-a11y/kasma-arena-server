@@ -3,18 +3,29 @@
 Kısa notlar, en yenisi üstte.
 
 ## sıradaki sürüm
-- SİLAH EVRİMİ: silah 8. seviyeye gelince ve eşi olan kitap da elindeyse seviye
-  atlama elinde EVRİM kartı çıkar. Her silahın kendi evrimi var (Papuç -> Anne
-  Terliği, Balta -> Kıyamet Baltası...): x1.5 hasar + yakma, dondurma, zincir
-  şimşek, can çalma, patlama ya da zehir. Tarifler Silahlık'ta yazıyor.
-- GÜÇ SUNAKLARI: haritada arada bir sunak belirir, üstünde 2 sn durunca 25 sn
-  güç verir (öfke, rüzgâr, kan, altın) ya da anında iş görür (mıknatıs, kalkan)
-- DALGA OLAYLARI: 4. dalgadan sonra arada bir Altın Yağmuru, Kan Ayı (elitler +
-  tecrübe x2) ya da Göktaşı Yağmuru
-- arayüz baştan çizildi: yeni yazı tipi, kalın konturlu kartlar ve düğmeler, sıcak renkler
-- düğme yazısı sığmazsa küçülüyor (Rusça/Almanca taşmaları)
+- OYUN 2 KAT UZUN: 25 dalga normal 70 dk, zor 60, kabus 40. Yaratık başına
+  tecrübe/altın ve skor yarıya indi: dalga başına güçlenme ve sıralama aynı
+- DENGE: oyuncu bir dalga için olağandan güçlüyse yeni yaratıklar daha canlı
+  gelir (güçlü takımla 25. dalgada yaratıklar kâğıt gibiydi). 2. patrondan
+  itibaren her patron dövüşü daha uzun, darbesi daha sert; 1. patron aynı
+- SİLAH EVRİMİ yenilendi: her silahın kendine has evrimi (20 ayrı etki: kalkan
+  dalgası, işaretleme, sersemletme, buz kesme, infaz, savurma, ruh yığını,
+  kanama, artçı sarsıntı...). Şart Lv.10 + eş kitap Lv.3 (nadir kitap: elde
+  olsun) + en az 3 silah; koşuda en çok 2 evrim; hasar payı x1.25
+- GÖK İŞARETİ: her koşu bir işaretle başlar (Bereket, Şanslı Yıldız, Kızıl
+  Gök, Kuraklık, Ağır Adım, Fırtına Öncesi, Durgun Gök)
+- KAYIP KERVAN: bazı koşularda 2-4. dalga arası haritadan bir kervan geçer;
+  yakalarsan altın + bir el efsanevi kart, kaçarsa gider
+- güç sunakları kaldı; altın yağmuru / kan ayı / göktaşı yağmuru kaldırıldı
+- daha sakin ekran: flaş ve sarsıntı yarıya yakın, kalabalıkta küçük hasar
+  sayıları ve parçacıklar kısıldı (düşman sayısı/hızı aynı)
+- arayüz: düğmeler kâğıt etiket, kutuların kenarları düz, büyük başlıklarda
+  harf aralığı, yazı konturu inceldi
+- gözlük gözü kapatır, göz ve gözlük aynı yöne bakar; şapka/gözlüklere
+  kontur ve ışıltı; markette eşya kendi karakterinde denenir
+- Taş Meydan yaratıklarına arena donanımı (miğfer, sorguç, kalkan, tasma)
+- arayüz baştan çizildi: yeni yazı tipi, kalın konturlu kartlar, sıcak renkler
 - ₺ işareti kare kutu çıkıyordu, artık "TL" yazıyor
-- skin/kıyafet marketinde elmas sayısı her dilde çevriliyor
 
 ## 3.48
 - 2 kişilikte katılan oyuncunun donma/gecikme sorunu düzeldi (akış denetimi, kopunca yeniden bağlanma, ping göstergesi)
@@ -24,7 +35,7 @@ Kısa notlar, en yenisi üstte.
 - Kabus Avcısı başarımı 5. dalgadan 10. dalgaya çıktı
 
 ## 3.47
-- dalgalar artık süreyle ilerliyor (25 dalga: normal 35 dk, zor 30, kabus 20)
+- dalgalar artık süreyle ilerliyor (25 dalga: normal 35 dk, zor 30, kabus 20; sonra 2 katına çıktı)
 - patron dalgayı durdurmuyor
 - 2 kişilik mod (beta, sadece PC ve Taş Meydan): oda kur, 6 harfli kodla katıl
 

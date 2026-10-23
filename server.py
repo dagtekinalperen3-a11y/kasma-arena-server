@@ -1911,8 +1911,10 @@ def _wave_goal(wave):
     return 4100 + 5.9 * (w - 5) * (900 + 60 * (w - 5))
 
 
-# süreli dalgalar - oyundaki takvimin birebir kopyası (kasma_arena13.py
-# wave_length / wave_start_time).
+# süreli dalgalar - oyundaki takvimin ESKİ (kısa) hâli. Oyunda süreler 2
+# katına çıktı (WAVE_PLAN_SCALE); burası bilerek kısa kaldı: denetim "bu dalgaya
+# bu kadar kısa sürede ulaşılamaz" diye alt sınır koyar, uzun koşu her zaman
+# geçer, eski sürümü kullanan oyuncunun skoru da reddedilmez.
 WAVE_PLAN_COUNT = 25
 WAVE_PLAN_GROW = 0.07
 WAVE_PLAN_TOTAL = {

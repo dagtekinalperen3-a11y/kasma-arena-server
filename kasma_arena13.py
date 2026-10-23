@@ -634,7 +634,7 @@ FPS_CHOICES = [60, 90, 120, 144, 165, 240]
 #   %100 = efektler tam görünür (hiç ek maliyet yok)
 #   %1-99 = efekt katmanı o oranda saydam basılır
 #   %0 = efekt katmanı hiç çizilmez (en hızlısı)
-WEAPON_FX_DEFAULT = 100           # yeni oyuncunun başlangıç değeri (%)
+WEAPON_FX_DEFAULT = 80            # yeni oyuncunun başlangıç değeri (%) - göz yormasın
 # Eski üç kademeli ayarın sayısal karşılıkları (kayıt göçü için).
 WEAPON_FX_LEGACY = {"full": 100, "dim": 32, "off": 0}
 # oyunun adı EvolveArena (E ve A büyük). (Kayıt klasörü "KasmaArena" olarak
@@ -805,11 +805,11 @@ HOWTO_TOUCH = [
 ]
 HOWTO_GAME = [
     (("DALGALAR", "WAVES", "OLEADAS", "WELLEN", "ВОЛНЫ"),
-     ("Süreyle ilerler. 25 dalga: normal 35 dk, zor 30, kabus 20",
-      "Advance with time. 25 waves: normal 35 min, hard 30, nightmare 20",
-      "Avanzan con el tiempo. 25 oleadas: normal 35 min, difícil 30, pesadilla 20",
-      "Laufen nach Zeit. 25 Wellen: normal 35 Min., schwer 30, Albtraum 20",
-      "Идут по времени. 25 волн: обычная 35 мин, сложная 30, кошмар 20")),
+     ("Süreyle ilerler. 25 dalga: normal 70 dk, zor 60, kabus 40",
+      "Advance with time. 25 waves: normal 70 min, hard 60, nightmare 40",
+      "Avanzan con el tiempo. 25 oleadas: normal 70 min, difícil 60, pesadilla 40",
+      "Laufen nach Zeit. 25 Wellen: normal 70 Min., schwer 60, Albtraum 40",
+      "Идут по времени. 25 волн: обычная 70 мин, сложная 60, кошмар 40")),
     (("SEVİYE ATLAYINCA", "ON LEVEL UP", "AL SUBIR DE NIVEL", "BEIM AUFSTIEG", "НОВЫЙ УРОВЕНЬ"),
      ("3 karttan birini seç: silah, kitap ya da yükseltme", "Pick 1 of 3 cards: weapon, book or upgrade",
       "Elige 1 de 3 cartas: arma, libro o mejora", "Wähle 1 von 3 Karten: Waffe, Buch oder Upgrade",
@@ -2101,21 +2101,21 @@ STRINGS = {
     "diff.normal":    _T("NORMAL", "NORMAL", "NORMAL", "NORMAL", "ОБЫЧНАЯ"),
     "diff.hard":      _T("ZOR", "HARD", "DIFÍCIL", "SCHWER", "СЛОЖНАЯ"),
     "diff.nightmare": _T("KABUS", "NIGHTMARE", "PESADILLA", "ALBTRAUM", "КОШМАР"),
-    "diffd.normal":    _T("Sakin tempo. 25 dalga 35 dakika sürer, düşmanlar daha seyrek gelir.",
-                          "Calm pace. 25 waves take 35 minutes, enemies come less often.",
-                          "Ritmo tranquilo. 25 oleadas en 35 minutos, menos enemigos.",
-                          "Ruhiges Tempo. 25 Wellen dauern 35 Minuten, weniger Gegner.",
-                          "Спокойный темп. 25 волн за 35 минут, врагов меньше."),
-    "diffd.hard":      _T("Dengeli tempo. 25 dalga 30 dakika sürer, düşmanlar düzenli akar.",
-                          "Balanced pace. 25 waves take 30 minutes, enemies keep coming.",
-                          "Ritmo equilibrado. 25 oleadas en 30 minutos.",
-                          "Ausgewogenes Tempo. 25 Wellen dauern 30 Minuten.",
-                          "Ровный темп. 25 волн за 30 минут."),
-    "diffd.nightmare": _T("Hızlı tempo. 25 dalga 20 dakika sürer, düşmanlar çok daha sık gelir!",
-                          "Fast pace. 25 waves take 20 minutes, enemies come far more often!",
-                          "Ritmo rápido. 25 oleadas en 20 minutos, muchos más enemigos.",
-                          "Schnelles Tempo. 25 Wellen in 20 Minuten, viel mehr Gegner!",
-                          "Быстрый темп. 25 волн за 20 минут, врагов гораздо больше!"),
+    "diffd.normal":    _T("Sakin tempo. 25 dalga 70 dakika sürer, düşmanlar daha seyrek gelir.",
+                          "Calm pace. 25 waves take 70 minutes, enemies come less often.",
+                          "Ritmo tranquilo. 25 oleadas en 70 minutos, menos enemigos.",
+                          "Ruhiges Tempo. 25 Wellen dauern 70 Minuten, weniger Gegner.",
+                          "Спокойный темп. 25 волн за 70 минут, врагов меньше."),
+    "diffd.hard":      _T("Dengeli tempo. 25 dalga 60 dakika sürer, düşmanlar düzenli akar.",
+                          "Balanced pace. 25 waves take 60 minutes, enemies keep coming.",
+                          "Ritmo equilibrado. 25 oleadas en 60 minutos.",
+                          "Ausgewogenes Tempo. 25 Wellen dauern 60 Minuten.",
+                          "Ровный темп. 25 волн за 60 минут."),
+    "diffd.nightmare": _T("Hızlı tempo. 25 dalga 40 dakika sürer, düşmanlar çok daha sık gelir!",
+                          "Fast pace. 25 waves take 40 minutes, enemies come far more often!",
+                          "Ritmo rápido. 25 oleadas en 40 minutos, muchos más enemigos.",
+                          "Schnelles Tempo. 25 Wellen in 40 Minuten, viel mehr Gegner!",
+                          "Быстрый темп. 25 волн за 40 минут, врагов гораздо больше!"),
     "ui.n_gem_packs":  _T("{0} elmas paketi", "{0} gem packs", "{0} packs de gemas", "{0} Edelsteinpakete", "{0} наборов кристаллов"),
     "ui.n_prem_pets":  _T("{0} skin - {1} pet", "{0} skins - {1} pets",
                           "{0} skins premium - {1} mascotas", "{0} Premium-Skins - {1} Haustiere",
@@ -3718,6 +3718,14 @@ def _web_glyphs(text):
     return _TL_RE.sub(r"\1 TL", text).replace("₺", "TL")
 
 
+def _tracking(text, size, bold):
+    """Büyük, kalın, BÜYÜK HARFLİ başlıklara harf aralığı: hazır yazı gibi
+    dip dibe durmasın."""
+    if size < 26 or not bold or len(text) > 40 or text != text.upper() or not any(c.isalpha() for c in text):
+        return 0
+    return max(1, int(round(size * 0.06)))
+
+
 def _render(text, size, bold, color):
     text = _web_glyphs(text)
     key = (text, size, bold, color)
@@ -3725,7 +3733,18 @@ def _render(text, size, bold, color):
     if img is None:
         if len(_text_cache) > (3000 if MOBILE else 900):
             _text_cache.clear()
-        img = font_for(text, size, bold).render(text, True, color)
+        f = font_for(text, size, bold)
+        tr = _tracking(text, size, bold)
+        if tr:
+            parts = [f.render(ch, True, color) for ch in text]
+            w = sum(pt.get_width() for pt in parts) + tr * (len(parts) - 1)
+            img = pygame.Surface((max(1, w), f.get_height()), pygame.SRCALPHA)
+            x = 0
+            for pt in parts:
+                img.blit(pt, (x, 0))
+                x += pt.get_width() + tr
+        else:
+            img = f.render(text, True, color)
         _text_cache[key] = img
     return img
 
@@ -3743,7 +3762,7 @@ def _render_inked(text, size, bold, color):
             _ink_cache.clear()
         top = _render(text, size, bold, color)
         ink = _render(text, size, bold, INK)
-        k = 2 if size < 30 else 3
+        k = 1 if size < 26 else 2
         w, h = top.get_size()
         img = pygame.Surface((w + k * 2, h + k * 3), pygame.SRCALPHA)
         for dx in range(-k, k + 1):
@@ -3774,7 +3793,7 @@ def draw_text(surf, text, pos, size=20, color=TEXT, bold=False,
     if shadow and bold and size >= 18:
         ink = _render_inked(text, size, bold, color)
         ink.set_alpha(alpha)
-        k = 2 if size < 30 else 3
+        k = 1 if size < 26 else 2
         surf.blit(ink, (r.x - k, r.y - k))
         return r
     img.set_alpha(alpha)
@@ -3799,7 +3818,14 @@ def text_width(text, size=20, bold=False, tiny=False):
         if len(_TW_CACHE) > 6000:
             _TW_CACHE.clear()
         t2 = _web_glyphs(text)
-        w = _TW_CACHE[key] = font_for(t2, ui_font_size(size, tiny), bold).size(t2)[0]
+        sz = ui_font_size(size, tiny)
+        f = font_for(t2, sz, bold)
+        tr = _tracking(t2, sz, bold)
+        if tr:
+            w = sum(f.size(ch)[0] for ch in t2) + tr * (len(t2) - 1)
+        else:
+            w = f.size(t2)[0]
+        _TW_CACHE[key] = w
     return w
 
 
@@ -7216,8 +7242,20 @@ class FloatingText:
                   alpha=int(255 * min(1.0, t * 2.2)))
 
 
+# ---- sakin ekran ----
+# "Sürekli bir şeyler patlıyor, göz yoruyor." Düşman hızı ve sayısı aynı;
+# yalnız görsel gürültü kısıldı: flaş ve sarsıntı yarıya yakın, aynı anda
+# uçuşan yazı ve parçacık sınırlı, kalabalıkta küçük hasar sayıları atlanır.
+FX_FLASH_K = 0.45
+FX_FLASH_MAX = 0.32
+FX_SHAKE_K = 0.55
+FX_BURST_K = 0.7
+FX_TEXT_MAX = 36
+FX_TEXT_BUSY = 18               # bundan fazla yazı varken küçük sayılar basılmaz
+
+
 class EffectSystem:
-    MAX_PARTICLES = 260 if MOBILE else 650
+    MAX_PARTICLES = 220 if MOBILE else 420
 
     def __init__(self):
         self.particles = []
@@ -7234,6 +7272,7 @@ class EffectSystem:
             self.particles.append(Particle(x, y, vx, vy, life, color, r, gravity, add, drag, grow))
 
     def burst(self, x, y, color, n=10, speed=140, life=0.5, r=3.0, gravity=0.0, add=True):
+        n = max(1, int(n * FX_BURST_K + 0.5))
         for _ in range(n):
             ang = random.uniform(0, math.tau)
             spd = random.uniform(speed * 0.3, speed)
@@ -7241,6 +7280,7 @@ class EffectSystem:
                        random.uniform(life * 0.6, life), random.uniform(r * 0.6, r), gravity, add)
 
     def ring(self, x, y, color, n=16, speed=180, life=0.4, r=2.5):
+        n = max(3, int(n * FX_BURST_K + 0.5))
         for i in range(n):
             ang = (i / n) * math.tau
             self.spark(x, y, color, math.cos(ang) * speed, math.sin(ang) * speed, life, r)
@@ -7252,15 +7292,19 @@ class EffectSystem:
         self.bolts.append(BoltFx(pts, color, life))
 
     def popup(self, x, y, text, color=TEXT, size=18, life=0.8):
-        if len(self.texts) < 60:
-            self.texts.append(FloatingText(x, y, text, color, size, life=life))
+        n = len(self.texts)
+        if n >= FX_TEXT_MAX:
+            return
+        if n >= FX_TEXT_BUSY and size <= 16 and life <= 0.6:
+            return
+        self.texts.append(FloatingText(x, y, text, color, size, life=life))
 
     def shake(self, amount=8, duration=0.18):
         self.shake_time = max(self.shake_time, duration)
-        self.shake_mag = max(self.shake_mag, amount)
+        self.shake_mag = max(self.shake_mag, amount * FX_SHAKE_K)
 
     def do_flash(self, color=WHITE, amount=0.5):
-        self.flash = max(self.flash, amount)
+        self.flash = max(self.flash, min(FX_FLASH_MAX, amount * FX_FLASH_K))
         self.flash_col = color
 
     def get_shake_offset(self):
@@ -9630,7 +9674,58 @@ def _draw_cloth_cape(surf, p, item, px, py, t, r, bx, by, nx, ny, col, acc, sp=0
         pygame.draw.circle(surf, lighten(clasp, 0.55), (int(cx_ - 1), int(cy_ - 1)), 1)
 
 
+def _cosmetic_inked(raw, slot, surf, p, px, py, t):
+    """Şapka/gözlük: önce silüetin çevresine mürekkep kontur (karakterlerle ve
+    arayüzle aynı el), sonra eşyanın kendisi, arada bir üstünden ışıltı geçer."""
+    item = _player_cosmetic(p, slot)
+    if not item:
+        return
+    r = p.radius
+    size = int(r * 6) | 1
+    off = size // 2
+    tmp = pygame.Surface((size, size), pygame.SRCALPHA)
+    raw(tmp, p, off + (px - int(px)), off + (py - int(py)), t)
+    ox, oy = int(px) - off, int(py) - off
+    m = pygame.mask.from_surface(tmp, 60)
+    for comp in m.connected_components(minimum=6):
+        pts = comp.outline(2)
+        if len(pts) > 2:
+            pygame.draw.lines(surf, INK, True, [(x + ox, y + oy) for x, y in pts], 3)
+    raw(surf, p, px, py, t)
+    # ışıltı: eşyaya göre kayan zamanla 4 sn'de bir 0.6 sn
+    ph = (t + (hash(item["id"]) % 97) * 0.05) % 4.0
+    if ph < 0.6:
+        k = ph / 0.6
+        g = pygame.Surface((size, size), pygame.SRCALPHA)
+        bx = -size * 0.4 + k * size * 1.6
+        pygame.draw.polygon(g, (255, 255, 255, 150), [(bx, 0), (bx + r * 0.5, 0),
+                                                     (bx - r * 0.9, size), (bx - r * 1.4, size)])
+        a = tmp.copy()
+        a.fill((255, 255, 255, 0), special_flags=pygame.BLEND_RGBA_MAX)
+        g.blit(a, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
+        surf.blit(g, (ox, oy))
+
+
+def eyes_hidden(p):
+    """Gözlük takılıysa gözler çizilmez (gözlük gözü kapatır). Monokl yalnız
+    sağ gözü kapatır. Dönüş: kapalı göz tarafları kümesi."""
+    if CFG.get("plain_skin"):
+        return ()
+    item = _player_cosmetic(p, "eyewear")
+    if not item:
+        return ()
+    return (1,) if item["id"] == "monocle" else (-1, 1)
+
+
 def draw_cosmetic_hat(surf, p, px, py, t):
+    _cosmetic_inked(_draw_cosmetic_hat_raw, "hat", surf, p, px, py, t)
+
+
+def draw_cosmetic_eyewear(surf, p, px, py, t):
+    _cosmetic_inked(_draw_cosmetic_eyewear_raw, "eyewear", surf, p, px, py, t)
+
+
+def _draw_cosmetic_hat_raw(surf, p, px, py, t):
     """Şapka - kafanın üstünde, gövdeden sonra çizilir."""
     item = _player_cosmetic(p, "hat")
     if not item:
@@ -10194,7 +10289,7 @@ def _fpts(px, py, fx, fy, sx, sy, local):
     return [(px + lf * fx + ls * sx, py + lf * fy + ls * sy) for lf, ls in local]
 
 
-def draw_cosmetic_eyewear(surf, p, px, py, t):
+def _draw_cosmetic_eyewear_raw(surf, p, px, py, t):
     """Gözlük - gözlerin üstüne, gövdeden sonra çizilir."""
     item = _player_cosmetic(p, "eyewear")
     if not item:
@@ -11050,13 +11145,18 @@ class _SkinPreviewActor:
         return self.skin["color"]
 
 
-def draw_skin_preview(surf, sk, cx, cy, t, r=22, weapon=True):
-    """Bir skini tüm efektleriyle birlikte önizler."""
-    actor = _SkinPreviewActor(sk, r, (math.cos(t * 0.6), math.sin(t * 0.6) * 0.3))
+def draw_skin_preview(surf, sk, cx, cy, t, r=22, weapon=True, aim=None, hide_eyes=(), extras=True):
+    """Bir skini tüm efektleriyle birlikte önizler. aim verilirse gözler o
+    yöne bakar (gözlükle aynı yön); hide_eyes: çizilmeyecek göz tarafları."""
+    if aim is None:
+        aim = (math.cos(t * 0.6), math.sin(t * 0.6) * 0.3)
+    al = math.hypot(aim[0], aim[1]) or 1.0
+    actor = _SkinPreviewActor(sk, r, (aim[0] / al, aim[1] / al))
     prev_plain = CFG.get("plain_skin")
     CFG["plain_skin"] = False          # markette skin her zaman tam hâliyle görünür
     try:
-        skin_draw_back(surf, actor, cx, cy, t)
+        if extras:
+            skin_draw_back(surf, actor, cx, cy, t)
         body = actor.body_color(t)
         acc = sk["accent"]
         ix, iy = int(cx), int(cy)
@@ -11068,6 +11168,8 @@ def draw_skin_preview(surf, sk, cx, cy, t, r=22, weapon=True):
         pygame.draw.circle(surf, acc, (ix, iy), int(r), 2)
         ax, ay = actor.aim_dir
         for s in (-1, 1):
+            if s in hide_eyes:
+                continue
             ex = cx + ax * r * 0.42 + (-ay) * s * r * 0.34
             ey = cy + ay * r * 0.42 + ax * s * r * 0.34
             pygame.draw.circle(surf, (250, 250, 255), (int(ex), int(ey)), max(2, int(r * 0.24)))
@@ -11075,7 +11177,8 @@ def draw_skin_preview(surf, sk, cx, cy, t, r=22, weapon=True):
                                (int(ex + ax * 1.8), int(ey + ay * 1.8)), max(1, int(r * 0.12)))
         if weapon:
             draw_weapon(surf, actor, cx, cy, t)
-        skin_draw_front(surf, actor, cx, cy, t)
+        if extras:
+            skin_draw_front(surf, actor, cx, cy, t)
     finally:
         CFG["plain_skin"] = prev_plain
 
@@ -12422,7 +12525,7 @@ ECON_TIME_REF_SLOPE = 0.65     # 30'dan sonra eski tempo: dalga başına dakika
 # Daha uzun süren dalgada oyuncu daha güçlenip daha hızlı keser (kendini
 # besleyen döngü); süre oranı tek başına yetmez - ölçümle ayarlanan pay.
 ECON_TIME_EDGE = {"normal": 0.72, "hard": 0.72, "nightmare": 0.85}
-ECON_TIME_FLOOR = 0.30
+ECON_TIME_FLOOR = 0.12
 _ECON_TIME_CACHE = {}
 
 
@@ -13672,7 +13775,10 @@ class Player:
             pygame.draw.circle(surf, lighten(body, 0.5), (int(px - r * 0.36), int(py - r * 0.42)), max(2, int(r * 0.22)))
             pygame.draw.circle(surf, acc, (ix, iy), r, 2)
         ax, ay = self.aim_dir
+        hidden = eyes_hidden(self)
         for s in (-1, 1):
+            if s in hidden:
+                continue
             ex = px + ax * r * 0.42 + (-ay) * s * r * 0.34
             ey = py + ay * r * 0.42 + ax * s * r * 0.34
             if self.skin["id"] == "shadow" and not plain:
@@ -17611,7 +17717,7 @@ def weapon_damage(player, w, level):
     # şans: silahın nadirlik bonusu (sandık / seviye kartı). Tek-atma freni
     # (cap_oneshot) vuruşta ayrıca uygulanır; bonus onu atlamaz.
     boost = 1.0 + float(getattr(player, "weapon_boost", {}).get(w["key"], 0.0))
-    evo = EVO_DMG_MULT if w["key"] in getattr(player, "evolved", ()) else 1.0
+    evo = evo_weapon_mult(player, w["key"]) if EVO_ON else 1.0
     return (player.eff_dmg() * w["dmg"] * WEAPON_DMG_GLOBAL
             * (1.0 + dpl * WEAPON_DPL_SCALE * weapon_growth(level)) * boost * evo)
 
@@ -17950,6 +18056,9 @@ class LegendChest(BossChest):
 
 
 # düşman türleri
+
+# Taş Meydan yaratıklarının arena donanımı (Enemy._arena_gear)
+ARENA_GEAR = ("red", "blue", "yellow", "tank", "sprinter", "brute")
 
 ENEMY_COLORS = {
     "red":    (222, 70, 78),
@@ -18680,6 +18789,8 @@ class Enemy:
         # karşılığı var.
         if self.fear_timer > 0 and self.fear_vuln > 0:
             amount *= (1.0 + self.fear_vuln)
+        if EVO_ON:
+            amount *= evo_mark_mult(self)
         # 25. dalgadan sonraki arena yaratıklarının zırhı gelen hasarı keser.
         if self.armor > 0:
             amount *= (1.0 - self.armor)
@@ -20156,6 +20267,102 @@ class Enemy:
     # Gövde, her yaratığın kendi sprite'ında saklanıyor. _draw_body yalnızca
     # "şu noktaya şu anki görünüşü çiz" der; nereye çizdiğini bilmez, böylece
     # hem dünyaya hem de önbellek yüzeyine aynı kod çizebiliyor.
+    def _arena_gear(self, surf, x, y, r, t, flash, breathe):
+        """Taş Meydan bir arena: yaratıkları da arena canavarı gibi donanır
+        (tasma, miğfer, sorguç, kalkan). Yalnızca haritaya özgü çizimi
+        olmayan temel şekillerde."""
+        fx_, fy_ = self.face_x, self.face_y
+        sx_, sy_ = -fy_, fx_
+        bronze = (255, 255, 255) if flash else (206, 146, 66)
+        bronze_d = scale_col(bronze, 0.62)
+        steel = (255, 255, 255) if flash else (176, 182, 196)
+
+        def P(f, s_):
+            return (x + fx_ * f + sx_ * s_, y + fy_ * f + sy_ * s_)
+
+        def tri(a, b, c, col):
+            pygame.draw.polygon(surf, OUTLINE, [a, b, c])
+            mx_, my_ = (a[0] + b[0] + c[0]) / 3.0, (a[1] + b[1] + c[1]) / 3.0
+            pygame.draw.polygon(surf, col, [(mx_ + (q[0] - mx_) * 0.7, my_ + (q[1] - my_) * 0.7) for q in (a, b, c)])
+
+        def band(f0, curve, half, col, w):
+            pts = [P(-f0 - curve * (u * u), u * half) for u in (-1.0, -0.66, -0.33, 0.0, 0.33, 0.66, 1.0)]
+            pygame.draw.lines(surf, OUTLINE, False, pts, w + 3)
+            pygame.draw.lines(surf, col, False, pts, w)
+            return pts
+
+        pr = r * breathe
+        sh = self.shape
+        if sh == "red":
+            # dikenli bronz tasma + iki köpek dişi
+            pts = band(pr * 0.10, pr * 0.20, pr * 0.86, bronze, 4)
+            for k in (1, 3, 5):
+                bx_, by_ = pts[k]
+                tip = (bx_ - fx_ * pr * 0.34, by_ - fy_ * pr * 0.34)
+                tri((bx_ - sx_ * 3, by_ - sy_ * 3), tip, (bx_ + sx_ * 3, by_ + sy_ * 3), bronze)
+            for s_ in (-1, 1):
+                tri(P(pr * 0.72, s_ * pr * 0.20), P(pr * 0.98, s_ * pr * 0.14), P(pr * 0.74, s_ * pr * 0.06),
+                    (250, 246, 236))
+        elif sh == "blue":
+            # kulak püskülleri + sivri dişler
+            for s_ in (-1, 1):
+                tri(P(r * 0.40, s_ * r * 0.26), P(r * 0.86, s_ * r * 0.62), P(r * 0.20, s_ * r * 0.46),
+                    scale_col(self.color, 0.7) if not flash else WHITE)
+                tri(P(r * 0.98, s_ * r * 0.10), P(r * 1.22, s_ * r * 0.05), P(r * 0.96, s_ * r * 0.01),
+                    (250, 246, 236))
+        elif sh == "yellow":
+            # oyulmuş taş: çatlaklar ve dört köşede rün
+            rune = (255, 252, 210) if not flash else WHITE
+            for i in range(4):
+                a = i * math.pi / 2
+                c0 = (x + math.cos(a) * pr * 0.62, y + math.sin(a) * pr * 0.62)
+                pygame.draw.line(surf, rune, (c0[0] - 2, c0[1]), (c0[0] + 2, c0[1]), 2)
+                pygame.draw.line(surf, rune, (c0[0], c0[1] - 3), (c0[0], c0[1] + 3), 1)
+            crack = scale_col(self.color, 0.45) if not flash else WHITE
+            pygame.draw.lines(surf, crack, False, [(x - pr * 0.62, y - pr * 0.10), (x - pr * 0.40, y + pr * 0.06),
+                                                    (x - pr * 0.46, y + pr * 0.30)], 2)
+            pygame.draw.lines(surf, crack, False, [(x + pr * 0.30, y - pr * 0.52), (x + pr * 0.42, y - pr * 0.30),
+                                                    (x + pr * 0.30, y - pr * 0.16)], 2)
+        elif sh == "tank":
+            # gladyatör miğferi: kırmızı sorguç + yanda yuvarlak kalkan
+            plume = (255, 255, 255) if flash else (206, 44, 56)
+            crest = [P(-r * 1.05, -r * 0.16), P(r * 0.30, -r * 0.12), P(r * 0.30, r * 0.12), P(-r * 1.05, r * 0.16)]
+            pygame.draw.polygon(surf, OUTLINE, [(a + 1, b + 1) for a, b in crest])
+            pygame.draw.polygon(surf, plume, crest)
+            for k in range(5):
+                f = -r * 0.95 + k * r * 0.28
+                pygame.draw.line(surf, scale_col(plume, 0.6), P(f, -r * 0.12), P(f + r * 0.10, r * 0.12), 1)
+            scx, scy = P(-r * 0.05, r * 1.10)
+            sr = max(4, int(r * 0.48))
+            pygame.draw.circle(surf, OUTLINE, (int(scx), int(scy)), sr + 2)
+            pygame.draw.circle(surf, bronze, (int(scx), int(scy)), sr)
+            pygame.draw.circle(surf, bronze_d, (int(scx), int(scy)), sr, 2)
+            pygame.draw.circle(surf, steel, (int(scx), int(scy)), max(2, sr // 3))
+        elif sh == "sprinter":
+            # dikenli tasma + sırtta kaplan çizgileri
+            stripe = scale_col(self.color, 0.45) if not flash else WHITE
+            for k in range(3):
+                f = -r * 0.10 - k * r * 0.26
+                pygame.draw.lines(surf, stripe, False, [P(f, -r * 0.62), P(f - r * 0.12, -r * 0.20),
+                                                        P(f - r * 0.12, r * 0.20), P(f, r * 0.62)], 2)
+            pts = band(-r * 0.40, r * 0.16, r * 0.62, bronze, 3)
+            for k in (2, 4):
+                bx_, by_ = pts[k]
+                tri((bx_ - sx_ * 3, by_ - sy_ * 3), (bx_ - fx_ * r * 0.26, by_ - fy_ * r * 0.26),
+                    (bx_ + sx_ * 3, by_ + sy_ * 3), bronze)
+        elif sh == "brute":
+            # boynuzlu çelik miğfer
+            dome = [P(-pr * 0.10, -pr * 0.70), P(-pr * 0.62, -pr * 0.46), P(-pr * 0.80, 0.0),
+                    P(-pr * 0.62, pr * 0.46), P(-pr * 0.10, pr * 0.70)]
+            pygame.draw.polygon(surf, OUTLINE, [(a + 1, b + 1) for a, b in dome])
+            pygame.draw.polygon(surf, steel, dome)
+            pygame.draw.line(surf, lighten(steel, 0.4), P(-pr * 0.20, -pr * 0.50), P(-pr * 0.60, -pr * 0.20), 2)
+            for s_ in (-1, 1):
+                horn = [P(-pr * 0.20, s_ * pr * 0.62), P(pr * 0.10, s_ * pr * 1.22), P(pr * 0.40, s_ * pr * 1.12),
+                        P(pr * 0.02, s_ * pr * 0.52)]
+                pygame.draw.polygon(surf, OUTLINE, [(a + 1, b + 1) for a, b in horn])
+                pygame.draw.polygon(surf, (240, 228, 200) if not flash else WHITE, horn)
+
     def _draw_body(self, surf, x, y, t, r):
         # şifacı'nın iyileştirdiği yaratık kısa süre yeşil parlar: oyuncu
         # "bunlar neden ölmüyor?" sorusunun cevabını ekranda görsün, yoksa
@@ -20553,6 +20760,9 @@ class Enemy:
                 blit_disc(surf, ex, ey, max(1.0, 2.6 * (1.0 - ph)), (255, 190, 90),
                           int(200 * (1.0 - ph)))
 
+        if self.shape in ARENA_GEAR and not self.hellish:
+            self._arena_gear(surf, x, y, r, t, flash, breathe)
+
         # ---- durum halkaları ----
         if self.slow_timer > 0:
             pygame.draw.circle(surf, CYAN, (int(x), int(y)), int(r + 4), 1)
@@ -20910,6 +21120,11 @@ def boss_wound(wave, hellish=False):
 # 2) patron canı ayrıca bu çarpanla %20 yükseltiliyor.
 BOSS_HP_BONUS = 1.20
 BOSS_TELEGRAPH_EXTRA = 0.40
+# "ilk patron tam kıvamında, sonrakilerde biz de güçlendiğimiz için eşit
+# kalıyoruz": 2. patrondan itibaren her patron dövüşü biraz daha uzun ve
+# darbesi biraz daha sert. 1. patrona dokunulmaz.
+BOSS_LATE_FIGHT = 0.16          # patron sırası başına dövüş süresi payı
+BOSS_LATE_DMG = 0.07            # patron sırası başına hasar payı
 
 
 def boss_index_for_wave(wave):
@@ -22140,7 +22355,8 @@ class Boss(MapBossArt):
         self.max_hp = d["hp"] * hp_mult * diff_mult * pw_hp * BOSS_HP_NERF * BOSS_HP_BONUS
         self.hp = self.max_hp
         self.speed = d["speed"]
-        self.dmg = d["dmg"] * diff_mult * pw_dmg * (0.55 + 0.45 * dmgm) * BOSS_DMG_NERF
+        self.dmg = (d["dmg"] * diff_mult * pw_dmg * (0.55 + 0.45 * dmgm) * BOSS_DMG_NERF
+                    * (1.0 + BOSS_LATE_DMG * max(0, self.boss_index - 1)))
         self.radius = d["radius"]
         self.hit_r = self.radius * 0.92
         self.color = HELL_BOSS_COLORS.get(kind, d["color"]) if hellish else d["color"]
@@ -23529,6 +23745,8 @@ class Boss(MapBossArt):
                          AEGIS_COLOR, 24, life=1.0)
                 fx.ring(self.x, self.y, AEGIS_COLOR, n=30, speed=320, life=0.55, r=4)
                 sfx("crit", 0.9, 0.0)
+        if EVO_ON:
+            amount *= evo_mark_mult(self)
         # patron hasar tavanı: havuzda ne varsa o kadarı işler, fazlası boşa
         # gider.
         if self.intake_budget is None:
@@ -24574,6 +24792,8 @@ def scale_bosses_to_player(bosses, player):
     # "patronlara %20 daha fazla can" sözü, canı oyuncunun gücüne göre yeniden
     # kuran bu ölçekten sonra da geçerli kalsın.
     want = est * BOSS_FIGHT_UPTIME * BOSS_FIGHT_TARGET * BOSS_HP_BONUS
+    idx = max([int(getattr(b, "boss_index", 1)) for b in bosses] or [1])
+    want *= 1.0 + BOSS_LATE_FIGHT * max(0, idx - 1)
     # Süre = ham_can / (dps * (1 - zırh)) olduğundan, sürenin sabit kalması
     # için ham_can ∝ (1 - zırh).
     arm = sum(getattr(b, "armor", 0.0) for b in bosses) / max(1, n)
@@ -24620,7 +24840,8 @@ WAVE_GOAL_TABLE = {1: 600, 2: 2300, 3: 2900, 4: 3500, 5: 4100, 6: 4250}
 WAVE_GOAL_SCALE = 5.9
 # skor kazancı: "skor çok hızlı artıyor, %50 nerf" - 10 puanlık yaratık 5
 # verir.
-SCORE_GAIN = 0.35               # skor kazancı -%30 (0.5 -> 0.35)
+# skor kazancı -%30 (0.5 -> 0.35); oyun 2 kat uzayınca yarısı (öldürme 2 kat)
+SCORE_GAIN = 0.175
 # dalga hedefi: "dalga atlama hedeflerini artır, süre 15 sn olsun; oyuncu
 # saniye beklemesin, SKOR bekletsin".
 WAVE_GOAL_KILLS = 1.3
@@ -24727,9 +24948,19 @@ def wave_min_time(wave, diff="normal", biome="arena"):
 
 # geç dalga güçlenmesi: "çok güçleniyoruz, düşman göremiyoruz; ilerleyen
 # dalgalarda düşmanları hem çoğalt, hem canını, hem hasarını artır".
+# ---- uyarlanır yaratık canı (RunState.adapt_hp_mult) ----
+# Ölçüm: güçlü takımla 5. dalgada saniyede ~6 yaratık eritiliyordu, 25.
+# dalgada ~24. Oran ADAPT_TARGET'ı aşınca yaratık canı (oran/hedef)^EXP
+# kadar artar: 24'lük oran ~10'a iner.
+ADAPT_FROM_WAVE = 7
+ADAPT_FULL_WAVE = 11
+ADAPT_REF_HP = 45.0             # dalga çarpanı 1 iken ortalama yaratık canı
+ADAPT_TARGET = 6.0
+ADAPT_EXP = 0.65
+ADAPT_MAX = 3.5
 LATE_BOOST_FROM = 10
 LATE_BOOST_HP = 0.045           # dalga başına ek can payı
-LATE_BOOST_DMG = 0.028          # dalga başına ek hasar payı
+LATE_BOOST_DMG = 0.036          # dalga başına ek hasar payı (0.028 -> 0.036)
 LATE_BOOST_COUNT_EVERY = 6      # bu kadar dalgada bir doğum başına +1 yaratık
 LATE_BOOST_COUNT_MAX = 4
 
@@ -24748,12 +24979,19 @@ def late_wave_boost(wave, biome="arena"):
 # "Her skorda bir dalga atlama mantığı olmayacak; saniye mantığıyla dalga
 # atlanacak." Dalgalar oyuncunun skoruna bakmaz, yalnızca süreyle ilerler: kötü
 # oynayan da iyi oynayan da aynı saatte aynı dalgadadır:
-#   normal 35 dk, zor 30 dk, kabus 20 dk - cehennemde 40 / 34 / 23 dk.
+#   normal 70 dk, zor 60 dk, kabus 40 dk - cehennemde 80 / 69 / 46 dk.
+# Süreler 2 katına çıktı ("oyun çok kısa"); dakika başına güçlenme aynı
+# kalsın diye yaratık başına tecrübe/altın econ_time_factor'da kendiliğinden
+# yarıya iner, skor da SCORE_GAIN'de yarıya indi. Sunucu eski (kısa) takvimi
+# alt sınır olarak tutuyor: uzun koşu o denetimden her zaman geçer.
 WAVE_PLAN_COUNT = 25
 WAVE_PLAN_GROW = 0.07
+WAVE_PLAN_SCALE = 2.0
 WAVE_PLAN_TOTAL = {
-    "arena": {"normal": 35 * 60.0, "hard": 30 * 60.0, "nightmare": 20 * 60.0},
-    "hell": {"normal": 40 * 60.0, "hard": 40 * 60.0 * 30 / 35, "nightmare": 40 * 60.0 * 20 / 35},
+    "arena": {"normal": 35 * 60.0 * WAVE_PLAN_SCALE, "hard": 30 * 60.0 * WAVE_PLAN_SCALE,
+              "nightmare": 20 * 60.0 * WAVE_PLAN_SCALE},
+    "hell": {"normal": 40 * 60.0 * WAVE_PLAN_SCALE, "hard": 40 * 60.0 * 30 / 35 * WAVE_PLAN_SCALE,
+             "nightmare": 40 * 60.0 * 20 / 35 * WAVE_PLAN_SCALE},
 }
 _WAVE_PLAN_W = sum(1.0 + WAVE_PLAN_GROW * (i - 1) for i in range(1, WAVE_PLAN_COUNT + 1))
 
@@ -25205,8 +25443,10 @@ def _hand_poly(w, h, rad, seed, inset=0.0):
 def _hand_poly_make(w, h, rad, seed, inset):
     rnd = random.Random(seed)
     lim = max(2.0, min(w, h) / 2.0 - 1)
-    rads = [min(lim, rad * rnd.uniform(0.55, 1.3)) for _ in range(4)]
-    wob = 0.0 if min(w, h) < 26 else (0.6 if min(w, h) < 60 else 1.0)
+    # "kenarlarda yamukluk var, güzel değil": köşeler eşit, kenarlar düz.
+    # (Köşe yarıçapı biraz küçük: hap gibi değil, kart gibi dursun.)
+    rads = [min(lim, rad * 0.7) for _ in range(4)]
+    wob = 0.0
     x0, y0 = inset, inset
     x1, y1 = w - 1 - inset, h - 1 - inset
     centers = ((x0, y0, 1, 1, 180), (x1, y0, -1, 1, 270),
@@ -25276,6 +25516,49 @@ def hand_card(w, h, fill, edge=None, rad=12, alpha=255, ink=3, seed=0, lip=0):
     return s
 
 
+# ---- kâğıt ----
+# Düğmeler ve küçük notlar krem kâğıt: lif dokulu, düz kenarlı, mürekkep
+# çerçeveli. Koyu paneller kitap kapağı, düğmeler üstlerine yapıştırılmış
+# etiket gibi dursun.
+PAPER = (236, 222, 190)
+PAPER_DARK = (204, 184, 146)
+PAPER_INK = (54, 38, 32)
+PAPER_INK_DIM = (112, 90, 72)
+_paper_cache = {}
+
+
+def paper_card(w, h, seed=0, tint=None, fold=True):
+    """Kâğıt etiket (önbellekli). tint verilirse kâğıt o renge hafifçe boyanır."""
+    w, h = int(w), int(h)
+    key = (w, h, seed, tint, fold)
+    s = _paper_cache.get(key)
+    if s is not None:
+        return s
+    if len(_paper_cache) > 300:
+        _paper_cache.clear()
+    base = mix_col(PAPER, tint, 0.28) if tint else PAPER
+    s = pygame.Surface((w, h), pygame.SRCALPHA)
+    pygame.draw.rect(s, (*INK, 255), s.get_rect(), border_radius=5)
+    body = s.get_rect().inflate(-4, -4)
+    pygame.draw.rect(s, (*scale_col(base, 0.80), 255), body, border_radius=4)
+    pygame.draw.rect(s, (*base, 255), body.inflate(0, -3).move(0, -1), border_radius=4)
+    # lif dokusu: kısa, soluk çizgiler
+    rnd = random.Random(seed * 131 + w * 7 + h)
+    for _ in range(max(6, w * h // 70)):
+        x = rnd.randint(body.x + 2, max(body.x + 2, body.right - 4))
+        y = rnd.randint(body.y + 2, max(body.y + 2, body.bottom - 5))
+        c = scale_col(base, rnd.uniform(0.86, 0.95)) if rnd.random() < 0.7 else lighten(base, 0.35)
+        pygame.draw.line(s, c, (x, y), (x + rnd.randint(1, 4), y + rnd.choice((0, 0, 1))), 1)
+    if fold and w > 60 and h > 26:
+        # sağ üst köşe hafif kıvrık
+        f = 9
+        pygame.draw.polygon(s, scale_col(base, 0.72), [(body.right - f, body.y), (body.right, body.y + f),
+                                                       (body.right - f, body.y + f)])
+        pygame.draw.line(s, INK, (body.right - f, body.y), (body.right, body.y + f), 1)
+    _paper_cache[key] = s
+    return s
+
+
 _hand_shadow_cache = {}
 
 
@@ -25325,20 +25608,20 @@ class Button:
             g = sum(col) // 3
             col = mix_col(col, (g, g, g), 0.75)
             col = scale_col(col, 0.7)
-        tc = self.text_color or (TEXT if self.enabled else (126, 116, 108))
+        # kâğıt üstüne mürekkep: açık renkli yazı kâğıtta okunmaz
+        tc = self.text_color if (self.text_color and sum(self.text_color[:3]) < 330) else PAPER_INK
+        if not self.enabled:
+            tc = (140, 128, 112)
         return col, tc
 
     def _paint(self, surf, x, y, col, tc, step):
-        """Basılabilir tuş: altta koyu dudak, üzerine gelince 2 piksel kalkar."""
+        """Kâğıt etiket düğme: düğmenin rengi kâğıda siner ve altta kalınlık
+        şeridi olur; üzerine gelince 2 piksel kalkar."""
         w, h = self.rect.w, self.rect.h
-        lift = step
-        lip = 5 if h >= 30 else 3
-        surf.blit(hand_shadow(w, h, 10, alpha=140), (x + 3, y + 4))
-        surf.blit(hand_card(w, h, col, rad=10, ink=3, lip=lip), (x, y - lift))
+        face = paper_button(surf, x, y, w, h, col, step, self.enabled)
         label, sz = _fit_size(TRX(self.text), self.text_size, w - 18, True,
                               min_size=min(12, self.text_size))
-        draw_text(surf, label, (x + w // 2, y - lift + (h - lip) // 2 + 1),
-                  sz, tc, bold=True, center=True)
+        draw_text(surf, label, face.center, sz, tc, bold=True, center=True, shadow=False)
         if self.subtitle:
             draw_text(surf, self.subtitle, (x + w // 2, y + h + 13), 13, TEXT_DIM,
                       center=True, shadow=False)
@@ -25422,16 +25705,26 @@ def _button_body(w, h, col, anim, rad):
     return hand_card(w, h, col, rad=min(int(rad), 14), ink=3, lip=5 if h >= 30 else 3)
 
 
+def paper_button(surf, x, y, w, h, col, lift=0, enabled=True):
+    """Kâğıt etiket düğme gövdesi; yazının ortalanacağı yüzü döndürür."""
+    lip = 5 if h >= 30 else 3
+    base = ui_warm(col)
+    surf.blit(hand_shadow(w, h, 6, alpha=130), (x + 3, y + 4))
+    body = pygame.Rect(x, y - lift, w, h)
+    pygame.draw.rect(surf, INK, body, border_radius=6)
+    pygame.draw.rect(surf, scale_col(base, 0.9) if enabled else (96, 90, 86), body.inflate(-4, -4),
+                     border_radius=5)
+    tint = (lighten(base, 0.15) if lift else base) if enabled else (130, 126, 122)
+    face = pygame.Rect(x, y - lift, w, h - lip)
+    surf.blit(paper_card(w, h - lip, seed=(w * 3 + h) % 11, tint=tint, fold=False), face.topleft)
+    return face
+
+
 def key_button(surf, rect, col, hover=False, rad=10):
-    """Button sınıfı dışında elle çizilen düğmeler için aynı basılabilir tuş
-    gövdesi. Yazının ortalanacağı dikdörtgeni döndürür."""
+    """Button sınıfı dışında elle çizilen düğmeler için aynı kâğıt düğme.
+    Yazının ortalanacağı dikdörtgeni döndürür (yazı PAPER_INK ile)."""
     rect = pygame.Rect(rect)
-    lip = 5 if rect.h >= 30 else 3
-    lift = 2 if hover else 0
-    c = lighten(ui_warm(col), 0.10) if hover else ui_warm(col)
-    surf.blit(hand_shadow(rect.w, rect.h, rad, alpha=140), (rect.x + 3, rect.y + 4))
-    surf.blit(hand_card(rect.w, rect.h, c, rad=rad, ink=3, lip=lip), (rect.x, rect.y - lift))
-    return pygame.Rect(rect.x, rect.y - lift, rect.w, rect.h - lip)
+    return paper_button(surf, rect.x, rect.y, rect.w, rect.h, col, 2 if hover else 0)
 
 
 def panel(surf, rect, bg=PANEL_BG, edge=PANEL_EDGE, alpha=235, radius=16, edge_w=2):
@@ -25541,8 +25834,8 @@ def run_score_plausible(run):
 # yanar ve 25 saniyelik bir güç verir (ya da anında bir iyilik yapar).
 # Oyuncuya "dur mu, koş mu" kararı verdirir: sunağın başında beklerken
 # kalabalık üstüne gelir. 2 kişilik modda yok.
-SHRINE_FIRST = 55.0             # ilk sunağın koşudaki saniyesi
-SHRINE_GAP = (70.0, 100.0)      # sunaklar arası (saniye)
+SHRINE_FIRST = 90.0             # ilk sunağın koşudaki saniyesi
+SHRINE_GAP = (120.0, 170.0)     # sunaklar arası (saniye)
 SHRINE_LIFE = 50.0              # kullanılmazsa bu kadar sonra söner
 SHRINE_R = 54.0                 # üstünde durulacak daire
 SHRINE_CHARGE = 2.0             # dolma süresi
@@ -25583,35 +25876,165 @@ STRINGS.update({
                       "На карте появился алтарь"),
     "sh.stand":    _T("üstünde dur", "stand on it", "quédate encima", "drauf stehen", "встань на него"),
     "sh.faded":    _T("SUNAK SÖNDÜ", "SHRINE FADED", "SANTUARIO APAGADO", "ALTAR ERLOSCHEN", "АЛТАРЬ ПОГАС"),
-    # ---- dalga olayları ----
-    "ev.gold_rain":  _T("ALTIN YAĞMURU", "GOLD RAIN", "LLUVIA DE ORO", "GOLDREGEN", "ЗОЛОТОЙ ДОЖДЬ"),
-    "ev.blood_moon": _T("KAN AYI", "BLOOD MOON", "LUNA DE SANGRE", "BLUTMOND", "КРОВАВАЯ ЛУНА"),
-    "ev.meteors":    _T("GÖKTAŞI YAĞMURU", "METEOR SHOWER", "LLUVIA DE METEOROS", "METEORSCHAUER",
-                        "МЕТЕОРИТНЫЙ ДОЖДЬ"),
-    "ev.gold_rain.d":  _T("gökten altın yağıyor, topla!", "gold falls from the sky - grab it!",
-                          "¡cae oro del cielo, recógelo!", "Gold fällt vom Himmel - schnapp es dir!",
-                          "с неба падает золото - собирай!"),
-    "ev.blood_moon.d": _T("elitler geliyor, tecrübe x2", "elites incoming, XP x2", "llegan élites, EXP x2",
-                          "Elite kommen, EP x2", "идёт элита, опыт x2"),
-    "ev.meteors.d":    _T("kırmızı dairelerden kaç - yaratıkları da ezer", "dodge the red circles - they crush monsters too",
-                          "esquiva los círculos rojos - aplastan monstruos", "weich den roten Kreisen aus - sie zerquetschen auch Monster",
-                          "уходи от красных кругов - они давят и монстров"),
+    # ---- gök işareti ----
+    "om.title":    _T("GÖK İŞARETİ", "OMEN", "PRESAGIO", "OMEN", "ЗНАМЕНИЕ"),
+    "om.calm":     _T("Durgun Gök", "Still Sky", "Cielo Quieto", "Stiller Himmel", "Тихое небо"),
+    "om.calm.d":   _T("bu koşuda gök bir şey söylemiyor", "the sky says nothing this run",
+                      "el cielo no dice nada esta vez", "der Himmel schweigt diesmal", "небо молчит в этот раз"),
+    "om.plenty":   _T("Bereket", "Plenty", "Abundancia", "Fülle", "Изобилие"),
+    "om.plenty.d": _T("+%25 altın, +%15 tecrübe", "+25% gold, +15% XP", "+25% oro, +15% EXP",
+                      "+25% Gold, +15% EP", "+25% золота, +15% опыта"),
+    "om.lucky":    _T("Şanslı Yıldız", "Lucky Star", "Estrella de la Suerte", "Glücksstern", "Счастливая звезда"),
+    "om.lucky.d":  _T("+%25 şans, 2 bedava yenileme", "+25% luck, 2 free rerolls", "+25% suerte, 2 cambios gratis",
+                      "+25% Glück, 2 Gratis-Neuwürfe", "+25% удачи, 2 бесплатные замены"),
+    "om.redsky":   _T("Kızıl Gök", "Red Sky", "Cielo Rojo", "Roter Himmel", "Красное небо"),
+    "om.redsky.d": _T("yaratıklar +%20 canlı, ama +%40 altın ve tecrübe",
+                      "monsters +20% HP, but +40% gold and XP",
+                      "monstruos +20% vida, pero +40% oro y EXP",
+                      "Monster +20% LP, aber +40% Gold und EP",
+                      "монстры +20% здоровья, но +40% золота и опыта"),
+    "om.drought":  _T("Kuraklık", "Drought", "Sequía", "Dürre", "Засуха"),
+    "om.drought.d": _T("kalp düşmez, ama +%20 hasar", "no hearts drop, but +20% damage",
+                       "no caen corazones, pero +20% de daño", "keine Herzen, aber +20% Schaden",
+                       "сердца не падают, но +20% урона"),
+    "om.heavy":    _T("Ağır Adım", "Heavy Step", "Paso Pesado", "Schwerer Schritt", "Тяжёлый шаг"),
+    "om.heavy.d":  _T("-%10 hız, ama +%12 zırh", "-10% speed, but +12% armor", "-10% velocidad, pero +12% armadura",
+                      "-10% Tempo, aber +12% Rüstung", "-10% скорости, но +12% брони"),
+    "om.storm":    _T("Fırtına Öncesi", "Before the Storm", "Antes de la Tormenta", "Vor dem Sturm", "Перед бурей"),
+    "om.storm.d":  _T("+%25 atış hızı, yaratıklar +%10 canlı", "+25% fire rate, monsters +10% HP",
+                      "+25% cadencia, monstruos +10% vida", "+25% Feuerrate, Monster +10% LP",
+                      "+25% темпа, монстры +10% здоровья"),
+    # ---- kayıp kervan ----
+    "cv.appear":   _T("KAYIP KERVAN geçiyor - yakala!", "A LOST CARAVAN is passing - catch it!",
+                      "¡Pasa una CARAVANA PERDIDA, atrápala!", "Eine VERLORENE KARAWANE zieht vorbei - schnapp sie!",
+                      "Идёт ПОТЕРЯННЫЙ КАРАВАН - догони!"),
+    "cv.name":     _T("KAYIP KERVAN", "LOST CARAVAN", "CARAVANA PERDIDA", "VERLORENE KARAWANE", "ПОТЕРЯННЫЙ КАРАВАН"),
+    "cv.got":      _T("KERVAN DURDU! Efsanevi el geliyor", "CARAVAN STOPPED! A legendary hand awaits",
+                      "¡CARAVANA DETENIDA! Mano legendaria", "KARAWANE GESTOPPT! Legendäre Hand",
+                      "КАРАВАН ОСТАНОВЛЕН! Легендарная рука"),
+    "cv.gone":     _T("kervan gitti...", "the caravan is gone...", "la caravana se fue...",
+                      "die Karawane ist weg...", "караван ушёл..."),
 })
 
-# ---- dalga olayları ----
-# Bazı dalgaların başında süreli bir olay: koşular birbirine benzemesin.
-EVENT_FROM_WAVE = 4
-EVENT_EVERY = 3                 # her 3 dalgada bir zar atılır
-EVENT_CHANCE = 0.65
-# olay -> (süre, renk, simge)
-EVENTS = {
-    "gold_rain":  (16.0, (255, 206, 80), "coin"),
-    "blood_moon": (30.0, (220, 50, 70), "skull"),
-    "meteors":    (18.0, (255, 120, 50), "flame"),
+# ---- gök işareti ----
+# Her koşu bir işaretle başlar: iyi, kötü ya da karışık. Kötü gelen oyuncu
+# "bu koşu olmaz" deyip baştan başlayabilir, iyi gelen "iyi başladık" der -
+# anahtarlı sandığın verdiği his. Değerler hile denetiminin dışında kalan
+# alanlara yazılır (shrine_dmg / shrine_spd ayrı tutuluyor).
+# işaret -> (ağırlık, renk, simge)
+OMENS = {
+    "calm":    (3.0, (180, 176, 200), "star"),
+    "plenty":  (1.2, (255, 206, 90), "coin"),
+    "lucky":   (1.2, (120, 230, 140), "clover"),
+    "redsky":  (1.0, (236, 80, 80), "skull"),
+    "drought": (1.0, (230, 170, 90), "flame"),
+    "heavy":   (1.0, (160, 170, 200), "shield"),
+    "storm":   (1.0, (140, 200, 255), "bolt"),
 }
-METEOR_EVERY = 0.55
-METEOR_WARN = 1.1
-METEOR_R = 74.0
+OMEN_SHOW_T = 7.0               # başta gösterilen kartın süresi
+
+# ---- kayıp kervan ----
+# Koşuların bir kısmında 2-4. dalga arasında haritanın bir ucundan öbürüne
+# yavaşça bir kervan geçer. Yanında iki saniye durursan durur: altın + bir el
+# efsanevi kart. Kaçarsa bir daha gelmez.
+CARAVAN_CHANCE = 0.40
+CARAVAN_SPEED = 52.0
+CARAVAN_R = 78.0
+CARAVAN_CHARGE = 2.0
+CARAVAN_COLOR = (226, 170, 90)
+
+
+class Caravan:
+    def __init__(self, x0, y0, x1, y1):
+        self.x, self.y = x0, y0
+        self.x1, self.y1 = x1, y1
+        d = dist(x0, y0, x1, y1) or 1.0
+        self.dx, self.dy = (x1 - x0) / d, (y1 - y0) / d
+        self.charge = 0.0
+        self.stopped = False
+        self.gone = False
+        self.fade = 0.0
+        self.wheel = 0.0
+
+    def update(self, dt):
+        if self.stopped or self.gone:
+            self.fade += dt
+            return
+        self.x += self.dx * CARAVAN_SPEED * dt
+        self.y += self.dy * CARAVAN_SPEED * dt
+        self.wheel += dt * CARAVAN_SPEED / 14.0
+        if (self.x1 - self.x) * self.dx + (self.y1 - self.y) * self.dy <= 0:
+            self.gone = True
+
+    def draw(self, surf, t):
+        a = 1.0 - clamp(self.fade / 1.0, 0.0, 1.0) if self.gone else 1.0
+        if a <= 0:
+            return
+        x, y = self.x, self.y
+        face = 1 if self.dx >= 0 else -1
+        # durma dairesi
+        if not self.stopped:
+            ring = pygame.Surface((int(CARAVAN_R * 2 + 8), int(CARAVAN_R * 2 + 8)), pygame.SRCALPHA)
+            c = int(CARAVAN_R + 4)
+            pygame.draw.circle(ring, (*CARAVAN_COLOR, int(28 * a)), (c, c), int(CARAVAN_R))
+            pygame.draw.circle(ring, (*CARAVAN_COLOR, int(150 * a)), (c, c), int(CARAVAN_R), 2)
+            surf.blit(ring, (int(x - c), int(y - c)))
+            if self.charge > 0:
+                rect = pygame.Rect(0, 0, int(CARAVAN_R * 2 + 10), int(CARAVAN_R * 2 + 10))
+                rect.center = (int(x), int(y))
+                pygame.draw.arc(surf, WHITE, rect, math.pi / 2,
+                                math.pi / 2 + math.tau * clamp(self.charge / CARAVAN_CHARGE, 0, 1), 5)
+        bob = math.sin(t * 6) * 1.5 if not self.stopped else 0.0
+        # gölge
+        pygame.draw.ellipse(surf, (0, 0, 0), (int(x - 46), int(y + 14), 92, 16))
+        # eşek
+        hx = x + face * 44
+        pygame.draw.ellipse(surf, INK, (int(hx - 17), int(y - 9 + bob), 34, 22))
+        pygame.draw.ellipse(surf, (140, 122, 112), (int(hx - 15), int(y - 7 + bob), 30, 18))
+        head = (hx + face * 16, y - 12 + bob)
+        pygame.draw.circle(surf, INK, (int(head[0]), int(head[1])), 10)
+        pygame.draw.circle(surf, (150, 132, 120), (int(head[0]), int(head[1])), 8)
+        for ex in (-3, 3):
+            pygame.draw.line(surf, INK, (head[0] + ex, head[1] - 6), (head[0] + ex - face * 2, head[1] - 17), 4)
+        pygame.draw.circle(surf, (24, 18, 20), (int(head[0] + face * 3), int(head[1] - 1)), 2)
+        for lx in (-9, 9):
+            ph = math.sin(t * 8 + lx) * 3 if not self.stopped else 0
+            pygame.draw.line(surf, INK, (hx + lx, y + 8), (hx + lx + ph, y + 18), 4)
+        # araba
+        body = pygame.Rect(0, 0, 70, 30)
+        body.center = (int(x - face * 6), int(y - 4))
+        pygame.draw.rect(surf, INK, body.inflate(6, 6), border_radius=6)
+        pygame.draw.rect(surf, (128, 84, 52), body, border_radius=5)
+        for k in range(1, 4):
+            pygame.draw.line(surf, (98, 62, 38), (body.x + k * 17, body.y + 3), (body.x + k * 17, body.bottom - 3), 2)
+        # branda
+        cov = pygame.Rect(body.x + 2, body.y - 26, body.w - 4, 34)
+        pygame.draw.ellipse(surf, INK, cov.inflate(6, 6))
+        pygame.draw.ellipse(surf, (232, 214, 176), cov)
+        pygame.draw.ellipse(surf, (206, 184, 140), cov.inflate(-18, -14))
+        pygame.draw.rect(surf, (232, 214, 176), (cov.x, cov.centery, cov.w, cov.h // 2))
+        pygame.draw.line(surf, INK, (cov.x, cov.centery + cov.h // 2), (cov.right, cov.centery + cov.h // 2), 3)
+        # fener
+        lx_, ly_ = body.right - 4 if face > 0 else body.x + 4, body.y - 6
+        add_glow(surf, lx_, ly_, 26, (255, 210, 120), 0.45 * a)
+        pygame.draw.circle(surf, (255, 220, 140), (int(lx_), int(ly_)), 4)
+        # tekerlekler
+        for wx in (body.x + 14, body.right - 14):
+            wy = body.bottom + 4
+            pygame.draw.circle(surf, INK, (int(wx), int(wy)), 12)
+            pygame.draw.circle(surf, (96, 62, 38), (int(wx), int(wy)), 10)
+            for k in range(4):
+                ang = self.wheel + k * math.pi / 4
+                pygame.draw.line(surf, INK, (wx - math.cos(ang) * 9, wy - math.sin(ang) * 9),
+                                 (wx + math.cos(ang) * 9, wy + math.sin(ang) * 9), 2)
+            pygame.draw.circle(surf, (210, 170, 110), (int(wx), int(wy)), 3)
+        # sandıklar
+        if not self.stopped:
+            for i_, cc in enumerate(((176, 120, 60), (210, 170, 90))):
+                br = pygame.Rect(0, 0, 14, 11)
+                br.midbottom = (body.x + 12 + i_ * 16, body.y + 2)
+                pygame.draw.rect(surf, INK, br.inflate(4, 4), border_radius=3)
+                pygame.draw.rect(surf, cc, br, border_radius=2)
 
 
 _SHRINE_BEAM = {}
@@ -25692,18 +26115,23 @@ class PowerShrine:
 
 
 class WorldExtrasMixin:
-    """RunState'e güç sunakları ve dalga olayları (karışım sınıf)."""
+    """RunState'e güç sunakları, gök işareti ve kayıp kervan (karışım sınıf)."""
 
     def extras_init(self):
         self.shrine = None
         self.shrine_next = SHRINE_FIRST
         self.shrine_buffs = []          # [tür, bitiş zamanı]
         self.shrines_used = 0
-        self.event = None               # [tür, başlangıç, bitiş]
-        self.event_banner = None        # (başlangıç, tür)
-        self.event_meteors = []         # [x, y, kalan]
-        self.event_t = 0.0
-
+        self.omen = None
+        self.omen_t0 = 0.0
+        self.caravan = None
+        self.caravan_note = None        # (zaman, metin anahtarı)
+        self.caravan_at = None
+        self.omen_rolled = False
+        if self.extras_active():
+            if random.random() < CARAVAN_CHANCE:
+                d = getattr(self, "diff", "normal")
+                self.caravan_at = random.uniform(wave_start_time(2, d), wave_start_time(4, d))
     def extras_active(self):
         return not getattr(self, "is_coop", False)
 
@@ -25782,130 +26210,106 @@ class WorldExtrasMixin:
         else:
             sh.charge = max(0.0, sh.charge - dt * 1.5)
 
-    # ---- olay ----
-    def _roll_event(self):
-        w = int(self.waves.wave)
-        if (w < EVENT_FROM_WAVE or w % EVENT_EVERY != 1 or self.event is not None
-                or self.waves.boss_pending or self.waves.boss_active or self.waves.is_boss_wave(w)):
-            return
-        if random.random() > EVENT_CHANCE:
-            return
-        self.start_event(random.choice(list(EVENTS)))
-
-    def start_event(self, kind):
-        dur, col, _ic = EVENTS[kind]
-        self.event = [kind, self.run_time, self.run_time + dur]
-        self.event_banner = (self.run_time, kind)
-        self.event_t = 0.0
+    # ---- gök işareti ----
+    def _roll_omen(self):
+        keys = list(OMENS)
+        k = random.choices(keys, weights=[OMENS[o][0] for o in keys], k=1)[0]
+        self.omen = k
         p = self.player
-        if kind == "blood_moon":
-            p.add_temp_buff(dur, run_xp_mult=1.0)
-            for i in range(3):
-                x, y = self.near_camera_point()
-                try:
-                    self.enemies.append(self._make_enemy("elite", x, y))
-                except Exception:
-                    pass
-        self.fx.do_flash(col, 0.3)
-        sfx("wave", 0.9, 0.0)
-        sfx("second", 0.6, 0.0)
+        if k == "plenty":
+            p.run_coin_mult += 0.25
+            p.run_xp_mult += 0.15
+        elif k == "lucky":
+            p.luck += 0.25
+            self.reroll_bonus = getattr(self, "reroll_bonus", 0) + 2
+        elif k == "redsky":
+            p.enemy_hp_curse += 0.20
+            p.run_coin_mult += 0.40
+            p.run_xp_mult += 0.40
+        elif k == "drought":
+            p.shrine_dmg += 0.20
+        elif k == "heavy":
+            p.shrine_spd -= 0.10
+            p.run_armor_bonus += 0.12
+        elif k == "storm":
+            p.run_aspd_mult += 0.25
+            p.enemy_hp_curse += 0.10
 
-    def _update_event(self, dt):
-        ev = self.event
+    # ---- kayıp kervan ----
+    def _spawn_caravan(self):
         p = self.player
-        for m in self.event_meteors:
-            m[2] -= dt
-            if m[2] <= 0:
-                self._meteor_hit(m[0], m[1])
-        self.event_meteors = [m for m in self.event_meteors if m[2] > 0]
-        if ev is None:
-            return
-        kind, t0, t1 = ev
-        if self.run_time >= t1:
-            self.event = None
-            return
-        self.event_t -= dt
-        if kind == "gold_rain" and self.event_t <= 0:
-            # 16 sn'de ~50 kese: bir hazine goblini kadar altın
-            self.event_t = 0.30
-            a = random.uniform(0, math.tau)
-            d = random.uniform(40, 420)
-            x = clamp(p.x + math.cos(a) * d, ARENA_RECT.left + 40, ARENA_RECT.right - 40)
-            y = clamp(p.y + math.sin(a) * d, ARENA_RECT.top + 40, ARENA_RECT.bottom - 40)
-            w = max(1, int(self.waves.wave))
-            val = scaled_coin_gain(2 + 0.6 * w, p.eff_coin_mult(), self.biome)
-            self.drop_pickup(x, y, "coin", val)
-            self.fx.spark(x, y - 30, (255, 220, 120), 0, 120, 0.25, 2.5)
-        elif kind == "meteors" and self.event_t <= 0:
-            self.event_t = METEOR_EVERY
-            # yarısı oyuncunun yakınına, yarısı kalabalığın içine
-            tgt = None
-            if self.enemies and random.random() < 0.6:
-                e = random.choice(self.enemies)
-                if e.alive and dist(e.x, e.y, p.x, p.y) < 650:
-                    tgt = (e.x, e.y)
-            if tgt is None:
-                a = random.uniform(0, math.tau)
-                d = random.uniform(60, 380)
-                tgt = (p.x + math.cos(a) * d, p.y + math.sin(a) * d)
-            self.event_meteors.append([tgt[0], tgt[1], METEOR_WARN])
+        a = random.uniform(0, math.tau)
+        x0 = clamp(p.x + math.cos(a) * 760, ARENA_RECT.left + 80, ARENA_RECT.right - 80)
+        y0 = clamp(p.y + math.sin(a) * 520, ARENA_RECT.top + 120, ARENA_RECT.bottom - 80)
+        # oyuncunun yakınından geçip karşı uca gider
+        x1 = clamp(p.x - math.cos(a) * 900 + random.uniform(-200, 200), ARENA_RECT.left + 80, ARENA_RECT.right - 80)
+        y1 = clamp(p.y - math.sin(a) * 620 + random.uniform(-160, 160), ARENA_RECT.top + 120, ARENA_RECT.bottom - 80)
+        self.caravan = Caravan(x0, y0, x1, y1)
+        self.caravan_note = (self.run_time, "cv.appear")
+        sfx("second", 0.7, 0.0)
 
-    def _meteor_hit(self, x, y):
+    def _update_caravan(self, dt):
+        cv = self.caravan
+        if cv is None:
+            if self.caravan_at is not None and self.run_time >= self.caravan_at:
+                self.caravan_at = None
+                self._spawn_caravan()
+            return
+        cv.update(dt)
+        if cv.gone or cv.stopped:
+            if cv.gone and cv.fade <= dt * 1.5:
+                self.caravan_note = (self.run_time, "cv.gone")
+            if cv.fade > 1.2:
+                self.caravan = None
+            return
         p = self.player
-        col = EVENTS["meteors"][1]
-        self.fx.shockwave(x, y, METEOR_R * 1.3, col, 0.4, 7)
-        self.fx.burst(x, y, (255, 200, 120), n=18, speed=260, life=0.5, r=4)
-        self.fx.burst(x, y, (90, 70, 60), n=10, speed=140, life=0.7, r=5)
-        self.fx.shake(5, 0.15)
-        sfx("explosion", 0.5, 0.05)
-        w = max(1, int(self.total_wave() if hasattr(self, "total_wave") else self.waves.wave))
-        dmg_e = 60.0 * self.wave_hp_mult(self.waves.wave)
-        prev = DMG_SRC[0]
-        DMG_SRC[0] = "other"
-        for e in self.enemies:
-            if e.alive and (e.x - x) ** 2 + (e.y - y) ** 2 < METEOR_R * METEOR_R:
-                if e.take_damage(dmg_e, False, self.fx, quiet=False):
-                    self.on_enemy_killed(e)
-        DMG_SRC[0] = prev
-        if p.alive and dist(p.x, p.y, x, y) < METEOR_R:
-            p.take_damage(8.0 + 1.6 * w, self.fx, x, y, src="meteor")
+        if p.alive and dist(p.x, p.y, cv.x, cv.y) < CARAVAN_R:
+            cv.charge += dt
+            if cv.charge >= CARAVAN_CHARGE:
+                self._claim_caravan(cv)
+        else:
+            cv.charge = max(0.0, cv.charge - dt)
+
+    def _claim_caravan(self, cv):
+        cv.stopped = True
+        p = self.player
+        w = max(1, int(self.waves.wave))
+        gold = scaled_coin_gain(60 + 30 * w, p.eff_coin_mult(), self.biome)
+        for i in range(8):
+            a = i * math.tau / 8
+            self.drop_pickup(cv.x + math.cos(a) * 34, cv.y + math.sin(a) * 34, "coin", gold / 8)
+        self.legend_hands = getattr(self, "legend_hands", 0) + 1
+        self.pending_levelups += 1
+        self.caravans_caught = getattr(self, "caravans_caught", 0) + 1
+        self.caravan_note = (self.run_time, "cv.got")
+        self.fx.ring(cv.x, cv.y, CARAVAN_COLOR, n=24, speed=240, life=0.6, r=3.5)
+        self.fx.do_flash(CARAVAN_COLOR, 0.2)
+        sfx("buy", 0.9, 0.0)
 
     def extras_wave_changed(self):
-        if self.extras_active():
-            self._roll_event()
+        pass
 
     def extras_update(self, dt):
         if not self.extras_active():
             return
+        if not self.omen_rolled:
+            # koşu kurulumu bitince atılır (kurulum bazı alanları sıfırlıyor)
+            self.omen_rolled = True
+            self._roll_omen()
         self._update_shrine(dt)
-        self._update_event(dt)
+        self._update_caravan(dt)
         if self.shrine_buffs:
             self.shrine_buffs = [b for b in self.shrine_buffs if b[1] > self.run_time]
 
 
 def draw_world_extras(world, run, cam, t):
-    """Zemindeki sunak ve göktaşı uyarı daireleri."""
+    """Zemindeki sunak ve kervan."""
     sh = getattr(run, "shrine", None)
     if sh is not None and cam.inflate(400, 400).collidepoint(sh.x, sh.y):
         sh.draw(world, t)
-    mets = getattr(run, "event_meteors", None)
-    if mets:
-        col = EVENTS["meteors"][1]
-        for x, y, left in mets:
-            k = 1.0 - clamp(left / METEOR_WARN, 0.0, 1.0)
-            s = pygame.Surface((int(METEOR_R * 2 + 6), int(METEOR_R * 2 + 6)), pygame.SRCALPHA)
-            c = int(METEOR_R + 3)
-            pygame.draw.circle(s, (220, 40, 30, int(40 + 70 * k)), (c, c), int(METEOR_R))
-            pygame.draw.circle(s, (255, 80, 60, 220), (c, c), int(METEOR_R), 3)
-            pygame.draw.circle(s, (255, 200, 140, 200), (c, c), max(2, int(METEOR_R * k)), 2)
-            world.blit(s, (int(x - c), int(y - c)))
-            # düşen taş
-            fy = y - 420 * (1.0 - k)
-            fx_ = x + 120 * (1.0 - k)
-            add_glow(world, fx_, fy, 30, col, 0.5)
-            pygame.draw.circle(world, INK, (int(fx_), int(fy)), 11)
-            pygame.draw.circle(world, (120, 84, 70), (int(fx_), int(fy)), 9)
-            pygame.draw.circle(world, (255, 170, 80), (int(fx_ - 2), int(fy - 2)), 4)
+    cv = getattr(run, "caravan", None)
+    if cv is not None and cam.inflate(400, 400).collidepoint(cv.x, cv.y):
+        cv.draw(world, t)
 
 
 def _buff_ring(surf, cx, cy, r, col, frac, icon):
@@ -25920,13 +26324,12 @@ def _buff_ring(surf, cx, cy, r, col, frac, icon):
 
 
 def draw_extras_hud(surf, run, t):
-    """Güç simgeleri, olay süre çubuğu ve olay duyurusu."""
+    """Güç simgeleri, gök işareti kartı ve kervan notları."""
     if not hasattr(run, "shrine_buffs"):
         return
     now = run.run_time
     # güçler: dalga panelinin altında, ortada
     buffs = run.shrine_buffs
-    ev = run.event
     y = 124
     items = []
     for k, t_end in buffs:
@@ -25936,114 +26339,113 @@ def draw_extras_hud(surf, run, t):
         n = len(items)
         x0 = VIRTUAL_W / 2 - (n - 1) * 22
         for i, (col, icon, frac, nm) in enumerate(items):
-            blink = frac > 0.15 or int(t * 6) % 2 == 0
-            if blink:
+            if frac > 0.15 or int(t * 6) % 2 == 0:
                 _buff_ring(surf, x0 + i * 44, y, 15, col, frac, icon)
-        y += 30
-    if ev is not None:
-        kind, t0, t1 = ev
-        dur, col, icon = EVENTS[kind]
-        frac = clamp((t1 - now) / max(0.1, t1 - t0), 0, 1)
-        r = pygame.Rect(0, 0, 230, 26)
-        r.midtop = (VIRTUAL_W // 2, y)
-        surf.blit(hand_card(r.w, r.h, (40, 28, 30), edge=col, rad=8, alpha=220), r.topleft)
-        bar = pygame.Rect(r.x + 30, r.bottom - 8, r.w - 40, 4)
-        pygame.draw.rect(surf, (20, 14, 15), bar)
-        pygame.draw.rect(surf, col, (bar.x, bar.y, int(bar.w * frac), bar.h))
-        draw_icon(surf, r.x + 16, r.centery, icon, col, 7)
-        draw_text(surf, L("ev." + kind), (r.x + 30, r.y + 3), 12, lighten(col, 0.3), bold=True, shadow=False)
-    # kan ayı: ekran kızıla çalar
-    if ev is not None and ev[0] == "blood_moon":
-        k = clamp(min(now - ev[1], ev[2] - now) / 1.5, 0, 1)
-        ov = _blood_overlay()
-        ov.set_alpha(int(60 * k))
-        surf.blit(ov, (0, 0))
-    eb = run.event_banner
-    if eb is not None:
-        st = now - eb[0]
-        life = 3.0
-        if 0 <= st <= life:
-            kind = eb[1]
-            col = EVENTS[kind][1]
-            k = ease_out_cubic(min(1.0, st / 0.3))
-            a = min(1.0, (life - st) / 0.5)
-            yy = 200
-            band = pygame.Surface((VIRTUAL_W, 96), pygame.SRCALPHA)
-            band.fill((22, 14, 18, int(190 * a * k)))
-            surf.blit(band, (0, yy - 48))
-            for sgn in (-1, 1):
-                pygame.draw.line(surf, scale_col(col, 0.4 + 0.5 * a), (0, yy + sgn * 48),
-                                 (VIRTUAL_W, yy + sgn * 48), 3)
-            draw_text(surf, L("ev." + kind), (VIRTUAL_W / 2, yy - 12), int(44 + 20 * (1 - k)), col,
-                      bold=True, center=True, alpha=int(255 * a))
-            draw_text(surf, L("ev.%s.d" % kind), (VIRTUAL_W / 2, yy + 24), 15, TEXT, bold=True,
-                      center=True, alpha=int(255 * a))
-
-
-_BLOOD_OV = [None]
-
-
-def _blood_overlay():
-    if _BLOOD_OV[0] is None:
-        s = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
-        s.fill((150, 10, 30, 255))
-        # kenarlar daha koyu
-        edge = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
-        for i in range(12):
-            pygame.draw.rect(edge, (40, 0, 8, 22), (i * 10, i * 8, VIRTUAL_W - i * 20, VIRTUAL_H - i * 16), 10)
-        s.blit(edge, (0, 0))
-        _BLOOD_OV[0] = s
-    return _BLOOD_OV[0]
+    om = getattr(run, "omen", None)
+    if om:
+        col, icon = OMENS[om][1], OMENS[om][2]
+        st = now - 1.5
+        if 0 <= st <= OMEN_SHOW_T:
+            # koşunun başında sakin bir kart: kâğıt etiket, yetenek çubuğunun
+            # üstünde (haritayı, duyuruları örtmesin)
+            k = ease_out_cubic(min(1.0, st / 0.4))
+            a = min(1.0, (OMEN_SHOW_T - st) / 0.6)
+            w_ = max(300, text_width(L("om.%s.d" % om), 13) + 70)
+            r = pygame.Rect(0, 0, w_, 66)
+            r.midbottom = (VIRTUAL_W // 2, int(626 + 30 * (1 - k)))
+            card = paper_card(r.w, r.h, seed=7)
+            card.set_alpha(int(255 * a))
+            surf.blit(card, r.topleft)
+            draw_icon(surf, r.x + 26, r.centery, icon, scale_col(col, 0.7), 11)
+            draw_text(surf, L("om.title"), (r.x + 50, r.y + 10), 11, PAPER_INK_DIM, bold=True,
+                      shadow=False, alpha=int(255 * a))
+            draw_text(surf, L("om." + om), (r.x + 50, r.y + 24), 17, PAPER_INK, bold=True,
+                      shadow=False, alpha=int(255 * a))
+            draw_text(surf, L("om.%s.d" % om), (r.x + 50, r.y + 45), 12, PAPER_INK_DIM,
+                      shadow=False, alpha=int(255 * a))
+        elif st > OMEN_SHOW_T and om != "calm":
+            # sonra yalnız küçük bir simge: haritanın altında
+            cx, cy = VIRTUAL_W - 34, 238
+            pygame.draw.circle(surf, INK, (cx, cy), 13)
+            pygame.draw.circle(surf, scale_col(col, 0.45), (cx, cy), 11)
+            draw_icon(surf, cx, cy, icon, lighten(col, 0.2), 7)
+    note = getattr(run, "caravan_note", None)
+    if note is not None:
+        st = now - note[0]
+        if 0 <= st <= 3.2:
+            a = min(1.0, st / 0.3, (3.2 - st) / 0.6)
+            msg = L(note[1])
+            draw_text(surf, msg, (VIRTUAL_W / 2, 168), 18, CARAVAN_COLOR, bold=True, center=True,
+                      alpha=int(255 * a))
 
 
 # ---- silah evrimi ----
-# Oyunun adı EvolveArena ama silahlar yalnızca seviye atlıyordu. Evrim:
-# silah EVO_LEVEL'a gelince ve eşi olan kitap da elindeyse, seviye atlama
-# elinde bir EVRİM kartı çıkar. Seçilen silah yeni bir ad, %50 hasar ve bir
-# vuruş etkisi kazanır (yakma, dondurma, zincir, can çalma, patlama, zehir).
+# Silah EVO_LEVEL'a gelince, eşi olan kitap EVO_BOOK_LEVEL'da ve elde en az
+# EVO_MIN_WEAPONS silah varsa seviye elinde bir EVRİM kartı çıkar. Her silahın
+# evrimi kendine has bir şey yapar (20 ayrı etki).
+# Denge: "2 silah 2 kitap kasıp evrimle uçmasın" - 3 silah şartı, koşuda en
+# çok EVO_MAX_PER_RUN evrim, hasar payı ılımlı (x1.25). Etkiler saniye/yaratık
+# başına sınırlı; ekran patlamaya dönmesin.
 # 2 kişilik modda kapalı: el ağ üzerinden eşitleniyor, yeni kart türü oraya
 # girmesin.
-EVO_LEVEL = 8
-EVO_DMG_MULT = 1.5
-EVO_PROC_CD = 0.4               # aynı yaratıkta etkinin yeniden tutması için bekleme
+EVO_LEVEL = 10
+EVO_BOOK_LEVEL = 3
+EVO_MIN_WEAPONS = 3
+EVO_MAX_PER_RUN = 2
+EVO_DMG_MULT = 1.25
+EVO_PROC_CD = 0.5               # aynı yaratıkta etkinin yeniden tutması için bekleme
 EVO_CHAIN_CHANCE = 0.30
 EVO_CHAIN_R = 170.0
-EVO_CHAIN_DMG = 0.45
-EVO_BLAST_R = 82.0
-EVO_BLAST_DMG = 0.8
-EVO_BLAST_PER_SEC = 8           # ekran patlamadan geçilmesin
+EVO_CHAIN_DMG = 0.40
+EVO_BLAST_R = 78.0
+EVO_BLAST_DMG = 0.6
+EVO_BLAST_PER_SEC = 5
 EVO_BANNER_T = 2.8
+EVO_AEGIS_EVERY = 5.0
+EVO_AEGIS_R = 160.0
+EVO_SOUL_MAX = 10
+EVO_SOUL_STEP = 0.03
+EVO_SOUL_T = 4.0
+EVO_SHOCK_DELAY = 0.5
 
 # silah -> (eş kitap, etki, renk)
 EVOLUTIONS = {
-    "axe":          ("r_critd",       "blast",  (255, 150, 60)),
-    "book":         ("r_armor",       "chill",  (170, 214, 255)),
-    "pentagram":    ("r_killheal",    "leech",  (255, 60, 100)),
-    "whip":         ("r_crit",        "burn",   (255, 120, 50)),
-    "zemzem":       ("r_regen",       "chill",  (120, 220, 255)),
-    "shoe":         ("r_bonk",        "blast",  (255, 160, 70)),
-    "frost":        ("r_wspd",        "chill",  (150, 230, 255)),
-    "emanet":       ("r_luck",        "chain",  (255, 236, 130)),
-    "cloak":        ("r_evade",       "shroud", (150, 120, 240)),
-    "tornado":      ("r_mag",         "chain",  (200, 236, 255)),
-    "ghost_swords": ("r_aspd",        "leech",  (140, 240, 255)),
-    "wolves":       ("r_swarm",       "poison", (170, 180, 255)),
-    "tesla":        ("r_echo",        "chain",  (255, 240, 120)),
-    "meteor":       ("r_dmg",         "burn",   (255, 110, 40)),
-    "beam":         ("r_xp",          "burn",   (255, 214, 110)),
-    "hawk":         ("r_bosshunter",  "burn",   (255, 140, 60)),
-    "bats":         ("r_vamp",        "leech",  (220, 90, 255)),
-    "nova":         ("r_hp",          "chill",  (160, 236, 255)),
-    "knives":       ("r_pierce",      "poison", (150, 236, 110)),
-    "quake":        ("r_hp_big",      "blast",  (240, 160, 80)),
+    "axe":          ("r_critd",       "blast",      (255, 150, 60)),
+    "book":         ("r_armor",       "aegis",      (170, 214, 255)),
+    "pentagram":    ("r_killheal",    "curse",      (255, 60, 100)),
+    "whip":         ("r_crit",        "burn",       (255, 120, 50)),
+    "zemzem":       ("r_regen",       "chill",      (120, 220, 255)),
+    "shoe":         ("r_bonk",        "stun",       (255, 160, 70)),
+    "frost":        ("r_wspd",        "freeze",     (150, 230, 255)),
+    "emanet":       ("r_luck",        "execute",    (255, 236, 130)),
+    "cloak":        ("r_evade",       "shroud",     (150, 120, 240)),
+    "tornado":      ("r_mag",         "knock",      (200, 236, 255)),
+    "ghost_swords": ("r_aspd",        "soul",       (140, 240, 255)),
+    "wolves":       ("r_swarm",       "bleed",      (220, 70, 80)),
+    "tesla":        ("r_echo",        "chain",      (255, 240, 120)),
+    "meteor":       ("r_dmg",         "scorch",     (255, 110, 40)),
+    "beam":         ("r_xp",          "sunder",     (255, 214, 110)),
+    "hawk":         ("r_bosshunter",  "phoenix",    (255, 140, 60)),
+    "bats":         ("r_vamp",        "leech",      (220, 90, 255)),
+    "nova":         ("r_hp",          "shatter",    (160, 236, 255)),
+    "knives":       ("r_pierce",      "poison",     (150, 236, 110)),
+    "quake":        ("r_hp_big",      "aftershock", (240, 160, 80)),
 }
 EVO_PERK_COLOR = {
     "burn": (255, 120, 40), "chill": (130, 210, 255), "chain": (255, 236, 120),
     "leech": (255, 70, 110), "blast": (255, 170, 60), "poison": (140, 230, 90),
-    "shroud": (170, 130, 255),
+    "shroud": (170, 130, 255), "aegis": (170, 214, 255), "curse": (230, 60, 110),
+    "stun": (255, 220, 120), "freeze": (180, 236, 255), "execute": (255, 236, 150),
+    "knock": (210, 236, 255), "soul": (140, 240, 255), "bleed": (220, 50, 60),
+    "scorch": (255, 110, 40), "sunder": (255, 214, 110), "phoenix": (255, 150, 60),
+    "shatter": (190, 240, 255), "aftershock": (240, 170, 90),
 }
-EVO_PERK_ICON = {"burn": "flame", "chill": "snow", "chain": "bolt", "leech": "drop",
-                 "blast": "star", "poison": "skull", "shroud": "ghost"}
+EVO_PERK_ICON = {
+    "burn": "flame", "chill": "snow", "chain": "bolt", "leech": "drop", "blast": "star",
+    "poison": "skull", "shroud": "ghost", "aegis": "shield", "curse": "cross", "stun": "fist",
+    "freeze": "snow", "execute": "sword", "knock": "orbit", "soul": "ghost", "bleed": "drop",
+    "scorch": "flame", "sunder": "target", "phoenix": "flame", "shatter": "gem", "aftershock": "target",
+}
 
 STRINGS.update({
     "evo.name.axe":          _T("KIYAMET BALTASI", "DOOM AXE", "HACHA DEL FIN", "UNTERGANGSAXT", "ТОПОР РОКА"),
@@ -26082,16 +26484,66 @@ STRINGS.update({
     "evo.perk.shroud": _T("görünmezken çevreni zehirler", "poisons around you while invisible",
                           "envenena a tu alrededor siendo invisible", "vergiftet die Umgebung, solange unsichtbar",
                           "в невидимости травит всех вокруг"),
+    "evo.perk.aegis":  _T("5 sn'de bir çevreni sarsan kalkan dalgası", "a shield wave bursts around you every 5s",
+                          "una onda de escudo cada 5 s", "alle 5 s eine Schildwelle um dich",
+                          "каждые 5 с щитовая волна вокруг"),
+    "evo.perk.curse":  _T("vurduğu yaratık her yerden %20 fazla hasar alır",
+                          "marked enemies take 20% more damage from everything",
+                          "los marcados reciben un 20% más de daño", "Markierte nehmen 20% mehr Schaden",
+                          "помеченные враги получают на 20% больше урона"),
+    "evo.perk.stun":   _T("vurduğunu sersemletir: ŞAAK!", "stuns what it hits: WHACK!",
+                          "aturde lo que golpea: ¡ZAS!", "betäubt Getroffene: KLATSCH!",
+                          "оглушает: ШЛЁП!"),
+    "evo.perk.freeze": _T("arada bir yaratığı buz kesir", "sometimes freezes enemies solid",
+                          "a veces congela por completo", "friert Gegner manchmal ein",
+                          "иногда замораживает насмерть"),
+    "evo.perk.execute": _T("canı azalan yaratığı tek vuruşta bitirir", "finishes off badly hurt enemies",
+                           "remata a los enemigos malheridos", "erledigt schwer Verwundete",
+                           "добивает израненных врагов"),
+    "evo.perk.knock":  _T("vurduğunu uzağa savurur", "flings enemies far away", "lanza lejos a los enemigos",
+                          "schleudert Gegner weit weg", "отбрасывает врагов далеко"),
+    "evo.perk.soul":   _T("her öldürme kılıçları %3 güçlendirir (en çok %30)",
+                          "each kill makes the blades 3% stronger (up to 30%)",
+                          "cada muerte da +3% a las espadas (máx. 30%)",
+                          "jeder Kill +3% Klingenschaden (max. 30%)",
+                          "каждое убийство +3% клинкам (до 30%)"),
+    "evo.perk.bleed":  _T("ısırık kanatır, üst üste biner", "bites cause stacking bleed",
+                          "las mordidas desangran y se acumulan", "Bisse verursachen stapelnde Blutung",
+                          "укусы вызывают кровотечение"),
+    "evo.perk.scorch": _T("düştüğü yer etrafı tutuşturur", "impacts set the area ablaze",
+                          "los impactos incendian la zona", "Einschläge setzen die Umgebung in Brand",
+                          "удары поджигают всё вокруг"),
+    "evo.perk.sunder": _T("elit ve patronlara %60 fazla vurur", "60% more damage to elites and bosses",
+                          "60% más daño a élites y jefes", "60% mehr Schaden an Elite und Bossen",
+                          "на 60% больше урона элите и боссам"),
+    "evo.perk.phoenix": _T("yakar, öldürdükçe seni iyileştirir", "burns, and kills heal you",
+                           "quema y las muertes te curan", "verbrennt, Kills heilen dich",
+                           "поджигает, убийства лечат"),
+    "evo.perk.shatter": _T("yavaşlamış yaratığa %50 fazla vurur", "50% more damage to slowed enemies",
+                           "50% más daño a enemigos ralentizados", "50% mehr Schaden an Verlangsamten",
+                           "на 50% больше урона замедленным"),
+    "evo.perk.aftershock": _T("yarım saniye sonra aynı yer bir kez daha sarsılır",
+                              "the ground shakes again half a second later",
+                              "el suelo vuelve a temblar medio segundo después",
+                              "eine halbe Sekunde später bebt es erneut",
+                              "через полсекунды земля бьёт ещё раз"),
     "evo.band":   _T("EVRİM", "EVOLUTION", "EVOLUCIÓN", "EVOLUTION", "ЭВОЛЮЦИЯ"),
     "evo.banner": _T("EVRİM!", "EVOLVED!", "¡EVOLUCIÓN!", "EVOLUTION!", "ЭВОЛЮЦИЯ!"),
     "evo.dmg":    _T("Hasar", "Damage", "Daño", "Schaden", "Урон"),
-    "evo.need":   _T("Evrim: Lv.{0} + {1}", "Evolves: Lv.{0} + {1}", "Evoluciona: Nv.{0} + {1}",
-                     "Evolution: St.{0} + {1}", "Эволюция: ур.{0} + {1}"),
+    "evo.need":   _T("Lv.{0} + {1} Lv.{2}", "Lv.{0} + {1} Lv.{2}", "Nv.{0} + {1} Nv.{2}",
+                     "St.{0} + {1} St.{2}", "ур.{0} + {1} ур.{2}"),
+    "evo.rule":   _T("en az {0} silah gerekir, koşuda en çok {1} evrim",
+                     "needs {0}+ weapons, max {1} evolutions per run",
+                     "requiere {0}+ armas, máx. {1} evoluciones",
+                     "braucht {0}+ Waffen, max. {1} Evolutionen pro Lauf",
+                     "нужно {0}+ оружия, максимум {1} эволюции"),
     "evo.ready":  _T("EVRİME HAZIR", "READY TO EVOLVE", "LISTO PARA EVOLUCIONAR", "BEREIT ZUR EVOLUTION",
                      "ГОТОВ К ЭВОЛЮЦИИ"),
     "evo.pick":   _T("EVRİLT", "EVOLVE", "EVOLUCIONAR", "ENTWICKELN", "ЭВОЛЮЦИЯ"),
     "evo.short":  _T("EVO", "EVO", "EVO", "EVO", "ЭВО"),
     "evo.stat":   _T("Evrim", "Evolutions", "Evoluciones", "Evolutionen", "Эволюции"),
+    "evo.whack":  _T("ŞAAK!", "WHACK!", "¡ZAS!", "KLATSCH!", "ШЛЁП!"),
+    "evo.exec":   _T("İNFAZ", "EXECUTE", "EJECUTAR", "HINRICHTUNG", "КАЗНЬ"),
 })
 
 
@@ -26104,22 +26556,63 @@ def evo_book_name(key):
     return bk_name(bk) if bk else EVOLUTIONS[key][0]
 
 
+def evo_book_need(key):
+    """Eş kitabın gereken seviyesi: nadir kitaplar seviye atlamaz, elde olması yeter."""
+    bk = BOOK_BY_KEY.get(EVOLUTIONS[key][0])
+    return 1 if (bk is None or bk.get("rare")) else EVO_BOOK_LEVEL
+
+
 def evo_ready_keys(p):
-    """Evrime hazır silahlar: seviyesi yeten, eş kitabı elde olan, henüz evrilmemiş."""
+    """Evrime hazır silahlar: seviye, eş kitap seviyesi ve takım şartı tutan, henüz evrilmemiş."""
     done = getattr(p, "evolved", ())
+    if len(done) >= EVO_MAX_PER_RUN or len(p.weapons) < EVO_MIN_WEAPONS:
+        return []
     out = []
     for key, lvl in p.weapons.items():
         ev = EVOLUTIONS.get(key)
         if ev is None or key in done or lvl < EVO_LEVEL:
             continue
-        if p.books.get(ev[0], 0) > 0:
+        if p.books.get(ev[0], 0) >= evo_book_need(key):
             out.append(key)
     return out
+
+
+def evo_weapon_mult(player, key):
+    """Evrilmiş silahın hasar çarpanı (ruh kılıçlarının yığını dahil)."""
+    if key not in getattr(player, "evolved", ()):
+        return 1.0
+    m = EVO_DMG_MULT
+    if key == "ghost_swords":
+        n, t_end = getattr(player, "evo_soul", (0, 0.0))
+        run = EVO_CTX[0]
+        if n and run is not None and run.run_time < t_end:
+            m *= 1.0 + EVO_SOUL_STEP * n
+    return m
 
 
 # Vuruş anında hangi koşunun etkileri işliyor: koşu her karede kendini yazar.
 EVO_CTX = [None]
 EVO_BUSY = [False]
+
+
+def evo_mark_mult(e):
+    """Kan ayini işareti: işaretli yaratık her kaynaktan fazla hasar alır."""
+    run = EVO_CTX[0]
+    if run is not None and getattr(e, "_evo_mark", -1.0) > run.run_time:
+        return 1.2
+    return 1.0
+
+
+def _evo_extra_hit(run, e, dmg):
+    """Etkinin kendi ek vuruşu (yeniden etki tetiklemez)."""
+    if dmg <= 0 or not e.alive:
+        return
+    EVO_BUSY[0] = True
+    try:
+        if e.take_damage(dmg, False, run.fx, quiet=True):
+            run.on_enemy_killed(e)
+    finally:
+        EVO_BUSY[0] = False
 
 
 def evo_on_hit(e, amount, fx):
@@ -26131,46 +26624,104 @@ def evo_on_hit(e, amount, fx):
     perk = run.evo_perks.get(key)
     if perk is None:
         return
+    p = run.player
+    boss = getattr(e, "is_boss", False)
+    dying = e.hp <= 0 and e.alive
     if perk == "blast":
-        if e.hp <= 0 and e.alive:
+        if dying:
             run.evo_blast(e, amount, key)
         return
+    if perk == "soul":
+        if dying:
+            n, _t = getattr(p, "evo_soul", (0, 0.0))
+            p.evo_soul = (min(EVO_SOUL_MAX, n + 1), run.run_time + EVO_SOUL_T)
+        return
+    if perk == "phoenix" and dying:
+        if run.run_time >= getattr(run, "evo_phx_t", 0.0):
+            run.evo_phx_t = run.run_time + 0.4
+            p.heal(p.max_hp * 0.006)
+    if perk == "execute":
+        if not dying and not boss and e.hp < e.max_hp * 0.12 and e.hp > 0:
+            fx.popup(e.x, e.y - e.radius - 14, L("evo.exec"), EVO_PERK_COLOR["execute"], 13, life=0.5)
+            _evo_extra_hit(run, e, e.hp + 1.0)
+        return
+    if perk == "sunder":
+        tough = boss or getattr(e, "is_mini", False) or getattr(e, "kind", "") == "elite" \
+            or enemy_weight_class(e) == "tough"
+        if tough and not dying:
+            _evo_extra_hit(run, e, amount * 0.6)
+        return
+    if perk == "shatter":
+        if not dying and getattr(e, "slow_timer", 0.0) > 0:
+            _evo_extra_hit(run, e, amount * 0.5)
     now = run.run_time
-    if now < getattr(e, "_evo_t", -1.0):
+    if now < getattr(e, "_evo_t", -1.0) or dying:
         return
     e._evo_t = now + EVO_PROC_CD
     col = EVO_PERK_COLOR[perk]
-    if perk == "burn":
-        e.apply_burn(max(1.0, amount * 0.30), 2.5)
-        fx.burst(e.x, e.y - 4, col, n=4, speed=70, life=0.35, r=2.4, gravity=-60)
-    elif perk == "chill":
+    if perk in ("burn", "phoenix"):
+        e.apply_burn(max(1.0, amount * 0.25), 2.5)
+        if random.random() < 0.4:
+            fx.burst(e.x, e.y - 4, col, n=3, speed=60, life=0.3, r=2.2, gravity=-60)
+    elif perk in ("chill", "shatter"):
         e.apply_slow(0.55, 1.6)
-        fx.burst(e.x, e.y, col, n=4, speed=60, life=0.4, r=2.2)
+    elif perk == "freeze":
+        if random.random() < 0.20:
+            e.apply_slow(0.6 if boss else 0.08, 1.4)
+            fx.burst(e.x, e.y, col, n=6, speed=70, life=0.4, r=2.6)
+        else:
+            e.apply_slow(0.75, 1.0)
+    elif perk == "stun":
+        e._evo_t = now + 2.0              # sersemletme sık tutmasın
+        e.apply_slow(0.65 if boss else 0.05, 0.7)
+        if random.random() < 0.35:
+            fx.popup(e.x, e.y - e.radius - 12, L("evo.whack"), col, 14, life=0.45)
+    elif perk == "curse":
+        e._evo_mark = now + 3.0
     elif perk == "poison":
         if not getattr(e, "_evo_poison", False):
             e._evo_poison = True
             e.apply_poison(max(0.5, amount * 0.10))
-            fx.burst(e.x, e.y, col, n=5, speed=50, life=0.5, r=2.6, gravity=-30)
+    elif perk == "bleed":
+        st = getattr(e, "_evo_bleed", 0)
+        if st < 5:
+            e._evo_bleed = st + 1
+            e.apply_poison(max(0.3, amount * 0.05))
     elif perk == "leech":
-        run.player.lifesteal(amount * 0.04)
-    elif perk == "chain" and random.random() < EVO_CHAIN_CHANCE:
-        run.evo_chain(e, amount, key)
+        p.lifesteal(amount * 0.04)
+    elif perk == "chain":
+        if random.random() < EVO_CHAIN_CHANCE:
+            run.evo_chain(e, amount, key)
+    elif perk == "knock":
+        if not boss:
+            d = dist(e.x, e.y, p.x, p.y) or 1.0
+            e.knock_x += (e.x - p.x) / d * 420.0
+            e.knock_y += (e.y - p.y) / d * 420.0
+    elif perk == "scorch":
+        if run.run_time >= getattr(run, "evo_scorch_t", 0.0):
+            run.evo_scorch_t = run.run_time + 0.25
+            run.evo_scorch(e.x, e.y, amount)
+    elif perk == "aftershock":
+        if len(run.evo_shocks) < 12:
+            run.evo_shocks.append([e.x, e.y, EVO_SHOCK_DELAY, amount * 0.5])
 
 
 class EvoMixin:
     """RunState'e evrim davranışı (karışım sınıf: RunState zaten çok uzun)."""
-
 
     def evo_init(self):
         self.evo_perks = {}            # evrilmiş silah -> etki
         self.evo_banner = None         # (başlangıç zamanı, silah)
         self.evo_blast_t = 0.0
         self.evo_blasts = 0
+        self.evo_shocks = []           # [x, y, kalan, hasar]
+        self.evo_aegis_t = EVO_AEGIS_EVERY
         self.player.evolved = set()
+        self.player.evo_soul = (0, 0.0)
         EVO_ON.clear()
 
     def evo_update(self, dt):
-        """Kareye bağlı evrim etkileri (pelerin: vuruşu olmayan silah)."""
+        """Kareye bağlı evrim etkileri."""
         p = self.player
         if "cloak" in p.evolved and getattr(p, "invis_t", 0.0) > 0:
             self.evo_shroud_t = getattr(self, "evo_shroud_t", 0.0) - dt
@@ -26178,13 +26729,58 @@ class EvoMixin:
                 self.evo_shroud_t = 0.5
                 col = EVO_PERK_COLOR["shroud"]
                 dmg = weapon_damage(p, WEAPON_BY_KEY["emanet"], max(1, p.weapons.get("cloak", 1))) * 0.12
-                self.fx.ring(p.x, p.y, col, n=12, speed=160, life=0.4, r=2.6)
+                self.fx.ring(p.x, p.y, col, n=10, speed=160, life=0.4, r=2.4)
                 for e in self.enemies:
                     if e.alive and not getattr(e, "_evo_poison", False) and \
                             (e.x - p.x) ** 2 + (e.y - p.y) ** 2 < 220 * 220:
                         e._evo_poison = True
                         e.apply_poison(max(0.5, dmg))
-                        self.fx.burst(e.x, e.y, col, n=4, speed=50, life=0.45, r=2.4, gravity=-30)
+        if "book" in p.evolved:
+            self.evo_aegis_t -= dt
+            if self.evo_aegis_t <= 0:
+                self.evo_aegis_t = EVO_AEGIS_EVERY
+                col = EVO_PERK_COLOR["aegis"]
+                dmg = weapon_damage(p, WEAPON_BY_KEY["book"], p.weapons.get("book", 1)) * 1.2
+                self.fx.shockwave(p.x, p.y, EVO_AEGIS_R, col, 0.4, 5)
+                prev = DMG_SRC[0]
+                DMG_SRC[0] = "book"
+                EVO_BUSY[0] = True
+                try:
+                    for e in self.enemies:
+                        if not e.alive:
+                            continue
+                        dx, dy = e.x - p.x, e.y - p.y
+                        d2 = dx * dx + dy * dy
+                        if d2 < EVO_AEGIS_R * EVO_AEGIS_R:
+                            d = math.sqrt(d2) or 1.0
+                            e.knock_x += dx / d * 300.0
+                            e.knock_y += dy / d * 300.0
+                            if e.take_damage(dmg, False, self.fx, quiet=True):
+                                self.on_enemy_killed(e)
+                finally:
+                    EVO_BUSY[0] = False
+                    DMG_SRC[0] = prev
+        if self.evo_shocks:
+            col = EVO_PERK_COLOR["aftershock"]
+            keep = []
+            for s in self.evo_shocks:
+                s[2] -= dt
+                if s[2] > 0:
+                    keep.append(s)
+                    continue
+                self.fx.shockwave(s[0], s[1], 70, col, 0.3, 4)
+                prev = DMG_SRC[0]
+                DMG_SRC[0] = "quake"
+                EVO_BUSY[0] = True
+                try:
+                    for e in self.enemies:
+                        if e.alive and (e.x - s[0]) ** 2 + (e.y - s[1]) ** 2 < 70 * 70:
+                            if e.take_damage(s[3], False, self.fx, quiet=True):
+                                self.on_enemy_killed(e)
+                finally:
+                    EVO_BUSY[0] = False
+                    DMG_SRC[0] = prev
+            self.evo_shocks = keep
 
     def evo_offer(self, key):
         w = WEAPON_BY_KEY[key]
@@ -26224,12 +26820,11 @@ class EvoMixin:
         self.evo_banner = (self.run_time, key)
         self.evo_count = getattr(self, "evo_count", 0) + 1
         fx = self.fx
-        fx.do_flash(col, 0.55)
-        fx.shake(9, 0.3)
-        for k in range(3):
-            fx.shockwave(p.x, p.y, 120 + 90 * k, col if k != 1 else WHITE, 0.45 + 0.1 * k, 6 - k)
-        fx.ring(p.x, p.y, col, n=40, speed=320, life=0.7, r=4)
-        fx.burst(p.x, p.y, lighten(col, 0.4), n=30, speed=220, life=0.8, r=3.5, gravity=-40)
+        fx.do_flash(col, 0.35)
+        fx.shake(6, 0.25)
+        for k in range(2):
+            fx.shockwave(p.x, p.y, 120 + 100 * k, col if k == 0 else WHITE, 0.45 + 0.1 * k, 6 - k)
+        fx.ring(p.x, p.y, col, n=30, speed=300, life=0.7, r=4)
         # evrim dalgası: çevredeki yaratıkları iter
         for e in self.enemies:
             if e.alive:
@@ -26253,16 +26848,11 @@ class EvoMixin:
             return
         cands.sort(key=lambda c: c[0])
         col = EVO_PERK_COLOR["chain"]
-        EVO_BUSY[0] = True
-        try:
-            prev = src
-            for _d, e in cands[:2]:
-                self.fx.bolt(zigzag(prev.x, prev.y, e.x, e.y, 6, 9), col, 0.22)
-                if e.take_damage(amount * EVO_CHAIN_DMG, False, self.fx, quiet=True):
-                    self.on_enemy_killed(e)
-                prev = e
-        finally:
-            EVO_BUSY[0] = False
+        prev = src
+        for _d, e in cands[:2]:
+            self.fx.bolt(zigzag(prev.x, prev.y, e.x, e.y, 6, 9), col, 0.22)
+            _evo_extra_hit(self, e, amount * EVO_CHAIN_DMG)
+            prev = e
 
     def evo_blast(self, src, amount, key):
         sec = int(self.run_time)
@@ -26273,18 +26863,19 @@ class EvoMixin:
         self.evo_blasts += 1
         col = EVO_PERK_COLOR["blast"]
         self.fx.shockwave(src.x, src.y, EVO_BLAST_R, col, 0.3, 4)
-        self.fx.burst(src.x, src.y, col, n=10, speed=200, life=0.35, r=3.2)
         dmg = amount * EVO_BLAST_DMG
-        EVO_BUSY[0] = True
-        try:
-            for e in self.enemies:
-                if e is src or not e.alive:
-                    continue
-                if (e.x - src.x) ** 2 + (e.y - src.y) ** 2 < EVO_BLAST_R * EVO_BLAST_R:
-                    if e.take_damage(dmg, False, self.fx, quiet=True):
-                        self.on_enemy_killed(e)
-        finally:
-            EVO_BUSY[0] = False
+        for e in self.enemies:
+            if e is src or not e.alive:
+                continue
+            if (e.x - src.x) ** 2 + (e.y - src.y) ** 2 < EVO_BLAST_R * EVO_BLAST_R:
+                _evo_extra_hit(self, e, dmg)
+
+    def evo_scorch(self, x, y, amount):
+        col = EVO_PERK_COLOR["scorch"]
+        self.fx.burst(x, y, col, n=6, speed=90, life=0.4, r=2.8, gravity=-50)
+        for e in self.enemies:
+            if e.alive and (e.x - x) ** 2 + (e.y - y) ** 2 < 75 * 75:
+                e.apply_burn(max(1.0, amount * 0.20), 2.5)
 
 
 def draw_evo_orbs(world, run, t):
@@ -26408,13 +26999,13 @@ def draw_evo_card(surf, r2, ch, run, t, hover):
     pygame.draw.rect(surf, (20, 15, 15), box, border_radius=10)
     ink_frame(surf, box, scale_col(col, 0.45), 10, 1)
     draw_text(surf, L("evo.dmg"), (box.x + 10, box.y + 9), 13, (176, 170, 160), shadow=False)
-    draw_text(surf, "x%.1f" % EVO_DMG_MULT, (box.right - 10, box.y + 8), 15, GREEN, bold=True,
+    draw_text(surf, "x" + ("%.2f" % EVO_DMG_MULT).rstrip("0").rstrip("."), (box.right - 10, box.y + 8), 15, GREEN, bold=True,
               right=True, shadow=False)
     draw_icon(surf, box.x + 18, box.y + 44, EVO_PERK_ICON[perk], pcol, 8)
     for i, ln in enumerate(wrap_text(ch["desc"], 13, box.w - 44)[:2]):
         draw_text(surf, ln, (box.x + 32, box.y + 36 + i * 16), 13, pcol, bold=True, shadow=False)
     bk = ch.get("book")
-    req = L("evo.need", EVO_LEVEL, bk_name(bk) if bk else "?")
+    req = L("evo.need", EVO_LEVEL, bk_name(bk) if bk else "?", evo_book_need(key))
     draw_text(surf, _fit_text(req, 11, box.w - 16), (box.centerx, box.bottom - 15), 11, TEXT_DIM,
               center=True, shadow=False)
     if hover:
@@ -27075,7 +27666,30 @@ class RunState(EvoMixin, WorldExtrasMixin):
             base = hell_hp_mult(wave)
         else:
             base = arena_hp_mult(wave) * (1.0 + getattr(self, "theme_hp", 0.0))
-        return base * (1.0 + self.player.enemy_hp_curse)
+        return base * (1.0 + self.player.enemy_hp_curse) * self.adapt_hp_mult(wave, base)
+
+    def adapt_hp_mult(self, wave, base):
+        """Uyarlanır yaratık canı: oyuncu o dalga için olağandan çok güçlüyse
+        yeni doğan yaratıklar daha canlı gelir (kısmen - güçlü olan yine farkı
+        hisseder). Zayıf oyuncuya dokunmaz; ilk dalgalarda yok."""
+        tw = int(wave) + (HELL_BASE_WAVE if self.biome == "hell" else 0)
+        if tw < ADAPT_FROM_WAVE or getattr(self, "is_coop", False):
+            return 1.0
+        cache = self.__dict__.setdefault("_adapt", {})
+        hit = cache.get(int(wave))
+        if hit is not None and self.run_time < hit[0]:
+            return hit[1]
+        try:
+            est = self.player.estimated_dps()
+        except Exception:
+            est = 0.0
+        ref = ADAPT_REF_HP * base * late_wave_boost(wave, self.biome)[0]
+        ratio = est / max(1.0, ref)
+        m = clamp((ratio / ADAPT_TARGET) ** ADAPT_EXP, 1.0, ADAPT_MAX) if ratio > ADAPT_TARGET else 1.0
+        ramp = clamp((tw - ADAPT_FROM_WAVE + 1) / float(ADAPT_FULL_WAVE - ADAPT_FROM_WAVE + 1), 0.0, 1.0)
+        m = 1.0 + (m - 1.0) * ramp
+        cache[int(wave)] = (self.run_time + 1.0, m)
+        return m
 
     def open_shop(self):
         self.shop_offers = SHOP_ITEMS
@@ -28895,7 +29509,8 @@ class RunState(EvoMixin, WorldExtrasMixin):
             self.drop_pickup(e.x, e.y, "coin", coin_gain)
             self.drop_pickup(e.x, e.y, "xp", xp_gain)
         self._on_cursed_death(e)
-        if random.random() < HEART_DROP_CHANCE and p.hp < p.max_hp * 0.9:
+        if (random.random() < HEART_DROP_CHANCE and p.hp < p.max_hp * 0.9
+                and getattr(self, "omen", None) != "drought"):
             self.pickups.append(Pickup(e.x, e.y, "heart", 26))
         # mıknatıs: binde 2.5 düşer (kötü şansa karşı kademeli garanti için).
         can_stone = self.level_drops_total < self.magnets_dropped
@@ -31008,7 +31623,7 @@ OATH_BY_KEY = {k: (k, ic, col) for k, ic, col in OATHS}
 # bot ölçümüyle ayarlandı (ortalama bot ~7-14 dk yaşıyor):
 #   anahtar: (simge, renk, (kolay, orta, zor) hedefleri - None: o zorlukta çıkmaz)
 QUEST_DEFS = {
-    "kills":  ("skull", (255, 128, 110), (600, 1500, 3000)),
+    "kills":  ("skull", (255, 128, 110), (1200, 3000, 6000)),     # oyun 2 kat uzun
     "wave":   ("flame", (255, 170, 80), (7, 12, 18)),
     "level":  ("star", (190, 150, 255), (10, 16, 24)),
     "gold":   ("coin", (232, 186, 90), (600, 1800, 4000)),
@@ -32400,6 +33015,12 @@ def draw_minimap(surf, run, t, big=False):
                                max(2, int(k * (4 + pulse * 0.4))))
             pygame.draw.circle(surf, WHITE, (int(px), int(py)), max(1, int(k * 2)))
 
+    # kayıp kervan
+    _cv = getattr(run, "caravan", None)
+    if _cv is not None and not (_cv.stopped or _cv.gone):
+        px, py = mp(_cv.x, _cv.y)
+        pygame.draw.rect(surf, INK, (int(px) - 4, int(py) - 3, 9, 7))
+        pygame.draw.rect(surf, CARAVAN_COLOR, (int(px) - 3, int(py) - 2, 7, 5))
     # güç sunağı
     _psh = getattr(run, "shrine", None)
     if _psh is not None and not _psh.used:
@@ -32551,6 +33172,9 @@ def draw_offscreen_markers(surf, run, cam, t):
     _psh = getattr(run, "shrine", None)
     if _psh is not None and not _psh.used:
         marks.append((_psh.x, _psh.y, _psh.color(), SHRINE_KINDS[_psh.kind][1]))
+    _cv = getattr(run, "caravan", None)
+    if _cv is not None and not (_cv.stopped or _cv.gone):
+        marks.append((_cv.x, _cv.y, CARAVAN_COLOR, "coin"))
     # hazine goblini: kaçan ganimet ekran dışındaysa ok göster
     for e in run.enemies:
         if e.alive and e.kind == "goblin":
@@ -36960,7 +37584,7 @@ def _ms_draw_detail(app, canvas, theme, mouse_pos, clicked, t, k):
         hov = rect.collidepoint(mouse_pos)
         face = key_button(canvas, rect, c_, hov, rad=12)
         lab, lsz = ms_fit(label, 19, rect.w - 16, True)
-        draw_text(canvas, lab, face.center, lsz, WHITE, bold=True, center=True)
+        draw_text(canvas, lab, face.center, lsz, PAPER_INK, bold=True, center=True, shadow=False)
         if hov and clicked and k >= 1.0:
             result = kind
     return result
@@ -37010,10 +37634,9 @@ def draw_map_select(app, canvas, mouse_pos, clicked, t):
             rows.append((bc, L("coop.ms_btn"), (96, 70, 150), "coop"))
         for rect, label, c_, kind in rows:
             hov = rect.collidepoint(mouse_pos) and zoom is None
-            panel(canvas, rect, bg=lighten(c_, 0.15) if hov else c_, edge=lighten(c_, 0.4), alpha=250,
-                  radius=12, edge_w=2)
+            face = key_button(canvas, rect, c_, hov, rad=12)
             lab, lsz = ms_fit(label, 19, rect.w - 16, True)
-            draw_text(canvas, lab, rect.center, lsz, WHITE, bold=True, center=True)
+            draw_text(canvas, lab, face.center, lsz, PAPER_INK, bold=True, center=True, shadow=False)
             if hov and clicked and result is None:
                 result = (kind, sel)
     if zoom is not None:
@@ -37923,9 +38546,9 @@ STATE_SNOW = "snow_event"           # kartopu savaşı
 DIFF_ORDER = ["normal", "hard", "nightmare"]
 DIFF_LABEL = {"normal": "NORMAL", "hard": "ZOR", "nightmare": "KABUS"}
 # Zorluk yalnızca TEMPOyu değiştirir.
-DIFF_DESC = {"normal": "Sakin tempo. 25 dalga 35 dakika sürer, düşmanlar daha seyrek gelir.",
-             "hard": "Dengeli tempo. 25 dalga 30 dakika sürer, düşmanlar düzenli akar.",
-             "nightmare": "Hızlı tempo. 25 dalga 20 dakika sürer, düşmanlar çok daha sık gelir!"}
+DIFF_DESC = {"normal": "Sakin tempo. 25 dalga 70 dakika sürer, düşmanlar daha seyrek gelir.",
+             "hard": "Dengeli tempo. 25 dalga 60 dakika sürer, düşmanlar düzenli akar.",
+             "nightmare": "Hızlı tempo. 25 dalga 40 dakika sürer, düşmanlar çok daha sık gelir!"}
 
 
 # ---- sohbet / komut satırı (L tuşu) ----
@@ -47076,8 +47699,10 @@ class App:
         if not self.save.cosmetics_locked():
             draw_cosmetic_cape(canvas, fake, cx, cy, t)
         # Skinin kendi görünümü (aura, maske, kanat, pelerin...) tam hâliyle
-        draw_skin_preview(canvas, sk, cx, cy, t, r=27, weapon=False)
-        if not self.save.cosmetics_locked():
+        locked_cos = self.save.cosmetics_locked()
+        draw_skin_preview(canvas, sk, cx, cy, t, r=27, weapon=False, aim=fake.aim_dir,
+                          hide_eyes=() if locked_cos else eyes_hidden(fake))
+        if not locked_cos:
             draw_cosmetic_eyewear(canvas, fake, cx, cy, t)
             draw_cosmetic_hat(canvas, fake, cx, cy, t)
 
@@ -51893,9 +52518,12 @@ class App:
             # evrim tarifi: hangi kitapla, neye dönüşür, ne kazanır
             ecol = ev[2]
             draw_text(canvas, L("evo.band"), (rx, yy), 12, ecol, bold=True, shadow=False)
-            draw_text(canvas, L("evo.need", EVO_LEVEL, evo_book_name(key)),
+            draw_text(canvas, L("evo.need", EVO_LEVEL, evo_book_name(key), evo_book_need(key)),
                       (rx + text_width(L("evo.band"), 12, True) + 10, yy), 12, TEXT_DIM, shadow=False)
-            yy += 20
+            yy += 18
+            draw_text(canvas, L("evo.rule", EVO_MIN_WEAPONS, EVO_MAX_PER_RUN), (rx, yy), 11,
+                      (150, 140, 130), shadow=False)
+            yy += 18
             blit_sigil(canvas, rx + 9, yy + 9, 8, key, ecol)
             draw_text(canvas, "%s  -  %s" % (evo_name(key), L("evo.perk." + ev[1])), (rx + 24, yy + 1),
                       13, lighten(ecol, 0.25), bold=True, shadow=False)
@@ -51954,9 +52582,8 @@ class App:
 
         cb = pygame.Rect(rect.centerx + 30, rect.bottom - 52, 200, 34)
         chov = cb.collidepoint(mouse_pos)
-        pygame.draw.rect(canvas, (64, 46, 48) if chov else (48, 35, 36), cb, border_radius=8)
-        ink_frame(canvas, cb, edge, 8, 2)
-        draw_text(canvas, L("ui.close"), cb.center, 13, TEXT, bold=True, center=True, shadow=False)
+        face = key_button(canvas, cb, (120, 100, 90), chov)
+        draw_text(canvas, L("ui.close"), face.center, 13, PAPER_INK, bold=True, center=True, shadow=False)
         if clicked and (chov or not rect.collidepoint(mouse_pos)):
             self.weapon_detail = None
             sfx("click", 0.45, 0.0)
@@ -52383,9 +53010,8 @@ class App:
         cb = pygame.Rect(0, 0, 190, 40)
         cb.center = (book_rect.centerx, book_rect.bottom + 34)
         hov = cb.collidepoint(mouse_pos)
-        pygame.draw.rect(canvas, (56, 60, 88) if hov else (32, 34, 52), cb, border_radius=10)
-        ink_frame(canvas, cb, edge if hov else PANEL_EDGE, 10, 2)
-        draw_text(canvas, L("ui.close_esc"), cb.center, 15, TEXT, bold=True, center=True)
+        face = key_button(canvas, cb, (120, 100, 90), hov)
+        draw_text(canvas, L("ui.close_esc"), face.center, 15, PAPER_INK, bold=True, center=True)
 
         if clicked and (hov or not book_rect.collidepoint(mouse_pos)):
             self.book_detail = None
@@ -52702,11 +53328,14 @@ class App:
         fake.aim_dir = (math.sin(t * 0.6) * 0.25, 1.0)
         fake.cosmetics = {"hat": None, "eyewear": None, "cape": None}
         fake.cosmetics[slot] = item_id
-        body = (92, 100, 132)
+        # deneme kabini: eşya oyuncunun kendi karakterinin üstünde görünür
+        sk = get_skin(self.save.equipped_skin_id())
+        fake.skin = sk
+        pygame.draw.ellipse(canvas, (0, 0, 0), (int(cx - radius * 0.9), int(cy + radius * 0.75),
+                                                 int(radius * 1.8), int(radius * 0.5)))
         draw_cosmetic_cape(canvas, fake, cx, cy, t)
-        pygame.draw.circle(canvas, OUTLINE, (int(cx), int(cy)), radius + 2)
-        pygame.draw.circle(canvas, body, (int(cx), int(cy)), radius)
-        pygame.draw.circle(canvas, lighten(body, .35), (int(cx - radius * .3), int(cy - radius * .3)), max(2, int(radius * .25)))
+        draw_skin_preview(canvas, sk, cx, cy, t, r=radius, weapon=False, aim=fake.aim_dir,
+                          hide_eyes=eyes_hidden(fake), extras=False)
         draw_cosmetic_eyewear(canvas, fake, cx, cy, t)
         draw_cosmetic_hat(canvas, fake, cx, cy, t)
 
@@ -52821,9 +53450,9 @@ class App:
                 item["color"] if (owned or affordable or is_pet) else (60, 62, 82))
             panel(canvas, rect, bg=(30, 34, 54) if hover else (20, 22, 36), edge=edge, alpha=240, radius=14, edge_w=2)
 
-            cc = (rect.centerx, rect.y + 62)
-            add_glow(canvas, cc[0], cc[1], 42, item["color"], .4)
-            self._cosmetic_preview(canvas, cc[0], cc[1], 26, item["slot"], item["id"], self.t)
+            cc = (rect.centerx, rect.y + 60)
+            add_glow(canvas, cc[0], cc[1], 42, item["color"], .25)
+            self._cosmetic_preview(canvas, cc[0], cc[1], 25, item["slot"], item["id"], self.t)
 
             draw_text(canvas, cos_name(item), (rect.centerx, rect.y + 100), 15, TEXT, bold=True, center=True)
             # İki satır sığıyor (alt yazı rect.bottom-18'de).
