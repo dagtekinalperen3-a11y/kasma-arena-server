@@ -31874,6 +31874,15 @@ STRINGS.update({
     "ui.ad_wait":     _T("Sonraki: {0}", "Next: {0}", "Siguiente: {0}", "Nächste: {0}", "Следующая: {0}"),
     "ui.ad_tomorrow": _T("Yarın yenilenir ({0})", "Resets tomorrow ({0})", "Se renueva mañana ({0})",
                          "Morgen wieder ({0})", "Обновится завтра ({0})"),
+    "rp.watch":       _T("SON ANLARI İZLE", "WATCH REPLAY", "VER REPETICIÓN", "WIEDERHOLUNG", "ПОВТОР"),
+    "rp.title":       _T("SON ANLAR", "LAST MOMENTS", "ÚLTIMOS MOMENTOS", "LETZTE MOMENTE", "ПОСЛЕДНИЕ МГНОВЕНИЯ"),
+    "rp.slow":        _T("AĞIR ÇEKİM", "SLOW MOTION", "CÁMARA LENTA", "ZEITLUPE", "ЗАМЕДЛЕНИЕ"),
+    "rp.skip":        _T("ESC / tıkla: geç", "ESC / click: skip", "ESC / clic: saltar", "ESC / Klick: überspringen",
+                         "ESC / клик: пропустить"),
+    "rp.note":        _T("Kaydedilmez, bu ekrandan çıkınca silinir.", "Not saved - gone once you leave this screen.",
+                         "No se guarda: se borra al salir de esta pantalla.",
+                         "Wird nicht gespeichert - weg, sobald du hier rausgehst.",
+                         "Не сохраняется — пропадёт, когда уйдёшь с этого экрана."),
     "ui.daily_gift":  _T("GÜNLÜK HEDİYE", "DAILY GIFT", "REGALO DIARIO", "TAGESGESCHENK", "ЕЖЕДНЕВНЫЙ ПОДАРОК"),
     "ui.gift_desc":   _T("Her gün uğra, seri büyüdükçe hediye büyür.", "Drop by daily - the streak grows the gift.",
                          "Vuelve cada día: la racha agranda el regalo.", "Komm täglich - die Serie macht es größer.",
@@ -47296,6 +47305,264 @@ TEXT_TR.update({
 })
 
 
+# ---- ölüm tekrarı ----
+# Koşunun son birkaç saniyesi küçültülüp JPEG olarak yalnızca bellekte tutulur
+# (diske hiç yazılmaz). Ölünce sonuç ekranından bir kez izlenebilir; o ekrandan
+# çıkınca silinir.
+REPLAY_SECS = 8.0
+REPLAY_FPS = 12 if MOBILE else 24
+REPLAY_SIZE = (640, 360) if MOBILE else (960, 540)
+REPLAY_SLOW_LAST = 1.6           # son kısım ağır çekimde oynar
+REPLAY_SLOW = 0.4
+REPLAY_HOLD = 1.1                # son karede bekleme
+REPLAY_AFTER = 1.4               # 2 kişilikte ölümden sonra kayıt bu kadar sürer
+_rp_h = VIRTUAL_H - 68
+REPLAY_VIEW = pygame.Rect((VIRTUAL_W - VIRTUAL_W * _rp_h // VIRTUAL_H) // 2, 34, VIRTUAL_W * _rp_h // VIRTUAL_H, _rp_h)
+# bu ekranlarda tekrar bellekte kalır, başka yere geçince silinir
+REPLAY_KEEP_STATES = frozenset((STATE_PLAY, STATE_PAUSE, STATE_LEVELUP, STATE_CURSE, STATE_MERCHANT,
+                                STATE_RUN_SHOP, STATE_GAMEOVER, STATE_NAME_ENTRY, "coop_pause", "coop_end"))
+try:
+    from collections import deque as _rp_deque
+except Exception:
+    _rp_deque = None
+
+
+class DeathReplay:
+    def __init__(self):
+        self.frames = _rp_deque(maxlen=int(REPLAY_FPS * REPLAY_SECS))
+        self.gen = 0
+        self.run = None
+        self.clock = 0.0
+        self.acc = 0.0
+        self.after = -1.0
+        self.frozen = False
+        self.died = False
+        self.cause = ""
+        self.jpg = True
+        self.q = None
+        self.th = None
+        self.play = None
+
+    def reset(self, run=None):
+        self.gen += 1
+        self.frames.clear()
+        self.run = run
+        self.clock = self.acc = 0.0
+        self.after = -1.0
+        self.frozen = self.died = False
+        self.cause = ""
+        self.play = None
+
+    def ready(self, run):
+        return (self.died and run is not None and run is self.run
+                and len(self.frames) >= REPLAY_FPS)
+
+    def capture(self, canvas, dt, run):
+        if run is not self.run:
+            self.reset(run)
+        p = getattr(run, "player", None)
+        alive = bool(getattr(p, "alive", True))
+        force = False
+        if not alive:
+            if not self.died:
+                force = True              # ölüm karesi hiç atlanmasın
+                self.died = True
+                self.cause = str(getattr(run, "death_cause", "") or getattr(p, "last_hit_by", "") or "")
+                self.after = REPLAY_AFTER
+        elif self.died:
+            # 2 kişilikte kaldırıldım: önceki ölüm geçersiz, kayıt sürer
+            self.died = self.frozen = False
+            self.after = -1.0
+        if self.frozen:
+            return
+        if self.after >= 0:
+            self.after -= dt
+            if self.after < 0:
+                self.frozen = True
+        self.clock += dt
+        self.acc += dt
+        iv = 1.0 / REPLAY_FPS
+        if self.acc < iv and not force:
+            return
+        self.acc = max(0.0, min(self.acc - iv, iv))
+        try:
+            small = pygame.transform.smoothscale(canvas, REPLAY_SIZE)
+        except Exception:
+            return
+        item = (self.gen, self.clock, small)
+        if IS_WEB or _queue is None:
+            self._store(item)
+            return
+        if self.th is None:
+            self.q = _queue.Queue(maxsize=6)
+            self.th = threading.Thread(target=self._worker, daemon=True)
+            self.th.start()
+        try:
+            self.q.put(item, timeout=0.25) if force else self.q.put_nowait(item)
+        except Exception:
+            pass                          # yetişemedi: bu kare atlanır
+
+    def _worker(self):
+        while True:
+            try:
+                self._store(self.q.get())
+            except Exception:
+                pass
+
+    def _store(self, item):
+        gen, t, surf = item
+        data = surf
+        if self.jpg:
+            try:
+                bio = io.BytesIO()
+                pygame.image.save(surf, bio, "replay.jpg")
+                data = bio.getvalue()
+            except Exception:
+                self.jpg = False
+        if not self.jpg:
+            # JPEG yoksa: daha küçük ham kare (bellek sınırlı kalsın)
+            try:
+                data = pygame.transform.smoothscale(surf, (REPLAY_SIZE[0] // 2, REPLAY_SIZE[1] // 2))
+            except Exception:
+                return
+        if gen == self.gen:
+            self.frames.append((t, data))
+
+    # ---- oynatma ----
+    def start(self):
+        fr = list(self.frames)
+        if len(fr) < 2:
+            return False
+        t0, t1 = fr[0][0], fr[-1][0]
+        self.play = {"fr": fr, "t0": t0, "t1": t1, "pos": 0.0, "hold": 0.0, "idx": -1, "img": None,
+                     "slow_sfx": False}
+        sfx("dash", 0.5, 0.0)
+        return True
+
+    def playing(self):
+        return self.play is not None
+
+    def stop(self):
+        self.play = None
+
+    def _frame_img(self, pl, i):
+        if pl["idx"] == i and pl["img"] is not None:
+            return pl["img"]
+        data = pl["fr"][i][1]
+        try:
+            if isinstance(data, (bytes, bytearray)):
+                img = pygame.image.load(io.BytesIO(data), "replay.jpg")
+            else:
+                img = data
+            # sinema şeritlerinin arasına sığsın (HUD kesilmesin)
+            img = pygame.transform.smoothscale(img, REPLAY_VIEW.size)
+        except Exception:
+            img = pl["img"]
+        pl["idx"], pl["img"] = i, img
+        return img
+
+    def draw(self, canvas, dt, t):
+        """Bir kare oynatır; bitince False döner."""
+        pl = self.play
+        if pl is None:
+            return False
+        span = max(0.01, pl["t1"] - pl["t0"])
+        slow_from = max(0.0, span - REPLAY_SLOW_LAST)
+        slow = pl["pos"] >= slow_from
+        if pl["pos"] < span:
+            pl["pos"] = min(span, pl["pos"] + dt * (REPLAY_SLOW if slow else 1.0))
+        else:
+            pl["hold"] += dt
+            if pl["hold"] >= REPLAY_HOLD:
+                self.play = None
+                return False
+        if slow and not pl["slow_sfx"]:
+            pl["slow_sfx"] = True
+            sfx("hurt", 0.35, 0.0)
+        # gösterilecek kare: zamanı geçmiş en son kare
+        tt = pl["t0"] + pl["pos"]
+        fr = pl["fr"]
+        lo, hi = 0, len(fr) - 1
+        while lo < hi:
+            mid = (lo + hi + 1) // 2
+            if fr[mid][0] <= tt:
+                lo = mid
+            else:
+                hi = mid - 1
+        img = self._frame_img(pl, lo)
+        canvas.fill((0, 0, 0))
+        if img is not None:
+            if pl["hold"] > 0:
+                # son kare: renk yavaşça çekilir
+                if pl.get("gray") is None:
+                    try:
+                        pl["gray"] = pygame.transform.grayscale(img)
+                    except Exception:
+                        pl["gray"] = img
+                canvas.blit(img, REPLAY_VIEW.topleft)
+                gimg = pl["gray"]
+                gimg.set_alpha(int(255 * clamp(pl["hold"] / 0.5, 0.0, 1.0)))
+                canvas.blit(gimg, REPLAY_VIEW.topleft)
+            else:
+                canvas.blit(img, REPLAY_VIEW.topleft)
+        bh = REPLAY_VIEW.y
+        # son anlarda kızıl kenar
+        if slow:
+            k = clamp((pl["pos"] - slow_from) / max(0.01, REPLAY_SLOW_LAST), 0.0, 1.0)
+            vig = pygame.Surface(REPLAY_VIEW.size, pygame.SRCALPHA)
+            for i in range(8):
+                q = i / 7.0
+                pygame.draw.rect(vig, (120, 0, 16, int((10 + 14 * q) * k)),
+                                 vig.get_rect().inflate(-int(70 * q * 6), -int(40 * q * 6)), 36,
+                                 border_radius=36)
+            canvas.blit(vig, REPLAY_VIEW.topleft)
+        # başlık
+        blink = 0.5 + 0.5 * math.sin(t * 6)
+        circle_aa(canvas, 26, bh // 2, 6, (int(150 + 105 * blink), 40, 50))
+        draw_text(canvas, L("rp.title"), (40, bh // 2 - 9), 16, (255, 220, 220), bold=True, shadow=False)
+        if slow:
+            draw_text(canvas, L("rp.slow"), (VIRTUAL_W / 2, bh // 2 - 8), 14, (255, 150, 150), bold=True,
+                      center=True, shadow=False)
+        draw_text(canvas, L("rp.skip"), (VIRTUAL_W - 18, bh // 2 - 7), 12, (170, 170, 190), right=True,
+                  shadow=False)
+        # ilerleme çubuğu (ağır çekim kısmı kızıl)
+        bar = pygame.Rect(40, VIRTUAL_H - bh // 2 - 3, VIRTUAL_W - 80, 6)
+        pygame.draw.rect(canvas, (50, 46, 58), bar, border_radius=3)
+        sx = bar.x + int(bar.w * slow_from / span)
+        pygame.draw.rect(canvas, (110, 34, 44), (sx, bar.y, bar.right - sx, bar.h), border_radius=3)
+        fw = int(bar.w * clamp(pl["pos"] / span, 0.0, 1.0))
+        if fw > 0:
+            pygame.draw.rect(canvas, (255, 120, 120) if slow else (230, 230, 245),
+                             (bar.x, bar.y, fw, bar.h), border_radius=3)
+        left_s = max(0.0, span - pl["pos"])
+        draw_text(canvas, "-%.1f" % left_s, (bar.x - 8, bar.y - 5), 11, (170, 170, 190), right=True, shadow=False)
+        # son kare: kimin öldürdüğü
+        if pl["hold"] > 0 and self.cause:
+            a = clamp(pl["hold"] / 0.25, 0.0, 1.0)
+            dc = L("ui.killed_by", self.cause)
+            w_ = text_width(dc, 20, True) + 60
+            r_ = pygame.Rect(0, 0, w_, 44)
+            r_.center = (VIRTUAL_W // 2, VIRTUAL_H // 2 + 120)
+            panel(canvas, r_, bg=(46, 16, 22), edge=(190, 70, 80), alpha=int(235 * a), radius=14, edge_w=2)
+            draw_icon(canvas, r_.x + 24, r_.centery, "skull", (255, 150, 150), 9)
+            draw_text(canvas, dc, (r_.x + 42, r_.centery - 11), 20, (255, 200, 200), bold=True, shadow=False)
+        return True
+
+
+def replay_button_draw(canvas, rect, mouse_pos, t):
+    """Sonuç ekranındaki 'son anları izle' düğmesi (oynat simgeli). Üstünde mi döner."""
+    hov = rect.collidepoint(mouse_pos)
+    add_glow(canvas, rect.centerx, rect.centery, rect.w * 0.6, (255, 90, 90), 0.08 + 0.04 * math.sin(t * 3))
+    panel(canvas, rect, bg=(120, 40, 52) if hov else (92, 30, 40), edge=(255, 130, 130), alpha=245,
+          radius=12, edge_w=2)
+    cx, cy = rect.x + 26, rect.centery
+    pygame.draw.polygon(canvas, (255, 225, 225), [(cx - 6, cy - 9), (cx - 6, cy + 9), (cx + 9, cy)])
+    tw = rect.w - 50
+    draw_text(canvas, _fit_text(L("rp.watch"), 15, tw, bold=True), (rect.x + 42 + tw / 2, cy), 15,
+              (255, 235, 235), bold=True, center=True, shadow=False)
+    return hov
+
+
 class App:
     def __init__(self, shadow_of=None):
         # gölge kip: shadow_of verilirse bu App gerçek oyunun yanında çalışan
@@ -47336,6 +47603,7 @@ class App:
         self.merchant_ui = MerchantOverlay()
         self.restart_hold = 0.0         # oyunda R basılı tutma süresi
         self.restart_armed = False
+        self.replay = DeathReplay()
         self.shop_ui = RunShopOverlay()
         # L ile açılan sol alt sohbet/komut kutusu (hile kodu da buradan).
         self.chat = ChatConsole()
@@ -48027,6 +48295,9 @@ class App:
             elif self.state == STATE_COOP_PAUSE: self.update_coop_pause(dt, mouse_pos, clicked)
             elif self.state == STATE_COOP_END: self.update_coop_end(dt, mouse_pos, clicked)
 
+            rp = self.replay
+            if rp.run is not None and self.state not in REPLAY_KEEP_STATES:
+                rp.reset(None)                 # sonuç ekranından çıkıldı: tekrar silinir
         except Exception:
             if not self._frame_error():
                 raise
@@ -48152,6 +48423,9 @@ class App:
         # izlendiyse ödül yine verilir).
         if self.ad_play is not None:
             self._ad_finish(True)
+            return
+        if self.replay.playing():
+            self.replay.stop()
             return
         if self.state == STATE_LOGIN and self.contact is not None:
             self.contact = None
@@ -48312,6 +48586,8 @@ class App:
         offset = self.run.fx.get_shake_offset()
         canvas = self.display.canvas
         self._draw_run_frame(canvas, aim_pos=mouse_pos, offset=offset)
+        if self.state == STATE_PLAY:
+            self.replay.capture(canvas, dt, self.run)
         if self.touch is not None and self.state == STATE_PLAY:
             self.touch.draw_play(canvas, self.run, self.t)
 
@@ -48844,6 +49120,10 @@ class App:
         """oyun bitti (yeniden tasarım): son karenin bulanık hâli üstünde kahraman kartı"""
         canvas = self.display.canvas
         r = self.run
+        if self.replay.playing():
+            if not self.replay.draw(canvas, dt, self.t) or clicked:
+                self.replay.stop()
+            return
         if getattr(self, "_go_run", None) is not r:
             self._go_run = r
             self.gameover_t = 0.0
@@ -49073,16 +49353,29 @@ class App:
                     break
 
         # ---- düğmeler ----
-        bw, bh = 240, 54
-        gap = 16
-        x0 = left.centerx - (bw * 3 + gap * 2) / 2
-        btns = [Button((x0, by + 6, bw, bh), L("ui.play_again"), self.start_run,
+        has_rp = self.replay.ready(r)
+        bw, bh = (190, 54) if has_rp else (240, 54)
+        gap = 14 if has_rp else 16
+        nb = 4 if has_rp else 3
+        x0 = left.centerx - (bw * nb + gap * (nb - 1)) / 2
+        rp_rect = None
+        if has_rp:
+            rp_rect = pygame.Rect(int(x0 + bw + gap), by + 6, bw, bh)
+        xs = [x0] + [x0 + k * (bw + gap) for k in range(nb - 2, nb)]
+        btns = [Button((xs[0], by + 6, bw, bh), L("ui.play_again"), self.start_run,
                        color=(60, 130, 90), hover_color=(80, 170, 115)),
-                Button((x0 + bw + gap, by + 6, bw, bh), L("ui.world_lb"),
+                Button((xs[1], by + 6, bw, bh), L("ui.world_lb"),
                        lambda: self.goto(STATE_WORLD_LB), color=(70, 76, 140),
-                       hover_color=(96, 104, 186), text_size=18),
-                Button((x0 + 2 * (bw + gap), by + 6, bw, bh), L("ui.main_menu"),
+                       hover_color=(96, 104, 186), text_size=18 if not has_rp else 16),
+                Button((xs[2], by + 6, bw, bh), L("ui.main_menu"),
                        lambda: self.set_state(STATE_MENU))]
+        if rp_rect is not None:
+            hov_rp = replay_button_draw(canvas, rp_rect, mouse_pos, self.t)
+            draw_text(canvas, _fit_text(L("rp.note"), 10, left.w - 40), (left.centerx, left.bottom - 8), 10,
+                      (150, 130, 140), center=True, shadow=False)
+            if clicked and hov_rp:
+                self.replay.start()
+                return
         add_glow(canvas, btns[0].rect.centerx, btns[0].rect.centery, 150, GREEN,
                  0.10 + 0.05 * math.sin(self.t * 3))
         for b in btns:
@@ -55837,6 +56130,7 @@ def _app_coop_play(self, dt, keys, mouse_pos, mouse_down, bonk_pressed, dash_pre
     canvas = self.display.canvas
     self._draw_run_frame(canvas, aim_pos=mouse_pos, offset=offset)
     _draw_coop_overlay(canvas, run, co, self.t)
+    self.replay.capture(canvas, dt, run)
     # pencereler (oyun durmaz)
     if run.want_open_shop:
         run.want_open_shop = False
@@ -55913,6 +56207,13 @@ def _app_update_coop_pause(self, dt, mouse_pos, clicked):
 
 def _app_update_coop_end(self, dt, mouse_pos, clicked):
     canvas = self.display.canvas
+    rp = self.replay
+    if rp.playing():
+        if not rp.draw(canvas, dt, self.t) or clicked:
+            rp.stop()
+        if self.coop is not None and self.coop.phase == "lobby":
+            self.coop.lobby_tick(dt)
+        return
     self.bg.update(dt)
     self.bg.draw(canvas)
     co = self.coop
@@ -55971,6 +56272,13 @@ def _app_update_coop_end(self, dt, mouse_pos, clicked):
     for b in btns:
         b.update(mouse_pos, dt)
         b.draw(canvas)
+    if rp.ready(rp.run):
+        rr = pygame.Rect(0, 0, 300, 46)
+        rr.center = (int(cx), VIRTUAL_H - 136)
+        if replay_button_draw(canvas, rr, mouse_pos, self.t) and clicked:
+            rp.start()
+            return
+        draw_text(canvas, L("rp.note"), (cx, VIRTUAL_H - 28), 10, (150, 130, 140), center=True, shadow=False)
     if clicked:
         for b in btns:
             if b.click(mouse_pos):

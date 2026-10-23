@@ -3,6 +3,13 @@
 Kısa notlar, en yenisi üstte.
 
 ## sıradaki sürüm
+- ÖLÜM TEKRARI: ölünce sonuç ekranında "SON ANLARI İZLE" düğmesi çıkar
+  - son 8 saniye oynar, son 1,6 saniye ağır çekim; son karede renk çekilir
+    ve seni kimin öldürdüğü yazar. ESC ya da tıklama ile geçilir
+  - hiçbir yere kaydedilmez (yalnızca bellekte); sonuç ekranından çıkınca
+    silinir, sonra bir daha izlenemez
+  - 2 kişilikte de var: düştüğün an + 1,4 sn kaydedilir, oyun sonu ekranından
+    izlenir
 - 2 KİŞİLİK, KONUK TARAFI GECİKME HİSSİ:
   - konuğun ana silahı artık ev sahibini beklemeden anında ateşlenir: mermi
     o an senin namlundan çıkar, sesi o an çalar (hasarı yine ev sahibi verir,
