@@ -12,8 +12,28 @@ from collections import defaultdict, deque
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.middleware.proxy_fix import ProxyFix
 from supabase import create_client, Client
-
+from flask_socketio import SocketIO, emit
 app = Flask(__name__, static_folder=".")
+socketio = SocketIO(app, cors_allowed_origins="*")
+
+online_players = 0
+
+@socketio.on('connect')
+def handle_connect():
+    global online_players
+    online_players += 1
+    print(f"Yeni oyuncu bağlandı! Anlık Online: {online_players}")
+    emit('online_count_update', online_players, broadcast=True)
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    global online_players
+    online_players -= 1
+    if online_players < 0:
+        online_players = 0
+    print(f"Oyuncu ayrıldı! Kalan Online: {online_players}")
+    emit('online_count_update', online_players, broadcast=True)
+
 
 # CORS: masaüstü oyunun buna ihtiyacı yok, ama telefon sürümü GitHub Pages'ta
 # çalışan bir web sayfası. İzin sadece oyunun kendi sayfasına ve oyunun
