@@ -3,6 +3,27 @@
 Kısa notlar, en yenisi üstte.
 
 ## sıradaki sürüm
+- YETENEK: oyun artık "4 silah al, düz koş" ile kazanılmıyor
+  - ODAK (oyuncunun altındaki çubuk): elle nişan alıp vurdukça, kusursuz
+    kaçış ve savuşturmayla dolar; ateşi bırakınca ve vurulunca düşer.
+    Bütün hasar x0.8 - x1.2, skor x0.6 - x2.0
+  - vurulunca kombo kırılır (kombo skoru çarpıyor)
+  - KUSURSUZ KAÇIŞ: atılırken darbeyi boşa çıkar: kısa ağır çekim, odak,
+    2.5 sn +%25 hasar
+  - SAVUŞTURMA: bonk yakındaki düşman mermilerini geri yollar
+  - elitler (5. dalgadan) yere vurur, nişancılar (8. dalgadan) havan atar:
+    düşecekleri yer işaretli ve gittiğin yöne nişan alıyorlar
+  - taban skor kısıldı: dikkatsiz oyun eskisinin ~üçte biri, iyi oyun daha
+    fazlası
+- 2 KİŞİLİK: evrim, güç sunakları, 5 harita bulgusu ve kayıp kervan artık 2
+  kişilikte de var; başında duran oyuncu alır, eller ve evrimler kişiye özel
+- Noel menüsü kalıcı
+- karakter: gölgeli gövde, yürürken basan ayaklar, göz kırpma; Taş Meydan
+  zemininde "kareli defter" ızgarası kalktı, taşlara doku
+- silahı henüz açılmamış oyuncuya da Silah Rafı kart verir (verecek kart
+  yoksa altın)
+- tüccar ipucu da üstteki not satırında (sol paneli örtüyordu); pencere
+  açıkken arkadaki notlar gizlenir
 - 2 KİŞİLİK GECİKME: iki oyun artık birbirine DOĞRUDAN bağlanmayı dener (UDP,
   NAT delik açma, IPv6). Kurulursa mesajlar sunucuya uğramaz: aynı şehirde
   ~130 ms yerine ~20-40 ms. Kurulamazsa sunucu yolundan devam eder; doğrudan

@@ -608,7 +608,7 @@ VIRTUAL_W, VIRTUAL_H = SCREEN_W - 2 * SAFE_X, 720
 # Ana menüye mevsimlik kar tanesi + ışık dizisi + "YENİ YILIN KUTLU OLSUN" süsü
 # ekler. Tarihe göre kendiliğinden açılır/kapanır (7 Ekim - 7 Ocak).
 # NEW_YEAR_FORCE: None = tarihe bak, True = hep açık, False = hep kapalı.
-NEW_YEAR_FORCE = None
+NEW_YEAR_FORCE = True             # Noel menüsü kalıcı (oyuncular sevdi)
 
 
 def _new_year_active():
@@ -12776,6 +12776,94 @@ def fmt_pct1(v):
     return t + "%"
 
 
+# ---- yetenek: odak, kusursuz kaçış, savuşturma ----
+# Oyuncular "rastgele 4 silahla düz koşup ateş eden de 500 bin yapıyor" dedi.
+# Artık hasar da skor da nasıl oynadığına bağlı:
+# * ODAK (0-1): elle nişan alıp vurdukça, kusursuz kaçışla ve savuşturmayla
+#   dolar; ateşi bırakınca ve vurulunca düşer. Hasar x0.8 - x1.2, skor
+#   x0.6 - x2.0.
+# * vurulunca kombo kırılır (kombo da skoru çarpıyor).
+# * KUSURSUZ KAÇIŞ: atılırken bir darbeyi boşa çıkarmak: kısa ağır çekim,
+#   odak ve 2.5 sn +%25 hasar.
+# * SAVUŞTURMA: bonk, yakındaki düşman mermilerini geri yollar.
+# * Elitler yere vurur, nişancılar (8. dalgadan) havan atar; düşecekleri yer
+#   önceden belli ve gittiğin yöne nişan alıyorlar: düz koşan yakalanır.
+FOCUS_START = 0.5
+FOCUS_HIT = 0.010             # elle atılan merminin isabeti
+FOCUS_KILL = 0.006            # elle atılan mermiyle öldürme
+FOCUS_DODGE = 0.20
+FOCUS_PARRY = 0.05
+FOCUS_HURT = 0.22             # vurulunca (en çok 0.6 sn'de bir)
+FOCUS_IDLE_AFTER = 1.5        # bu kadar ateş edilmezse odak söner
+FOCUS_IDLE_DECAY = 0.07       # sn başına
+FOCUS_DMG_LO, FOCUS_DMG_HI = 0.8, 1.2
+FOCUS_SCORE_LO, FOCUS_SCORE_HI = 0.6, 2.0
+ADRENALINE_T = 2.5
+ADRENALINE_DMG = 0.25
+DODGE_SLOWMO = 0.22           # kusursuz kaçışta ağır çekim (sn, tek kişilik)
+COMBO_BREAK_MIN = 10
+FOCUS_COLORS = ((150, 160, 196), (110, 220, 255), (255, 214, 110))
+MINION_HAZARD_CAP = 5         # yaratıkların aynı anda kurabildiği en çok tuzak
+ELITE_SLAM_FROM = 5           # elit yere vuruşu bu dalgadan
+MORTAR_FROM = 8               # nişancı havanı bu dalgadan
+ENEMY_HAZARDS = [None]        # işleyen koşu (yaratıklar tuzaklarını onun listesine koyar)
+
+
+# ---- oyuncu gövdesi ----
+# Düz renkli bir daireydi. Artık 3 kat büyük çizilip küçültülen (kenarı
+# yumuşak) gölgeli bir gövde: üstten ışık, alttan yansıyan kenar ışığı,
+# parlak nokta. Renk / boy başına bir kez çizilir.
+_PBODY = {}
+
+
+def _player_body_sprite(r, body, acc, flash=False):
+    key = (int(r), tuple(body), tuple(acc), flash)
+    spr = _PBODY.get(key)
+    if spr is not None:
+        return spr
+    if len(_PBODY) > 160:
+        _PBODY.clear()
+    S = 3
+    pad = 4
+    size = (int(r) + pad) * 2
+    big = pygame.Surface((size * S, size * S), pygame.SRCALPHA)
+    c = size * S / 2.0
+    R = r * S
+    pygame.draw.circle(big, OUTLINE, (c, c), R + 2.2 * S)
+    if flash:
+        pygame.draw.circle(big, WHITE, (c, c), R)
+    else:
+        rim = mix_col(lighten(body, 0.40), acc, 0.30)
+        pygame.draw.circle(big, rim, (c, c), R)
+        pygame.draw.circle(big, scale_col(body, 0.80), (c - R * 0.06, c - R * 0.08), R * 0.94)
+        for i in range(12):
+            k = i / 11.0
+            col = mix_col(scale_col(body, 0.88), lighten(body, 0.24), k ** 0.9)
+            pygame.draw.circle(big, col, (c - R * 0.18 * k, c - R * 0.24 * k), R * (0.92 - 0.46 * k))
+        # parlak nokta
+        pygame.draw.ellipse(big, (*lighten(body, 0.70), 225),
+                            (c - R * 0.66, c - R * 0.74, R * 0.62, R * 0.36))
+        pygame.draw.circle(big, (255, 255, 255, 235), (c - R * 0.46, c - R * 0.56), R * 0.10)
+        pygame.draw.circle(big, acc, (c, c), R, int(1.8 * S))
+    spr = pygame.transform.smoothscale(big, (size, size))
+    _PBODY[key] = spr
+    return spr
+
+
+def _player_feet(surf, p, px, py, r, body, moving):
+    """Gövdenin altında iki küçük ayak; yürürken sırayla basar."""
+    ph = p.move_anim
+    col = scale_col(body, 0.58)
+    for s_ in (-1, 1):
+        lift = math.sin(ph + (0 if s_ < 0 else math.pi)) * 3.0 if moving else 0.0
+        fx = px + s_ * r * 0.50
+        fy = py + r * 0.92 - max(0.0, lift)
+        rect = pygame.Rect(0, 0, int(r * 0.74), int(r * 0.48))
+        rect.center = (int(fx), int(fy))
+        pygame.draw.ellipse(surf, OUTLINE, rect.inflate(4, 4))
+        pygame.draw.ellipse(surf, col, rect)
+
+
 class Player:
     def __init__(self, skin_id="default"):
         self.skin = get_skin(skin_id)
@@ -13005,6 +13093,16 @@ class Player:
         self.ghosts = []
         self.ghost_t = 0.0
         self.last_hit_by = ""
+        # yetenek
+        self.focus = FOCUS_START
+        self.fire_idle = 0.0
+        self.dodge_window = 0.0         # atılmanın dokunulmazlık penceresi
+        self.dodged = False             # bu pencerede bir darbe boşa çıktı
+        self.adrenaline_t = 0.0
+        self.focus_hurt_cd = 0.0
+        self.hurt_flag = False
+        self.perfect_dodges = 0
+        self.parries = 0
 
     def apply_cosmetic_perks(self):
         """Kuşanılmış kıyafetlerin (şapka / gözlük / pelerin) verdiği küçük kalıcı bonusları uygular."""
@@ -13060,7 +13158,22 @@ class Player:
         # pelerin: görünmezken vuruşlar daha ağır.
         if self.invis_t > 0:
             d *= (1.0 + cloak_ambush_bonus(self.weapons.get("cloak", 0)))
-        return d * (1.0 + self.shrine_dmg)
+        return d * (1.0 + self.shrine_dmg) * self.focus_mult()
+
+    def focus_mult(self):
+        """Odak ve adrenalinin hasar çarpanı."""
+        f = clamp(getattr(self, "focus", FOCUS_START), 0.0, 1.0)
+        m = FOCUS_DMG_LO + (FOCUS_DMG_HI - FOCUS_DMG_LO) * f
+        if getattr(self, "adrenaline_t", 0.0) > 0:
+            m += ADRENALINE_DMG
+        return m
+
+    def focus_score_mult(self):
+        f = clamp(getattr(self, "focus", FOCUS_START), 0.0, 1.0)
+        return FOCUS_SCORE_LO + (FOCUS_SCORE_HI - FOCUS_SCORE_LO) * f
+
+    def add_focus(self, v):
+        self.focus = clamp(getattr(self, "focus", FOCUS_START) + v, 0.0, 1.0)
 
     def eff_atk_cd(self):
         return max(0.07, self.base_atk_cd / (self.run_aspd_mult * (1.0 + self.skin_aspd)))
@@ -13487,6 +13600,8 @@ class Player:
     def take_damage(self, amount, fx, sx=None, sy=None, src=""):
         """Genel 'hasar aldıktan sonra dokunulmazlık' yok: aynı anda birden fazla düşman/mermi hasar verebilir."""
         if not self.alive or self.invuln > 0:
+            if self.alive and amount > 0 and getattr(self, "dodge_window", 0.0) > 0:
+                self.dodged = True              # atılırken boşa çıkan darbe
             return 0
         if self.shield_charges > 0:
             if self.shield_icd > 0:
@@ -13507,6 +13622,10 @@ class Player:
         arm = self.eff_armor() * (1.0 - clamp(self.armor_pierce, 0.0, 1.0))
         dmg = amount * (1 - arm) * self.dmg_taken_mult * self.lowhp_factor()
         self.hp -= dmg
+        if dmg >= 1.0 and getattr(self, "focus_hurt_cd", 0.0) <= 0:
+            self.focus_hurt_cd = 0.6
+            self.add_focus(-FOCUS_HURT)
+            self.hurt_flag = True               # koşu: kombo kırılır
         self.hit_flash = 0.3
         self.hurt_vig = min(1.0, self.hurt_vig + dmg / 45.0)
         if src:
@@ -13635,7 +13754,8 @@ class Player:
         if not self.alive:
             return
         for name in ("atk_timer", "bonk_timer", "hit_flash", "invuln", "shield_icd",
-                     "dash_cd_timer", "flash_t", "hurt_vig", "smash_timer"):
+                     "dash_cd_timer", "flash_t", "hurt_vig", "smash_timer",
+                     "dodge_window", "adrenaline_t", "focus_hurt_cd"):
             v = getattr(self, name)
             if v > 0:
                 setattr(self, name, max(0.0, v - dt))
@@ -13652,6 +13772,13 @@ class Player:
             mx, my = mx / mlen, my / mlen
             self.move_anim += dt * 10
         self.move_in = (mx, my)
+        # odak: ateşi bırakınca yavaşça söner
+        if keys.get("mouse_down"):
+            self.fire_idle = 0.0
+        else:
+            self.fire_idle += dt
+            if self.fire_idle > FOCUS_IDLE_AFTER:
+                self.add_focus(-FOCUS_IDLE_DECAY * dt)
 
         if self.dash_time > 0:
             self.dash_time -= dt
@@ -13744,6 +13871,7 @@ class Player:
         self.dash_cd_timer = self.eff_dash_cd()
         # melek kanadı: dash sonrası dokunulmazlık belirgin biçimde uzar.
         self.invuln = max(self.invuln, 0.26 + 0.45 * self.angel_wing)
+        self.dodge_window = 0.26 + 0.45 * self.angel_wing
         self.dash_count += 1
         # sayaç canlı işler. Anında artıyor; koşu sonunda bir daha eklenmiyor.
         sv = MASTERY_SAVE[0]
@@ -13835,16 +13963,20 @@ class Player:
         if self.frenzy_stacks > 0:
             add_glow(surf, px, py, r * 3, (255, 200, 80), 0.25 + 0.08 * self.frenzy_stacks)
         ix, iy = int(px), int(py)
-        pygame.draw.circle(surf, OUTLINE, (ix, iy), r + 2)
-        if flash:
-            pygame.draw.circle(surf, WHITE, (ix, iy), r)
-        else:
-            pygame.draw.circle(surf, scale_col(body, 0.6), (ix, iy), r)
-            pygame.draw.circle(surf, body, (int(px - r * 0.10), int(py - r * 0.14)), int(r * 0.86))
-            pygame.draw.circle(surf, lighten(body, 0.5), (int(px - r * 0.36), int(py - r * 0.42)), max(2, int(r * 0.22)))
-            pygame.draw.circle(surf, acc, (ix, iy), r, 2)
+        if not plain:
+            _player_feet(surf, self, px, py, r, body, moving)
+        spr = _player_body_sprite(r, (int(body[0]), int(body[1]), int(body[2])), tuple(acc[:3]), flash)
+        if moving and not plain:
+            # adımda hafif esneme (ezil-uza)
+            k = abs(math.sin(self.move_anim)) * 0.06
+            w_ = int(spr.get_width() * (1.0 + k))
+            h_ = int(spr.get_height() * (1.0 - k))
+            spr = pygame.transform.smoothscale(spr, (w_, h_))
+        surf.blit(spr, (int(px - spr.get_width() / 2), int(py - spr.get_height() / 2)))
         ax, ay = self.aim_dir
         hidden = eyes_hidden(self)
+        # göz kırpma: ~4 sn'de bir
+        blink = ((t * 0.9 + (id(self) % 97) * 0.13) % 4.1) < 0.11
         for s in (-1, 1):
             if s in hidden:
                 continue
@@ -13853,9 +13985,13 @@ class Player:
             if self.skin["id"] == "shadow" and not plain:
                 add_glow(surf, ex, ey, 10, acc, 0.85)
                 pygame.draw.circle(surf, (235, 200, 255), (int(ex), int(ey)), 3)
+            elif blink and not flash:
+                pygame.draw.line(surf, (20, 24, 40), (int(ex - 3), int(ey)), (int(ex + 3), int(ey)), 2)
             else:
-                pygame.draw.circle(surf, (250, 250, 255), (int(ex), int(ey)), 4)
-                pygame.draw.circle(surf, (20, 24, 40), (int(ex + ax * 1.6), int(ey + ay * 1.6)), 2)
+                circle_aa(surf, ex, ey, 4.2, (20, 24, 40))
+                circle_aa(surf, ex, ey, 3.4, (250, 250, 255))
+                circle_aa(surf, ex + ax * 1.5, ey + ay * 1.5, 2.0, (20, 24, 40))
+                circle_aa(surf, ex + ax * 1.5 - 0.8, ey + ay * 1.5 - 0.9, 0.7, (255, 255, 255))
         if plain:
             # sade görünüm: süslü silah yerine nişan yönünü gösteren kısa bir
             # namlu.
@@ -18364,6 +18500,25 @@ LATE_DMG_COEF = 0.042
 LATE_DMG_COEF_HELL = 0.05
 
 
+def _minion_hazard(e, player, lead, r, delay, dmg, color):
+    """Yaratığın yere bıraktığı işaretli patlama (oyuncunun gittiği yere)."""
+    run = ENEMY_HAZARDS[0]
+    hz = getattr(run, "hazards", None)
+    if hz is None or sum(1 for h in hz if getattr(h, "minion", False)) >= MINION_HAZARD_CAP:
+        return False
+    mx, my = getattr(player, "move_in", (0.0, 0.0))
+    try:
+        sp = float(player.eff_speed())
+    except Exception:
+        sp = BASE_SPEED
+    x = clamp(player.x + mx * sp * lead, ARENA_RECT.left + 30, ARENA_RECT.right - 30)
+    y = clamp(player.y + my * sp * lead, ARENA_RECT.top + 30, ARENA_RECT.bottom - 30)
+    h = Hazard(x, y, r, delay, dmg, color=color)
+    h.minion = True
+    hz.append(h)
+    return True
+
+
 class Enemy:
     def __init__(self, kind, x, y, wave_mult, diff_mult=1.0, wave=1,
                  variant=None, biome="arena"):
@@ -18439,6 +18594,7 @@ class Enemy:
         # kudurma: 25. dalgadan sonra renk kızıla (yarasa / arı mora) kayar;
         # hâle ve közler draw'da, önbelleğin dışında çizilir.
         self.rage = rage_level(wave, biome)
+        self.spawn_wave = int(wave) + (HELL_WAVE_OFFSET if biome == "hell" else 0)
         self.rage_col = RAGE_BAT if kind in ("blue", "stinger") else RAGE_FIRE
         if self.rage > 0:
             self.color = mix_col(self.color, self.rage_col, 0.25 + 0.40 * self.rage)
@@ -18781,7 +18937,12 @@ class Enemy:
                 if self.shoot_cd <= 0 and self.spawn_t > 0.4:
                     self.shoot_cd = random.uniform(1.5, 2.3)
                     pdx, pdy = norm_dir(self.x, self.y, player.x, player.y)
-                    if self.map_var:
+                    self.shots_n = getattr(self, "shots_n", 0) + 1
+                    if (self.shots_n % 4 == 0 and getattr(self, "spawn_wave", 1) >= MORTAR_FROM
+                            and _minion_hazard(self, player, 0.9, 56, 1.0,
+                                               self.dmg * 1.8 + player.max_hp * 0.05, (255, 150, 70))):
+                        sfx("shoot_d", 0.35, 0.1)
+                    elif self.map_var:
                         projectiles.append(EnemyProjectile(
                             self.x, self.y, pdx * 230, pdy * 230, self.dmg * 0.85,
                             color=MAP_SHOT_COLORS.get(self.shot_style, (235, 210, 70)),
@@ -18796,6 +18957,15 @@ class Enemy:
                     self.dash_cd = random.uniform(1.6, 2.6)
                     self.dash_t = 0.22
                     self.dash_dx, self.dash_dy = dx, dy
+            # elit: yere vuruş. Düşeceği yer gittiğin yöne göre önceden belli.
+            if (self.kind == "elite" and getattr(self, "spawn_wave", 1) >= ELITE_SLAM_FROM
+                    and self.spawn_t > 1.0 and player.alive):
+                self.slam_cd = getattr(self, "slam_cd", random.uniform(2.0, 4.0)) - dt
+                if self.slam_cd <= 0 and dist(self.x, self.y, player.x, player.y) < 360:
+                    self.slam_cd = random.uniform(4.5, 6.5)
+                    if _minion_hazard(self, player, 0.35, 78, 0.85,
+                                      max(self.dmg * 2.4, player.max_hp * 0.14), (255, 196, 120)):
+                        fx.ring(self.x, self.y, (255, 196, 120), n=10, speed=120, life=0.3, r=2.6)
             # düz ve öngörülebilir bir hareket - gereksiz sallanma/titreme
             # olmasın
             self.x += dx * eff_speed * dt * scale_in
@@ -24922,7 +25092,10 @@ WAVE_GOAL_SCALE = 5.9
 # skor kazancı: "skor çok hızlı artıyor, %50 nerf" - 10 puanlık yaratık 5
 # verir.
 # skor kazancı -%30 (0.5 -> 0.35); oyun 2 kat uzayınca yarısı (öldürme 2 kat)
-SCORE_GAIN = 0.175
+# odak çarpanı (x0.6 - x2.0) ve vurulunca kırılan kombo geldi: taban skor
+# 0.175'ten kısıldı. Dikkatsiz oyun eskisinin ~üçte birini, iyi oyun daha
+# fazlasını yapar.
+SCORE_GAIN = 0.13
 # dalga hedefi: "dalga atlama hedeflerini artır, süre 15 sn olsun; oyuncu
 # saniye beklemesin, SKOR bekletsin".
 WAVE_GOAL_KILLS = 1.3
@@ -25812,7 +25985,8 @@ def run_integrity_check(run):
     lvl = max(1, int(getattr(p, "level", 1)))
     try:
         # güç sunağının süreli payı oyunun kendi verdiği bir şey: sayılmaz
-        dmg_ratio = p.eff_dmg() / (1.0 + getattr(p, "shrine_dmg", 0.0)) / max(1e-6, BASE_DMG)
+        dmg_ratio = (p.eff_dmg() / (1.0 + getattr(p, "shrine_dmg", 0.0))
+                     / max(1e-6, p.focus_mult() if hasattr(p, "focus_mult") else 1.0) / max(1e-6, BASE_DMG))
         spd_ratio = p.eff_speed() / (1.0 + getattr(p, "shrine_spd", 0.0)) / max(1e-6, BASE_SPEED)
         hp = float(p.max_hp)
     except Exception:
@@ -25933,6 +26107,16 @@ STRINGS.update({
                       "иди к X и копай"),
     "fd.dig":      _T("GÖMÜLÜ HAZİNE", "BURIED TREASURE", "TESORO ENTERRADO", "VERGRABENER SCHATZ", "ЗАРЫТЫЙ КЛАД"),
     "fd.dig.d":    _T("altın + sandık", "gold + a chest", "oro + un cofre", "Gold + eine Truhe", "золото + сундук"),
+    "sk.combo_break": _T("KOMBO KIRILDI", "COMBO BROKEN", "COMBO ROTO", "KOMBO GEBROCHEN", "КОМБО СБИТО"),
+    "sk.dodge":    _T("KUSURSUZ!", "PERFECT!", "¡PERFECTO!", "PERFEKT!", "ИДЕАЛЬНО!"),
+    "sk.parry":    _T("SAVUŞTURMA x{0}", "PARRY x{0}", "PARADA x{0}", "PARADE x{0}", "ОТРАЖЕНИЕ x{0}"),
+    "sk.focus":    _T("ODAK", "FOCUS", "FOCO", "FOKUS", "ФОКУС"),
+    "sk.focus_x":  _T("ODAK x{0}", "FOCUS x{0}", "FOCO x{0}", "FOKUS x{0}", "ФОКУС x{0}"),
+    "sk.hint":     _T("ODAK: elle vur, vurulma, atılarak kaç = daha çok hasar ve skor",
+                      "FOCUS: aim, don't get hit, dash through attacks = more damage & score",
+                      "FOCO: apunta, que no te den, esquiva = más daño y puntos",
+                      "FOKUS: zielen, nicht treffen lassen, ausweichen = mehr Schaden & Punkte",
+                      "ФОКУС: целься, не попадайся, уклоняйся = больше урона и очков"),
     "fd.appear":   _T("Haritada bir şey var: {0}", "Something on the map: {0}", "Algo en el mapa: {0}",
                       "Etwas auf der Karte: {0}", "Что-то на карте: {0}"),
     "fd.gone":     _T("kaçırdın: {0}", "missed: {0}", "perdido: {0}", "verpasst: {0}", "упущено: {0}"),
@@ -26357,7 +26541,29 @@ class WorldExtrasMixin:
             self.find_plan.sort()
 
     def extras_active(self):
-        return not getattr(self, "is_coop", False)
+        # 2 kişilikte ev sahibi işler; konuk yalnızca görüntüyü çizer
+        return not getattr(self, "is_guest", False)
+
+    def _near_player(self, x, y, r):
+        """(x, y)'nin r yakınındaki en yakın canlı oyuncunun sırası (yoksa None)."""
+        best, bd = None, r
+        for i, q in enumerate(getattr(self, "players", None) or [self.player]):
+            if q.alive:
+                d = dist(q.x, q.y, x, y)
+                if d < bd:
+                    best, bd = i, d
+        return best
+
+    def _as_player(self, i, fn, *a):
+        """fn'i i. oyuncunun bağlamında çalıştırır (2 kişilik; tek kişilikte doğrudan)."""
+        if not hasattr(self, "_ctx_use") or i is None:
+            return fn(*a)
+        prev = self.cur
+        self._ctx_use(i)
+        try:
+            return fn(*a)
+        finally:
+            self._ctx_use(prev)
 
     # ---- sunak ----
     def _spawn_shrine(self):
@@ -26423,14 +26629,15 @@ class WorldExtrasMixin:
                 self.shrine = None
                 self.shrine_next = self.run_time + random.uniform(*SHRINE_GAP)
             return
-        if p.alive and dist(p.x, p.y, sh.x, sh.y) < SHRINE_R:
+        who = self._near_player(sh.x, sh.y, SHRINE_R)
+        if who is not None:
             sh.charge += dt
             if random.random() < dt * 14:
                 a = random.uniform(0, math.tau)
                 self.fx.spark(sh.x + math.cos(a) * SHRINE_R, sh.y + math.sin(a) * SHRINE_R,
                               sh.color(), -math.cos(a) * 90, -math.sin(a) * 90, 0.5, 2.6)
             if sh.charge >= SHRINE_CHARGE:
-                self._claim_shrine(sh)
+                self._as_player(who, self._claim_shrine, sh)
         else:
             sh.charge = max(0.0, sh.charge - dt * 1.5)
 
@@ -26481,7 +26688,7 @@ class WorldExtrasMixin:
         elif k == "sword":
             p.shrine_dmg += FIND_SWORD_DMG
         elif k == "trial":
-            self.trial = [self.run_time + FIND_TRIAL_T, self.run_time + 0.8]
+            self.trial = [self.run_time + FIND_TRIAL_T, self.run_time + 0.8, getattr(self, "cur", 0)]
             self.find_note = (self.run_time, L("fd.trial.d"), col)
             sfx("boss", 0.35, 0.0)
         elif k == "map":
@@ -26508,7 +26715,6 @@ class WorldExtrasMixin:
     def _update_finds(self, dt):
         while self.find_plan and self.run_time >= self.find_plan[0][0]:
             self._spawn_find(self.find_plan.pop(0)[1])
-        p = self.player
         keep = []
         for f in self.finds:
             if f.used or self.run_time - f.born > f.spec()[4]:
@@ -26519,21 +26725,25 @@ class WorldExtrasMixin:
                     keep.append(f)
                 continue
             keep.append(f)
-            if not p.alive or self.trial is not None and f.kind == "trial":
+            if self.trial is not None and f.kind == "trial":
                 continue
-            if dist(p.x, p.y, f.x, f.y) < FIND_R:
+            who = self._near_player(f.x, f.y, FIND_R)
+            if who is not None:
                 f.charge += dt
                 if f.need() > 0 and random.random() < dt * 12:
                     a = random.uniform(0, math.tau)
                     self.fx.spark(f.x + math.cos(a) * FIND_R, f.y + math.sin(a) * FIND_R,
                                   f.color(), -math.cos(a) * 90, -math.sin(a) * 90, 0.5, 2.6)
                 if f.charge >= f.need():
-                    self._claim_find(f)
+                    self._as_player(who, self._claim_find, f)
             else:
                 f.charge = max(0.0, f.charge - dt * 1.5)
         self.finds = keep
         tr = self.trial
         if tr is not None:
+            players = getattr(self, "players", None) or [self.player]
+            owner = players[tr[2]] if len(tr) > 2 and tr[2] < len(players) else self.player
+            p = owner if owner.alive else next((q for q in players if q.alive), owner)
             if not p.alive:
                 self.trial = None
             elif self.run_time >= tr[0]:
@@ -26564,6 +26774,22 @@ class WorldExtrasMixin:
 
     def _rack_offers(self):
         offers, _ = self.levelup_pool()
+        offers = [o for o in offers if o["kind"] == "weapon"]
+        if not offers:
+            # henüz silahı açılmamış oyuncu: raf boş kalmasın, bütün silahlar
+            # (bu koşu için) teklif edilir
+            p = self.player
+            room = len(p.weapons) < slot_max(p, 'w')
+            muted = set((self.save.data.get("weapons_muted") or []))
+            for w in BOSS_WEAPONS:
+                k = w["key"]
+                if k in muted:
+                    continue
+                if k in p.weapons:
+                    if p.weapons[k] < weapon_max_level(w):
+                        offers.append(self._weapon_offer(w, p.weapons[k] + 1, False))
+                elif room:
+                    offers.append(self._weapon_offer(w, 1, True))
         tier = RARITY_COUNT - 2
         out = []
         for o in offers:
@@ -26576,9 +26802,15 @@ class WorldExtrasMixin:
         return out
 
     def find_hand(self):
-        """Raf / örs eli (verecek kart yoksa boş liste)."""
+        """Raf / örs eli (verecek kart yoksa boş liste: o zaman altın verilir)."""
         kind = self.find_hands[0]
         offers = self._anvil_offers() if kind == "anvil" else self._rack_offers()
+        if not offers:
+            p = self.player
+            gold = scaled_coin_gain(80 + 30 * max(1, int(self.waves.wave)), p.eff_coin_mult(), self.biome)
+            for i in range(6):
+                a = i * math.tau / 6
+                self.drop_pickup(p.x + math.cos(a) * 40, p.y + math.sin(a) * 40, "coin", gold / 6)
         random.shuffle(offers)
         # rafta önce yeni silahlar: rafın tadı orada
         if kind == "rack":
@@ -26616,11 +26848,11 @@ class WorldExtrasMixin:
             if cv.fade > 1.2:
                 self.caravan = None
             return
-        p = self.player
-        if p.alive and dist(p.x, p.y, cv.x, cv.y) < CARAVAN_R:
+        who = self._near_player(cv.x, cv.y, CARAVAN_R)
+        if who is not None:
             cv.charge += dt
             if cv.charge >= CARAVAN_CHARGE:
-                self._claim_caravan(cv)
+                self._as_player(who, self._claim_caravan, cv)
         else:
             cv.charge = max(0.0, cv.charge - dt)
 
@@ -26708,6 +26940,8 @@ def draw_extras_hud(surf, run, t):
         for i, (col, icon, frac, nm) in enumerate(items):
             if frac > 0.15 or int(t * 6) % 2 == 0:
                 _buff_ring(surf, x0 + i * 44, y, 15, col, frac, icon)
+    if getattr(run, "_overlay", False):
+        return
     ny = 168
     note = getattr(run, "caravan_note", None)
     if note is not None:
@@ -27067,6 +27301,77 @@ def evo_on_hit(e, amount, fx):
             run.evo_shocks.append([e.x, e.y, EVO_SHOCK_DELAY, amount * 0.5])
 
 
+class SkillMixin:
+    """Odak, kombo kırılması, kusursuz kaçış ve savuşturma (RunState karışımı)."""
+
+    def _skill_tick(self, dt):
+        p = self.player
+        if not getattr(self, "_focus_hint", False) and self.run_time > 4.0:
+            self._focus_hint = True
+            try:
+                runs = int((self.save.data.get("stats") or {}).get("runs", 0) or 0)
+            except Exception:
+                runs = 99
+            if runs < 4 and not getattr(self, "is_guest", False):
+                self.fx.popup(p.x, p.y + 74, L("sk.hint"), (150, 220, 255), 14, life=6.0)
+        if getattr(p, "hurt_flag", False):
+            p.hurt_flag = False
+            if self.combo.count >= COMBO_BREAK_MIN:
+                self.fx.popup(p.x, p.y - 74, L("sk.combo_break"), (255, 130, 120), 15, life=0.9)
+            self.combo.count = 0
+            self.combo.timer = 0.0
+        if getattr(p, "dodged", False):
+            p.dodged = False
+            if p.dodge_window > 0:
+                p.dodge_window = 0.0          # her atılmada bir kez
+                self._perfect_dodge(p)
+
+    def _perfect_dodge(self, p):
+        p.add_focus(FOCUS_DODGE)
+        p.adrenaline_t = ADRENALINE_T
+        p.invuln = max(p.invuln, 0.35)
+        p.perfect_dodges = getattr(p, "perfect_dodges", 0) + 1
+        if not getattr(self, "is_coop", False):
+            self.slowmo_t = DODGE_SLOWMO
+        col = (130, 230, 255)
+        self.fx.popup(p.x, p.y - 58, L("sk.dodge"), col, 20, life=0.9)
+        self.fx.ring(p.x, p.y, col, n=18, speed=230, life=0.4, r=3)
+        self.fx.shockwave(p.x, p.y, 90, col, 0.3, 3)
+        sfx("crit", 0.7, 0.05)
+
+    def parry_projectiles(self, radius):
+        """Bonk: yakındaki düşman mermileri geri döner (en yakın yaratığa)."""
+        p = self.player
+        n = 0
+        for proj in self.enemy_projectiles:
+            if not proj.alive or n >= 12:
+                continue
+            if dist(proj.x, proj.y, p.x, p.y) > radius + getattr(proj, "r", 6):
+                continue
+            proj.alive = False
+            tgt, td = None, 650.0 * 650.0
+            for e in self._all_targets():
+                if e.alive:
+                    d2 = (e.x - proj.x) ** 2 + (e.y - proj.y) ** 2
+                    if d2 < td:
+                        tgt, td = e, d2
+            if tgt is not None:
+                dx, dy = norm_dir(proj.x, proj.y, tgt.x, tgt.y)
+            else:
+                dx, dy = norm_dir(p.x, p.y, proj.x, proj.y)
+            rp = PlayerProjectile(proj.x, proj.y, dx * 640, dy * 640, max(proj.dmg * 3.0, p.eff_dmg() * 1.6),
+                                  3, p.eff_crit_chance(), p.eff_crit_dmg(), style="bolt",
+                                  color=(255, 214, 110))
+            rp._wsrc = "parry"
+            self.player_projectiles.append(rp)
+            n += 1
+        if n:
+            p.add_focus(min(0.15, FOCUS_PARRY * n))
+            p.parries = getattr(p, "parries", 0) + n
+            self.fx.popup(p.x, p.y - 64, L("sk.parry", n), GOLD, 17, life=0.8)
+        return n
+
+
 class EvoMixin:
     """RunState'e evrim davranışı (karışım sınıf: RunState zaten çok uzun)."""
 
@@ -27077,6 +27382,10 @@ class EvoMixin:
         self.evo_blasts = 0
         self.evo_shocks = []           # [x, y, kalan, hasar]
         self.evo_aegis_t = EVO_AEGIS_EVERY
+        self.evo_shroud_t = 0.0
+        self.evo_phx_t = 0.0
+        self.evo_scorch_t = 0.0
+        self.evo_count = 0
         self.player.evolved = set()
         self.player.evo_soul = (0, 0.0)
         EVO_ON.clear()
@@ -27152,8 +27461,6 @@ class EvoMixin:
 
     def evo_inject(self, chosen):
         """Evrime hazır silah varsa elin bir kartı EVRİM kartı olur."""
-        if getattr(self, "is_coop", False):
-            return chosen
         ready = evo_ready_keys(self.player)
         if not ready or any(c.get("kind") == "evo" for c in chosen):
             return chosen
@@ -27378,7 +27685,7 @@ def draw_evo_card(surf, r2, ch, run, t, hover):
                   bold=True, center=True, shadow=False)
 
 
-class RunState(EvoMixin, WorldExtrasMixin):
+class RunState(EvoMixin, WorldExtrasMixin, SkillMixin):
     def __init__(self, save, skin_id, diff="normal", ach=None):
         self.save = save
         self.diff = diff
@@ -27682,7 +27989,8 @@ class RunState(EvoMixin, WorldExtrasMixin):
         self.merchant_hand = []
         self.merchant_hand_lvl = 0
         self.merchant_rerolls = 0
-        self.fx.popup(p.x, p.y - 96, L("m.hint"), MERCHANT_COLOR, 18, life=4.0)
+        # dünyada süzülen yazı sol paneli örtüyordu: üstteki not satırına
+        self.find_note = (self.run_time, L("m.hint"), MERCHANT_COLOR)
 
     def merchant_luck(self):
         """Tüccarın kademe şansı: oyuncunun şansı + seviye başına pay."""
@@ -29334,6 +29642,8 @@ class RunState(EvoMixin, WorldExtrasMixin):
                 self.fx.ring(e.x, e.y, (120, 200, 255), n=8, speed=120, life=0.25, r=2)
                 if died:
                     self.on_enemy_killed(e)
+        # savuşturma: bonk yakındaki düşman mermilerini geri yollar
+        self.parry_projectiles(p.eff_bonk_radius() + 10)
         self.fx.ring(p.x, p.y, ORANGE, n=20, speed=260, life=0.35, r=3)
         self.fx.shockwave(p.x, p.y, radius, ORANGE, 0.3, 4)
         self.fx.shake(6 if hit_any else 3, 0.15)
@@ -29859,8 +30169,10 @@ class RunState(EvoMixin, WorldExtrasMixin):
         if getattr(e, "kind", "") == "goblin":
             self._goblin_loot(e)
         # Altın artık ölüm anında verilmiyor: yere düşen parayı toplaman gerek.
+        if DMG_SRC[0] == "gun":
+            p.add_focus(FOCUS_KILL)
         gain = (e.score * combo_mult * (1.0 + self.curse_score_bonus) * SCORE_GAIN
-                + self.score_frac)
+                * p.focus_score_mult() + self.score_frac)
         self.score += int(gain)
         self.score_frac = gain - int(gain)
         if not getattr(e, "raised", False):
@@ -29930,6 +30242,11 @@ class RunState(EvoMixin, WorldExtrasMixin):
         DMG_LOG[0] = self.dmg_log
         DMG_SRC[0] = "other"
         EVO_CTX[0] = self
+        ENEMY_HAZARDS[0] = self
+        # kusursuz kaçış: kısa ağır çekim
+        if getattr(self, "slowmo_t", 0.0) > 0:
+            self.slowmo_t -= dt
+            dt *= 0.4
         self.run_time += dt
         # koşu görevleri: yarım saniyede bir bakılır.
         self.quest_t -= dt
@@ -30204,6 +30521,7 @@ class RunState(EvoMixin, WorldExtrasMixin):
         # ---- gezgin tüccar (koşu boyunca haritada) ----
         self.update_merchant(dt, input_state, portal_used)
 
+        self._skill_tick(dt)
         self.combo.update(dt)
         self.fx.update(dt)
         if self.ach:
@@ -30270,6 +30588,8 @@ class RunState(EvoMixin, WorldExtrasMixin):
                         continue            # hayalet dokunulmazken mermi içinden geçer
                     if dist(proj.x, proj.y, e.x, e.y) < proj.r + e_hit_r + forgive:
                         proj.hit_set.add(id(e))
+                        if not getattr(proj, "_wsrc", None):
+                            p.add_focus(FOCUS_HIT)      # elle nişan alıp vurmak odak verir
                         crit = random.random() < proj.crit_chance
                         if crit:
                             p.run_crits += 1
@@ -30914,7 +31234,12 @@ class RunState(EvoMixin, WorldExtrasMixin):
             if hand:
                 self.levelup_choices = hand
                 return
+            # kart çıkmadı (altın verildi): bu el için açılan seviye de düşer
             self.find_hands.pop(0)
+            self.pending_levelups = max(0, self.pending_levelups - 1)
+            if self.pending_levelups <= 0:
+                self.levelup_choices = []
+                return
         offers, weights = self.levelup_pool()
         pool = [(o, w) for o, w in zip(offers, weights) if w > 0]
         if not pool:
@@ -32082,6 +32407,12 @@ def _decorate_arena_floor(surf, st, rnd):
             pygame.draw.line(surf, scale_col(face, 1.28), pts[0], pts[3], 1)
             pygame.draw.line(surf, scale_col(stone_lo, 0.7), pts[3], pts[2], 2)
             pygame.draw.polygon(surf, scale_col(stone_lo, 0.85), pts, 1)
+            # el boyaması gibi benekler: düz renkli taş yüzü canlansın
+            for _k in range(rnd.randint(4, 9)):
+                bx = cx + rnd.uniform(-hw * 0.85, hw * 0.85)
+                by = cy + rnd.uniform(-hh * 0.8, hh * 0.8)
+                pygame.draw.circle(surf, scale_col(face, rnd.uniform(0.84, 1.12)),
+                                   (int(bx), int(by)), rnd.choice((1, 1, 2, 2, 3)))
             # taşın üstünde çatlak
             if rnd.random() < 0.30:
                 a = rnd.uniform(0, math.pi)
@@ -33002,10 +33333,13 @@ def _build_floor(biome):
         surf.blit(strip, (pos - w // 2, 0) if vertical else (0, pos - w // 2))
     _GRID_STRIPS = {}
     step = 64
-    for x in range(0, ARENA_RECT.w + 1, step):
-        _aline(st["grid"], True, x)
-    for y in range(0, ARENA_RECT.h + 1, step):
-        _aline(st["grid"], False, y)
+    # taş döşemeli meydanda ince ızgara "kareli defter" gibi duruyordu: orada
+    # çizilmez (taşların derzi zaten zemini böler)
+    if biome != "arena":
+        for x in range(0, ARENA_RECT.w + 1, step):
+            _aline(st["grid"], True, x)
+        for y in range(0, ARENA_RECT.h + 1, step):
+            _aline(st["grid"], False, y)
     for i in range(1, WORLD_TILES_X):
         _aline(st["cell"], True, BASE_VIEW_W * i, 3)
     for j in range(1, WORLD_TILES_Y):
@@ -34777,6 +35111,29 @@ def _draw_hud_top(surf, run, t):
         draw_text(surf, f"x{lvl}", (icon_x + 12, by + 6), 11, col, shadow=False)
 
 
+def draw_focus_bar(surf, p, t):
+    """Odak: oyuncunun ayağının altında ince bir çubuk (gözü savaştan ayırmadan okunsun)."""
+    f = clamp(float(getattr(p, "focus", FOCUS_START) or 0.0), 0.0, 1.0)
+    w, h = 40, 5
+    x = int(p.x - w / 2)
+    y = int(p.y + p.radius + 12)
+    tier = 0 if f < 0.34 else (1 if f < 0.67 else 2)
+    col = FOCUS_COLORS[tier]
+    if getattr(p, "adrenaline_t", 0.0) > 0:
+        add_glow(surf, p.x, y + 2, 26, (255, 180, 90), 0.35 + 0.15 * math.sin(t * 18))
+    elif tier == 2:
+        add_glow(surf, p.x, y + 2, 22, col, 0.18 + 0.08 * math.sin(t * 5))
+    pygame.draw.rect(surf, INK, (x - 2, y - 2, w + 4, h + 4), border_radius=3)
+    pygame.draw.rect(surf, scale_col(col, 0.32), (x, y, w, h), border_radius=2)
+    fw = int(w * f)
+    if fw > 0:
+        pygame.draw.rect(surf, col, (x, y, fw, h), border_radius=2)
+        pygame.draw.line(surf, lighten(col, 0.4), (x + 1, y), (x + max(1, fw - 2), y), 1)
+    # ortadaki çentik: x1.0 hasar
+    mx = x + int(w * 0.5)
+    pygame.draw.line(surf, INK, (mx, y), (mx, y + h - 1), 1)
+
+
 def _draw_hud_center(surf, run, t):
     p = run.player
     frac = clamp(p.hp / p.max_hp, 0, 1)
@@ -35089,6 +35446,7 @@ def draw_run(surf, run, t, aim_pos=None, shake=(0, 0)):
             draw_invisible_player(world, run.player, t)
         else:
             run.player.draw(world, t)
+        draw_focus_bar(world, run.player, t)
     # ---- pet: oyuncunun yanında gezer (yalnızca görünüş) ----
     draw_run_pet(world, run, t)
     draw_evo_orbs(world, run, t)
@@ -44609,6 +44967,9 @@ COOP_PERSONAL = (
     "wolf_howl_cd", "penta_inside", "combo", "dmg_log", "coins_earned", "gem_coins",
     "kills", "score", "score_frac", "merchant_open", "show_map", "show_stats",
     "bonk_hits", "new_books", "new_weapons", "death_cause", "_pet", "_pet_id",
+    # sunak güçleri, raf/örs elleri, evrimler: herkesin kendisi
+    "shrine_buffs", "find_hands", "evo_perks", "evo_banner", "evo_aegis_t", "evo_shroud_t",
+    "evo_blast_t", "evo_blasts", "evo_count", "evo_phx_t", "evo_scorch_t",
 )
 # çizimde iki oyuncunun nesneleri birlikte görünsün diye birleştirilen listeler
 COOP_MERGE_LISTS = (
@@ -44661,6 +45022,8 @@ class CoopRunState(RunState):
                 pass
         p0 = self.player
         p1.x, p1.y = p0.x + 70, p0.y + 10
+        p1.evolved = set()
+        p1.evo_soul = (0, 0.0)
         self.players.append(p1)
         c1 = {}
         for k, v in base.items():
@@ -44864,6 +45227,8 @@ class CoopRunState(RunState):
         prev_ctx = self.cur
         DMG_LOG[0] = self.dmg_log
         DMG_SRC[0] = "other"
+        EVO_CTX[0] = self
+        ENEMY_HAZARDS[0] = self
         self.run_time += dt
         if self.time_stop > 0:
             self.time_stop = max(0.0, self.time_stop - dt)
@@ -45020,10 +45385,12 @@ class CoopRunState(RunState):
             self.update_keys(d_)
             self.update_magnets(d_)
             first = False
-        # ---- 6) silahlar: herkes kendi silahları ----
+        # ---- 6) silahlar: herkes kendi silahları (+ evrim etkileri) ----
         for i in alive:
             self._ctx_use(i)
             _COOP_CTX[0] = i
+            if self.evo_perks:
+                self.evo_update(dt)
             self.update_boss_weapons(dt)
             self.update_passive_weapons(dt)
             self.update_weapon_objects(dt)
@@ -45057,6 +45424,15 @@ class CoopRunState(RunState):
             self._roll_goblin()
             self.extras_wave_changed()
         self._update_goblins()
+        # ---- 10b) sunak, harita bulguları, kervan (dünyada ortak; başında
+        # duran oyuncu alır) ----
+        if alive and not frozen:
+            self.extras_update(dt)
+            for i in range(len(self.players)):
+                self._ctx_use(i)
+                if self.shrine_buffs:
+                    self.shrine_buffs = [b for b in self.shrine_buffs if b[1] > self.run_time]
+            self._ctx_use(focus)
 
         # ---- 11) kapı, mağara, tüccar: E'ye basan oyuncunun bağlamında ----
         portal_used = False
@@ -45080,6 +45456,7 @@ class CoopRunState(RunState):
         # seviye kartları: konuğun eli ev sahibinde hazırlanır
         for i in range(len(self.players)):
             self._ctx_use(i)
+            self._skill_tick(dt)
             self.combo.update(dt)
             if i != 0 and self.player.alive and self.pending_levelups > 0 and not self.levelup_choices:
                 self.start_levelup_choice()
@@ -45301,14 +45678,14 @@ def coop_clean_cosmetics(d):
 # Ev sahibi, dünyadaki her nesnenin basit alanlarını (sayı, yazı, bayrak, küçük
 # liste/sözlük) gönderir; yalnızca değişen alanlar gider.
 COOP_SHARED_LISTS = ("enemies", "bosses", "hazards", "pickups", "enemy_projectiles",
-                     "chests", "map_keys", "magnets", "level_drops")
-COOP_SINGLES = ("legend_chest", "hell_portal", "cursed_shrine", "merchant")
+                     "chests", "map_keys", "magnets", "level_drops", "finds")
+COOP_SINGLES = ("legend_chest", "hell_portal", "cursed_shrine", "merchant", "shrine", "caravan")
 COOP_SYNC_CLASS_NAMES = (
     "Enemy", "Boss", "Hazard", "Pickup", "EnemyProjectile", "PlayerProjectile", "MagnetDrop",
     "LevelDrop", "BossChest", "MapKey", "LegendChest", "HellPortal", "CursedShrine", "Merchant",
     "WaterZone", "FireRing", "SwordSlash", "Tornado", "FlyingAxe", "WhipLash", "GhostBlade",
     "SpectralWolf", "MeteorStrike", "SunBeam", "Hawk", "BatSwarmBat", "FrostNova",
-    "ThrownKnife", "QuakeCharge", "Player",
+    "ThrownKnife", "QuakeCharge", "Player", "PowerShrine", "Caravan", "MapFind",
 )
 # RunState'in konuğa gitmeyen alanları (ya ayrı gider ya da konukta anlamsız)
 COOP_RUN_SKIP = set(COOP_SHARED_LISTS) | set(COOP_SINGLES) | set(COOP_MERGE_LISTS) | {
@@ -45430,6 +45807,11 @@ class CoopSyncHost:
             return v if len(v) <= 200 else v[:200]
         if d >= 4:
             return _COOP_SKIP_VAL
+        if t is set or t is frozenset:
+            # (ör. evrilmiş silahlar) konukta liste olur; "in" ile okunur
+            if len(v) > 96 or not all(type(x) in (str, int) for x in v):
+                return _COOP_SKIP_VAL
+            return sorted(v, key=str)
         if t is list or t is tuple:
             if len(v) > 96:
                 return _COOP_SKIP_VAL
@@ -47729,6 +48111,9 @@ class App:
                 if rr[2] > 0 and rr[3] > 0:
                     canvas.blit(bgf, rr[:2], rr)
         coop = getattr(self.run, "is_coop", False)
+        # pencere (duraklatma, mağara, market...) açıkken arkadaki koşu
+        # karartılır: üstteki duyuru notları pencerenin yazısına karışmasın
+        self.run._overlay = self.state != STATE_PLAY
         if coop:
             # 2 kişilik: kendi gözümden, iki oyuncunun silahları birlikte
             self.run.view_begin(1 if self.run.is_guest else 0)
