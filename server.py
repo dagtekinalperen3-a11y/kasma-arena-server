@@ -12,6 +12,8 @@ from collections import defaultdict, deque
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.middleware.proxy_fix import ProxyFix
 from supabase import create_client, Client
+from flask_socketio import SocketIO, emit  # <-- İŞTE BU EKSİKTİ (SOCKET İMPORTU)
+
 # Flask uygulamasını static_folder ayarıyla tek seferde tanımlıyoruz:
 app = Flask(__name__, static_folder=".")
 
@@ -35,17 +37,24 @@ def handle_disconnect():
         online_players = 0
     print(f"Oyuncu ayrıldı! Kalan Online: {online_players}")
     emit('online_count_update', online_players, broadcast=True)
+
 # CORS: masaüstü oyunun buna ihtiyacı yok, ama telefon sürümü GitHub Pages'ta
 # çalışan bir web sayfası. İzin sadece oyunun kendi sayfasına ve oyunun
 # kullandığı uçlara veriliyor (/diag, eski steam uçları kapalı). Çerez yok,
 # jeton gövdede gidiyor.
-#   Render > Environment: PLAY_ORIGINS = https://KULLANICIADIN.github.io
-#   (virgülle birden fazla yazılabilir; boşsa sadece *.github.io)
+# Render > Environment: PLAY_ORIGINS = https://KULLANICIADIN.github.io
+# (virgülle birden fazla yazılabilir; boşsa sadece *.github.io)
 PLAY_ORIGINS = [o.strip().rstrip("/").lower()
-                for o in (os.environ.get("PLAY_ORIGINS") or "").split(",") if o.strip()]
-CORS_PATHS = ("/auth/", "/player/", "/shop/", "/reward", "/rewards", "/ad/", "/gift",
-              "/scores", "/submit", "/contact", "/snow", "/event")
-CORS_BLOCKED = ("/diag", "/get_player", "/update_player", "/admin")
+                for o in os.environ.get("PLAY_ORIGINS", "").split(",") if o.strip()]
+CORS_PATHS = ("/auth/", "/player/", "/shop/", "/reward/", "/rewards/", "/ad/", "/gift/",
+              "/scores/", "/submit/", "/contact/", "/snow/", "/event/")
+CORS_BLOCKED = ("/diag/", "/get_player/", "/update_player/", "/admin/")
+
+def _origin_ok(origin):
+    n = (origin or "").strip().rstrip("/").lower()
+    if PLAY_ORIGINS:
+        return n in PLAY_ORIGINS   # yalnızca elle yazılmış kökenler
+    if not n.startswith("https://") or len(n) > 280:
 
 
 def _origin_ok(origin):
