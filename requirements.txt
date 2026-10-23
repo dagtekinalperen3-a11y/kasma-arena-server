@@ -3,3 +3,4 @@ flask-cors
 supabase
 gunicorn
 flask-sock
+flask-socketio
