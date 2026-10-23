@@ -12,9 +12,29 @@ from collections import defaultdict, deque
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.middleware.proxy_fix import ProxyFix
 from supabase import create_client, Client
-
+# Flask uygulamasını static_folder ayarıyla tek seferde tanımlıyoruz:
 app = Flask(__name__, static_folder=".")
 
+# SocketIO'yu uygulamaya bağlıyoruz:
+socketio = SocketIO(app, cors_allowed_origins="*")
+
+online_players = 0
+
+@socketio.on('connect')
+def handle_connect():
+    global online_players
+    online_players += 1
+    print(f"Yeni oyuncu bağlandı! Anlık Online: {online_players}")
+    emit('online_count_update', online_players, broadcast=True)
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    global online_players
+    online_players -= 1
+    if online_players < 0:
+        online_players = 0
+    print(f"Oyuncu ayrıldı! Kalan Online: {online_players}")
+    emit('online_count_update', online_players, broadcast=True)
 # CORS: masaüstü oyunun buna ihtiyacı yok, ama telefon sürümü GitHub Pages'ta
 # çalışan bir web sayfası. İzin sadece oyunun kendi sayfasına ve oyunun
 # kullandığı uçlara veriliyor (/diag, eski steam uçları kapalı). Çerez yok,
@@ -1330,7 +1350,7 @@ DAILY_GIFT_GEMS = (150, 250, 350, 450, 550, 650, 750)   # (oyunla aynı)
 # düşman 1 elmas (altın goblin 3).
 SNOW_DAILY = 3
 SNOW_TIME = 30.0
-SNOW_MAX_GEMS = 90              # tek oyunda en çok (dürüst oyunun üst ucu ~70)
+SNOW_MAX_GEMS = 130             # tek oyunda en çok (iyi bir oyun ~100)
 SNOW_MAX_ELAPSED = 15 * 60
 
 
