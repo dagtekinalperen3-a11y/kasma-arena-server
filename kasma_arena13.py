@@ -12876,6 +12876,41 @@ def _player_feet(surf, p, px, py, r, body, moving):
         pygame.draw.ellipse(surf, col, rect)
 
 
+# Seviye / mağara penceresi kapanınca kısa dokunulmazlık: oyuncu kalabalığın
+# ortasına hazırlıksız dönmesin (2 kişilikte oyun pencerede de akıyor).
+MENU_GRACE = 3.0
+GRACE_COLOR = (255, 222, 130)
+_GRACE_SPR = {}
+
+
+def draw_grace_bubble(surf, x, y, r, left, t):
+    """Dokunulmazlık balonu: altın kalkan + kalan süre yayı; son saniyede yanıp söner."""
+    fade = min(1.0, left / 0.4)
+    if left < 1.0 and int(t * 10) % 2 == 0:
+        fade *= 0.4
+    rr = int(r + 13 + 1.5 * math.sin(t * 6))
+    spr = _GRACE_SPR.get(rr)
+    if spr is None:
+        spr = pygame.Surface((rr * 2 + 6, rr * 2 + 6), pygame.SRCALPHA)
+        c = rr + 3
+        pygame.draw.circle(spr, (*GRACE_COLOR, 34), (c, c), rr)
+        pygame.draw.circle(spr, (*GRACE_COLOR, 70), (c, c), rr, 4)
+        pygame.draw.circle(spr, (255, 250, 225, 210), (c, c), rr, 2)
+        # parlak yansıma (balon hissi)
+        pygame.draw.arc(spr, (255, 255, 255, 170), pygame.Rect(c - rr + 5, c - rr + 5, rr * 2 - 10, rr * 2 - 10),
+                        math.radians(100), math.radians(160), 2)
+        _GRACE_SPR[rr] = spr
+    spr.set_alpha(int(255 * fade))
+    surf.blit(spr, (int(x - rr - 3), int(y - rr - 3)))
+    add_glow(surf, x, y, rr * 1.5, GRACE_COLOR, 0.2 * fade)
+    k = clamp(left / MENU_GRACE, 0.0, 1.0)
+    if k > 0.01:
+        ar = pygame.Rect(0, 0, rr * 2 + 12, rr * 2 + 12)
+        ar.center = (int(x), int(y))
+        pygame.draw.arc(surf, scale_col(GRACE_COLOR, 0.55 + 0.45 * fade), ar,
+                        math.pi / 2, math.pi / 2 + math.tau * k, 3)
+
+
 class Player:
     def __init__(self, skin_id="default"):
         self.skin = get_skin(skin_id)
@@ -13078,6 +13113,7 @@ class Player:
         self.dash_speed = 0.0
         self.dash_count = 0
         self.invuln = 0.0
+        self.grace_t = 0.0             # pencere sonrası dokunulmazlık (balon çizilir)
         self.shield_icd = 0.0
         self.hit_flash = 0.0
         self.hurt_vig = 0.0
@@ -13765,7 +13801,7 @@ class Player:
     def update(self, dt, keys, fx):
         if not self.alive:
             return
-        for name in ("atk_timer", "bonk_timer", "hit_flash", "invuln", "shield_icd",
+        for name in ("atk_timer", "bonk_timer", "hit_flash", "invuln", "grace_t", "shield_icd",
                      "dash_cd_timer", "flash_t", "hurt_vig", "smash_timer",
                      "dodge_window", "adrenaline_t", "focus_hurt_cd"):
             v = getattr(self, name)
@@ -14020,7 +14056,9 @@ class Player:
         if self.shield_charges > 0:
             add_glow(surf, px, py, r * 2.4, (120, 170, 255), 0.3)
             pygame.draw.circle(surf, (160, 200, 255), (ix, iy), r + 8, 2)
-        if self.invuln > 0 and self.dash_time <= 0:
+        if getattr(self, "grace_t", 0.0) > 0:
+            draw_grace_bubble(surf, ix, iy, r, self.grace_t, t)
+        elif self.invuln > 0 and self.dash_time <= 0:
             pygame.draw.circle(surf, (255, 255, 255), (ix, iy), r + 5, 1)
         if self.bonk_timer > 0:
             frac = 1 - clamp(self.bonk_timer / self.eff_bonk_cd(), 0, 1)
@@ -27019,8 +27057,7 @@ def draw_extras_hud(surf, run, t):
 # Denge: "2 silah 2 kitap kasıp evrimle uçmasın" - 3 silah şartı, koşuda en
 # çok EVO_MAX_PER_RUN evrim, hasar payı ılımlı (x1.25). Etkiler saniye/yaratık
 # başına sınırlı; ekran patlamaya dönmesin.
-# 2 kişilik modda kapalı: el ağ üzerinden eşitleniyor, yeni kart türü oraya
-# girmesin.
+# 2 kişilikte kişi başı 2 silah yuvası var: orada şart 2 silah.
 EVO_LEVEL = 10
 EVO_BOOK_LEVEL = 3
 EVO_MIN_WEAPONS = 3
@@ -27198,7 +27235,9 @@ def evo_book_need(key):
 def evo_ready_keys(p):
     """Evrime hazır silahlar: seviye, eş kitap seviyesi ve takım şartı tutan, henüz evrilmemiş."""
     done = getattr(p, "evolved", ())
-    if len(done) >= EVO_MAX_PER_RUN or len(p.weapons) < EVO_MIN_WEAPONS:
+    # 2 kişilikte yuva 2 silah: orada 2 silah da yeter
+    need = min(EVO_MIN_WEAPONS, slot_max(p, "w"))
+    if len(done) >= EVO_MAX_PER_RUN or len(p.weapons) < need:
         return []
     out = []
     for key, lvl in p.weapons.items():
@@ -31030,6 +31069,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin):
             self.fx.shake(6, 0.3)
             sfx("bonk", 0.5, 0.0)
         self.curse_offers = None
+        self.menu_grace()
 
     def accept_curse(self, idx):
         offers = self.curse_offers or []
@@ -31064,6 +31104,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin):
         if sh is not None:
             sh.used = True
         self.curse_offers = None
+        self.menu_grace()
         sfx("levelup", 0.9, 0.0)
 
     def _apply_curse_reward(self, vals, mult=1):
@@ -31471,6 +31512,14 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin):
             self.start_levelup_choice()
         else:
             self.levelup_choices = []
+            self.menu_grace()
+
+    def menu_grace(self, players=None):
+        """Pencere kapandı: MENU_GRACE sn dokunulmazlık."""
+        for q in players or (self.player,):
+            if q.alive:
+                q.invuln = max(q.invuln, MENU_GRACE)
+                q.grace_t = max(getattr(q, "grace_t", 0.0), MENU_GRACE)
 
     def reroll_levelup(self):
         """Eli yeniler."""
@@ -34360,7 +34409,7 @@ def draw_weapon_slots(surf, run, t):
               hcol if full else (104, 110, 136), bold=True, shadow=False)
 
     evolved = getattr(p, "evolved", ())
-    ready_evo = evo_ready_keys(p) if not getattr(run, "is_coop", False) else ()
+    ready_evo = evo_ready_keys(p)
     for i in range(n):
         r = pygame.Rect(x0 + i * (cell + gap), y0, cell, cell)
         if i >= n_filled:
@@ -35540,6 +35589,8 @@ def draw_run(surf, run, t, aim_pos=None, shake=(0, 0)):
     for hz in run.hazards:
         if vis_far.collidepoint(hz.x, hz.y):
             hz.draw(world, t)
+    if getattr(run, "coop_others", None):
+        draw_coop_world(world, run, t, "team")
     # ---- zemine çizilen silah alanları (varlıkların altında kalır) ----
     # silah görselleri açık / kısık / kapalı (Ayarlar). Hasar aynen işler;
     # yalnızca çizim değişir.
@@ -36703,15 +36754,15 @@ def draw_levelup_card(surf, r2, ch, run, t, hover):
         prev = surf.get_clip()
         surf.set_clip(r2.inflate(-6, -6).clip(prev) if prev else r2.inflate(-6, -6))
         n_ray = 10 if tier_i == 4 else 7
+        rs = pygame.Surface((r2.w, r2.h), pygame.SRCALPHA)
         for i in range(n_ray):
             a = t * (0.5 if tier_i == 4 else 0.3) + i * math.tau / n_ray
             pts = [(ecx, ecy),
                    (ecx + math.cos(a - 0.07) * 150, ecy + math.sin(a - 0.07) * 150),
                    (ecx + math.cos(a + 0.07) * 150, ecy + math.sin(a + 0.07) * 150)]
-            rs = pygame.Surface((r2.w, r2.h), pygame.SRCALPHA)
             pygame.draw.polygon(rs, (*band_col, 22 if tier_i == 3 else 30),
                                 [(x - r2.x, y - r2.y) for x, y in pts])
-            surf.blit(rs, r2.topleft)
+        surf.blit(rs, r2.topleft)
         surf.set_clip(prev)
 
     # ---- kenar ----
@@ -37394,17 +37445,28 @@ class LevelUpOverlay:
             cls._TITLE_ART = a
         return cls._TITLE_ART
 
+    _RAYS = [None, -1]
+
     def _backdrop(self, surf, t):
         surf.blit(self._dim_layer(), (0, 0))
         cx, cy = VIRTUAL_W / 2, 92
-        # yavaş dönen altın ışınlar
-        rays = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
-        for i in range(14):
-            a = t * 0.12 + i * math.tau / 14
-            pts = [(cx, cy), (cx + math.cos(a - 0.05) * 900, cy + math.sin(a - 0.05) * 900),
-                   (cx + math.cos(a + 0.05) * 900, cy + math.sin(a + 0.05) * 900)]
-            pygame.draw.polygon(rays, (255, 214, 120, 9), pts)
-        surf.blit(rays, (0, 0))
+        # yavaş dönen altın ışınlar (yüzey saniyede 15 kez yenilenir; dönüş
+        # o kadar yavaş ki fark edilmez)
+        rc = LevelUpOverlay._RAYS
+        step = int(t * 15)
+        if rc[0] is None or rc[1] != step:
+            if rc[0] is None:
+                rc[0] = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+            rays = rc[0]
+            rays.fill((0, 0, 0, 0))
+            ts = step / 15.0
+            for i in range(14):
+                a = ts * 0.12 + i * math.tau / 14
+                pts = [(cx, cy), (cx + math.cos(a - 0.05) * 900, cy + math.sin(a - 0.05) * 900),
+                       (cx + math.cos(a + 0.05) * 900, cy + math.sin(a + 0.05) * 900)]
+                pygame.draw.polygon(rays, (255, 214, 120, 9), pts)
+            rc[1] = step
+        surf.blit(rc[0], (0, 0))
         add_glow(surf, cx, cy, 260, GOLD, 0.30)
         # yükselen kıvılcımlar
         for i in range(26):
@@ -43965,6 +44027,7 @@ COOP_CAP_MULT = 1.4               # aynı anda yaşayan yaratık tavanı
 COOP_CAP_MAX = 240
 COOP_BOSS_HP = 1.25               # patron canı (iki oyuncunun toplam gücü üstüne)
 COOP_MENU_SHIELD = 4.0            # pencere açıkken en çok bu kadar sn hasar yok
+MENU_WORLD_HZ = 20.0              # pencere açıkken arkadaki dünyanın yenilenme sıklığı
 COOP_SNAP_HZ = 30.0               # ev sahibi -> konuk anlık görüntü sıklığı
 COOP_SNAP_HZ_DIRECT = 45.0        # doğrudan yolda daha sık (çizim tamponu kısalır)
 COOP_PREDICT_GUN = True           # konuk ana silah mermisini anında kendisi çizer
@@ -45224,6 +45287,9 @@ STRINGS.update({
                        "Welle {0}, {1}, {2}", "Волна {0}, {1}, {2}"),
     "coop.team_score": _T("TAKIM SKORU {0}", "TEAM SCORE {0}", "PUNTOS DE EQUIPO {0}", "TEAM-PUNKTE {0}",
                           "СЧЁТ КОМАНДЫ {0}"),
+    "coop.team": _T("TAKIM SKORU", "TEAM SCORE", "PUNTOS DE EQUIPO", "TEAM-PUNKTE", "СЧЁТ КОМАНДЫ"),
+    "coop.evo": _T("{0} evrildi: {1}!", "{0} evolved: {1}!", "¡{0} evolucionó: {1}!", "{0} entwickelt: {1}!",
+                   "{0} эволюционирует: {1}!"),
     "coop.r_score": _T("Skor", "Score", "Puntos", "Punkte", "Счёт"),
     "coop.r_kills": _T("Öldürme", "Kills", "Bajas", "Kills", "Убийства"),
     "coop.r_level": _T("Seviye", "Level", "Nivel", "Stufe", "Уровень"),
@@ -45498,6 +45564,8 @@ class CoopRunState(RunState):
             return
         blood = offers[idx].get("kind") == "blood"
         RunState.accept_curse(self, idx)
+        # mağaranın tuzağı ikisinin de yanında patlayabilir: ikisi de korunur
+        self.menu_grace([self.players[i] for i in self.alive_players()])
         if blood:
             # kan bedeli ikisinden de alınır (bir kez açanınki RunState'te
             # alındı)
@@ -45509,6 +45577,15 @@ class CoopRunState(RunState):
                 q.max_hp = max(30, int(q.max_hp) - loss)
                 q.hp = min(q.hp, q.max_hp)
                 self.fx.popup(q.x, q.y - 70, f"-{loss} " + L("cu.maxhp"), CURSE_RED, 20, life=1.6)
+
+    def evolve_weapon(self, key):
+        RunState.evolve_weapon(self, key)
+        # şerit yalnızca evrilene çıkar; ikisi de görsün diye başının üstünde
+        # adıyla bir duyuru
+        p = self.player
+        nm = self.names[self.cur] if self.cur < len(self.names) else ""
+        self.fx.popup(p.x, p.y - 96, L("coop.evo", nm or "?", evo_name(key)), EVOLUTIONS[key][2], 22,
+                      life=2.4)
 
     # ortak yemin: seçilen yemin iki oyuncuya da işler
     def apply_oath(self, key, tier=0):
@@ -45864,7 +45941,8 @@ class CoopRunState(RunState):
         q = self.players[i]
         q.alive = True
         q.hp = max(1.0, q.max_hp * SOUL_HP)
-        q.invuln = max(getattr(q, "invuln", 0.0), 3.0)
+        q.invuln = max(getattr(q, "invuln", 0.0), MENU_GRACE)
+        q.grace_t = MENU_GRACE
         self.dead[i] = False
         self.soul = None
         self.revives += 1
@@ -48987,13 +49065,25 @@ class App:
             self._menu_dt = 0.0
             menu_timed = True
             _mt0 = time.perf_counter()
+        fw = getattr(self, "_font_warm", None)
+        if fw is None:
+            # yazı tipleri ilk kullanıldıkları karede yükleniyordu (yeni bir
+            # pencere ilk açılınca kısa takılma): menüdeyken her karede
+            # birkaç boy önceden yüklenir.
+            fw = self._font_warm = [(sz, b_) for sz in range(44, 9, -1) for b_ in (True, False)]
+        if fw and self.state != STATE_PLAY:
+            for _ in range(3):
+                if fw:
+                    get_font(*fw.pop())
         if getattr(self.account, "just_registered", False):
             # yeni kayıt olan herkese eğitim (bu cihazda daha önce oynamış olsa da)
             self.account.just_registered = False
             if self.tut is None and not getattr(self, "shadow", False):
                 self.tut = Tutorial(self)
         tut = self.tut
-        if tut is not None and tut.active and tut.take_click(mouse_pos, clicked):
+        # 2 kişilik açıkken eğitim bekler (adımları tek kişilik oyuna göre)
+        tut_on = tut is not None and tut.active and self.coop is None
+        if tut_on and tut.take_click(mouse_pos, clicked):
             clicked = False
         try:
             if self.state == STATE_MENU: self.update_menu(dt, mouse_pos, clicked)
@@ -49038,7 +49128,7 @@ class App:
             self._menu_cost = getattr(self, "_menu_cost", 0.0) * 0.9 + mc * 0.1
 
         if self.tut is not None:
-            if self.tut.active:
+            if self.tut.active and self.coop is None:
                 try:
                     self.tut.draw(self.display.canvas, dt, mouse_pos)
                 except Exception as e:
@@ -49255,6 +49345,31 @@ class App:
     # ---- oynanış ----
     def _draw_run_frame(self, canvas, aim_pos=None, offset=(0, 0)):
         """Koşuyu ekrana çizer (performans)."""
+        if self.state != STATE_PLAY and self.run is not None:
+            # Pencere açıkken arkadaki dünya karartılmış durur: her karede
+            # baştan çizmek pencereyi takır takır yapıyordu. Tek kişilikte
+            # oyun durduğu için bir kez, 2 kişilikte (oyun akıyor) saniyede
+            # MENU_WORLD_HZ kez çizilir; arada kopyası basılır.
+            c = getattr(self, "_menu_world", None)
+            live = getattr(self.run, "is_coop", False)
+            now = self.t
+            if (c is not None and c[0] is self.run and c[1] == self.state and now - c[3] < 0.25
+                    and (not live or now - c[2] < 1.0 / MENU_WORLD_HZ)):
+                canvas.blit(c[4], (0, 0))
+                c[3] = now
+                return
+            self._draw_run_frame_now(canvas, aim_pos, offset)
+            if c is not None and c[4].get_size() == canvas.get_size():
+                sfc = c[4]
+                sfc.blit(canvas, (0, 0))
+            else:
+                sfc = canvas.copy()
+            self._menu_world = [self.run, self.state, now, now, sfc]
+            return
+        self._menu_world = None
+        self._draw_run_frame_now(canvas, aim_pos, offset)
+
+    def _draw_run_frame_now(self, canvas, aim_pos=None, offset=(0, 0)):
         bgf = self.bg.static_frame()
         ox, oy = (int(offset[0]), int(offset[1])) if offset else (0, 0)
         if ox or oy:
@@ -57150,8 +57265,63 @@ def draw_coop_soul(world, run, t):
     circle_aa(world, sx + 4, y + 1, 1.8, (30, 60, 90))
 
 
+COOP_TEAM_COL = ((110, 226, 236), (200, 168, 255))      # oda kuran, katılan
+
+
+def coop_team_col(i):
+    return COOP_TEAM_COL[i % 2]
+
+
+def _coop_index(run, q):
+    try:
+        return run.players.index(q)
+    except (ValueError, AttributeError):
+        return 0
+
+
+_COOP_RING = {}
+
+
+def _coop_ring_sprite(radius, i):
+    """Ayak altındaki takım halkası (önbellekte)."""
+    k = (radius, i)
+    spr = _COOP_RING.get(k)
+    if spr is None:
+        col = coop_team_col(i)
+        w, h = int((radius + 10) * 2.4), int((radius + 10) * 1.1)
+        spr = pygame.Surface((w + 8, h + 8), pygame.SRCALPHA)
+        el = pygame.Rect(4, 4, w, h)
+        pygame.draw.ellipse(spr, (*col, 46), el)
+        pygame.draw.ellipse(spr, (*col, 120), el.inflate(6, 4), 2)
+        pygame.draw.ellipse(spr, (*lighten(col, 0.3), 235), el, 3)
+        _COOP_RING[k] = spr
+    return spr
+
+
+def _coop_name_tag(world, x, y, name, col):
+    """Arkadaşın başının üstünde küçük isim hapı."""
+    w_ = text_width(name, 12, True) + 22
+    r = pygame.Rect(0, 0, w_, 18)
+    r.center = (int(x), int(y))
+    tag = pygame.Surface(r.size, pygame.SRCALPHA)
+    pygame.draw.rect(tag, (20, 15, 18, 190), tag.get_rect(), border_radius=9)
+    pygame.draw.rect(tag, (*col, 200), tag.get_rect(), width=1, border_radius=9)
+    world.blit(tag, r.topleft)
+    circle_aa(world, r.x + 9, r.centery, 3.2, col)
+    draw_text(world, name, (r.x + 15, r.y + 2), 12, lighten(col, 0.25), bold=True, shadow=False)
+
+
 def draw_coop_world(world, run, t, layer):
-    """Draw_run içinden: öbür oyuncunun pentagramı, kalkan kitapları, kendisi ve adı. layer"""
+    """Draw_run içinden: takım halkaları, öbür oyuncunun pentagramı, kalkan kitapları, kendisi ve adı."""
+    if layer == "team":
+        # ayağın altında takım rengi halka: kim kim, kalabalıkta da belli
+        for i, q in enumerate(getattr(run, "players", ()) or ()):
+            if q is None or not q.alive or getattr(q, "invis_t", 0.0) > 0:
+                continue
+            spr = _coop_ring_sprite(int(q.radius), i % 2)
+            spr.set_alpha(int(200 + 55 * math.sin(t * 3 + i * 2)))
+            world.blit(spr, spr.get_rect(center=(int(q.x), int(q.y + q.radius * 0.75))))
+        return
     for op in getattr(run, "coop_others", ()) or ():
         if op is None:
             continue
@@ -57166,92 +57336,142 @@ def draw_coop_world(world, run, t, layer):
                 if op.alive and op.weapons.get("book", 0) > 0:
                     draw_shield_books(world, op, t, layer="front")
             elif layer == "body":
+                # ölü arkadaş: mezar taşı draw_coop_soul'da çizilir
                 if op.alive:
                     if getattr(op, "invis_t", 0.0) > 0:
                         draw_invisible_player(world, op, t)
                     else:
                         op.draw(world, t)
-                    i = run.players.index(op) if op in run.players else 1
+                    i = _coop_index(run, op)
+                    col = coop_team_col(i)
                     nm = run.names[i] if i < len(run.names) else ""
+                    top = op.y - op.radius
                     if nm:
-                        draw_text(world, nm, (op.x, op.y - op.radius - 30), 13,
-                                  CYAN if i == 0 else (200, 170, 255), bold=True, center=True)
+                        _coop_name_tag(world, op.x, top - 34, nm, col)
                     w_ = 46
                     fr = clamp(op.hp / max(1.0, op.max_hp), 0.0, 1.0)
-                    bar = pygame.Rect(int(op.x - w_ / 2), int(op.y - op.radius - 18), w_, 5)
-                    pygame.draw.rect(world, (37, 27, 28), bar, border_radius=2)
+                    bar = pygame.Rect(int(op.x - w_ / 2), int(top - 20), w_, 6)
+                    pygame.draw.rect(world, (20, 15, 16), bar.inflate(2, 2), border_radius=3)
                     pygame.draw.rect(world, GREEN if fr > 0.5 else (ORANGE if fr > 0.25 else RED),
-                                     (bar.x, bar.y, int(w_ * fr), 5), border_radius=2)
-                else:
-                    x, y = int(op.x), int(op.y)
-                    pygame.draw.circle(world, (88, 73, 74), (x, y), 16)
-                    pygame.draw.circle(world, (120, 120, 140), (x, y), 16, 2)
-                    draw_text(world, "X", (x, y), 16, (200, 90, 90), bold=True, center=True)
+                                     (bar.x, bar.y, max(1, int(w_ * fr)), bar.h), border_radius=3)
         except Exception:
             continue
 
 
+def _coop_offscreen_badge(surf, run, op, nm, col, t):
+    """Arkadaş ekran dışındaysa kenarda yönünü gösteren rozet (düştüyse mezar + "diril" çağrısı)."""
+    sx, sy = run.world_to_screen(op.x, op.y)
+    # rozet HUD'ların üstüne binmesin: üst şerit, sol silah şeridi, sağ üst
+    # harita ve alt yetenek çubuğu dışında kalan kutu
+    box = pygame.Rect(64, 236, VIRTUAL_W - 128, VIRTUAL_H - 236 - 112)
+    if box.collidepoint(sx, sy):
+        return
+    cx, cy = box.centerx, box.centery
+    dx, dy = sx - cx, sy - cy
+    k = min((box.w / 2) / max(1e-3, abs(dx)), (box.h / 2) / max(1e-3, abs(dy)))
+    ex, ey = cx + dx * k, cy + dy * k
+    ang = math.atan2(dy, dx)
+    down = not op.alive
+    bc = (255, 120, 120) if down else col
+    pulse = 0.5 + 0.5 * math.sin(t * (6 if down else 3))
+    add_glow(surf, ex, ey, 34, bc, 0.25 + 0.2 * pulse)
+    # yön oku
+    tip = (ex + math.cos(ang) * 30, ey + math.sin(ang) * 30)
+    pts = [tip, (ex + math.cos(ang + 0.5) * 20, ey + math.sin(ang + 0.5) * 20),
+           (ex + math.cos(ang - 0.5) * 20, ey + math.sin(ang - 0.5) * 20)]
+    poly_aa(surf, pts, bc)
+    circle_aa(surf, ex, ey, 19, (24, 18, 22))
+    ring_aa(surf, ex, ey, 19, bc, 2)
+    if down:
+        # mezar taşı simgesi
+        st_ = pygame.Rect(0, 0, 14, 17)
+        st_.center = (int(ex), int(ey + 1))
+        pygame.draw.rect(surf, (186, 190, 214), st_, border_top_left_radius=7, border_top_right_radius=7)
+        pygame.draw.line(surf, (90, 92, 120), (ex, st_.y + 4), (ex, st_.y + 13), 2)
+        pygame.draw.line(surf, (90, 92, 120), (ex - 4, st_.y + 7), (ex + 4, st_.y + 7), 2)
+    else:
+        draw_text(surf, (nm or "?")[:1].upper(), (ex, ey), 16, lighten(col, 0.3), bold=True, center=True,
+                  shadow=False)
+    me = run.player
+    m = int(dist(me.x, me.y, op.x, op.y) / 40)       # ~40 px = 1 m
+    lab = (L("coop.mate_down") if down else (nm or "?")) + "  ·  %dm" % m
+    lw = text_width(lab, 11, True)
+    lx = clamp(ex - math.cos(ang) * 38, box.x + lw / 2 + 4, box.right - lw / 2 - 4)
+    ly = clamp(ey - math.sin(ang) * 34, box.y + 8, box.bottom - 8)
+    draw_text(surf, lab, (lx, ly), 11, lighten(bc, 0.3), bold=True, center=True)
+
+
 def draw_coop_hud(surf, run, t):
-    """Sol altta arkadaşın kartı + ekran dışındaysa yönünü gösteren ok."""
+    """Sol altta takım paneli (skor, arkadaşın canı ve silahları, ruh) + ekran dışı rozeti."""
     others = getattr(run, "coop_others", ()) or ()
     if not others:
         return
     op = others[0]
     if op is None:
         return
-    i = run.players.index(op) if op in run.players else 0
+    i = _coop_index(run, op)
+    col = coop_team_col(i)
     nm = run.names[i] if i < len(run.names) else "?"
-    r = pygame.Rect(14, VIRTUAL_H - 74, 260, 58)
-    panel(surf, r, bg=(37, 27, 28), edge=(120, 140, 220), alpha=225, radius=12, edge_w=2)
-    draw_text(surf, nm or "?", (r.x + 14, r.y + 8), 14, (200, 190, 255), bold=True, shadow=False)
-    draw_text(surf, "Lv.%d" % int(op.level), (r.right - 14, r.y + 8), 13, GOLD, bold=True, right=True,
-              shadow=False)
-    fr = clamp(op.hp / max(1.0, op.max_hp), 0.0, 1.0) if op.alive else 0.0
-    bar = pygame.Rect(r.x + 14, r.y + 32, r.w - 28, 10)
-    draw_bar(surf, bar, fr, GREEN if fr > 0.5 else (ORANGE if fr > 0.25 else RED), radius=4)
-    if not op.alive:
-        draw_text(surf, L("coop.mate_down"), bar.center, 11, (255, 150, 150), bold=True, center=True,
-                  shadow=False)
-    # ekran dışı ok
-    cam = run.cam_rect()
-    if op.alive and not cam.collidepoint(op.x, op.y):
-        sx, sy = run.world_to_screen(op.x, op.y)
-        v = VIEW_RECT
-        cxv, cyv = v.centerx, v.centery
-        dx, dy = sx - cxv, sy - cyv
-        k = min((v.w / 2 - 40) / max(1e-3, abs(dx)), (v.h / 2 - 40) / max(1e-3, abs(dy)))
-        ex, ey = cxv + dx * k, cyv + dy * k
-        ang = math.atan2(dy, dx)
-        pts = [(ex + math.cos(ang) * 16, ey + math.sin(ang) * 16),
-               (ex + math.cos(ang + 2.5) * 12, ey + math.sin(ang + 2.5) * 12),
-               (ex + math.cos(ang - 2.5) * 12, ey + math.sin(ang - 2.5) * 12)]
-        pygame.draw.polygon(surf, (200, 170, 255), pts)
-        draw_text(surf, nm, (ex - math.cos(ang) * 26, ey - math.sin(ang) * 26), 11, (220, 210, 255),
-                  bold=True, center=True)
+    r = pygame.Rect(14, VIRTUAL_H - 112, 272, 98)
+    panel(surf, r, bg=(30, 22, 26), edge=scale_col(col, 0.75), alpha=228, radius=12, edge_w=2)
     # takım skoru
     if getattr(run, "is_guest", False):
         team = int(run.score) + int(run.host_score[0])
     else:
         team = int(run.ctx_get(0, "score") or 0) + int(run.ctx_get(1, "score") or 0)
-    draw_text(surf, L("coop.team_score", fmt_num(team)), (r.x + 14, r.y - 20), 12, CYAN, bold=True)
+    draw_text(surf, L("coop.team"), (r.x + 14, r.y + 9), 11, TEXT_DIM, bold=True, shadow=False)
+    draw_text(surf, fmt_num(team), (r.right - 14, r.y + 5), 17, CYAN, bold=True, right=True, shadow=False)
+    pygame.draw.line(surf, (70, 56, 62), (r.x + 12, r.y + 29), (r.right - 12, r.y + 29), 1)
+    # arkadaş satırı
+    circle_aa(surf, r.x + 19, r.y + 43, 5, col)
+    draw_text(surf, nm or "?", (r.x + 30, r.y + 35), 14, lighten(col, 0.25), bold=True, shadow=False)
+    draw_text(surf, "Lv.%d" % int(op.level), (r.right - 14, r.y + 35), 13, GOLD, bold=True, right=True,
+              shadow=False)
+    fr = clamp(op.hp / max(1.0, op.max_hp), 0.0, 1.0) if op.alive else 0.0
+    bar = pygame.Rect(r.x + 14, r.y + 56, r.w - 28, 10)
+    draw_bar(surf, bar, fr, GREEN if fr > 0.5 else (ORANGE if fr > 0.25 else RED), radius=4)
+    if not op.alive:
+        draw_text(surf, L("coop.mate_down"), bar.center, 11, (255, 150, 150), bold=True, center=True,
+                  shadow=False)
+    # arkadaşın silahları (evrilen altın halkalı)
+    evo_ = getattr(op, "evolved", ()) or ()
+    x = r.x + 24
+    for key in list(getattr(op, "weapons", {}) or {})[:4]:
+        w = WEAPON_BY_KEY.get(key)
+        if w is None:
+            continue
+        evolved = key in evo_
+        wc = EVOLUTIONS[key][2] if (evolved and key in EVOLUTIONS) else tuple(w["color"])
+        if evolved:
+            ring_aa(surf, x, r.y + 82, 11, GOLD, 2)
+        blit_sigil(surf, x, r.y + 82, 8, key, wc)
+        x += 28
     sl_ = getattr(run, "soul", None)
     if isinstance(sl_, (list, tuple)) and len(sl_) >= 4:
         # patron ruhu bekliyor: biri düşerse diriltebilir
         pulse = 0.6 + 0.4 * math.sin(t * 4)
-        circle_aa(surf, r.x + 22, r.y - 58, 6, scale_col(SOUL_COLOR, pulse))
-        draw_text(surf, L("coop.soul_ready"), (r.x + 34, r.y - 66), 12, SOUL_COLOR, bold=True)
-    # bağlantı kalitesi: herkes gecikmeyi görsün
+        txt = L("coop.soul_ready")
+        tw_ = text_width(txt, 11, True)
+        circle_aa(surf, r.right - 22 - tw_, r.y + 82, 5, scale_col(SOUL_COLOR, pulse))
+        draw_text(surf, txt, (r.right - 14, r.y + 75), 11, SOUL_COLOR, bold=True, right=True, shadow=False)
+    # bağlantı: panelin üstünde küçük hap
     pg = getattr(run, "_net_ping", 0)
+    txt, pc = None, GREEN
     if getattr(run, "_net_sync", False):
-        draw_text(surf, L("coop.resync"), (r.x + 14, r.y - 40), 12, ORANGE, bold=True)
+        txt, pc = L("coop.resync"), ORANGE
     elif pg is not None and pg < 0:
-        draw_text(surf, L("coop.reconnecting"), (r.x + 14, r.y - 40), 12, RED, bold=True)
+        txt, pc = L("coop.reconnecting"), RED
     elif pg:
-        col = GREEN if pg < 150 else (GOLD if pg < 300 else RED)
+        pc = GREEN if pg < 150 else (GOLD if pg < 300 else RED)
         via = L("coop.path_direct") if getattr(run, "_net_direct", False) else L("coop.path_relay")
-        # takım skorunun üstünde ayrı satır (uzun skorla üst üste binmesin)
-        draw_text(surf, "%s  ·  %s" % (L("coop.ping", int(pg)), via), (r.x + 14, r.y - 40), 12, col,
-                  bold=True)
+        txt = "%s  ·  %s" % (L("coop.ping", int(pg)), via)
+    if txt:
+        pw = text_width(txt, 11, True) + 26
+        pr_ = pygame.Rect(r.x, r.y - 26, pw, 20)
+        panel(surf, pr_, bg=(30, 22, 26), edge=scale_col(pc, 0.6), alpha=210, radius=10, edge_w=1)
+        circle_aa(surf, pr_.x + 11, pr_.centery, 3.5, pc)
+        draw_text(surf, txt, (pr_.x + 19, pr_.y + 3), 11, pc, bold=True, shadow=False)
+    _coop_offscreen_badge(surf, run, op, nm, col, t)
 
 
 App.open_coop = _app_open_coop
