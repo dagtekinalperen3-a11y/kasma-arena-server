@@ -35295,6 +35295,9 @@ def _draw_hud_center(surf, run, t):
         alpha = int(255 * min(1, a * 2))
         scale_t = ease_out_cubic(1 - a)
         size = int(lerp(54, 40, scale_t))
+        # uzun duyuru sol üstteki silah şeridinin altına kaçmasın
+        while size > 22 and text_width(run.waves.announce_text, size, True) > 640:
+            size -= 2
         if "PATRON" in run.waves.announce_text:
             col = RED
         elif "YOĞUNLUK" in run.waves.announce_text:
@@ -57235,19 +57238,20 @@ def draw_coop_hud(surf, run, t):
     if isinstance(sl_, (list, tuple)) and len(sl_) >= 4:
         # patron ruhu bekliyor: biri düşerse diriltebilir
         pulse = 0.6 + 0.4 * math.sin(t * 4)
-        circle_aa(surf, r.x + 22, r.y - 40, 6, scale_col(SOUL_COLOR, pulse))
-        draw_text(surf, L("coop.soul_ready"), (r.x + 34, r.y - 48), 12, SOUL_COLOR, bold=True)
+        circle_aa(surf, r.x + 22, r.y - 58, 6, scale_col(SOUL_COLOR, pulse))
+        draw_text(surf, L("coop.soul_ready"), (r.x + 34, r.y - 66), 12, SOUL_COLOR, bold=True)
     # bağlantı kalitesi: herkes gecikmeyi görsün
     pg = getattr(run, "_net_ping", 0)
     if getattr(run, "_net_sync", False):
-        draw_text(surf, L("coop.resync"), (r.right - 14, r.y - 20), 12, ORANGE, bold=True, right=True)
+        draw_text(surf, L("coop.resync"), (r.x + 14, r.y - 40), 12, ORANGE, bold=True)
     elif pg is not None and pg < 0:
-        draw_text(surf, L("coop.reconnecting"), (r.right - 14, r.y - 20), 12, RED, bold=True, right=True)
+        draw_text(surf, L("coop.reconnecting"), (r.x + 14, r.y - 40), 12, RED, bold=True)
     elif pg:
         col = GREEN if pg < 150 else (GOLD if pg < 300 else RED)
         via = L("coop.path_direct") if getattr(run, "_net_direct", False) else L("coop.path_relay")
-        draw_text(surf, "%s  ·  %s" % (L("coop.ping", int(pg)), via), (r.right - 14, r.y - 20), 12, col,
-                  bold=True, right=True)
+        # takım skorunun üstünde ayrı satır (uzun skorla üst üste binmesin)
+        draw_text(surf, "%s  ·  %s" % (L("coop.ping", int(pg)), via), (r.x + 14, r.y - 40), 12, col,
+                  bold=True)
 
 
 App.open_coop = _app_open_coop
