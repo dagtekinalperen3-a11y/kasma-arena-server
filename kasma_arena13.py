@@ -7013,6 +7013,8 @@ class AccountClient:
         res = await self._post(path, payload)
         if res.get("success"):
             await self._remember(res["token"], res["account"])
+            if path == "/auth/register":
+                self.just_registered = True       # yeni hesap: eğitim gösterilsin
             self.ok_msg = L("ui.acc_welcome", res["account"].get("name", ""))
             self.status = ""
         else:
@@ -7144,6 +7146,8 @@ class AccountClient:
              "device_legacy": device_id_legacy()})
         if out.get("success"):
             await self._remember(out["token"], out["account"])
+            if out.get("new"):
+                self.just_registered = True       # Google ile ilk kez: eğitim
             self.ok_msg = L("ui.acc_welcome", out["account"].get("name", ""))
             self.status = ""
         else:
@@ -48980,6 +48984,11 @@ class App:
             self._menu_dt = 0.0
             menu_timed = True
             _mt0 = time.perf_counter()
+        if getattr(self.account, "just_registered", False):
+            # yeni kayıt olan herkese eğitim (bu cihazda daha önce oynamış olsa da)
+            self.account.just_registered = False
+            if self.tut is None and not getattr(self, "shadow", False):
+                self.tut = Tutorial(self)
         tut = self.tut
         if tut is not None and tut.active and tut.take_click(mouse_pos, clicked):
             clicked = False

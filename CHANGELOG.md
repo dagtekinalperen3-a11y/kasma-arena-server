@@ -5,8 +5,9 @@ Kısa notlar, en yenisi üstte.
 ## sıradaki sürüm
 - EĞİTİM: oyuna ilk kez girene kısa bir tur: silahlık (silahlar nasıl açılır,
   aç / kapat), skin market'ten bedava Yeşil Öncü'yü aldırır, oyunu başlatır,
-  bir düşman öldürtür, B ile marketi açtırır. Her adımda "EĞİTİMİ GEÇ" var;
-  eski oyunculara hiç çıkmaz
+  bir düşman öldürtür, B ile marketi açtırır. Her adımda "EĞİTİMİ GEÇ" var.
+  Hem oyunu ilk kez açana hem de yeni hesap açana (kullanıcı adıyla ya da
+  Google ile ilk kez) gösterilir
 - 2 KİŞİLİK:
   - elmas artık 2 kişilikte de kazanılıyor (herkes kendi topladığı kadar,
     tek kişilikle aynı oranda); sonuç ekranında yazar
