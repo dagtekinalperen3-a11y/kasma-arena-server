@@ -12,46 +12,28 @@ from collections import defaultdict, deque
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.middleware.proxy_fix import ProxyFix
 from supabase import create_client, Client
-from flask_socketio import SocketIO, emit
 
-# Flask uygulamasını static_folder ayarıyla tek seferde tanımlıyoruz:
 app = Flask(__name__, static_folder=".")
 
-# SocketIO'yu uygulamaya bağlıyoruz:
-socketio = SocketIO(app, cors_allowed_origins="*")
-
-online_players = 0
-
-@socketio.on('connect')
-def handle_connect():
-    global online_players
-    online_players += 1
-    print(f"Yeni oyuncu bağlandı! Anlık Online: {online_players}")
-    emit('online_count_update', online_players, broadcast=True)
-
-@socketio.on('disconnect')
-def handle_disconnect():
-    global online_players
-    online_players -= 1
-    if online_players < 0:
-        online_players = 0
-    print(f"Oyuncu ayrıldı! Kalan Online: {online_players}")
-    emit('online_count_update', online_players, broadcast=True)
-
-# CORS ayarları
+# CORS: masaüstü oyunun buna ihtiyacı yok, ama telefon sürümü GitHub Pages'ta
+# çalışan bir web sayfası. İzin sadece oyunun kendi sayfasına ve oyunun
+# kullandığı uçlara veriliyor (/diag, eski steam uçları kapalı). Çerez yok,
+# jeton gövdede gidiyor.
+#   Render > Environment: PLAY_ORIGINS = https://KULLANICIADIN.github.io
+#   (virgülle birden fazla yazılabilir; boşsa sadece *.github.io)
 PLAY_ORIGINS = [o.strip().rstrip("/").lower()
-                for o in os.environ.get("PLAY_ORIGINS", "").split(",") if o.strip()]
-CORS_PATHS = ("/auth/", "/player/", "/shop/", "/reward/", "/rewards/", "/ad/", "/gift/",
-              "/scores/", "/submit/", "/contact/", "/snow/", "/event/")
-CORS_BLOCKED = ("/diag/", "/get_player/", "/update_player/", "/admin/")
+                for o in (os.environ.get("PLAY_ORIGINS") or "").split(",") if o.strip()]
+CORS_PATHS = ("/auth/", "/player/", "/shop/", "/reward", "/rewards", "/ad/", "/gift",
+              "/scores", "/submit", "/contact", "/snow", "/event")
+CORS_BLOCKED = ("/diag", "/get_player", "/update_player", "/admin")
+
 
 def _origin_ok(origin):
-    n = (origin or "").strip().rstrip("/").lower()
+    o = (origin or "").strip().rstrip("/").lower()
     if PLAY_ORIGINS:
-        return n in PLAY_ORIGINS   # yalnızca elle yazılmış kökenler
-    if not n.startswith("https://") or len(n) > 280:
+        return o in PLAY_ORIGINS          # yalnızca elle yazılmış kökenler
+    if not o.startswith("https://") or len(o) > 200:
         return False
-    return True
     host = o[len("https://"):]
     return (host.endswith(".github.io") and "/" not in host and ":" not in host
             and host.count(".") == 2)
