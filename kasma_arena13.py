@@ -634,7 +634,7 @@ FPS_CHOICES = [60, 90, 120, 144, 165, 240]
 #   %100 = efektler tam görünür (hiç ek maliyet yok)
 #   %1-99 = efekt katmanı o oranda saydam basılır
 #   %0 = efekt katmanı hiç çizilmez (en hızlısı)
-WEAPON_FX_DEFAULT = 80            # yeni oyuncunun başlangıç değeri (%) - göz yormasın
+WEAPON_FX_DEFAULT = 100           # kısma her karede tüm görüntüyü kopyalıyor (FPS); varsayılan tam
 # Eski üç kademeli ayarın sayısal karşılıkları (kayıt göçü için).
 WEAPON_FX_LEGACY = {"full": 100, "dim": 32, "off": 0}
 # oyunun adı EvolveArena (E ve A büyük). (Kayıt klasörü "KasmaArena" olarak
@@ -1826,11 +1826,11 @@ STRINGS = {
     "contact.no_server": _T("Sunucuya bağlanılamıyor; internetini kontrol et.", "Can't reach the server; check your connection.",
                             "No se puede conectar al servidor.", "Server nicht erreichbar.", "Сервер недоступен."),
     "snow.title":     _T("KARTOPU SAVAŞI", "SNOWBALL FIGHT", "GUERRA DE BOLAS", "SCHNEEBALLSCHLACHT", "СНЕЖНАЯ БИТВА"),
-    "snow.desc":      _T("{0:.0f} saniyede köy meydanından geçen yaratıklara kar topu at! Vurduğun her yaratık 1 elmas, altın goblin 3 elmas. Kar topu nişan aldığın yere kavisle düşer, önüne at. Günde {1} hak.",
-                         "Throw snowballs at the creatures crossing the village square for {0:.0f} seconds! Each hit creature is 1 gem, a golden goblin is 3. Snowballs arc to where you aim - lead your target. {1} plays a day.",
-                         "¡Lanza bolas de nieve durante {0:.0f} segundos! Cada criatura vale 1 gema, el duende DORADO 3. {1} partidas al día.",
-                         "Wirf {0:.0f} Sekunden lang Schneebälle! Jede getroffene Kreatur 1 Edelstein, der GOLDENE Kobold 3. {1} Spiele pro Tag.",
-                         "Кидай снежки {0:.0f} секунд! Каждое существо — 1 самоцвет, ЗОЛОТОЙ гоблин — 3. {1} игры в день."),
+    "snow.desc":      _T("{0:.0f} saniyede köy meydanından geçen yaratıklara kar topu at! Vurduğun her yaratık 2 elmas, tank 3, altın goblin 6 elmas. Kar topu nişan aldığın yere kavisle düşer, önüne at. Günde {1} hak.",
+                         "Throw snowballs at the creatures crossing the village square for {0:.0f} seconds! Each creature is 2 gems, a tank 3, a golden goblin 6. Snowballs arc to where you aim - lead your target. {1} plays a day.",
+                         "¡Lanza bolas de nieve durante {0:.0f} segundos! Cada criatura vale 2 gemas, el tanque 3, el duende DORADO 6. {1} partidas al día.",
+                         "Wirf {0:.0f} Sekunden lang Schneebälle! Jede Kreatur 2 Edelsteine, der Panzer 3, der GOLDENE Kobold 6. {1} Spiele pro Tag.",
+                         "Кидай снежки {0:.0f} секунд! Каждое существо — 2 самоцвета, танк — 3, ЗОЛОТОЙ гоблин — 6. {1} игры в день."),
     "snow.left":      _T("Bugün kalan hak: {0}", "Plays left today: {0}", "Partidas hoy: {0}", "Heute übrig: {0}", "Осталось сегодня: {0}"),
     "snow.badge":     _T("KARTOPU {0}/3", "SNOWBALL {0}/3", "NIEVE {0}/3", "SCHNEE {0}/3", "СНЕЖКИ {0}/3"),
     "snow.start":     _T("BAŞLA", "START", "EMPEZAR", "START", "СТАРТ"),
@@ -3339,6 +3339,8 @@ STRINGS.update({
  "dmg.storm": _T("Fırtına", "Storm", "Tormenta", "Sturm", "Буря"),
  "dmg.ult": _T("Özel Yetenek", "Special Ability", "Habilidad Especial", "Spezialfähigkeit", "Особая способность"),
  "dmg.orbit": _T("Yörünge", "Orbit", "Órbita", "Orbit", "Орбита"),
+ "dmg.parry": _T("Savuşturma", "Parry", "Parada", "Parade", "Парирование"),
+ "dmg.book": _T("Kitap etkileri", "Book effects", "Efectos de libros", "Buch-Effekte", "Эффекты книг"),
  "dmg.other": _T("Yanık / Zehir / Diğer", "Burn / Poison / Other", "Quemadura / Veneno / Otro", "Brand / Gift / Sonstiges", "Горение / Яд / Прочее"),
  "ms.locked": _T("KİLİTLİ", "LOCKED", "BLOQUEADO", "GESPERRT", "ЗАКРЫТО"),
  "ms.lock_stone": _T("{0}'ı bitir: 25. dalga patronunu yen", "Finish {0}: beat the wave 25 boss", "Termina {0}: vence al jefe de la oleada 25", "Schließe {0} ab: besiege den Boss der Welle 25", "Пройди {0}: победи босса 25-й волны"),
@@ -5208,6 +5210,12 @@ class SaveManager:
             fxm = int(round(float(fxm)))
         except (TypeError, ValueError):
             fxm = WEAPON_FX_DEFAULT
+        if not st.get("wfx_v2"):
+            # eski varsayılan %80'di; o da her karede ek bir tam ekran
+            # kopyası demek. Değiştirmemiş olanlar bir kereliğine %100'e geçer.
+            st["wfx_v2"] = True
+            if fxm == 80:
+                fxm = 100
         CFG["weapon_fx"] = int(clamp(fxm, 0, 100))
         st["weapon_fx"] = CFG["weapon_fx"]
         CFG["pet_show"] = bool(st.get("pet_show", True))
@@ -14453,20 +14461,32 @@ PICKUP_GRAB_R = 24.0
 _PICKUP_SPR = {}
 
 
+def pickup_sprite_kind(pu):
+    if pu.kind == "coin" and pu.value >= 4:
+        return "coin2"
+    return pu.kind
+
+
 def _pickup_sprite(kind):
     img = _PICKUP_SPR.get(kind)
     if img is None:
         global _GLOW_ON_ALPHA
-        n = 40 if kind not in ("coin", "xp") else 28
+        n = 40 if kind not in ("coin", "coin2", "xp") else 32
         img = pygame.Surface((n, n), pygame.SRCALPHA)
         x = y = n // 2
         _GLOW_ON_ALPHA = True
         try:
-            if kind == "coin":
-                add_glow(img, x, y, 12, GOLD, .5)
-                pygame.draw.circle(img, (150, 105, 30), (x, y), 6)
-                pygame.draw.circle(img, GOLD, (x, y), 5)
-                pygame.draw.circle(img, (255, 240, 170), (x - 1, y - 1), 2)
+            if kind in ("coin", "coin2"):
+                # koyu kontur + kenar + parıltı: her zeminde seçilsin
+                add_glow(img, x, y, 13, GOLD, .55)
+                coins = ((0, 0),) if kind == "coin" else ((-4, 2), (4, 2), (0, -3))
+                for ox, oy in coins:
+                    cx_, cy_ = x + ox, y + oy
+                    pygame.draw.circle(img, (60, 38, 8), (cx_, cy_ + 1), 8)
+                    pygame.draw.circle(img, (176, 118, 26), (cx_, cy_), 7)
+                    pygame.draw.circle(img, (255, 206, 70), (cx_, cy_), 6)
+                    pygame.draw.circle(img, (226, 160, 40), (cx_, cy_), 4, 1)
+                    pygame.draw.circle(img, (255, 246, 196), (cx_ - 2, cy_ - 2), 2)
             elif kind == "xp":
                 add_glow(img, x, y, 12, PURPLE, .55)
                 pts = [(x, y - 6), (x + 4, y), (x, y + 6), (x - 4, y)]
@@ -14547,11 +14567,16 @@ class Pickup:
     def draw(self, surf, t):
         bob = math.sin(t * 4 + self.bob) * 2.5
         x, y = int(self.x), int(self.y + bob)
-        if MOBILE:
-            # Telefon: her eşya tipinin hazır (parıltısı gömülü) görüntüsü tek
-            # blit.
-            img = _pickup_sprite(self.kind)
+        if True:
+            # hazır (parıltısı gömülü) görüntü tek blit; büyük yığın üç para
+            img = _pickup_sprite(pickup_sprite_kind(self))
             surf.blit(img, (x - img.get_width() // 2, y - img.get_height() // 2))
+            if self.kind == "coin" and ((t * 0.9 + self.bob) % 2.2) < 0.18:
+                # ara sıra parlama: kalabalıkta da göze çarpsın
+                k = ((t * 0.9 + self.bob) % 2.2) / 0.18
+                r_ = int(3 + 6 * math.sin(k * math.pi))
+                pygame.draw.line(surf, (255, 250, 220), (x - r_, y - 3), (x + r_, y - 3), 1)
+                pygame.draw.line(surf, (255, 250, 220), (x, y - 3 - r_), (x, y - 3 + r_), 1)
             return
         if self.kind == "coin":
             # para kaybolmuyor, yanıp sönme uyarısı da kalktı.
@@ -18036,7 +18061,8 @@ def dmg_src_label(key):
         return w_name(w), w.get("icon", "sword"), w.get("color", TEXT)
     extra = {"gun": ("target", (255, 214, 120)), "bonk": ("skull", (150, 255, 130)),
              "storm": ("bolt", (190, 215, 255)), "ult": ("star", (255, 150, 230)),
-             "orbit": ("orbit", (140, 200, 255)), "other": ("flame", (200, 160, 140))}
+             "orbit": ("orbit", (140, 200, 255)), "other": ("flame", (200, 160, 140)),
+             "parry": ("shield", (255, 236, 150)), "book": ("book", (186, 150, 255))}
     ic, col = extra.get(key, ("flame", (200, 160, 140)))
     return L("dmg." + key) if ("dmg." + key) in STRINGS else key, ic, col
 
@@ -26584,10 +26610,11 @@ class WorldExtrasMixin:
         self.fx.popup(p.x, p.y - 132, L("sh.appear"), SHRINE_KINDS[kind][0], 16, life=2.2)
         sfx("second", 0.5, 0.0)
 
-    def _claim_shrine(self, sh):
+    def _claim_shrine(self, sh, shared=False):
         p = self.player
         sh.used = True
-        self.shrines_used += 1
+        if not shared:
+            self.shrines_used += 1
         col = sh.color()
         k = sh.kind
         if k == "rage":
@@ -26607,6 +26634,9 @@ class WorldExtrasMixin:
             self.shrine_buffs.append([k, self.run_time + SHRINE_BUFF_T])
         self.fx.popup(p.x, p.y - 84, L("sh." + k), col, 26, life=1.8)
         self.fx.popup(p.x, p.y - 60, L("sh.%s.d" % k), lighten(col, 0.3), 16, life=1.8)
+        if shared:
+            self.fx.ring(p.x, p.y, col, n=20, speed=220, life=0.5, r=3)
+            return
         self.fx.shockwave(sh.x, sh.y, 200, col, 0.5, 6)
         self.fx.ring(sh.x, sh.y, col, n=30, speed=300, life=0.6, r=3.5)
         self.fx.burst(sh.x, sh.y - 38, lighten(col, 0.4), n=24, speed=200, life=0.7, r=3.2, gravity=-60)
@@ -26638,6 +26668,10 @@ class WorldExtrasMixin:
                               sh.color(), -math.cos(a) * 90, -math.sin(a) * 90, 0.5, 2.6)
             if sh.charge >= SHRINE_CHARGE:
                 self._as_player(who, self._claim_shrine, sh)
+                # 2 kişilik: sunak ikisine de işler
+                for j in (self.alive_players() if hasattr(self, "alive_players") else ()):
+                    if j != who:
+                        self._as_player(j, self._claim_shrine, sh, True)
         else:
             sh.charge = max(0.0, sh.charge - dt * 1.5)
 
@@ -26992,7 +27026,7 @@ EVO_PROC_CD = 0.5               # aynı yaratıkta etkinin yeniden tutması içi
 EVO_CHAIN_CHANCE = 0.30
 EVO_CHAIN_R = 170.0
 EVO_CHAIN_DMG = 0.40
-EVO_BLAST_R = 78.0
+EVO_BLAST_R = 92.0
 EVO_BLAST_DMG = 0.6
 EVO_BLAST_PER_SEC = 5
 EVO_BANNER_T = 2.8
@@ -27230,6 +27264,8 @@ def evo_on_hit(e, amount, fx):
         if dying:
             n, _t = getattr(p, "evo_soul", (0, 0.0))
             p.evo_soul = (min(EVO_SOUL_MAX, n + 1), run.run_time + EVO_SOUL_T)
+            dx_, dy_ = norm_dir(e.x, e.y, p.x, p.y)
+            fx.spark(e.x, e.y, EVO_PERK_COLOR["soul"], dx_ * 300, dy_ * 300, 0.5, 3.4)
         return
     if perk == "phoenix" and dying:
         if run.run_time >= getattr(run, "evo_phx_t", 0.0):
@@ -27245,6 +27281,8 @@ def evo_on_hit(e, amount, fx):
             or enemy_weight_class(e) == "tough"
         if tough and not dying:
             _evo_extra_hit(run, e, amount * 0.6)
+            if random.random() < 0.3:
+                fx.burst(e.x, e.y, EVO_PERK_COLOR["sunder"], n=5, speed=120, life=0.3, r=3)
         return
     if perk == "shatter":
         if not dying and getattr(e, "slow_timer", 0.0) > 0:
@@ -27260,6 +27298,7 @@ def evo_on_hit(e, amount, fx):
             fx.burst(e.x, e.y - 4, col, n=3, speed=60, life=0.3, r=2.2, gravity=-60)
     elif perk in ("chill", "shatter"):
         e.apply_slow(0.55, 1.6)
+        fx.burst(e.x, e.y, col, n=4, speed=70, life=0.35, r=2.4)
     elif perk == "freeze":
         if random.random() < 0.20:
             e.apply_slow(0.6 if boss else 0.08, 1.4)
@@ -27273,17 +27312,22 @@ def evo_on_hit(e, amount, fx):
             fx.popup(e.x, e.y - e.radius - 12, L("evo.whack"), col, 14, life=0.45)
     elif perk == "curse":
         e._evo_mark = now + 3.0
+        fx.ring(e.x, e.y, col, n=8, speed=60, life=0.35, r=2.2)
     elif perk == "poison":
         if not getattr(e, "_evo_poison", False):
             e._evo_poison = True
             e.apply_poison(max(0.5, amount * 0.10))
+            fx.burst(e.x, e.y, col, n=6, speed=60, life=0.5, r=2.8, gravity=-30)
     elif perk == "bleed":
         st = getattr(e, "_evo_bleed", 0)
         if st < 5:
             e._evo_bleed = st + 1
             e.apply_poison(max(0.3, amount * 0.05))
+            fx.burst(e.x, e.y, col, n=4, speed=80, life=0.4, r=2.4, add=False, gravity=220)
     elif perk == "leech":
         p.lifesteal(amount * 0.04)
+        dx_, dy_ = norm_dir(e.x, e.y, p.x, p.y)
+        fx.spark(e.x, e.y, col, dx_ * 260, dy_ * 260, 0.4, 3)
     elif perk == "chain":
         if random.random() < EVO_CHAIN_CHANCE:
             run.evo_chain(e, amount, key)
@@ -27292,6 +27336,7 @@ def evo_on_hit(e, amount, fx):
             d = dist(e.x, e.y, p.x, p.y) or 1.0
             e.knock_x += (e.x - p.x) / d * 420.0
             e.knock_y += (e.y - p.y) / d * 420.0
+            fx.ring(e.x, e.y, col, n=8, speed=120, life=0.3, r=2.4)
     elif perk == "scorch":
         if run.run_time >= getattr(run, "evo_scorch_t", 0.0):
             run.evo_scorch_t = run.run_time + 0.25
@@ -27438,7 +27483,8 @@ class EvoMixin:
                 if s[2] > 0:
                     keep.append(s)
                     continue
-                self.fx.shockwave(s[0], s[1], 70, col, 0.3, 4)
+                self.fx.shockwave(s[0], s[1], 80, col, 0.35, 6)
+                self.fx.burst(s[0], s[1], (150, 120, 90), n=6, speed=110, life=0.4, r=3, add=False)
                 prev = DMG_SRC[0]
                 DMG_SRC[0] = "quake"
                 EVO_BUSY[0] = True
@@ -27530,7 +27576,14 @@ class EvoMixin:
             return
         self.evo_blasts += 1
         col = EVO_PERK_COLOR["blast"]
-        self.fx.shockwave(src.x, src.y, EVO_BLAST_R, col, 0.3, 4)
+        # gözle görülür patlama: parlak çekirdek, ateş topu, iki halka
+        self.fx.burst(src.x, src.y, (255, 244, 200), n=6, speed=60, life=0.22, r=7)
+        self.fx.burst(src.x, src.y, col, n=16, speed=230, life=0.45, r=4.5)
+        self.fx.burst(src.x, src.y, (120, 70, 50), n=6, speed=90, life=0.6, r=4, add=False, gravity=-40)
+        self.fx.shockwave(src.x, src.y, EVO_BLAST_R, col, 0.38, 7)
+        self.fx.shockwave(src.x, src.y, EVO_BLAST_R * 0.55, (255, 236, 170), 0.25, 4)
+        if self.evo_blasts <= 2:
+            sfx("explosion", 0.35, 0.08)
         dmg = amount * EVO_BLAST_DMG
         for e in self.enemies:
             if e is src or not e.alive:
@@ -27544,6 +27597,12 @@ class EvoMixin:
         for e in self.enemies:
             if e.alive and (e.x - x) ** 2 + (e.y - y) ** 2 < 75 * 75:
                 e.apply_burn(max(1.0, amount * 0.20), 2.5)
+
+
+# evrilince parlayan silah nesneleri (liste, silah)
+EVO_GLOW_LISTS = (("flying_axes", "axe"), ("sword_slashes", "emanet"), ("tornados", "tornado"),
+                  ("ghost_blades", "ghost_swords"), ("wolves", "wolves"), ("meteors", "meteor"),
+                  ("hawks", "hawk"), ("bats", "bats"), ("knives", "knives"))
 
 
 def draw_evo_orbs(world, run, t):
@@ -28657,13 +28716,9 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin):
             self.gold_wallet += gold
             self.coins_earned += gold
             self.gem_coins += gem
-            self.fx.popup(chest.x, chest.y - 60, f"+{gold} ALTIN", GOLD, 26, life=1.6)
-            if not p.weapons:
-                # Henüz hiç silahı yok: sandığın niye altına döndüğünü söyle.
-                sub = "silahlar seviye atlarken seçilir"
-            else:
-                sub = "bütün silahların tavanda"
-            self.fx.popup(chest.x, chest.y - 34, sub, TEXT, 14, life=1.8)
+            # Henüz hiç silahı yoksa sandığın niye altına döndüğünü söyle.
+            sub = L("ui.chest_no_weapon") if not p.weapons else L("ui.chest_all_max")
+            self.reward_note("+%s %s" % (fmt_num(gold), L("ui.gold_word")), sub, GOLD, None, "coin")
             sfx("coin", 0.9, 0.0)
             return
         # En düşük seviyeli silah öne alınır: sandıklar takımı dengeli
@@ -28683,6 +28738,11 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin):
             extra = True
         self._chest_rarity_fx(chest, w, tier, gained, extra)
 
+    def reward_note(self, title, sub, col, wkey=None, icon=None, tier=0):
+        """Sandık ödülü kartı: ekranın üst ortasında tek kart (yenisi eskisinin yerini alır)."""
+        self.reward_card = [round(self.run_time, 2), str(title), str(sub or ""),
+                            [int(c) for c in col[:3]], wkey, icon, int(tier)]
+
     def _chest_rarity_fx(self, chest, w, tier, gained, extra):
         """Sandık açılış gösterisi: kademe yükseldikçe daha büyük ve parlak."""
         p = self.player
@@ -28694,12 +28754,11 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin):
         else:
             head = "%s • %s (%s)" % (rarity_name(tier), w_name(w).upper(), L("ui.boost_capped"))
         sub = L("ui.chest_level", w_name(w), lvl)
-        size = 26 + 2 * tier
-        self.fx.popup(chest.x, chest.y - 80, head, rc, size, life=1.9 + 0.25 * tier)
-        self.fx.popup(chest.x, chest.y - 50, sub, w["color"], 15, life=1.9)
         if extra:
-            self.fx.popup(chest.x, chest.y - 28, L("ui.chest_legend_extra"), GOLD, 16, life=2.2)
-        self.fx.do_flash(rc, 0.30 + 0.08 * tier)
+            sub += "  ·  " + L("ui.chest_legend_extra")
+        # tek, düzenli bir kart (ekranın üstünde); dünyada üst üste yazı yok
+        self.reward_note(head, sub, rc, w["key"], None, tier)
+        self.fx.do_flash(rc, 0.18 + 0.05 * tier)
         for k in range(1 + tier):
             self.fx.ring(chest.x, chest.y, rc, n=22 + 8 * tier, speed=240 + 60 * k,
                          life=0.55 + 0.08 * k, r=3 + 0.5 * tier)
@@ -28803,7 +28862,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin):
         p.on_level_up(n)
         self.legend_hands += 1
         self.pending_levelups += n + 1
-        self.fx.popup(ch.x, ch.y - 90, L("fx.legend_open", n), LEGEND_COLOR, 30, life=2.6)
+        self.reward_note(L("fx.legend_open", n), "", LEGEND_COLOR, None, "star", 4)
         self.fx.do_flash(LEGEND_COLOR, 0.55)
         self.fx.shake(10, 0.4)
         self.fx.burst(ch.x, ch.y, LEGEND_COLOR, n=70, speed=420, life=1.0, r=5)
@@ -30166,9 +30225,13 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin):
             p.soul_timer = 5.0
         p.register_kill_for_frenzy()
         combo_mult = self.combo.multiplier()
-        coin_gain = scaled_coin_gain(e.coin, p.eff_coin_mult()
-                                     * econ_wave_factor(self.waves.wave, self.biome, "gold", self.diff),
-                                     self.biome)
+        # kesirli altın birikir: rastgele yuvarlamada art arda hiç düşmeyen
+        # öldürmeler olmasın (ortalama aynı)
+        cx_ = (max(0.0, e.coin * p.eff_coin_mult()
+                   * econ_wave_factor(self.waves.wave, self.biome, "gold", self.diff)
+                   * coin_drop_scale(self.biome)) + self.__dict__.get("coin_carry", 0.0))
+        coin_gain = int(cx_)
+        self.coin_carry = cx_ - coin_gain
         xp_gain = (e.xp * econ_wave_factor(self.waves.wave, self.biome, "xp", self.diff)
                    * xp_level_softcap(p.level, self.total_wave()))
         if getattr(e, "kind", "") == "goblin":
@@ -31874,6 +31937,12 @@ STRINGS.update({
     "ui.ad_wait":     _T("Sonraki: {0}", "Next: {0}", "Siguiente: {0}", "Nächste: {0}", "Следующая: {0}"),
     "ui.ad_tomorrow": _T("Yarın yenilenir ({0})", "Resets tomorrow ({0})", "Se renueva mañana ({0})",
                          "Morgen wieder ({0})", "Обновится завтра ({0})"),
+    "ui.chest_no_weapon": _T("Silahlar seviye atlarken seçilir", "Weapons are picked on level up",
+                             "Las armas se eligen al subir de nivel", "Waffen wählst du beim Levelaufstieg",
+                             "Оружие выбирается при повышении уровня"),
+    "ui.chest_all_max": _T("Bütün silahların tavanda", "All your weapons are maxed", "Todas tus armas están al máximo",
+                           "Alle deine Waffen sind am Maximum", "Всё твоё оружие на максимуме"),
+    "ui.gold_word":   _T("ALTIN", "GOLD", "ORO", "GOLD", "ЗОЛОТА"),
     "rp.watch":       _T("SON ANLARI İZLE", "WATCH REPLAY", "VER REPETICIÓN", "WIEDERHOLUNG", "ПОВТОР"),
     "rp.title":       _T("SON ANLAR", "LAST MOMENTS", "ÚLTIMOS MOMENTOS", "LETZTE MOMENTE", "ПОСЛЕДНИЕ МГНОВЕНИЯ"),
     "rp.slow":        _T("AĞIR ÇEKİM", "SLOW MOTION", "CÁMARA LENTA", "ZEITLUPE", "ЗАМЕДЛЕНИЕ"),
@@ -33511,14 +33580,31 @@ def arena_motes():
                          rnd.uniform(9, 26), rnd.uniform(1.1, 2.6),
                          rnd.uniform(0, math.tau))
                         for _ in range(_nd(620))]
+        _ARENA_MOTES.sort(key=lambda m: m[0])     # kamera aralığı ikili aramayla bulunsun
     return _ARENA_MOTES
+
+
+def _motes_in(cam, pad=48):
+    import bisect
+    ms = arena_motes()
+    keys = _MOTE_X.get(id(ms))
+    if keys is None:
+        keys = [m[0] for m in ms]
+        _MOTE_X.clear()
+        _MOTE_X[id(ms)] = keys
+    i0 = bisect.bisect_left(keys, cam.left - pad)
+    i1 = bisect.bisect_right(keys, cam.right + pad)
+    return ms[i0:i1]
+
+
+_MOTE_X = {}
 
 
 def _draw_arena_air(world, cam, t):
     """Arena'nın canlı katmanı."""
     span = 340.0
     # Telefonda süzülen ışık zerreleri çizilmez (her karede ~60 küçük çizim).
-    motes = () if MOBILE else arena_motes()
+    motes = () if MOBILE else _motes_in(cam)
     for (ex, ey, spd, sz, ph) in motes:
         yy = ey - (t * spd) % span
         if yy < cam.top - 16 or yy > cam.bottom + 16:
@@ -33549,7 +33635,7 @@ def _draw_theme_air(world, cam, key, t):
     """Haritanın canlı havası: kar, ateş böcekleri, kum rüzgârı."""
     if key == "frost":
         span = 420.0
-        for (ex, ey, spd, sz, ph) in arena_motes():
+        for (ex, ey, spd, sz, ph) in _motes_in(cam):
             yy = ey + (t * (spd * 1.4 + 20)) % span
             if yy < cam.top - 16 or yy > cam.bottom + 16:
                 continue
@@ -33558,7 +33644,7 @@ def _draw_theme_air(world, cam, key, t):
                 continue
             blit_disc(world, xx, yy, sz * 0.9 + 0.6, (236, 244, 255), 150)
     elif key == "jungle":
-        for (ex, ey, spd, sz, ph) in arena_motes():
+        for (ex, ey, spd, sz, ph) in _motes_in(cam):
             xx = ex + math.sin(t * 0.7 + ph) * 34.0
             yy = ey + math.cos(t * 0.5 + ph * 1.3) * 22.0
             if not (cam.left - 16 < xx < cam.right + 16 and cam.top - 16 < yy < cam.bottom + 16):
@@ -33569,7 +33655,7 @@ def _draw_theme_air(world, cam, key, t):
             blit_disc(world, xx, yy, sz * (0.8 + 0.6 * tw), (200, 255, 120), int(60 + 150 * tw))
     elif key == "desert":
         span = 600.0
-        for (ex, ey, spd, sz, ph) in arena_motes():
+        for (ex, ey, spd, sz, ph) in _motes_in(cam.move(-300, 0).inflate(600, 0)):
             xx = ex + (t * (spd * 4 + 60)) % span
             if xx < cam.left - 30 or xx > cam.right + 30:
                 continue
@@ -34143,12 +34229,21 @@ def draw_team_strips(surf, run, t):
     if MOBILE:
         _mob_team_strips(surf, run, t, pct, qy)
         return
-    if getattr(run, "quests", None) and CFG.get("show_quests", True):
-        draw_quest_hud(surf, run, HUD_STRIP_X - 8, qy, t)
+    show_q = bool(getattr(run, "quests", None) and CFG.get("show_quests", True))
     if pct == 100 and not MOBILE:
-        draw_weapon_slots(surf, run, t)
-        draw_book_slots(surf, run, t)
+        # masaüstü: şeritler + görevler hazır görüntüde, iki karede bir tazelenir
+        ox, oy = HUD_STRIP_X - 12, HUD_WEAPON_Y - 22
+        size = (ox + 470, (qy + 130) if show_q else (HUD_BOOK_Y + BSLOT_CELL + 42))
+
+        def _strips(b):
+            draw_weapon_slots(b, run, t)
+            draw_book_slots(b, run, t)
+            if show_q:
+                draw_quest_hud(b, run, HUD_STRIP_X - 8, qy, t)
+        mob_layer(surf, "team_pc", run, t, 1, size, _strips, period=2, rect_every=8)
         return
+    if show_q:
+        draw_quest_hud(surf, run, HUD_STRIP_X - 8, qy, t)
     global _GLOW_ON_ALPHA
     ox, oy = HUD_STRIP_X - 12, HUD_WEAPON_Y - 22
     w, h = 470, HUD_BOOK_Y + BSLOT_CELL + 42 - oy
@@ -34849,7 +34944,8 @@ def draw_hud(surf, run, t):
         mob_layer(surf, "hud_map", run, t, 2, size,
                   lambda b: (draw_minimap(b, run, t), _draw_key_counter(b, run, t)))
     else:
-        _draw_hud_top(surf, run, t)
+        mob_layer(surf, "hud_top_pc", run, t, 0, (VIRTUAL_W, HUD_TOP_H),
+                  lambda b: _draw_hud_top(b, run, t), period=2, rect_every=8)
     _draw_hud_center(surf, run, t)
     if getattr(run, "coop_others", None):
         draw_coop_hud(surf, run, t)       # 2 kişilik - arkadaşın kartı
@@ -34859,8 +34955,33 @@ HUD_TOP_H = 236          # telefon önbelleği: üst şerit + küçük harita + 
 _MOB_LAYERS = {}
 
 
-def mob_layer(surf, name, run, t, phase, size, draw, period=8):
-    """telefon: HUD'un bir katmanını hazır görüntüde tutar."""
+_BANDS = {}
+
+
+def _cached_band(surf, name, run, t, y, h, draw, period=2):
+    """Ekranın yatay bir şeridini hazır görüntüde tutar (period karede bir çizilir)."""
+    global _GLOW_ON_ALPHA
+    c = _BANDS.get(name)
+    if c is None:
+        c = _BANDS[name] = {}
+    band = pygame.Rect(0, y, VIRTUAL_W, h)
+    if not (c.get("run") is run and c.get("band") == band and _MOB_FRAME[0] % period != 0
+            and abs(t - c.get("t", -9)) < 0.5 and c.get("img") is not None):
+        buf = c.get("work")
+        if buf is None:
+            buf = c["work"] = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+        buf.fill((0, 0, 0, 0), band)
+        _GLOW_ON_ALPHA = True
+        try:
+            draw(buf)
+        finally:
+            _GLOW_ON_ALPHA = False
+        c.update(img=buf.subsurface(band).copy(), run=run, band=band, t=t)
+    surf.blit(c["img"], band.topleft)
+
+
+def mob_layer(surf, name, run, t, phase, size, draw, period=8, rect_every=12):
+    """HUD'un bir katmanını hazır görüntüde tutar (telefon; masaüstünde de şeritler)."""
     global _GLOW_ON_ALPHA
     c = _MOB_LAYERS.get(name)
     if c is None:
@@ -34884,7 +35005,7 @@ def mob_layer(surf, name, run, t, phase, size, draw, period=8):
         W, H = size
         n = c.get("n", 0)
         rects = c.get("rects")
-        if rects is None or n % 12 == 0 or c.get("size") != size:
+        if rects is None or n % rect_every == 0 or c.get("size") != size:
             rects = []
             for x0 in range(0, W, 192):
                 tw = min(192, W - x0)
@@ -35153,28 +35274,31 @@ def _draw_hud_center(surf, run, t):
     frac = clamp(p.hp / p.max_hp, 0, 1)
     dy = 16 if MOBILE else 0
     if p.frenzy_stacks > 0:
-        draw_text(surf, L("ui.frenzy", p.frenzy_stacks), (VIRTUAL_W / 2, 96 + dy * 1.6), 14, (255, 200, 80), bold=True, center=True)
+        draw_text(surf, L("ui.frenzy", p.frenzy_stacks), (VIRTUAL_W / 2, 112 + dy * 1.6), 14, (255, 200, 80), bold=True, center=True)
 
     if run.combo.count >= 3:
         pulse = 1 + run.combo.pulse * 0.4
         size = int(20 * pulse)
         col = GOLD if run.combo.count >= 20 else (ORANGE if run.combo.count >= 10 else CYAN)
-        draw_text(surf, L("ui.combo", run.combo.count), (VIRTUAL_W / 2, 76 + dy), size, col, bold=True, center=True)
-        br = pygame.Rect(VIRTUAL_W / 2 - 80, 94 + dy, 160, 5)
+        draw_text(surf, L("ui.combo", run.combo.count), (VIRTUAL_W / 2, 88 + dy), size, col, bold=True, center=True)
+        br = pygame.Rect(VIRTUAL_W / 2 - 80, 104 + dy, 160, 5)
         draw_bar(surf, br, run.combo.timer / run.combo.window, col, radius=3)
+
+    draw_reward_card(surf, run, t)
 
     if run.waves.announce_timer > 0 and run.waves.announce_text:
         a = clamp(run.waves.announce_timer / 2.2, 0, 1)
         alpha = int(255 * min(1, a * 2))
         scale_t = ease_out_cubic(1 - a)
-        size = int(lerp(64, 44, scale_t))
+        size = int(lerp(54, 40, scale_t))
         if "PATRON" in run.waves.announce_text:
             col = RED
         elif "YOĞUNLUK" in run.waves.announce_text:
             col = ORANGE
         else:
             col = CYAN
-        draw_text(surf, run.waves.announce_text, (VIRTUAL_W / 2, VIRTUAL_H / 2 - 40), size, col,
+        # karakterin üstüne binmesin: ekranın üst üçte birinde
+        draw_text(surf, run.waves.announce_text, (VIRTUAL_W / 2, VIRTUAL_H * 0.29), size, col,
                   bold=True, center=True, alpha=alpha)
 
     if frac < 0.3 and p.alive:
@@ -35339,6 +35463,49 @@ def _draw_enemies_fast(world, ens, t):
         _fast_blits(world, batch)
 
 
+REWARD_CARD_LIFE = 2.8
+
+
+def draw_reward_card(surf, run, t):
+    rc = getattr(run, "reward_card", None)
+    if not isinstance(rc, (list, tuple)) or len(rc) < 7:
+        return
+    try:
+        age = float(run.run_time) - float(rc[0])
+    except (TypeError, ValueError):
+        return
+    tier = int(rc[6] or 0)
+    life = REWARD_CARD_LIFE + 0.25 * tier
+    if age < 0 or age > life:
+        return
+    title, sub, col, wkey, icon = str(rc[1]), str(rc[2]), tuple(rc[3]), rc[4], rc[5]
+    k_in = ease_out_cubic(clamp(age / 0.25, 0.0, 1.0))
+    k_out = clamp((life - age) / 0.4, 0.0, 1.0)
+    a = min(k_in, k_out)
+    w = max(300, min(560, max(text_width(title, 18, True), text_width(sub, 13)) + 96))
+    r = pygame.Rect(0, 0, w, 62 if sub else 46)
+    r.midtop = (VIRTUAL_W // 2, int(128 - 22 * (1.0 - k_in)))
+    panel(surf, r, bg=scale_col(col, 0.20), edge=col, alpha=int(238 * a), radius=14, edge_w=2)
+    if tier >= 3:
+        add_glow(surf, r.centerx, r.centery, w * 0.55, col, 0.10 * a)
+    tile = pygame.Rect(r.x + 10, r.centery - 20, 40, 40)
+    pygame.draw.rect(surf, scale_col(col, 0.30), tile, border_radius=10)
+    if wkey and wkey in WEAPON_BY_KEY:
+        blit_sigil(surf, tile.centerx, tile.centery, 14, wkey, tuple(WEAPON_BY_KEY[wkey]["color"]))
+    else:
+        draw_icon(surf, tile.centerx, tile.centery, icon or "star", col, 10)
+    tx = tile.right + 12
+    tw = r.right - 14 - tx
+    if sub:
+        draw_text(surf, _fit_text(title, 18, tw, bold=True), (tx, r.y + 9), 18, lighten(col, 0.25),
+                  bold=True, shadow=False, alpha=int(255 * a))
+        draw_text(surf, _fit_text(sub, 13, tw), (tx, r.y + 35), 13, (225, 222, 236), shadow=False,
+                  alpha=int(255 * a))
+    else:
+        draw_text(surf, _fit_text(title, 18, tw, bold=True), (tx, r.centery - 10), 18, lighten(col, 0.25),
+                  bold=True, shadow=False, alpha=int(255 * a))
+
+
 def draw_run(surf, run, t, aim_pos=None, shake=(0, 0)):
     """Koşuyu çizer."""
     world = world_surface()
@@ -35405,15 +35572,26 @@ def draw_run(surf, run, t, aim_pos=None, shake=(0, 0)):
         _bob = t * 4
         for pu in run.pickups:
             if vis_near.collidepoint(pu.x, pu.y):
-                img = _pickup_sprite(pu.kind)
+                img = _pickup_sprite(pickup_sprite_kind(pu))
                 _bt.append((img, (int(pu.x) - img.get_width() // 2,
                                   int(pu.y + math.sin(_bob + pu.bob) * 2.5) - img.get_height() // 2)))
         if _bt:
             _fast_blits(world, _bt)
     else:
+        _bt = []
+        _bob = t * 4
         for pu in run.pickups:
             if vis_near.collidepoint(pu.x, pu.y):
-                pu.draw(world, t)
+                if pu.kind == "coin":
+                    pu.draw(world, t)          # parıltı için
+                    continue
+                img = _pickup_sprite(pickup_sprite_kind(pu))
+                _bt.append((img, (int(pu.x) - img.get_width() // 2,
+                                  int(pu.y + math.sin(_bob + pu.bob) * 2.5) - img.get_height() // 2)))
+        if _bt:
+            _fast_blits(world, _bt)
+    if _coop_o or getattr(run, "is_coop", False):
+        draw_coop_soul(world, run, t)
     for mg in run.magnets:
         if vis_far.collidepoint(mg.x, mg.y):
             mg.draw(world, t)
@@ -35475,6 +35653,18 @@ def draw_run(surf, run, t, aim_pos=None, shake=(0, 0)):
         draw_shield_books(world, run.player, t, layer="front")
         if _coop_o:
             draw_coop_world(world, run, t, "front")
+        _evo_ = getattr(run.player, "evolved", None)
+        if _evo_:
+            # evrilmiş silahın nesneleri kendi renginde parlar: evrim gözle seçilsin
+            _pk = 0.30 + 0.10 * math.sin(t * 6)
+            for _ln, _wk in EVO_GLOW_LISTS:
+                if _wk in _evo_:
+                    _col = EVOLUTIONS[_wk][2]
+                    for _ob in getattr(run, _ln, None) or ():
+                        _x, _y = getattr(_ob, "x", None), getattr(_ob, "y", None)
+                        if type(_x) in (int, float) and type(_y) in (int, float) \
+                                and vis_near.collidepoint(_x, _y):
+                            add_glow(world, _x, _y, 34, _col, _pk)
         # kurtlar, ışın, hayalet kılıçlar, düşen göktaşları
         for wf in run.wolves:
             if vis_near.collidepoint(wf.x, wf.y):
@@ -35532,8 +35722,9 @@ def draw_run(surf, run, t, aim_pos=None, shake=(0, 0)):
     _MOB_FRAME[0] += 1
     draw_hud(surf, run, t)
     if not MOBILE:              # telefonda ikisi de draw_hud'un hazır görüntüsünde
-        draw_minimap(surf, run, t)
-        _draw_key_counter(surf, run, t)
+        mob_layer(surf, "hud_map_pc", run, t, 1, (VIRTUAL_W, HUD_TOP_H),
+                  lambda b: (draw_minimap(b, run, t), _draw_key_counter(b, run, t)), period=3,
+                  rect_every=8)
     # M ile açılan büyük harita: küçük haritanın aynısı, ekranın ortasında.
     # Oyun bu sırada durmaz - harita bir mola değil, bir bakış.
     if getattr(run, "show_map", False):
@@ -35542,7 +35733,8 @@ def draw_run(surf, run, t, aim_pos=None, shake=(0, 0)):
     draw_extras_hud(surf, run, t)
     draw_evo_banner(surf, run, t)
     if not MOBILE:
-        draw_skill_bar(surf, run, t)     # telefonda düğmeler sağ altta (TouchUI)
+        _cached_band(surf, "skill_bar", run, t, VIRTUAL_H - 200, 200,
+                     lambda b: draw_skill_bar(b, run, t))     # telefonda düğmeler sağ altta (TouchUI)
     # istatistik paneli en üstte çizilir: açıkken küçük haritayı örter.
     draw_stats_button(surf, run, aim_pos, t)
     if getattr(run, "show_stats", False):
@@ -42079,19 +42271,19 @@ AD_LENGTH = GameTour.LENGTH
 # saniyede karlı köy meydanından geçen yaratıklara kar topu at.
 SNOW_DAILY = 3
 SNOW_TIME = 30.0
-SNOW_MAX_GEMS = 90
+SNOW_MAX_GEMS = 130              # iyi bir oyun ~100 elmas eder
 SNOW_THROW_CD = 0.24
 SNOW_HIT_R = 40
 SNOW_LANE_TOP = 268
 SNOW_LANE_BOT = 560
 SNOW_KINDS = (
     # (tür, ağırlık, hız aralığı, can, değer, uçar mı)
-    ("red", 34, (110, 160), 1, 1, False),
-    ("sprinter", 16, (200, 250), 1, 1, False),
-    ("blue", 18, (150, 200), 1, 1, True),
-    ("yellow", 12, (130, 170), 1, 1, False),
-    ("tank", 12, (70, 95), 2, 2, False),
-    ("goblin", 8, (250, 300), 1, 3, False),
+    ("red", 34, (110, 160), 1, 2, False),
+    ("sprinter", 16, (200, 250), 1, 2, False),
+    ("blue", 18, (150, 200), 1, 2, True),
+    ("yellow", 12, (130, 170), 1, 2, False),
+    ("tank", 12, (70, 95), 2, 3, False),
+    ("goblin", 8, (250, 300), 1, 6, False),
 )
 
 
@@ -42680,6 +42872,67 @@ def make_house_ad(app):
     return GameTour(app)
 
 
+_ICE_PANEL = {}
+
+
+def _ice_chip(canvas, r):
+    """Kartopu HUD kutusu (koyu buz)."""
+    s_ = pygame.Surface(r.size, pygame.SRCALPHA)
+    pygame.draw.rect(s_, (22, 34, 72, 215), s_.get_rect(), border_radius=16)
+    pygame.draw.rect(s_, (196, 228, 255, 230), s_.get_rect(), 2, border_radius=16)
+    canvas.blit(s_, r.topleft)
+
+
+def ice_panel(canvas, R, t=0.0):
+    """Kış penceresi: buz mavisi degrade, donuk kenar, üstünde kar birikintisi."""
+    key = R.size
+    img = _ICE_PANEL.get(key)
+    if img is None:
+        w, h = R.size
+        img = pygame.Surface((w + 16, h + 30), pygame.SRCALPHA)
+        body = pygame.Surface((w, h), pygame.SRCALPHA)
+        for y in range(h):
+            k = y / max(1, h - 1)
+            pygame.draw.line(body, (*mix_col((44, 70, 128), (20, 30, 66), k), 250), (0, y), (w, y))
+        mask = pygame.Surface((w, h), pygame.SRCALPHA)
+        pygame.draw.rect(mask, (255, 255, 255, 255), (0, 0, w, h), border_radius=22)
+        body.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
+        pygame.draw.rect(img, (6, 10, 24, 120), (10, 22, w, h), border_radius=22)
+        img.blit(body, (8, 14))
+        pygame.draw.rect(img, (196, 228, 255), (8, 14, w, h), 3, border_radius=22)
+        pygame.draw.rect(img, (255, 255, 255, 70), (12, 18, w - 8, h - 8), 1, border_radius=19)
+        # buz çatlakları (köşelerde ince)
+        rnd = random.Random(w * 7 + h)
+        for cx_, cy_ in ((24, h - 2), (w - 6, 40)):
+            for _ in range(3):
+                a = rnd.uniform(0, math.tau)
+                ln = rnd.uniform(18, 40)
+                pygame.draw.line(img, (170, 210, 255, 90), (cx_, cy_ + 14),
+                                 (cx_ + math.cos(a) * ln, cy_ + 14 + math.sin(a) * ln), 1)
+        # üst kenarda kar birikintisi
+        x = 18
+        while x < w - 6:
+            r_ = rnd.randint(9, 17)
+            pygame.draw.circle(img, (196, 214, 240), (x, 16 + 3), r_)
+            pygame.draw.circle(img, (250, 252, 255), (x, 16), r_)
+            x += int(r_ * 1.3)
+        pygame.draw.rect(img, (250, 252, 255), (14, 14, w - 12, 6))
+        for _ in range(6):
+            dx_ = rnd.randint(30, w - 30)
+            dl = rnd.randint(8, 22)
+            pygame.draw.line(img, (240, 248, 255), (dx_, 18), (dx_, 18 + dl), 3)
+            pygame.draw.circle(img, (240, 248, 255), (dx_, 18 + dl), 2)
+        _ICE_PANEL[key] = img
+    canvas.blit(img, (R.x - 8, R.y - 14))
+    # süzülen kar taneleri
+    for i in range(8):
+        ph = (t * 0.18 + i * 0.137) % 1.0
+        x_ = R.x + 20 + ((i * 97) % max(1, R.w - 40))
+        y_ = R.y + 24 + ph * (R.h - 40)
+        blit_disc(canvas, x_ + math.sin(t * 1.3 + i) * 6, y_, 1.6 + (i % 3) * 0.6, (235, 245, 255),
+                  int(170 * math.sin(ph * math.pi)))
+
+
 class SnowEvent:
     """Kartopu Savaşı mini oyunu (durum makinesi + çizim)."""
 
@@ -42859,11 +43112,24 @@ class SnowEvent:
             for px_, py_ in pts[1:-1]:
                 if py_ < base - amp * 0.55:
                     pygame.draw.polygon(s, (236, 240, 252), [(px_, py_), (px_ - 22, py_ + 26), (px_ + 22, py_ + 26)])
-        # kar zemini
-        pygame.draw.rect(s, (226, 236, 250), (0, 290, W, H - 290))
-        for i in range(14):
-            yy = 300 + i * i * 2.6
-            pygame.draw.line(s, (204, 216, 238), (0, yy), (W, yy), 1)
+        # kar zemini: bembeyaz, ufukta hafif mavi gölge, yumuşak tümsekler ve
+        # pırıltılar (çizgili değil)
+        for y in range(290, H):
+            k = clamp((y - 290) / 110.0, 0.0, 1.0)
+            pygame.draw.line(s, mix_col((214, 226, 246), (250, 252, 255), k), (0, y), (W, y))
+        for i in range(26):
+            ex_ = rnd.randint(-80, W)
+            ey_ = rnd.randint(330, H - 20)
+            ew = rnd.randint(140, 320)
+            eh = int(ew * rnd.uniform(0.10, 0.16))
+            pygame.draw.ellipse(s, (239, 244, 252), (ex_, ey_ + eh // 3, ew, eh))
+            pygame.draw.ellipse(s, (255, 255, 255), (ex_ + 6, ey_, ew - 12, eh))
+        for i in range(260):
+            sx_, sy_ = rnd.randint(0, W), rnd.randint(300, H)
+            c_ = rnd.choice(((255, 255, 255), (206, 226, 255), (190, 214, 250)))
+            s.set_at((sx_, sy_), c_)
+            if rnd.random() < 0.15:
+                s.set_at((sx_ + 1, sy_), c_)
         # köy evleri (arka sıra)
         for i, hx in enumerate((120, 330, 560, 820, 1060)):
             hw, hh = 120 + (i % 2) * 30, 70 + (i % 3) * 10
@@ -42953,12 +43219,12 @@ class SnowEvent:
         # süre
         cx = VIRTUAL_W / 2
         frac = clamp(self.time_left / SNOW_TIME, 0.0, 1.0)
-        panel(canvas, pygame.Rect(cx - 110, 12, 220, 70), bg=(48, 35, 36), edge=(160, 200, 255), alpha=220, radius=16)
+        _ice_chip(canvas, pygame.Rect(cx - 110, 12, 220, 70))
         col = (255, 120, 110) if self.time_left < 6 else (200, 230, 255)
         draw_text(canvas, "%d" % int(math.ceil(self.time_left)), (cx, 40), 36, col, bold=True, center=True)
         draw_bar(canvas, pygame.Rect(cx - 90, 64, 180, 8), frac, col, radius=4)
         # isabet / elmas
-        panel(canvas, pygame.Rect(20, 14, 210, 64), bg=(48, 35, 36), edge=GEM_COLOR, alpha=220, radius=14)
+        _ice_chip(canvas, pygame.Rect(20, 14, 210, 64))
         draw_icon(canvas, 48, 46, "gem", GEM_COLOR, 13)
         draw_text(canvas, str(min(self.gems, SNOW_MAX_GEMS)), (74, 26), 30, GEM_COLOR, bold=True)
         draw_text(canvas, L("snow.hits", self.hits), (150, 50), 11, (190, 200, 230), shadow=False)
@@ -42971,18 +43237,18 @@ class SnowEvent:
             k = self.count_t - math.floor(self.count_t)
             draw_text(canvas, str(n) if n > 0 else L("snow.go"), (cx, 330), int(90 + 40 * k), WHITE,
                       bold=True, center=True)
-            draw_text(canvas, L("snow.how"), (cx, 410), 16, (104, 76, 78), bold=True, center=True, shadow=False)
+            draw_text(canvas, L("snow.how"), (cx, 410), 16, (60, 80, 130), bold=True, center=True, shadow=False)
 
     # ---- giriş / sonuç pencereleri ----
     def draw_intro(self, canvas, mouse_pos, clicked, dt, t):
         canvas.blit(self._backdrop(), (0, 0))
         dim = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
-        dim.fill((10, 12, 30, 150))
+        dim.fill((16, 24, 56, 60))
         canvas.blit(dim, (0, 0))
         R = pygame.Rect(0, 0, 620, 520)
-        R.center = (VIRTUAL_W / 2, VIRTUAL_H / 2)
+        R.center = (VIRTUAL_W / 2, VIRTUAL_H / 2 + 6)
         add_glow(canvas, R.centerx, R.y + 90, 300, (180, 220, 255), 0.22)
-        panel(canvas, R, bg=(20, 26, 52), edge=(180, 220, 255), alpha=245, radius=20, edge_w=3)
+        ice_panel(canvas, R, t)
         # Kollar + dal uçları, yuvarlatılmış silindir şapka + bant, saçaklı
         # sarkan atkı ucu, kaş ve gülümseme eklendi.)
         mx, my = R.centerx, R.y + 172
@@ -43052,11 +43318,11 @@ class SnowEvent:
 
     def draw_result(self, canvas, mouse_pos, clicked, dt, t):
         dim = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
-        dim.fill((37, 27, 28, 170))
+        dim.fill((16, 24, 56, 110))
         canvas.blit(dim, (0, 0))
         R = pygame.Rect(0, 0, 560, 400)
-        R.center = (VIRTUAL_W / 2, VIRTUAL_H / 2)
-        panel(canvas, R, bg=(62, 45, 46), edge=GEM_COLOR, alpha=248, radius=20, edge_w=3)
+        R.center = (VIRTUAL_W / 2, VIRTUAL_H / 2 + 6)
+        ice_panel(canvas, R, t)
         draw_text(canvas, L("snow.over"), (R.centerx, R.y + 40), 30, (220, 240, 255), bold=True, center=True)
         draw_text(canvas, L("snow.hits", self.hits), (R.centerx, R.y + 92), 18, (196, 210, 240), center=True)
         if self.stage == "claim":
@@ -43667,6 +43933,24 @@ except Exception:            # (web sürümünde 2 kişilik zaten kapalı)
     _socket = _zlib = _queue = _ssl = collections = None
 
 COOP_SLOTS = (2, 2, 1)            # kişi başı: silah, normal kitap, nadir kitap
+SOUL_COLOR = (150, 240, 255)
+SOUL_R = 78.0                     # ölünün çevresinde durulacak alan
+SOUL_NEED = 3.0                   # bu kadar saniye durunca dirilir
+SOUL_SPEED = 420.0
+SOUL_HP = 0.5                     # dirilince canın yarısı
+COOP_GEM_RATE = 1.0               # 2 kişilikte elmas (tek kişilikle aynı oran)
+COOP_GEM_MAX = 4000               # tek koşuda en çok
+
+
+def coop_run_gems(run, i):
+    """i. oyuncunun bu 2 kişilik koşudan kazandığı elmas."""
+    if getattr(run, "cheat_flag", ""):
+        return 0
+    try:
+        gc = float(run.ctx_get(i, "gem_coins") or 0.0) if hasattr(run, "ctx_get") else float(run.gem_coins)
+    except (TypeError, ValueError):
+        return 0
+    return int(clamp(int(gc * RUN_GEM_RATE * COOP_GEM_RATE), 0, COOP_GEM_MAX))
 COOP_ENEMY_HP = 1.75              # yaratık canı
 COOP_ENEMY_DMG = 1.15             # yaratık hasarı
 COOP_SPAWN_RATE = 1.6             # doğum sıklığı
@@ -44937,10 +45221,20 @@ STRINGS.update({
     "coop.r_kills": _T("Öldürme", "Kills", "Bajas", "Kills", "Убийства"),
     "coop.r_level": _T("Seviye", "Level", "Nivel", "Stufe", "Уровень"),
     "coop.r_dps": _T("Hasar / sn", "Damage / s", "Daño / s", "Schaden / s", "Урон / с"),
-    "coop.no_rewards": _T("2 kişilik BETA: dünya sıralaması, elmas ve başarım yok.",
-                          "2-player BETA: no world ranking, gems or achievements.",
-                          "BETA: sin ranking, gemas ni logros.", "BETA: keine Rangliste, Edelsteine, Erfolge.",
-                          "БЕТА: без рейтинга, кристаллов и достижений."),
+    "coop.no_rewards": _T("2 kişilik BETA: dünya sıralaması ve başarım yok, elmas var.",
+                          "2-player BETA: no world ranking or achievements - gems count.",
+                          "BETA: sin ranking ni logros, las gemas sí cuentan.",
+                          "BETA: keine Rangliste, keine Erfolge - Edelsteine zählen.",
+                          "БЕТА: без рейтинга и достижений, кристаллы засчитываются."),
+    "coop.soul":      _T("PATRON RUHU!", "BOSS SOUL!", "¡ALMA DEL JEFE!", "BOSSSEELE!", "ДУША БОССА!"),
+    "coop.soul_go":   _T("Ruh arkadaşına gidiyor: üstünde 3 sn dur", "The soul flies to your mate: stand on it 3s",
+                         "El alma va a tu amigo: quédate 3 s encima", "Die Seele fliegt zum Freund: 3 s draufstehen",
+                         "Душа летит к другу: постой на ней 3 с"),
+    "coop.soul_hint": _T("ÜSTÜNDE DUR: DİRİLT", "STAND HERE: REVIVE", "QUÉDATE: REVIVIR", "DRAUFSTEHEN: BELEBEN",
+                         "СТОЙ ЗДЕСЬ: ВОСКРЕСИТЬ"),
+    "coop.soul_ready": _T("Ruh hazır", "Soul ready", "Alma lista", "Seele bereit", "Душа готова"),
+    "coop.revived":   _T("{0} DİRİLDİ!", "{0} IS BACK!", "¡{0} REVIVIÓ!", "{0} IST ZURÜCK!", "{0} ВОСКРЕС!"),
+    "coop.r_gems":    _T("Elmas", "Gems", "Gemas", "Edelsteine", "Кристаллы"),
     "coop.again": _T("TEKRAR OYNA", "PLAY AGAIN", "OTRA VEZ", "NOCHMAL", "ЕЩЁ РАЗ"),
     "ui.boss_wound": _T("YARA - şifa -%{0}", "WOUND - healing -{0}%", "HERIDA - curación -{0}%",
                         "WUNDE - Heilung -{0}%", "РАНА - лечение -{0}%"),
@@ -44987,7 +45281,7 @@ COOP_PERSONAL = (
     "bonk_hits", "new_books", "new_weapons", "death_cause", "_pet", "_pet_id",
     # sunak güçleri, raf/örs elleri, evrimler: herkesin kendisi
     "shrine_buffs", "find_hands", "evo_perks", "evo_banner", "evo_aegis_t", "evo_shroud_t",
-    "evo_blast_t", "evo_blasts", "evo_count", "evo_phx_t", "evo_scorch_t",
+    "evo_blast_t", "evo_blasts", "evo_count", "evo_phx_t", "evo_scorch_t", "reward_card",
 )
 # çizimde iki oyuncunun nesneleri birlikte görünsün diye birleştirilen listeler
 COOP_MERGE_LISTS = (
@@ -45082,6 +45376,9 @@ class CoopRunState(RunState):
         self.dead = [False, False]
         self.curse_owner = 0
         self.focus = 0
+        # patron ruhu: [x, y, hedef (ölen oyuncu, yoksa -1), dolum] - en çok 1 tane
+        self.soul = None
+        self.revives = 0
         self.tp = [0, 0]                   # ışınlanma sayacı (konuk konumunu bırakır)
         self.cmd_ack = 0
         self.connected = [True, True]
@@ -45482,6 +45779,7 @@ class CoopRunState(RunState):
                     self.pending_levelups = 0
         self._ctx_use(prev_ctx)
         self.fx.update(dt)
+        self._soul_tick(dt)
         # ---- 12) ölüm: ölen izler, ikisi de ölünce biter ----
         for i, p in enumerate(self.players):
             if not p.alive and not self.dead[i]:
@@ -45500,6 +45798,74 @@ class CoopRunState(RunState):
         if not self.alive_players() and not self.game_over:
             self.game_over = True
             self.death_cause = self.players[0].last_hit_by
+
+    # ---- patron ruhu: ölen arkadaşı diriltir ----
+    def _soul_spawn(self, x, y):
+        """Patron ölünce ruh çıkar. Birikmez: zaten bir ruh varsa yenisi gelmez."""
+        if self.soul is not None:
+            return
+        self.soul = [float(x), float(y), -1, 0.0]
+        self.fx.popup(x, y - 90, L("coop.soul"), SOUL_COLOR, 22, life=2.4)
+        self.fx.ring(x, y, SOUL_COLOR, n=24, speed=220, life=0.6, r=3)
+        sfx("second", 0.7, 0.0)
+
+    def _soul_tick(self, dt):
+        sl = self.soul
+        if sl is None or self.game_over:
+            return
+        alive = self.alive_players()
+        if not alive:
+            return
+        dead = [i for i, q in enumerate(self.players) if not q.alive]
+        if dead:
+            ti = dead[0]
+            q = self.players[ti]
+            tx, ty = q.x, q.y - 26
+            if sl[2] != ti:
+                sl[2], sl[3] = ti, 0.0
+                self.fx.popup(q.x, q.y - 80, L("coop.soul_go"), SOUL_COLOR, 18, life=2.4)
+        else:
+            # kimse ölmedi: ruh bekler, yaşayan oyuncunun yanında süzülür
+            q = self.players[alive[0]]
+            a = self.run_time * 1.6
+            tx, ty = q.x + math.cos(a) * 54, q.y - 64 + math.sin(a * 2) * 8
+            sl[2], sl[3] = -1, 0.0
+        dx, dy = tx - sl[0], ty - sl[1]
+        d = math.hypot(dx, dy)
+        step = SOUL_SPEED * dt
+        if d > step and d > 1.0:
+            sl[0] += dx / d * step
+            sl[1] += dy / d * step
+        else:
+            sl[0], sl[1] = tx, ty
+        if sl[2] < 0 or d > 30:
+            return
+        # ruh ölünün üstünde: yaşayan arkadaş üstünde durursa dolar
+        near = any(dist(self.players[i].x, self.players[i].y, sl[0], sl[1] + 26) < SOUL_R for i in alive)
+        if near:
+            sl[3] += dt
+            if random.random() < dt * 16:
+                a = random.uniform(0, math.tau)
+                self.fx.spark(sl[0] + math.cos(a) * SOUL_R, sl[1] + 26 + math.sin(a) * SOUL_R, SOUL_COLOR,
+                              -math.cos(a) * 110, -math.sin(a) * 110, 0.45, 2.6)
+        else:
+            sl[3] = max(0.0, sl[3] - dt * 1.5)
+        if sl[3] >= SOUL_NEED:
+            self._revive(sl[2])
+
+    def _revive(self, i):
+        q = self.players[i]
+        q.alive = True
+        q.hp = max(1.0, q.max_hp * SOUL_HP)
+        q.invuln = max(getattr(q, "invuln", 0.0), 3.0)
+        self.dead[i] = False
+        self.soul = None
+        self.revives += 1
+        self.fx.popup(q.x, q.y - 70, L("coop.revived", self.names[i] or "?"), SOUL_COLOR, 26, life=2.2)
+        self.fx.shockwave(q.x, q.y, 180, SOUL_COLOR, 0.5, 6)
+        self.fx.ring(q.x, q.y, (255, 255, 255), n=30, speed=260, life=0.6, r=3.5)
+        self.fx.burst(q.x, q.y - 20, SOUL_COLOR, n=26, speed=200, life=0.8, r=3.2, gravity=-80)
+        sfx("levelup", 1.0, 0.0)
 
     def _spectate_camera(self, dt):
         """Ölen oyuncunun kamerası arkadaşını izler."""
@@ -45579,6 +45945,7 @@ class CoopRunState(RunState):
             nb = max(1, int(getattr(b, "champion", 1)))
             for k in range(nb):
                 self.spawn_boss_chest(b, dx=(k - (nb - 1) / 2.0) * 90)
+            self._soul_spawn(b.x, b.y)
             self.bosses.remove(b)
         if not self.bosses and self.waves.boss_active:
             beaten = int(getattr(self, "_beaten_boss_wave", 0) or self.waves.wave)
@@ -47305,12 +47672,351 @@ TEXT_TR.update({
 })
 
 
+
+# ---- yeni oyuncu eğitimi ----
+# İlk açılışta (hiç koşu yokken) kısa bir tur: silahlık, silah aç/kapat, bedava
+# skin, oyun, ilk öldürme, koşu marketi. Her an "EĞİTİMİ GEÇ" ile bırakılır.
+STRINGS.update({
+    "tut.skip":    _T("EĞİTİMİ GEÇ", "SKIP TUTORIAL", "SALTAR TUTORIAL", "TUTORIAL ÜBERSPRINGEN", "ПРОПУСТИТЬ ОБУЧЕНИЕ"),
+    "tut.next":    _T("ANLADIM", "GOT IT", "ENTENDIDO", "VERSTANDEN", "ПОНЯТНО"),
+    "tut.start":   _T("TURA BAŞLA", "START TOUR", "EMPEZAR", "LOS GEHT'S", "НАЧАТЬ"),
+    "tut.step":    _T("EĞİTİM {0}/{1}", "TUTORIAL {0}/{1}", "TUTORIAL {0}/{1}", "TUTORIAL {0}/{1}", "ОБУЧЕНИЕ {0}/{1}"),
+    "tut.welcome.t": _T("Hoş geldin!", "Welcome!", "¡Bienvenido!", "Willkommen!", "Добро пожаловать!"),
+    "tut.welcome": _T("Bir dakikalık kısa bir tur atalım: silahlar, karakterin ve ilk koşun. İstersen hemen geçebilirsin.",
+                      "Let's take a one-minute tour: weapons, your character and your first run. You can skip it any time.",
+                      "Un recorrido de un minuto: armas, tu personaje y tu primera partida. Puedes saltarlo.",
+                      "Eine kurze Tour: Waffen, deine Figur und dein erster Lauf. Du kannst sie jederzeit überspringen.",
+                      "Короткий тур на минуту: оружие, персонаж и первый забег. Можно пропустить в любой момент."),
+    "tut.codex":   _T("Önce silahlara bakalım: SİLAHLIK'a tıkla.", "First, the weapons: click ARMORY.",
+                      "Primero, las armas: pulsa ARSENAL.", "Zuerst die Waffen: klicke auf WAFFENKAMMER.",
+                      "Сначала оружие: нажми АРСЕНАЛ."),
+    "tut.codex2":  _T("Silahlar görevle açılır: kartın altındaki çubuk ne kadar kaldığını gösterir. Açtığın silahı KAPAT / AÇ düğmesiyle kapatabilirsin; kapalı silah koşuda karşına çıkmaz.",
+                      "Weapons unlock through tasks - the bar under a card shows how far you are. Turn an unlocked weapon OFF / ON with its button; an off weapon never shows up in a run.",
+                      "Las armas se desbloquean con tareas: la barra muestra tu progreso. Con APAGAR / ENCENDER eliges si salen en la partida.",
+                      "Waffen werden über Aufgaben freigeschaltet - der Balken zeigt den Fortschritt. Mit AUS / AN bestimmst du, ob sie im Lauf auftauchen.",
+                      "Оружие открывается заданиями - полоска под карточкой показывает прогресс. Кнопкой ВЫКЛ / ВКЛ решаешь, будет ли оно выпадать в забеге."),
+    "tut.back":    _T("Tamam! Şimdi menüye dön.", "Nice! Now head back to the menu.", "¡Bien! Vuelve al menú.",
+                      "Gut! Zurück zum Menü.", "Отлично! Возвращайся в меню."),
+    "tut.skin":    _T("Karakterini seçelim: SKIN MARKET'e tıkla.", "Let's pick your character: click SKIN MARKET.",
+                      "Elige tu personaje: pulsa TIENDA DE SKINS.", "Wähle deine Figur: klicke auf SKIN-MARKT.",
+                      "Выберем персонажа: нажми МАГАЗИН СКИНОВ."),
+    "tut.skin2":   _T("{0} bedava (0 elmas)! Kartına tıkla.", "{0} is free (0 gems)! Click its card.",
+                      "¡{0} es gratis (0 gemas)! Pulsa su carta.", "{0} ist gratis (0 Edelsteine)! Klicke auf die Karte.",
+                      "{0} - бесплатно (0 кристаллов)! Нажми на карточку."),
+    "tut.skin3":   _T("SATIN AL'a bas: 0 elmas, hemen senin.", "Press BUY: 0 gems, it's yours.",
+                      "Pulsa COMPRAR: 0 gemas.", "Drück KAUFEN: 0 Edelsteine.", "Жми КУПИТЬ: 0 кристаллов."),
+    "tut.skin4":   _T("Süper! Diğer skinleri elmas biriktirip sonra alırsın. Şimdi menüye dön.",
+                      "Great! Save gems for the other skins later. Now back to the menu.",
+                      "¡Genial! Las demás skins, con gemas más tarde. Vuelve al menú.",
+                      "Super! Die anderen Skins holst du dir später mit Edelsteinen. Zurück zum Menü.",
+                      "Супер! Остальные скины - позже за кристаллы. Возвращайся в меню."),
+    "tut.play":    _T("Hazırsın: OYNA'ya bas!", "You're ready: hit PLAY!", "¡Listo: pulsa JUGAR!",
+                      "Bereit: klicke SPIELEN!", "Готов: жми ИГРАТЬ!"),
+    "tut.map":     _T("Haritayı seç ve başlat (Enter da olur).", "Pick a map and start it (Enter works too).",
+                      "Elige un mapa y empieza (o Enter).", "Wähle eine Karte und starte (oder Enter).",
+                      "Выбери карту и начни (можно Enter)."),
+    "tut.move":    _T("WASD ile yürü, fareyle nişan al, SOL TIK ile ateş et. Bir düşman öldür!",
+                      "Move with WASD, aim with the mouse, LEFT CLICK to shoot. Take down an enemy!",
+                      "Muévete con WASD, apunta con el ratón, CLIC IZQUIERDO para disparar. ¡Elimina a un enemigo!",
+                      "Laufen mit WASD, zielen mit der Maus, LINKSKLICK schießt. Erledige einen Gegner!",
+                      "WASD - ходьба, мышь - прицел, ЛКМ - выстрел. Убей врага!"),
+    "tut.shop":    _T("Harika! Şimdi B'ye bas: koşu marketi açılır.", "Nice shot! Now press B to open the run shop.",
+                      "¡Bien! Pulsa B para abrir la tienda.", "Stark! Drück B für den Laden.", "Отлично! Жми B - откроется магазин."),
+    "tut.shop2":   _T("Topladığın altınla burada güçlenirsin. ESC ya da B ile kapat, oyuna dön.",
+                      "Spend the gold you pick up here to get stronger. Close it with ESC or B.",
+                      "Aquí gastas el oro para hacerte más fuerte. Cierra con ESC o B.",
+                      "Hier machst du dich mit Gold stärker. Mit ESC oder B schließen.",
+                      "Здесь золото превращается в силу. Закрой через ESC или B."),
+    "tut.done":    _T("Hepsi bu! Gerisi sende, iyi kasmalar!", "That's it - the rest is up to you. Have fun!",
+                      "¡Eso es todo! ¡A disfrutar!", "Das war's - viel Spaß!", "Вот и всё - удачи!"),
+})
+
+TUT_STEPS = ("welcome", "codex", "codex2", "back", "skin", "skin2", "skin3", "skin4", "play", "map",
+             "move", "shop", "shop2", "done")
+TUT_FREE_SKIN = "ranger"
+
+
+class Tutorial:
+    """Adım adım yönlendirme katmanı (ekranların üstüne çizilir)."""
+
+    def __init__(self, app):
+        self.app = app
+        self.i = 0
+        self.t = 0.0
+        self.active = True
+        self._btns = []
+
+    @property
+    def step(self):
+        return TUT_STEPS[self.i] if self.i < len(TUT_STEPS) else "done"
+
+    def go(self, name):
+        if name in TUT_STEPS:
+            self.i = TUT_STEPS.index(name)
+            self.t = 0.0
+            sfx("click", 0.5, 0.0)
+
+    def finish(self):
+        self.active = False
+        try:
+            self.app.save.data.setdefault("settings", {})["tut_done"] = True
+            self.app.save.save()
+        except Exception:
+            pass
+
+    # ---- hedefler (vurgulanan düğme) ----
+    def _menu_btn(self, i):
+        mb = getattr(self.app, "menu_buttons", None) or []
+        return mb[i].rect if i < len(mb) else None
+
+    def _skin_card(self):
+        try:
+            idx = [sk["id"] for sk in SKINS].index(TUT_FREE_SKIN)
+        except ValueError:
+            return None
+        cols, cw, ch, gx, gy = 4, 270, 208, 20, 18
+        sx = (VIRTUAL_W - (cols * cw + (cols - 1) * gx)) / 2
+        y = 100 + (idx // cols) * (ch + gy) - getattr(self.app, "skin_scroll", 0.0)
+        return pygame.Rect(int(sx + (idx % cols) * (cw + gx)), int(y), cw, ch)
+
+    def _codex_card(self):
+        cols, cw, gx = 4, 268, 18
+        sx = (VIRTUAL_W - (cols * cw + (cols - 1) * gx)) / 2
+        return pygame.Rect(int(sx), int(158 - getattr(self.app, "weapon_scroll", 0.0)), cw, 262)
+
+    def _detail_btn(self):
+        pr = pygame.Rect(0, 0, 540, 618)
+        pr.center = (VIRTUAL_W / 2, VIRTUAL_H / 2)
+        by = pr.bottom - 66
+        if self.app.save.owns_skin(TUT_FREE_SKIN):
+            return pygame.Rect(int(pr.centerx + 7), by, 170, 46)
+        return pygame.Rect(int(pr.centerx - 177), by, 170, 46)
+
+    def _back_btn(self):
+        return pygame.Rect(int(VIRTUAL_W / 2 - 135), VIRTUAL_H - 58, 270, 44)
+
+    # ---- akış ----
+    def update(self, dt):
+        """Durum değişikliklerine göre adımı ilerletir; (ekran, hedef, yazı, düğme) döner."""
+        a = self.app
+        st = a.state
+        self.t += dt
+        s_ = self.step
+        run = a.run
+        # oyuncu turu beklemeden oyuna girdiyse menü adımları atlanır
+        if st == STATE_PLAY and TUT_STEPS.index(s_) < TUT_STEPS.index("move"):
+            self.go("move")
+            s_ = self.step
+        if s_ == "codex" and st == STATE_WEAPON_CODEX:
+            self.go("codex2")
+        elif s_ in ("codex2", "back") and st == STATE_MENU:
+            self.go("skin")
+        elif s_ == "skin" and st == STATE_SKIN_MARKET:
+            self.go("skin2")
+        elif s_ == "skin2" and st == STATE_SKIN_DETAIL and getattr(a, "detail_skin_id", None) == TUT_FREE_SKIN:
+            self.go("skin3")
+        elif s_ == "skin3" and a.save.equipped_skin_id() == TUT_FREE_SKIN:
+            self.go("skin4")
+        elif s_ == "skin3" and st == STATE_SKIN_MARKET:
+            self.go("skin2")
+        elif s_ in ("skin2", "skin4") and st == STATE_MENU:
+            self.go("play" if a.save.equipped_skin_id() == TUT_FREE_SKIN or s_ == "skin4" else "skin")
+        elif s_ == "play" and st == STATE_MAP_SELECT:
+            self.go("map")
+        elif s_ == "map" and st == STATE_MENU:
+            self.go("play")
+        elif s_ == "move" and run is not None and int(getattr(run, "kills", 0)) >= 1:
+            self.go("shop")
+        elif s_ == "shop" and st == STATE_RUN_SHOP:
+            self.go("shop2")
+        elif s_ == "shop2" and st == STATE_PLAY:
+            self.go("done")
+        elif s_ == "done" and self.t > 4.5:
+            self.finish()
+        s_ = self.step
+        # adım -> (gösterildiği ekran, hedef dikdörtgen, yazı anahtarı, ileri düğmesi)
+        table = {
+            "welcome": (STATE_MENU, None, "tut.welcome", "start"),
+            "codex": (STATE_MENU, self._menu_btn(4), "tut.codex", None),
+            "codex2": (STATE_WEAPON_CODEX, self._codex_card(), "tut.codex2", "next"),
+            "back": (STATE_WEAPON_CODEX, self._back_btn(), "tut.back", None),
+            "skin": (STATE_MENU, self._menu_btn(8), "tut.skin", None),
+            "skin2": (STATE_SKIN_MARKET, self._skin_card(), "tut.skin2", None),
+            "skin3": (STATE_SKIN_DETAIL, self._detail_btn(), "tut.skin3", None),
+            "skin4": ((STATE_SKIN_MARKET, STATE_SKIN_DETAIL), self._back_btn(), "tut.skin4", None),
+            "play": (STATE_MENU, self._menu_btn(0), "tut.play", None),
+            "map": (STATE_MAP_SELECT, None, "tut.map", None),
+            "move": (STATE_PLAY, None, "tut.move", None),
+            "shop": (STATE_PLAY, None, "tut.shop", None),
+            "shop2": (STATE_RUN_SHOP, None, "tut.shop2", None),
+            "done": (STATE_PLAY, None, "tut.done", None),
+        }
+        return table.get(s_)
+
+    def take_click(self, mouse_pos, clicked):
+        """Eğitimin kendi düğmeleri tıklandıysa tıklamayı yutar."""
+        if not clicked or not self.active:
+            return False
+        for r, fn in self._btns:
+            if r.collidepoint(mouse_pos):
+                fn()
+                return True
+        # karşılama kartı açıkken arkadaki menü tıklanmaz
+        return self.step == "welcome" and self.app.state == STATE_MENU
+
+    def _next(self):
+        s_ = self.step
+        if s_ == "welcome":
+            self.go("codex")
+        elif s_ == "codex2":
+            self.go("back")
+
+    def _skip(self):
+        sfx("click", 0.6, 0.0)
+        self.finish()
+
+    def draw(self, canvas, dt, mouse_pos):
+        self._btns = []
+        a = self.app
+        if not self.active or (a.state == STATE_MENU and a.splash_t < a.SPLASH_TIME):
+            return
+        info = self.update(dt)
+        if not self.active or info is None:
+            return
+        states, target, key, btn = info
+        if not isinstance(states, tuple):
+            states = (states,)
+        if a.state not in states:
+            return
+        play = a.state == STATE_PLAY
+        t = self.t
+        # spot ışığı: hedef dışı hafif kararır (oyun içinde karartma yok)
+        if target is not None and not play:
+            dim = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+            dim.fill((6, 8, 18, 120))
+            dim.fill((0, 0, 0, 0), target.inflate(16, 16))
+            canvas.blit(dim, (0, 0))
+            k = 0.5 + 0.5 * math.sin(t * 5)
+            pygame.draw.rect(canvas, (255, 214, 90), target.inflate(12 + 6 * k, 12 + 6 * k), 3,
+                             border_radius=14)
+        welcome = self.step == "welcome"
+        if welcome:
+            dim = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+            dim.fill((6, 8, 18, 150))
+            canvas.blit(dim, (0, 0))
+        # konuşma balonu
+        if key == "tut.skin2":
+            sk_ = SKIN_BY_ID.get(TUT_FREE_SKIN)
+            text = L(key, skin_name(sk_) if sk_ else TUT_FREE_SKIN)
+        else:
+            text = L(key)
+        bw = 560 if welcome else 470
+        lines = wrap_text(text, 15, bw - 40)[:5]
+        extra = 0
+        if self.step == "codex2":
+            extra = 44
+        bh = 58 + len(lines) * 21 + extra + (56 if btn else 0) + (30 if welcome else 0)
+        if welcome:
+            box = pygame.Rect(0, 0, bw, bh)
+            box.center = (VIRTUAL_W // 2, VIRTUAL_H // 2)
+        elif play:
+            box = pygame.Rect(0, 0, bw, bh)
+            box.midbottom = (VIRTUAL_W // 2, VIRTUAL_H - 118)     # duyurulara binmesin
+        elif target is not None:
+            # hedefin yanına; sığmazsa altına / üstüne
+            box = pygame.Rect(0, 0, bw, bh)
+            if target.right + 30 + bw < VIRTUAL_W - 10:
+                box.midleft = (target.right + 34, target.centery)
+            elif target.x - 30 - bw > 10:
+                box.midright = (target.x - 34, target.centery)
+            elif target.bottom + 20 + bh < VIRTUAL_H - 10:
+                box.midtop = (target.centerx, target.bottom + 26)
+            else:
+                box.midbottom = (target.centerx, target.y - 26)
+            box.clamp_ip(pygame.Rect(10, 10, VIRTUAL_W - 20, VIRTUAL_H - 20))
+        else:
+            box = pygame.Rect(0, 0, bw, bh)
+            box.midtop = (VIRTUAL_W // 2, 70)
+        bob = math.sin(t * 2.4) * 3 if not welcome else 0
+        box = box.move(0, int(bob))
+        panel(canvas, box, bg=(30, 34, 58), edge=(255, 214, 90), alpha=246, radius=16, edge_w=2)
+        # ok: balondan hedefe
+        if target is not None and not play and not welcome:
+            ax = clamp(target.centerx, box.x + 20, box.right - 20)
+            ay = clamp(target.centery, box.y + 20, box.bottom - 20)
+            if target.centerx > box.right:
+                ax = box.right
+            elif target.centerx < box.x:
+                ax = box.x
+            elif target.centery > box.bottom:
+                ay = box.bottom
+            else:
+                ay = box.y
+            tx = clamp(ax, target.x - 6, target.right + 6)
+            ty = clamp(ay, target.y - 6, target.bottom + 6)
+            pygame.draw.line(canvas, (255, 214, 90), (ax, ay), (tx, ty), 4)
+            ang = math.atan2(ty - ay, tx - ax)
+            pts = [(tx, ty), (tx - math.cos(ang - 0.5) * 14, ty - math.sin(ang - 0.5) * 14),
+                   (tx - math.cos(ang + 0.5) * 14, ty - math.sin(ang + 0.5) * 14)]
+            pygame.draw.polygon(canvas, (255, 214, 90), pts)
+        n_steps = len(TUT_STEPS) - 1
+        if welcome:
+            draw_text(canvas, L("tut.welcome.t"), (box.centerx, box.y + 26), 26, (255, 224, 120), bold=True,
+                      center=True)
+            ty0 = box.y + 56
+        else:
+            draw_text(canvas, L("tut.step", max(1, self.i), n_steps), (box.x + 20, box.y + 12), 11,
+                      (255, 214, 90), bold=True, shadow=False)
+            ty0 = box.y + 34
+        for j, ln in enumerate(lines):
+            draw_text(canvas, ln, (box.centerx, ty0 + j * 21), 15, (236, 238, 250), center=True, shadow=False)
+        y = ty0 + len(lines) * 21 + 6
+        if self.step == "codex2":
+            # aç / kapat düğmesinin küçük bir örneği
+            for k_, (lab, col) in enumerate(((L("ui.mute_weapon"), (150, 80, 80)), (L("ui.unmute"), (80, 140, 96)))):
+                r_ = pygame.Rect(0, 0, 150, 28)
+                r_.center = (box.centerx - 84 + k_ * 168, y + 16)
+                pygame.draw.rect(canvas, (44, 30, 32) if k_ == 0 else (28, 44, 34), r_, border_radius=8)
+                ink_frame(canvas, r_, col, 8, 2)
+                draw_text(canvas, _fit_text(lab, 12, r_.w - 12, bold=True), r_.center, 12, TEXT, bold=True,
+                          center=True, shadow=False)
+            draw_text(canvas, "/", (box.centerx, y + 16), 18, (255, 214, 90), bold=True, center=True)
+            y += extra
+        if btn:
+            label = L("tut.start") if btn == "start" else L("tut.next")
+            r_ = pygame.Rect(0, 0, 220, 44)
+            r_.midtop = (box.centerx + (-120 if welcome else 0), y + 4)
+            hov = r_.collidepoint(mouse_pos)
+            pygame.draw.rect(canvas, (80, 170, 115) if hov else (60, 130, 90), r_, border_radius=10)
+            ink_frame(canvas, r_, (150, 230, 170), 10, 2)
+            draw_text(canvas, label, r_.center, 17, WHITE, bold=True, center=True, shadow=False)
+            self._btns.append((r_, self._next))
+            if welcome:
+                r2 = pygame.Rect(0, 0, 220, 44)
+                r2.midtop = (box.centerx + 120, y + 4)
+                hov2 = r2.collidepoint(mouse_pos)
+                pygame.draw.rect(canvas, (110, 80, 84) if hov2 else (84, 60, 64), r2, border_radius=10)
+                ink_frame(canvas, r2, (200, 160, 160), 10, 2)
+                draw_text(canvas, L("tut.skip"), r2.center, 15, WHITE, bold=True, center=True, shadow=False)
+                self._btns.append((r2, self._skip))
+        if not welcome:
+            # her adımda: eğitimi geç
+            sk = pygame.Rect(16, VIRTUAL_H - 50, 190, 34)
+            if play:
+                sk.topleft = (VIRTUAL_W - 206, VIRTUAL_H - 50)
+            hov = sk.collidepoint(mouse_pos)
+            pygame.draw.rect(canvas, (70, 52, 56) if hov else (46, 34, 38), sk, border_radius=9)
+            ink_frame(canvas, sk, (190, 150, 150), 9, 1)
+            draw_text(canvas, L("tut.skip"), sk.center, 12, (236, 220, 220), bold=True, center=True, shadow=False)
+            self._btns.append((sk, self._skip))
+
+
 # ---- ölüm tekrarı ----
 # Koşunun son birkaç saniyesi küçültülüp JPEG olarak yalnızca bellekte tutulur
 # (diske hiç yazılmaz). Ölünce sonuç ekranından bir kez izlenebilir; o ekrandan
 # çıkınca silinir.
 REPLAY_SECS = 8.0
-REPLAY_FPS = 12 if MOBILE else 24
+REPLAY_FPS = 12 if MOBILE else 20
 REPLAY_SIZE = (640, 360) if MOBILE else (960, 540)
 REPLAY_SLOW_LAST = 1.6           # son kısım ağır çekimde oynar
 REPLAY_SLOW = 0.4
@@ -47604,6 +48310,17 @@ class App:
         self.restart_hold = 0.0         # oyunda R basılı tutma süresi
         self.restart_armed = False
         self.replay = DeathReplay()
+        self.tut = None
+        try:
+            _st = self.save.data.setdefault("settings", {})
+            _runs = int((self.save.data.get("stats") or {}).get("runs", 0) or 0)
+            if not _st.get("tut_done"):
+                if _runs > 0 or getattr(self, "shadow", False):
+                    _st["tut_done"] = True          # eski oyuncu: eğitim yok
+                else:
+                    self.tut = Tutorial(self)
+        except Exception:
+            self.tut = None
         self.shop_ui = RunShopOverlay()
         # L ile açılan sol alt sohbet/komut kutusu (hile kodu da buradan).
         self.chat = ChatConsole()
@@ -48263,6 +48980,9 @@ class App:
             self._menu_dt = 0.0
             menu_timed = True
             _mt0 = time.perf_counter()
+        tut = self.tut
+        if tut is not None and tut.active and tut.take_click(mouse_pos, clicked):
+            clicked = False
         try:
             if self.state == STATE_MENU: self.update_menu(dt, mouse_pos, clicked)
             elif self.state == STATE_PLAY: self.update_play(dt, keys, mouse_pos, mouse_down, bonk_pressed,
@@ -48305,6 +49025,15 @@ class App:
             mc = time.perf_counter() - _mt0
             self._menu_cost = getattr(self, "_menu_cost", 0.0) * 0.9 + mc * 0.1
 
+        if self.tut is not None:
+            if self.tut.active:
+                try:
+                    self.tut.draw(self.display.canvas, dt, mouse_pos)
+                except Exception as e:
+                    log_net_error("tutorial", e, ("tut", ""))
+                    self.tut.finish()
+            if not self.tut.active:
+                self.tut = None
         # Sohbet en üstte durur: hangi ekranda olursak olalım aynı yerde, sol
         # altta görünsün.
         self.chat.update(dt)
@@ -55576,6 +56305,7 @@ class CoopSession:
                         "skins": [self.my_skin(), self.peer.get("skin", "default")],
                         "cos": [self.my_cos(), self.peer.get("cos") or {}], "proto": COOP_PROTO})
         self.phase = "play"
+        self.gems_paid = None
         _SFX_TAP[0] = []
         app.run = run
         app.merchant_ui.reset()
@@ -55599,6 +56329,7 @@ class CoopSession:
         self.run = run
         self.my_cnt = {"dc": 0, "bc": 0, "uc": 0}
         self.phase = "play"
+        self.gems_paid = None
         self.need_kf = False
         self.last_n = 0
         app.run = run
@@ -55786,6 +56517,24 @@ class CoopSession:
             self.link.send({"t": "kf"})
 
     def _guest_end(self, res):
+        # elmas: kendi biriktirdiğim (ev sahibinin gönderdiği görüntülerden);
+        # bağlantı koptuysa da kazandığım kaybolmaz
+        run = self.run
+        if run is not None:
+            mine = coop_run_gems(run, 1)
+            pl = res.get("players") if isinstance(res, dict) else None
+            if isinstance(pl, list) and len(pl) > 1 and isinstance(pl[1], dict):
+                try:
+                    mine = min(max(mine, int(pl[1].get("gems", 0) or 0)), COOP_GEM_MAX)
+                except (TypeError, ValueError):
+                    pass
+            self._pay_gems(mine)
+            if isinstance(pl, list) and len(pl) > 1 and isinstance(pl[1], dict):
+                pl[1]["gems"] = getattr(self, "gems_paid", mine)
+                if pl[1].get("dead") and run.player.alive:
+                    run.player.alive = False      # son düşüş: tekrar için (görüntüden önce bitiş geldi)
+            elif isinstance(res, dict):
+                res["my_gems"] = getattr(self, "gems_paid", mine)
         self.result = res
         self.phase = "end"
         self.app.state = STATE_COOP_END
@@ -55871,6 +56620,19 @@ class CoopSession:
         if self.link_dead():
             self._guest_end({"t": "end", "lost": 1})
 
+    def _pay_gems(self, n):
+        """2 kişilik koşunun elması (bir kez)."""
+        if getattr(self, "gems_paid", None) is not None:
+            return
+        n = int(clamp(int(n or 0), 0, COOP_GEM_MAX))
+        self.gems_paid = n
+        if n > 0:
+            try:
+                self.app.save.add_gems(n)
+                self.app.save.progress_changed()
+            except Exception as e:
+                log_net_error("coop gems", e, ("coop", ""))
+
     def _finish(self):
         run = self.run
         res = {"t": "end", "wave": int(run.total_wave()), "time": int(run.run_time),
@@ -55883,8 +56645,11 @@ class CoopSession:
                 "level": int(p.level), "weapons": len(p.weapons),
                 "books": sum(1 for _k in p.books),
                 "dps": int(max(0.0, float(p.estimated_dps()))),
+                "gems": coop_run_gems(run, i),
+                "dead": 0 if p.alive else 1,
             })
         self.result = res
+        self._pay_gems(res["players"][0]["gems"])
         if self.link.connected():
             self.link.send(res)
         self.phase = "end"
@@ -56125,6 +56890,8 @@ def _app_coop_play(self, dt, keys, mouse_pos, mouse_down, bonk_pressed, dash_pre
         inp = {"aim_x": ax, "aim_y": ay}
     co.tick(dt, inp)
     if self.state != STATE_PLAY or self.run is not run:
+        if self.state == STATE_COOP_END and not run.player.alive:
+            self.replay.capture(self.display.canvas, 0.0, run)    # son düşüş de tekrarda olsun
         return
     offset = run.fx.get_shake_offset()
     canvas = self.display.canvas
@@ -56243,7 +57010,8 @@ def _app_update_coop_end(self, dt, mouse_pos, clicked):
             rows = ((L("coop.r_score"), fmt_num(int(pd.get("score", 0) or 0))),
                     (L("coop.r_kills"), fmt_num(int(pd.get("kills", 0) or 0))),
                     (L("coop.r_level"), str(int(pd.get("level", 0) or 0))),
-                    (L("coop.r_dps"), fmt_num(int(pd.get("dps", 0) or 0))))
+                    (L("coop.r_dps"), fmt_num(int(pd.get("dps", 0) or 0))),
+                    (L("coop.r_gems"), "+" + fmt_num(int(pd.get("gems", 0) or 0))))
             for j, (a, b) in enumerate(rows):
                 yy = r.y + 152 + j * 32
                 draw_text(canvas, a, (r.x + 40, yy), 15, TEXT_DIM, shadow=False)
@@ -56318,6 +57086,56 @@ def _draw_coop_overlay(canvas, run, co, t):
         draw_text(canvas, L("coop.peer_lost"), (cx, 150), 18, ORANGE, bold=True, center=True)
     elif run.is_guest and not run.got_first:
         draw_text(canvas, L("coop.connecting"), (cx, 150), 18, CYAN, bold=True, center=True)
+
+
+def draw_coop_soul(world, run, t):
+    """Ölen oyuncunun mezar taşı + patron ruhu (dolum halkasıyla)."""
+    players = getattr(run, "players", None) or []
+    for q in players:
+        if q is None or q.alive:
+            continue
+        x, y = q.x, q.y
+        world.blit(shadow_sprite(40), (int(x - 20), int(y + 8)))
+        stone = pygame.Rect(0, 0, 28, 34)
+        stone.midbottom = (int(x), int(y + 14))
+        pygame.draw.rect(world, (40, 38, 52), stone.inflate(4, 4), border_top_left_radius=14,
+                         border_top_right_radius=14)
+        pygame.draw.rect(world, (150, 152, 176), stone, border_top_left_radius=12, border_top_right_radius=12)
+        pygame.draw.rect(world, (186, 190, 214), stone.inflate(-10, -12).move(0, -2), 0,
+                         border_top_left_radius=8, border_top_right_radius=8)
+        pygame.draw.line(world, (90, 92, 120), (x, stone.y + 8), (x, stone.y + 22), 3)
+        pygame.draw.line(world, (90, 92, 120), (x - 6, stone.y + 13), (x + 6, stone.y + 13), 3)
+    sl = getattr(run, "soul", None)
+    if not isinstance(sl, (list, tuple)) or len(sl) < 4:      # konukta demet gelir
+        return
+    try:
+        sx, sy, ti, ch = float(sl[0]), float(sl[1]), int(sl[2]), float(sl[3])
+    except (TypeError, ValueError):
+        return
+    if ti >= 0:
+        # ölünün çevresinde dolum halkası
+        cx, cy = sx, sy + 26
+        ring_aa(world, cx, cy, SOUL_R, scale_col(SOUL_COLOR, 0.45 + 0.15 * math.sin(t * 4)), 2)
+        k = clamp(ch / SOUL_NEED, 0.0, 1.0)
+        if k > 0:
+            n = max(2, int(48 * k))
+            pts = [(cx + math.cos(-math.pi / 2 + math.tau * k * i / (n - 1)) * SOUL_R,
+                    cy + math.sin(-math.pi / 2 + math.tau * k * i / (n - 1)) * SOUL_R) for i in range(n)]
+            pygame.draw.lines(world, (255, 255, 255), False, pts, 5)
+            pygame.draw.lines(world, SOUL_COLOR, False, pts, 3)
+        draw_text(world, L("coop.soul_hint"), (cx, cy + SOUL_R + 14), 12, SOUL_COLOR, bold=True, center=True)
+    bob = math.sin(t * 3.2) * 5
+    y = sy + bob
+    add_glow(world, sx, y, 54, SOUL_COLOR, 0.55)
+    # kuyruk
+    for i in range(5):
+        k = i / 5.0
+        blit_disc(world, sx + math.sin(t * 5 + i) * 4 * k, y + 10 + i * 6, 9 * (1 - k) + 2,
+                  lighten(SOUL_COLOR, 0.3), int(200 * (1 - k)))
+    circle_aa(world, sx, y, 12, SOUL_COLOR)
+    circle_aa(world, sx - 3, y - 3, 6, (240, 252, 255))
+    circle_aa(world, sx - 4, y + 1, 1.8, (30, 60, 90))
+    circle_aa(world, sx + 4, y + 1, 1.8, (30, 60, 90))
 
 
 def draw_coop_world(world, run, t, layer):
@@ -56404,6 +57222,12 @@ def draw_coop_hud(surf, run, t):
     else:
         team = int(run.ctx_get(0, "score") or 0) + int(run.ctx_get(1, "score") or 0)
     draw_text(surf, L("coop.team_score", fmt_num(team)), (r.x + 14, r.y - 20), 12, CYAN, bold=True)
+    sl_ = getattr(run, "soul", None)
+    if isinstance(sl_, (list, tuple)) and len(sl_) >= 4:
+        # patron ruhu bekliyor: biri düşerse diriltebilir
+        pulse = 0.6 + 0.4 * math.sin(t * 4)
+        circle_aa(surf, r.x + 22, r.y - 40, 6, scale_col(SOUL_COLOR, pulse))
+        draw_text(surf, L("coop.soul_ready"), (r.x + 34, r.y - 48), 12, SOUL_COLOR, bold=True)
     # bağlantı kalitesi: herkes gecikmeyi görsün
     pg = getattr(run, "_net_ping", 0)
     if getattr(run, "_net_sync", False):

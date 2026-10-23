@@ -3,6 +3,31 @@
 Kısa notlar, en yenisi üstte.
 
 ## sıradaki sürüm
+- EĞİTİM: oyuna ilk kez girene kısa bir tur: silahlık (silahlar nasıl açılır,
+  aç / kapat), skin market'ten bedava Yeşil Öncü'yü aldırır, oyunu başlatır,
+  bir düşman öldürtür, B ile marketi açtırır. Her adımda "EĞİTİMİ GEÇ" var;
+  eski oyunculara hiç çıkmaz
+- 2 KİŞİLİK:
+  - elmas artık 2 kişilikte de kazanılıyor (herkes kendi topladığı kadar,
+    tek kişilikle aynı oranda); sonuç ekranında yazar
+  - PATRON RUHU: patron ölünce bir ruh çıkar. Biri ölmüşse ruh ona uçar,
+    yaşayan arkadaş mezarın başında 3 sn durunca yarı canla dirilir. Kimse
+    ölmediyse ruh bekler; birikmez, en çok 1 tane olur
+  - sunak birine gelince ikisine de işler
+- evrimler belirgin: Kıyamet Baltası patlaması gerçek bir patlama (ateş topu,
+  iki halka, ses); evrilmiş silahlar kendi renginde parlıyor; diğer evrim
+  etkilerinin de görünür işaretleri var
+- sandık açılınca dünyada üst üste binen yazılar yerine ekranın üstünde tek,
+  düzenli bir ödül kartı; "PATRON DEVRİLDİ" karakterin üstüne binmiyor
+- altın: kesirli altın artık birikir (art arda hiç düşmeyen öldürmeler yok);
+  paralar daha büyük, konturlu ve parlıyor, büyük yığın üç para görünüyor
+- hasar dökümünde "parry" yerine "Savuşturma" (+ "Kitap etkileri")
+- FPS: kalabalık sahnede kare süresi ~%25 kısaldı (sol üst şeritler, üst
+  bilgi, küçük harita ve yetenek çubuğu hazır görüntüden; yerdeki eşyalar
+  tek seferde; ışık zerreleri yalnız kamerada olanlar; silah efekti kısma
+  varsayılanı kapalı - her karede tam ekran kopyası yapıyordu)
+- KARTOPU: zemin bembeyaz kar, buz temalı pencereler; her yaratık 2 elmas,
+  tank 3, altın goblin 6 (iyi bir oyun ~100, tavan 130)
 - ÖLÜM TEKRARI: ölünce sonuç ekranında "SON ANLARI İZLE" düğmesi çıkar
   - son 8 saniye oynar, son 1,6 saniye ağır çekim; son karede renk çekilir
     ve seni kimin öldürdüğü yazar. ESC ya da tıklama ile geçilir

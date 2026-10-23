@@ -1330,7 +1330,7 @@ DAILY_GIFT_GEMS = (150, 250, 350, 450, 550, 650, 750)   # (oyunla aynı)
 # düşman 1 elmas (altın goblin 3).
 SNOW_DAILY = 3
 SNOW_TIME = 30.0
-SNOW_MAX_GEMS = 90              # tek oyunda en çok (dürüst oyunun üst ucu ~70)
+SNOW_MAX_GEMS = 130             # tek oyunda en çok (iyi bir oyun ~100)
 SNOW_MAX_ELAPSED = 15 * 60
 
 
