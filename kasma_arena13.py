@@ -4163,6 +4163,17 @@ def leather_wrap(surf, p0, p1, w, n=4, base=(96, 62, 44)):
         thick_line(surf, a0, a1, w * 0.42, base if i % 2 == 0 else scale_col(base, 0.72))
 
 
+# Sesler arka planda saf Python ile üretiliyor; üretim ipliği yorumlayıcı
+# kilidini (GIL) bırakmadan uzun döngülere girince açılıştaki menü takılıyordu.
+# Bu iplik her notadan sonra kısa bir mola verir.
+_AUDIO_GEN_THREAD = [None]
+
+
+def _audio_breathe():
+    if threading.current_thread() is _AUDIO_GEN_THREAD[0]:
+        time.sleep(0.002)
+
+
 def _env_tone(freq, dur, vol=0.4, shape="sine", f_end=None, attack=0.004,
               power=1.6, noise=0.0, vib=0.0):
     n = max(1, int(dur * _SR))
@@ -4191,6 +4202,7 @@ def _env_tone(freq, dur, vol=0.4, shape="sine", f_end=None, attack=0.004,
             s = s * (1 - noise) + random.uniform(-1, 1) * noise
         a = i / att_n if i < att_n else 1.0
         out[i] = s * a * ((1 - t) ** power) * vol
+    _audio_breathe()
     return out
 
 
@@ -4205,6 +4217,7 @@ def _mix(parts, total=None):
             if j >= total:
                 break
             out[j] += v
+        _audio_breathe()
     return out
 
 
@@ -4371,16 +4384,72 @@ class AudioManager:
         except Exception:
             self.ok = False
 
-    def _generate(self):
+    def _cache_path(self):
         try:
+            return os.path.join(get_save_dir(), "sound_cache.bin")
+        except Exception:
+            return None
+
+    def _cache_tag(self):
+        return "%s|%d|%d|%d" % (GAME_VERSION, _SR, self.channels, len(SFX_BUILDERS))
+
+    def _load_cache(self):
+        """Önceki açılışta üretilmiş sesler (aynı sürüm) - anında yüklenir."""
+        path = self._cache_path()
+        if not path or not os.path.exists(path):
+            return False
+        try:
+            with open(path, "rb") as f:
+                blob = zlib.decompress(f.read())
+            if not blob:
+                return False
+            head, body = blob.split(b"\n", 1)
+            meta = json.loads(head.decode("utf-8"))
+            if meta.get("tag") != self._cache_tag():
+                return False
+            got, pos = {}, 0
+            for kind, name, n in meta.get("items", []):
+                got[(kind, name)] = body[pos:pos + n]
+                pos += n
+            if pos != len(body) or len(got) < len(SFX_BUILDERS) + 2:
+                return False
+            with self._lock:
+                self._raw.update(got)
+            return True
+        except Exception:
+            return False
+
+    def _save_cache(self, items):
+        path = self._cache_path()
+        if not path:
+            return
+        try:
+            meta = {"tag": self._cache_tag(), "items": [[k, n, len(r)] for (k, n), r in items]}
+            blob = json.dumps(meta).encode("utf-8") + b"\n" + b"".join(r for _k, r in items)
+            tmp = path + ".tmp"
+            with open(tmp, "wb") as f:
+                f.write(zlib.compress(blob, 6))
+            os.replace(tmp, path)
+        except Exception:
+            pass
+
+    def _generate(self):
+        _AUDIO_GEN_THREAD[0] = threading.current_thread()
+        try:
+            if self._load_cache():
+                return
+            items = []
             for name, fn in SFX_BUILDERS.items():
                 raw = _to_bytes(fn(), self.channels)
+                items.append((("sfx", name), raw))
                 with self._lock:
                     self._raw[("sfx", name)] = raw
             for kind in ("menu", "battle"):
                 raw = _to_bytes(_gen_music(kind), self.channels)
+                items.append((("music", kind), raw))
                 with self._lock:
                     self._raw[("music", kind)] = raw
+            self._save_cache(items)
         except Exception:
             pass
 
@@ -43233,13 +43302,14 @@ COOP_CAP_MULT = 1.4               # aynı anda yaşayan yaratık tavanı
 COOP_CAP_MAX = 240
 COOP_BOSS_HP = 1.25               # patron canı (iki oyuncunun toplam gücü üstüne)
 COOP_MENU_SHIELD = 4.0            # pencere açıkken en çok bu kadar sn hasar yok
-COOP_SNAP_HZ = 15.0               # ev sahibi -> konuk anlık görüntü sıklığı
-COOP_INPUT_HZ = 30.0              # konuk -> ev sahibi girdi sıklığı
+COOP_SNAP_HZ = 30.0               # ev sahibi -> konuk anlık görüntü sıklığı
+COOP_INPUT_HZ = 60.0              # konuk -> ev sahibi girdi sıklığı (doğrudan yolda)
+COOP_INPUT_HZ_RELAY = 45.0        # sunucu yolunda (sunucunun mesaj sınırı)
 COOP_MAX_RAW = 2 * 1024 * 1024    # açılmış bir mesajın en büyük boyu
 COOP_MAX_IN = 120 * 1024          # gelen tek bir websocket mesajının sınırı
 COOP_RECONNECT_FOR = 20.0         # kopunca bu kadar sn yeniden denenir
 COOP_PART = 48 * 1024             # büyük mesaj bu boyda parçalara bölünür (sunucu sınırı 96 KB)
-COOP_INTERP_MIN = 0.07            # konuk: çizim gecikmesi tamponu (sn) alt/üst sınır
+COOP_INTERP_MIN = 0.035           # konuk: çizim gecikmesi tamponu (sn) alt/üst sınır
 COOP_INTERP_MAX = 0.45
 COOP_PROTO = 2
 COOP_CODE_ALPH = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -43439,7 +43509,7 @@ class CoopWS:
                 continue
             if op in (0x1, 0x2):
                 if fin:
-                    self.q.put(("t" if op == 1 else "b", data))
+                    self.q.put(("t" if op == 1 else "b", data, time.time()))
                 else:
                     self._frag_op, self._frag = op, bytearray(data)
             elif op == 0x0 and self._frag_op is not None:
@@ -43447,7 +43517,7 @@ class CoopWS:
                 if len(self._frag) > COOP_MAX_IN:
                     raise ConnectionError("mesaj çok büyük")
                 if fin:
-                    self.q.put(("t" if self._frag_op == 1 else "b", bytes(self._frag)))
+                    self.q.put(("t" if self._frag_op == 1 else "b", bytes(self._frag), time.time()))
                     self._frag_op, self._frag = None, bytearray()
 
     # ---- yazma (yalnız kuyruğa koyar) ----
@@ -43516,6 +43586,443 @@ def _ws_mask(data, mask):
     return (int.from_bytes(data, "big") ^ m).to_bytes(n, "big")
 
 
+# ---- 2 kişilik: doğrudan bağlantı (UDP) ----
+# Sunucu yolunda her mesaj iki kez yol alır (oyuncu -> sunucu -> arkadaş);
+# Türkiye'den Frankfurt'a gidip gelmek tek başına ~60 ms, iki oyuncu arası
+# ~130 ms ediyordu. İki bilgisayar birbirine doğrudan bağlanabilirse gecikme
+# yalnızca ikisinin arasındaki yol kadar olur (aynı şehirde 10-30 ms).
+# Bağlantı NAT "delik açma" ile kurulur: iki taraf da kendi dış adresini
+# (STUN) ve yerel adreslerini sunucu üstünden karşıya yollar, sonra aynı anda
+# birbirine paket atar. Kurulamazsa (simetrik NAT, kapalı UDP) oyun sunucu
+# yolundan sürer; doğrudan yol düşerse kendiliğinden sunucuya döner.
+# Paketler odaya özel rastgele bir anahtarla imzalanır (HMAC). Mesajlar
+# sıralı ve kayıpsız gider: parçalara bölünür, karşı taraf aldıklarını
+# bildirir, gelmeyen parça hemen yeniden yollanır.
+COOP_STUN = (("stun.l.google.com", 19302), ("stun1.l.google.com", 19302),
+             ("stun.cloudflare.com", 3478), ("stun.nextcloud.com", 3478))
+COOP_P2P_FRAG = 1100           # bir paketteki en büyük veri (MTU altında kalsın)
+COOP_P2P_PUNCH_FOR = 10.0      # delik açma denemesi (sn)
+COOP_P2P_DEAD = 1.6            # bu kadar sessizlikte doğrudan yol düştü sayılır
+COOP_P2P_MAGIC = b"EA\x01"
+_P2P_PUNCH, _P2P_PUNCH_ACK, _P2P_DATA, _P2P_ACK, _P2P_PING, _P2P_PONG, _P2P_BYE = range(1, 8)
+
+
+def _p2p_private(ip):
+    try:
+        a, b = (int(x) for x in ip.split(".")[:2])
+    except Exception:
+        return False
+    return a == 10 or a == 127 or (a == 192 and b == 168) or (a == 172 and 16 <= b <= 31) or (a == 169 and b == 254)
+
+
+def _p2p_local_ips():
+    out = []
+    try:
+        s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+        try:
+            s.connect(("8.8.8.8", 53))           # paket gitmez; yalnız yol seçilir
+            out.append(s.getsockname()[0])
+        finally:
+            s.close()
+    except Exception:
+        pass
+    try:
+        for info in _socket.getaddrinfo(_socket.gethostname(), None, _socket.AF_INET):
+            ip = info[4][0]
+            if ip not in out:
+                out.append(ip)
+    except Exception:
+        pass
+    if "127.0.0.1" not in out:
+        out.append("127.0.0.1")                  # aynı bilgisayarda iki oyun
+    return [ip for ip in out if ip and not ip.startswith("0.")][:6]
+
+
+def _p2p_local_ips6():
+    """Genel IPv6 adresi: NAT yok, çoğu zaman doğrudan yol buradan açılır."""
+    out = []
+    try:
+        s = _socket.socket(_socket.AF_INET6, _socket.SOCK_DGRAM)
+        try:
+            s.connect(("2001:4860:4860::8888", 53))
+            ip = s.getsockname()[0]
+            if ip and not ip.lower().startswith("fe80") and ip != "::1":
+                out.append(ip)
+        finally:
+            s.close()
+    except Exception:
+        pass
+    return out
+
+
+def _p2p_addr_ok(ip):
+    try:
+        _socket.inet_pton(_socket.AF_INET6 if ":" in ip else _socket.AF_INET, ip)
+        return True
+    except (OSError, ValueError, TypeError):
+        return False
+
+
+def _stun_request(tid):
+    return b"\x00\x01\x00\x00\x21\x12\xa4\x42" + tid
+
+
+def _stun_parse(data, tid):
+    """STUN yanıtından dış adres (ip, port) - tutmazsa None."""
+    if len(data) < 20 or data[0:2] != b"\x01\x01" or data[4:8] != b"\x21\x12\xa4\x42" or data[8:20] != tid:
+        return None
+    n = int.from_bytes(data[2:4], "big")
+    i, end = 20, min(len(data), 20 + n)
+    mapped = None
+    while i + 4 <= end:
+        at = int.from_bytes(data[i:i + 2], "big")
+        ln = int.from_bytes(data[i + 2:i + 4], "big")
+        v = data[i + 4:i + 4 + ln]
+        if len(v) >= 8 and v[1] == 1:                     # IPv4
+            port = int.from_bytes(v[2:4], "big")
+            ip4 = bytes(v[4:8])
+            if at == 0x0020:                              # XOR-MAPPED-ADDRESS
+                port ^= 0x2112
+                ip4 = bytes(x ^ y for x, y in zip(ip4, b"\x21\x12\xa4\x42"))
+                return (".".join(str(x) for x in ip4), port)
+            if at == 0x0001 and mapped is None:           # MAPPED-ADDRESS
+                mapped = (".".join(str(x) for x in ip4), port)
+        i += 4 + ((ln + 3) & ~3)
+    return mapped
+
+
+class CoopP2P:
+    """Doğrudan UDP yolu: delik açma + sıralı, kayıpsız mesaj kanalı."""
+
+    def __init__(self, stun=COOP_STUN):
+        s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+        try:
+            s.setsockopt(_socket.SOL_SOCKET, _socket.SO_RCVBUF, 1 << 20)
+            s.setsockopt(_socket.SOL_SOCKET, _socket.SO_SNDBUF, 1 << 20)
+        except Exception:
+            pass
+        s.bind(("0.0.0.0", 0))
+        s.setblocking(False)
+        self.sock = s
+        self.port = s.getsockname()[1]
+        self.sock6 = None
+        self.port6 = 0
+        ip6 = _p2p_local_ips6()
+        if ip6:
+            try:
+                s6 = _socket.socket(_socket.AF_INET6, _socket.SOCK_DGRAM)
+                try:
+                    s6.setsockopt(_socket.IPPROTO_IPV6, _socket.IPV6_V6ONLY, 1)
+                except Exception:
+                    pass
+                s6.bind(("::", 0))
+                s6.setblocking(False)
+                self.sock6 = s6
+                self.port6 = s6.getsockname()[1]
+            except Exception:
+                self.sock6 = None
+        self.key = b""
+        self.sid = b"\x00" * 4
+        self.alive = True
+        self.q = _queue.Queue()                  # ("b", veri, varış)
+        self.lock = threading.Lock()
+        self.cands = [(ip, self.port) for ip in _p2p_local_ips()]
+        if self.sock6 is not None:
+            self.cands = [(ip, self.port6) for ip in ip6] + self.cands
+        self.public = None
+        self.peer_cands = []
+        self.peer_addr = None
+        self.peer_rtt = 9.0
+        self.est_t = 0.0
+        self.established = False
+        self.ever = False                         # bir kez kuruldu mu
+        self.punch_until = 0.0
+        self.punch_t = 0.0
+        self.last_rx = 0.0
+        self.ping_t = 0.0
+        self.rtt = 0.0
+        # gönderen
+        self.snd_next = 0
+        self.unacked = collections.OrderedDict()   # seq -> [paket, ilk, son, deneme]
+        self.unacked_bytes = 0
+        self.hi_ack = -1
+        self.srtt = 0.0
+        self.rttvar = 0.0
+        self.rto = 0.12
+        # alan
+        self.rcv_next = 0
+        self.rcv_buf = {}
+        self.rcv_msg = bytearray()
+        self.ack_due = False
+        self.sent_pk = 0
+        self.resent_pk = 0
+        self._stun = list(stun)
+        self._stun_tid = os.urandom(12)
+        self._stun_addrs = []
+        self._stun_t = 0.0
+        self._stun_n = 0
+        self.th = threading.Thread(target=self._io, daemon=True)
+        self.th.start()
+        if self._stun:
+            threading.Thread(target=self._resolve_stun, daemon=True).start()
+
+    # ---- dış adres ----
+    def _resolve_stun(self):
+        addrs = []
+        for host, port in self._stun:
+            try:
+                for info in _socket.getaddrinfo(host, port, _socket.AF_INET, _socket.SOCK_DGRAM):
+                    addrs.append(info[4][:2])
+                    break
+            except Exception:
+                pass
+        self._stun_addrs = addrs
+
+    def set_key(self, key, sid):
+        self.key = bytes(key)
+        self.sid = bytes(sid)[:4].ljust(4, b"\x00")
+
+    def start_punch(self, peer_cands):
+        """Karşının adayları geldi: delik açma başlar (yeni adaylar eklenir)."""
+        with self.lock:
+            for c in peer_cands:
+                if c not in self.peer_cands:
+                    self.peer_cands.append(c)
+            if not self.established:
+                self.punch_until = time.time() + COOP_P2P_PUNCH_FOR
+
+    def ok(self):
+        return self.alive and self.established and time.time() - self.last_rx < COOP_P2P_DEAD
+
+    def pending(self):
+        return self.unacked_bytes
+
+    # ---- paket ----
+    def _tag(self, body):
+        return hmac.new(self.key, body, hashlib.sha256).digest()[:8]
+
+    def _pack(self, typ, payload):
+        body = COOP_P2P_MAGIC + bytes((typ,)) + self.sid + payload
+        return body + self._tag(body)
+
+    def _sendto(self, pkt, addr):
+        try:
+            if ":" in addr[0]:
+                if self.sock6 is None:
+                    return False
+                self.sock6.sendto(pkt, addr[:2])
+            else:
+                self.sock.sendto(pkt, addr)
+            return True
+        except (BlockingIOError, InterruptedError):
+            return False
+        except OSError:
+            return False
+
+    # ---- dışarıya: mesaj ----
+    def send(self, data):
+        """Bir mesajı (bayt) parçalayıp sıraya koyar ve hemen yollar."""
+        if not self.ok():
+            return False
+        if self.unacked_bytes > 3 * 1024 * 1024:
+            return False
+        n = len(data)
+        parts = max(1, (n + COOP_P2P_FRAG - 1) // COOP_P2P_FRAG)
+        now = time.time()
+        with self.lock:
+            addr = self.peer_addr
+            for i in range(parts):
+                chunk = data[i * COOP_P2P_FRAG:(i + 1) * COOP_P2P_FRAG]
+                flags = (1 if i == 0 else 0) | (2 if i == parts - 1 else 0)
+                seq = self.snd_next
+                self.snd_next += 1
+                pkt = self._pack(_P2P_DATA, seq.to_bytes(4, "big") + bytes((flags,)) + chunk)
+                self.unacked[seq] = [pkt, now, now, 1]
+                self.unacked_bytes += len(pkt)
+                self._sendto(pkt, addr)
+                self.sent_pk += 1
+        return True
+
+    def close(self):
+        if self.alive and self.established and self.peer_addr:
+            for _ in range(2):
+                self._sendto(self._pack(_P2P_BYE, b""), self.peer_addr)
+        self.alive = False
+        for s_ in (self.sock, self.sock6):
+            try:
+                if s_ is not None:
+                    s_.close()
+            except Exception:
+                pass
+
+    # ---- G/Ç döngüsü ----
+    def _io(self):
+        import select as _select
+        socks = [x for x in (self.sock, self.sock6) if x is not None]
+        while self.alive:
+            try:
+                r, _, _ = _select.select(socks, [], [], 0.004)
+            except Exception:
+                break
+            now = time.time()
+            for sk in r:
+                for _ in range(256):
+                    try:
+                        data, addr = sk.recvfrom(4096)
+                    except (BlockingIOError, InterruptedError):
+                        break
+                    except OSError:
+                        break
+                    try:
+                        self._on_packet(data, addr[:2], now)
+                    except Exception:
+                        pass
+            try:
+                self._timers(now)
+            except Exception:
+                pass
+
+    def _timers(self, now):
+        # dış adres: birkaç kez sor
+        if self._stun_addrs and self.public is None and self._stun_n < 6 and now - self._stun_t > 0.4:
+            self._stun_t = now
+            self._stun_n += 1
+            for a in self._stun_addrs:
+                self._sendto(_stun_request(self._stun_tid), a)
+        if self.ack_due and self.peer_addr is not None:
+            self.ack_due = False
+            self._send_ack()
+        if not self.key:
+            return
+        with self.lock:
+            if not self.established and now < self.punch_until and now - self.punch_t > 0.05:
+                self.punch_t = now
+                pay = int(now * 1e6).to_bytes(8, "big")
+                for c in self.peer_cands:
+                    self._sendto(self._pack(_P2P_PUNCH, pay), c)
+            if not self.established or self.peer_addr is None:
+                return
+            if now - self.ping_t > 0.25:
+                self.ping_t = now
+                self._sendto(self._pack(_P2P_PING, int(now * 1e6).to_bytes(8, "big")), self.peer_addr)
+            # yeniden gönderim
+            if self.unacked:
+                base = max(0.03, self.rto)
+                fast = (self.srtt * 1.125 + 0.004) if self.srtt else 0.05
+                for seq, ent in self.unacked.items():
+                    age = now - ent[2]
+                    # sonra yollanan en az 3 parça ulaştıysa ya da biri ulaşıp
+                    # bir gidiş-dönüş geçtiyse bu parça kaybolmuştur
+                    lost = seq < self.hi_ack - 2 or (seq < self.hi_ack and age > fast)
+                    if lost or age > base * (1.6 ** min(ent[3] - 1, 5)):
+                        ent[2] = now
+                        ent[3] += 1
+                        self._sendto(ent[0], self.peer_addr)
+                        self.resent_pk += 1
+                        if ent[3] > 30:
+                            self.established = False     # yol öldü
+                            break
+
+    def _send_ack(self):
+        cum = self.rcv_next
+        bits = 0
+        for k in self.rcv_buf:
+            d = k - cum - 1
+            if 0 <= d < 256:
+                bits |= 1 << d
+        self._sendto(self._pack(_P2P_ACK, cum.to_bytes(4, "big") + bits.to_bytes(32, "big")), self.peer_addr)
+
+    def _on_packet(self, data, addr, now):
+        if data[:2] == b"\x01\x01":
+            pub = _stun_parse(data, self._stun_tid)
+            if pub and self.public is None:
+                self.public = pub
+                if pub not in self.cands:
+                    self.cands.insert(0, pub)
+            return
+        if len(data) < 16 or data[:3] != COOP_P2P_MAGIC or not self.key:
+            return
+        body, tag = data[:-8], data[-8:]
+        if body[4:8] != self.sid or not hmac.compare_digest(tag, self._tag(body)):
+            return
+        typ = body[3]
+        pay = body[8:]
+        if typ == _P2P_PUNCH:
+            self._sendto(self._pack(_P2P_PUNCH_ACK, pay[:8]), addr)
+            if not self.established:
+                with self.lock:
+                    if self.peer_addr is None:
+                        self.peer_addr = addr
+            self.last_rx = now
+            return
+        if typ == _P2P_PUNCH_ACK:
+            rtt = max(0.0, now - int.from_bytes(pay[:8], "big") / 1e6)
+            with self.lock:
+                # ilk yanıt yolu açar; ilk saniyede daha hızlı bir aday gelirse ona geçilir
+                if not self.established or (rtt < self.peer_rtt * 0.7 and now - self.est_t < 1.0):
+                    if not self.established:
+                        self.est_t = now
+                    self.peer_addr = addr
+                    self.peer_rtt = rtt
+                    self.established = True
+                    self.ever = True
+                    self.rtt = rtt
+            self.last_rx = now
+            return
+        if addr != self.peer_addr:
+            if not self.established:
+                return
+            # karşının NAT eşlemesi değişti (ör. ağ değişimi): yeni adrese geç
+            self.peer_addr = addr
+        self.last_rx = now
+        if typ == _P2P_DATA and len(pay) >= 5:
+            seq = int.from_bytes(pay[:4], "big")
+            if seq >= self.rcv_next and seq - self.rcv_next < 8192 and seq not in self.rcv_buf:
+                self.rcv_buf[seq] = (pay[4], pay[5:])
+                while self.rcv_next in self.rcv_buf:
+                    fl, chunk = self.rcv_buf.pop(self.rcv_next)
+                    self.rcv_next += 1
+                    if fl & 1:
+                        self.rcv_msg = bytearray()
+                    self.rcv_msg += chunk
+                    if len(self.rcv_msg) > COOP_MAX_RAW:
+                        self.rcv_msg = bytearray()
+                        continue
+                    if fl & 2:
+                        self.q.put(("b", bytes(self.rcv_msg), now))
+                        self.rcv_msg = bytearray()
+            self.ack_due = True
+        elif typ == _P2P_ACK and len(pay) >= 36:
+            cum = int.from_bytes(pay[:4], "big")
+            bits = int.from_bytes(pay[4:36], "big")
+            with self.lock:
+                for seq in list(self.unacked):
+                    d = seq - cum - 1
+                    if seq >= cum + 257:
+                        break
+                    if seq < cum or (0 <= d < 256 and (bits >> d) & 1):
+                        ent = self.unacked.pop(seq)
+                        self.unacked_bytes -= len(ent[0])
+                        if ent[3] == 1:
+                            smp = now - ent[1]
+                            if self.srtt == 0.0:
+                                self.srtt, self.rttvar = smp, smp / 2
+                            else:
+                                self.rttvar = 0.75 * self.rttvar + 0.25 * abs(self.srtt - smp)
+                                self.srtt = 0.875 * self.srtt + 0.125 * smp
+                            self.rto = min(0.6, max(0.02, self.srtt + 4 * self.rttvar))
+                        if seq > self.hi_ack:
+                            self.hi_ack = seq
+        elif typ == _P2P_PING:
+            self._sendto(self._pack(_P2P_PONG, pay[:8]), addr)
+        elif typ == _P2P_PONG:
+            smp = now - int.from_bytes(pay[:8], "big") / 1e6
+            if 0 <= smp < 5:
+                self.rtt = smp if self.rtt <= 0 else self.rtt * 0.8 + smp * 0.2
+        elif typ == _P2P_BYE:
+            self.established = False
+
+
 class CoopLink:
     """Oda kurma / katılma + websocket bağlantısı + mesaj kodlama."""
 
@@ -43545,6 +44052,17 @@ class CoopLink:
         self.rtt_srv = 0.0           # sunucuya gidiş-dönüş (sn)
         self._ping_t = 0.0
         self._ping_sent = 0.0
+        # doğrudan yol (UDP)
+        self.p2p = None
+        self.p2p_key = b""
+        self.p2p_sid = b""
+        self.path = "relay"          # relay | direct
+        self.path_changed = False
+        self._p2p_offer_t = 0.0
+        self._p2p_offers = 0
+        self._tx_stream_path = None
+        self._rx_src = None          # sıkıştırma akışı hangi yoldan geliyor
+        self.my_ip = None            # sunucunun gördüğü dış ip (STUN yoksa yedek aday)
 
     # ---- http ----
     def _auth_payload(self, **extra):
@@ -43638,8 +44156,117 @@ class CoopLink:
         self._comp = None
         self._dec = None
         self._part = None
+        self._rx_src = None
         self.lost_t = None
         self.state = "lobby"
+        self._p2p_start()
+
+    # ---- doğrudan yol ----
+    def _p2p_start(self):
+        if self.p2p is not None and self.p2p.alive:
+            return
+        if os.environ.get("EVOLVE_NO_P2P"):
+            return
+        try:
+            self.p2p = CoopP2P()
+        except Exception:
+            self.p2p = None
+            return
+        if self.role == "host":
+            if not self.p2p_key:
+                self.p2p_key = os.urandom(16)
+                self.p2p_sid = os.urandom(4)
+            self.p2p.set_key(self.p2p_key, self.p2p_sid)
+        elif self.p2p_key:
+            self.p2p.set_key(self.p2p_key, self.p2p_sid)
+
+    def _p2p_cands(self):
+        pp = self.p2p
+        if pp is None:
+            return []
+        out = [list(c) for c in pp.cands]
+        if self.my_ip and not pp.public and [self.my_ip, pp.port] not in out:
+            out.append([self.my_ip, pp.port])     # çoğu ev modemi kaynak portu korur
+        return out[:10]
+
+    def _p2p_msg(self, msg):
+        """Karşıdan aday / anahtar geldi."""
+        pp = self.p2p
+        if pp is None:
+            return
+        cands = []
+        for c in (msg.get("c") or [])[:10]:
+            if (isinstance(c, list) and len(c) == 2 and isinstance(c[0], str) and len(c[0]) <= 45
+                    and isinstance(c[1], int) and 0 < c[1] < 65536 and _p2p_addr_ok(c[0])):
+                cands.append((c[0], c[1]))
+        if self.role == "guest":
+            try:
+                key = bytes.fromhex(str(msg.get("k") or ""))[:32]
+                sid = bytes.fromhex(str(msg.get("s") or ""))[:4]
+            except ValueError:
+                return
+            if len(key) < 16 or len(sid) != 4:
+                return
+            if self.p2p_sid and sid != self.p2p_sid and pp.ever:
+                # ev sahibi yolu baştan kurdu: eski oturum kapanır
+                pp.close()
+                self.p2p = None
+                self._p2p_start()
+                pp = self.p2p
+                if pp is None:
+                    return
+            if key != self.p2p_key or sid != self.p2p_sid or pp.key != key:
+                self.p2p_key, self.p2p_sid = key, sid
+                pp.set_key(key, sid)
+            self._send_ws({"t": "p2p", "c": self._p2p_cands()})
+        if cands:
+            pp.start_punch(cands)
+
+    def p2p_tick(self, dt):
+        """Aday değişimi + yol seçimi (her karede)."""
+        pp = self.p2p
+        if pp is None:
+            if self.ws is not None and self.ws.alive and self.state == "lobby":
+                self._p2p_start()
+            return
+        now = time.time()
+        if not pp.alive or (self.role == "host" and pp.ever and not pp.ok() and now - pp.last_rx > 3.0):
+            # doğrudan yol öldü: yeni soket + yeni oturum kimliği, karşı taraf
+            # da yeni teklifle sıfırlanır (eski paketler kimlik tutmadığından
+            # yok sayılır)
+            pp.close()
+            self.p2p = None
+            if self.role == "host":
+                self.p2p_sid = os.urandom(4)
+                self._p2p_offers = 0
+                self._p2p_offer_t = 0.0
+                self._p2p_start()
+            return
+        if (self.role == "host" and self.peer_on and not pp.ok() and self.ws is not None and self.ws.alive
+                and now - self._p2p_offer_t > (1.0 if self._p2p_offers < 12 else 4.0)):
+            self._p2p_offer_t = now
+            self._p2p_offers += 1
+            self._send_ws({"t": "p2p", "k": self.p2p_key.hex(), "s": self.p2p_sid.hex(),
+                           "c": self._p2p_cands()})
+        path = "direct" if pp.ok() else "relay"
+        if path != self.path:
+            self.path = path
+            self.path_changed = True
+
+    def _send_ws(self, obj):
+        ws = self.ws
+        if ws is None or not ws.alive:
+            return False
+        data = b"J" + json.dumps(obj, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        self.bytes_out += len(data)
+        return ws.send(data)
+
+    def direct(self):
+        return self.p2p is not None and self.p2p.ok()
+
+    def peer_ok(self):
+        """Arkadaş ulaşılabilir mi (sunucu ya da doğrudan yol)."""
+        return self.peer_on or self.direct()
 
     def reconnect(self):
         """Kopan bağlantıyı aynı biletle yeniden kurmayı dener (arka planda)."""
@@ -43666,6 +44293,9 @@ class CoopLink:
                 pass
             self.ws = None
             ws.close()
+        if self.p2p is not None:
+            self.p2p.close()
+            self.p2p = None
         self.state = "closed"
         if code and key:
             def run():
@@ -43677,14 +44307,27 @@ class CoopLink:
 
     # ---- mesajlar ----
     def connected(self):
-        return self.ws is not None and self.ws.alive
+        return (self.ws is not None and self.ws.alive) or self.direct()
 
     def send(self, obj, stream=False):
+        """Mesaj: oyun akışı (görüntü, girdi) doğrudan yol açıksa oradan; komutlar sunucudan."""
         ws = self.ws
-        if ws is None or not ws.alive:
+        ws_ok = ws is not None and ws.alive
+        direct = self.direct()
+        t = obj.get("t") if isinstance(obj, dict) else None
+        if stream or t == "i":
+            via = "direct" if direct else "ws"
+        elif t in ("end", "bye"):
+            via = "both"
+        else:
+            via = "ws" if ws_ok else "direct"
+        if via == "ws" and not ws_ok or via == "direct" and not direct:
             return False
         raw = json.dumps(obj, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
         if stream:
+            if self._tx_stream_path != via:
+                self._tx_stream_path = via
+                self._comp = None           # yol değişti: akış yeni yolda baştan
             new = self._comp is None
             if new:
                 self._comp = _zlib.compressobj(6)
@@ -43698,15 +44341,26 @@ class CoopLink:
                 else:
                     head = b"Z" if last else b"z"
                 self.bytes_out += len(part) + 1
-                ok = ws.send(head + part) and ok
+                if via == "direct":
+                    ok = self.p2p.send(head + part) and ok
+                else:
+                    ok = ws.send(head + part) and ok
             if not ok:
                 self._comp = None        # yarım kalan akış: sonraki mesaj baştan
             return ok
         data = b"J" + raw
         self.bytes_out += len(data)
-        return ws.send(data)
+        ok = False
+        if via in ("direct", "both") and direct:
+            ok = self.p2p.send(data) or ok
+        if via in ("ws", "both") and ws_ok:
+            ok = ws.send(data) or ok
+        return ok
 
     def pending(self):
+        """Yolda bekleyen bayt (görüntülerin gittiği yolda)."""
+        if self.direct():
+            return self.p2p.pending()
         ws = self.ws
         return ws.pending() if ws is not None and ws.alive else 0
 
@@ -43726,16 +44380,27 @@ class CoopLink:
         self._comp = None
 
     def poll(self):
-        """Gelen mesajları çözer."""
+        """Gelen mesajları çözer (sunucu + doğrudan yol)."""
         out = []
+        items = []
         ws = self.ws
-        if ws is None:
-            return out
-        for _ in range(400):
-            try:
-                kind, data = ws.q.get_nowait()
-            except _queue.Empty:
-                break
+        if ws is not None:
+            for _ in range(400):
+                try:
+                    items.append(("ws",) + tuple(ws.q.get_nowait()))
+                except _queue.Empty:
+                    break
+        pp = self.p2p
+        if pp is not None:
+            for _ in range(400):
+                try:
+                    items.append(("p2p",) + tuple(pp.q.get_nowait()))
+                except _queue.Empty:
+                    break
+            items.sort(key=lambda it: it[3] if len(it) > 3 else 0.0)
+        for it in items:
+            src, kind, data = it[0], it[1], it[2]
+            rx = it[3] if len(it) > 3 else time.time()
             if kind == "closed":
                 if self.ws is ws:
                     self.lost_t = time.time()
@@ -43750,25 +44415,37 @@ class CoopLink:
                 if isinstance(msg, dict) and msg.get("t") == "srv":
                     ev = msg.get("ev")
                     if ev == "pong" and self._ping_sent:
-                        self.rtt_srv = max(0.0, min(9.0, time.time() - self._ping_sent))
+                        self.rtt_srv = max(0.0, min(9.0, rx - self._ping_sent))
                         self._ping_sent = 0.0
                         continue
                     if ev == "hello":
                         self.down_since = None
                         self.room_gone = False
+                        you = msg.get("you")
+                        if isinstance(you, str) and 7 <= len(you) <= 15 and you.count(".") == 3:
+                            self.my_ip = you
                     elif ev == "closed":
                         self.room_gone = True
                     out.append(("srv", msg))
                 continue
-            msg = self._decode(data)
+            msg = self._decode(data, src)
             if isinstance(msg, dict):
+                if msg.get("t") == "p2p":
+                    try:
+                        self._p2p_msg(msg)
+                    except Exception:
+                        pass
+                    continue
+                msg["_rx"] = rx
                 out.append(("msg", msg))
         return out
 
-    def _decode(self, data):
+    def _decode(self, data, src="ws"):
         if not data:
             return None
         head, body = data[:1], data[1:]
+        if head in (b"Z", b"z") and self._rx_src is not None and src != self._rx_src:
+            return None                  # eski yoldan geç kalmış akış parçası
         try:
             if head == b"J":
                 raw = body
@@ -43777,6 +44454,7 @@ class CoopLink:
                     self._dec = _zlib.decompressobj()
                     self._part = None
                     self.stream_bad = False
+                    self._rx_src = src
                 elif self._dec is None or self.stream_bad:
                     # akışın ortası: başı kaybolmuşsa çözülemez, tam görüntü
                     # beklenir
@@ -43893,6 +44571,17 @@ STRINGS.update({
     "coop.mate_left": _T("ARKADAŞIN AYRILDI", "YOUR MATE LEFT", "TU COMPAÑERO SE FUE", "DEIN MITSPIELER IST WEG",
                          "НАПАРНИК УШЁЛ"),
     "coop.ping": _T("PING {0} ms", "PING {0} ms", "PING {0} ms", "PING {0} ms", "ПИНГ {0} мс"),
+    "coop.path_direct": _T("doğrudan", "direct", "directa", "direkt", "напрямую"),
+    "coop.link_direct": _T("Bağlantı: DOĞRUDAN · {0} ms", "Connection: DIRECT · {0} ms",
+                           "Conexión: DIRECTA · {0} ms", "Verbindung: DIREKT · {0} ms",
+                           "Связь: НАПРЯМУЮ · {0} мс"),
+    "coop.link_relay": _T("Bağlantı: sunucu üstünden · ~{0} ms", "Connection: via server · ~{0} ms",
+                          "Conexión: vía servidor · ~{0} ms", "Verbindung: über Server · ~{0} ms",
+                          "Связь: через сервер · ~{0} мс"),
+    "coop.link_try": _T("Doğrudan bağlantı deneniyor...", "Trying a direct connection...",
+                        "Probando conexión directa...", "Direkte Verbindung wird versucht...",
+                        "Пробуем прямое соединение..."),
+    "coop.path_relay": _T("sunucu üstünden", "via server", "vía servidor", "über Server", "через сервер"),
     "coop.resync": _T("eşitleniyor…", "syncing…", "sincronizando…", "synchronisiere…", "синхронизация…"),
     "coop.lost": _T("Bağlantı koptu.", "Connection lost.", "Conexión perdida.", "Verbindung verloren.",
                     "Связь потеряна."),
@@ -45277,7 +45966,7 @@ class GuestRun(CoopRunState):
 
     def _snap_clock(self, snap):
         """Görüntünün ev sahibi zamanı + saat farkı / titreşim tahmini."""
-        now = time.time()
+        now = snap.get("_rx") if type(snap.get("_rx")) is float else time.time()
         ht = snap.get("ht")
         if type(ht) in (int, float) and math.isfinite(ht):
             ht = float(ht)
@@ -53969,6 +54658,14 @@ class CoopSession:
         """Bağlantı koptuysa aynı biletle yeniden dener (COOP_RECONNECT_FOR sn)."""
         lk = self.link
         lk.ping_tick(dt)
+        try:
+            lk.p2p_tick(dt)
+        except Exception:
+            pass
+        if lk.path_changed:
+            lk.path_changed = False
+            if self.phase == "play" and self.role == "host":
+                self._host_resync()          # görüntü akışı yeni yolda baştan
         if lk.closed_by_user or not lk.key or lk.room_gone:
             return
         if not lk.connected() and lk.state != "busy":
@@ -54102,6 +54799,7 @@ class CoopSession:
             self._guest_tick(dt, local_inp or {}, menu)
         # HUD için (alt çizgili: anlık görüntüyle karşıya taşınmaz)
         run._net_ping = self.ping_ms() if self.link.connected() else -1
+        run._net_direct = self.link.direct()
         run._net_sync = bool(getattr(self, "need_kf", False)) and self.role != "host"
 
     def _host_resync(self):
@@ -54135,7 +54833,7 @@ class CoopSession:
                 self._guest_gone()
         # konuk 30 sn'den uzun süredir yoksa: ayrıldı say (ev sahibi tek devam
         # eder)
-        if (not self.link.peer_on and self.peer_lost_t is not None
+        if (not self.link.peer_ok() and self.peer_lost_t is not None
                 and time.time() - self.peer_lost_t > COOP_RECONNECT_FOR + 10):
             self._guest_gone()
         g = dict(self.guest_in)
@@ -54143,15 +54841,15 @@ class CoopSession:
         for k, name in (("dc", "dash_pressed"), ("bc", "bonk_pressed"), ("uc", "use_pressed")):
             g[name] = bool(g.pop("_" + k, False))
             self.guest_in.pop("_" + k, None)
-        if not self.link.peer_on:
+        if not self.link.peer_ok():
             g = {"aim_x": run.players[1].x, "aim_y": run.players[1].y - 1}
         run.menu_open[0] = bool(menu)
-        run.menu_open[1] = bool(self.guest_in.get("menu")) and self.link.peer_on
+        run.menu_open[1] = bool(self.guest_in.get("menu")) and self.link.peer_ok()
         run.update(dt, [inp0, g])
         # anlık görüntü - akış denetimi: konuğun onayladığı son görüntüden bu
         # yana yoldaki görüntü sayısı sınırlı.
         self.snap_t -= dt
-        if self.snap_t <= 0 and self.link.connected() and self.link.peer_on:
+        if self.snap_t <= 0 and self.link.connected() and self.link.peer_ok():
             seq = self.sync.seq
             inflight = seq - getattr(self, "g_ack", 0)
             lim = int(getattr(self, "cc_lim", 6.0))
@@ -54179,7 +54877,7 @@ class CoopSession:
                 del run.fx.log[:-300]
             if _SFX_TAP[0] is not None and len(_SFX_TAP[0]) > 60:
                 del _SFX_TAP[0][:-20]
-        elif not self.link.peer_on:
+        elif not self.link.peer_ok():
             run.fx.log = []
             _SFX_TAP[0] = []
         if run.game_over and self.phase == "play":
@@ -54231,7 +54929,8 @@ class CoopSession:
                 self.g_ack = sa
         e = m.get("e")
         if isinstance(e, list) and len(e) == 2 and all(type(x) in (int, float) for x in e):
-            smp = time.time() - float(e[0]) - float(e[1]) / 1000.0
+            rx = m.get("_rx") if type(m.get("_rx")) is float else time.time()
+            smp = rx - float(e[0]) - float(e[1]) / 1000.0
             if 0.0 <= smp < 10.0:
                 r0 = getattr(self, "rtt", 0.0)
                 self.rtt = smp if r0 <= 0 else r0 * 0.85 + smp * 0.15
@@ -54303,7 +55002,7 @@ class CoopSession:
                 self.last_n = n
                 ht = msg.get("ht")
                 if type(ht) in (int, float):
-                    self.last_ht = (float(ht), time.time())
+                    self.last_ht = (float(ht), msg.get("_rx") or time.time())
                 rt = msg.get("rt")
                 if isinstance(rt, int) and 0 <= rt < 10000:
                     self.rtt = rt / 1000.0
@@ -54336,7 +55035,7 @@ class CoopSession:
             run.pending_cmds.pop(0)
         self.in_t -= dt
         if self.in_t <= 0 and self.link.connected():
-            self.in_t = 1.0 / COOP_INPUT_HZ
+            self.in_t = 1.0 / (COOP_INPUT_HZ if self.link.direct() else COOP_INPUT_HZ_RELAY)
             me = run.player
             mx = inp.get("right", 0) - inp.get("left", 0)
             my = inp.get("down", 0) - inp.get("up", 0)
@@ -54524,6 +55223,7 @@ def _app_update_coop_lobby(self, dt, mouse_pos, clicked):
             draw_text(canvas, L("coop.code_hint") if co.role == "host" else L("coop.joined_room"),
                       (code_r.centerx, code_r.bottom - 22), 11, TEXT_DIM, center=True, shadow=False)
             me_host = co.role == "host"
+            _draw_coop_link_line(canvas, lk, cx, 118)
             my_name = lk.host_name if me_host else lk.guest_name
             hn, hs = (my_name, co.my_skin()) if me_host else (co.peer.get("name", lk.host_name),
                                                                co.peer.get("skin"))
@@ -54753,6 +55453,22 @@ def _app_update_coop_end(self, dt, mouse_pos, clicked):
         co.lobby_tick(dt)
 
 
+def _draw_coop_link_line(canvas, lk, cx, y):
+    """Lobide bağlantı türü + gecikme (oyuna girmeden görülsün)."""
+    if not lk.peer_ok():
+        return
+    pp = lk.p2p
+    if lk.direct():
+        ms = int((pp.rtt or pp.peer_rtt) * 1000)
+        draw_text(canvas, L("coop.link_direct", max(1, ms)), (cx, y), 14, GREEN, bold=True, center=True)
+    elif pp is not None and time.time() < pp.punch_until:
+        draw_text(canvas, L("coop.link_try"), (cx, y), 14, CYAN, bold=True, center=True)
+    elif lk.rtt_srv > 0:
+        ms = int(lk.rtt_srv * 2000)
+        draw_text(canvas, L("coop.link_relay", ms), (cx, y), 14, GOLD if ms < 150 else ORANGE, bold=True,
+                  center=True)
+
+
 def _draw_coop_overlay(canvas, run, co, t):
     """Oyun içi 2 kişilik bilgileri: bağlantı durumu, izleme, takım skoru."""
     if co is None:
@@ -54763,7 +55479,7 @@ def _draw_coop_overlay(canvas, run, co, t):
                   center=True)
     if not co.link.connected():
         draw_text(canvas, L("coop.reconnecting"), (cx, 150), 18, ORANGE, bold=True, center=True)
-    elif not co.link.peer_on:
+    elif not co.link.peer_ok():
         draw_text(canvas, L("coop.peer_lost"), (cx, 150), 18, ORANGE, bold=True, center=True)
     elif run.is_guest and not run.got_first:
         draw_text(canvas, L("coop.connecting"), (cx, 150), 18, CYAN, bold=True, center=True)
@@ -54861,7 +55577,9 @@ def draw_coop_hud(surf, run, t):
         draw_text(surf, L("coop.reconnecting"), (r.right - 14, r.y - 20), 12, RED, bold=True, right=True)
     elif pg:
         col = GREEN if pg < 150 else (GOLD if pg < 300 else RED)
-        draw_text(surf, L("coop.ping", int(pg)), (r.right - 14, r.y - 20), 12, col, bold=True, right=True)
+        via = L("coop.path_direct") if getattr(run, "_net_direct", False) else L("coop.path_relay")
+        draw_text(surf, "%s  ·  %s" % (L("coop.ping", int(pg)), via), (r.right - 14, r.y - 20), 12, col,
+                  bold=True, right=True)
 
 
 App.open_coop = _app_open_coop

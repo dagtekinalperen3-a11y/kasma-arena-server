@@ -3,6 +3,15 @@
 Kısa notlar, en yenisi üstte.
 
 ## sıradaki sürüm
+- 2 KİŞİLİK GECİKME: iki oyun artık birbirine DOĞRUDAN bağlanmayı dener (UDP,
+  NAT delik açma, IPv6). Kurulursa mesajlar sunucuya uğramaz: aynı şehirde
+  ~130 ms yerine ~20-40 ms. Kurulamazsa sunucu yolundan devam eder; doğrudan
+  yol koparsa sunucuya geçer, düzelince kendiliğinden geri döner. Lobide ve
+  oyunda bağlantı türü yazıyor
+- 2 kişilik: görüntü 15 -> 30 Hz, konuk girdisi 30 -> 60 Hz, çizim gecikme
+  tamponu yarıya indi (yaratıklar daha güncel görünür)
+- açılıştaki takılma: sesler ilk açılışta bir kez üretilip diske yazılıyor,
+  sonraki açılışlar anında; üretim sırasında menü artık donmuyor
 - OYUN 2 KAT UZUN: 25 dalga normal 70 dk, zor 60, kabus 40. Yaratık başına
   tecrübe/altın ve skor yarıya indi: dalga başına güçlenme ve sıralama aynı
 - DENGE: oyuncu bir dalga için olağandan güçlüyse yeni yaratıklar daha canlı

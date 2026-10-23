@@ -3083,8 +3083,9 @@ COOP_IDLE = 45.0              # bu kadar sessizlikte oda kapanır
 COOP_RECONNECT = 25.0         # kopan oyuncunun geri dönme payı
 COOP_MAX_AGE = 3 * 3600.0
 COOP_MSG_MAX = {"host": 96 * 1024, "guest": 4 * 1024}
-COOP_BUCKET = {"host": (120.0, 400.0, 768 * 1024.0, 2048 * 1024.0),
-               "guest": (70.0, 140.0, 32 * 1024.0, 64 * 1024.0)}
+# konuk saniyede 45-60 girdi yollar (gecikme düşsün diye); sınır buna göre
+COOP_BUCKET = {"host": (160.0, 480.0, 768 * 1024.0, 2048 * 1024.0),
+               "guest": (150.0, 300.0, 64 * 1024.0, 128 * 1024.0)}
 COOP_VER_RE = _re.compile(r"^[0-9][0-9.]{0,9}$")
 
 _COOP_ROOMS = {}
@@ -3361,9 +3362,12 @@ if _coop_sock is not None:
                 room["last"] = time.time()
                 if role == "host":
                     room["host_seen"] = True
+                # "you": oyuncunun dış ip'si. İki oyun birbirine doğrudan
+                # bağlanmayı denerken (UDP delik açma) yedek aday olur.
                 hello = {"role": role, "code": code, "host": room["host_name"],
                          "guest": room.get("guest_name") or "",
-                         "peer": room.get(other + "_ws") is not None}
+                         "peer": room.get(other + "_ws") is not None,
+                         "you": _client_ip()}
                 peer = room.get(other + "_ws")
         if room is None:
             time.sleep(0.5)                    # bilet deneme hızını keser
