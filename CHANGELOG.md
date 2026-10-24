@@ -3,6 +3,18 @@
 Kısa notlar, en yenisi üstte.
 
 ## sıradaki sürüm
+- v3.49: 2 kişilikte iki oyuncu da aynı sürümü kullanmalı (eski dosyayla oda
+  kurulunca konuğun kartları ev sahibinin kaydından çıkıyordu)
+- ana menünün altında ARKADAŞLAR şeridi: kim çevrimiçi, istekleri kabul /
+  reddet, tek tıkla yaz ya da 2 kişiliğe çağır, TÜMÜ ile arkadaşlar ekranı
+- açılmamış silah hiçbir yerden gelmez (raf, elinde verecek silah yoksa artık
+  bütün silahları değil altın verir)
+- 2 kişilik:
+  - aynı silah iki oyuncuda olmaz: biri kırbaç aldıysa öbürüne kırbaç seviye
+    elinde, sandıkta, efsanevi elde, rafta çıkmaz; açık elinde varsa el
+    kendiliğinden yenilenir
+  - ikiniz de ESC'ye basarsanız oyun durur (arkadaş düşmüşse ya da koptuysa
+    tek başına ESC yeter); biri moladaysa öbürüne üstte yazar
 - ARKADAŞLAR (ana menüde yeni düğme): kullanıcı adıyla ekle, isteği kabul et /
   reddet, sil; kim çevrimiçi, menüde mi oyunda mı 2 kişilikte mi görünür;
   arkadaşınla yazışma; profil (en iyi skor, dalga, öldürme, koşu, patron,

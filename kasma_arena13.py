@@ -640,7 +640,7 @@ WEAPON_FX_LEGACY = {"full": 100, "dim": 32, "off": 0}
 # oyunun adı EvolveArena (E ve A büyük). (Kayıt klasörü "KasmaArena" olarak
 # kalıyor: adı değiştirmek oyuncuların ilerlemesini kaybettirirdi)
 GAME_TITLE = "EvolveArena"
-GAME_VERSION = "3.48"
+GAME_VERSION = "3.49"
 
 
 # ---- dil sistemi ----
@@ -26849,23 +26849,10 @@ class WorldExtrasMixin:
         return out
 
     def _rack_offers(self):
+        # yalnızca açılmış silahlar (açılmamış silah rafta da çıkmaz; verecek
+        # kart yoksa find_hand altın verir)
         offers, _ = self.levelup_pool()
         offers = [o for o in offers if o["kind"] == "weapon"]
-        if not offers:
-            # henüz silahı açılmamış oyuncu: raf boş kalmasın, bütün silahlar
-            # (bu koşu için) teklif edilir
-            p = self.player
-            room = len(p.weapons) < slot_max(p, 'w')
-            muted = set((self.save.data.get("weapons_muted") or []))
-            for w in BOSS_WEAPONS:
-                k = w["key"]
-                if k in muted:
-                    continue
-                if k in p.weapons:
-                    if p.weapons[k] < weapon_max_level(w):
-                        offers.append(self._weapon_offer(w, p.weapons[k] + 1, False))
-                elif room:
-                    offers.append(self._weapon_offer(w, 1, True))
         tier = RARITY_COUNT - 2
         out = []
         for o in offers:
@@ -45280,9 +45267,18 @@ STRINGS.update({
     "coop.room_closed": _T("Oda kapandı.", "The room was closed.", "La sala se cerró.", "Raum geschlossen.",
                            "Комната закрыта."),
     "coop.pause": _T("2 KİŞİLİK - MOLA", "2 PLAYERS - PAUSE", "PAUSA", "PAUSE", "ПАУЗА"),
-    "coop.pause_hint": _T("Oyun durmaz, arkadaşın oynamaya devam ediyor.",
-                          "The game does not stop - your friend keeps playing.",
-                          "El juego NO se detiene.", "Das Spiel läuft weiter.", "Игра НЕ останавливается."),
+    "coop.paused_all": _T("İkiniz de moladasınız: oyun durdu.", "You are both paused: the game is stopped.",
+                          "Ambos en pausa: juego detenido.", "Beide pausiert: Spiel angehalten.",
+                          "Вы оба на паузе: игра остановлена."),
+    "coop.mate_paused": _T("{0} molada - sen de ESC'ye basarsan oyun durur",
+                           "{0} paused - press ESC too to stop the game",
+                           "{0} en pausa - pulsa ESC para detener", "{0} pausiert - drück auch ESC zum Anhalten",
+                           "{0} на паузе - нажми ESC, чтобы остановить игру"),
+    "coop.pause_hint": _T("Arkadaşın da ESC'ye basarsa oyun durur; o zamana kadar akıyor.",
+                          "If your friend presses ESC too, the game stops; until then it keeps going.",
+                          "Si tu amigo también pulsa ESC, el juego se detiene.",
+                          "Drückt dein Freund auch ESC, hält das Spiel an.",
+                          "Если друг тоже нажмёт ESC, игра остановится."),
     "coop.quit": _T("ODADAN ÇIK", "LEAVE ROOM", "SALIR", "VERLASSEN", "ВЫЙТИ"),
     "coop.end": _T("OYUN BİTTİ", "GAME OVER", "FIN", "SPIELENDE", "ИГРА ОКОНЧЕНА"),
     "coop.end_sub": _T("Dalga {0}, {1}, {2}", "Wave {0}, {1}, {2}", "Oleada {0}, {1}, {2}",
@@ -45583,6 +45579,41 @@ class CoopRunState(RunState):
                 q.max_hp = max(30, int(q.max_hp) - loss)
                 q.hp = min(q.hp, q.max_hp)
                 self.fx.popup(q.x, q.y - 70, f"-{loss} " + L("cu.maxhp"), CURSE_RED, 20, life=1.6)
+
+    # ---- aynı silah iki oyuncuda olmaz ----
+    def partner_weapons(self):
+        """Şu an işlenen oyuncunun arkadaşlarının silahları."""
+        out = set()
+        for j, q in enumerate(self.players):
+            if j != self.cur and q is not None:
+                out.update(q.weapons)
+        return out
+
+    def levelup_pool(self):
+        # seviye eli, sandık / efsanevi el, raf: hepsi bu havuzdan çeker
+        offers, weights = RunState.levelup_pool(self)
+        taken = self.partner_weapons()
+        if not taken:
+            return offers, weights
+        keep = [(o, w) for o, w in zip(offers, weights)
+                if not (o["kind"] == "weapon" and o["key"] not in self.player.weapons and o["key"] in taken)]
+        return [o for o, _w in keep], [w for _o, w in keep]
+
+    def _hand_has_taken(self):
+        taken = self.partner_weapons()
+        return any(c.get("kind") == "weapon" and c.get("key") in taken and c.get("key") not in self.player.weapons
+                   for c in (self.levelup_choices or ()))
+
+    def choose_levelup(self, idx):
+        # arkadaş aynı silahı bir an önce aldıysa: el yenilenir, seviye yanmaz
+        if self._hand_has_taken():
+            ch = self.levelup_choices[idx] if 0 <= idx < len(self.levelup_choices) else None
+            if ch is not None and ch.get("kind") == "weapon" and ch.get("key") in self.partner_weapons():
+                p = self.player
+                self.fx.popup(p.x, p.y - 80, L("coop.w_taken", w_name(ch["w"])), ORANGE, 16, life=1.8)
+                self.start_levelup_choice()
+                return
+        return RunState.choose_levelup(self, idx)
 
     # mıknatıs: kim alırsa alsın haritadaki altın ve tecrübe ikiye eşit bölünür
     # (çekilen her parça toplayana yarım, arkadaşa yarım yazılır)
@@ -45912,6 +45943,10 @@ class CoopRunState(RunState):
             self._ctx_use(i)
             self._skill_tick(dt)
             self.combo.update(dt)
+            if self.levelup_choices and self._hand_has_taken():
+                self.start_levelup_choice()
+                if not self.levelup_choices:
+                    self.pending_levelups = 0
             if i != 0 and self.player.alive and self.pending_levelups > 0 and not self.levelup_choices:
                 self.start_levelup_choice()
                 if not self.levelup_choices:
@@ -49631,6 +49666,10 @@ class App:
             self._coop_overlay_tick(dt)       # 2 kişilik: oyun durmaz
             if self.state == STATE_COOP_END:
                 return
+        if not self.run.levelup_choices:
+            # el boşaldı (2 kişilikte arkadaş son silahı aldı vb.): ekranda kilitlenme
+            self.state = STATE_PLAY
+            return
         canvas = self.display.canvas
         self._draw_run_frame(canvas)
         self.levelup_ui.rebuild(self.run.levelup_choices)
@@ -50796,6 +50835,8 @@ class App:
                 g = b.anim * 4
                 self.xmas.draw_cap(canvas, b.rect.inflate(g, g), seed=i)
         self._draw_event_snowman(canvas, mouse_pos, clicked)
+        if not MOBILE:
+            self._menu_friends_dock(canvas, mouse_pos, clicked)
 
         # Tuşlar zaten nasıl oynanır'da; sürüm ve bağlantı durumu yalnızca sol
         # altta, göze batmayan tek bir satırda duruyor.
@@ -56635,8 +56676,9 @@ class CoopSession:
         _coop_gc_settle()
 
     # ---- oyun ----
-    def tick(self, dt, local_inp, menu=False):
+    def tick(self, dt, local_inp, menu=False, pause=False):
         """Her karede: ağ + (ev sahibinde) simülasyon / (konukta) görüntü."""
+        self.my_pause = bool(pause)
         self._keepalive(dt)
         run = self.run
         if run is None:
@@ -56693,7 +56735,17 @@ class CoopSession:
             g = {"aim_x": run.players[1].x, "aim_y": run.players[1].y - 1}
         run.menu_open[0] = bool(menu)
         run.menu_open[1] = bool(self.guest_in.get("menu")) and self.link.peer_ok()
-        run.update(dt, [inp0, g])
+        # ikisi de moladaysa (ESC) oyun durur. Düşmüş ya da kopmuş oyuncu
+        # beklenmez: tek başına kalan ESC'ye basınca durur.
+        peer = self.link.peer_ok()
+        hp_ = bool(getattr(self, "my_pause", False))
+        gp_ = bool(self.guest_in.get("pz")) and peer
+        h_ok = hp_ or not run.players[0].alive
+        g_ok = gp_ or not run.players[1].alive or not peer
+        run.pause_who = [1 if hp_ else 0, 1 if gp_ else 0]
+        run.paused_all = bool((hp_ or gp_) and h_ok and g_ok)
+        if not run.paused_all:
+            run.update(dt, [inp0, g])
         # anlık görüntü - akış denetimi: konuğun onayladığı son görüntüden bu
         # yana yoldaki görüntü sayısı sınırlı.
         self.snap_t -= dt
@@ -56794,7 +56846,7 @@ class CoopSession:
         g = {"left": 1.0 if mx < -0.3 else 0.0, "right": 1.0 if mx > 0.3 else 0.0,
              "up": 1.0 if my < -0.3 else 0.0, "down": 1.0 if my > 0.3 else 0.0,
              "mouse_down": bool(m.get("f")), "aim_x": ax, "aim_y": ay,
-             "menu": bool(m.get("menu"))}
+             "menu": bool(m.get("menu")), "pz": bool(m.get("pz"))}
         pos = m.get("p")
         if isinstance(pos, list) and len(pos) == 3 and isinstance(pos[2], int):
             g["pos"] = [_coop_num(pos[0], -1e5, 1e5, p.x), _coop_num(pos[1], -1e5, 1e5, p.y), pos[2]]
@@ -56909,7 +56961,8 @@ class CoopSession:
                    "a": [_coop_q(inp.get("aim_x", me.x)), _coop_q(inp.get("aim_y", me.y))],
                    "p": [_coop_q(me.x), _coop_q(me.y), int(run.my_tp)],
                    "dc": self.my_cnt["dc"], "bc": self.my_cnt["bc"], "uc": self.my_cnt["uc"],
-                   "menu": 1 if menu else 0, "sa": int(getattr(self, "last_n", 0))}
+                   "menu": 1 if menu else 0, "pz": 1 if getattr(self, "my_pause", False) else 0,
+                   "sa": int(getattr(self, "last_n", 0))}
             lh = getattr(self, "last_ht", None)
             if lh:
                 msg["e"] = [lh[0], int((time.time() - lh[1]) * 1000)]
@@ -57310,7 +57363,7 @@ def _app_update_coop_pause(self, dt, mouse_pos, clicked):
         self.state = STATE_MENU
         return
     run = self.run
-    co.tick(dt, {"aim_x": run.player.x, "aim_y": run.player.y - 1}, menu=True)   # duraklatma da korur
+    co.tick(dt, {"aim_x": run.player.x, "aim_y": run.player.y - 1}, menu=True, pause=True)
     if co.phase == "end":
         self.state = STATE_COOP_END
         return
@@ -57323,7 +57376,11 @@ def _app_update_coop_pause(self, dt, mouse_pos, clicked):
     pr.center = (VIRTUAL_W / 2, VIRTUAL_H / 2)
     panel(canvas, pr, alpha=246)
     draw_text(canvas, L("coop.pause"), (pr.centerx, pr.y + 36), 26, GOLD, bold=True, center=True)
-    draw_text(canvas, L("coop.pause_hint"), (pr.centerx, pr.y + 72), 13, TEXT_DIM, center=True, shadow=False)
+    if getattr(run, "paused_all", False):
+        draw_text(canvas, L("coop.paused_all"), (pr.centerx, pr.y + 72), 14, GREEN, bold=True, center=True,
+                  shadow=False)
+    else:
+        draw_text(canvas, L("coop.pause_hint"), (pr.centerx, pr.y + 72), 13, TEXT_DIM, center=True, shadow=False)
 
     def _quit():
         co.leave()
@@ -57464,6 +57521,12 @@ def _draw_coop_overlay(canvas, run, co, t):
     if co is None:
         return
     cx = VIRTUAL_W / 2
+    pw = getattr(run, "pause_who", None)
+    mate = 0 if run.is_guest else 1
+    if isinstance(pw, (list, tuple)) and len(pw) == 2 and pw[mate] and not pw[1 - mate]:
+        nm = run.names[mate] if mate < len(run.names) else "?"
+        draw_text(canvas, L("coop.mate_paused", nm or "?"), (cx, 124), 15, (200, 220, 255), bold=True,
+                  center=True)
     if not run.player.alive:
         draw_text(canvas, L("coop.spectate"), (cx, VIRTUAL_H - 150), 22, (255, 150, 150), bold=True,
                   center=True)
@@ -57765,6 +57828,10 @@ STRINGS.update({
                  "Hinzufügen, chatten, Profile ansehen, zu 2 Spielern einladen.",
                  "Добавляй, переписывайся, смотри профили, зови в игру вдвоём."),
     "fr.menu_btn": _T("ARKADAŞLAR", "FRIENDS", "AMIGOS", "FREUNDE", "ДРУЗЬЯ"),
+    "fr.unread_n": _T("{0} yeni mesaj", "{0} new msg", "{0} mensajes", "{0} neue", "{0} новых"),
+    "fr.req_short": _T("seni eklemek istiyor", "wants to add you", "quiere añadirte", "will dich adden",
+                       "хочет добавить"),
+    "fr.all": _T("TÜMÜ »", "ALL »", "TODOS »", "ALLE »", "ВСЕ »"),
     "fr.coop_btn": _T("2 KİŞİLİK", "2 PLAYERS", "2 JUGADORES", "2 SPIELER", "ВДВОЁМ"),
     "fr.add_hint": _T("kullanıcı adı yaz...", "type a username...", "escribe un usuario...",
                       "Benutzernamen eingeben...", "введи имя игрока..."),
@@ -57870,6 +57937,9 @@ STRINGS.update({
                     "Espalda con espalda. ¡Subid juntos al ranking a 2!",
                     "Rücken an Rücken. Steigt zusammen in der Duo-Rangliste auf!",
                     "Спина к спине. Поднимайтесь в рейтинге дуэтов вместе!"),
+    "coop.w_taken": _T("{0} arkadaşında var, el yenilendi", "Your friend has {0} - new hand",
+                       "Tu amigo tiene {0}: mano nueva", "Dein Freund hat {0} - neue Hand",
+                       "{0} уже у друга - новая рука"),
     "coop.mag_split": _T("ganimet ikinize bölünüyor", "loot is split between you", "el botín se reparte",
                          "Beute wird geteilt", "добыча делится поровну"),
     "coop.say_hint": _T("L: arkadaşına yaz", "L: chat with your friend", "L: chatear", "L: chatten",
@@ -57880,6 +57950,14 @@ STRINGS.update({
 def _draw_tick(surf, r, col=WHITE):
     cx, cy = r.center
     pygame.draw.lines(surf, col, False, [(cx - 7, cy), (cx - 2, cy + 5), (cx + 7, cy - 6)], 3)
+
+
+def _draw_bubble(surf, cx, cy, col=WHITE):
+    """Küçük konuşma balonu (yaz düğmesi)."""
+    br = pygame.Rect(0, 0, 18, 13)
+    br.center = (int(cx), int(cy) - 2)
+    pygame.draw.rect(surf, col, br, 2, border_radius=5)
+    pygame.draw.polygon(surf, col, [(br.x + 4, br.bottom - 1), (br.x + 4, br.bottom + 5), (br.x + 9, br.bottom - 1)])
 
 
 def _draw_cross(surf, r, col=WHITE):
@@ -58906,7 +58984,118 @@ def _app_coop_call_panel(self, canvas, R, mouse_pos, clicked, t):
         self.open_friends(STATE_COOP_LOBBY)
 
 
+def _app_menu_friends_dock(self, canvas, mouse_pos, clicked):
+    """Ana menünün altında arkadaş şeridi: kim çevrimiçi, tek tıkla yaz / çağır, istekler."""
+    so = self.social
+    R = pygame.Rect(250, 598, 810, 86)
+    panel(canvas, R, bg=(30, 24, 34), edge=(130, 116, 190), alpha=236, radius=14, edge_w=2)
+    on = [f for f in so.friends if f.get("online")]
+    draw_icon(canvas, R.x + 26, R.y + 24, "heart", (200, 170, 255), 9)
+    draw_text(canvas, L("fr.title"), (R.x + 42, R.y + 14), 15, (220, 206, 255), bold=True, shadow=False)
+    hit = None
+    if not self.account.logged_in() or not so.base:
+        draw_text(canvas, L("fr.need_login"), (R.x + 18, R.y + 48), 13, TEXT_DIM, shadow=False)
+        br = pygame.Rect(R.right - 170, R.y + 22, 154, 42)
+        hit = (br, lambda: self.goto(STATE_LOGIN), L("coop.login_b"), (70, 96, 150))
+        chips = []
+    else:
+        draw_text(canvas, "%d / %d  %s" % (len(on), len(so.friends), L("fr.online").lower()),
+                  (R.x + 18, R.y + 40), 12, GREEN if on else TEXT_DIM, shadow=False)
+        if so.unread:
+            draw_text(canvas, L("fr.unread_n", so.unread), (R.x + 18, R.y + 58), 11, (255, 170, 170), bold=True,
+                      shadow=False)
+        chips = [("req", nm) for nm in so.incoming[:2]] + [("fr", f) for f in (on + [f for f in so.friends
+                                                                                    if not f.get("online")])]
+        br = pygame.Rect(R.right - 132, R.y + 22, 116, 42)
+        hit = (br, lambda: self.open_friends(STATE_MENU), L("fr.all"), (84, 70, 130))
+    x = R.x + 138
+    for kind, it in chips:
+        if kind == "req":
+            nm = it
+            w = max(164, min(220, text_width(nm, 13, True) + 100))
+        else:
+            nm = str(it.get("name") or "")
+            w = max(170, min(210, text_width(nm, 14, True) + 100))
+        cr = pygame.Rect(x, R.y + 12, w, R.h - 24)
+        if cr.right > R.right - 140:
+            break
+        if kind == "req":
+            pygame.draw.rect(canvas, (56, 46, 30), cr, border_radius=10)
+            ink_frame(canvas, cr, GOLD, 10, 1)
+            draw_text(canvas, _fit_text(nm, 13, w - 96, bold=True), (cr.x + 10, cr.y + 8), 13, (255, 230, 170),
+                      bold=True, shadow=False)
+            draw_text(canvas, _fit_text(L("fr.req_short"), 10, w - 92), (cr.x + 10, cr.y + 30), 10, (200, 180, 130),
+                      shadow=False)
+            for k_, (fn, col, acc_) in enumerate(((_draw_tick, (60, 140, 90), True),
+                                                  (_draw_cross, (150, 60, 60), False))):
+                bb = pygame.Rect(cr.right - 80 + k_ * 38, cr.y + 12, 32, cr.h - 24)
+                hov = bb.collidepoint(mouse_pos)
+                pygame.draw.rect(canvas, lighten(col, 0.25) if hov else col, bb, border_radius=8)
+                fn(canvas, bb)
+                if clicked and hov:
+                    so.respond(nm, acc_)
+                    sfx("click", 0.7, 0.0)
+                    return True
+        else:
+            online = bool(it.get("online"))
+            hov_c = cr.collidepoint(mouse_pos)
+            pygame.draw.rect(canvas, (50, 42, 62) if hov_c else (40, 33, 46), cr, border_radius=10)
+            ink_frame(canvas, cr, (120, 110, 170) if online else (70, 64, 84), 10, 1)
+            circle_aa(canvas, cr.x + 14, cr.y + 17, 5, GREEN if online else (90, 90, 100))
+            draw_text(canvas, _fit_text(nm, 14, w - 100, bold=True), (cr.x + 26, cr.y + 8), 14,
+                      TEXT if online else TEXT_DIM, bold=True, shadow=False)
+            st = social_status_text(it.get("status")) if online else L("fr.offline")
+            draw_text(canvas, _fit_text(st, 10, w - 100), (cr.x + 26, cr.y + 30), 10,
+                      GREEN if online else (120, 116, 130), shadow=False)
+            un = int(it.get("unread") or 0)
+            # yaz / çağır
+            bw = 34
+            b1 = pygame.Rect(cr.right - 2 * bw - 12, cr.y + 12, bw, cr.h - 24)
+            b2 = pygame.Rect(cr.right - bw - 6, cr.y + 12, bw, cr.h - 24)
+            can_inv = online and coop_available()
+            for bb, ic, col, ok in ((b1, "chat", (70, 90, 150), True), (b2, "star", (60, 120, 90), can_inv)):
+                hov = ok and bb.collidepoint(mouse_pos)
+                pygame.draw.rect(canvas, lighten(col, 0.25) if hov else (col if ok else (60, 54, 62)), bb,
+                                 border_radius=8)
+                ic_col = WHITE if ok else (120, 116, 126)
+                if ic == "chat":
+                    _draw_bubble(canvas, bb.centerx, bb.centery, ic_col)
+                else:
+                    draw_icon(canvas, bb.centerx, bb.centery, ic, ic_col, 7)
+                if hov:
+                    tip = L("fr.send") if bb is b1 else L("fr.call_b")
+                    draw_text(canvas, tip, (bb.centerx, cr.y - 10), 10, WHITE, bold=True, center=True)
+                if clicked and hov:
+                    sfx("click", 0.7, 0.0)
+                    if bb is b1:
+                        self.open_friends(STATE_MENU)
+                        so.open_chat(nm)
+                        self.fr_focus = "chat"
+                    else:
+                        so.invite(nm)
+                    return True
+            if un:
+                circle_aa(canvas, cr.right - 4, cr.y + 4, 9, (210, 60, 70))
+                draw_text(canvas, str(min(9, un)), (cr.right - 4, cr.y + 4), 10, WHITE, bold=True, center=True,
+                          shadow=False)
+        x = cr.right + 6
+    if so.ok() and not chips:
+        draw_text(canvas, _fit_text(L("fr.none"), 12, R.w - 330), (R.x + 150, R.y + 34), 12, TEXT_DIM, shadow=False)
+    if hit is not None:
+        br, fn, txt, col = hit
+        hov = br.collidepoint(mouse_pos)
+        pygame.draw.rect(canvas, lighten(col, 0.25) if hov else col, br, border_radius=10)
+        ink_frame(canvas, br, lighten(col, 0.4), 10, 1)
+        draw_text(canvas, txt, br.center, 14, WHITE, bold=True, center=True, shadow=False)
+        if clicked and hov:
+            sfx("click", 0.7, 0.0)
+            fn()
+            return True
+    return False
+
+
 App.open_friends = _app_open_friends
+App._menu_friends_dock = _app_menu_friends_dock
 App.handle_friends_key = _app_friends_key
 App.update_friends = _app_update_friends
 App._coop_board = _app_coop_board
