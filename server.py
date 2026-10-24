@@ -421,6 +421,11 @@ def diag():
         "player_events": ["account_id", "at", "kind", "delta", "total", "note"],
         "scores": ["name", "score", "kills", "wave", "run_time", "created_at",
                    "account_id", "skin", "details"],      # supabase_leaderboard.sql
+        # arkadaşlar / mesajlar / 2 kişilik sıralama - VERITABANI_SOSYAL.sql
+        "friends": ["id", "a", "b", "status", "created_at"],
+        "messages": ["id", "sender", "receiver", "kind", "body", "created_at", "read_at"],
+        "coop_scores": ["id", "pair_key", "account_a", "account_b", "name_a", "name_b", "score",
+                        "kills", "wave", "run_time", "diff", "details", "created_at"],
         # gerçek para (TL) siparişleri - bkz. README_ODEME.md
         "shop_orders": ["id", "account_id", "product_id", "kind", "amount", "currency",
                         "status", "provider", "provider_ref", "payload", "created_at",
@@ -440,7 +445,8 @@ def diag():
                 pass
             info["var"] = False
             out["ok"] = False
-            out["yapilacak"].append(f"'{tbl}' tablosu yok, VERITABANI.sql'i çalıştır")
+            sql = "VERITABANI_SOSYAL.sql" if tbl in ("friends", "messages", "coop_scores") else "VERITABANI.sql"
+            out["yapilacak"].append(f"'{tbl}' tablosu yok, {sql}'i çalıştır")
             out["tables"][tbl] = info
             continue
         for c in cols:
@@ -3316,6 +3322,7 @@ def coop_leave():
                 role = "guest"
         if role == "guest":
             c = room.get("guest_ws")
+            room["guest_hist"] = (room.get("guest_acct"), room.get("guest_name") or "", time.time())
             room["guest_ws"] = None
             room["guest_acct"] = None
             room["guest_key"] = None
@@ -3417,6 +3424,596 @@ if _coop_sock is not None:
             conn.closed = True
             if still:
                 _coop_ctrl(peer, "peer_off", role=role)
+
+
+# ---- 2 kişilik dünya sıralaması ----
+# Koşu ev sahibinde işlediği için skoru ev sahibi gönderir. Sunucu odanın
+# iki hesabını zaten biliyor (kim kurdu, kim katıldı): skor o iki hesaba
+# yazılır, istemcinin söylediği adlara bakılmaz. Oda başına aynı koşu bir
+# kez yazılır; makullük tek kişilik denetiminin kişi başına düşen payıyla
+# yapılır (iki oyuncu = iki kat öldürme ve skor). Ban yok, yalnızca ret.
+COOP_LB_SIZE = 20
+COOP_SUBMIT_SLACK = 45.0       # koşu süresi oda ömrüne bu kadar sığmayabilir
+COOP_GUEST_GONE = 120.0        # konuk bu kadar önce ayrıldıysa skor yazılmaz
+COOP_PUBLIC_FIELDS = ("name_a", "name_b", "score", "kills", "wave", "run_time", "diff",
+                      "created_at", "details")
+
+
+def _coop_pair_key(a, b):
+    a, b = str(a), str(b)
+    return a + ":" + b if a < b else b + ":" + a
+
+
+def _clean_coop_player(d, owned):
+    """2 kişilik koşudaki bir oyuncunun kartı: tek kişilik kartı + evrimler + kişisel sayılar."""
+    if not isinstance(d, dict):
+        d = {}
+    build, skin = _clean_build(d, owned)
+    out = build or {"v": 1, "skin": "default", "w": [], "b": [], "d": [], "st": {}}
+    evo = d.get("evo")
+    out["evo"] = sorted({str(k) for k in evo if str(k) in BUILD_WEAPONS})[:4] if isinstance(evo, list) else []
+    for k, hi in (("score", MAX_SCORE), ("kills", 2_000_000), ("lv", 999), ("combo", 100000)):
+        out[k] = int(max(0, min(hi, _num(d.get(k), 0))))
+    return out
+
+
+def _owned_skins(account_id):
+    try:
+        return set(_stored_progress(_player_row(account_id)).get("skins_owned") or [])
+    except Exception:
+        return set()
+
+
+@app.route("/coop/submit", methods=["POST"])
+def coop_submit():
+    if not supabase:
+        return jsonify({"success": False, "error": "Supabase bağlantısı yapılandırılmamış!"}), 500
+    try:
+        data = _body()
+        acc = _acct(data)
+        if not acc:
+            return jsonify({"success": False, "error": "giriş gerekli"}), 401
+        aid = str(acc.get("id"))
+        if not _rate_ok("coops:" + aid, 10, 600):
+            return jsonify({"success": False, "error": "çok sık gönderim"}), 429
+        code = str(data.get("code") or "").strip().upper()[:12]
+        key = str(data.get("key") or "")[:80]
+        run_id = str(data.get("run_id") or "")[:40]
+        if not (COOP_CODE_RE.match(code) and COOP_KEY_RE.match(key) and _KEY_RE.match(run_id or "-")):
+            return jsonify({"success": False, "error": "geçersiz gönderi"}), 400
+        try:
+            score = int(data.get("score", 0))
+            kills = int(data.get("kills", 0))
+            wave = int(data.get("wave", 0))
+            run_time = float(data.get("run_time", 0))
+        except (TypeError, ValueError, OverflowError):
+            return jsonify({"success": False, "error": "geçersiz gönderi"}), 400
+        if not math.isfinite(run_time):
+            return jsonify({"success": False, "error": "geçersiz gönderi"}), 400
+        diff = str(data.get("diff", "normal"))
+        if diff not in ("normal", "hard", "nightmare"):
+            diff = "normal"
+        now = time.time()
+        with _coop_lock:
+            room = _COOP_ROOMS.get(code)
+            if room is None or room["host_acct"] != aid or not hmac.compare_digest(key, room["host_key"]):
+                return jsonify({"success": False, "error": "oda bulunamadı"}), 404
+            runs = room.setdefault("runs", set())
+            if run_id in runs:
+                return jsonify({"success": False, "error": "bu koşu zaten gönderildi"}), 409
+            gid, gname = room.get("guest_acct"), room.get("guest_name") or ""
+            if not gid:
+                hist = room.get("guest_hist")
+                if hist and now - hist[2] < COOP_GUEST_GONE:
+                    gid, gname = hist[0], hist[1]
+            # aynı odada art arda koşular: her koşu bir öncekinin gönderisinden
+            # sonra başlamış olmalı
+            span = now - max(room["created"], room.get("last_submit", 0.0))
+            if not gid:
+                return jsonify({"success": False, "error": "arkadaşın odada değil"}), 409
+            if run_time > now - room["created"] + COOP_SUBMIT_SLACK or run_time > span + COOP_SUBMIT_SLACK:
+                return jsonify({"success": False, "error": "koşu süresi tutmuyor"}), 422
+            runs.add(run_id)
+            room["last_submit"] = now
+        ok, why = score_is_plausible("", score / 2.0, kills / 2.0, wave, run_time, "time")
+        if ok and not _time_wave_ok(wave, run_time, diff):
+            ok, why = False, "dalga süreye sığmıyor"
+        if not ok:
+            return jsonify({"success": False, "error": "skor reddedildi: " + why}), 422
+        gacc = supabase.table("accounts").select("id,username").eq("id", gid).execute().data or []
+        if not gacc or not acc.get("username") or not gacc[0].get("username"):
+            return jsonify({"success": False, "error": "iki oyuncunun da kullanıcı adı olmalı"}), 409
+        if _is_banned(aid) or _is_banned(gid):
+            return jsonify({"success": False, "banned": True,
+                            "error": "oyunculardan biri sıralamadan çıkarılmış"}), 403
+        pls = data.get("players") if isinstance(data.get("players"), list) else []
+        pls = (pls + [{}, {}])[:2]
+        details = {"v": 1, "a": _clean_coop_player(pls[0], _owned_skins(aid)),
+                   "b": _clean_coop_player(pls[1], _owned_skins(gid))}
+        if len(json.dumps(details)) > BUILD_RAW_MAX * 2:
+            return jsonify({"success": False, "error": "koşu kartı çok büyük"}), 413
+        row = {"pair_key": _coop_pair_key(aid, gid), "account_a": aid, "account_b": str(gid),
+               "name_a": str(acc.get("username"))[:14], "name_b": str(gacc[0].get("username"))[:14],
+               "score": score, "kills": kills, "wave": wave, "run_time": run_time, "diff": diff,
+               "details": details, "created_at": now}
+        try:
+            supabase.table("coop_scores").insert(row).execute()
+        except Exception as e:
+            app.logger.exception("coop_scores insert")
+            return jsonify({"success": False, "error": "2 kişilik sıralama henüz kurulmamış "
+                                                       "(VERITABANI_SOSYAL.sql)"}), 503
+        rank = None
+        try:
+            for i, r in enumerate(_coop_top(COOP_LB_SIZE)):
+                if r.get("_pair") == row["pair_key"] and int(r.get("score") or 0) == score:
+                    rank = i + 1
+                    break
+        except Exception:
+            pass
+        return jsonify({"success": True, "rank": rank})
+    except Exception as e:
+        return _oops(e)
+
+
+def _coop_top(n):
+    rows = (supabase.table("coop_scores").select("*").order("score", desc=True).limit(1000)
+            .execute().data or [])
+    rows.sort(key=lambda r: float(r.get("score") or 0), reverse=True)
+    out, seen = [], set()
+    for r in rows:
+        pk = r.get("pair_key")
+        if pk in seen:
+            continue                     # aynı ikili tabloda bir kez (en iyi koşusu)
+        seen.add(pk)
+        d = r.get("details")
+        if isinstance(d, str):
+            try:
+                d = json.loads(d)
+            except Exception:
+                d = None
+        o = {k: r.get(k) for k in COOP_PUBLIC_FIELDS}
+        o["details"] = d
+        o["_pair"] = pk
+        out.append(o)
+        if len(out) >= n:
+            break
+    return out
+
+
+@app.route("/coop/scores", methods=["GET"])
+def coop_scores():
+    if not supabase:
+        return jsonify({"error": "Supabase bağlantısı yapılandırılmamış!"}), 500
+    try:
+        rows = _coop_top(COOP_LB_SIZE)
+    except Exception:
+        app.logger.exception("coop_scores")
+        return jsonify({"scores": [], "setup": False})
+    for r in rows:
+        r.pop("_pair", None)
+    return jsonify({"scores": rows, "setup": True})
+
+
+# ---- arkadaşlar, mesajlar, davet, profil ----
+# Arkadaşlık iki yönlü tek satır: a isteği gönderen, b alan. Kabul edilince
+# status = accepted. Mesajlar yalnızca arkadaşlar arasında; davet de bir mesaj
+# türü (gövdesi oda kodu). Çevrimiçi bilgisi bellekte (tek süreç), kalıcı
+# değil: oyun açıkken her yoklamada tazelenir.
+SOCIAL_ONLINE = 75.0           # bu kadar sn içinde yoklayan çevrimiçi sayılır
+SOCIAL_MAX_FRIENDS = 100
+SOCIAL_MAX_PENDING = 30
+SOCIAL_MSG_MAX = 240
+SOCIAL_INVITE_TTL = 180.0
+SOCIAL_STATUSES = ("menu", "play", "coop", "lobby")
+_PRESENCE = {}
+_presence_lock = threading.Lock()
+
+
+def _social_acc(data):
+    acc = _acct(data)
+    if not acc or not acc.get("username"):
+        return None
+    aid = str(acc.get("id"))
+    st = str(data.get("status") or "menu")
+    with _presence_lock:
+        if len(_PRESENCE) > 50000:
+            cut = time.time() - SOCIAL_ONLINE
+            for k in [k for k, v in _PRESENCE.items() if v[0] < cut]:
+                _PRESENCE.pop(k, None)
+        _PRESENCE[aid] = (time.time(), st if st in SOCIAL_STATUSES else "menu")
+    return acc
+
+
+def _presence(aid):
+    with _presence_lock:
+        v = _PRESENCE.get(str(aid))
+    if not v or time.time() - v[0] > SOCIAL_ONLINE:
+        return False, ""
+    return True, v[1]
+
+
+def _social_need_login():
+    return jsonify({"success": False, "error": "giriş ve kullanıcı adı gerekli"}), 401
+
+
+def _social_setup_error():
+    return jsonify({"success": False, "setup": False,
+                    "error": "arkadaş sistemi henüz kurulmamış (VERITABANI_SOSYAL.sql)"}), 503
+
+
+def _friend_rows(aid):
+    a = supabase.table("friends").select("*").eq("a", aid).execute().data or []
+    b = supabase.table("friends").select("*").eq("b", aid).execute().data or []
+    return a + b
+
+
+def _names_for(ids):
+    ids = sorted({str(i) for i in ids if i})
+    if not ids:
+        return {}
+    try:
+        rows = supabase.table("accounts").select("id,username").in_("id", ids).execute().data or []
+    except AttributeError:
+        rows = []
+        for i in ids:
+            rows += supabase.table("accounts").select("id,username").eq("id", i).execute().data or []
+    return {str(r.get("id")): str(r.get("username") or "") for r in rows}
+
+
+def _account_named(name):
+    rows = _accounts_by_username(name, "id,username,created_at")
+    return rows[0] if rows else None
+
+
+def _are_friends(aid, bid):
+    for r in _friend_rows(aid):
+        if r.get("status") == "accepted" and {str(r.get("a")), str(r.get("b"))} == {str(aid), str(bid)}:
+            return True
+    return False
+
+
+@app.route("/social/sync", methods=["POST"])
+def social_sync():
+    if not supabase:
+        return _social_setup_error()
+    data = _body()
+    acc = _social_acc(data)
+    if not acc:
+        return _social_need_login()
+    if not _rate_ok("socs:" + str(acc.get("id")), 40, 60):
+        return jsonify({"success": False, "error": "çok sık istek"}), 429
+    aid = str(acc.get("id"))
+    try:
+        rows = _friend_rows(aid)
+        unread = supabase.table("messages").select("id,sender,kind,body,created_at").eq(
+            "receiver", aid).is_("read_at", "null").limit(500).execute().data or []
+    except Exception:
+        app.logger.exception("social_sync")
+        return _social_setup_error()
+    other = {}
+    for r in rows:
+        o = str(r.get("b")) if str(r.get("a")) == aid else str(r.get("a"))
+        other[o] = r
+    names = _names_for(list(other) + [m.get("sender") for m in unread])
+    now = time.time()
+    friends, incoming, outgoing = [], [], []
+    cnt = defaultdict(int)
+    invites = []
+    for m in unread:
+        s = str(m.get("sender"))
+        if m.get("kind") == "invite":
+            if now - float(m.get("created_at") or 0) < SOCIAL_INVITE_TTL and names.get(s):
+                invites.append({"id": m.get("id"), "from": names[s], "code": str(m.get("body") or "")[:6],
+                                "at": m.get("created_at")})
+        else:
+            cnt[s] += 1
+    for o, r in other.items():
+        nm = names.get(o)
+        if not nm:
+            continue
+        if r.get("status") == "accepted":
+            on, st = _presence(o)
+            friends.append({"name": nm, "online": on, "status": st, "unread": cnt.get(o, 0)})
+        elif str(r.get("a")) == aid:
+            outgoing.append(nm)
+        else:
+            incoming.append(nm)
+    friends.sort(key=lambda f: (not f["online"], -f["unread"], f["name"].lower()))
+    invites.sort(key=lambda i: -float(i.get("at") or 0))
+    return jsonify({"success": True, "friends": friends, "incoming": sorted(incoming),
+                    "outgoing": sorted(outgoing), "invites": invites[:3],
+                    "unread": sum(f["unread"] for f in friends)})
+
+
+@app.route("/social/request", methods=["POST"])
+def social_request():
+    if not supabase:
+        return _social_setup_error()
+    data = _body()
+    acc = _social_acc(data)
+    if not acc:
+        return _social_need_login()
+    aid = str(acc.get("id"))
+    if not _rate_ok("socr:" + aid, 20, 3600):
+        return jsonify({"success": False, "error": "çok fazla istek gönderdin, biraz bekle"}), 429
+    tgt = _account_named(data.get("name"))
+    if not tgt:
+        return jsonify({"success": False, "error": "bu adda oyuncu yok"}), 404
+    tid = str(tgt.get("id"))
+    if tid == aid:
+        return jsonify({"success": False, "error": "kendini ekleyemezsin"}), 400
+    try:
+        rows = _friend_rows(aid)
+        mine = [r for r in rows if {str(r.get("a")), str(r.get("b"))} == {aid, tid}]
+        if mine:
+            r = mine[0]
+            if r.get("status") == "accepted":
+                return jsonify({"success": True, "state": "friends", "name": tgt.get("username")})
+            if str(r.get("a")) == tid:
+                # o da beni eklemiş: iki taraf da istiyor, arkadaş oldunuz
+                supabase.table("friends").update({"status": "accepted"}).eq("id", r.get("id")).execute()
+                return jsonify({"success": True, "state": "friends", "name": tgt.get("username")})
+            return jsonify({"success": True, "state": "pending", "name": tgt.get("username")})
+        acc_n = sum(1 for r in rows if r.get("status") == "accepted")
+        pend_n = sum(1 for r in rows if r.get("status") != "accepted" and str(r.get("a")) == aid)
+        if acc_n >= SOCIAL_MAX_FRIENDS:
+            return jsonify({"success": False, "error": "arkadaş listen dolu (%d)" % SOCIAL_MAX_FRIENDS}), 409
+        if pend_n >= SOCIAL_MAX_PENDING:
+            return jsonify({"success": False, "error": "bekleyen isteğin çok fazla"}), 409
+        supabase.table("friends").insert({"a": aid, "b": tid, "status": "pending",
+                                          "created_at": time.time()}).execute()
+    except Exception:
+        app.logger.exception("social_request")
+        return _social_setup_error()
+    return jsonify({"success": True, "state": "pending", "name": tgt.get("username")})
+
+
+@app.route("/social/respond", methods=["POST"])
+def social_respond():
+    if not supabase:
+        return _social_setup_error()
+    data = _body()
+    acc = _social_acc(data)
+    if not acc:
+        return _social_need_login()
+    aid = str(acc.get("id"))
+    tgt = _account_named(data.get("name"))
+    if not tgt:
+        return jsonify({"success": False, "error": "bu adda oyuncu yok"}), 404
+    tid = str(tgt.get("id"))
+    try:
+        rows = [r for r in _friend_rows(aid) if str(r.get("a")) == tid and str(r.get("b")) == aid
+                and r.get("status") != "accepted"]
+        if not rows:
+            return jsonify({"success": False, "error": "istek bulunamadı"}), 404
+        if data.get("accept"):
+            supabase.table("friends").update({"status": "accepted"}).eq("id", rows[0].get("id")).execute()
+        else:
+            supabase.table("friends").delete().eq("id", rows[0].get("id")).execute()
+    except Exception:
+        app.logger.exception("social_respond")
+        return _social_setup_error()
+    return jsonify({"success": True})
+
+
+@app.route("/social/remove", methods=["POST"])
+def social_remove():
+    if not supabase:
+        return _social_setup_error()
+    data = _body()
+    acc = _social_acc(data)
+    if not acc:
+        return _social_need_login()
+    aid = str(acc.get("id"))
+    tgt = _account_named(data.get("name"))
+    if not tgt:
+        return jsonify({"success": False, "error": "bu adda oyuncu yok"}), 404
+    tid = str(tgt.get("id"))
+    try:
+        for r in _friend_rows(aid):
+            if {str(r.get("a")), str(r.get("b"))} == {aid, tid}:
+                supabase.table("friends").delete().eq("id", r.get("id")).execute()
+    except Exception:
+        app.logger.exception("social_remove")
+        return _social_setup_error()
+    return jsonify({"success": True})
+
+
+def _msg_public(m, aid, names):
+    return {"id": m.get("id"), "me": str(m.get("sender")) == aid, "text": str(m.get("body") or ""),
+            "at": m.get("created_at"), "from": names.get(str(m.get("sender")), "")}
+
+
+@app.route("/social/messages", methods=["POST"])
+def social_messages():
+    if not supabase:
+        return _social_setup_error()
+    data = _body()
+    acc = _social_acc(data)
+    if not acc:
+        return _social_need_login()
+    aid = str(acc.get("id"))
+    if not _rate_ok("socm:" + aid, 60, 60):
+        return jsonify({"success": False, "error": "çok sık istek"}), 429
+    tgt = _account_named(data.get("name"))
+    if not tgt:
+        return jsonify({"success": False, "error": "bu adda oyuncu yok"}), 404
+    tid = str(tgt.get("id"))
+    after = _int(data.get("after"), 0)
+    try:
+        if not _are_friends(aid, tid):
+            return jsonify({"success": False, "error": "yalnızca arkadaşlarınla yazışabilirsin"}), 403
+        q1 = supabase.table("messages").select("*").eq("sender", aid).eq("receiver", tid).eq("kind", "text")
+        q2 = supabase.table("messages").select("*").eq("sender", tid).eq("receiver", aid).eq("kind", "text")
+        if after > 0:
+            q1, q2 = q1.gt("id", after), q2.gt("id", after)
+        rows = (q1.order("id", desc=True).limit(60).execute().data or []) + \
+               (q2.order("id", desc=True).limit(60).execute().data or [])
+        rows.sort(key=lambda m: int(m.get("id") or 0))
+        rows = rows[-60:]
+        if any(str(m.get("sender")) == tid and not m.get("read_at") for m in rows):
+            supabase.table("messages").update({"read_at": time.time()}).eq("receiver", aid).eq(
+                "sender", tid).eq("kind", "text").is_("read_at", "null").execute()
+    except Exception:
+        app.logger.exception("social_messages")
+        return _social_setup_error()
+    names = {aid: str(acc.get("username")), tid: str(tgt.get("username"))}
+    on, st = _presence(tid)
+    return jsonify({"success": True, "messages": [_msg_public(m, aid, names) for m in rows],
+                    "online": on, "status": st})
+
+
+@app.route("/social/send", methods=["POST"])
+def social_send():
+    if not supabase:
+        return _social_setup_error()
+    data = _body()
+    acc = _social_acc(data)
+    if not acc:
+        return _social_need_login()
+    aid = str(acc.get("id"))
+    if not _rate_ok("socw:" + aid, 20, 60) or not _rate_ok("socwd:" + aid, 600, 86400):
+        return jsonify({"success": False, "error": "çok hızlı yazıyorsun, biraz yavaş"}), 429
+    text = " ".join(_clean_text(data.get("text"), SOCIAL_MSG_MAX).split())
+    if not text:
+        return jsonify({"success": False, "error": "boş mesaj"}), 400
+    tgt = _account_named(data.get("name"))
+    if not tgt:
+        return jsonify({"success": False, "error": "bu adda oyuncu yok"}), 404
+    tid = str(tgt.get("id"))
+    try:
+        if not _are_friends(aid, tid):
+            return jsonify({"success": False, "error": "yalnızca arkadaşlarınla yazışabilirsin"}), 403
+        res = supabase.table("messages").insert({"sender": aid, "receiver": tid, "kind": "text",
+                                                 "body": text, "created_at": time.time()}).execute()
+    except Exception:
+        app.logger.exception("social_send")
+        return _social_setup_error()
+    m = (res.data or [{}])[0]
+    return jsonify({"success": True, "message": _msg_public(m, aid, {aid: str(acc.get("username"))})})
+
+
+@app.route("/social/invite", methods=["POST"])
+def social_invite():
+    if not supabase:
+        return _social_setup_error()
+    data = _body()
+    acc = _social_acc(data)
+    if not acc:
+        return _social_need_login()
+    aid = str(acc.get("id"))
+    if not _rate_ok("soci:" + aid, 10, 120):
+        return jsonify({"success": False, "error": "çok sık davet"}), 429
+    code = str(data.get("code") or "").strip().upper()[:12]
+    key = str(data.get("key") or "")[:80]
+    if not (COOP_CODE_RE.match(code) and COOP_KEY_RE.match(key)):
+        return jsonify({"success": False, "error": "önce oda kur"}), 400
+    with _coop_lock:
+        room = _COOP_ROOMS.get(code)
+        ok = room is not None and room["host_acct"] == aid and hmac.compare_digest(key, room["host_key"])
+        full = bool(room and room.get("guest_acct"))
+    if not ok:
+        return jsonify({"success": False, "error": "oda bulunamadı"}), 404
+    if full:
+        return jsonify({"success": False, "error": "oda dolu"}), 409
+    tgt = _account_named(data.get("name"))
+    if not tgt:
+        return jsonify({"success": False, "error": "bu adda oyuncu yok"}), 404
+    tid = str(tgt.get("id"))
+    try:
+        if not _are_friends(aid, tid):
+            return jsonify({"success": False, "error": "yalnızca arkadaşlarını davet edebilirsin"}), 403
+        # eski davetleri kapat: aynı kişiye tek geçerli davet
+        supabase.table("messages").update({"read_at": time.time()}).eq("sender", aid).eq(
+            "receiver", tid).eq("kind", "invite").is_("read_at", "null").execute()
+        supabase.table("messages").insert({"sender": aid, "receiver": tid, "kind": "invite", "body": code,
+                                           "created_at": time.time()}).execute()
+    except Exception:
+        app.logger.exception("social_invite")
+        return _social_setup_error()
+    on, _st = _presence(tid)
+    return jsonify({"success": True, "online": on})
+
+
+@app.route("/social/invite_seen", methods=["POST"])
+def social_invite_seen():
+    if not supabase:
+        return _social_setup_error()
+    data = _body()
+    acc = _social_acc(data)
+    if not acc:
+        return _social_need_login()
+    mid = _int(data.get("id"), 0)
+    try:
+        supabase.table("messages").update({"read_at": time.time()}).eq("id", mid).eq(
+            "receiver", str(acc.get("id"))).eq("kind", "invite").execute()
+    except Exception:
+        return _social_setup_error()
+    return jsonify({"success": True})
+
+
+@app.route("/social/profile", methods=["POST"])
+def social_profile():
+    if not supabase:
+        return _social_setup_error()
+    data = _body()
+    acc = _social_acc(data)
+    if not acc:
+        return _social_need_login()
+    aid = str(acc.get("id"))
+    if not _rate_ok("socp:" + aid, 30, 60):
+        return jsonify({"success": False, "error": "çok sık istek"}), 429
+    tgt = _account_named(data.get("name"))
+    if not tgt:
+        return jsonify({"success": False, "error": "bu adda oyuncu yok"}), 404
+    tid = str(tgt.get("id"))
+    row = _player_row(tid) or {}
+    prog = _stored_progress(row)
+    st = prog.get("stats") if isinstance(prog.get("stats"), dict) else {}
+
+    def _n(v):
+        return int(max(0, _num(v, 0)))
+    out = {"name": tgt.get("username"), "created_at": tgt.get("created_at"),
+           "best_score": _n(row.get("best_score") or st.get("best_score")),
+           "best_wave": _n(row.get("best_wave") or st.get("best_wave")),
+           "total_kills": _n(row.get("total_kills") or st.get("total_kills")),
+           "runs": _n(row.get("runs") or st.get("runs")),
+           "bosses": _n(st.get("bosses")), "best_combo": _n(st.get("best_combo")),
+           "skins": _n(row.get("skin_count")) or len(prog.get("skins_owned") or []),
+           "skin": str(prog.get("equipped_skin") or "default")[:40],
+           "banned": bool(prog.get("board_banned"))}
+    on, stt = _presence(tid)
+    out["online"], out["status"] = on, stt
+    rel = "self" if tid == aid else "none"
+    try:
+        for r in _friend_rows(aid):
+            if {str(r.get("a")), str(r.get("b"))} == {aid, tid}:
+                rel = "friends" if r.get("status") == "accepted" else (
+                    "sent" if str(r.get("a")) == aid else "incoming")
+    except Exception:
+        pass
+    out["rel"] = rel
+    top = []
+    try:
+        rows = (supabase.table("scores").select("score,wave,kills,run_time,diff,created_at").eq(
+            "account_id", tgt.get("id")).order("score", desc=True).limit(3).execute().data or [])
+        top = [{k: r.get(k) for k in ("score", "wave", "kills", "run_time", "diff")} for r in rows]
+    except Exception:
+        pass
+    out["top"] = top
+    coop = []
+    try:
+        ra = supabase.table("coop_scores").select("name_a,name_b,score,wave,account_a").eq(
+            "account_a", tid).order("score", desc=True).limit(3).execute().data or []
+        rb = supabase.table("coop_scores").select("name_a,name_b,score,wave,account_a").eq(
+            "account_b", tid).order("score", desc=True).limit(3).execute().data or []
+        for r in sorted(ra + rb, key=lambda r: -float(r.get("score") or 0))[:3]:
+            mate = r.get("name_b") if str(r.get("account_a")) == tid else r.get("name_a")
+            coop.append({"mate": mate, "score": r.get("score"), "wave": r.get("wave")})
+    except Exception:
+        pass
+    out["coop"] = coop
+    return jsonify({"success": True, "profile": out})
 
 
 if __name__ == "__main__":
