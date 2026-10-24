@@ -3,6 +3,24 @@
 Kısa notlar, en yenisi üstte.
 
 ## sıradaki sürüm
+- arayüz elden geçti (oyun mantığına dokunulmadı):
+  - yeni yazı tipleri: başlık ve düğmelerde Russo One, geri kalan her yerde
+    Onest (Balsamiq Sans kalktı); başlıklardaki zorla açılmış harf aralığı da
+    kalktı
+  - düğme ve başlıklarda degrade yok: dünya / yerel / 2 kişilik sıralama
+    başlıkları, sıralama satırları, istatistik paneli, kış penceresi düz renk;
+    düğmelerin üstündeki parlak çizgi ve dolum çubuklarındaki parlama kalktı
+  - yazıyla aynı renkte kenarlık yok: zorluk seçici, seviye eli çipleri, harita
+    rozetleri, ayarlar satırları, sonuç ekranı kutuları, mağaza / skin /
+    başarım kartları, market kartları, sekmeler. Rozetler artık hafif boyalı
+    koyu zemin + mürekkep kenar (tag_chip); renk yazıda ve simgede kalıyor
+  - ortalanan yazılar büyük harf yüksekliğine göre dikey ortalanır; kalın
+    yazılarda kalın kontur yalnız büyük başlıklarda, düğmelerde sert gölge
+  - kayık başlık / alt başlıklar düzeldi: duraklatma başlığı panelden
+    taşıyordu, seviye elindeki ipucu satırı çiplerin altında oyun dünyasının
+    üstünde okunmuyordu (artık koyu levhada), sıralama başlığındaki yıldızlar
+    ve ayarlar / hesap başlığındaki ayraçlar başlık hizasında, KİŞİSEL REKOR
+    şeridinin alt satırı ve tüccar balonundaki şans satırı kenara biniyordu
 - v3.49: 2 kişilikte iki oyuncu da aynı sürümü kullanmalı (eski dosyayla oda
   kurulunca konuğun kartları ev sahibinin kaydından çıkıyordu)
 - ana menü sadeleşti: AYARLAR ve ARKADAŞLAR sol üstte küçük kare düğmeler

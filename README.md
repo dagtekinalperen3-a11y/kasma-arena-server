@@ -35,7 +35,7 @@ Render > Environment'a girilmesi gerekenler:
 | `PAYMENT_PROVIDER` + sağlayıcı anahtarları | TL ile satın alma |
 | `DIAG_TOKEN` | `/diag` kurulum kontrolü |
 
-Arayüz yazı tipi Balsamiq Sans (SIL Open Font License 1.1), oyunun içine
-gömülü; lisans metni [FONT_LICENSE.txt](FONT_LICENSE.txt).
+Arayüz yazı tipleri Onest ve Russo One (SIL Open Font License 1.1),
+oyunun içine gömülü; lisans metni [FONT_LICENSE.txt](FONT_LICENSE.txt).
 
 Değişiklik notları: [CHANGELOG.md](CHANGELOG.md)
