@@ -39533,7 +39533,8 @@ STATE_RUN_SHOP = "run_shop"
 STATE_GAMEOVER = "gameover"
 STATE_SKIN_MARKET = "skin_market"
 STATE_SKIN_DETAIL = "skin_detail"
-STATE_COSMETIC_MARKET = "cosmetic_market"
+STATE_COSMETIC_MARKET = "cosmetic_market"     # skin market'in şapka / gözlük / pelerin / pet sekmeleri
+SKIN_LIST_TOP = 152                            # skin market kart ızgarasının üstü (sekmelerin altı)
 STATE_BOOK_MARKET = "book_market"
 STATE_WEAPON_CODEX = "weapon_codex"
 STATE_LEADERBOARD = "leaderboard"
@@ -47971,9 +47972,11 @@ class Tutorial:
             pass
 
     # ---- hedefler (vurgulanan düğme) ----
-    def _menu_btn(self, i):
-        mb = getattr(self.app, "menu_buttons", None) or []
-        return mb[i].rect if i < len(mb) else None
+    def _menu_btn(self, key):
+        for b in getattr(self.app, "menu_buttons", None) or []:
+            if getattr(b, "mkey", None) == key:
+                return b.rect
+        return None
 
     def _skin_card(self):
         try:
@@ -47982,7 +47985,7 @@ class Tutorial:
             return None
         cols, cw, ch, gx, gy = 4, 270, 208, 20, 18
         sx = (VIRTUAL_W - (cols * cw + (cols - 1) * gx)) / 2
-        y = 100 + (idx // cols) * (ch + gy) - getattr(self.app, "skin_scroll", 0.0)
+        y = SKIN_LIST_TOP + (idx // cols) * (ch + gy) - getattr(self.app, "skin_scroll", 0.0)
         return pygame.Rect(int(sx + (idx % cols) * (cw + gx)), int(y), cw, ch)
 
     def _codex_card(self):
@@ -48043,14 +48046,14 @@ class Tutorial:
         # adım -> (gösterildiği ekran, hedef dikdörtgen, yazı anahtarı, ileri düğmesi)
         table = {
             "welcome": (STATE_MENU, None, "tut.welcome", "start"),
-            "codex": (STATE_MENU, self._menu_btn(4), "tut.codex", None),
+            "codex": (STATE_MENU, self._menu_btn("codex"), "tut.codex", None),
             "codex2": (STATE_WEAPON_CODEX, self._codex_card(), "tut.codex2", "next"),
             "back": (STATE_WEAPON_CODEX, self._back_btn(), "tut.back", None),
-            "skin": (STATE_MENU, self._menu_btn(8), "tut.skin", None),
+            "skin": (STATE_MENU, self._menu_btn("skin"), "tut.skin", None),
             "skin2": (STATE_SKIN_MARKET, self._skin_card(), "tut.skin2", None),
             "skin3": (STATE_SKIN_DETAIL, self._detail_btn(), "tut.skin3", None),
             "skin4": ((STATE_SKIN_MARKET, STATE_SKIN_DETAIL), self._back_btn(), "tut.skin4", None),
-            "play": (STATE_MENU, self._menu_btn(0), "tut.play", None),
+            "play": (STATE_MENU, self._menu_btn("play"), "tut.play", None),
             "map": (STATE_MAP_SELECT, None, "tut.map", None),
             "move": (STATE_PLAY, None, "tut.move", None),
             "shop": (STATE_PLAY, None, "tut.shop", None),
@@ -48622,61 +48625,44 @@ class App:
         y_dunya = y_skor + alt_h + gap
         center_bottom = y_dunya + alt_h  # = 306+68+16+54+16+54 = 514
 
-        # ---- yan sütunlar ----
-        # simetri: yan sütunların satırları orta sütunun satırlarıyla aynı
-        # eksende ortalanıyor. Her satırın ortası ortak:
-        #     sol düğme merkezi == orta düğme merkezi == sağ düğme merkezi
-        side_w, side_h = 236, 58
-        center_mids = (y_oyna + oyna_h / 2.0,
-                       y_skor + alt_h / 2.0,
-                       y_dunya + alt_h / 2.0)
-        y_side0, y_side1, y_side2 = (m - side_h / 2.0 for m in center_mids)
+        # ---- yan sütunlar: iki düğme, orta sütunun dört satırına ortalı ----
+        # (ayarlar ve arkadaşlar sol üstte küçük kare düğmelerde; kıyafetler
+        # skin market'in sekmelerinde; 2 kişilik oyna > harita seçiminde)
+        side_w, side_h, side_gap = 236, 60, 20
+        block_mid = (y_oyna + center_bottom + 16 + alt_h) / 2.0
+        y_side0 = block_mid - side_gap / 2.0 - side_h
+        y_side1 = block_mid + side_gap / 2.0
         left_x = cx - cw / 2 - 30 - side_w
-
-        right_w, right_h = side_w, side_h
         right_x = cx + cw / 2 + 30
-        y_right0, y_right1, y_right2 = y_side0, y_side1, y_side2
+
+        def mb(key, rect, text, fn, **kw):
+            b = Button(rect, text, fn, **kw)
+            b.mkey = key
+            return b
 
         self.menu_buttons = [
-            Button((cx - cw / 2, y_oyna, cw, oyna_h), L("ui.play"), self.open_map_select,
-                   color=(60, 130, 90), hover_color=(80, 170, 115), text_size=30),
-            Button((cx - cw / 2, y_skor, cw, alt_h), L("ui.scores"), lambda: self.goto(STATE_LEADERBOARD),
-                   text_size=19),
-            Button((cx - cw / 2, y_dunya, cw, alt_h), L("ui.world_lb"), lambda: self.goto(STATE_WORLD_LB),
-                   color=(50, 80, 120), hover_color=(70, 110, 160), text_size=19),
+            mb("play", (cx - cw / 2, y_oyna, cw, oyna_h), L("ui.play"), self.open_map_select,
+               color=(60, 130, 90), hover_color=(80, 170, 115), text_size=30),
+            mb("scores", (cx - cw / 2, y_skor, cw, alt_h), L("ui.scores"), lambda: self.goto(STATE_LEADERBOARD),
+               text_size=19),
+            mb("world", (cx - cw / 2, y_dunya, cw, alt_h), L("ui.world_lb"), lambda: self.goto(STATE_WORLD_LB),
+               color=(50, 80, 120), hover_color=(70, 110, 160), text_size=19),
             # arena ustalığı: koşular arası kalıcı yükseltme.
-            Button((cx - cw / 2, center_bottom + 16, cw, alt_h), L("ui.mastery"),
-                   lambda: self.goto(STATE_MASTERY),
-                   color=(116, 86, 40), hover_color=(156, 118, 56), text_size=18),
-
-            # sol sütunun üstü: silahların kilitleri, ne işe yaradıkları ve
-            # istenmeyenleri kapatma ekranı.
-            Button((left_x, y_side0, side_w, side_h), L("ui.codex"),
-                   lambda: self.goto(STATE_WEAPON_CODEX),
-                   color=(132, 74, 52), hover_color=(178, 100, 70), text_size=16),
-            # nasıl oynanır yerine ayarlar. Nasıl Oynanır Ayarlar ekranının
-            # içinden açılıyor.
-            Button((left_x, y_side1, side_w, side_h), L("ui.settings"), lambda: self.goto(STATE_SETTINGS),
-                   color=(62, 84, 116), hover_color=(88, 118, 160), text_size=16),
-            Button((left_x, y_side2, side_w, side_h), L("ui.achievements"), lambda: self.goto(STATE_ACHIEVEMENTS),
-                   color=(90, 70, 110), hover_color=(120, 95, 145), text_size=16),
-
-            Button((right_x, y_right0, right_w, right_h), L("ui.books"), lambda: self.goto(STATE_BOOK_MARKET),
-                   color=(88, 62, 128), hover_color=(120, 88, 168), text_size=16),
-            Button((right_x, y_right1, right_w, right_h), L("ui.skin_market"), lambda: self.goto(STATE_SKIN_MARKET),
-                   color=(120, 95, 40), hover_color=(160, 125, 55), text_size=16),
-            Button((right_x, y_right2, right_w, right_h), L("ui.cos_market"), lambda: self.goto(STATE_COSMETIC_MARKET),
-                   color=(60, 110, 130), hover_color=(80, 145, 170), text_size=16),
+            mb("mastery", (cx - cw / 2, center_bottom + 16, cw, alt_h), L("ui.mastery"),
+               lambda: self.goto(STATE_MASTERY), color=(116, 86, 40), hover_color=(156, 118, 56), text_size=18),
+            # silahların kilitleri, ne işe yaradıkları ve istenmeyenleri kapatma
+            mb("codex", (left_x, y_side0, side_w, side_h), L("ui.codex"), lambda: self.goto(STATE_WEAPON_CODEX),
+               color=(132, 74, 52), hover_color=(178, 100, 70), text_size=16),
+            mb("ach", (left_x, y_side1, side_w, side_h), L("ui.achievements"), lambda: self.goto(STATE_ACHIEVEMENTS),
+               color=(90, 70, 110), hover_color=(120, 95, 145), text_size=16),
+            mb("books", (right_x, y_side0, side_w, side_h), L("ui.books"), lambda: self.goto(STATE_BOOK_MARKET),
+               color=(88, 62, 128), hover_color=(120, 88, 168), text_size=16),
+            mb("skin", (right_x, y_side1, side_w, side_h), L("ui.skin_market"), lambda: self.goto(STATE_SKIN_MARKET),
+               color=(120, 95, 40), hover_color=(160, 125, 55), text_size=16),
         ]
-        # arkadaşlar ve 2 kişilik: orta sütunun 4. satırıyla aynı eksende
-        y4 = center_bottom + 16 + alt_h / 2.0 - side_h / 2.0
-        fr = Button((left_x, y4, side_w, side_h), L("fr.menu_btn"), lambda: self.open_friends(STATE_MENU),
-                    color=(70, 96, 150), hover_color=(96, 128, 196), text_size=16)
-        self._fr_menu_btn = fr.rect
-        self.menu_buttons.append(fr)
-        if coop_available():
-            self.menu_buttons.append(Button((right_x, y4, right_w, right_h), L("fr.coop_btn"), self.open_coop,
-                                            color=(100, 70, 150), hover_color=(132, 96, 196), text_size=16))
+        # sol üstte küçük kare düğmeler: ayarlar, altında arkadaşlar
+        self._corner_settings = pygame.Rect(16, 16, 52, 52)
+        self._fr_menu_btn = pygame.Rect(16, 78, 52, 52)
 
     def goto(self, state):
         self.prev_state = self.state
@@ -50835,8 +50821,7 @@ class App:
                 g = b.anim * 4
                 self.xmas.draw_cap(canvas, b.rect.inflate(g, g), seed=i)
         self._draw_event_snowman(canvas, mouse_pos, clicked)
-        if not MOBILE:
-            self._menu_friends_dock(canvas, mouse_pos, clicked)
+        self._menu_corner_buttons(canvas, mouse_pos, clicked)
 
         # Tuşlar zaten nasıl oynanır'da; sürüm ve bağlantı durumu yalnızca sol
         # altta, göze batmayan tek bir satırda duruyor.
@@ -55887,6 +55872,33 @@ class App:
             sfx("click", 0.5, 0.0)
 
     # ---- skin market ----
+    def _market_tabs(self, canvas, mouse_pos, clicked, active, y):
+        """Skin market'in sekmeleri: SKİNLER, ŞAPKA, GÖZLÜK, PELERİN, PET (kıyafet marketi artık burada)."""
+        tabs = [("skin", L("ui.tab_skins"))] + [(slot, LX("ui.slot_" + slot, SLOT_LABELS[slot]))
+                                                 for slot in MARKET_TABS]
+        tab_w, tab_h, tab_gap = 156, 36, 10
+        x0 = (VIRTUAL_W - (tab_w * len(tabs) + tab_gap * (len(tabs) - 1))) / 2
+        for i, (key, label) in enumerate(tabs):
+            r = pygame.Rect(x0 + i * (tab_w + tab_gap), y, tab_w, tab_h)
+            on = key == active
+            hover = r.collidepoint(mouse_pos)
+            acc = GEM_COLOR if key == "skin" else CYAN
+            bg = scale_col(acc, 0.42) if on else ((48, 36, 40) if hover else (32, 24, 27))
+            pygame.draw.rect(canvas, bg, r, border_radius=9)
+            ink_frame(canvas, r, acc if on else PANEL_EDGE, 9, 2)
+            draw_text(canvas, label, r.center, 15, TEXT if on else TEXT_DIM, bold=True, center=True)
+            if clicked and hover and not on:
+                sfx("click", 0.5, 0.0)
+                if key == "skin":
+                    self.set_state(STATE_SKIN_MARKET)
+                else:
+                    self.cosmetic_tab = key
+                    self.cosmetic_scroll = 0.0
+                    if self.state != STATE_COSMETIC_MARKET:
+                        self.set_state(STATE_COSMETIC_MARKET)
+                return True
+        return False
+
     def update_skin_market(self, dt, mouse_pos, clicked, wheel_y=0):
         canvas = self.display.canvas
         draw_skin_market_bg(canvas, self.t)          # kahramanlar salonu
@@ -55896,7 +55908,7 @@ class App:
         card_w, card_h = 270, 208
         gap_x, gap_y = 20, 18
         start_x = (VIRTUAL_W - (cols * card_w + (cols - 1) * gap_x)) / 2
-        list_top = 100
+        list_top = SKIN_LIST_TOP
         list_bottom = VIRTUAL_H - 72  # alt buton için yer bırak
         list_h = list_bottom - list_top
         equipped = self.save.equipped_skin_id()
@@ -55961,11 +55973,12 @@ class App:
         if max_scroll > 0:
             draw_scrollbar(canvas, VIRTUAL_W - 16, list_top, list_h, content_h, self.skin_scroll)
 
-        top = pygame.Rect(0, 0, VIRTUAL_W, 80)
+        top = pygame.Rect(0, 0, VIRTUAL_W, 146)
         s = pygame.Surface(top.size, pygame.SRCALPHA)
         pygame.draw.rect(s, (28, 20, 21, 235), top)
         canvas.blit(s, (0, 0))
         draw_text(canvas, L("ui.skin_market"), (40, 24), 28, GEM_COLOR, bold=True)
+        self._market_tabs(canvas, mouse_pos, clicked, "skin", 98)
         gem_txt = L("ui.gems", fmt_num(self.save.get_gems()))
         gw_ = coin_label_width(gem_txt, 21, 10, gap=8)
         draw_coin_label(canvas, VIRTUAL_W - 40 - gw_ / 2, 40, gem_txt, GEM_COLOR, 21,
@@ -56244,7 +56257,7 @@ class App:
         s = pygame.Surface(top.size, pygame.SRCALPHA)
         pygame.draw.rect(s, (12, 13, 22, 235), top)
         canvas.blit(s, (0, 0))
-        draw_text(canvas, L("ui.cos_market"), (40, 18), 26, CYAN, bold=True)
+        draw_text(canvas, L("ui.skin_market"), (40, 18), 26, GEM_COLOR, bold=True)
         if self.save.cosmetics_locked() and self.cosmetic_tab != "pet":
             # Premium skin kendi kostümüyle gelir; kıyafet slotları kilitlidir.
             # (pet'ler kostümün parçası değil, premium skinle de yürür.)
@@ -56261,22 +56274,8 @@ class App:
         draw_coin_label(canvas, VIRTUAL_W - 40 - gw_ / 2, 34, gem_txt, GEM_COLOR, 20,
                         icon="gem", icon_r=10, gap=8)
 
-        # ---- sekmeler (şapka / gözlük / pelerin) ----
-        tab_w, tab_h, tab_gap = 160, 36, 10
-        tabs_x = (VIRTUAL_W - (tab_w * len(MARKET_TABS) + tab_gap * (len(MARKET_TABS) - 1))) / 2
-        tab_y = 104
-        for i, slot in enumerate(MARKET_TABS):
-            r = pygame.Rect(tabs_x + i * (tab_w + tab_gap), tab_y, tab_w, tab_h)
-            active = self.cosmetic_tab == slot
-            hover = r.collidepoint(mouse_pos)
-            bg = (46, 96, 110) if active else ((32, 36, 54) if hover else (22, 24, 38))
-            pygame.draw.rect(canvas, bg, r, border_radius=9)
-            ink_frame(canvas, r, CYAN if active else PANEL_EDGE, 9, 2)
-            draw_text(canvas, LX("ui.slot_" + slot, SLOT_LABELS[slot]), r.center, 15, TEXT if active else TEXT_DIM, bold=True, center=True)
-            if clicked and hover and not active:
-                self.cosmetic_tab = slot
-                self.cosmetic_scroll = 0.0
-                sfx("click", 0.5, 0.0)
+        # ---- sekmeler: skinler + şapka / gözlük / pelerin / pet ----
+        self._market_tabs(canvas, mouse_pos, clicked, self.cosmetic_tab, 104)
 
         # ---- kart ızgarası ----
         list_top = 158
@@ -57144,8 +57143,8 @@ def _app_update_coop_lobby(self, dt, mouse_pos, clicked):
     elif co.role is None:
         # ---- 2 kişilik merkez: solda oda kur / katıl / arkadaşlar, sağda
         # 2 kişilik dünya sıralaması ----
-        lr = pygame.Rect(40, 112, 400, 196)
-        rr = pygame.Rect(40, 320, 400, 216)
+        lr = pygame.Rect(40, 112, 400, 236)
+        rr = pygame.Rect(40, 362, 400, 278)
         panel(canvas, lr, alpha=245, edge=(90, 170, 120))
         panel(canvas, rr, alpha=245, edge=(120, 140, 220))
         draw_text(canvas, L("coop.create_t"), (lr.centerx, lr.y + 24), 20, GREEN, bold=True, center=True)
@@ -57155,7 +57154,7 @@ def _app_update_coop_lobby(self, dt, mouse_pos, clicked):
                   center=True)
         draw_text(canvas, L("coop.join_d"), (rr.centerx, rr.y + 52), 12, TEXT_DIM, center=True, shadow=False)
         box = pygame.Rect(0, 0, 320, 62)
-        box.center = (rr.centerx, rr.y + 104)
+        box.center = (rr.centerx, rr.y + 124)
         pygame.draw.rect(canvas, (28, 20, 21), box, border_radius=12)
         ink_frame(canvas, box, (150, 170, 255), 12, 2)
         slots = co.code_buf + "_" * (6 - len(co.code_buf))
@@ -57171,25 +57170,6 @@ def _app_update_coop_lobby(self, dt, mouse_pos, clicked):
         btns.append(Button((rr.centerx - 140, rr.bottom - 66, 280, 50), L("coop.join_b"),
                            (lambda: (setattr(co, "role", "guest"), co.link.join(co.code_buf))) if ok
                            else (lambda: None), color=(70, 90, 170) if ok else (93, 73, 75), text_size=19))
-        # arkadaşlar kısa yolu: çevrimiçi sayısı + okunmamış
-        so = self.social
-        fr_r = pygame.Rect(40, 548, 400, 92)
-        panel(canvas, fr_r, alpha=242, edge=(150, 130, 230))
-        n_on = sum(1 for f in so.friends if f.get("online"))
-        draw_text(canvas, L("fr.title"), (fr_r.x + 18, fr_r.y + 12), 16, (210, 196, 255), bold=True, shadow=False)
-        draw_text(canvas, "%d / %d  %s" % (n_on, len(so.friends), L("fr.online").lower()),
-                  (fr_r.x + 18, fr_r.y + 36), 12, GREEN if n_on else TEXT_DIM, shadow=False)
-        for k_, f in enumerate([f for f in so.friends if f.get("online")][:3]):
-            draw_text(canvas, _fit_text(str(f.get("name") or ""), 11, 120), (fr_r.x + 18 + k_ * 64, fr_r.y + 60),
-                      11, (200, 230, 200), shadow=False)
-        btns.append(Button((fr_r.right - 156, fr_r.y + 22, 140, 48), L("fr.menu_btn"),
-                           lambda: self.open_friends(STATE_COOP_LOBBY), color=(84, 70, 130),
-                           hover_color=(112, 94, 172), text_size=14))
-        if so.unread or so.incoming:
-            n_ = so.unread + len(so.incoming)
-            circle_aa(canvas, fr_r.right - 20, fr_r.y + 22, 10, (210, 60, 70))
-            draw_text(canvas, str(min(9, n_)), (fr_r.right - 20, fr_r.y + 22), 11, WHITE, bold=True, center=True,
-                      shadow=False)
         board = pygame.Rect(460, 112, 780, 528)
         self._coop_board(canvas, board, mouse_pos, clicked, self.t)
         btns.append(Button((board.right - 150, board.bottom + 12, 150, 40), L("ui.refresh"),
@@ -57280,6 +57260,8 @@ def _app_update_coop_lobby(self, dt, mouse_pos, clicked):
         for b in btns:
             if b.click(mouse_pos):
                 break
+    if self.account.logged_in() and detail is None:
+        self._menu_corner_buttons(canvas, mouse_pos, clicked, only_friends=True, back=STATE_COOP_LOBBY)
     if detail is not None:
         if self._coop_board_detail(canvas, detail[0], detail[1], mouse_pos, clicked_top, self.t, dt):
             self._clb_detail = None
@@ -57831,6 +57813,7 @@ STRINGS.update({
     "fr.unread_n": _T("{0} yeni mesaj", "{0} new msg", "{0} mensajes", "{0} neue", "{0} новых"),
     "fr.req_short": _T("seni eklemek istiyor", "wants to add you", "quiere añadirte", "will dich adden",
                        "хочет добавить"),
+    "ui.tab_skins": _T("SKİNLER", "SKINS", "SKINS", "SKINS", "СКИНЫ"),
     "fr.all": _T("TÜMÜ »", "ALL »", "TODOS »", "ALLE »", "ВСЕ »"),
     "fr.coop_btn": _T("2 KİŞİLİK", "2 PLAYERS", "2 JUGADORES", "2 SPIELER", "ВДВОЁМ"),
     "fr.add_hint": _T("kullanıcı adı yaz...", "type a username...", "escribe un usuario...",
@@ -58393,6 +58376,8 @@ class SocialClient:
         y = max(y, 66)
         for txt, col, life in self.toasts:
             a_ = int(255 * clamp(life / 0.4, 0.0, 1.0))
+            if a_ < 40:
+                continue
             w = text_width(txt, 13, True) + 40
             r = pygame.Rect(0, 0, w, 32)
             r.topright = (VIRTUAL_W - 14, y)
@@ -58984,118 +58969,84 @@ def _app_coop_call_panel(self, canvas, R, mouse_pos, clicked, t):
         self.open_friends(STATE_COOP_LOBBY)
 
 
-def _app_menu_friends_dock(self, canvas, mouse_pos, clicked):
-    """Ana menünün altında arkadaş şeridi: kim çevrimiçi, tek tıkla yaz / çağır, istekler."""
-    so = self.social
-    R = pygame.Rect(250, 598, 810, 86)
-    panel(canvas, R, bg=(30, 24, 34), edge=(130, 116, 190), alpha=236, radius=14, edge_w=2)
-    on = [f for f in so.friends if f.get("online")]
-    draw_icon(canvas, R.x + 26, R.y + 24, "heart", (200, 170, 255), 9)
-    draw_text(canvas, L("fr.title"), (R.x + 42, R.y + 14), 15, (220, 206, 255), bold=True, shadow=False)
-    hit = None
-    if not self.account.logged_in() or not so.base:
-        draw_text(canvas, L("fr.need_login"), (R.x + 18, R.y + 48), 13, TEXT_DIM, shadow=False)
-        br = pygame.Rect(R.right - 170, R.y + 22, 154, 42)
-        hit = (br, lambda: self.goto(STATE_LOGIN), L("coop.login_b"), (70, 96, 150))
-        chips = []
+def _draw_gear(surf, cx, cy, r, col):
+    """Ayarlar simgesi: dişli."""
+    for k in range(8):
+        a = k * math.tau / 8
+        pts = []
+        for da, rr in ((-0.20, r * 0.78), (-0.13, r * 1.12), (0.13, r * 1.12), (0.20, r * 0.78)):
+            pts.append((cx + math.cos(a + da) * rr, cy + math.sin(a + da) * rr))
+        pygame.draw.polygon(surf, col, pts)
+    circle_aa(surf, cx, cy, r * 0.84, col)
+    circle_aa(surf, cx, cy, r * 0.36, (34, 26, 30))
+
+
+def _draw_people(surf, cx, cy, r, col, back=None):
+    """Arkadaşlar simgesi: arkada küçük, önde büyük iki kişi (baş + omuz)."""
+    back = back or scale_col(col, 0.62)
+    for dx, dy, c, k in ((r * 0.42, -r * 0.08, back, 0.78), (-r * 0.22, 0.0, col, 1.0)):
+        hx, hy = cx + dx, cy + dy - r * 0.38 * k
+        circle_aa(surf, hx, hy, r * 0.34 * k, c)
+        sr = r * 0.62 * k
+        sy = hy + r * 0.98 * k
+        pts = [(hx + math.cos(a) * sr, sy + math.sin(a) * sr * 0.95)
+               for a in [math.pi + i * math.pi / 12 for i in range(13)]]
+        pygame.draw.polygon(surf, c, pts)
+
+
+def _app_menu_corner_buttons(self, canvas, mouse_pos, clicked, only_friends=False, back=None):
+    """Sol üstte küçük kare düğmeler: ayarlar ve arkadaşlar (2 kişilik ekranında yalnız arkadaşlar)."""
+    if only_friends:
+        items = ((pygame.Rect(16, 16, 52, 52), "fr"),)
     else:
-        draw_text(canvas, "%d / %d  %s" % (len(on), len(so.friends), L("fr.online").lower()),
-                  (R.x + 18, R.y + 40), 12, GREEN if on else TEXT_DIM, shadow=False)
-        if so.unread:
-            draw_text(canvas, L("fr.unread_n", so.unread), (R.x + 18, R.y + 58), 11, (255, 170, 170), bold=True,
-                      shadow=False)
-        chips = [("req", nm) for nm in so.incoming[:2]] + [("fr", f) for f in (on + [f for f in so.friends
-                                                                                    if not f.get("online")])]
-        br = pygame.Rect(R.right - 132, R.y + 22, 116, 42)
-        hit = (br, lambda: self.open_friends(STATE_MENU), L("fr.all"), (84, 70, 130))
-    x = R.x + 138
-    for kind, it in chips:
-        if kind == "req":
-            nm = it
-            w = max(164, min(220, text_width(nm, 13, True) + 100))
+        sr = getattr(self, "_corner_settings", None)
+        fr = getattr(self, "_fr_menu_btn", None)
+        if sr is None or fr is None:
+            return False
+        items = ((sr, "set"), (fr, "fr"))
+    so = self.social
+    for r, kind in items:
+        hov = r.collidepoint(mouse_pos)
+        col = (70, 84, 120) if kind == "set" else (84, 70, 130)
+        pygame.draw.rect(canvas, (20, 15, 18), r.move(0, 3), border_radius=12)
+        pygame.draw.rect(canvas, lighten(col, 0.22) if hov else col, r, border_radius=12)
+        pygame.draw.rect(canvas, lighten(col, 0.45), pygame.Rect(r.x + 6, r.y + 3, r.w - 12, 3), border_radius=2)
+        ink_frame(canvas, r, lighten(col, 0.5) if hov else lighten(col, 0.3), 12, 2)
+        ic = (250, 246, 236)
+        if kind == "set":
+            _draw_gear(canvas, r.centerx, r.centery, 13, ic)
+            tip = L("ui.settings")
         else:
-            nm = str(it.get("name") or "")
-            w = max(170, min(210, text_width(nm, 14, True) + 100))
-        cr = pygame.Rect(x, R.y + 12, w, R.h - 24)
-        if cr.right > R.right - 140:
-            break
-        if kind == "req":
-            pygame.draw.rect(canvas, (56, 46, 30), cr, border_radius=10)
-            ink_frame(canvas, cr, GOLD, 10, 1)
-            draw_text(canvas, _fit_text(nm, 13, w - 96, bold=True), (cr.x + 10, cr.y + 8), 13, (255, 230, 170),
-                      bold=True, shadow=False)
-            draw_text(canvas, _fit_text(L("fr.req_short"), 10, w - 92), (cr.x + 10, cr.y + 30), 10, (200, 180, 130),
-                      shadow=False)
-            for k_, (fn, col, acc_) in enumerate(((_draw_tick, (60, 140, 90), True),
-                                                  (_draw_cross, (150, 60, 60), False))):
-                bb = pygame.Rect(cr.right - 80 + k_ * 38, cr.y + 12, 32, cr.h - 24)
-                hov = bb.collidepoint(mouse_pos)
-                pygame.draw.rect(canvas, lighten(col, 0.25) if hov else col, bb, border_radius=8)
-                fn(canvas, bb)
-                if clicked and hov:
-                    so.respond(nm, acc_)
-                    sfx("click", 0.7, 0.0)
-                    return True
-        else:
-            online = bool(it.get("online"))
-            hov_c = cr.collidepoint(mouse_pos)
-            pygame.draw.rect(canvas, (50, 42, 62) if hov_c else (40, 33, 46), cr, border_radius=10)
-            ink_frame(canvas, cr, (120, 110, 170) if online else (70, 64, 84), 10, 1)
-            circle_aa(canvas, cr.x + 14, cr.y + 17, 5, GREEN if online else (90, 90, 100))
-            draw_text(canvas, _fit_text(nm, 14, w - 100, bold=True), (cr.x + 26, cr.y + 8), 14,
-                      TEXT if online else TEXT_DIM, bold=True, shadow=False)
-            st = social_status_text(it.get("status")) if online else L("fr.offline")
-            draw_text(canvas, _fit_text(st, 10, w - 100), (cr.x + 26, cr.y + 30), 10,
-                      GREEN if online else (120, 116, 130), shadow=False)
-            un = int(it.get("unread") or 0)
-            # yaz / çağır
-            bw = 34
-            b1 = pygame.Rect(cr.right - 2 * bw - 12, cr.y + 12, bw, cr.h - 24)
-            b2 = pygame.Rect(cr.right - bw - 6, cr.y + 12, bw, cr.h - 24)
-            can_inv = online and coop_available()
-            for bb, ic, col, ok in ((b1, "chat", (70, 90, 150), True), (b2, "star", (60, 120, 90), can_inv)):
-                hov = ok and bb.collidepoint(mouse_pos)
-                pygame.draw.rect(canvas, lighten(col, 0.25) if hov else (col if ok else (60, 54, 62)), bb,
-                                 border_radius=8)
-                ic_col = WHITE if ok else (120, 116, 126)
-                if ic == "chat":
-                    _draw_bubble(canvas, bb.centerx, bb.centery, ic_col)
-                else:
-                    draw_icon(canvas, bb.centerx, bb.centery, ic, ic_col, 7)
-                if hov:
-                    tip = L("fr.send") if bb is b1 else L("fr.call_b")
-                    draw_text(canvas, tip, (bb.centerx, cr.y - 10), 10, WHITE, bold=True, center=True)
-                if clicked and hov:
-                    sfx("click", 0.7, 0.0)
-                    if bb is b1:
-                        self.open_friends(STATE_MENU)
-                        so.open_chat(nm)
-                        self.fr_focus = "chat"
-                    else:
-                        so.invite(nm)
-                    return True
-            if un:
-                circle_aa(canvas, cr.right - 4, cr.y + 4, 9, (210, 60, 70))
-                draw_text(canvas, str(min(9, un)), (cr.right - 4, cr.y + 4), 10, WHITE, bold=True, center=True,
-                          shadow=False)
-        x = cr.right + 6
-    if so.ok() and not chips:
-        draw_text(canvas, _fit_text(L("fr.none"), 12, R.w - 330), (R.x + 150, R.y + 34), 12, TEXT_DIM, shadow=False)
-    if hit is not None:
-        br, fn, txt, col = hit
-        hov = br.collidepoint(mouse_pos)
-        pygame.draw.rect(canvas, lighten(col, 0.25) if hov else col, br, border_radius=10)
-        ink_frame(canvas, br, lighten(col, 0.4), 10, 1)
-        draw_text(canvas, txt, br.center, 14, WHITE, bold=True, center=True, shadow=False)
+            _draw_people(canvas, r.centerx, r.centery - 1, 17, ic)
+            n_on = sum(1 for f in so.friends if f.get("online"))
+            if n_on:
+                circle_aa(canvas, r.x + 9, r.bottom - 9, 5, (24, 18, 22))
+                circle_aa(canvas, r.x + 9, r.bottom - 9, 3.6, GREEN)
+            tip = L("fr.menu_btn")
+            if n_on:
+                tip += "  ·  %d %s" % (n_on, L("fr.online").lower())
+        if hov:
+            tw = text_width(tip, 13, True) + 20
+            tr = pygame.Rect(r.right + 8, r.centery - 14, tw, 28)
+            panel(canvas, tr, bg=(28, 22, 26), edge=lighten(col, 0.3), alpha=240, radius=8, edge_w=1)
+            draw_text(canvas, tip, (tr.x + 10, tr.y + 6), 13, TEXT, bold=True, shadow=False)
         if clicked and hov:
-            sfx("click", 0.7, 0.0)
-            fn()
+            sfx("click", 0.6, 0.0)
+            if kind == "set":
+                self.goto(STATE_SETTINGS)
+            else:
+                self.open_friends(back or STATE_MENU)
             return True
+        if kind == "fr" and only_friends and (so.unread or so.incoming):
+            n_ = so.unread + len(so.incoming)
+            circle_aa(canvas, r.right - 6, r.y + 6, 10, (210, 60, 70))
+            draw_text(canvas, str(min(99, n_)), (r.right - 6, r.y + 6), 11, WHITE, bold=True, center=True,
+                      shadow=False)
     return False
 
 
 App.open_friends = _app_open_friends
-App._menu_friends_dock = _app_menu_friends_dock
+App._menu_corner_buttons = _app_menu_corner_buttons
 App.handle_friends_key = _app_friends_key
 App.update_friends = _app_update_friends
 App._coop_board = _app_coop_board

@@ -5,8 +5,10 @@ Kısa notlar, en yenisi üstte.
 ## sıradaki sürüm
 - v3.49: 2 kişilikte iki oyuncu da aynı sürümü kullanmalı (eski dosyayla oda
   kurulunca konuğun kartları ev sahibinin kaydından çıkıyordu)
-- ana menünün altında ARKADAŞLAR şeridi: kim çevrimiçi, istekleri kabul /
-  reddet, tek tıkla yaz ya da 2 kişiliğe çağır, TÜMÜ ile arkadaşlar ekranı
+- ana menü sadeleşti: AYARLAR ve ARKADAŞLAR sol üstte küçük kare düğmeler
+  (arkadaşlarda okunmamış rozeti ve çevrimiçi noktası); KIYAFET MARKET kalktı,
+  şapka / gözlük / pelerin / pet SKİN MARKET'in sekmeleri; 2 kişilik yalnızca
+  OYNA > harita seçiminde (sağ altta); menüdeki arkadaş şeridi kaldırıldı
 - açılmamış silah hiçbir yerden gelmez (raf, elinde verecek silah yoksa artık
   bütün silahları değil altın verir)
 - 2 kişilik:
