@@ -44026,7 +44026,7 @@ COOP_SPAWN_RATE = 1.6             # doğum sıklığı
 COOP_CAP_MULT = 1.4               # aynı anda yaşayan yaratık tavanı
 COOP_CAP_MAX = 240
 COOP_BOSS_HP = 1.25               # patron canı (iki oyuncunun toplam gücü üstüne)
-COOP_MENU_SHIELD = 4.0            # pencere açıkken en çok bu kadar sn hasar yok
+COOP_MENU_SHIELD = 6.0            # pencere açıkken en çok bu kadar sn hasar yok (mağara/tüccar kartları okunsun)
 COOP_MENU_PER_CARD = 2.0          # üst üste seviye eli (ör. mağaradan +6): her ek kart için ek koruma
 COOP_MENU_SHIELD_MAX = 16.0
 MENU_WORLD_HZ = 20.0              # pencere açıkken arkadaki dünyanın yenilenme sıklığı
@@ -45257,20 +45257,20 @@ STRINGS.update({
     "coop.rules": _T("• Herkesin kendi marketi, silahları ve kitapları var: kişi başı 2 silah, 2 kitap, 1 nadir kitap.\n"
                      "• Mağara ve yemin ortak: biri seçer, ödülü de bedeli de ikinize birden işler.\n"
                      "• Seviye / market pencereleri oyunu durdurmaz (pencere açıkken kısa süre korunursun).\n"
-                     "• Ölen oyuncu arkadaşını izler; ikiniz de ölünce oyun biter.",
+                     "• Düşeni patron ruhuyla diriltin; mıknatıs ganimeti ikinize eşit bölünür. İkiniz de düşünce biter.",
                      "• Everyone has their own shop, weapons and books: 2 weapons, 2 books, 1 rare book each.\n"
                      "• Cave and oath are shared: one picks, the reward and the price apply to both.\n"
                      "• Level-up / shop windows do not pause the game (you are briefly protected).\n"
-                     "• A fallen player spectates; the run ends when both fall.",
+                     "• Revive a fallen friend with a boss soul; magnet loot is split evenly. The run ends when both fall.",
                      "• Cada uno tiene su tienda, armas y libros: 2 ARMAS, 2 LIBROS, 1 LIBRO RARO.\n"
                      "• CUEVA y JURAMENTO son compartidos.\n• Las ventanas NO pausan el juego.\n"
-                     "• Quien cae observa; termina cuando caen los dos.",
+                     "• Revive al caído con un alma de jefe; el botín del imán se reparte. Termina si caéis los dos.",
                      "• Jeder hat eigenen Laden, Waffen, Bücher: 2 WAFFEN, 2 BÜCHER, 1 SELTENES.\n"
                      "• HÖHLE und SCHWUR sind gemeinsam.\n• Fenster pausieren das Spiel NICHT.\n"
-                     "• Wer fällt, schaut zu; Ende, wenn beide fallen.",
+                     "• Belebt Gefallene mit einer Bossseele wieder; Magnetbeute wird geteilt. Ende, wenn beide fallen.",
                      "• У каждого свой магазин, оружие и книги: 2 ОРУЖИЯ, 2 КНИГИ, 1 РЕДКАЯ.\n"
                      "• ПЕЩЕРА и КЛЯТВА общие.\n• Окна НЕ ставят игру на паузу.\n"
-                     "• Павший наблюдает; конец, когда пали оба."),
+                     "• Воскрешай павшего душой босса; добыча магнита делится поровну. Конец, когда пали оба."),
     "coop.start": _T("BAŞLAT", "START", "EMPEZAR", "START", "СТАРТ"),
     "coop.wait_host": _T("Oda sahibinin başlatması bekleniyor...", "Waiting for the host to start...",
                          "Esperando al anfitrión...", "Warte auf den Gastgeber...", "Ждём хозяина..."),
@@ -58279,11 +58279,14 @@ class SocialClient:
             circle_aa(canvas, fb.right - 6, fb.y + 6, 11, (210, 60, 70))
             draw_text(canvas, str(min(99, n_)), (fb.right - 6, fb.y + 6), 11, WHITE, bold=True, center=True,
                       shadow=False)
-        playing = a.state == STATE_PLAY or (a.coop is not None and a.coop.phase == "play")
+        # koşu sürerken (mola / seviye penceresi dahil) davete tıklanınca koşu
+        # yanmasın: yalnızca küçük not
+        playing = (a.state == STATE_PLAY or (a.coop is not None and a.coop.phase == "play")
+                   or (a.run is not None and a.state in RUN_OVERLAY_STATES))
         y = 12
         for inv in self.invites[:1]:
             if playing:
-                if a.state == STATE_PLAY and a.coop is None:
+                if a.coop is None:
                     draw_text(canvas, L("fr.inv_play", inv["from"]), (VIRTUAL_W / 2, 98), 13, GOLD,
                               bold=True, center=True)
                 continue
