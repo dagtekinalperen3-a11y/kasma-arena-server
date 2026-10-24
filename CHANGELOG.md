@@ -3,6 +3,32 @@
 Kısa notlar, en yenisi üstte.
 
 ## sıradaki sürüm
+- ARKADAŞLAR (ana menüde yeni düğme): kullanıcı adıyla ekle, isteği kabul et /
+  reddet, sil; kim çevrimiçi, menüde mi oyunda mı 2 kişilikte mi görünür;
+  arkadaşınla yazışma; profil (en iyi skor, dalga, öldürme, koşu, patron,
+  en iyi 2 kişilik skoru ve kiminle); tek tıkla 2 kişiliğe çağır (oda yoksa
+  kendiliğinden kurulur). Davet her ekranın üstünde KATIL / SONRA ile belirir;
+  yeni mesaj ve arkadaşlık isteği bildirimi, menüde okunmamış rozeti.
+  Sunucuda VERITABANI_SOSYAL.sql bir kez çalıştırılmalı
+- 2 KİŞİLİK DÜNYA SIRALAMASI: 2 KİŞİLİK ekranı merkez oldu (oda kur, katıl,
+  arkadaşlar, sıralama). İkili olarak girersiniz; satırda iki oyuncunun
+  silahları yan yana, evrilenler altın halkalı; tıklayınca ikisinin tam kartı
+  (silah, kitap, evrim, hasar dökümü, kişisel skor). Skoru ev sahibi gönderir,
+  sunucu iki hesabı odadan bilir; sonuç ekranında "#3!" gibi sıra çıkar
+- 2 kişilik:
+  - evrim artık 2 kişilikte de var: kişi başı 2 silah yuvası olduğu için orada
+    2 silah yeter; arkadaş evrilince ikinizin ekranında duyuru
+  - mıknatıs: kim alırsa alsın haritadaki altın ve tecrübe ikiye eşit bölünür
+  - seviye eli ve mağara kapanınca 3 sn dokunulmazlık (altın kalkan balonu);
+    mağaradan +6 seviye gibi üst üste kartlarda her kart için ek koruma
+  - konuğun seviye kartları kendi açtığı silah ve kitaplardan çıkar (önceden
+    ev sahibinin kaydından çıkıyordu: yeni oyuncunun odasında eski oyuncu
+    neredeyse hiç silah göremiyordu)
+  - L ile oyunda / lobide arkadaşına yazma
+  - takım halkaları, isim etiketi, ekran dışı arkadaş rozeti (yön + mesafe),
+    toplu takım paneli; eğitim 2 kişilikte araya girmez
+- seviye / mağara ekranındaki takılma: pencere arkasındaki dünya önbellekte
+  (seviye ekranı ~2 kat hızlı); yazı tipleri menüde önceden yüklenir
 - EĞİTİM: oyuna ilk kez girene kısa bir tur: silahlık (silahlar nasıl açılır,
   aç / kapat), skin market'ten bedava Yeşil Öncü'yü aldırır, oyunu başlatır,
   bir düşman öldürtür, B ile marketi açtırır. Her adımda "EĞİTİMİ GEÇ" var.
