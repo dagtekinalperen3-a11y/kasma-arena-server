@@ -3432,8 +3432,7 @@ if _coop_sock is not None:
 # Koşu ev sahibinde işlediği için skoru ev sahibi gönderir. Sunucu odanın
 # iki hesabını zaten biliyor (kim kurdu, kim katıldı): skor o iki hesaba
 # yazılır, istemcinin söylediği adlara bakılmaz. Oda başına aynı koşu bir
-# kez yazılır; makullük tek kişilik denetiminin kişi başına düşen payıyla
-# yapılır (iki oyuncu = iki kat öldürme ve skor). Ban yok, yalnızca ret.
+# kez yazılır. Skor makullük denetiminden geçmez, gönderildiği gibi yazılır.
 COOP_LB_SIZE = 20
 COOP_SUBMIT_SLACK = 45.0       # koşu süresi oda ömrüne bu kadar sığmayabilir
 COOP_GUEST_GONE = 120.0        # konuk bu kadar önce ayrıldıysa skor yazılmaz
@@ -3517,11 +3516,13 @@ def coop_submit():
                 return jsonify({"success": False, "error": "koşu süresi tutmuyor"}), 422
             runs.add(run_id)
             room["last_submit"] = now
-        ok, why = score_is_plausible("", score / 2.0, kills / 2.0, wave, run_time, "time")
-        if ok and not _time_wave_ok(wave, run_time, diff):
-            ok, why = False, "dalga süreye sığmıyor"
-        if not ok:
-            return jsonify({"success": False, "error": "skor reddedildi: " + why}), 422
+        # 2 kişilik skorda "en çok şu kadar skor olabilir" makullük denetimi yok:
+        # gönderilen skor aynen yazılır. Yalnızca veritabanını bozacak uç
+        # değerler (negatif, taşan sayı) sınırlanır; ret yok.
+        score = max(0, min(score, MAX_SCORE))
+        kills = max(0, min(kills, 2_000_000))
+        wave = max(1, min(wave, MAX_WAVE))
+        run_time = max(0.0, min(run_time, float(MAX_RUN_TIME)))
         gacc = supabase.table("accounts").select("id,username").eq("id", gid).execute().data or []
         if not gacc or not acc.get("username") or not gacc[0].get("username"):
             return jsonify({"success": False, "error": "iki oyuncunun da kullanıcı adı olmalı"}), 409
