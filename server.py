@@ -4079,7 +4079,7 @@ for _name, _retry in (("social_sync", True), ("social_messages", True), ("social
 # Yetki, istekteki geçerli oturumun hesabının kullanıcı adından gelir; ad
 # Render > Environment > ADMIN_USERNAMES (virgülle) ile değişir.
 ADMIN_USERNAMES = {u.strip().lower()
-                   for u in (os.environ.get("ADMIN_USERNAMES") or "Yapımcı1903").split(",") if u.strip()}
+                   for u in (os.environ.get("ADMIN_USERNAMES") or "Yapimci1903").split(",") if u.strip()}
 
 
 @app.route("/admin/unban", methods=["POST"])
