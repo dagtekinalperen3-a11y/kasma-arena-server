@@ -1,6 +1,8 @@
 import os
+import sys
 import json
 import math
+import functools
 import time
 import uuid
 import hmac
@@ -3609,8 +3611,18 @@ _PRESENCE = {}
 _presence_lock = threading.Lock()
 
 
+def _twice(fn, *a, **k):
+    """Geçici bir Supabase/ağ hatasında aynı okumayı bir kez daha dener."""
+    try:
+        return fn(*a, **k)
+    except Exception as e:
+        app.logger.warning("tekrar deneniyor %s: %r", getattr(fn, "__name__", "?"), e)
+        time.sleep(0.4)
+        return fn(*a, **k)
+
+
 def _social_acc(data):
-    acc = _acct(data)
+    acc = _twice(_acct, data)
     if not acc or not acc.get("username"):
         return None
     aid = str(acc.get("id"))
@@ -3636,7 +3648,25 @@ def _social_need_login():
     return jsonify({"success": False, "error": "giriş ve kullanıcı adı gerekli"}), 401
 
 
+_MISSING_TABLE_HINTS = ("pgrst205", "pgrst200", "42p01", "does not exist",
+                        "schema cache", "could not find the table", "could not find a relationship")
+
+
 def _social_setup_error():
+    """Gerçekten tablo eksikse "kurulmamış"; başka her hata geçici sunucu hatasıdır.
+
+    Eskiden her istisna "kurulmamış" diye dönüyor, oyun da arkadaş ekranını
+    kapatıyordu. Aktif istisna varsa (except bloğundan çağrılır) ona bakılır.
+    """
+    e = sys.exc_info()[1]
+    if e is not None and not any(h in str(e).lower() for h in _MISSING_TABLE_HINTS):
+        ref = uuid.uuid4().hex[:8]
+        try:
+            app.logger.error("[%s] sosyal geçici hata: %r", ref, e)
+        except Exception:
+            pass
+        return jsonify({"success": False, "ref": ref,
+                        "error": "sunucu şu an yanıt vermedi, birazdan tekrar dene"}), 500
     return jsonify({"success": False, "setup": False,
                     "error": "arkadaş sistemi henüz kurulmamış (VERITABANI_SOSYAL.sql)"}), 503
 
@@ -3661,7 +3691,7 @@ def _names_for(ids):
 
 
 def _account_named(name):
-    rows = _accounts_by_username(name, "id,username,created_at")
+    rows = _twice(_accounts_by_username, name, "id,username,created_at")
     return rows[0] if rows else None
 
 
@@ -4014,6 +4044,86 @@ def social_profile():
         pass
     out["coop"] = coop
     return jsonify({"success": True, "profile": out})
+
+
+# ---- sosyal uçlar: yakalanmayan hata "sunucu hatası" yerine düzgün cevap ----
+def _social_safe(fn, retry):
+    from werkzeug.exceptions import HTTPException
+
+    @functools.wraps(fn)
+    def inner(*a, **k):
+        for attempt in (0, 1):
+            try:
+                return fn(*a, **k)
+            except HTTPException:
+                raise
+            except Exception as e:
+                if retry and attempt == 0:
+                    app.logger.warning("sosyal uç tekrar deneniyor %s: %r", fn.__name__, e)
+                    time.sleep(0.4)
+                    continue
+                app.logger.exception("sosyal uç %s", fn.__name__)
+                return _social_setup_error()
+    return inner
+
+
+# yazma uçları (mesaj, istek, davet) çift işlenmesin diye yeniden denenmez
+for _name, _retry in (("social_sync", True), ("social_messages", True), ("social_profile", True),
+                      ("social_respond", True), ("social_remove", True),
+                      ("social_request", False), ("social_send", False),
+                      ("social_invite", False), ("social_invite_seen", False)):
+    app.view_functions[_name] = _social_safe(app.view_functions[_name], _retry)
+
+
+# ---- yönetici: dünya sıralaması yasağını kaldır ----
+# Yetki, istekteki geçerli oturumun hesabının kullanıcı adından gelir; ad
+# Render > Environment > ADMIN_USERNAMES (virgülle) ile değişir.
+ADMIN_USERNAMES = {u.strip().lower()
+                   for u in (os.environ.get("ADMIN_USERNAMES") or "Yapimc1903").split(",") if u.strip()}
+
+
+@app.route("/admin/unban", methods=["POST"])
+def admin_unban():
+    if not _accounts_enabled():
+        return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
+    data = _body()
+    acc = _acct(data)
+    if not acc:
+        return jsonify({"success": False, "error": "oturum geçersiz"}), 401
+    if str(acc.get("username") or "").strip().lower() not in ADMIN_USERNAMES:
+        app.logger.warning("yetkisiz /admin/unban denemesi: hesap %s", acc.get("id"))
+        return jsonify({"success": False, "error": "bu komut için yetkin yok"}), 403
+    if not _rate_ok("adm:" + str(acc.get("id")), 30, 60):
+        return jsonify({"success": False, "error": "çok sık istek"}), 429
+    tgt = _account_named(data.get("name"))
+    if not tgt:
+        return jsonify({"success": False, "error": "bu adda oyuncu yok"}), 404
+    tid = tgt.get("id")
+    try:
+        with _acct_lock(tid):
+            row = _player_row(tid)
+            prog = _stored_progress(row)
+            was = bool(prog.get("board_banned"))
+            prog["board_banned"] = False
+            prog["ban_reasons"] = []
+            # Oyuncunun kendi kaydındaki yerel yasak da kalksın diye artan damga:
+            # oyun bu damgayı profilinde ilk kez görünce yerel yasağı siler.
+            prog["ban_lift"] = max(int(time.time()), _int(prog.get("ban_lift"), 0) + 1)
+            payload = {
+                "account_id": tid,
+                "data": {k: v for k, v in prog.items()
+                         if k not in ("gems", "gems_earned", "gems_spent")},
+                "updated_at": time.time(),
+            }
+            if row:
+                supabase.table("player_data").update(payload).eq("account_id", tid).execute()
+            else:
+                payload.update(gems=0, gems_earned=0, gems_spent=0)
+                supabase.table("player_data").insert(payload).execute()
+        _log_event(tid, "yasak", 0, 0, ("kaldırıldı: " + str(acc.get("username")))[:120])
+    except Exception as e:
+        return _oops(e, "ban kaldırılamadı")
+    return jsonify({"success": True, "name": tgt.get("username"), "was_banned": was})
 
 
 if __name__ == "__main__":
