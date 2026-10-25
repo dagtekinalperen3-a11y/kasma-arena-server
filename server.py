@@ -4127,6 +4127,58 @@ def admin_unban():
     return jsonify({"success": True, "name": tgt.get("username"), "was_banned": was})
 
 
+# ---- yönetici: bir oyuncuya elmas ver ----
+GEM_TOTAL_MAX = 2_000_000_000        # veritabanı sütunu taşmasın (int4 ~2,147 milyar)
+
+
+@app.route("/admin/give_gems", methods=["POST"])
+def admin_give_gems():
+    if not _accounts_enabled():
+        return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
+    data = _body()
+    acc = _acct(data)
+    if not acc:
+        return jsonify({"success": False, "error": "oturum geçersiz"}), 401
+    if str(acc.get("username") or "").strip().lower() not in ADMIN_USERNAMES:
+        app.logger.warning("yetkisiz /admin/give_gems denemesi: hesap %s", acc.get("id"))
+        return jsonify({"success": False, "error": "bu komut için yetkin yok"}), 403
+    if not _rate_ok("adm:" + str(acc.get("id")), 30, 60):
+        return jsonify({"success": False, "error": "çok sık istek"}), 429
+    amount = _int(data.get("amount"), 0)
+    if amount < 1:
+        return jsonify({"success": False, "error": "miktar 1 ya da daha büyük olmalı"}), 400
+    tgt = _account_named(data.get("name"))
+    if not tgt:
+        return jsonify({"success": False, "error": "bu adda oyuncu yok"}), 404
+    tid = tgt.get("id")
+    try:
+        with _acct_lock(tid):
+            row = _player_row(tid)
+            prog = _stored_progress(row)
+            earned = max(0, _int(prog.get("gems_earned"), 0))
+            spent = min(max(0, _int(prog.get("gems_spent"), 0)), earned)
+            add = min(amount, GEM_TOTAL_MAX - earned)
+            if add < 1:
+                return jsonify({"success": False, "error": "bu oyuncunun elmas sınırı dolu"}), 409
+            earned += add
+            total = earned - spent
+            payload = {
+                "account_id": tid,
+                "gems": total, "gems_earned": earned, "gems_spent": spent,
+                "data": {k: v for k, v in prog.items()
+                         if k not in ("gems", "gems_earned", "gems_spent")},
+                "updated_at": time.time(),
+            }
+            if row:
+                supabase.table("player_data").update(payload).eq("account_id", tid).execute()
+            else:
+                supabase.table("player_data").insert(payload).execute()
+        _log_event(tid, "gem", add, total, ("yönetici: " + str(acc.get("username")))[:120])
+    except Exception as e:
+        return _oops(e, "elmas verilemedi")
+    return jsonify({"success": True, "name": tgt.get("username"), "added": add, "total": total})
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
