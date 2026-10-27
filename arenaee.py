@@ -555,6 +555,132 @@ def _ctrl_down():
         return False
 
 
+# ---- metin kutusu imleci ----
+# Yazı kutularında imleç artık hep sonda değil: fareyle bir harfin yanına
+# tıklanınca imleç oraya gider; sol/sağ, Home/End, Delete çalışır, yazılan harf
+# imlecin olduğu yere girer. Kutunun kimliği (ör. "login:user") imleci ve
+# görünen pencereyi (uzun yazıda kaydırma) tutar.
+_CARETS = {}         # kutu -> imleç (harf sırası); yoksa yazının sonu
+_CARET_VIEW = {}     # kutu -> görünen ilk harf
+
+
+def caret_get(fid, text):
+    c = _CARETS.get(fid)
+    n = len(text or "")
+    return n if c is None else max(0, min(n, c))
+
+
+def caret_set(fid, i=None):
+    """i=None: imleç yazının sonuna (yazı dışarıdan değişti)."""
+    if i is None:
+        _CARETS.pop(fid, None)
+    else:
+        _CARETS[fid] = max(0, int(i))
+
+
+def _word_left(text, i):
+    while i > 0 and text[i - 1] == " ":
+        i -= 1
+    while i > 0 and text[i - 1] != " ":
+        i -= 1
+    return i
+
+
+def _word_right(text, i):
+    n = len(text)
+    while i < n and text[i] == " ":
+        i += 1
+    while i < n and text[i] != " ":
+        i += 1
+    return i
+
+
+def text_edit(fid, text, event, accept=None, limit=10 ** 6):
+    """İmleçli düzenleme. Dönüş: (yeni yazı, tuş işlendi mi).
+    accept(harf) False dönerse harf girmez. Enter/Tab/Esc çağıran tarafta."""
+    text = text or ""
+    i = caret_get(fid, text)
+    k = getattr(event, "key", None)
+    ctrl = _ctrl_down()
+    if k == pygame.K_LEFT:
+        caret_set(fid, _word_left(text, i) if ctrl else i - 1)
+        return text, True
+    if k == pygame.K_RIGHT:
+        caret_set(fid, min(len(text), _word_right(text, i) if ctrl else i + 1))
+        return text, True
+    if k == pygame.K_HOME:
+        caret_set(fid, 0)
+        return text, True
+    if k == pygame.K_END:
+        caret_set(fid, len(text))
+        return text, True
+    if k == pygame.K_BACKSPACE:
+        if i > 0:
+            j = _word_left(text, i) if ctrl else i - 1
+            text = text[:j] + text[i:]
+            caret_set(fid, j)
+        return text, True
+    if k == pygame.K_DELETE:
+        if i < len(text):
+            j = _word_right(text, i) if ctrl else i + 1
+            text = text[:i] + text[j:]
+            caret_set(fid, i)
+        return text, True
+    if ctrl and k == pygame.K_v:
+        chars = clip_get().replace("\r", "").replace("\n", " ")
+    elif ctrl:
+        return text, False
+    else:
+        chars = getattr(event, "unicode", "") or ""
+    took = False
+    for ch in chars:
+        if not ch.isprintable() or len(text) >= limit:
+            continue
+        if accept is not None and not accept(ch):
+            continue
+        text = text[:i] + ch + text[i:]
+        i += 1
+        took = True
+    if took:
+        caret_set(fid, i)
+    return text, took or bool(chars)
+
+
+def text_view(fid, shown, size, avail, bold=False):
+    """Uzun yazının kutuya sığan parçası, imleç görünür kalacak şekilde.
+    Dönüş: (ilk harf, görünen yazı, imlecin x payı)."""
+    i = caret_get(fid, shown)
+    st = min(_CARET_VIEW.get(fid, 0), len(shown))
+    if i < st:
+        st = i
+    while st < i and text_width(shown[st:i], size, bold) > avail:
+        st += 1
+    # sonda boşluk kaldıysa geri kaydır (yazının sonu kutunun sağına yaslansın)
+    while st > 0 and text_width(shown[st - 1:], size, bold) <= avail:
+        st -= 1
+    _CARET_VIEW[fid] = st
+    vis = shown[st:]
+    while vis and text_width(vis, size, bold) > avail:
+        vis = vis[:-1]
+    return st, vis, text_width(shown[st:i], size, bold)
+
+
+def text_click(fid, shown, size, x0, mx, bold=False):
+    """Kutuya tıklanınca imleci tıklanan harfin yanına koyar."""
+    if MOBILE:
+        caret_set(fid)       # telefon klavyesi yazının sonundan düzenler
+        return
+    st = min(_CARET_VIEW.get(fid, 0), len(shown))
+    best, best_d = st, abs(mx - x0)
+    for j in range(st + 1, len(shown) + 1):
+        d = abs(mx - (x0 + text_width(shown[st:j], size, bold)))
+        if d < best_d:
+            best, best_d = j, d
+        elif d > best_d:
+            break
+    caret_set(fid, best)
+
+
 async def http_call(url, data=None, timeout=20, method=None):
     """HTTP isteği; cevap gövdesini (bytes) döner."""
     if not IS_WEB:
@@ -39906,9 +40032,12 @@ class ChatConsole:
         self.hist_idx = 0
 
     # ---- durum ----
+    FID = "chat"
+
     def open_box(self):
         self.open = True
         self.text = ""
+        caret_set(self.FID)
         self.caret = 0.0
         self.hist_idx = len(self.history)
         # Kutu açıkken eski satırlar solmasın: oyuncu ne yazdığını görebilsin.
@@ -39938,32 +40067,34 @@ class ChatConsole:
         if event.key == pygame.K_ESCAPE:
             self.close()
             return None
-        if event.key == pygame.K_BACKSPACE:
-            self.text = self.text[:-1]
-            return None
         if event.key == pygame.K_UP and self.history:
             self.hist_idx = max(0, self.hist_idx - 1)
             self.text = self.history[self.hist_idx]
+            caret_set(self.FID)
             return None
         if event.key == pygame.K_DOWN and self.history:
             self.hist_idx = min(len(self.history), self.hist_idx + 1)
             self.text = ("" if self.hist_idx >= len(self.history)
                          else self.history[self.hist_idx])
+            caret_set(self.FID)
             return None
         if _ctrl_down() and event.key == pygame.K_c:
             clip_set(self.text)
             return None
-        if _ctrl_down() and event.key == pygame.K_v:
-            ch = clip_get().replace("\n", " ")
-        elif _ctrl_down():
-            return None
-        else:
-            ch = getattr(event, "unicode", "")
         # Yazdırılabilir olmayan karakterler (kontrol tuşları) kutuya girmesin.
-        for c in (ch or ""):
-            if c.isprintable() and len(self.text) < CHAT_MAX_LEN:
-                self.text += c
+        self.text, _ = text_edit(self.FID, self.text, event, None, CHAT_MAX_LEN)
+        self.caret = 0.0
         return None
+
+    def box_rect(self):
+        return pygame.Rect(CHAT_X, VIRTUAL_H - CHAT_BOTTOM - 28, CHAT_W, 28)
+
+    def handle_click(self, pos):
+        """Kutu açıkken tıklama: yazının üstündeyse imleç tıklanan harfe gider."""
+        box = self.box_rect()
+        if box.collidepoint(pos):
+            text_click(self.FID, self.text, 16, box.x + 26, pos[0])
+            self.caret = 0.0
 
     # ---- çizim ----
     def update(self, dt):
@@ -39995,16 +40126,14 @@ class ChatConsole:
             return
         box = pygame.Rect(x, VIRTUAL_H - CHAT_BOTTOM - box_h, CHAT_W, box_h)
         panel(surf, box, alpha=232, radius=10, edge_w=2)
-        caret = "|" if (self.caret * 2.2) % 1.0 < 0.55 else " "
         draw_text(surf, "»", (box.x + 10, box.y + 6), 16, CYAN, bold=True,
                   shadow=False)
-        # Metin kutudan taşarsa sonu görünsün: oyuncu yazdığı yeri görmeli.
-        shown = self.text
-        avail = CHAT_W - 46
-        while shown and text_width(shown + caret, 16) > avail:
-            shown = shown[1:]
-        draw_text(surf, shown + caret, (box.x + 26, box.y + 6), 16, TEXT,
-                  shadow=False)
+        # Metin kutudan taşarsa imlecin olduğu yer görünür kalır.
+        _st, vis, cdx = text_view(self.FID, self.text, 16, CHAT_W - 46)
+        draw_text(surf, vis, (box.x + 26, box.y + 6), 16, TEXT, shadow=False)
+        if (self.caret * 2.2) % 1.0 < 0.55:
+            cx = box.x + 27 + cdx
+            pygame.draw.line(surf, TEXT, (cx, box.y + 6), (cx, box.y + 22), 2)
 
 
 # ---- yılbaşı ana menü süsleri ----
@@ -49536,6 +49665,8 @@ class App:
                 # Sohbet kutusu açıkken fare tıklaması da oyuna geçmez:
                 # yazarken düğmelere basılmasın, ateş edilmesin.
                 if self.chat.open:
+                    if event.button == 1:
+                        self.chat.handle_click(mouse_pos)
                     continue
                 if event.button == 1:
                     clicked = True
@@ -53179,40 +53310,30 @@ class App:
                 return
             self._login_submit()
             return
-        if event.key == pygame.K_BACKSPACE:
-            self.login_fields[self.login_focus] = self.login_fields[self.login_focus][:-1]
-            return
         ctrl = _ctrl_down()
         if ctrl and event.key == pygame.K_c:
             # şifre kutularından kopyalama yok (ekranda gizli, panoya sızmasın)
             if self.login_focus not in ("password", "newpw"):
                 clip_set(self.login_fields[self.login_focus])
             return
-        if ctrl and event.key == pygame.K_v:
-            chars = clip_get()
-        elif ctrl:
-            return
-        else:
-            chars = event.unicode
+        foc = self.login_focus
         limit = {"user": 64, "password": 64, "email": 96,
-                 "newpw": 64, "code": 6}[self.login_focus]
-        if self.login_focus == "user" and self.login_mode in ("up", "pick"):
+                 "newpw": 64, "code": 6}[foc]
+        if foc == "user" and self.login_mode in ("up", "pick"):
             limit = USERNAME_MAX
-        for ch in (chars or ""):
-            if not ch.isprintable():
-                continue
-            if self.login_focus == "code" and not ch.isdigit():
-                continue
-            if self.login_focus in ("email", "code", "user", "password", "newpw") and ch.isspace():
-                if self.login_focus != "password" and self.login_focus != "newpw":
-                    continue
-            if self.login_focus == "user" and self.login_mode in ("up", "pick"):
+
+        def accept(ch):
+            if foc == "code" and not ch.isdigit():
+                return False
+            if ch.isspace() and foc not in ("password", "newpw"):
+                return False
+            if foc == "user" and self.login_mode in ("up", "pick"):
                 # Kullanıcı adında boşluk ve noktalama yok: sıralamada "KASMACI "
                 # gibi taklit adlar üretilemesin.
-                if not (ch.isalnum() or ch == "_"):
-                    continue
-            if len(self.login_fields[self.login_focus]) < limit:
-                self.login_fields[self.login_focus] += ch
+                return ch.isalnum() or ch == "_"
+            return True
+        self.login_fields[foc], _ = text_edit("login:" + foc, self.login_fields[foc], event, accept, limit)
+        self.login_caret = 0.0          # yazarken imleç yanıp sönmesin
 
     def _login_submit(self):
         f = self.login_fields
@@ -53321,15 +53442,18 @@ class App:
         if not val and hint and not focused:
             draw_text(canvas, hint, (rect.x + 14, rect.y + 22), 13, (92, 98, 124),
                       shadow=False)
-        # Uzun metin kutudan taşmasın: sondan göster (yazdığın yeri görürsün).
-        while shown and text_width(shown, 15) > rect.w - 28:
-            shown = shown[1:]
-        draw_text(canvas, shown, (rect.x + 14, rect.y + 22), 15, TEXT, shadow=False)
+        # Uzun metin kutudan taşmasın: imlecin olduğu yer görünür kalır.
+        fid = "login:" + key
+        _st, vis, cdx = text_view(fid, shown, 15, rect.w - 28)
+        draw_text(canvas, vis, (rect.x + 14, rect.y + 22), 15, TEXT, shadow=False)
         if focused and (self.login_caret % 1.0) < 0.55:
-            cx = rect.x + 14 + text_width(shown, 15)
+            cx = rect.x + 14 + cdx
             pygame.draw.line(canvas, CYAN, (cx + 1, rect.y + 22), (cx + 1, rect.y + 38), 2)
         if clicked and hov:
+            # tıklanan harfin yanına imleç
+            text_click(fid, shown, 15, rect.x + 14, mouse_pos[0])
             self.login_focus = key
+            self.login_caret = 0.0
             sfx("click", 0.5, 0.0)
         touch_text_field(rect, key, val, focused=(self.login_focus == key), secret=secret,
                          numeric=(key == "code"), label=label)
@@ -59146,19 +59270,19 @@ def _app_coop_board_detail(self, canvas, e, rank, mouse_pos, clicked, t, dt):
     return False
 
 
-def _fr_input_box(canvas, rect, text, hint, focused, t, key, label=""):
+def _fr_input_box(canvas, rect, text, hint, focused, t, key, label="", mouse_pos=None, clicked=False):
     pygame.draw.rect(canvas, (24, 18, 20), rect, border_radius=10)
     ink_frame(canvas, rect, (170, 180, 255) if focused else (88, 80, 104), 10, 2 if focused else 1)
-    shown = text
-    while shown and text_width(shown, 15) > rect.w - 26:
-        shown = shown[1:]
-    if shown:
-        draw_text(canvas, shown, (rect.x + 12, rect.centery - 9), 15, WHITE, shadow=False)
+    _st, vis, cdx = text_view(key, text, 15, rect.w - 26)
+    if text:
+        draw_text(canvas, vis, (rect.x + 12, rect.centery - 9), 15, WHITE, shadow=False)
     else:
         draw_text(canvas, hint, (rect.x + 12, rect.centery - 8), 13, (110, 104, 128), shadow=False)
     if focused and int(t * 2) % 2 == 0:
-        cx = rect.x + 14 + text_width(shown, 15)
+        cx = rect.x + 13 + cdx
         pygame.draw.line(canvas, CYAN, (cx, rect.y + 9), (cx, rect.bottom - 9), 2)
+    if clicked and mouse_pos is not None and rect.collidepoint(mouse_pos):
+        text_click(key, text, 15, rect.x + 12, mouse_pos[0])
     touch_text_field(rect, key, text, focused, label=label)
 
 
@@ -59190,28 +59314,14 @@ def _app_friends_key(self, event):
             self.fr_chat = ""
             self.fr_chat_scroll = 0.0
         return
-    if event.key == pygame.K_BACKSPACE:
-        if foc == "add":
-            self.fr_input = self.fr_input[:-1]
-        else:
-            self.fr_chat = self.fr_chat[:-1]
-        return
-    ch = getattr(event, "unicode", "") or ""
     if _ctrl_down() and event.key == pygame.K_c:
         clip_set(self.fr_input if foc == "add" else self.fr_chat)
         return
-    if _ctrl_down() and event.key == pygame.K_v:
-        ch = clip_get().replace("\n", " ")
-    elif _ctrl_down():
-        return
-    for c in ch:
-        if not c.isprintable():
-            continue
-        if foc == "add":
-            if (c.isalnum() or c == "_") and len(self.fr_input) < USERNAME_MAX:
-                self.fr_input += c
-        elif len(self.fr_chat) < SOCIAL_MSG_MAX:
-            self.fr_chat += c
+    if foc == "add":
+        self.fr_input, _ = text_edit("fr_add", self.fr_input, event,
+                                     lambda c: c.isalnum() or c == "_", USERNAME_MAX)
+    else:
+        self.fr_chat, _ = text_edit("fr_chat", self.fr_chat, event, None, SOCIAL_MSG_MAX)
 
 
 def _app_update_friends(self, dt, mouse_pos, clicked, wheel_y=0.0):
@@ -59248,7 +59358,7 @@ def _app_update_friends(self, dt, mouse_pos, clicked, wheel_y=0.0):
         panel(canvas, LP, bg=(32, 24, 28), edge=(120, 110, 170), alpha=244, radius=16, edge_w=2)
         ib = pygame.Rect(LP.x + 16, LP.y + 16, LP.w - 130, 42)
         _fr_input_box(canvas, ib, self.fr_input, L("fr.add_hint"), self.fr_focus == "add", t, "fr_add",
-                      L("fr.add_hint"))
+                      L("fr.add_hint"), mouse_pos, clicked)
         if clicked and ib.collidepoint(mouse_pos):
             self.fr_focus = "add"
         okadd = bool(self.fr_input.strip())
@@ -59447,7 +59557,7 @@ def _app_update_friends(self, dt, mouse_pos, clicked, wheel_y=0.0):
             canvas.set_clip(prev_clip)
             ib2 = pygame.Rect(RP.x + 16, RP.bottom - 56, RP.w - 32 - 150, 42)
             _fr_input_box(canvas, ib2, self.fr_chat, L("fr.chat_hint"), self.fr_focus == "chat", t, "fr_chat",
-                          nm)
+                          nm, mouse_pos, clicked)
             if clicked and ib2.collidepoint(mouse_pos):
                 self.fr_focus = "chat"
             oks = bool(self.fr_chat.strip())
