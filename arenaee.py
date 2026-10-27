@@ -32739,10 +32739,10 @@ QUEST_DEFS = {
     "boss":   ("skull", (255, 90, 90), (None, 1, 2)),
     "cave":   ("ghost", (190, 120, 255), (None, 1, 2)),
 }
-# "elmas çok kazanıyoruz, %30 azalt" - 25/50/100 -> 18/35/70.
-QUEST_GEMS = (14, 28, 56)                        # kolay / orta / zor ödülü (-%20)
-# Koşu sonunda toplanan altının elmasa dönüşme oranı (0.12 -> 0.084).
-RUN_GEM_RATE = 0.0672           # elmas -%20 (0.084 -> 0.0672)
+# "elmas çok kazanıyoruz, %50 azalt": 14/28/56 -> 7/14/28.
+QUEST_GEMS = (7, 14, 28)                         # kolay / orta / zor ödülü (-%50)
+# Koşu sonunda toplanan altının elmasa dönüşme oranı (2 kişilik de bunu kullanır).
+RUN_GEM_RATE = 0.0336           # elmas -%50 (0.0672 -> 0.0336)
 QUEST_TIER_COLORS = ((110, 220, 140), (100, 160, 240), (170, 120, 230))
 
 BIOME_STYLE["frost"] = dict(BIOME_STYLE["arena"], **{
@@ -44360,6 +44360,48 @@ COOP_PROTO = 2
 COOP_CODE_ALPH = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 
+def coop_dmg_rows(log, n=8):
+    """Hasar dökümü -> [[kaynak, hasar], ...] büyükten küçüğe (ağ için küçük)."""
+    try:
+        rows = sorted(((str(k), int(v)) for k, v in dict(log).items() if v >= 1), key=lambda kv: -kv[1])
+    except (TypeError, ValueError):
+        return []
+    return [[k, v] for k, v in rows[:n]]
+
+
+def draw_coop_dmg(canvas, rect, rows, n=6):
+    """2 kişilik bitiş ekranı: bir oyuncunun hasar dökümü (ilk n kaynak)."""
+    clean = []
+    for it in (rows if isinstance(rows, list) else []):
+        try:
+            clean.append((str(it[0])[:24], max(0, int(it[1]))))
+        except (TypeError, ValueError, IndexError):
+            continue
+    draw_text(canvas, L("ui.dmg_title"), (rect.x, rect.y), 13, GOLD, bold=True, shadow=False)
+    if not clean:
+        draw_text(canvas, L("ui.dmg_none"), (rect.x, rect.y + 30), 12, TEXT_DIM, shadow=False)
+        return
+    total = max(1, sum(v for _k, v in clean))
+    top = max(1, clean[0][1])
+    yy = rect.y + 24
+    step = max(30, min(40, (rect.h - 24) // max(1, min(n, len(clean)))))
+    for key, v in clean[:n]:
+        name, ic, c = dmg_src_label(key)
+        c = tuple(int(x) for x in c[:3])
+        if key in WEAPON_BY_KEY:
+            blit_sigil(canvas, rect.x + 9, yy + 9, 8, key, c)
+        else:
+            draw_icon(canvas, rect.x + 9, yy + 9, ic, c, 7)
+        draw_text(canvas, _fit_text(name, 12, rect.w - 110, bold=True), (rect.x + 24, yy), 12, c, bold=True,
+                  shadow=False)
+        pct = v / total * 100
+        draw_text(canvas, fmt_num(v), (rect.right - 44, yy), 11, TEXT_DIM, right=True, shadow=False)
+        draw_text(canvas, ("%%%d" % round(pct)) if lang() == "tr" else "%d%%" % round(pct),
+                  (rect.right, yy), 11, TEXT, bold=True, right=True, shadow=False)
+        draw_bar(canvas, pygame.Rect(rect.x + 24, yy + 16, rect.w - 24, 6), clamp(v / top, 0, 1), c, radius=3)
+        yy += step
+
+
 def coop_available():
     """2 kişilik bu cihazda açık mı?"""
     return not IS_WEB and not MOBILE
@@ -48551,7 +48593,8 @@ class Tutorial:
 # çıkınca silinir.
 REPLAY_SECS = 8.0
 REPLAY_FPS = 12 if MOBILE else 20
-REPLAY_SIZE = (640, 360) if MOBILE else (960, 540)
+# masaüstünde tam 720p (eskiden 960x540 kaydedilip büyütülüyordu: bulanıktı)
+REPLAY_SIZE = (640, 360) if MOBILE else (1280, 720)
 REPLAY_SLOW_LAST = 1.6           # son kısım ağır çekimde oynar
 REPLAY_SLOW = 0.4
 REPLAY_HOLD = 1.1                # son karede bekleme
@@ -48626,7 +48669,10 @@ class DeathReplay:
             return
         self.acc = max(0.0, min(self.acc - iv, iv))
         try:
-            small = pygame.transform.smoothscale(canvas, REPLAY_SIZE)
+            if canvas.get_size() == REPLAY_SIZE:
+                small = canvas.copy()         # aynı boy: küçültme yok (hem net hem ucuz)
+            else:
+                small = pygame.transform.smoothscale(canvas, REPLAY_SIZE)
         except Exception:
             return
         item = (self.gen, self.clock, small)
@@ -57496,6 +57542,9 @@ class CoopSession:
                 "dps": int(max(0.0, float(p.estimated_dps()))),
                 "gems": coop_run_gems(run, i),
                 "dead": 0 if p.alive else 1,
+                # hasar dökümü: konuğun koşusunda dmg_log yok (gönderilmiyor),
+                # iki oyuncunun dökümü de bitişte buradan gider
+                "dmg": coop_dmg_rows(run.ctx_get(i, "dmg_log") or {}),
             })
         self.result = res
         self._pay_gems(res["players"][0]["gems"])
@@ -57880,36 +57929,40 @@ def _app_update_coop_end(self, dt, mouse_pos, clicked):
         for i, pd in enumerate(pls[:2]):
             if not isinstance(pd, dict):
                 continue
-            r = pygame.Rect(cx - 520 + i * 540, 196, 500, 300)
+            # sol yarı: oyuncu + sayılar, sağ yarı: hasar dökümü
+            r = pygame.Rect(cx - 610 + i * 620, 180, 600, 332)
             panel(canvas, r, alpha=246)
+            lc = r.x + 140
             sk = SKIN_BY_ID.get(_coop_skin_ok(pd.get("skin")))
             if sk is not None:
-                draw_skin_preview(canvas, sk, r.centerx, r.y + 64, self.t, r=28)
-            draw_text(canvas, str(pd.get("name") or "?")[:14], (r.centerx, r.y + 116), 22, TEXT, bold=True,
+                draw_skin_preview(canvas, sk, lc, r.y + 58, self.t, r=26)
+            draw_text(canvas, str(pd.get("name") or "?")[:14], (lc, r.y + 106), 21, TEXT, bold=True,
                       center=True)
+            pygame.draw.line(canvas, (86, 63, 65), (r.x + 282, r.y + 18), (r.x + 282, r.bottom - 18), 1)
+            draw_coop_dmg(canvas, pygame.Rect(r.x + 300, r.y + 20, r.w - 320, r.h - 40), pd.get("dmg"))
             rows = ((L("coop.r_score"), fmt_num(int(pd.get("score", 0) or 0))),
                     (L("coop.r_kills"), fmt_num(int(pd.get("kills", 0) or 0))),
                     (L("coop.r_level"), str(int(pd.get("level", 0) or 0))),
                     (L("coop.r_dps"), fmt_num(int(pd.get("dps", 0) or 0))),
                     (L("coop.r_gems"), "+" + fmt_num(int(pd.get("gems", 0) or 0))))
             for j, (a, b) in enumerate(rows):
-                yy = r.y + 146 + j * 29
-                draw_text(canvas, a, (r.x + 40, yy), 15, TEXT_DIM, shadow=False)
-                draw_text(canvas, b, (r.right - 40, yy), 17, TEXT, bold=True, right=True, shadow=False)
+                yy = r.y + 140 + j * 34
+                draw_text(canvas, _fit_text(a, 15, 150), (r.x + 26, yy), 15, TEXT_DIM, shadow=False)
+                draw_text(canvas, b, (r.x + 262, yy), 17, TEXT, bold=True, right=True, shadow=False)
         lb = getattr(co, "lb", None) if co is not None else None
         if lb:
             stt = lb.get("state")
             if stt == "sending":
-                draw_text(canvas, L("clb.sending"), (cx, 522), 14, TEXT_DIM, center=True, shadow=False)
+                draw_text(canvas, L("clb.sending"), (cx, 530), 14, TEXT_DIM, center=True, shadow=False)
             elif stt == "ok" and lb.get("rank"):
                 pulse = 0.5 + 0.5 * math.sin(self.t * 3)
-                add_glow(canvas, cx, 522, 220, GOLD, 0.12 + 0.08 * pulse)
-                draw_text(canvas, L("clb.rank", lb["rank"]), (cx, 522), 22, GOLD, bold=True, center=True)
+                add_glow(canvas, cx, 530, 220, GOLD, 0.12 + 0.08 * pulse)
+                draw_text(canvas, L("clb.rank", lb["rank"]), (cx, 530), 22, GOLD, bold=True, center=True)
             elif stt == "ok":
-                draw_text(canvas, L("clb.sent", COOP_LB_ROWS), (cx, 522), 14, (200, 190, 255), bold=True,
+                draw_text(canvas, L("clb.sent", COOP_LB_ROWS), (cx, 530), 14, (200, 190, 255), bold=True,
                           center=True, shadow=False)
             else:
-                draw_text(canvas, _fit_text(L("clb.fail", lb.get("err") or "?"), 13, 900), (cx, 522), 13,
+                draw_text(canvas, _fit_text(L("clb.fail", lb.get("err") or "?"), 13, 900), (cx, 530), 13,
                           (255, 160, 150), center=True, shadow=False)
 
     def _menu():
