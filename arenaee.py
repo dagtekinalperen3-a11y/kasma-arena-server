@@ -14279,7 +14279,7 @@ class Player:
             if self.frenzy_timer <= 0:
                 self.frenzy_stacks = 0
 
-        if self.eff_regen() > 0 and self.hp < self.max_hp:
+        if self.eff_regen() > 0 and self.hp < self.max_hp and RUN_EVENT[0] != "bloodmoon":
             self.regen_acc += self.eff_regen() * dt * (1.0 - self.wound)
             heal = int(self.regen_acc)
             if heal > 0:
@@ -14346,6 +14346,8 @@ class Player:
         """kan emici ile can çalar ve çalınan miktarı ayrıca sayar."""
         if amount <= 0 or not self.alive:
             return
+        if RUN_EVENT[0] == "bloodmoon":
+            return                          # kan ayı: can çalma işlemez
         if capped:
             amount = min(amount, self.vamp_hit_cap())
             amount = min(amount, max(0.0, self.vamp_rate_cap() - self._vamp_spent))
@@ -18455,6 +18457,8 @@ def weapon_damage(player, w, level):
     # (cap_oneshot) vuruşta ayrıca uygulanır; bonus onu atlamaz.
     boost = 1.0 + float(getattr(player, "weapon_boost", {}).get(w["key"], 0.0))
     evo = evo_weapon_mult(player, w["key"]) if EVO_ON else 1.0
+    if RUN_EVENT[0] is not None:
+        evo *= run_event_mod("weapons")
     return (player.eff_dmg() * w["dmg"] * WEAPON_DMG_GLOBAL
             * (1.0 + dpl * WEAPON_DPL_SCALE * weapon_growth(level)) * boost * evo)
 
@@ -27430,7 +27434,9 @@ class WorldExtrasMixin:
         sfx("buy", 0.9, 0.0)
 
     def extras_wave_changed(self):
-        pass
+        ev = getattr(self, "event_wave_changed", None)
+        if ev is not None:
+            ev()
 
     def extras_update(self, dt):
         if not self.extras_active():
@@ -27497,6 +27503,20 @@ def draw_extras_hud(surf, run, t):
         for i, (col, icon, frac, nm) in enumerate(items):
             if frac > 0.15 or int(t * 6) % 2 == 0:
                 _buff_ring(surf, x0 + i * 44, y, 15, col, frac, icon)
+    ev = getattr(run, "wave_event", None)
+    if ev in WAVE_EVENTS:
+        # dalga olayı: dalga panelinin hemen altında küçük bir künye
+        col, icon, _m = WAVE_EVENTS[ev]
+        txt = L("ev." + ev)
+        if ev == "hunt" and getattr(run, "hunt_total", 0):
+            txt += "  " + L("ev.hunt_left", run.hunt_total - run.hunt_left, run.hunt_total)
+        w_ = text_width(txt, 13, True) + 44
+        r_ = pygame.Rect(0, 0, w_, 24)
+        r_.midtop = (VIRTUAL_W // 2, 80)
+        pygame.draw.rect(surf, mix_col((24, 17, 19), col, 0.22), r_, border_radius=12)
+        ink_frame(surf, r_, col, 12, 2)
+        draw_icon(surf, r_.x + 16, r_.centery, icon, col, 7)
+        draw_text(surf, txt, (r_.x + 30, r_.centery - 8), 13, lighten(col, 0.3), bold=True, shadow=False)
     if getattr(run, "_overlay", False):
         return
     ny = 168
@@ -28088,6 +28108,273 @@ def _evo_proc(run, e, perk, amount, key, boss, now, fx):
             run.evo_shocks.append([e.x, e.y, EVO_SHOCK_DELAY, amount * 0.5])
 
 
+# ---- dalga olayları + dönen pazar stoğu ----
+# "Hep aynı döngü" (kes, çoklu atış al, kan emici al, yine çoklu atış...)
+# kırılsın diye:
+# * Pazar her dalga yeni bir stokla açılır: her kategoride eşyaların yarısı
+#   kadarı tezgâhta, biri de FIRSAT (indirimli). Stok altınla yenilenebilir.
+# * Her 3 dalgada bir (4, 7, 10...; patron dalgası hariç) bir DALGA OLAYI
+#   kuralları o dalga boyunca değiştirir: kan ayında can çalma çalışmaz, altın
+#   yağmurunda pazar kapalıdır, silah şöleninde ana silah zayıflar...
+WAVE_EVENT_FIRST = 4
+WAVE_EVENT_EVERY = 3
+WAVE_EVENTS = {
+    # anahtar: (renk, simge, çarpanlar)
+    "bloodmoon":   ((230, 50, 70), "drop", dict(no_leech=1, speed=1.2, xp=1.6, gold=1.3)),
+    "goldrain":    ((255, 210, 80), "coin", dict(gold=2.0, hp=1.25, shop_closed=1)),
+    "swarm":       ((150, 230, 120), "skull", dict(spawn=1.8, hp=0.6, xp=1.25)),
+    "hunt":        ((255, 150, 60), "target", dict(hunt=3)),
+    "feast":       ((170, 120, 255), "orbit", dict(gun=0.5, weapons=1.6)),
+    "sniper":      ((120, 210, 255), "target", dict(gun=1.5, weapons=0.6)),
+    "blackmarket": ((200, 160, 255), "coin", dict(price=0.6, restock=1)),
+}
+RUN_EVENT = [None]              # o an işleyen koşunun olayı (vuruş/şifa kancaları okur)
+SHOP_STOCK_SHARE = 0.5          # her kategoride tezgâha çıkan eşya payı
+SHOP_DEAL_OFF = 0.30            # fırsat eşyasının indirimi
+SHOP_REROLL_BASE = 0.45         # yenileme: en ucuz eşyanın bu payı (+ her yenilemede artar)
+HUNT_HP = 1.6                   # av elitlerinin can çarpanı
+
+
+def run_event_mod(name, default=1.0):
+    """Etkin dalga olayının çarpanı (yoksa default)."""
+    ev = RUN_EVENT[0]
+    if ev is None:
+        return default
+    return WAVE_EVENTS[ev][2].get(name, default)
+
+
+STRINGS.update({
+    "ev.label": _T("DALGA OLAYI", "WAVE EVENT", "EVENTO DE OLEADA", "WELLEN-EREIGNIS", "СОБЫТИЕ ВОЛНЫ"),
+    "ev.bloodmoon": _T("KAN AYI", "BLOOD MOON", "LUNA DE SANGRE", "BLUTMOND", "КРОВАВАЯ ЛУНА"),
+    "ev.bloodmoon.d": _T("can çalma ve yenilenme çalışmaz, yaratıklar %20 hızlı - tecrübe x1.6, altın x1.3",
+                         "no lifesteal or regen, enemies 20% faster - XP x1.6, gold x1.3",
+                         "sin robo de vida ni regeneración, enemigos 20% más rápidos - EXP x1,6, oro x1,3",
+                         "kein Lebensraub/Regeneration, Gegner 20% schneller - EP x1,6, Gold x1,3",
+                         "нет вампиризма и регенерации, враги на 20% быстрее - опыт x1,6, золото x1,3"),
+    "ev.goldrain": _T("ALTIN YAĞMURU", "GOLD RAIN", "LLUVIA DE ORO", "GOLDREGEN", "ЗОЛОТОЙ ДОЖДЬ"),
+    "ev.goldrain.d": _T("altın x2 ama pazar kapalı, yaratıklar %25 dayanıklı - sonraki dalgaya biriktir",
+                        "gold x2 but the market is closed, enemies 25% tougher - save it for next wave",
+                        "oro x2 pero el mercado cierra, enemigos 25% más duros - ahorra para la próxima",
+                        "Gold x2, aber Markt geschlossen, Gegner 25% zäher - spar für die nächste Welle",
+                        "золото x2, но рынок закрыт, враги на 25% крепче - копи на следующую волну"),
+    "ev.swarm": _T("SÜRÜ", "SWARM", "ENJAMBRE", "SCHWARM", "РОЙ"),
+    "ev.swarm.d": _T("yaratıklar neredeyse iki kat sık ama %40 cansız - tecrübe x1.25",
+                     "almost twice as many enemies, but 40% less HP - XP x1.25",
+                     "casi el doble de enemigos, con 40% menos vida - EXP x1,25",
+                     "fast doppelt so viele Gegner, aber 40% weniger LP - EP x1,25",
+                     "врагов почти вдвое больше, но у них на 40% меньше здоровья - опыт x1,25"),
+    "ev.hunt": _T("ELİT AVI", "ELITE HUNT", "CAZA DE ÉLITE", "ELITEJAGD", "ОХОТА НА ЭЛИТУ"),
+    "ev.hunt.d": _T("işaretli 3 eliti dalga bitmeden devir: +2 seviye kartı ve altın kesesi",
+                    "slay the 3 marked elites before the wave ends: +2 level cards and a gold purse",
+                    "derrota a las 3 élites marcadas antes del fin: +2 cartas de nivel y oro",
+                    "besiege die 3 markierten Elite vor Wellenende: +2 Stufenkarten und Gold",
+                    "убей 3 помеченных элиты до конца волны: +2 карты уровня и золото"),
+    "ev.feast": _T("SİLAH ŞÖLENİ", "WEAPON FEAST", "FESTÍN DE ARMAS", "WAFFENFEST", "ПИР ОРУЖИЯ"),
+    "ev.feast.d": _T("ana silahın hasarı yarıya iner, bütün silahların +%60 vurur",
+                     "main gun deals half damage, all weapons hit 60% harder",
+                     "el arma principal hace la mitad, las demás +60%",
+                     "Hauptwaffe halber Schaden, alle Waffen +60%",
+                     "основное оружие бьёт вдвое слабее, все остальные +60%"),
+    "ev.sniper": _T("NİŞANCI GECESİ", "SHARPSHOOTER NIGHT", "NOCHE DEL TIRADOR", "SCHARFSCHÜTZENNACHT",
+                    "НОЧЬ СНАЙПЕРА"),
+    "ev.sniper.d": _T("ana silahın +%50 vurur, diğer silahların -%40",
+                      "main gun +50% damage, other weapons -40%",
+                      "arma principal +50%, otras armas -40%",
+                      "Hauptwaffe +50%, andere Waffen -40%",
+                      "основное оружие +50%, остальное -40%"),
+    "ev.blackmarket": _T("KARA BORSA", "BLACK MARKET", "MERCADO NEGRO", "SCHWARZMARKT", "ЧЁРНЫЙ РЫНОК"),
+    "ev.blackmarket.d": _T("pazar yepyeni bir stokla açıldı, her şey %40 indirimli",
+                           "the market restocked with new goods, everything 40% off",
+                           "el mercado se renovó, todo con 40% de descuento",
+                           "der Markt ist neu bestückt, alles 40% günstiger",
+                           "рынок обновлён, всё со скидкой 40%"),
+    "ev.hunt_left": _T("AV: {0}/{1}", "HUNT: {0}/{1}", "CAZA: {0}/{1}", "JAGD: {0}/{1}", "ОХОТА: {0}/{1}"),
+    "ev.hunt_done": _T("AV TAMAM!", "HUNT COMPLETE!", "¡CAZA COMPLETA!", "JAGD ERFÜLLT!", "ОХОТА ЗАВЕРШЕНА!"),
+    "ev.hunt_fail": _T("Av kaçtı...", "The hunt got away...", "La presa escapó...", "Die Beute entkam...",
+                       "Добыча ушла..."),
+    "shop.closed": _T("PAZAR KAPALI: altın yağmurunda tezgâh kurulmaz. Sonraki dalga açılır.",
+                      "MARKET CLOSED during the gold rain. It reopens next wave.",
+                      "MERCADO CERRADO durante la lluvia de oro. Abre en la próxima oleada.",
+                      "MARKT GESCHLOSSEN während des Goldregens. Nächste Welle wieder offen.",
+                      "РЫНОК ЗАКРЫТ во время золотого дождя. Откроется в следующую волну."),
+    "shop.stock": _T("Stok her dalga yenilenir", "Stock changes every wave", "El stock cambia cada oleada",
+                     "Sortiment wechselt jede Welle", "Товар меняется каждую волну"),
+    "shop.reroll": _T("STOĞU YENİLE", "RESTOCK", "RENOVAR", "NEU BESTÜCKEN", "ОБНОВИТЬ"),
+    "shop.deal": _T("FIRSAT", "DEAL", "OFERTA", "ANGEBOT", "СКИДКА"),
+})
+
+
+class WaveEventMixin:
+    """Dalga olayları ve pazar stoğu (RunState karışımı)."""
+
+    def events_init(self):
+        self.wave_event = None
+        self.wave_event_wave = 0
+        self.wave_event_last = None
+        self.wave_event_mults = []      # [(oyuncu, xp, altın)] - olay bitince geri alınır
+        self.hunt_left = 0
+        self.hunt_total = 0
+        self.shop_stock = None          # tezgâhtaki eşyaların anahtarları (None = hepsi)
+        self.shop_deal = None
+        self.shop_rerolls = 0
+        self.shop_stock_wave = -1
+
+    # ---- olaylar ----
+    def _event_players(self):
+        return [q for q in (getattr(self, "players", None) or [self.player])]
+
+    def event_wave_changed(self):
+        if getattr(self, "is_guest", False):
+            return
+        self.end_wave_event()
+        self.roll_shop_stock()
+        w = int(self.waves.wave)
+        if (w >= WAVE_EVENT_FIRST and (w - WAVE_EVENT_FIRST) % WAVE_EVENT_EVERY == 0
+                and not self.waves.is_boss_wave(w) and not self.waves.boss_active):
+            keys = [k for k in WAVE_EVENTS if k != self.wave_event_last]
+            self.start_wave_event(random.choice(keys))
+
+    def start_wave_event(self, key):
+        col, icon, mods = WAVE_EVENTS[key]
+        self.wave_event = key
+        self.wave_event_last = key
+        self.wave_event_wave = int(self.waves.wave)
+        RUN_EVENT[0] = key
+        self.wave_event_mults = []
+        for q in self._event_players():
+            xm, gm = mods.get("xp", 1.0), mods.get("gold", 1.0)
+            q.run_xp_mult *= xm
+            q.run_coin_mult *= gm
+            self.wave_event_mults.append((q, xm, gm))
+        self._apply_wave_mods()
+        if mods.get("restock"):
+            self.roll_shop_stock(share=0.75)
+        if mods.get("hunt"):
+            self._spawn_hunt(int(mods["hunt"]))
+        p = self.player
+        self.waves.announce_text = L("ev." + key)
+        self.waves.announce_timer = 3.0
+        self.fx.do_flash(col, 0.25)
+        self.fx.ring(p.x, p.y, col, n=26, speed=300, life=0.7, r=4)
+        self.find_note = (self.run_time, L("ev." + key) + ": " + L("ev." + key + ".d"), col)
+        sfx("second", 0.8, 0.0)
+
+    def end_wave_event(self):
+        key = self.wave_event
+        if key is None:
+            return
+        for q, xm, gm in self.wave_event_mults:
+            q.run_xp_mult /= xm
+            q.run_coin_mult /= gm
+        self.wave_event_mults = []
+        if key == "hunt" and self.hunt_left > 0:
+            for e in self.enemies:
+                if getattr(e, "_hunt", False):
+                    e._hunt = False
+            p = self.player
+            self.fx.popup(p.x, p.y - 90, L("ev.hunt_fail"), (200, 200, 210), 18, life=1.6)
+        self.hunt_left = 0
+        self.wave_event = None
+        RUN_EVENT[0] = None
+        self._apply_wave_mods()
+
+    def _spawn_hunt(self, n):
+        self.hunt_left = self.hunt_total = n
+        for _ in range(n):
+            x, y = self.near_camera_point()
+            e = self._make_enemy("elite", x, y)
+            e.max_hp *= HUNT_HP
+            e.hp = e.max_hp
+            e._hunt = True
+            self.enemies.append(e)
+
+    def event_on_kill(self, e):
+        if not getattr(e, "_hunt", False) or self.wave_event != "hunt":
+            return
+        e._hunt = False
+        self.hunt_left = max(0, self.hunt_left - 1)
+        col = WAVE_EVENTS["hunt"][0]
+        self.fx.ring(e.x, e.y, col, n=18, speed=240, life=0.5, r=3.5)
+        p = self.player
+        if self.hunt_left > 0:
+            self.fx.popup(p.x, p.y - 90, L("ev.hunt_left", self.hunt_total - self.hunt_left, self.hunt_total),
+                          col, 18, life=1.2)
+            return
+        # ödül: herkese 2 seviye kartı + altın kesesi
+        w = max(1, int(self.waves.wave))
+        for i, q in enumerate(self._event_players()):
+            def pay(q=q):
+                self.pending_levelups += 2
+                gold = int(scaled_coin_gain(120 + 30 * w, q.eff_coin_mult(), self.biome))
+                self.gold_wallet += gold
+                self.coins_earned += gold
+            self._as_player(i if hasattr(self, "_ctx_use") else None, pay)
+        self.fx.popup(p.x, p.y - 96, L("ev.hunt_done"), col, 26, life=2.0)
+        self.fx.do_flash(col, 0.3)
+        sfx("ach", 0.9, 0.0)
+
+    # ---- pazar stoğu ----
+    def roll_shop_stock(self, share=SHOP_STOCK_SHARE):
+        """Her kategoriden eşyaların bir kısmı tezgâha çıkar; biri fırsat olur."""
+        if getattr(self, "is_coop", False):
+            self.shop_stock, self.shop_deal = None, None      # 2 kişilikte bütün pazar açık
+            return
+        p = self.player
+        stock = set()
+        by_cat = {}
+        for it in SHOP_ITEMS:
+            by_cat.setdefault(it["cat"], []).append(it)
+        for cat, items in by_cat.items():
+            if cat == "cursed":
+                stock.update(it["key"] for it in items)
+                continue
+            # yalnız şu an alınabilenler (kilitli / tavandaki eşya tezgâhı boşa doldurmasın)
+            cand = [it for it in items if p.shop_levels.get(it["key"], 0) < it.get("max", 999)
+                    and shop_item_unlocked(it, self.waves.wave, self.biome)]
+            n = max(2, int(math.ceil(len(items) * share)))
+            stock.update(it["key"] for it in random.sample(cand, min(n, len(cand))))
+        self.shop_stock = stock
+        buyable = [k for k in stock if shop_item_unlocked(SHOP_BY_KEY[k], self.waves.wave, self.biome)
+                   and not SHOP_BY_KEY[k].get("cursed")]
+        self.shop_deal = random.choice(buyable) if buyable else None
+        self.shop_stock_wave = int(self.waves.wave)
+        self.shop_offers = self.stocked_items()
+
+    def stocked_items(self):
+        if self.shop_stock is None:
+            return SHOP_ITEMS
+        return [it for it in SHOP_ITEMS if it["key"] in self.shop_stock]
+
+    def shop_price(self, item, lvl):
+        """Eşyanın bu koşudaki fiyatı (fırsat + kara borsa indirimleri)."""
+        cost = shop_item_cost(item, lvl)
+        k = run_event_mod("price") if self.wave_event == "blackmarket" else 1.0
+        if item["key"] == self.shop_deal:
+            k *= 1.0 - SHOP_DEAL_OFF
+        return max(1, int(round(cost * k)))
+
+    def shop_closed(self):
+        return self.wave_event is not None and bool(WAVE_EVENTS[self.wave_event][2].get("shop_closed"))
+
+    def shop_reroll_price(self):
+        items = [it for it in self.stocked_items() if shop_item_unlocked(it, self.waves.wave, self.biome)]
+        base = min((shop_item_cost(it, self.player.shop_levels.get(it["key"], 0)) for it in items), default=60)
+        return max(15, int(base * (SHOP_REROLL_BASE + 0.25 * self.shop_rerolls)))
+
+    def shop_reroll(self):
+        if self.shop_stock is None:
+            return False
+        cost = self.shop_reroll_price()
+        if self.gold_wallet < cost:
+            sfx("error", 0.6, 0.0)
+            return False
+        self.gold_wallet -= cost
+        self.shop_rerolls += 1
+        self.roll_shop_stock()
+        sfx("buy", 0.8, 0.0)
+        return True
+
+
 class SkillMixin:
     """Odak, kombo kırılması, kusursuz kaçış ve savuşturma (RunState karışımı)."""
 
@@ -28547,7 +28834,7 @@ def draw_evo_card(surf, r2, ch, run, t, hover):
                   bold=True, center=True, shadow=False)
 
 
-class RunState(EvoMixin, WorldExtrasMixin, SkillMixin):
+class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
     def __init__(self, save, skin_id, diff="normal", ach=None):
         self.save = save
         self.diff = diff
@@ -28566,6 +28853,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin):
         self.fx = EffectSystem()
         self.evo_init()
         self.extras_init()
+        self.events_init()
         self.waves = WaveManager(diff)
         # Düşmanlar dünyanın kenarından değil, kameranın hemen dışından gelir.
         self.waves.spawn_pos_fn = self.near_camera_point
@@ -28976,8 +29264,9 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin):
     def _apply_wave_mods(self):
         """Harita (yalnız arenada) + yemin çarpanlarını dalga yöneticisine yazar."""
         arena = self.biome != "hell"
-        self.waves.enemy_speed_mult = (self.theme_speed if arena else 1.0) * self.oath_speed
-        self.waves.spawn_rate_mult = (self.theme_spawn if arena else 1.0) * self.oath_spawn
+        ev = WAVE_EVENTS[self.wave_event][2] if getattr(self, "wave_event", None) else {}
+        self.waves.enemy_speed_mult = (self.theme_speed if arena else 1.0) * self.oath_speed * ev.get("speed", 1.0)
+        self.waves.spawn_rate_mult = (self.theme_spawn if arena else 1.0) * self.oath_spawn * ev.get("spawn", 1.0)
         self.waves.theme = self.map_theme if arena else "stone"
         self.waves.doom = self.map_theme != "stone"
 
@@ -29196,7 +29485,8 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin):
             base = hell_hp_mult(wave)
         else:
             base = arena_hp_mult(wave) * (1.0 + getattr(self, "theme_hp", 0.0))
-        return base * (1.0 + self.player.enemy_hp_curse) * self.adapt_hp_mult(wave, base)
+        ev = WAVE_EVENTS[self.wave_event][2].get("hp", 1.0) if getattr(self, "wave_event", None) else 1.0
+        return base * (1.0 + self.player.enemy_hp_curse) * self.adapt_hp_mult(wave, base) * ev
 
     def adapt_hp_mult(self, wave, base):
         """Uyarlanır yaratık canı: oyuncu o dalga için olağandan çok güçlüyse
@@ -29222,7 +29512,9 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin):
         return m
 
     def open_shop(self):
-        self.shop_offers = SHOP_ITEMS
+        if getattr(self, "shop_stock_wave", -1) < 0:
+            self.roll_shop_stock()          # koşunun ilk stoğu
+        self.shop_offers = self.stocked_items()
 
     def spawn_market_portal(self):
         """Kaldırıldı."""
@@ -29343,7 +29635,9 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin):
         lvl = self.player.shop_levels.get(key, 0)
         if lvl >= item.get("max", 999):
             return False
-        cost = shop_item_cost(item, lvl)
+        if self.shop_closed() or (self.shop_stock is not None and key not in self.shop_stock):
+            return False
+        cost = self.shop_price(item, lvl)
         if self.gold_wallet < cost:
             sfx("error", 0.6, 0.0)
             return False
@@ -29377,6 +29671,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin):
                         break
             if near >= 3:
                 atk_mult *= (1.0 + p.swarm_bonus())
+        atk_mult *= run_event_mod("gun")           # dalga olayı: şölen / nişancı
         n = 1 + p.multishot_level
         spread_deg = 9
         base_ang = math.atan2(aim_dy, aim_dx)
@@ -31006,6 +31301,8 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin):
             e.death_counted = True
         except AttributeError:
             pass        # __slots__ kullanan bir tür gelirse sessizce geç
+        if getattr(e, "_hunt", False):
+            self.event_on_kill(e)
         # bombacı öldüğü yerde patlar.
         if getattr(e, "kind", "") == "bomber":
             self.hazards.append(Hazard(e.x, e.y, BOMBER_RADIUS, BOMBER_DELAY,
@@ -31115,6 +31412,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin):
         DMG_LOG[0] = self.dmg_log
         DMG_SRC[0] = "other"
         EVO_CTX[0] = self
+        RUN_EVENT[0] = getattr(self, "wave_event", None)
         ENEMY_HAZARDS[0] = self
         # kusursuz kaçış: kısa ağır çekim
         if getattr(self, "slowmo_t", 0.0) > 0:
@@ -36482,6 +36780,18 @@ def draw_run(surf, run, t, aim_pos=None, shake=(0, 0), world_only=False):
     else:
         for e in sorted(_vis_en, key=lambda e: e.y):
             e.draw(world, t)
+    if getattr(run, "hunt_left", 0):
+        # elit avı: işaretli elitlerin çevresinde dönen nişan
+        hc = WAVE_EVENTS["hunt"][0]
+        for e in _vis_en:
+            if e.alive and getattr(e, "_hunt", False):
+                rr = e.radius + 12 + 2 * math.sin(t * 6)
+                ring_aa(world, e.x, e.y, rr, hc, 2)
+                for k_ in range(4):
+                    a_ = t * 1.5 + k_ * math.pi / 2
+                    thick_line(world, (e.x + math.cos(a_) * (rr - 5), e.y + math.sin(a_) * (rr - 5)),
+                               (e.x + math.cos(a_) * (rr + 6), e.y + math.sin(a_) * (rr + 6)), 2.5, hc)
+                draw_icon(world, e.x, e.y - e.radius - 22, "target", hc, 7)
     for b in sorted(run.bosses, key=lambda b: b.y):
         if b.alive:
             b.draw(world, t)
@@ -40122,7 +40432,9 @@ class RunShopOverlay:
         hover = rect.collidepoint(mouse_pos) and unlocked
         lvl = p.shop_levels.get(item["key"], 0)
         maxed = lvl >= item.get("max", 999)
-        cost = shop_item_cost(item, lvl)
+        base_cost = shop_item_cost(item, lvl)
+        cost = run.shop_price(item, lvl) if hasattr(run, "shop_price") else base_cost
+        deal = item["key"] == getattr(run, "shop_deal", None) and unlocked and not maxed
         affordable = unlocked and not maxed and run.gold_wallet >= cost
         is_hell_item = bool(item.get("hell_only"))
         col = tuple(item["color"])
@@ -40155,6 +40467,16 @@ class RunShopOverlay:
         else:
             edge_col = (86, 64, 66)
         ink_frame(surf, rect, edge_col, 16, 3 if hover or maxed else 2)
+        if deal:
+            # fırsat: köşede indirim şeridi
+            dcol = (255, 120, 90)
+            add_glow(surf, rect.centerx, rect.y + 52, 60, dcol, 0.10 + 0.06 * pulse)
+            dr = pygame.Rect(0, 0, text_width(L("shop.deal"), 10, True) + 50, 18)
+            dr.midtop = (rect.centerx, rect.y - 9)
+            pygame.draw.rect(surf, dcol, dr, border_radius=9)
+            pygame.draw.rect(surf, INK, dr, width=1, border_radius=9)
+            draw_text(surf, "%s -%d%%" % (L("shop.deal"), int(SHOP_DEAL_OFF * 100)), dr.center, 10, INK,
+                      bold=True, center=True, shadow=False)
 
         # ---- kategori + kademe rozeti ----
         badge, bcol = self.TIER_BADGE.get(item.get("tier", 1), ("I", TEXT_DIM))
@@ -40268,6 +40590,13 @@ class RunShopOverlay:
             ink_frame(surf, pill, None, 13, 2)
             draw_coin_label(surf, pill.centerx, pill.centery, cost_txt, pcol, 17,
                             icon_r=8)
+            if cost < base_cost:
+                # indirimden önceki fiyat, üstü çizili
+                old = fmt_num(base_cost)
+                ox = pill.right + 6
+                draw_text(surf, old, (ox, pill.y + 6), 11, (150, 120, 110), shadow=False)
+                pygame.draw.line(surf, (220, 110, 90), (ox - 1, pill.y + 13),
+                                 (ox + text_width(old, 11) + 1, pill.y + 13), 2)
             if hover and affordable:
                 draw_text(surf, L("ui.buy"), (rect.centerx, rect.y + 190), 10,
                           lighten(col, 0.35), bold=True, center=True, shadow=False)
@@ -40282,7 +40611,40 @@ class RunShopOverlay:
         hellish = self._hellish(run, self.tab)
         self._draw_backdrop(surf, hellish, t)
         self._draw_header(surf, run, hellish, t)
+        if hasattr(run, "shop_closed") and run.shop_closed():
+            # altın yağmuru: pazar kapalı
+            col = WAVE_EVENTS["goldrain"][0]
+            r_ = pygame.Rect(0, 0, 760, 120)
+            r_.center = (VIRTUAL_W // 2, VIRTUAL_H // 2 - 20)
+            panel(surf, r_, bg=(40, 30, 20), edge=col, alpha=246, radius=16, edge_w=3)
+            draw_icon(surf, r_.x + 46, r_.centery, "coin", col, 16)
+            lines = wrap_text(L("shop.closed"), 18, r_.w - 120)[:3]
+            y0 = r_.centery - len(lines) * 13
+            for i, ln in enumerate(lines):
+                draw_text(surf, ln, (r_.x + 90, y0 + i * 26), 18, lighten(col, 0.3), bold=True,
+                          shadow=False)
+            btn = Button((VIRTUAL_W / 2 - 130, VIRTUAL_H - 50, 260, 38), L("ui.close_b"), None)
+            btn.update(mouse_pos, 1 / 60)
+            btn.draw(surf)
+            return btn.rect.collidepoint(mouse_pos) and clicked
         self._draw_tabs(surf, run, mouse_pos, clicked, hellish, t)
+        if getattr(run, "shop_stock", None) is not None:
+            # stok notu + altınla yenileme
+            draw_text(surf, L("shop.stock"), (VIRTUAL_W / 2 - 300, 82), 11, TEXT_DIM, right=True, shadow=False)
+            price = run.shop_reroll_price()
+            rr = pygame.Rect(0, 0, 210, 28)
+            rr.midleft = (VIRTUAL_W / 2 + 300, 86)
+            can = run.gold_wallet >= price
+            hov = rr.collidepoint(mouse_pos)
+            pygame.draw.rect(surf, (74, 58, 34) if (hov and can) else (48, 38, 30), rr, border_radius=9)
+            ink_frame(surf, rr, GOLD if can else (110, 92, 70), 9, 2)
+            draw_text(surf, L("shop.reroll"), (rr.x + 12, rr.centery - 7), 12, TEXT if can else TEXT_DIM,
+                      bold=True, shadow=False)
+            draw_coin_label(surf, rr.right - 40, rr.centery, fmt_num(price), GOLD if can else (122, 98, 62), 13,
+                            icon_r=6)
+            if hov and clicked and can:
+                run.shop_reroll()
+                clicked = False
 
         offers = [it for it in run.shop_offers if it["cat"] == self.tab]
         per_page = self.COLS * self.ROWS
@@ -46619,6 +46981,7 @@ class CoopRunState(RunState):
         DMG_LOG[0] = self.dmg_log
         DMG_SRC[0] = "other"
         EVO_CTX[0] = self
+        RUN_EVENT[0] = getattr(self, "wave_event", None)
         ENEMY_HAZARDS[0] = self
         self.run_time += dt
         if self.time_stop > 0:
