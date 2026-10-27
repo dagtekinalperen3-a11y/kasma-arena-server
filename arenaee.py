@@ -28108,14 +28108,12 @@ def _evo_proc(run, e, perk, amount, key, boss, now, fx):
             run.evo_shocks.append([e.x, e.y, EVO_SHOCK_DELAY, amount * 0.5])
 
 
-# ---- dalga olayları + dönen pazar stoğu ----
+# ---- dalga olayları ----
 # "Hep aynı döngü" (kes, çoklu atış al, kan emici al, yine çoklu atış...)
-# kırılsın diye:
-# * Pazar her dalga yeni bir stokla açılır: her kategoride eşyaların yarısı
-#   kadarı tezgâhta, biri de FIRSAT (indirimli). Stok altınla yenilenebilir.
-# * Her 3 dalgada bir (4, 7, 10...; patron dalgası hariç) bir DALGA OLAYI
-#   kuralları o dalga boyunca değiştirir: kan ayında can çalma çalışmaz, altın
-#   yağmurunda pazar kapalıdır, silah şöleninde ana silah zayıflar...
+# kırılsın diye her 3 dalgada bir (4, 7, 10...; patron dalgası hariç) bir
+# DALGA OLAYI kuralları o dalga boyunca değiştirir: kan ayında can çalma
+# çalışmaz, altın yağmurunda pazar kapalıdır, silah şöleninde ana silah
+# zayıflar...
 WAVE_EVENT_FIRST = 4
 WAVE_EVENT_EVERY = 3
 WAVE_EVENTS = {
@@ -28126,12 +28124,9 @@ WAVE_EVENTS = {
     "hunt":        ((255, 150, 60), "target", dict(hunt=3)),
     "feast":       ((170, 120, 255), "orbit", dict(gun=0.5, weapons=1.6)),
     "sniper":      ((120, 210, 255), "target", dict(gun=1.5, weapons=0.6)),
-    "blackmarket": ((200, 160, 255), "coin", dict(price=0.6, restock=1)),
+    "blackmarket": ((200, 160, 255), "coin", dict(price=0.6)),
 }
 RUN_EVENT = [None]              # o an işleyen koşunun olayı (vuruş/şifa kancaları okur)
-SHOP_STOCK_SHARE = 0.5          # her kategoride tezgâha çıkan eşya payı
-SHOP_DEAL_OFF = 0.30            # fırsat eşyasının indirimi
-SHOP_REROLL_BASE = 0.45         # yenileme: en ucuz eşyanın bu payı (+ her yenilemede artar)
 HUNT_HP = 1.6                   # av elitlerinin can çarpanı
 
 
@@ -28183,11 +28178,11 @@ STRINGS.update({
                       "Hauptwaffe +50%, andere Waffen -40%",
                       "основное оружие +50%, остальное -40%"),
     "ev.blackmarket": _T("KARA BORSA", "BLACK MARKET", "MERCADO NEGRO", "SCHWARZMARKT", "ЧЁРНЫЙ РЫНОК"),
-    "ev.blackmarket.d": _T("pazar yepyeni bir stokla açıldı, her şey %40 indirimli",
-                           "the market restocked with new goods, everything 40% off",
-                           "el mercado se renovó, todo con 40% de descuento",
-                           "der Markt ist neu bestückt, alles 40% günstiger",
-                           "рынок обновлён, всё со скидкой 40%"),
+    "ev.blackmarket.d": _T("bu dalga pazarda her şey %40 indirimli",
+                           "everything in the market is 40% off this wave",
+                           "todo el mercado con 40% de descuento esta oleada",
+                           "diese Welle ist alles im Markt 40% günstiger",
+                           "в эту волну всё на рынке со скидкой 40%"),
     "ev.hunt_left": _T("AV: {0}/{1}", "HUNT: {0}/{1}", "CAZA: {0}/{1}", "JAGD: {0}/{1}", "ОХОТА: {0}/{1}"),
     "ev.hunt_done": _T("AV TAMAM!", "HUNT COMPLETE!", "¡CAZA COMPLETA!", "JAGD ERFÜLLT!", "ОХОТА ЗАВЕРШЕНА!"),
     "ev.hunt_fail": _T("Av kaçtı...", "The hunt got away...", "La presa escapó...", "Die Beute entkam...",
@@ -28197,10 +28192,6 @@ STRINGS.update({
                       "MERCADO CERRADO durante la lluvia de oro. Abre en la próxima oleada.",
                       "MARKT GESCHLOSSEN während des Goldregens. Nächste Welle wieder offen.",
                       "РЫНОК ЗАКРЫТ во время золотого дождя. Откроется в следующую волну."),
-    "shop.stock": _T("Stok her dalga yenilenir", "Stock changes every wave", "El stock cambia cada oleada",
-                     "Sortiment wechselt jede Welle", "Товар меняется каждую волну"),
-    "shop.reroll": _T("STOĞU YENİLE", "RESTOCK", "RENOVAR", "NEU BESTÜCKEN", "ОБНОВИТЬ"),
-    "shop.deal": _T("FIRSAT", "DEAL", "OFERTA", "ANGEBOT", "СКИДКА"),
 })
 
 
@@ -28214,10 +28205,6 @@ class WaveEventMixin:
         self.wave_event_mults = []      # [(oyuncu, xp, altın)] - olay bitince geri alınır
         self.hunt_left = 0
         self.hunt_total = 0
-        self.shop_stock = None          # tezgâhtaki eşyaların anahtarları (None = hepsi)
-        self.shop_deal = None
-        self.shop_rerolls = 0
-        self.shop_stock_wave = -1
 
     # ---- olaylar ----
     def _event_players(self):
@@ -28227,7 +28214,6 @@ class WaveEventMixin:
         if getattr(self, "is_guest", False):
             return
         self.end_wave_event()
-        self.roll_shop_stock()
         w = int(self.waves.wave)
         if (w >= WAVE_EVENT_FIRST and (w - WAVE_EVENT_FIRST) % WAVE_EVENT_EVERY == 0
                 and not self.waves.is_boss_wave(w) and not self.waves.boss_active):
@@ -28247,8 +28233,6 @@ class WaveEventMixin:
             q.run_coin_mult *= gm
             self.wave_event_mults.append((q, xm, gm))
         self._apply_wave_mods()
-        if mods.get("restock"):
-            self.roll_shop_stock(share=0.75)
         if mods.get("hunt"):
             self._spawn_hunt(int(mods["hunt"]))
         p = self.player
@@ -28313,66 +28297,17 @@ class WaveEventMixin:
         self.fx.do_flash(col, 0.3)
         sfx("ach", 0.9, 0.0)
 
-    # ---- pazar stoğu ----
-    def roll_shop_stock(self, share=SHOP_STOCK_SHARE):
-        """Her kategoriden eşyaların bir kısmı tezgâha çıkar; biri fırsat olur."""
-        if getattr(self, "is_coop", False):
-            self.shop_stock, self.shop_deal = None, None      # 2 kişilikte bütün pazar açık
-            return
-        p = self.player
-        stock = set()
-        by_cat = {}
-        for it in SHOP_ITEMS:
-            by_cat.setdefault(it["cat"], []).append(it)
-        for cat, items in by_cat.items():
-            if cat == "cursed":
-                stock.update(it["key"] for it in items)
-                continue
-            # yalnız şu an alınabilenler (kilitli / tavandaki eşya tezgâhı boşa doldurmasın)
-            cand = [it for it in items if p.shop_levels.get(it["key"], 0) < it.get("max", 999)
-                    and shop_item_unlocked(it, self.waves.wave, self.biome)]
-            n = max(2, int(math.ceil(len(items) * share)))
-            stock.update(it["key"] for it in random.sample(cand, min(n, len(cand))))
-        self.shop_stock = stock
-        buyable = [k for k in stock if shop_item_unlocked(SHOP_BY_KEY[k], self.waves.wave, self.biome)
-                   and not SHOP_BY_KEY[k].get("cursed")]
-        self.shop_deal = random.choice(buyable) if buyable else None
-        self.shop_stock_wave = int(self.waves.wave)
-        self.shop_offers = self.stocked_items()
-
-    def stocked_items(self):
-        if self.shop_stock is None:
-            return SHOP_ITEMS
-        return [it for it in SHOP_ITEMS if it["key"] in self.shop_stock]
-
+    # ---- pazar ----
     def shop_price(self, item, lvl):
-        """Eşyanın bu koşudaki fiyatı (fırsat + kara borsa indirimleri)."""
+        """Eşyanın bu koşudaki fiyatı (kara borsa indirimi)."""
         cost = shop_item_cost(item, lvl)
-        k = run_event_mod("price") if self.wave_event == "blackmarket" else 1.0
-        if item["key"] == self.shop_deal:
-            k *= 1.0 - SHOP_DEAL_OFF
-        return max(1, int(round(cost * k)))
+        if getattr(self, "wave_event", None) != "blackmarket":
+            return cost
+        return max(1, int(round(cost * WAVE_EVENTS["blackmarket"][2]["price"])))
 
     def shop_closed(self):
-        return self.wave_event is not None and bool(WAVE_EVENTS[self.wave_event][2].get("shop_closed"))
-
-    def shop_reroll_price(self):
-        items = [it for it in self.stocked_items() if shop_item_unlocked(it, self.waves.wave, self.biome)]
-        base = min((shop_item_cost(it, self.player.shop_levels.get(it["key"], 0)) for it in items), default=60)
-        return max(15, int(base * (SHOP_REROLL_BASE + 0.25 * self.shop_rerolls)))
-
-    def shop_reroll(self):
-        if self.shop_stock is None:
-            return False
-        cost = self.shop_reroll_price()
-        if self.gold_wallet < cost:
-            sfx("error", 0.6, 0.0)
-            return False
-        self.gold_wallet -= cost
-        self.shop_rerolls += 1
-        self.roll_shop_stock()
-        sfx("buy", 0.8, 0.0)
-        return True
+        ev = getattr(self, "wave_event", None)
+        return ev in WAVE_EVENTS and bool(WAVE_EVENTS[ev][2].get("shop_closed"))
 
 
 class SkillMixin:
@@ -29512,9 +29447,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
         return m
 
     def open_shop(self):
-        if getattr(self, "shop_stock_wave", -1) < 0:
-            self.roll_shop_stock()          # koşunun ilk stoğu
-        self.shop_offers = self.stocked_items()
+        self.shop_offers = SHOP_ITEMS
 
     def spawn_market_portal(self):
         """Kaldırıldı."""
@@ -29635,7 +29568,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
         lvl = self.player.shop_levels.get(key, 0)
         if lvl >= item.get("max", 999):
             return False
-        if self.shop_closed() or (self.shop_stock is not None and key not in self.shop_stock):
+        if self.shop_closed():
             return False
         cost = self.shop_price(item, lvl)
         if self.gold_wallet < cost:
@@ -40524,7 +40457,6 @@ class RunShopOverlay:
         maxed = lvl >= item.get("max", 999)
         base_cost = shop_item_cost(item, lvl)
         cost = run.shop_price(item, lvl) if hasattr(run, "shop_price") else base_cost
-        deal = item["key"] == getattr(run, "shop_deal", None) and unlocked and not maxed
         affordable = unlocked and not maxed and run.gold_wallet >= cost
         is_hell_item = bool(item.get("hell_only"))
         col = tuple(item["color"])
@@ -40557,17 +40489,6 @@ class RunShopOverlay:
         else:
             edge_col = (86, 64, 66)
         ink_frame(surf, rect, edge_col, 16, 3 if hover or maxed else 2)
-        if deal:
-            # fırsat: köşede indirim şeridi
-            dcol = (255, 120, 90)
-            add_glow(surf, rect.centerx, rect.y + 52, 60, dcol, 0.10 + 0.06 * pulse)
-            dr = pygame.Rect(0, 0, text_width(L("shop.deal"), 10, True) + 50, 18)
-            dr.midtop = (rect.centerx, rect.y - 9)
-            pygame.draw.rect(surf, dcol, dr, border_radius=9)
-            pygame.draw.rect(surf, INK, dr, width=1, border_radius=9)
-            draw_text(surf, "%s -%d%%" % (L("shop.deal"), int(SHOP_DEAL_OFF * 100)), dr.center, 10, INK,
-                      bold=True, center=True, shadow=False)
-
         # ---- kategori + kademe rozeti ----
         badge, bcol = self.TIER_BADGE.get(item.get("tier", 1), ("I", TEXT_DIM))
         draw_text(surf, LX("cat." + item["cat"], SHOP_CATS.get(item["cat"], "")), (rect.x + 13, rect.y + 14), 9,
@@ -40718,23 +40639,6 @@ class RunShopOverlay:
             btn.draw(surf)
             return btn.rect.collidepoint(mouse_pos) and clicked
         self._draw_tabs(surf, run, mouse_pos, clicked, hellish, t)
-        if getattr(run, "shop_stock", None) is not None:
-            # stok notu + altınla yenileme
-            draw_text(surf, L("shop.stock"), (VIRTUAL_W / 2 - 300, 82), 11, TEXT_DIM, right=True, shadow=False)
-            price = run.shop_reroll_price()
-            rr = pygame.Rect(0, 0, 210, 28)
-            rr.midleft = (VIRTUAL_W / 2 + 300, 86)
-            can = run.gold_wallet >= price
-            hov = rr.collidepoint(mouse_pos)
-            pygame.draw.rect(surf, (74, 58, 34) if (hov and can) else (48, 38, 30), rr, border_radius=9)
-            ink_frame(surf, rr, GOLD if can else (110, 92, 70), 9, 2)
-            draw_text(surf, L("shop.reroll"), (rr.x + 12, rr.centery - 7), 12, TEXT if can else TEXT_DIM,
-                      bold=True, shadow=False)
-            draw_coin_label(surf, rr.right - 40, rr.centery, fmt_num(price), GOLD if can else (122, 98, 62), 13,
-                            icon_r=6)
-            if hov and clicked and can:
-                run.shop_reroll()
-                clicked = False
 
         offers = [it for it in run.shop_offers if it["cat"] == self.tab]
         per_page = self.COLS * self.ROWS
