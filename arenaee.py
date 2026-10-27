@@ -1815,6 +1815,16 @@ STRINGS = {
                          "se ajusta en el juego con ESC - el daño no cambia",
                          "im Spiel mit ESC einstellbar - Schaden bleibt gleich",
                          "настраивается в игре по ESC — урон не меняется"),
+    "ui.note_gfx":    _T("Düşük grafik: meşale ve mumlar söner, havadaki zerreler, parıltılar ve aura kapanır, "
+                         "yaratıklar hazır karelerden çizilir. FPS belirgin artar; oyun aynı kalır.",
+                         "Low graphics: torches and candles go out, floating motes, sparkles and auras turn off, "
+                         "enemies use pre-drawn frames. Noticeably higher FPS; gameplay is unchanged.",
+                         "Gráficos bajos: antorchas y velas se apagan, sin partículas flotantes, destellos ni auras; "
+                         "enemigos con fotogramas listos. Más FPS; el juego no cambia.",
+                         "Niedrige Grafik: Fackeln und Kerzen aus, keine Schwebeteilchen, Funkeln oder Auren, "
+                         "Gegner aus fertigen Bildern. Deutlich mehr FPS; Spiel bleibt gleich.",
+                         "Низкая графика: факелы и свечи гаснут, нет летающих частиц, блеска и аур, "
+                         "враги из готовых кадров. Заметно больше FPS; игра та же."),
     "ui.note_fx":     _T("Eşya efekti sadece görüntüyü soluklaştırır, hasar değişmez. Oyunda ESC ile de ayarlanır.",
                           "Item effects only dims the visuals - damage never changes. Also adjustable in-game with ESC.",
                           "EFECTOS DE OBJETOS solo atenúa los visuales: el daño nunca cambia. También se ajusta en partida con ESC.",
@@ -3628,7 +3638,7 @@ def set_gfx_level(v):
     except (TypeError, ValueError):
         v = 2
     _GFX_LV[0] = v
-    _GFX_GLOW_R[0] = (60, 30, 0)[v]
+    _GFX_GLOW_R[0] = (120, 40, 0)[v]
     CFG["gfx"] = v
 
 
@@ -10993,8 +11003,8 @@ AURA_INTERVAL = {"motes": .045, "wings": .08, "bubbles": .055, "stars": .09, "ar
 
 def skin_update_fx(p, dt, fx):
     """Skin'e özel parçacık imzası."""
-    if CFG.get("plain_skin"):
-        return
+    if CFG.get("plain_skin") or gfx_level() == 0:
+        return          # düşük grafikte aura parçacıkları yok
     sk = p.skin
     a = sk["aura"]
     iv = AURA_INTERVAL.get(a, .2)
@@ -16518,9 +16528,10 @@ def draw_pentagram(surf, cx, cy, r, ang, t=0.0, color=PENTA_COLOR, color2=PENTA_
     if r < 6:
         return
     pulse = 0.5 + 0.5 * math.sin(t * 3.1)
+    low = gfx_level() == 0
     # 1) alanın kendisi - kanla dolu soluk daire
     blit_disc(surf, cx, cy, r, color, int(30 + 14 * pulse))
-    if not MOBILE:      # telefonda büyük toplamalı parlama yok (alan zaten dolu)
+    if not MOBILE and not low:      # telefonda büyük toplamalı parlama yok (alan zaten dolu)
         add_glow(surf, cx, cy, r * 0.75, color, 0.16 + 0.08 * pulse)
     # 2) iki çember
     pygame.draw.circle(surf, scale_col(color, 0.68), (int(cx), int(cy)), int(r), 3)
@@ -16534,6 +16545,8 @@ def draw_pentagram(surf, cx, cy, r, ang, t=0.0, color=PENTA_COLOR, color2=PENTA_
     star_col = scale_col(color2, 0.60 + 0.25 * pulse)
     for i in range(5):
         pygame.draw.line(surf, star_col, pts[order[i]], pts[order[i + 1]], 3)
+    if low:
+        return              # düşük grafik: mumlar sönük, dönen işaretler yok
     # 4) köşelerde yanan mumlar
     for (px, py) in pts:
         pygame.draw.circle(surf, color2, (int(px), int(py)), 4)
@@ -20734,7 +20747,12 @@ class Enemy:
                 fr[2] += 1
             old = self._spr_key
             steps = self.SPR_FACE_STEPS
-            turn = abs(old[0] - key[0]) % steps
+            # ortak (atlas) karesinden kişisel kareye geçiş: anahtarlar farklı
+            # biçimde (ilk alan şekil adı), karşılaştırılamaz -> hemen çiz
+            if len(old) != len(key) or getattr(self, "_spr_shared", False):
+                turn = steps // 2
+            else:
+                turn = abs(old[0] - key[0]) % steps
             urgent = (len(old) != len(key) or old[3] != key[3]
                       or old[4] != key[4]                      # boy / hasar parlaması
                       or min(turn, steps - turn) >= 2          # oyuncuya dönüyor
@@ -32155,8 +32173,8 @@ class Background:
 
     def _draw_full(self, surf):
         surf.blit(self.gradient, (0, 0))
-        # ---- dolaşan renkli sis ----
-        for (col, rad, spd, ph, vy) in self.nebula:
+        # ---- dolaşan renkli sis (düşük grafikte yok: dört büyük parlama) ----
+        for (col, rad, spd, ph, vy) in (self.nebula if gfx_level() > 0 else ()):
             nx = VIRTUAL_W * (0.5 + 0.42 * math.sin(self.t * spd + ph))
             ny = VIRTUAL_H * vy + math.cos(self.t * spd * 1.3 + ph) * 40
             add_glow(surf, nx, ny, rad, col, 0.13)
@@ -33253,9 +33271,9 @@ def _draw_one_fire(world, x, y, k, t, seed):
                   1.4 * (1.0 - ph) + 0.5, (255, 210, 120))
 
 
-def _draw_stone_fires(world, cam, t):
+def _draw_stone_fires(world, cam, t, cheap=False):
     """Taş Meydan mangal ve meşale alevleri (yalnız görünenler)."""
-    if MOBILE:
+    if MOBILE or cheap:
         for (x, y, k) in stone_fire_spots():
             if not cam.inflate(80, 80).collidepoint(x, y):
                 continue
@@ -33996,6 +34014,9 @@ def hell_embers():
     return _HELL_EMBERS
 
 
+_HELL_HEAT = {}
+
+
 def _draw_hell_air(world, cam, t):
     """Cehennem'in canlı katmanı: yukarı süzülen korlar ve sıcaklık parıltısı."""
     span = 420.0
@@ -34013,14 +34034,20 @@ def _draw_hell_air(world, cam, t):
         # dolup temizleniyor ve kare hızı düşüyor.
         blit_disc(world, xx, yy, sz * (0.45 + 0.55 * k),
                   (255, 150 + (int(70 * k) // 24) * 24, 60), int(70 + 130 * k))
-    # ısı parıltısı: ekranın altından yukarı doğru sönen, nabız gibi atan örtü
+    # ısı parıltısı: ekranın altından yukarı doğru sönen, nabız gibi atan örtü.
+    # Örtü bir kez çizilir (eskiden her karede 170 çizgi + ölçekleme), nabız
+    # yüzeyin saydamlığıyla verilir.
     h = 170
     peak = 30 + 12 * math.sin(t * 1.3)
-    heat = pygame.Surface((8, h), pygame.SRCALPHA)
-    for i in range(h):
-        k = (i / (h - 1)) ** 2          # aşağı indikçe güçlenir, kenarı belli olmaz
-        pygame.draw.line(heat, (255, 92, 40, int(peak * k)), (0, i), (8, i))
-    world.blit(pygame.transform.scale(heat, (cam.w, h)), (cam.left, cam.bottom - h))
+    heat = _HELL_HEAT.get(cam.w)
+    if heat is None:
+        col = pygame.Surface((8, h), pygame.SRCALPHA)
+        for i in range(h):
+            k = (i / (h - 1)) ** 2          # aşağı indikçe güçlenir, kenarı belli olmaz
+            pygame.draw.line(col, (255, 92, 40, int(42 * k)), (0, i), (8, i))
+        heat = _HELL_HEAT[cam.w] = pygame.transform.scale(col, (cam.w, h))
+    heat.set_alpha(int(255 * peak / 42.0))
+    world.blit(heat, (cam.left, cam.bottom - h))
 
 
 # arena havasında süzülen ışık zerreleri ("ateş böcekleri").
@@ -34049,7 +34076,8 @@ def _motes_in(cam, pad=48):
         _MOTE_X[id(ms)] = keys
     i0 = bisect.bisect_left(keys, cam.left - pad)
     i1 = bisect.bisect_right(keys, cam.right + pad)
-    return ms[i0:i1]
+    # orta grafikte zerrelerin yarısı
+    return ms[i0:i1:2] if gfx_level() < 2 else ms[i0:i1]
 
 
 _MOTE_X = {}
@@ -34126,6 +34154,22 @@ def _draw_theme_air(world, cam, key, t):
 def draw_world_floor(world, cam, biome, t):
     """Kameranın gördüğü zemin parçasını dünya yüzeyine kopyalar."""
     world.blit(floor_surface(biome), cam.topleft, cam)
+    gl = gfx_level()
+    if gl == 0:
+        # düşük grafik: havadaki zerreler, korlar ve mangal/meşale alevleri
+        # yok (alevler "söner"); zemin tek blit.
+        return
+    if gl == 1:
+        # orta: canlı katmanlar telefondaki ucuz yoldan (hazır alev kareleri,
+        # zerrelerin yarısı)
+        if biome == "hell":
+            _draw_hell_air(world, cam, t)
+        elif biome == "arena":
+            _draw_arena_air(world, cam, t)
+            _draw_stone_fires(world, cam, t, cheap=True)
+        else:
+            _draw_theme_air(world, cam, biome, t)
+        return
     if biome == "hell":
         _draw_hell_air(world, cam, t)
     elif biome == "arena":
@@ -36066,7 +36110,9 @@ def draw_run(surf, run, t, aim_pos=None, shake=(0, 0)):
     _vis_en = [e for e in run.enemies if vis_near.collidepoint(e.x, e.y)]
     Enemy._spr_budget[0] = int(clamp(len(_vis_en) * 0.36, Enemy.SPR_BUDGET, Enemy.SPR_BUDGET_MAX))
     Enemy._spr_tick[0] += 1
-    if MOBILE:
+    if MOBILE or gfx_level() < 2:
+        # telefon ve orta/düşük grafik: aynı türden yaratıklar ortak hazır
+        # karelerden çizilir, toplu blit (yaratık başına yeniden çizim yok)
         _draw_enemies_fast(world, _vis_en, t)
     else:
         for e in sorted(_vis_en, key=lambda e: e.y):
@@ -48793,7 +48839,8 @@ class DeathReplay:
                 self.frozen = True
         self.clock += dt
         self.acc += dt
-        iv = 1.0 / REPLAY_FPS
+        # düşük grafikte daha seyrek kare (JPEG sıkıştırma ana döngüyü de yavaşlatıyor)
+        iv = 1.0 / (REPLAY_FPS if gfx_level() > 0 else 12)
         if self.acc < iv and not force:
             return
         self.acc = max(0.0, min(self.acc - iv, iv))
@@ -48846,6 +48893,8 @@ class DeathReplay:
     # ---- oynatma ----
     def start(self):
         fr = list(self.frames)
+        if fr:
+            fr = [f for f in fr if f[0] >= fr[-1][0] - REPLAY_SECS]   # seyrek kayıtta da son 8 sn
         if len(fr) < 2:
             return False
         t0, t1 = fr[0][0], fr[-1][0]
@@ -54302,7 +54351,7 @@ class App:
 
         # ---- kısa notlar ----
         ny = ir.bottom + 12
-        notes = [L("ui.note_fx")]
+        notes = [L("ui.note_fx")] + wrap_text(L("ui.note_gfx"), 10, pr.w - 30)[:2]
         for ln in notes:
             draw_text(canvas, ln, (pr.centerx, ny), 10, TEXT_DIM, center=True, shadow=False)
             ny += 14
