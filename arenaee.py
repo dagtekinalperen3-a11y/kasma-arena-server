@@ -33214,7 +33214,7 @@ class Display:
                 self.canvas = self.screen
             web_call("setSafe", SAFE_X)
         else:
-            self.canvas = pygame.Surface((VIRTUAL_W, VIRTUAL_H)).convert()
+            self._bind_canvas()
         self.scale = 1.0
         self.offset = (0, 0)
         self.out_size = (VIRTUAL_W, VIRTUAL_H)
@@ -33249,6 +33249,18 @@ class Display:
             self.scaled_mode = False
             return pygame.display.set_mode(want, flags)
 
+    def _bind_canvas(self):
+        """Masaüstü SCALED kipinde oyun doğrudan pencere yüzeyine çizilir: her
+        karede tuval -> ekran tam boy kopyası eksik."""
+        if IS_WEB or SCREEN_W != VIRTUAL_W:
+            return
+        if self.scaled_mode and self.screen.get_size() == (VIRTUAL_W, VIRTUAL_H):
+            self.canvas = self.screen
+        elif getattr(self, "canvas", None) is None or self.canvas is getattr(self, "_old_screen", None) \
+                or self.canvas.get_size() != (VIRTUAL_W, VIRTUAL_H):
+            self.canvas = pygame.Surface((VIRTUAL_W, VIRTUAL_H)).convert()
+        self._old_screen = self.screen
+
     def _compute_scale(self):
         if self.scaled_mode:
             # SDL ölçekliyor: oyun için ekran tam olarak 1280x720.
@@ -33270,6 +33282,7 @@ class Display:
         self.fullscreen = not self.fullscreen
         try:
             self.screen = self._make_screen()
+            self._bind_canvas()
         except Exception:
             self.fullscreen = not self.fullscreen
         # set_mode bazı sürücülerde imleci yeniden görünür yapıyor: gizle.
@@ -33285,6 +33298,7 @@ class Display:
         """Ekranı aynı ayarlarla yeniden açar (vsync değişince)."""
         try:
             self.screen = self._make_screen()
+            self._bind_canvas()
             pygame.mouse.set_visible(False)
         except Exception as e:
             print("ekran yeniden açılamadı:", repr(e))
@@ -36098,7 +36112,7 @@ def draw_hud(surf, run, t):
         mob_layer(surf, "hud_map", run, t, 2, size,
                   lambda b: (draw_minimap(b, run, t), _draw_key_counter(b, run, t)))
     else:
-        _draw_hud_top(surf, run, t)
+        hud_layer(surf, "top", run, t, lambda b: _draw_hud_top(b, run, t), 0)
     _draw_hud_center(surf, run, t)
     if getattr(run, "coop_others", None):
         draw_coop_hud(surf, run, t)       # 2 kişilik - arkadaşın kartı
@@ -36106,6 +36120,58 @@ def draw_hud(surf, run, t):
 
 HUD_TOP_H = 236          # telefon önbelleği: üst şerit + küçük harita + anahtar sayacı
 _MOB_LAYERS = {}
+_HUD_LAYERS = {}
+
+
+def hud_period():
+    """Masaüstü HUD katmanlarının kaç karede bir tazeleneceği (yüksek grafik 2, orta/düşük 3)."""
+    return 2 if gfx_level() >= 2 else 3
+
+
+def hud_layer(surf, name, run, t, draw, phase=0):
+    """Masaüstü: HUD'un bir parçası hazır görüntüden basılır, birkaç karede bir
+    yeniden çizilir. HUD her karede baştan çiziliyordu (~4 ms): kare hızının
+    asıl tavanı buydu. Katmanın kapladığı alan arada bir ölçülür (büyüyebilir)."""
+    global _GLOW_ON_ALPHA
+    c = _HUD_LAYERS.get(name)
+    if c is None:
+        c = _HUD_LAYERS[name] = {}
+    period = hud_period()
+    pct = hud_scale_pct()
+    same = c.get("run") is run and c.get("pct") == pct
+    if (same and c.get("img") is not None and _MOB_FRAME[0] % period != phase % period
+            and abs(t - c.get("t", -9)) < 0.5):
+        surf.blit(c["img"], c["pos"])
+        return
+    buf = c.get("buf")
+    if buf is None:
+        buf = c["buf"] = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+    n = c.get("n", 0)
+    c["n"] = n + 1
+    reg = c.get("reg")
+    # alanı ölçmek (get_bounding_rect) pahalı: koşu başında tam ekran, sonra
+    # arada bir yalnız katmanın çevresinde (büyüdüyse yakalansın)
+    if reg is None or not same:
+        scan = buf.get_rect()
+    elif n % 40 == (hash(name) % 40):
+        scan = reg.inflate(96, 64).clip(buf.get_rect())
+    else:
+        scan = None
+    buf.fill((0, 0, 0, 0), scan or reg)
+    _GLOW_ON_ALPHA = True
+    try:
+        draw(buf)
+    finally:
+        _GLOW_ON_ALPHA = False
+    if scan is not None:
+        br = buf.subsurface(scan).get_bounding_rect().move(scan.topleft)
+        if br.w <= 0 or br.h <= 0:
+            br = pygame.Rect(0, 0, 1, 1)
+        br = br.inflate(24, 24).clip(buf.get_rect())
+        reg = br if (reg is None or not same) else reg.union(br)
+        c["reg"] = reg
+    c.update(img=buf.subsurface(reg).copy(), pos=reg.topleft, run=run, t=t, pct=pct)
+    surf.blit(c["img"], c["pos"])
 
 
 _BANDS = {}
@@ -36773,7 +36839,8 @@ def draw_run(surf, run, t, aim_pos=None, shake=(0, 0), world_only=False):
     _vis_en = [e for e in run.enemies if vis_near.collidepoint(e.x, e.y)]
     Enemy._spr_budget[0] = int(clamp(len(_vis_en) * 0.36, Enemy.SPR_BUDGET, Enemy.SPR_BUDGET_MAX))
     Enemy._spr_tick[0] += 1
-    if MOBILE or gfx_level() < 2:
+    if MOBILE or gfx_level() < 2 or len(_vis_en) > 40:
+        # yüksek grafikte de kalabalıkta (40+ yaratık) ortak karelere geçilir
         # telefon ve orta/düşük grafik: aynı türden yaratıklar ortak hazır
         # karelerden çizilir, toplu blit (yaratık başına yeniden çizim yok)
         _draw_enemies_fast(world, _vis_en, t)
@@ -36896,17 +36963,19 @@ def draw_run(surf, run, t, aim_pos=None, shake=(0, 0), world_only=False):
     _MOB_FRAME[0] += 1
     draw_hud(surf, run, t)
     if not MOBILE:              # telefonda ikisi de draw_hud'un hazır görüntüsünde
-        draw_minimap(surf, run, t)
-        _draw_key_counter(surf, run, t)
+        hud_layer(surf, "map", run, t, lambda b: (draw_minimap(b, run, t), _draw_key_counter(b, run, t)), 1)
     # M ile açılan büyük harita: küçük haritanın aynısı, ekranın ortasında.
     # Oyun bu sırada durmaz - harita bir mola değil, bir bakış.
     if getattr(run, "show_map", False):
         draw_minimap(surf, run, t, big=True)
-    draw_team_strips(surf, run, t)
+    if MOBILE:
+        draw_team_strips(surf, run, t)
+    else:
+        hud_layer(surf, "strips", run, t, lambda b: draw_team_strips(b, run, t), 2)
     draw_extras_hud(surf, run, t)
     draw_evo_banner(surf, run, t)
     if not MOBILE:
-        draw_skill_bar(surf, run, t)     # telefonda düğmeler sağ altta (TouchUI)
+        hud_layer(surf, "skill", run, t, lambda b: draw_skill_bar(b, run, t), 1)  # telefonda düğmeler TouchUI
     # istatistik paneli en üstte çizilir: açıkken küçük haritayı örter.
     draw_stats_button(surf, run, aim_pos, t)
     if getattr(run, "show_stats", False):
@@ -38193,6 +38262,27 @@ class CursedShrine:
                 self.alive = False
 
     def draw(self, surf, t):
+        # orta/düşük grafik: kapalı ve duran mağara tek hazır görüntüden basılır
+        # (her karede ~80 çizim + parlama yerine tek blit)
+        if gfx_level() < 2 and not self.opened and self.lid <= 0.05 and self.die_t <= 0:
+            img = getattr(self, "_still", None)
+            if img is None:
+                global _GLOW_ON_ALPHA
+                img = pygame.Surface((300, 300), pygame.SRCALPHA)
+                ox, oy, ot = self.x, self.y, self.t
+                self.x, self.y, self.t = 150.0, 140.0, 0.4
+                _GLOW_ON_ALPHA = True
+                try:
+                    self._draw_full(img, t)
+                finally:
+                    _GLOW_ON_ALPHA = False
+                    self.x, self.y, self.t = ox, oy, ot
+                img = self._still = mob_rle(img)
+            surf.blit(img, (int(self.x) - 150, int(self.y) - 140))
+            return
+        self._draw_full(surf, t)
+
+    def _draw_full(self, surf, t):
         x, y = self.x, self.y
         fade = 1.0 - clamp(self.die_t / 1.6, 0.0, 1.0)
         sink = 26 * (1.0 - fade)
@@ -49501,7 +49591,7 @@ class Tutorial:
 # (diske hiç yazılmaz). Ölünce sonuç ekranından bir kez izlenebilir; o ekrandan
 # çıkınca silinir.
 REPLAY_SECS = 8.0
-REPLAY_FPS = 12 if MOBILE else 20
+REPLAY_FPS = 12 if MOBILE else 15
 # masaüstünde tam 720p (eskiden 960x540 kaydedilip büyütülüyordu: bulanıktı)
 REPLAY_SIZE = (640, 360) if MOBILE else (1280, 720)
 REPLAY_SLOW_LAST = 1.6           # son kısım ağır çekimde oynar
@@ -49517,6 +49607,21 @@ try:
     from collections import deque as _rp_deque
 except Exception:
     _rp_deque = None
+
+
+def _replay_raw(surf):
+    """Kareyi ham bayt olarak kopyalar: (bayt, boy, biçim) ya da None."""
+    try:
+        if surf.get_bitsize() != 32:
+            return None
+        w, h = surf.get_size()
+        if surf.get_pitch() != w * 4:
+            return None
+        # biçim = kaynak yüzeyin renk maskeleri; geri açarken aynı düzende
+        # (alfasız) bir yüzeye birebir yazılır
+        return (surf.get_buffer().raw, (w, h), tuple(surf.get_masks()))
+    except Exception:
+        return None
 
 
 class DeathReplay:
@@ -49574,13 +49679,29 @@ class DeathReplay:
         self.clock += dt
         self.acc += dt
         # düşük grafikte daha seyrek kare (JPEG sıkıştırma ana döngüyü de yavaşlatıyor)
-        iv = 1.0 / (REPLAY_FPS if gfx_level() > 0 else 12)
+        iv = 1.0 / (REPLAY_FPS if gfx_level() > 0 else 10)
         if self.acc < iv and not force:
             return
         self.acc = max(0.0, min(self.acc - iv, iv))
+        if not IS_WEB and _queue is not None and canvas.get_size() == REPLAY_SIZE:
+            # Masaüstü: ham pikseller kopyalanır (~0.5 ms), sıkıştırma arka
+            # planda zlib ile olur. zlib çalışırken Python'u kilitlemez; eski
+            # JPEG kaydı her karede 5-15 ms oyunu durduruyordu (kasma).
+            raw = _replay_raw(canvas)
+            if raw is not None:
+                item = (self.gen, self.clock, raw)
+                if self.th is None:
+                    self.q = _queue.Queue(maxsize=6)
+                    self.th = threading.Thread(target=self._worker, daemon=True)
+                    self.th.start()
+                try:
+                    self.q.put(item, timeout=0.25) if force else self.q.put_nowait(item)
+                except Exception:
+                    pass
+                return
         try:
             if canvas.get_size() == REPLAY_SIZE:
-                small = canvas.copy()         # aynı boy: küçültme yok (hem net hem ucuz)
+                small = canvas.copy()
             else:
                 small = pygame.transform.smoothscale(canvas, REPLAY_SIZE)
         except Exception:
@@ -49607,6 +49728,16 @@ class DeathReplay:
 
     def _store(self, item):
         gen, t, surf = item
+        if isinstance(surf, tuple):
+            # ham kare: zlib (Python kilidini bırakır, oyun takılmaz)
+            raw, size, fmt = surf
+            try:
+                data = ("z", zlib.compress(raw, 1), size, fmt)
+            except Exception:
+                return
+            if gen == self.gen:
+                self.frames.append((t, data))
+            return
         data = surf
         if self.jpg:
             try:
@@ -49648,7 +49779,11 @@ class DeathReplay:
             return pl["img"]
         data = pl["fr"][i][1]
         try:
-            if isinstance(data, (bytes, bytearray)):
+            if isinstance(data, tuple):
+                _z, comp, size, masks = data
+                img = pygame.Surface(size, 0, 32, masks)
+                img.get_buffer().write(zlib.decompress(comp), 0)
+            elif isinstance(data, (bytes, bytearray)):
                 img = pygame.image.load(io.BytesIO(data), "replay.jpg")
             else:
                 img = data
