@@ -16074,6 +16074,75 @@ def draw_axe_shape(surf, x, y, spin, k=1.0, color=AXE_COLOR, glow=0.6):
     circle_aa(surf, *P(11.5, 0), 1.3 * k, color)
 
 
+def draw_scythe_shape(surf, x, y, spin, k=1.0, color=AXE_COLOR, glow=0.6, chain=False):
+    """Ölüm tırpanı (balta II) / zincirli orak (balta III): uzun sap, hilal ağız."""
+    hx, hy = math.cos(spin), math.sin(spin)
+    nx, ny = -hy, hx
+
+    def P(f, s_):
+        return (x + (hx * f + nx * s_) * k, y + (hy * f + ny * s_) * k)
+    if glow > 0:
+        add_glow(surf, x, y, 30 * k, color, glow * 0.75)
+    if chain:
+        # III: sap yok; ağzın dibinde zincir halkası
+        ring_aa(surf, *P(-6, 0), 4.2 * k, OUTLINE, max(2, int(3 * k)))
+        ring_aa(surf, *P(-6, 0), 4.2 * k, (196, 200, 214), max(1, int(2 * k)))
+        root_f = -2.0
+    else:
+        thick_line(surf, P(-22, 0), P(12, 0), 6.0 * k, OUTLINE)
+        thick_line(surf, P(-22, 0), P(12, 0), 3.8 * k, (70, 52, 60))
+        thick_line(surf, P(-21, -0.8), P(10, -0.8), 1.2 * k, (128, 100, 112))
+        root_f = 10.0
+    # hilal ağız: sapın ucundan yana açılıp geri kıvrılan, uca doğru incelen yay
+    cf, cs = root_f + 1.0, 21.0
+    outer_l, inner_l = [], []
+    for i in range(14):
+        q = i / 13.0
+        a = q * 2.35
+        of, os_ = cf + 17.0 * math.sin(a), cs - 21.0 * math.cos(a)
+        dfv, dsv = cf - of, cs - os_
+        dd = math.hypot(dfv, dsv) or 1.0
+        th = 9.0 * (1.0 - q) ** 1.1 + 0.6
+        outer_l.append((of, os_))
+        inner_l.append((of + dfv / dd * th, os_ + dsv / dd * th))
+    outer = [P(f_, s_) for f_, s_ in outer_l]
+    inner = [P(f_, s_) for f_, s_ in inner_l]
+    blade = outer + inner[::-1]
+    poly_aa(surf, [(px_ + 1.2, py_ + 1.8) for px_, py_ in blade], OUTLINE)
+    poly_aa(surf, blade, (206, 214, 230))
+    poly_aa(surf, [P(f_ * 0.5 + fi * 0.5, s_ * 0.5 + si * 0.5) for (f_, s_), (fi, si) in
+                   zip(outer_l[:-3], inner_l[:-3])] + inner[:-3][::-1], (150, 158, 178))
+    for a_, b_ in zip(outer, outer[1:]):
+        thick_line(surf, a_, b_, 1.6 * k, lighten(color, 0.55))
+    # ağızda evrim renginde kızgın damar
+    for a_, b_ in zip(inner[2:], inner[3:-2]):
+        thick_line(surf, a_, b_, 1.4 * k, color)
+    circle_aa(surf, *P(root_f + 2, 0), 2.2 * k, color)
+
+
+def draw_chain_links(surf, x0, y0, x1, y1, t, col, k=1.0):
+    """Oyuncudan oraka uzanan zincir (balta III)."""
+    d = math.hypot(x1 - x0, y1 - y0)
+    if d < 12:
+        return
+    n = max(2, int(d / (11 * k)))
+    ux, uy = (x1 - x0) / d, (y1 - y0) / d
+    sag = min(26.0, d * 0.08)
+    for i in range(n):
+        q = (i + 0.5) / n
+        x = x0 + (x1 - x0) * q + -uy * math.sin(q * math.pi) * sag
+        y = y0 + (y1 - y0) * q + ux * math.sin(q * math.pi) * sag
+        if i % 2 == 0:
+            pygame.draw.ellipse(surf, OUTLINE, (x - 5 * k, y - 3 * k, 10 * k, 6 * k), max(1, int(3 * k)))
+            pygame.draw.ellipse(surf, (176, 182, 198), (x - 4 * k, y - 2.4 * k, 8 * k, 4.8 * k), max(1, int(2 * k)))
+        else:
+            pygame.draw.ellipse(surf, OUTLINE, (x - 3 * k, y - 5 * k, 6 * k, 10 * k), max(1, int(3 * k)))
+            pygame.draw.ellipse(surf, (150, 156, 172), (x - 2.4 * k, y - 4 * k, 4.8 * k, 8 * k), max(1, int(2 * k)))
+    # zincirde dolaşan kızgın ışık
+    q = (t * 2.2) % 1.0
+    add_glow(surf, x0 + (x1 - x0) * q, y0 + (y1 - y0) * q, 14 * k, col, 0.45)
+
+
 class FlyingAxe:
     """Rastgele bir düşmana uçup oyuncuya geri dönen balta."""
 
@@ -16095,9 +16164,12 @@ class FlyingAxe:
         self.hit_set = set()
         self.alive = True
         self.trail = []                 # son konumlar: hareket bulanıklığı için
+        self.evo = 0                    # evrim kademesi (görünüş)
+        self.px, self.py = player.x, player.y
 
     def update(self, dt, run):
         p = run.player
+        self.px, self.py = p.x, p.y     # zincir (III) oyuncuya bağlı çizilir
         self.t += dt
         self.spin += dt * 17
         self.trail.append((self.x, self.y, self.spin))
@@ -16153,8 +16225,15 @@ class FlyingAxe:
             q = i / float(n)
             pygame.draw.line(sw, (255, 250, 236, int(40 + 150 * q)), outer[i], outer[i + 1], 2)
         surf.blit(sw, (self.x - c0, self.y - c0))
-        # 2) asıl balta
-        draw_axe_shape(surf, self.x, self.y, self.spin, k, self.color, glow=0.5)
+        # 2) asıl balta (evrimde tırpan / zincirli orak)
+        evo = getattr(self, "evo", 0)
+        if evo >= 3:
+            draw_chain_links(surf, self.px, self.py, self.x, self.y, t, self.color, k)
+            draw_scythe_shape(surf, self.x, self.y, self.spin, k, self.color, glow=0.6, chain=True)
+        elif evo == 2:
+            draw_scythe_shape(surf, self.x, self.y, self.spin, k * 1.08, self.color, glow=0.55)
+        else:
+            draw_axe_shape(surf, self.x, self.y, self.spin, k, self.color, glow=0.5)
 
 
 # kırbaç - şaklayıp düşmanı savuran darbe (yalnızca görsel). Hasar ve savurma
@@ -27452,19 +27531,34 @@ def draw_extras_hud(surf, run, t):
             pygame.draw.rect(surf, col, fill, border_radius=5)
 
 
-# ---- silah evrimi ----
-# Silah EVO_LEVEL'a gelince, eşi olan kitap EVO_BOOK_LEVEL'da ve elde en az
-# EVO_MIN_WEAPONS silah varsa seviye elinde bir EVRİM kartı çıkar. Her silahın
-# evrimi kendine has bir şey yapar (20 ayrı etki).
-# Denge: "2 silah 2 kitap kasıp evrimle uçmasın" - 3 silah şartı, koşuda en
-# çok EVO_MAX_PER_RUN evrim, hasar payı ılımlı (x1.25). Etkiler saniye/yaratık
-# başına sınırlı; ekran patlamaya dönmesin.
+# ---- silah evrimi (3 kademe) ----
+# Her silahın üç evrimi var; her kademe yeni bir ad, yeni bir etki ve daha
+# yüksek hasar getirir, önceki kademelerin etkileri sürer:
+#   I.  silah Lv.10 + eş kitap Lv.3   (ör. BALTA -> KIYAMET BALTASI: patlatır)
+#   II. silah Lv.20 + eş kitap Lv.5   (-> ÖLÜM TIRPANI: patlatır + yakar)
+#   III.silah Lv.25 + eş kitap Lv.10  (-> CEHENNEM ZİNCİRİ: + 0.5 sn yere zincirler)
+# Nadir kitaplar seviye atlamaz: onlarda kitabın elde olması yeter.
+# Şart tutunca seviye elinde bir EVRİM kartı çıkar.
+# Denge: ilk evrim için en az EVO_MIN_WEAPONS silah, koşuda en çok
+# EVO_MAX_PER_RUN silah evrilir (kademe atlatmak sayılmaz). Etkiler
+# saniye/yaratık başına sınırlı; ekran patlamaya dönmesin.
 # 2 kişilikte kişi başı 2 silah yuvası var: orada şart 2 silah.
-EVO_LEVEL = 10
-EVO_BOOK_LEVEL = 3
+EVO_TIER_LEVEL = (10, 20, 25)       # kademe başına silah seviyesi
+EVO_TIER_BOOK = (3, 5, 10)          # kademe başına eş kitap seviyesi
+EVO_TIER_MULT = (1.25, 1.5, 1.8)    # kademe başına silah hasarı çarpanı
+EVO_TIERS_MAX = len(EVO_TIER_LEVEL)
+EVO_ROMAN = ("", "I", "II", "III")
+EVO_LEVEL = EVO_TIER_LEVEL[0]
+EVO_BOOK_LEVEL = EVO_TIER_BOOK[0]
 EVO_MIN_WEAPONS = 3
 EVO_MAX_PER_RUN = 2
-EVO_DMG_MULT = 1.25
+EVO_DMG_MULT = EVO_TIER_MULT[0]
+EVO_ROOT_T = 0.5                # zincir / mutlak sıfır: yere çakılma süresi
+EVO_HAVEN_HEAL = 0.02           # zemzem II: suyun içinde saniyede maks canın %2'si
+EVO_BLESS_MULT = 1.25           # zemzem III: suyun içinde silah hasarı
+EVO_VEIL_HEAL = 0.03            # pelerin II: görünmezken saniyede maks canın %3'ü
+EVO_NIGHT_MULT = 1.35           # pelerin III: görünmezken (+3 sn) silah hasarı
+EVO_NIGHT_AFTER = 3.0
 EVO_PROC_CD = 0.5               # aynı yaratıkta etkinin yeniden tutması için bekleme
 EVO_CHAIN_CHANCE = 0.30
 EVO_CHAIN_R = 170.0
@@ -27517,7 +27611,37 @@ EVO_PERK_ICON = {
     "poison": "skull", "shroud": "ghost", "aegis": "shield", "curse": "cross", "stun": "fist",
     "freeze": "snow", "execute": "sword", "knock": "orbit", "soul": "ghost", "bleed": "drop",
     "scorch": "flame", "sunder": "target", "phoenix": "flame", "shatter": "gem", "aftershock": "target",
+    "root": "orbit", "haven": "heart", "bless": "star", "veil": "heart", "nightfall": "ghost",
 }
+EVO_PERK_COLOR.update({
+    "root": (190, 214, 255), "haven": (120, 255, 170), "bless": (255, 236, 150),
+    "veil": (190, 150, 255), "nightfall": (150, 110, 255),
+})
+# silah -> kademe başına eklenen etki (I, II, III). I. kademe EVOLUTIONS'takiyle aynı.
+EVO_TIERS = {
+    "axe":          ("blast", "burn", "root"),
+    "book":         ("aegis", "stun", "leech"),
+    "pentagram":    ("curse", "burn", "chill"),
+    "whip":         ("burn", "chain", "execute"),
+    "zemzem":       ("chill", "haven", "bless"),
+    "shoe":         ("stun", "burn", "aftershock"),
+    "frost":        ("freeze", "shatter", "root"),
+    "emanet":       ("execute", "bleed", "sunder"),
+    "cloak":        ("shroud", "veil", "nightfall"),
+    "tornado":      ("knock", "chill", "chain"),
+    "ghost_swords": ("soul", "leech", "execute"),
+    "wolves":       ("bleed", "sunder", "burn"),
+    "tesla":        ("chain", "stun", "blast"),
+    "meteor":       ("scorch", "aftershock", "root"),
+    "beam":         ("sunder", "burn", "execute"),
+    "hawk":         ("phoenix", "blast", "sunder"),
+    "bats":         ("leech", "poison", "curse"),
+    "nova":         ("shatter", "root", "blast"),
+    "knives":       ("poison", "bleed", "execute"),
+    "quake":        ("aftershock", "stun", "burn"),
+}
+# vuruşta değil, kare kare işleyen etkiler (evo_update)
+EVO_FIELD_PERKS = frozenset(("aegis", "shroud", "haven", "bless", "veil", "nightfall"))
 
 STRINGS.update({
     "evo.name.axe":          _T("KIYAMET BALTASI", "DOOM AXE", "HACHA DEL FIN", "UNTERGANGSAXT", "ТОПОР РОКА"),
@@ -27604,11 +27728,11 @@ STRINGS.update({
     "evo.dmg":    _T("Hasar", "Damage", "Daño", "Schaden", "Урон"),
     "evo.need":   _T("Lv.{0} + {1} Lv.{2}", "Lv.{0} + {1} Lv.{2}", "Nv.{0} + {1} Nv.{2}",
                      "St.{0} + {1} St.{2}", "ур.{0} + {1} ур.{2}"),
-    "evo.rule":   _T("en az {0} silah gerekir, koşuda en çok {1} evrim",
-                     "needs {0}+ weapons, max {1} evolutions per run",
-                     "requiere {0}+ armas, máx. {1} evoluciones",
-                     "braucht {0}+ Waffen, max. {1} Evolutionen pro Lauf",
-                     "нужно {0}+ оружия, максимум {1} эволюции"),
+    "evo.rule":   _T("ilk evrim için en az {0} silah; koşuda en çok {1} silah evrilir (her biri 3 kademe)",
+                     "first evolution needs {0}+ weapons; up to {1} weapons evolve per run (3 tiers each)",
+                     "la 1.ª evolución requiere {0}+ armas; hasta {1} armas por partida (3 niveles cada una)",
+                     "erste Evolution braucht {0}+ Waffen; bis zu {1} Waffen pro Lauf (je 3 Stufen)",
+                     "для 1-й эволюции нужно {0}+ оружия; до {1} оружий за забег (по 3 уровня)"),
     "evo.ready":  _T("EVRİME HAZIR", "READY TO EVOLVE", "LISTO PARA EVOLUCIONAR", "BEREIT ZUR EVOLUTION",
                      "ГОТОВ К ЭВОЛЮЦИИ"),
     "evo.pick":   _T("EVRİLT", "EVOLVE", "EVOLUCIONAR", "ENTWICKELN", "ЭВОЛЮЦИЯ"),
@@ -27618,9 +27742,137 @@ STRINGS.update({
     "evo.exec":   _T("İNFAZ", "EXECUTE", "EJECUTAR", "HINRICHTUNG", "КАЗНЬ"),
 })
 
+# ---- 2. ve 3. kademe evrim adları ----
+STRINGS.update({
+    "evo.name2.axe":   _T("ÖLÜM TIRPANI", "DEATH SCYTHE", "GUADAÑA MORTAL", "TODESSENSE", "КОСА СМЕРТИ"),
+    "evo.name3.axe":   _T("CEHENNEM ZİNCİRİ", "HELLCHAIN", "CADENA INFERNAL", "HÖLLENKETTE", "АДСКАЯ ЦЕПЬ"),
+    "evo.name2.book":  _T("ÇELİK SUR", "STEEL RAMPART", "MURALLA DE ACERO", "STAHLWALL", "СТАЛЬНОЙ ВАЛ"),
+    "evo.name3.book":  _T("KUTSAL KALKAN", "HOLY AEGIS", "ÉGIDA SAGRADA", "HEILIGE ÄGIS", "СВЯЩЕННАЯ ЭГИДА"),
+    "evo.name2.pentagram": _T("ALEV MÜHRÜ", "FLAME SEAL", "SELLO DE LLAMAS", "FLAMMENSIEGEL", "ОГНЕННАЯ ПЕЧАТЬ"),
+    "evo.name3.pentagram": _T("CEHENNEM KAPISI", "HELLGATE", "PUERTA INFERNAL", "HÖLLENTOR", "ВРАТА АДА"),
+    "evo.name2.whip":  _T("ŞİMŞEK KAMÇISI", "THUNDER LASH", "LÁTIGO DEL TRUENO", "DONNERPEITSCHE", "ГРОМОВОЙ КНУТ"),
+    "evo.name3.whip":  _T("KIYAMET KAMÇISI", "DOOM LASH", "LÁTIGO DEL JUICIO", "VERDAMMNISPEITSCHE", "КНУТ СУДНОГО ДНЯ"),
+    "evo.name2.zemzem": _T("ŞİFA KAYNAĞI", "HEALING WELL", "POZO SANADOR", "HEILQUELL", "ЦЕЛЕБНЫЙ КЛЮЧ"),
+    "evo.name3.zemzem": _T("HAYAT IRMAĞI", "RIVER OF LIFE", "RÍO DE LA VIDA", "LEBENSSTROM", "РЕКА ЖИЗНИ"),
+    "evo.name2.shoe":  _T("KOR TERLİK", "EMBER SLIPPER", "CHANCLA ARDIENTE", "GLUTPANTOFFEL", "ОГНЕННЫЙ ТАПОК"),
+    "evo.name3.shoe":  _T("DEPREM TERLİĞİ", "QUAKE SLIPPER", "CHANCLA SÍSMICA", "BEBENPANTOFFEL", "ТАПОК-ЗЕМЛЕТРЯС"),
+    "evo.name2.frost": _T("BUZUL YOLU", "GLACIER PATH", "SENDA GLACIAR", "GLETSCHERPFAD", "ЛЕДНИКОВЫЙ ПУТЬ"),
+    "evo.name3.frost": _T("MUTLAK SIFIR", "ABSOLUTE ZERO", "CERO ABSOLUTO", "ABSOLUTER NULLPUNKT", "АБСОЛЮТНЫЙ НОЛЬ"),
+    "evo.name2.emanet": _T("KANLI MİRAS", "BLOOD HEIRLOOM", "LEGADO SANGRIENTO", "BLUTERBE", "КРОВАВОЕ НАСЛЕДИЕ"),
+    "evo.name3.emanet": _T("DESTAN KILICI", "LEGEND BLADE", "ESPADA LEGENDARIA", "SAGENKLINGE", "ЛЕГЕНДАРНЫЙ КЛИНОК"),
+    "evo.name2.cloak": _T("GÖLGE ŞİFASI", "SHADOW MEND", "SANACIÓN SOMBRÍA", "SCHATTENHEILUNG", "ТЕНЕВОЕ ИСЦЕЛЕНИЕ"),
+    "evo.name3.cloak": _T("KARANLIK EFENDİSİ", "LORD OF NIGHT", "SEÑOR DE LA NOCHE", "HERR DER NACHT", "ВЛАДЫКА НОЧИ"),
+    "evo.name2.tornado": _T("BUZ FIRTINASI", "ICE STORM", "TORMENTA DE HIELO", "EISSTURM", "ЛЕДЯНАЯ БУРЯ"),
+    "evo.name3.tornado": _T("YILDIRIM KASIRGASI", "THUNDER CYCLONE", "CICLÓN ELÉCTRICO", "DONNERZYKLON", "ГРОЗОВОЙ ЦИКЛОН"),
+    "evo.name2.ghost_swords": _T("RUH EMİCİ", "SOUL DRINKER", "BEBEDOR DE ALMAS", "SEELENTRINKER", "ПОЖИРАТЕЛЬ ДУШ"),
+    "evo.name3.ghost_swords": _T("ÖLÜM MELEKLERİ", "DEATH ANGELS", "ÁNGELES DE MUERTE", "TODESENGEL", "АНГЕЛЫ СМЕРТИ"),
+    "evo.name2.wolves": _T("ALFA SÜRÜSÜ", "ALPHA PACK", "MANADA ALFA", "ALPHARUDEL", "СТАЯ АЛЬФЫ"),
+    "evo.name3.wolves": _T("CEHENNEM TAZILARI", "HELLHOUNDS", "SABUESOS INFERNALES", "HÖLLENHUNDE", "АДСКИЕ ГОНЧИЕ"),
+    "evo.name2.tesla": _T("GÖK GÜRÜLTÜSÜ", "THUNDERCLAP", "TRUENO", "DONNERSCHLAG", "РАСКАТ ГРОМА"),
+    "evo.name3.tesla": _T("ZEUS'UN ÖFKESİ", "WRATH OF ZEUS", "IRA DE ZEUS", "ZORN DES ZEUS", "ГНЕВ ЗЕВСА"),
+    "evo.name2.meteor": _T("GÖKTAŞI SAĞANAĞI", "STARFALL", "LLUVIA ESTELAR", "STERNENREGEN", "ЗВЕЗДОПАД"),
+    "evo.name3.meteor": _T("ÇEKİM KUYUSU", "GRAVITY WELL", "POZO GRAVITATORIO", "SCHWERKRAFTSCHACHT", "ГРАВИКОЛОДЕЦ"),
+    "evo.name2.beam":  _T("GÜNEŞ PATLAMASI", "SOLAR FLARE", "LLAMARADA SOLAR", "SONNENERUPTION", "СОЛНЕЧНАЯ ВСПЫШКА"),
+    "evo.name3.beam":  _T("YARGI IŞINI", "JUDGMENT RAY", "RAYO DEL JUICIO", "RICHTSTRAHL", "ЛУЧ СУДА"),
+    "evo.name2.hawk":  _T("ATEŞ KANADI", "FIREWING", "ALA DE FUEGO", "FEUERSCHWINGE", "ОГНЕННОЕ КРЫЛО"),
+    "evo.name3.hawk":  _T("GÖK HÜKÜMDARI", "SKY SOVEREIGN", "SOBERANO DEL CIELO", "HIMMELSHERRSCHER", "ВЛАДЫКА НЕБЕС"),
+    "evo.name2.bats":  _T("VEBA SÜRÜSÜ", "PLAGUE SWARM", "ENJAMBRE DE PESTE", "PESTSCHWARM", "ЧУМНОЙ РОЙ"),
+    "evo.name3.bats":  _T("KONT'UN GECESİ", "COUNT'S NIGHT", "NOCHE DEL CONDE", "NACHT DES GRAFEN", "НОЧЬ ГРАФА"),
+    "evo.name2.nova":  _T("DONMUŞ ZAMAN", "FROZEN TIME", "TIEMPO CONGELADO", "GEFRORENE ZEIT", "ЗАСТЫВШЕЕ ВРЕМЯ"),
+    "evo.name3.nova":  _T("KUTUP YILDIZI", "POLAR STAR", "ESTRELLA POLAR", "POLARSTERN", "ПОЛЯРНАЯ ЗВЕЗДА"),
+    "evo.name2.knives": _T("KAN YELPAZESİ", "BLOOD FAN", "ABANICO DE SANGRE", "BLUTFÄCHER", "КРОВАВЫЙ ВЕЕР"),
+    "evo.name3.knives": _T("ÖLÜM DANSI", "DANCE OF DEATH", "DANZA DE LA MUERTE", "TODESTANZ", "ТАНЕЦ СМЕРТИ"),
+    "evo.name2.quake": _T("TİTAN ADIMI", "TITAN STEP", "PASO DEL TITÁN", "TITANENSCHRITT", "ШАГ ТИТАНА"),
+    "evo.name3.quake": _T("MAGMA YARIĞI", "MAGMA RIFT", "GRIETA DE MAGMA", "MAGMARISS", "МАГМОВЫЙ РАЗЛОМ"),
+    # yeni etkiler
+    "evo.perk.root":  _T("vurduğunu 0.5 sn yere zincirler (kıpırdayamaz)",
+                         "chains enemies to the ground for 0.5s",
+                         "encadena al suelo 0,5 s", "kettet Gegner 0,5 s an den Boden",
+                         "приковывает врагов к земле на 0,5 с"),
+    "evo.perk.haven": _T("suyun içindeyken saniyede canının %2'si dolar",
+                         "standing in your water heals 2% HP per second",
+                         "dentro de tu agua curas 2% de vida por segundo",
+                         "in deinem Wasser heilst du 2% LP pro Sekunde",
+                         "в своей воде лечит 2% здоровья в секунду"),
+    "evo.perk.bless": _T("suyun içindeyken silah hasarın +%25",
+                         "+25% weapon damage while in your water",
+                         "+25% de daño de armas dentro de tu agua",
+                         "+25% Waffenschaden in deinem Wasser",
+                         "+25% урона оружия, пока стоишь в своей воде"),
+    "evo.perk.veil":  _T("görünmezken saniyede canının %3'ü dolar",
+                         "heals 3% HP per second while invisible",
+                         "cura 3% de vida por segundo siendo invisible",
+                         "heilt 3% LP pro Sekunde, solange unsichtbar",
+                         "в невидимости лечит 3% здоровья в секунду"),
+    "evo.perk.nightfall": _T("görünmezken ve sonraki 3 sn silah hasarın +%35",
+                             "+35% weapon damage while invisible and for 3s after",
+                             "+35% de daño de armas invisible y 3 s después",
+                             "+35% Waffenschaden unsichtbar und 3 s danach",
+                             "+35% урона оружия в невидимости и 3 с после"),
+    # arayüz
+    "evo.tier":   _T("EVRİM {0}", "EVOLUTION {0}", "EVOLUCIÓN {0}", "EVOLUTION {0}", "ЭВОЛЮЦИЯ {0}"),
+    "evo.keeps":  _T("önceki evrimlerin etkileri sürer", "earlier evolution effects stay",
+                     "los efectos anteriores se mantienen", "frühere Effekte bleiben",
+                     "прошлые эффекты сохраняются"),
+    "evo.rare_ok": _T("nadir kitap: elde olması yeter", "rare book: owning it is enough",
+                      "libro raro: basta con tenerlo", "seltenes Buch: Besitz genügt",
+                      "редкая книга: достаточно иметь"),
+    "evo.watch":  _T("EVRİMİ İZLE", "WATCH EVOLUTION", "VER EVOLUCIÓN", "EVOLUTION ANSEHEN", "СМОТРЕТЬ ЭВОЛЮЦИЮ"),
+    "evo.path":   _T("EVRİM YOLU", "EVOLUTION PATH", "CAMINO DE EVOLUCIÓN", "EVOLUTIONSPFAD", "ПУТЬ ЭВОЛЮЦИИ"),
+    "evo.base":   _T("TEMEL", "BASE", "BASE", "BASIS", "БАЗА"),
+    "evo.live":   _T("CANLI ÖNİZLEME", "LIVE PREVIEW", "VISTA EN VIVO", "LIVE-VORSCHAU", "ЖИВОЙ ПОКАЗ"),
+    "evo.live_note": _T("Silah gerçek oyunda tam böyle çalışır. Kademeye tıkla, farkı izle.",
+                        "This is exactly how the weapon plays in a real run. Click a tier to compare.",
+                        "Así funciona el arma en una partida real. Pulsa un nivel para comparar.",
+                        "Genau so spielt sich die Waffe im echten Lauf. Klicke eine Stufe zum Vergleich.",
+                        "Так оружие работает в настоящем забеге. Нажми на уровень, чтобы сравнить."),
+    "evo.no_evo": _T("Bu silahın evrimi yok.", "This weapon has no evolution.", "Esta arma no evoluciona.",
+                     "Diese Waffe hat keine Evolution.", "У этого оружия нет эволюции."),
+    "evo.base_desc": _T("evrimsiz hâli", "without evolution", "sin evolución", "ohne Evolution",
+                        "без эволюции"),
+})
 
-def evo_name(key):
-    return L("evo.name." + key)
+
+def evo_name(key, tier=1):
+    if tier <= 1:
+        return L("evo.name." + key)
+    return L("evo.name%d.%s" % (min(EVO_TIERS_MAX, tier), key))
+
+
+def evo_tier(p, key):
+    """Silahın evrim kademesi (0 = evrilmemiş)."""
+    tiers = getattr(p, "evo_tier", None)
+    if tiers:
+        try:
+            return int(tiers.get(key, 0) or 0)
+        except (TypeError, ValueError, AttributeError):
+            pass
+    return 1 if key in (getattr(p, "evolved", None) or ()) else 0
+
+
+def evo_perks_for(key, tier):
+    """Kademeye kadar birikmiş etkiler (I'den başlayarak)."""
+    tl = EVO_TIERS.get(key)
+    if tl is None:
+        return (EVOLUTIONS[key][1],) if key in EVOLUTIONS and tier > 0 else ()
+    return tuple(tl[:max(0, min(EVO_TIERS_MAX, tier))])
+
+
+def evo_tier_perk(key, tier):
+    """O kademenin getirdiği etki."""
+    tl = EVO_TIERS.get(key) or (EVOLUTIONS[key][1],) * EVO_TIERS_MAX
+    return tl[clamp(tier, 1, EVO_TIERS_MAX) - 1]
+
+
+def evo_color(key, tier=1):
+    """Kademenin rengi: I silahın evrim rengi, II etkinin rengine kayar, III efsanevi altın parlaklık alır."""
+    base = EVOLUTIONS[key][2]
+    if tier <= 1:
+        return base
+    if tier == 2:
+        pc = EVO_PERK_COLOR.get(evo_tier_perk(key, 2), base)
+        return lighten(mix_col(base, pc, 0.45), 0.06)
+    return lighten(mix_col(base, (255, 214, 96), 0.40), 0.10)
 
 
 def evo_book_name(key):
@@ -27628,34 +27880,58 @@ def evo_book_name(key):
     return bk_name(bk) if bk else EVOLUTIONS[key][0]
 
 
-def evo_book_need(key):
+def evo_book_need(key, tier=1):
     """Eş kitabın gereken seviyesi: nadir kitaplar seviye atlamaz, elde olması yeter."""
     bk = BOOK_BY_KEY.get(EVOLUTIONS[key][0])
-    return 1 if (bk is None or bk.get("rare")) else EVO_BOOK_LEVEL
+    if bk is None or bk.get("rare"):
+        return 1
+    need = EVO_TIER_BOOK[clamp(tier, 1, EVO_TIERS_MAX) - 1]
+    return min(need, book_max_level(bk))
+
+
+def evo_level_need(key, tier=1):
+    """Kademe için gereken silah seviyesi (silahın tavanını geçmez)."""
+    need = EVO_TIER_LEVEL[clamp(tier, 1, EVO_TIERS_MAX) - 1]
+    w = WEAPON_BY_KEY.get(key)
+    return min(need, weapon_max_level(w)) if w else need
+
+
+def evo_next_ready(p, key):
+    """Silah bir sonraki evrim kademesine hazır mı (seviye + eş kitap)?"""
+    ev = EVOLUTIONS.get(key)
+    if ev is None:
+        return False
+    tier = evo_tier(p, key)
+    if tier >= EVO_TIERS_MAX:
+        return False
+    return (p.weapons.get(key, 0) >= evo_level_need(key, tier + 1)
+            and p.books.get(ev[0], 0) >= evo_book_need(key, tier + 1))
 
 
 def evo_ready_keys(p):
-    """Evrime hazır silahlar: seviye, eş kitap seviyesi ve takım şartı tutan, henüz evrilmemiş."""
+    """Bir sonraki kademeye hazır silahlar. İlk evrim için takım şartı ve koşu sınırı da tutmalı."""
     done = getattr(p, "evolved", ())
     # 2 kişilikte yuva 2 silah: orada 2 silah da yeter
     need = min(EVO_MIN_WEAPONS, slot_max(p, "w"))
-    if len(done) >= EVO_MAX_PER_RUN or len(p.weapons) < need:
-        return []
+    first_ok = len(done) < EVO_MAX_PER_RUN and len(p.weapons) >= need
     out = []
-    for key, lvl in p.weapons.items():
-        ev = EVOLUTIONS.get(key)
-        if ev is None or key in done or lvl < EVO_LEVEL:
+    for key in p.weapons:
+        if key not in EVOLUTIONS:
             continue
-        if p.books.get(ev[0], 0) >= evo_book_need(key):
+        if evo_tier(p, key) == 0 and not first_ok:
+            continue
+        if evo_next_ready(p, key):
             out.append(key)
     return out
 
 
 def evo_weapon_mult(player, key):
-    """Evrilmiş silahın hasar çarpanı (ruh kılıçlarının yığını dahil)."""
-    if key not in getattr(player, "evolved", ()):
-        return 1.0
-    m = EVO_DMG_MULT
+    """Silahın evrim hasar çarpanı: kademe + ruh kılıçlarının yığını + alan güçleri (zemzem / pelerin)."""
+    buff = getattr(player, "evo_buff", 1.0) or 1.0
+    tier = evo_tier(player, key)
+    if tier <= 0:
+        return buff
+    m = EVO_TIER_MULT[min(EVO_TIERS_MAX, tier) - 1] * buff
     if key == "ghost_swords":
         n, t_end = getattr(player, "evo_soul", (0, 0.0))
         run = EVO_CTX[0]
@@ -27690,52 +27966,65 @@ def _evo_extra_hit(run, e, dmg):
 
 
 def evo_on_hit(e, amount, fx):
-    """Evrilmiş silahın vuruş etkisi. Enemy / Boss take_damage içinden çağrılır."""
+    """Evrilmiş silahın vuruş etkileri. Enemy / Boss take_damage içinden çağrılır.
+    Kademe atladıkça etkiler birikir (ör. zincir: patlatır + yakar + zincirler)."""
     run = EVO_CTX[0]
     if run is None or EVO_BUSY[0] or amount <= 0:
         return
     key = DMG_SRC[0]
-    perk = run.evo_perks.get(key)
-    if perk is None:
+    perks = run.evo_perks.get(key)
+    if not perks:
         return
+    if isinstance(perks, str):
+        perks = (perks,)
     p = run.player
     boss = getattr(e, "is_boss", False)
     dying = e.hp <= 0 and e.alive
-    if perk == "blast":
-        if dying:
-            run.evo_blast(e, amount, key)
+    procs = []
+    for perk in perks:
+        if perk in EVO_FIELD_PERKS:
+            continue
+        if perk == "blast":
+            if dying:
+                run.evo_blast(e, amount, key)
+        elif perk == "soul":
+            if dying:
+                n, _t = getattr(p, "evo_soul", (0, 0.0))
+                p.evo_soul = (min(EVO_SOUL_MAX, n + 1), run.run_time + EVO_SOUL_T)
+                dx_, dy_ = norm_dir(e.x, e.y, p.x, p.y)
+                fx.spark(e.x, e.y, EVO_PERK_COLOR["soul"], dx_ * 300, dy_ * 300, 0.5, 3.4)
+        elif perk == "execute":
+            if not dying and not boss and e.alive and 0 < e.hp < e.max_hp * 0.12:
+                fx.popup(e.x, e.y - e.radius - 14, L("evo.exec"), EVO_PERK_COLOR["execute"], 13, life=0.5)
+                _evo_extra_hit(run, e, e.hp + 1.0)
+        elif perk == "sunder":
+            tough = boss or getattr(e, "is_mini", False) or getattr(e, "kind", "") == "elite" \
+                or enemy_weight_class(e) == "tough"
+            if tough and not dying and e.alive:
+                _evo_extra_hit(run, e, amount * 0.6)
+                if random.random() < 0.3:
+                    fx.burst(e.x, e.y, EVO_PERK_COLOR["sunder"], n=5, speed=120, life=0.3, r=3)
+        else:
+            if perk == "phoenix" and dying:
+                if run.run_time >= getattr(run, "evo_phx_t", 0.0):
+                    run.evo_phx_t = run.run_time + 0.4
+                    p.heal(p.max_hp * 0.006)
+            elif perk == "shatter" and not dying and e.alive and getattr(e, "slow_timer", 0.0) > 0:
+                _evo_extra_hit(run, e, amount * 0.5)
+            procs.append(perk)
+    if not procs or dying or not e.alive:
         return
-    if perk == "soul":
-        if dying:
-            n, _t = getattr(p, "evo_soul", (0, 0.0))
-            p.evo_soul = (min(EVO_SOUL_MAX, n + 1), run.run_time + EVO_SOUL_T)
-            dx_, dy_ = norm_dir(e.x, e.y, p.x, p.y)
-            fx.spark(e.x, e.y, EVO_PERK_COLOR["soul"], dx_ * 300, dy_ * 300, 0.5, 3.4)
-        return
-    if perk == "phoenix" and dying:
-        if run.run_time >= getattr(run, "evo_phx_t", 0.0):
-            run.evo_phx_t = run.run_time + 0.4
-            p.heal(p.max_hp * 0.006)
-    if perk == "execute":
-        if not dying and not boss and e.hp < e.max_hp * 0.12 and e.hp > 0:
-            fx.popup(e.x, e.y - e.radius - 14, L("evo.exec"), EVO_PERK_COLOR["execute"], 13, life=0.5)
-            _evo_extra_hit(run, e, e.hp + 1.0)
-        return
-    if perk == "sunder":
-        tough = boss or getattr(e, "is_mini", False) or getattr(e, "kind", "") == "elite" \
-            or enemy_weight_class(e) == "tough"
-        if tough and not dying:
-            _evo_extra_hit(run, e, amount * 0.6)
-            if random.random() < 0.3:
-                fx.burst(e.x, e.y, EVO_PERK_COLOR["sunder"], n=5, speed=120, life=0.3, r=3)
-        return
-    if perk == "shatter":
-        if not dying and getattr(e, "slow_timer", 0.0) > 0:
-            _evo_extra_hit(run, e, amount * 0.5)
     now = run.run_time
-    if now < getattr(e, "_evo_t", -1.0) or dying:
+    if now < getattr(e, "_evo_t", -1.0):
         return
     e._evo_t = now + EVO_PROC_CD
+    for perk in procs:
+        _evo_proc(run, e, perk, amount, key, boss, now, fx)
+
+
+def _evo_proc(run, e, perk, amount, key, boss, now, fx):
+    """Bekleme süresine bağlı etkinin kendisi (yakma, dondurma, zincir...)."""
+    p = run.player
     col = EVO_PERK_COLOR[perk]
     if perk in ("burn", "phoenix"):
         e.apply_burn(max(1.0, amount * 0.25), 2.5)
@@ -27750,8 +28039,16 @@ def evo_on_hit(e, amount, fx):
             fx.burst(e.x, e.y, col, n=6, speed=70, life=0.4, r=2.6)
         else:
             e.apply_slow(0.75, 1.0)
+    elif perk == "root":
+        # yere zincirler: hareket durur, itilme de sıfırlanır (patron yarı yavaşlar)
+        e.apply_slow(0.5 if boss else 0.0, EVO_ROOT_T)
+        if not boss:
+            e.knock_x = e.knock_y = 0.0
+        fx.ring(e.x, e.y, col, n=8, speed=90, life=0.3, r=2.4)
+        if random.random() < 0.5:
+            fx.burst(e.x, e.y + e.radius * 0.6, (150, 160, 190), n=4, speed=60, life=0.35, r=2.2, add=False)
     elif perk == "stun":
-        e._evo_t = now + 2.0              # sersemletme sık tutmasın
+        e._evo_t = max(getattr(e, "_evo_t", 0.0), now + 2.0)     # sersemletme sık tutmasın
         e.apply_slow(0.65 if boss else 0.05, 0.7)
         if random.random() < 0.35:
             fx.popup(e.x, e.y - e.radius - 12, L("evo.whack"), col, 14, life=0.45)
@@ -27877,12 +28174,15 @@ class EvoMixin:
         self.evo_scorch_t = 0.0
         self.evo_count = 0
         self.player.evolved = set()
+        self.player.evo_tier = {}       # silah -> evrim kademesi (1..3)
+        self.player.evo_buff = 1.0      # alan güçleri (zemzem III / pelerin III)
         self.player.evo_soul = (0, 0.0)
         EVO_ON.clear()
 
     def evo_update(self, dt):
         """Kareye bağlı evrim etkileri."""
         p = self.player
+        self._evo_fields(p, dt)
         if "cloak" in p.evolved and getattr(p, "invis_t", 0.0) > 0:
             self.evo_shroud_t = getattr(self, "evo_shroud_t", 0.0) - dt
             if self.evo_shroud_t <= 0:
@@ -27943,12 +28243,54 @@ class EvoMixin:
                     DMG_SRC[0] = prev
             self.evo_shocks = keep
 
+    def _evo_fields(self, p, dt):
+        """Zemzem II-III (suyun içinde şifa / hasar) ve pelerin II-III (görünmezken şifa / hasar)."""
+        have = set()
+        for v in self.evo_perks.values():
+            have.update((v,) if isinstance(v, str) else v)
+        buff, heal = 1.0, 0.0
+        if "haven" in have or "bless" in have:
+            inside = False
+            for z in self.water_zones:
+                if z.alive and (p.x - z.x) ** 2 + (p.y - z.y) ** 2 < z.r * z.r:
+                    inside = True
+                    break
+            if inside:
+                if "haven" in have:
+                    heal += EVO_HAVEN_HEAL
+                if "bless" in have:
+                    buff *= EVO_BLESS_MULT
+                p.evo_glow = (EVO_PERK_COLOR["haven" if "haven" in have else "bless"], self.run_time)
+        if "veil" in have or "nightfall" in have:
+            invis = getattr(p, "invis_t", 0.0) > 0
+            if invis and "veil" in have:
+                heal += EVO_VEIL_HEAL
+            if "nightfall" in have:
+                if invis:
+                    p.evo_night_until = self.run_time + EVO_NIGHT_AFTER
+                if self.run_time < getattr(p, "evo_night_until", -1.0):
+                    buff *= EVO_NIGHT_MULT
+                    p.evo_glow = (EVO_PERK_COLOR["nightfall"], self.run_time)
+        p.evo_buff = buff
+        if heal > 0 and p.alive and p.hp < p.max_hp:
+            acc = getattr(p, "evo_heal_acc", 0.0) + heal * p.max_hp * dt
+            if acc >= 1.0:
+                p.heal(acc)
+                acc = 0.0
+                if random.random() < 0.25:
+                    self.fx.spark(p.x + random.uniform(-14, 14), p.y + 8, EVO_PERK_COLOR["haven"],
+                                  0, -70, 0.5, 2.6)
+            p.evo_heal_acc = acc
+
     def evo_offer(self, key):
         w = WEAPON_BY_KEY[key]
-        book, perk, col = EVOLUTIONS[key]
-        return dict(kind="evo", key=key, w=w, color=col, perk=perk, book=BOOK_BY_KEY.get(book),
-                    name=evo_name(key), lvl=self.player.weapons.get(key, 1),
-                    desc=L("evo.perk." + perk))
+        book, _perk, _col = EVOLUTIONS[key]
+        tier = min(EVO_TIERS_MAX, evo_tier(self.player, key) + 1)
+        perk = evo_tier_perk(key, tier)
+        return dict(kind="evo", key=key, w=w, color=evo_color(key, tier), perk=perk, tier=tier,
+                    book=BOOK_BY_KEY.get(book), name=evo_name(key, tier),
+                    prev=(evo_name(key, tier - 1) if tier > 1 else w_name(w)),
+                    lvl=self.player.weapons.get(key, 1), desc=L("evo.perk." + perk))
 
     def evo_inject(self, chosen):
         """Evrime hazır silah varsa elin bir kartı EVRİM kartı olur."""
@@ -27969,15 +28311,22 @@ class EvoMixin:
         return chosen
 
     def evolve_weapon(self, key):
+        """Silahı bir sonraki evrim kademesine taşır (I -> II -> III)."""
         p = self.player
-        book, perk, col = EVOLUTIONS[key]
+        if not hasattr(p, "evo_tier") or p.evo_tier is None:
+            p.evo_tier = {}
+        tier = min(EVO_TIERS_MAX, evo_tier(p, key) + 1)
+        col = evo_color(key, tier)
+        first = key not in p.evolved
         p.evolved.add(key)
+        p.evo_tier[key] = tier
         EVO_ON.add(key)
         if key == "cloak" and getattr(p, "invis_t", 0.0) <= 0:
             p.cloak_timer = min(getattr(p, "cloak_timer", 0.0), 1.0)
-        self.evo_perks[key] = perk
-        self.evo_banner = (self.run_time, key)
-        self.evo_count = getattr(self, "evo_count", 0) + 1
+        self.evo_perks[key] = evo_perks_for(key, tier)
+        self.evo_banner = (self.run_time, key, tier)
+        if first:
+            self.evo_count = getattr(self, "evo_count", 0) + 1
         fx = self.fx
         fx.do_flash(col, 0.35)
         fx.shake(6, 0.25)
@@ -28061,9 +28410,11 @@ def draw_evo_orbs(world, run, t):
         a = t * 1.6 + i * math.tau / n
         x = p.x + math.cos(a) * (p.radius + 20)
         y = p.y + math.sin(a) * (p.radius + 20) * 0.55 - 6
-        col = EVOLUTIONS[key][2]
-        add_glow(world, x, y, 16, col, 0.35)
-        pts = [(x, y - 6), (x + 4, y), (x, y + 6), (x - 4, y)]
+        tier = evo_tier(p, key)
+        col = evo_color(key, tier)
+        add_glow(world, x, y, 14 + 4 * tier, col, 0.30 + 0.06 * tier)
+        sz = 5 + tier          # kademe büyüdükçe taş büyür
+        pts = [(x, y - sz), (x + sz * 0.66, y), (x, y + sz), (x - sz * 0.66, y)]
         pygame.draw.polygon(world, INK, [(px + (1 if px > x else -1), py + (1 if py > y else -1))
                                          for px, py in pts])
         pygame.draw.polygon(world, col, pts)
@@ -28079,7 +28430,8 @@ def draw_evo_banner(surf, run, t):
     if st < 0 or st > EVO_BANNER_T:
         return
     key = eb[1]
-    col = EVOLUTIONS[key][2]
+    tier = eb[2] if len(eb) > 2 else 1
+    col = evo_color(key, tier)
     y = 250
     k = ease_out_cubic(min(1.0, st / 0.3))
     a = min(1.0, (EVO_BANNER_T - st) / 0.5)
@@ -28098,12 +28450,13 @@ def draw_evo_banner(surf, run, t):
                              (cx + math.cos(ang) * r1, y - 12 + math.sin(ang) * r1), 3)
         blit_sigil(surf, cx, y - 12, 13, key, lighten(col, 0.3))
     size = int(58 + 30 * (1 - k))
-    draw_text(surf, L("evo.banner"), (VIRTUAL_W / 2, y - 18), size, col, bold=True, center=True,
+    head = L("evo.banner") if tier <= 1 else L("evo.tier", EVO_ROMAN[tier]) + "!"
+    draw_text(surf, head, (VIRTUAL_W / 2, y - 18), size, col, bold=True, center=True,
               alpha=int(255 * a))
     w = WEAPON_BY_KEY[key]
-    sub = "%s  →  %s" % (w_name(w), evo_name(key))
+    sub = "%s  →  %s" % (w_name(w) if tier <= 1 else evo_name(key, tier - 1), evo_name(key, tier))
     draw_text(surf, sub, (VIRTUAL_W / 2, y + 28), 20, TEXT, bold=True, center=True, alpha=int(255 * a))
-    draw_text(surf, L("evo.perk." + EVOLUTIONS[key][1]), (VIRTUAL_W / 2, y + 50), 13,
+    draw_text(surf, L("evo.perk." + evo_tier_perk(key, tier)), (VIRTUAL_W / 2, y + 50), 13,
               lighten(col, 0.3), center=True, shadow=False, alpha=int(255 * a))
 
 
@@ -28136,7 +28489,8 @@ def draw_evo_card(surf, r2, ch, run, t, hover):
     pygame.draw.rect(surf, scale_col(col, 0.55), band, border_top_left_radius=15, border_top_right_radius=15)
     pygame.draw.rect(surf, col, band.inflate(0, -6).move(0, -3), border_top_left_radius=14,
                      border_top_right_radius=14)
-    bt = L("evo.band")
+    tier = int(ch.get("tier", 1) or 1)
+    bt = L("evo.tier", EVO_ROMAN[tier])
     draw_text(surf, bt, (band.centerx, band.centery - 2), 16, (28, 18, 20), bold=True, center=True,
               shadow=False)
     tw_ = text_width(bt, 16, True)
@@ -28159,7 +28513,8 @@ def draw_evo_card(surf, r2, ch, run, t, hover):
     # ad
     nm, nsz = ms_fit(ch["name"], 19, r2.w - 24, True)
     draw_text(surf, nm, (r2.centerx, r2.y + 152), nsz, lighten(col, 0.35), bold=True, center=True)
-    pill = "%s  →  %s" % (_fit_text(w_name(ch["w"]), 11, (r2.w - 60) // 2, True), L("evo.short"))
+    pill = "%s  →  %s %s" % (_fit_text(ch.get("prev") or w_name(ch["w"]), 11, (r2.w - 70) // 2, True),
+                             L("evo.short"), EVO_ROMAN[tier])
     pw_ = text_width(pill, 11, True) + 18
     pr_ = pygame.Rect(0, 0, pw_, 18)
     pr_.center = (r2.centerx, r2.y + 174)
@@ -28170,13 +28525,17 @@ def draw_evo_card(surf, r2, ch, run, t, hover):
     pygame.draw.rect(surf, (20, 15, 15), box, border_radius=10)
     ink_frame(surf, box, scale_col(col, 0.45), 10, 1)
     draw_text(surf, L("evo.dmg"), (box.x + 10, box.y + 9), 13, (176, 170, 160), shadow=False)
-    draw_text(surf, "x" + ("%.2f" % EVO_DMG_MULT).rstrip("0").rstrip("."), (box.right - 10, box.y + 8), 15, GREEN, bold=True,
-              right=True, shadow=False)
+    draw_text(surf, "x" + ("%.2f" % EVO_TIER_MULT[tier - 1]).rstrip("0").rstrip("."), (box.right - 10, box.y + 8),
+              15, GREEN, bold=True, right=True, shadow=False)
     draw_icon(surf, box.x + 18, box.y + 44, EVO_PERK_ICON[perk], pcol, 8)
-    for i, ln in enumerate(wrap_text(ch["desc"], 13, box.w - 44)[:2]):
+    dl = wrap_text(ch["desc"], 13, box.w - 44)[:2]
+    for i, ln in enumerate(dl):
         draw_text(surf, ln, (box.x + 32, box.y + 36 + i * 16), 13, pcol, bold=True, shadow=False)
+    if tier > 1 and len(dl) < 2:
+        draw_text(surf, _fit_text("+ " + L("evo.keeps"), 11, box.w - 44), (box.x + 32, box.y + 54), 11,
+                  TEXT_DIM, shadow=False)
     bk = ch.get("book")
-    req = L("evo.need", EVO_LEVEL, bk_name(bk) if bk else "?", evo_book_need(key))
+    req = L("evo.need", evo_level_need(key, tier), bk_name(bk) if bk else "?", evo_book_need(key, tier))
     draw_text(surf, _fit_text(req, 11, box.w - 16), (box.centerx, box.bottom - 15), 11, TEXT_DIM,
               center=True, shadow=False)
     if hover:
@@ -29838,7 +30197,9 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin):
             k = 0.92 + 0.021 * weapon_growth(lvl)
             for i in range(n_axe):
                 tgt = random.choice(targets)
-                ax = FlyingAxe(p, tgt, dmg, k, w["color"], lvl=lvl)
+                _et = evo_tier(p, "axe")
+                ax = FlyingAxe(p, tgt, dmg, k, evo_color("axe", _et) if _et else w["color"], lvl=lvl)
+                ax.evo = _et              # II: tırpan, III: zincirli orak (görünüş)
                 # Baltalar tam üst üste çıkmasın: oyuncunun çevresine dağıt.
                 a0 = random.uniform(0, math.tau)
                 ax.x += math.cos(a0) * 16
@@ -34861,7 +35222,8 @@ def draw_weapon_slots(surf, run, t):
         w = WEAPON_BY_KEY[key]
         lvl = p.weapons[key]
         is_evo = key in evolved
-        col = EVOLUTIONS[key][2] if is_evo else tuple(w["color"])
+        evo_t = evo_tier(p, key) if is_evo else 0
+        col = evo_color(key, evo_t) if is_evo else tuple(w["color"])
         passive = bool(w.get("passive"))
         timed = bool(w.get("timed"))
         invis_now = timed and getattr(p, "invis_t", 0.0) > 0
@@ -34920,13 +35282,16 @@ def draw_weapon_slots(surf, run, t):
                      maxed=lvl >= weapon_max_level(w), h=17)
         if is_evo or key in ready_evo:
             # evrilmiş: sol üstte EVO etiketi; evrime hazır: yanıp sönen ok
-            tag = L("evo.short") if is_evo else "!"
+            # kademe: EVO I / II / III; bir sonrakine hazırsa etiket altın yanıp söner
+            tag = (L("evo.short") + " " + EVO_ROMAN[evo_t]) if is_evo else "!"
+            nxt = key in ready_evo
             tr_ = pygame.Rect(r.x - 4, r.y - 6, text_width(tag, 9, True) + 8, 14)
             if is_evo or pulse > 0.4:
-                pygame.draw.rect(surf, col if is_evo else GOLD, tr_, border_radius=4)
+                pygame.draw.rect(surf, GOLD if (nxt and pulse > 0.4) or not is_evo else col, tr_,
+                                 border_radius=4)
                 pygame.draw.rect(surf, INK, tr_, width=1, border_radius=4)
                 draw_text(surf, tag, tr_.center, 9, INK, bold=True, center=True, shadow=False)
-        name = _fit_text(evo_name(key) if is_evo else w_name(w), 8, cell + gap - 7, bold=True)
+        name = _fit_text(evo_name(key, evo_t) if is_evo else w_name(w), 8, cell + gap - 7, bold=True)
         ncol = (CLOAK_COLOR2 if invis_now else
                 (lighten(col, 0.25) if ready else (118, 124, 148)))
         draw_text(surf, name, (r.centerx, r.bottom + 3), 8, ncol, bold=True,
@@ -35997,8 +36362,8 @@ def draw_reward_card(surf, run, t):
                   bold=True, shadow=False, alpha=int(255 * a))
 
 
-def draw_run(surf, run, t, aim_pos=None, shake=(0, 0)):
-    """Koşuyu çizer."""
+def draw_run(surf, run, t, aim_pos=None, shake=(0, 0), world_only=False):
+    """Koşuyu çizer. world_only: yalnız dünya + evrim şeridi (önizleme penceresi için, HUD yok)."""
     world = world_surface()
     cam = run.cam_rect()
     prev_clip = world.get_clip()
@@ -36154,12 +36519,14 @@ def draw_run(surf, run, t, aim_pos=None, shake=(0, 0)):
             _pk = 0.30 + 0.10 * math.sin(t * 6)
             for _ln, _wk in EVO_GLOW_LISTS:
                 if _wk in _evo_:
-                    _col = EVOLUTIONS[_wk][2]
+                    _tr = evo_tier(run.player, _wk)
+                    _col = evo_color(_wk, _tr)
+                    _gr = 34 + 10 * (_tr - 1)       # kademe büyüdükçe hâle genişler
                     for _ob in getattr(run, _ln, None) or ():
                         _x, _y = getattr(_ob, "x", None), getattr(_ob, "y", None)
                         if type(_x) in (int, float) and type(_y) in (int, float) \
                                 and vis_near.collidepoint(_x, _y):
-                            add_glow(world, _x, _y, 34, _col, _pk)
+                            add_glow(world, _x, _y, _gr, _col, _pk)
         # kurtlar, ışın, hayalet kılıçlar, düşen göktaşları
         for wf in run.wolves:
             if vis_near.collidepoint(wf.x, wf.y):
@@ -36211,7 +36578,9 @@ def draw_run(surf, run, t, aim_pos=None, shake=(0, 0)):
         # Telefon: dünya güvenli alanın dışına da (çentiğin altına) uzanır.
         _tgt, _ox = surf.get_parent(), surf.get_offset()[0]
     _tgt.blit(world, (VIEW_RECT.x + _ox + int(shake[0]), VIEW_RECT.y + int(shake[1])), cam)
-
+    if world_only:
+        draw_evo_banner(surf, run, t)
+        return
 
     draw_offscreen_markers(surf, run, cam, t)
     _MOB_FRAME[0] += 1
@@ -45951,6 +46320,7 @@ class CoopRunState(RunState):
         p0 = self.player
         p1.x, p1.y = p0.x + 70, p0.y + 10
         p1.evolved = set()
+        p1.evo_tier = {}
         p1.evo_soul = (0, 0.0)
         self.players.append(p1)
         c1 = {}
@@ -46205,7 +46575,8 @@ class CoopRunState(RunState):
         # adıyla bir duyuru
         p = self.player
         nm = self.names[self.cur] if self.cur < len(self.names) else ""
-        self.fx.popup(p.x, p.y - 96, L("coop.evo", nm or "?", evo_name(key)), EVOLUTIONS[key][2], 22,
+        tr_ = evo_tier(p, key)
+        self.fx.popup(p.x, p.y - 96, L("coop.evo", nm or "?", evo_name(key, tr_)), evo_color(key, tr_), 22,
                       life=2.4)
 
     # ortak yemin: seçilen yemin iki oyuncuya da işler
@@ -49013,6 +49384,152 @@ class DeathReplay:
         return True
 
 
+# ---- evrimi izle: canlı önizleme ----
+# Silahlık > silah > EVRİMİ İZLE. Video dosyası yok: gerçek bir koşu (kaydın
+# kopyasıyla) otomatik pilotla oynatılır ve pencereye küçültülüp basılır.
+# Kademe seçilince koşu bir alt kademeden başlar, kısa süre sonra evrim
+# gerçekleşir (şerit + parlama) ve yeni hâli savaşırken görünür.
+EVO_PV_SECS = 14.0              # bir döngünün süresi; sonra baştan
+EVO_PV_EVOLVE_AT = 1.6          # döngünün bu anında evrim olur
+
+
+class EvoPreview:
+    def __init__(self, app, key):
+        self.app = app
+        self.key = key
+        self.tier = 1
+        self.run = None
+        self.pilot = None
+        self.t = 0.0
+        self.open_t = 0.0
+        self.surf = pygame.Surface((VIRTUAL_W, VIRTUAL_H)).convert()
+        self.err = False
+        self.select(1)
+
+    def select(self, tier):
+        self.tier = int(clamp(tier, 0, EVO_TIERS_MAX))
+        self._restart()
+
+    def _restart(self):
+        key, tier = self.key, self.tier
+        try:
+            save = _AdSave(self.app.save.data)
+            run = RunState(save, self.app.save.equipped_skin_id(), "normal", None)
+            run.set_map_theme("stone")
+            p = run.player
+            show = max(1, tier)
+            lvl = evo_level_need(key, show) if key in EVOLUTIONS else 10
+            p.weapons = {key: lvl}
+            ev = EVOLUTIONS.get(key)
+            if ev is not None:
+                p.books = {ev[0]: evo_book_need(key, show)}
+            p.hp = p.max_hp
+            for _ in range(max(0, tier - 1)):
+                run.evolve_weapon(key)
+            run.evo_banner = None
+            run.fx = EffectSystem()
+            run.waves._begin_wave(6, 0)
+            run.waves.announce_timer = 0.0
+            pilot = _TourPilot(run, crowd=16)
+            orig = run.update
+
+            def upd(dt, inp, _orig=orig):
+                # yalnız silahın kendisi görünsün: ana silah ve bonk susar
+                inp["mouse_down"] = False
+                inp["bonk_pressed"] = False
+                inp["dash_pressed"] = False
+                _orig(dt, inp)
+            run.update = upd
+            self.run, self.pilot = run, pilot
+            self.t = 0.0
+            self.evolved_now = tier <= 0
+            self.err = False
+        except Exception as e:
+            log_net_error("evo preview", e, ("evo", ""))
+            self.run = None
+            self.err = True
+
+    def update(self, dt):
+        if self.run is None:
+            return
+        self.t += dt
+        try:
+            if not self.evolved_now and self.t >= EVO_PV_EVOLVE_AT:
+                self.evolved_now = True
+                self.run.evolve_weapon(self.key)
+            self.pilot.step(min(dt, 1 / 30))
+        except Exception as e:
+            log_net_error("evo preview", e, ("evo", ""))
+            self.run = None
+            self.err = True
+            return
+        if self.t >= EVO_PV_SECS:
+            self._restart()
+
+    def draw(self, canvas, rect, t):
+        run = self.run
+        if run is None:
+            pygame.draw.rect(canvas, (14, 10, 12), rect, border_radius=10)
+            return
+        try:
+            draw_run(self.surf, run, t, world_only=True)
+        except Exception as e:
+            log_net_error("evo preview", e, ("evo", ""))
+            self.run = None
+            return
+        # oyuncunun çevresi biraz yakından (pencere küçük)
+        cw, ch = int(rect.w * 1.25), int(rect.h * 1.25)
+        px, py = run.world_to_screen(run.player.x, run.player.y)
+        src = pygame.Rect(0, 0, cw, ch)
+        src.center = (int(px), int(py))
+        src.clamp_ip(self.surf.get_rect())
+        try:
+            img = pygame.transform.smoothscale(self.surf.subsurface(src), rect.size)
+        except Exception:
+            img = pygame.transform.scale(self.surf.subsurface(src), rect.size)
+        canvas.blit(img, rect.topleft)
+
+
+def _evo_tier_card(canvas, r, key, tier, sel, hov, t):
+    """Önizleme penceresinin sağındaki kademe kartı (TEMEL, I, II, III)."""
+    w = WEAPON_BY_KEY[key]
+    col = evo_color(key, tier) if tier > 0 else tuple(w["color"])
+    bg = mix_col((30, 22, 24), col, 0.22 if sel else (0.12 if hov else 0.06))
+    pygame.draw.rect(canvas, bg, r, border_radius=12)
+    if sel:
+        add_glow(canvas, r.centerx, r.centery, r.w * 0.45, col, 0.10 + 0.05 * math.sin(t * 4))
+    ink_frame(canvas, r, col if (sel or hov) else scale_col(col, 0.55), 12, 3 if sel else 2)
+    b = pygame.Rect(r.x + 12, r.y + 12, 40, 40)
+    pygame.draw.rect(canvas, scale_col(col, 0.35), b, border_radius=10)
+    ink_frame(canvas, b, col, 10, 2)
+    if tier > 0:
+        draw_text(canvas, EVO_ROMAN[tier], b.center, 18, lighten(col, 0.35), bold=True, center=True, shadow=False)
+    else:
+        blit_sigil(canvas, b.centerx, b.centery, 14, key, col)
+    tx = b.right + 12
+    tw = r.right - tx - 12
+    name = evo_name(key, tier) if tier > 0 else w_name(w)
+    draw_text(canvas, _fit_text(name, 15, tw, bold=True), (tx, r.y + 10), 15, lighten(col, 0.25), bold=True,
+              shadow=False)
+    if tier > 0:
+        need = L("evo.need", evo_level_need(key, tier), evo_book_name(key), evo_book_need(key, tier))
+        draw_text(canvas, _fit_text(need, 11, tw), (tx, r.y + 31), 11, TEXT_DIM, shadow=False)
+        perks = evo_perks_for(key, tier)
+        line = " + ".join(L("evo.perk." + pk) for pk in perks[-1:])
+        yy = r.y + 50
+        for ln in wrap_text(line, 11, r.w - 24)[:2]:
+            draw_text(canvas, ln, (r.x + 12, yy + 8), 11, (214, 204, 186), shadow=False)
+            yy += 14
+        icons_x = r.right - 12
+        for pk in perks[::-1]:
+            draw_icon(canvas, icons_x - 8, r.y + 20, EVO_PERK_ICON[pk], EVO_PERK_COLOR[pk], 7)
+            icons_x -= 20
+        draw_text(canvas, "x" + ("%.2f" % EVO_TIER_MULT[tier - 1]).rstrip("0").rstrip("."),
+                  (r.right - 12, r.bottom - 22), 12, GREEN, bold=True, right=True, shadow=False)
+    else:
+        draw_text(canvas, L("evo.base_desc"), (tx, r.y + 31), 11, TEXT_DIM, shadow=False)
+
+
 def replay_button_draw(canvas, rect, mouse_pos, t):
     """Sonuç ekranındaki 'son anları izle' düğmesi (oynat simgeli). Üstünde mi döner."""
     hov = rect.collidepoint(mouse_pos)
@@ -49124,6 +49641,7 @@ class App:
         self.weapon_scroll = 0.0
         self.weapon_filter = "all"    # all | owned | locked | muted
         self.weapon_detail = None     # açılan silahın anahtarı
+        self.evo_pv = None            # EVRİMİ İZLE penceresi (EvoPreview)
         self.weapon_detail_t = 0.0
         self.weapon_toast = ""
         self.weapon_toast_t = 0.0
@@ -50109,6 +50627,8 @@ class App:
             self.run.decline_curse()
             self.state = STATE_PLAY
         elif self.state == STATE_SKIN_DETAIL: self.state = STATE_SKIN_MARKET
+        elif self.state == STATE_WEAPON_CODEX and getattr(self, "evo_pv", None) is not None:
+            self.close_evo_viewer()
         elif self.state == STATE_WEAPON_CODEX and self.weapon_detail:
             self.weapon_detail = None
         elif self.state == STATE_BOOK_MARKET and self.book_detail:
@@ -55942,8 +56462,80 @@ class App:
         if list_click:
             btn.click(mouse_pos)
 
+        pv = getattr(self, "evo_pv", None)
         if self.weapon_detail:
-            self._draw_weapon_detail(canvas, dt, mouse_pos, clicked and not opened_now)
+            self._draw_weapon_detail(canvas, dt, (-9999, -9999) if pv else mouse_pos,
+                                     clicked and not opened_now and pv is None)
+        if pv is not None:
+            self._draw_evo_viewer(canvas, dt, mouse_pos, clicked)
+
+    def close_evo_viewer(self):
+        self.evo_pv = None
+        # önizleme koşusu evrim kümesini kendi koşusuna göre kurdu: varsa asıl
+        # koşununkini geri yükle
+        EVO_ON.clear()
+        r = getattr(self, "run", None)
+        if r is not None:
+            EVO_ON.update(getattr(r.player, "evolved", ()) or ())
+
+    def _draw_evo_viewer(self, canvas, dt, mouse_pos, clicked):
+        """EVRİMİ İZLE penceresi: solda canlı önizleme, sağda kademeler."""
+        pv = self.evo_pv
+        key = pv.key
+        w = WEAPON_BY_KEY[key]
+        pv.open_t = min(1.0, pv.open_t + dt / 0.2)
+        k = ease_out_cubic(pv.open_t)
+        pv.update(dt)
+        ov = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+        ov.fill((4, 5, 10, int(225 * k)))
+        canvas.blit(ov, (0, 0))
+        R = pygame.Rect(0, 0, 1210, 650)
+        R.center = (VIRTUAL_W // 2, VIRTUAL_H // 2 + int((1 - k) * 30))
+        col = evo_color(key, max(1, pv.tier)) if key in EVOLUTIONS else tuple(w["color"])
+        panel(canvas, R, bg=(33, 24, 26), edge=col, alpha=250, radius=18, edge_w=3)
+        title = "%s  -  %s" % (w_name(w), L("evo.path"))
+        draw_text(canvas, _fit_text(title, 24, R.w - 80, bold=True), (R.centerx, R.y + 30), 24, lighten(col, 0.2),
+                  bold=True, center=True)
+        # ---- önizleme ----
+        V = pygame.Rect(R.x + 24, R.y + 64, 784, 441)
+        pygame.draw.rect(canvas, (10, 8, 10), V.inflate(8, 8), border_radius=12)
+        if key in EVOLUTIONS:
+            pv.draw(canvas, V, self.t)
+        else:
+            draw_text(canvas, L("evo.no_evo"), V.center, 16, TEXT_DIM, center=True)
+        ink_frame(canvas, V.inflate(8, 8), scale_col(col, 0.8), 12, 2)
+        blink = 0.5 + 0.5 * math.sin(self.t * 5)
+        circle_aa(canvas, V.x + 18, V.y + 18, 6, (int(160 + 95 * blink), 40, 50))
+        draw_text(canvas, L("evo.live"), (V.x + 30, V.y + 9), 13, (255, 220, 220), bold=True)
+        if pv.run is not None:
+            frac = clamp(pv.t / EVO_PV_SECS, 0.0, 1.0)
+            bar = pygame.Rect(V.x, V.bottom + 10, V.w, 6)
+            pygame.draw.rect(canvas, (50, 42, 46), bar, border_radius=3)
+            pygame.draw.rect(canvas, col, (bar.x, bar.y, int(bar.w * frac), bar.h), border_radius=3)
+        for i, ln in enumerate(wrap_text(L("evo.live_note"), 13, V.w)[:2]):
+            draw_text(canvas, ln, (V.centerx, V.bottom + 34 + i * 17), 13, TEXT_DIM, center=True, shadow=False)
+        # ---- kademeler ----
+        cx0 = V.right + 22
+        cw = R.right - 24 - cx0
+        ch, gap = 104, 8
+        y = R.y + 64
+        for tier in range(0, EVO_TIERS_MAX + 1):
+            r = pygame.Rect(cx0, y, cw, ch)
+            hov = r.collidepoint(mouse_pos)
+            _evo_tier_card(canvas, r, key, tier, tier == pv.tier, hov, self.t)
+            if clicked and hov and tier != pv.tier:
+                pv.select(tier)
+                sfx("click", 0.6, 0.0)
+                clicked = False
+            y += ch + gap
+        # ---- kapat ----
+        cb = pygame.Rect(R.centerx - 110, R.bottom - 50, 220, 36)
+        chov = cb.collidepoint(mouse_pos)
+        face = key_button(canvas, cb, (120, 100, 90), chov)
+        draw_text(canvas, L("ui.close"), face.center, 14, TEXT, bold=True, center=True, shadow=False)
+        if clicked and (chov or not R.collidepoint(mouse_pos)):
+            self.close_evo_viewer()
+            sfx("click", 0.45, 0.0)
 
     def _wd_right(self, canvas, w, rx, top, rw, owned, cur, need, draw):
         """Silah detayının sağ sütunu. draw=False iken yalnız yüksekliği ölçer
@@ -55971,24 +56563,39 @@ class App:
             yy += 12
         ev = EVOLUTIONS.get(key)
         if ev is not None:
-            # evrim tarifi: hangi kitapla, neye dönüşür, ne kazanır
-            ecol = ev[2]
-            lab = L("evo.band")
-            T(lab, (rx, yy), 12, ecol, bold=True, shadow=False)
-            lw = text_width(lab, 12, True) + 10
-            T(_fit_text(L("evo.need", EVO_LEVEL, evo_book_name(key), evo_book_need(key)), 12, rw - lw),
-              (rx + lw, yy), 12, TEXT_DIM, shadow=False)
+            # evrim yolu: üç kademe - şart, ad ve kademenin getirdiği etki
+            lab = L("evo.path")
+            T(lab, (rx, yy), 12, ev[2], bold=True, shadow=False)
             yy += 18
             for ln in wrap_text(L("evo.rule", EVO_MIN_WEAPONS, EVO_MAX_PER_RUN), 11, rw):
                 T(ln, (rx, yy), 11, (150, 140, 130), shadow=False)
-                yy += 16
-            yy += 2
-            if draw:
-                blit_sigil(canvas, rx + 9, yy + 9, 8, key, ecol)
-            for i_, ln in enumerate(wrap_text("%s  -  %s" % (evo_name(key), L("evo.perk." + ev[1])), 13, rw - 24)[:2]):
-                T(ln, (rx + 24, yy + 1), 13, lighten(ecol, 0.25), bold=True, shadow=False)
-                yy += 18
-            yy += 12
+                yy += 15
+            yy += 4
+            for tier in range(1, EVO_TIERS_MAX + 1):
+                ecol = evo_color(key, tier)
+                if draw:
+                    r_ = pygame.Rect(rx, yy, 30, 30)
+                    pygame.draw.rect(canvas, scale_col(ecol, 0.30), r_, border_radius=8)
+                    ink_frame(canvas, r_, ecol, 8, 2)
+                    draw_text(canvas, EVO_ROMAN[tier], r_.center, 13, lighten(ecol, 0.3), bold=True, center=True,
+                              shadow=False)
+                tx = rx + 40
+                T(_fit_text(evo_name(key, tier), 13, rw - 40, bold=True), (tx, yy - 1), 13, lighten(ecol, 0.25),
+                  bold=True, shadow=False)
+                need_t = L("evo.need", evo_level_need(key, tier), evo_book_name(key), evo_book_need(key, tier))
+                T(_fit_text(need_t, 11, rw - 40), (tx, yy + 15), 11, TEXT_DIM, shadow=False)
+                yy += 32
+                for ln in wrap_text("+ " + L("evo.perk." + evo_tier_perk(key, tier))
+                                    + ("  (x%s)" % ("%.2f" % EVO_TIER_MULT[tier - 1]).rstrip("0").rstrip(".")),
+                                    11, rw - 40)[:2]:
+                    T(ln, (tx, yy), 11, (206, 196, 180), shadow=False)
+                    yy += 14
+                yy += 6
+            bk_ = BOOK_BY_KEY.get(ev[0])
+            if bk_ is not None and bk_.get("rare"):
+                T(_fit_text(L("evo.rare_ok"), 10, rw), (rx, yy), 10, (150, 140, 130), shadow=False)
+                yy += 14
+            yy += 8
         if owned:
             T(L("ui.unlocked"), (rx, yy), 13, GREEN, bold=True, shadow=False)
             yy += 24
@@ -56100,8 +56707,24 @@ class App:
             self._wd_right(canvas, w, rx, rect.y, rw, owned, cur, need, True)
 
         # ---- alt düğmeler ----
+        has_evo = key in EVOLUTIONS
+        bx0 = rect.centerx - (340 if has_evo else 230)
+        if has_evo:
+            # evrim yolunu canlı izle (silah kilitliyken de: oyuncu neyi açacağını görsün)
+            eb = pygame.Rect(rect.centerx - 110, rect.bottom - 52, 220, 34)
+            ehov = eb.collidepoint(mouse_pos)
+            ecol = evo_color(key, 2)
+            face = key_button(canvas, eb, scale_col(ecol, 0.75), ehov)
+            pygame.draw.polygon(canvas, WHITE, [(face.x + 16, face.centery - 7), (face.x + 16, face.centery + 7),
+                                                (face.x + 28, face.centery)])
+            draw_text(canvas, _fit_text(L("evo.watch"), 13, eb.w - 44, bold=True), (face.centerx + 10, face.centery),
+                      13, WHITE, bold=True, center=True, shadow=False)
+            if clicked and ehov:
+                self.evo_pv = EvoPreview(self, key)
+                sfx("click", 0.6, 0.0)
+                return
         if owned:
-            mb = pygame.Rect(rect.centerx - 230, rect.bottom - 52, 200, 34)
+            mb = pygame.Rect(bx0, rect.bottom - 52, 200, 34)
             mhov = mb.collidepoint(mouse_pos)
             pygame.draw.rect(canvas, (44, 30, 32) if not is_muted else (28, 44, 34), mb,
                              border_radius=8)
@@ -56114,7 +56737,7 @@ class App:
                 sfx("click", 0.6, 0.0)
                 return
 
-        cb = pygame.Rect(rect.centerx + 30, rect.bottom - 52, 200, 34)
+        cb = pygame.Rect(rect.centerx + (140 if has_evo else 30), rect.bottom - 52, 200, 34)
         chov = cb.collidepoint(mouse_pos)
         face = key_button(canvas, cb, (120, 100, 90), chov)
         draw_text(canvas, L("ui.close"), face.center, 13, TEXT, bold=True, center=True, shadow=False)
