@@ -15644,6 +15644,102 @@ class LevelDrop:
                              (x, y + R * 0.5), (x - R * 0.3, y - R * 0.1)])
 
 
+# ---- evrim görselleri: ortak çizim parçaları ----
+# Her silah nesnesi evrim kademesini (ob.evo: 0..3) taşır; çizimler II ve
+# III'te değişir (renk, şekil, ek parçalar). Düşük grafikte ağır süsler atlanır.
+FIRE_COLS = ((236, 74, 30), (255, 150, 52), (255, 236, 170))
+
+
+def evo_of(ob):
+    return getattr(ob, "evo", 0) or 0
+
+
+def evo_rich():
+    """Ağır evrim süsleri çizilsin mi (düşük grafikte hayır)."""
+    return gfx_level() > 0
+
+
+def evo_flame(surf, x, y, h, w, t, seed=0.0, cols=FIRE_COLS):
+    """Titreyen küçük alev dili: tabanı (x, y), boyu h."""
+    fl = 0.78 + 0.22 * math.sin(t * 13.0 + seed * 1.7) * math.sin(t * 7.1 + seed)
+    h *= fl
+    for j, (col, sc) in enumerate(zip(cols, (1.0, 0.66, 0.34))):
+        sway = math.sin(t * 8.0 + j + seed) * w * 0.35
+        poly_aa(surf, [(x - w * sc, y), (x + sway * 0.4 - w * sc * 0.45, y - h * sc * 0.55),
+                       (x + sway, y - h * sc), (x + sway * 0.4 + w * sc * 0.45, y - h * sc * 0.55),
+                       (x + w * sc, y)], col)
+
+
+def evo_zap(surf, x0, y0, x1, y1, col, segs=6, amp=8.0, w=2, core=True):
+    """Kırık çizgi şimşek (çekirdeği beyaz)."""
+    pts = [(int(a), int(b)) for a, b in zigzag(x0, y0, x1, y1, segs, amp)]
+    if len(pts) < 2:
+        return
+    pygame.draw.lines(surf, col, False, pts, w + 1)
+    if core:
+        pygame.draw.lines(surf, (255, 255, 240), False, pts, max(1, w - 1))
+
+
+def evo_rune_ring(surf, x, y, r, t, col, n=10, speed=0.8, w=2):
+    """Dönen yazıt halkası: çember + üstünde kısa rün çentikleri."""
+    if r < 6:
+        return
+    ring_aa(surf, x, y, r, col, w)
+    for i in range(n):
+        a = t * speed + i * math.tau / n
+        ca, sa = math.cos(a), math.sin(a)
+        nx, ny = -sa, ca
+        bx, by = x + ca * r, y + sa * r
+        g = i % 3
+        if g == 0:
+            thick_line(surf, (bx - ca * 5, by - sa * 5), (bx + ca * 5, by + sa * 5), 2, col)
+        elif g == 1:
+            thick_line(surf, (bx - nx * 4 - ca * 3, by - ny * 4 - sa * 3),
+                       (bx + nx * 4 + ca * 3, by + ny * 4 + sa * 3), 2, col)
+        else:
+            circle_aa(surf, bx, by, 2.4, col)
+
+
+def evo_wing(surf, x, y, ang, span, flap, col, sg, edge=WHITE):
+    """Tüylü küçük kanat (melek / ateş kanadı); sg = sol/sağ."""
+    ca, sa = math.cos(ang), math.sin(ang)
+    nx, ny = -sa * sg, ca * sg
+
+    def P(f, s_):
+        return (x + ca * f + nx * s_, y + sa * f + ny * s_)
+    up = 0.35 * flap
+    pts = [P(2, 1)]
+    for i in range(5):
+        q = i / 4.0
+        pts.append(P(-2 - q * span * 0.55 + up * span * 0.4, 2 + span * (0.55 + 0.45 * q)))
+        pts.append(P(-5 - q * span * 0.62 + up * span * 0.4, 1.5 + span * (0.50 + 0.42 * q)))
+    pts.append(P(-span * 0.35, 1))
+    poly_aa(surf, [(px, py + 1.2) for px, py in pts], OUTLINE)
+    poly_aa(surf, pts, col)
+    thick_line(surf, P(2, 1), pts[1], 1.4, edge)
+
+
+def evo_crown(surf, x, y, s, col=(255, 214, 96)):
+    """Küçük taç (III kademe hükümdarlar)."""
+    pts = [(x - 7 * s, y + 3 * s), (x - 7 * s, y - 3 * s), (x - 3.5 * s, y + 0.5 * s), (x, y - 6 * s),
+           (x + 3.5 * s, y + 0.5 * s), (x + 7 * s, y - 3 * s), (x + 7 * s, y + 3 * s)]
+    poly_aa(surf, [(px, py + 1.2) for px, py in pts], OUTLINE)
+    poly_aa(surf, pts, col)
+    for cx_ in (-7, 0, 7):
+        circle_aa(surf, x + cx_ * s, y + (-6 if cx_ == 0 else -3) * s, 1.4 * s, (255, 90, 110))
+
+
+def evo_heal_cross(surf, x, y, s, col):
+    thick_line(surf, (x - s, y), (x + s, y), max(1.5, s * 0.55), col)
+    thick_line(surf, (x, y - s), (x, y + s), max(1.5, s * 0.55), col)
+
+
+EVO_OBJ_LISTS = (("flying_axes", "axe"), ("sword_slashes", "emanet"), ("tornados", "tornado"),
+                 ("ghost_blades", "ghost_swords"), ("wolves", "wolves"), ("meteors", "meteor"),
+                 ("hawks", "hawk"), ("bats", "bats"), ("knives", "knives"), ("water_zones", "zemzem"),
+                 ("whip_lashes", "whip"), ("beams", "beam"), ("novas", "nova"), ("quakes", "quake"))
+
+
 class WaterZone:
     """Zemzem birikintisi: yavaşlatır ve saniyede hasar verir."""
 
@@ -15703,11 +15799,15 @@ class WaterZone:
             return
         x, y = self.x, self.y
         n = len(self.shape)
+        ev = evo_of(self)
+        # evrim: II şifa kaynağı (yeşil-turkuaz), III hayat ırmağı (altın-turkuaz)
+        c1, c2 = ((ZEMZEM_COLOR, ZEMZEM_COLOR2), (ZEMZEM_COLOR, ZEMZEM_COLOR2),
+                  ((86, 226, 170), (206, 255, 228)), ((90, 214, 200), (255, 236, 160)))[ev]
         # çizim notu: burada bilerek geçici srcalpha yüzeyi ayırmıyoruz:
         # 8. seviyede birikinti yarıçapı ~240 px oluyor; her karede üç tane
         # 1) su gövdesi - önbellekli saydam disk
-        blit_disc(surf, x, y, rad * 0.94, ZEMZEM_COLOR, 92)
-        add_glow(surf, x, y, rad * 0.9, ZEMZEM_COLOR, 0.20)
+        blit_disc(surf, x, y, rad * 0.94, c1, 92)
+        add_glow(surf, x, y, rad * 0.9, c1, 0.20 + 0.06 * ev)
         # 2) düzensiz, dalgalanan kıyı çizgisi
         pts = []
         for i in range(n):
@@ -15715,23 +15815,53 @@ class WaterZone:
             wob = 1.0 + 0.055 * math.sin(t * 2.6 + i * 1.7)
             rr = rad * self.shape[i] * wob
             pts.append((x + math.cos(a) * rr, y + math.sin(a) * rr * 0.86))
-        pygame.draw.polygon(surf, ZEMZEM_COLOR2, pts, 2)
+        pygame.draw.polygon(surf, c2, pts, 2 + (1 if ev >= 2 else 0))
         # 3) yüzeyde dışa açılan ışık halkaları
         for i in range(3):
             ph = (t * 0.55 + i / 3.0) % 1.0
             rr = rad * (0.25 + 0.72 * ph)
             if rr < 4:
                 continue
-            col = scale_col(ZEMZEM_COLOR2, 0.30 + 0.55 * (1 - ph))
+            col = scale_col(c2, 0.30 + 0.55 * (1 - ph))
             pygame.draw.ellipse(surf, col,
                                 (int(x - rr), int(y - rr * 0.86), int(rr * 2), int(rr * 2 * 0.86)), 2)
+        if ev >= 2:
+            # suyun içinden yükselen şifa haçları ve kabarcıklar
+            for i in range(5 if evo_rich() else 2):
+                ph = (t * 0.45 + i * 0.2 + self.shape[i % n]) % 1.0
+                a = i * 2.4 + self.shape[(i + 3) % n] * 6
+                hx = x + math.cos(a) * rad * 0.55
+                hy = y + math.sin(a) * rad * 0.45 - ph * 46
+                evo_heal_cross(surf, hx, hy, 4.5 * (1 - ph) + 1.5, scale_col(c2, 1.0 - 0.6 * ph))
+        if ev >= 3:
+            # altın akıntı: merkezde dönen sarmal kollar + nilüfer
+            for arm in range(3):
+                pts_ = []
+                for j in range(10):
+                    q = j / 9.0
+                    a = t * 1.3 + arm * math.tau / 3 + q * 2.6
+                    pts_.append((x + math.cos(a) * rad * (0.12 + 0.62 * q),
+                                 y + math.sin(a) * rad * (0.10 + 0.52 * q)))
+                pygame.draw.lines(surf, scale_col(c2, 0.75), False, pts_, 2)
+            for j in range(6):
+                a = j * math.tau / 6 + t * 0.4
+                tip = (x + math.cos(a) * 16, y + math.sin(a) * 12)
+                poly_aa(surf, [(x + math.cos(a - 0.45) * 6, y + math.sin(a - 0.45) * 5), tip,
+                               (x + math.cos(a + 0.45) * 6, y + math.sin(a + 0.45) * 5)], (255, 226, 150))
+            circle_aa(surf, x, y, 4.5, (255, 248, 210))
+            if evo_rich():
+                for j in range(3):
+                    ph = (t * 0.8 + j * 0.33) % 1.0
+                    a = j * 2.1 + t
+                    _sparkle(surf, x + math.cos(a) * rad * 0.7 * ph, y + math.sin(a) * rad * 0.55 * ph,
+                             3.5 * (1 - ph) + 1, (255, 240, 180))
         # 4) yere çarpma anı: yukarı sıçrayan damlalar
         if self.splash > 0:
             k = self.splash / 0.28
             for i in range(8):
                 a = i * math.tau / 8 + self.t
                 rr = rad * (1.0 - k * 0.5)
-                pygame.draw.circle(surf, ZEMZEM_COLOR2,
+                pygame.draw.circle(surf, c2,
                                    (int(x + math.cos(a) * rr), int(y + math.sin(a) * rr * 0.86 - 16 * k)),
                                    max(1, int(3 * k)))
 
@@ -15802,6 +15932,9 @@ class FireRing:
             return
         x, y = self.x, self.y
         k = clamp(self.life / self.max_life, 0.0, 1.0)
+        ev = evo_of(self)
+        if ev >= 2:
+            self._draw_evo(surf, t, rad, k, ev)
         # Saydam gövde için önbellekli blit_disc, kenarlar için doğrudan çizim.
         if self.ice:
             # ---- buz halkası: keskin kristal kenar, içeride donmuş zemin ----
@@ -15847,6 +15980,69 @@ class FireRing:
             pygame.draw.circle(surf, SHOE_COLOR2,
                                (int(x + math.cos(a) * rad), int(y + math.sin(a) * rad)),
                                random.randint(1, 2))
+
+    def _draw_evo(self, surf, t, rad, k, ev):
+        """Evrimli halka: papuç II kor (alev dilleri), III deprem (çatlak + kaya);
+        buz II buzul (kristal sarkıtlar), III mutlak sıfır (yazıt + zincir)."""
+        x, y = self.x, self.y
+        rich = evo_rich()
+        sd = self.seed
+        if not self.ice:
+            if ev == 2 or rich:
+                blit_disc(surf, x, y, rad * 0.8, (150, 34, 14), int(70 * k))
+            nfl = 10 if rich else 5
+            for i in range(nfl):
+                a = sd + i * math.tau / nfl
+                fx_, fy_ = x + math.cos(a) * rad, y + math.sin(a) * rad
+                evo_flame(surf, fx_, fy_ + 4, (16 + 8 * (i % 3)) * (0.5 + 0.5 * k), 5.5, t, sd + i)
+            if ev >= 3 and self.t < 0.7:
+                # yerin yarılması (halka yere vurduğu an): kızgın çatlaklar + fırlayan taşlar
+                for i in range(5):
+                    a = sd * 3 + i * math.tau / 5
+                    px_, py_ = x, y
+                    for j in range(1, 4):
+                        f = j / 3.0
+                        jit = math.sin(sd * 7 + i * 3 + j) * 0.25
+                        nx_, ny_ = x + math.cos(a + jit) * rad * 1.1 * f, y + math.sin(a + jit) * rad * 1.1 * f
+                        thick_line(surf, (px_, py_), (nx_, ny_), 4.0 * k + 1, (70, 34, 18))
+                        thick_line(surf, (px_, py_), (nx_, ny_), 2.0 * k + 0.6, (255, 170, 70))
+                        px_, py_ = nx_, ny_
+                if rich:
+                    for i in range(5):
+                        ph = (self.t * 1.4 + i * 0.2) % 1.0
+                        a = sd + i * 1.3
+                        rx_ = x + math.cos(a) * rad * (0.6 + 0.4 * ph)
+                        ry_ = y + math.sin(a) * rad * 0.6 - math.sin(ph * math.pi) * 26
+                        pts_ = [(rx_ + math.cos(j * 2.1 + i) * 4.5, ry_ + math.sin(j * 2.1 + i) * 4)
+                                for j in range(3)]
+                        poly_aa(surf, pts_, (122, 96, 74))
+            return
+        # buz
+        n = 10 if rich else 6
+        for i in range(n):
+            a = sd + i * math.tau / n
+            ca, sa = math.cos(a), math.sin(a)
+            nx_, ny_ = -sa, ca
+            bx, by = x + ca * rad * 0.92, y + sa * rad * 0.92
+            L_ = (18 + 10 * (i % 3)) * (0.5 + 0.5 * k)
+            spike = [(bx + nx_ * 5, by + ny_ * 5), (bx + ca * L_ * 0.6 + nx_ * 4, by + sa * L_ * 0.6 + ny_ * 4),
+                     (bx + ca * L_, by + sa * L_), (bx + ca * L_ * 0.6 - nx_ * 4, by + sa * L_ * 0.6 - ny_ * 4),
+                     (bx - nx_ * 5, by - ny_ * 5)]
+            poly_aa(surf, spike, scale_col(FROST_COLOR2, 0.55 + 0.45 * k))
+            thick_line(surf, (bx, by), (bx + ca * L_ * 0.85, by + sa * L_ * 0.85), 1.2, WHITE)
+        if ev >= 3:
+            blit_disc(surf, x, y, rad * 0.55, (40, 90, 170), int(80 * k))
+            evo_rune_ring(surf, x, y, rad * 0.62, t, scale_col(FROST_COLOR2, 0.5 + 0.5 * k), n=8, speed=-1.1)
+            # yere çakılı buz zincirleri
+            for i in range(4):
+                a = sd + i * math.tau / 4 + t * 0.3
+                x0_, y0_ = x + math.cos(a) * rad * 0.62, y + math.sin(a) * rad * 0.62
+                x1_, y1_ = x + math.cos(a) * rad * 1.05, y + math.sin(a) * rad * 1.05
+                for j in range(4):
+                    q = (j + 0.5) / 4
+                    cx_, cy_ = x0_ + (x1_ - x0_) * q, y0_ + (y1_ - y0_) * q
+                    pygame.draw.ellipse(surf, (210, 236, 255),
+                                        (int(cx_ - 4), int(cy_ - 3), 8, 6), 2)
 
 
 # ---- hortum - düşmanları ortaya toplayan kasırga ----
@@ -15966,7 +16162,11 @@ class Tornado:
         x, y = self.x, self.y
         k = clamp(self.life / self.LIFE, 0, 1)
         fade = clamp(self.t / 0.25, 0, 1) * clamp(self.life / 0.4, 0, 1)
-        add_glow(surf, x, y, 120, TORNADO_COLOR, 0.22 * fade)
+        ev = evo_of(self)
+        # II buz fırtınası (buz mavisi), III yıldırım kasırgası (koyu fırtına moru)
+        TC, TC2 = ((TORNADO_COLOR, TORNADO_COLOR2), (TORNADO_COLOR, TORNADO_COLOR2),
+                   ((150, 220, 255), (236, 250, 255)), ((96, 92, 168), (226, 222, 255)))[ev]
+        add_glow(surf, x, y, 120, TC, (0.22 + 0.08 * ev) * fade)
         # Saydamlık yerine rengi karartıyoruz: koyu zeminde göz aynı şeyi
         # görür. halka yığını değil, dolu ve dönen bir huni: yarı saydam gövde
         # + yukarı tırmanan sarmal bantlar (önü parlak, arkası sönük).
@@ -15984,35 +16184,52 @@ class Tornado:
                 cx_, cy_, erx = ring(i / 13.0)
                 left.append((cx_ - erx, cy_))
                 right.append((cx_ + erx, cy_))
-            pygame.draw.polygon(fs, (*TORNADO_COLOR, int(64 * fade)), left + right[::-1])
+            pygame.draw.polygon(fs, (*TC, int((64 + 30 * (ev >= 3)) * fade)), left + right[::-1])
             for b in range(10):
                 h = ((b / 10.0) + t * 0.85) % 1.0
                 cx_, cy_, erx = ring(h)
                 ery = max(3.0, erx * 0.32)
                 rect = pygame.Rect(int(cx_ - erx), int(cy_ - ery), int(erx * 2), int(ery * 2))
-                pygame.draw.arc(fs, (*TORNADO_COLOR, int(80 * fade)), rect, 0.15, math.pi - 0.15, 2)
-                pygame.draw.arc(fs, (*TORNADO_COLOR2, int(200 * fade * (1.0 - 0.45 * h))), rect,
+                pygame.draw.arc(fs, (*TC, int(80 * fade)), rect, 0.15, math.pi - 0.15, 2)
+                pygame.draw.arc(fs, (*TC2, int(200 * fade * (1.0 - 0.45 * h))), rect,
                                 math.pi + 0.1, math.tau - 0.1, 3)
             surf.blit(fs, (x - ox_, y - oy_))
+            if ev >= 3 and fade > 0.3:
+                # huninin içinde ve tepesinde çakan şimşekler
+                for j in range(2 if evo_rich() else 1):
+                    h0 = (t * 2.3 + j * 0.47) % 1.0
+                    cx0, cy0, er0 = ring(min(0.95, h0))
+                    cx1, cy1, er1 = ring(max(0.0, h0 - 0.35))
+                    evo_zap(surf, x - ox_ + cx0 + er0 * 0.5 * (1 if j else -1), y - oy_ + cy0,
+                            x - ox_ + cx1, y - oy_ + cy1, (255, 236, 120), 5, 9, 2)
+                if int(t * 5) % 3 == 0:
+                    evo_zap(surf, x, y - 160, x + math.sin(t * 7) * 60, y - 260, (230, 226, 255), 5, 12, 2)
         # çevresinde dönen enkaz
         for d in self.debris:
             a, rr, hh, _ = d
             px = x + math.cos(a) * rr * (0.35 + hh / 200.0)
             py = y - hh + math.sin(a) * rr * 0.30
-            col = TORNADO_COLOR2 if (hh % 2 < 1) else TORNADO_COLOR
-            pygame.draw.circle(surf, col, (int(px), int(py)), max(1, int(3 * fade)))
+            col = TC2 if (hh % 2 < 1) else TC
+            if ev == 2:
+                draw_icon(surf, px, py, "snow", TC2, max(2, int(4 * fade)))
+            else:
+                pygame.draw.circle(surf, col, (int(px), int(py)), max(1, int(3 * fade)))
         # zeminde dışa açılan toz halkası
         for i in range(2):
             ph = (t * 1.4 + i * 0.5) % 1.0
             rr = lerp(30, self.PULL_R * 0.42, ph)
             dim = 0.42 * (1 - ph) * fade
             if dim > 0.04:
-                pygame.draw.ellipse(surf, scale_col(TORNADO_COLOR, dim),
+                pygame.draw.ellipse(surf, scale_col(TC, dim),
                                     (int(x - rr), int(y - rr * 0.35),
                                      int(rr * 2), int(rr * 0.7)), 2)
+        if ev == 2:
+            # zeminde donan halka
+            pygame.draw.ellipse(surf, scale_col(TC2, 0.55 * fade),
+                                (int(x - 70), int(y - 22), 140, 44), 3)
         # ömrü dolarken huni incelip tek bir çizgiye düşer
         if k < 0.3:
-            pygame.draw.line(surf, TORNADO_COLOR2, (x, y - 150 * k), (x, y), 2)
+            pygame.draw.line(surf, TC2, (x, y - 150 * k), (x, y), 2)
 
 
 # balta - hedefe gidip geri dönen bumerang balta
@@ -16234,6 +16451,11 @@ class FlyingAxe:
             draw_scythe_shape(surf, self.x, self.y, self.spin, k, self.color, glow=0.6, chain=True)
         elif evo == 2:
             draw_scythe_shape(surf, self.x, self.y, self.spin, k * 1.08, self.color, glow=0.55)
+        if evo >= 2 and evo_rich():
+            # tırpan / orak yanar: dönen ağızdan alev
+            a_ = self.spin + 1.2
+            evo_flame(surf, self.x + math.cos(a_) * 16 * k, self.y + math.sin(a_) * 16 * k + 4,
+                      14 * k, 4 * k, t, self.spin)
         else:
             draw_axe_shape(surf, self.x, self.y, self.spin, k, self.color, glow=0.5)
 
@@ -16327,38 +16549,44 @@ class WhipLash:
         k = clamp(self.life / self.LIFE, 0.0, 1.0)
         f = 1.0 - k
         # turuncu bant değil, örgülü kahverengi deri kamçı
-        body = WHIP_LEATHER
+        ev = evo_of(self)
+        # II şimşek kamçısı (lacivert deri, elektrik), III kıyamet kamçısı (obsidyen, kızıl)
+        body, lite = ((WHIP_LEATHER, WHIP_LEATHER2), (WHIP_LEATHER, WHIP_LEATHER2),
+                      ((70, 92, 160), (255, 244, 150)), ((74, 26, 34), (255, 96, 70)))[ev]
         dark = scale_col(body, 0.36)
         mid = scale_col(body, 0.74)
-        lite = WHIP_LEATHER2
         w = self.width
 
         # Dünya yüzeyi saydam değil; bu yüzden alfa yerine rengi karartıyoruz:
         # 1) hareket izi - birkaç kare geriden gelen, sönen hayalet kırbaçlar.
-        for gi in range(1, self.GHOSTS + 1):
+        # (orta grafikte bir, düşükte hiç: kırbaç en pahalı çizimlerden)
+        gl = gfx_level()
+        # orta/düşük grafik: kenar yumuşatmasız çokgen (kırbaç kare başına onlarca çokgen)
+        PA = poly_aa if gl >= 2 else (lambda s_, p_, c_: pygame.draw.polygon(s_, c_, p_))
+        for gi in range(1, min(self.GHOSTS, gl) + 1):
             gf = f - gi * 0.085
             if gf <= 0.03:
                 continue
             _, _, gpts = self._curve(gf, segs=12)
             dim = 0.58 * (1.0 - gi / (self.GHOSTS + 1.0)) * (0.30 + 0.70 * k)
-            poly_aa(surf, self._ribbon(gpts, w * 0.44, 0.8), scale_col(lite, dim))
+            PA(surf, self._ribbon(gpts, w * 0.44, 0.8), scale_col(lite, dim))
 
         grip, a_grip, pts = self._curve(f)
 
         # Kalınlık kabzada w, uçta 1 pikselin altına iner: kırbaç uca doğru
         # gerçekten sivrilir, eski hâlindeki gibi kalın bir hortum kalmaz:
         # 2) kamçı - dört katman: kontur, koyu deri, açık deri, kenar ışığı.
-        poly_aa(surf, self._ribbon(pts, w + 3.2, 2.0), OUTLINE)
-        poly_aa(surf, self._ribbon(pts, w, 1.0), dark)
-        poly_aa(surf, self._ribbon(pts, w * 0.78, 0.8), mid)
-        poly_aa(surf, self._ribbon(pts, w * 0.52, 0.6), body)
+        PA(surf, self._ribbon(pts, w + 3.2, 2.0), OUTLINE)
+        PA(surf, self._ribbon(pts, w, 1.0), dark)
+        PA(surf, self._ribbon(pts, w * 0.78, 0.8), mid)
+        PA(surf, self._ribbon(pts, w * 0.52, 0.6), body)
         # Işık şeridi: gövdenin bir yanına kaçmış ince bir hat. Deriye yuvarlak
         # bir hacim veren tek çizgi bu.
-        poly_aa(surf, self._ribbon(pts, w * 0.30, 0.5, off=-w * 0.24),
+        PA(surf, self._ribbon(pts, w * 0.30, 0.5, off=-w * 0.24),
                 scale_col(lite, 0.62 + 0.38 * f))
-        # örgü: gövde boyunca çapraz koyu çentikler (deri kamçı dokusu)
+        # örgü: gövde boyunca çapraz koyu çentikler (deri kamçı dokusu) - yüksek grafikte
         n_ = len(pts)
-        for i in range(1, n_ - 3, 2):
+        for i in (range(1, n_ - 3, 2) if gl >= 2 else range(1, n_ - 3, 4) if ev >= 3 else ()):
             fr = i / (n_ - 1.0)
             hw = lerp(w, 1.0, fr ** 1.05) * 0.5
             if hw < 0.9:
@@ -16371,6 +16599,22 @@ class WhipLash:
             thick_line(surf, (cx_ + px_ * hw * 0.9 - ux_ * hw * 0.6, cy_ + py_ * hw * 0.9 - uy_ * hw * 0.6),
                        (cx_ - px_ * hw * 0.9 + ux_ * hw * 0.6, cy_ - py_ * hw * 0.9 + uy_ * hw * 0.6),
                        max(1.0, hw * 0.35), dark)
+            if ev >= 3 and i % 4 == 1:
+                # kıyamet kamçısı: gövdeden çıkan kemik dikenler (düz çokgen: ucuz)
+                for sg in (-1, 1):
+                    tip_ = (cx_ + px_ * sg * (hw + 7), cy_ + py_ * sg * (hw + 7))
+                    pygame.draw.polygon(surf, (232, 220, 200),
+                                        [(cx_ + px_ * sg * hw - ux_ * 3, cy_ + py_ * sg * hw - uy_ * 3), tip_,
+                                         (cx_ + px_ * sg * hw + ux_ * 3, cy_ + py_ * sg * hw + uy_ * 3)])
+        if ev == 2:
+            # kamçı boyunca çatırdayan elektrik
+            step = 3 if evo_rich() else 6
+            for i in range(0, n_ - step, step):
+                evo_zap(surf, pts[i][0], pts[i][1], pts[i + step][0], pts[i + step][1],
+                        scale_col(lite, 0.6 + 0.4 * k), 3, 5, 2)
+        elif ev >= 3 and gl >= 2:
+            for i in range(3, n_ - 2, 8):
+                evo_flame(surf, pts[i][0], pts[i][1], 12 * (0.4 + 0.6 * k), 3.5, t, i + self.x * 0.01)
 
         # biraz kalın ama oyuncunun üstünde şişkin bir topak bırakmayacak
         # kadar:
@@ -16395,8 +16639,18 @@ class WhipLash:
         fall = 16.0 * (0.35 + 0.65 * f)
         tip = (ex + ux * fall, ey + uy * fall)
         thick_line(surf, (ex, ey), tip, 2.2, scale_col(lite, 0.85))
-        add_glow(surf, tip[0], tip[1], 10 + 18 * f, lite, 0.28 + 0.34 * k)
-        circle_aa(surf, tip[0], tip[1], 1.6 + 1.4 * f, lite)
+        add_glow(surf, tip[0], tip[1], 10 + 18 * f + 10 * ev, lite, 0.28 + 0.34 * k)
+        circle_aa(surf, tip[0], tip[1], 1.6 + 1.4 * f + (1.5 if ev >= 2 else 0), lite)
+        if ev == 2 and f > 0.5:
+            for i in range(3):
+                a = random.uniform(0, math.tau)
+                evo_zap(surf, tip[0], tip[1], tip[0] + math.cos(a) * 30, tip[1] + math.sin(a) * 30,
+                        lite, 3, 6, 1)
+        elif ev >= 3:
+            # uçta kızıl kafatası kor
+            circle_aa(surf, tip[0], tip[1], 5.0, (60, 16, 20))
+            circle_aa(surf, tip[0], tip[1], 3.4, (255, 110, 80))
+            evo_flame(surf, tip[0], tip[1] + 2, 16, 4.5, t, 3.3)
 
         # şaklama: yay tamamlanırken uçta parlama ve kıvılcımlar.
         if f > 0.58:
@@ -16436,6 +16690,12 @@ class SwordSlash:
 
     def draw(self, surf, t):
         k = clamp(self.life / self.LIFE, 0.0, 1.0)
+        ev = evo_of(self)
+        # II kanlı miras (kızıl yay, kan damlaları), III destan kılıcı (altın, çift yay)
+        acol, acol2, steel = ((self.color, EMANET_COLOR2, (214, 222, 236)),
+                              (self.color, EMANET_COLOR2, (214, 222, 236)),
+                              ((214, 40, 56), (255, 150, 150), (226, 196, 200)),
+                              ((255, 206, 90), (255, 248, 210), (255, 232, 160)))[ev]
         # Yay ömrünün başında dar ve yakın, sonunda tam açık ve uzaktır: kılıç
         # gerçekten savruluyormuş gibi okunur.
         sweep = self.half * (0.35 + 0.65 * (1 - k))
@@ -16446,10 +16706,14 @@ class SwordSlash:
             a = self.ang - sweep + 2 * sweep * i / (n - 1.0)
             outer.append((self.x + math.cos(a) * rad, self.y + math.sin(a) * rad))
         # ince bir hilal: dolgulu geniş bir bant yerine üst üste üç şerit.
-        for f, w0, colr in ((0.86, 2.0, scale_col(self.color, 0.32 + 0.30 * k)),
-                            (0.94, 3.0, scale_col(self.color, 0.55 + 0.45 * k)),
-                            (1.00, 2.0 + 4.0 * k, scale_col(EMANET_COLOR2,
-                                                            0.55 + 0.45 * k))):
+        bands = [(0.86, 2.0, scale_col(acol, 0.32 + 0.30 * k)),
+                 (0.94, 3.0, scale_col(acol, 0.55 + 0.45 * k)),
+                 (1.00, 2.0 + 4.0 * k, scale_col(acol2, 0.55 + 0.45 * k))]
+        if ev >= 2:
+            bands.append((1.08, 2.0 + 3.0 * k, scale_col(acol, 0.45 + 0.4 * k)))
+        if ev >= 3:
+            bands.append((1.18, 1.5 + 2.0 * k, scale_col(acol2, 0.35 + 0.45 * k)))
+        for f, w0, colr in bands:
             band = [(self.x + (px - self.x) * f, self.y + (py - self.y) * f)
                     for px, py in outer]
             # Uçlarda incelip ortada kalınlaşsın: bir kılıç darbesinin izi.
@@ -16469,22 +16733,37 @@ class SwordSlash:
                  (x0 + ca * Lb, y0 + sa * Lb),
                  (x0 + ca * (Lb - 10) - nx * 3.0, y0 + sa * (Lb - 10) - ny * 3.0),
                  (x0 + ca * 6 - nx * 3.2, y0 + sa * 6 - ny * 3.2)]
+        if ev >= 2:
+            add_glow(surf, x0 + ca * Lb * 0.6, y0 + sa * Lb * 0.6, 26 + 8 * ev, acol, 0.35 * k + 0.15)
         poly_aa(surf, [(px_ + 1, py_ + 1.5) for px_, py_ in blade], OUTLINE)
-        poly_aa(surf, blade, (214, 222, 236))
+        poly_aa(surf, blade, steel)
         thick_line(surf, (x0 + ca * 8, y0 + sa * 8), (x0 + ca * (Lb - 6), y0 + sa * (Lb - 6)), 1.2,
-                   (150, 160, 180))
+                   acol if ev >= 2 else (150, 160, 180))
         thick_line(surf, (x0 + ca * 6 + nx * 7, y0 + sa * 6 + ny * 7),
                    (x0 + ca * 6 - nx * 7, y0 + sa * 6 - ny * 7), 3.0, (200, 160, 70))
         thick_line(surf, (x0 + ca * 5, y0 + sa * 5), (x0 - ca * 4, y0 - sa * 4), 3.2, (96, 62, 40))
         circle_aa(surf, x0 - ca * 5, y0 - sa * 5, 2.2, (200, 160, 70))
         # yayın ucunda kıvılcım
         ex, ey = outer[-1]
-        add_glow(surf, ex, ey, 22 * k + 8, EMANET_COLOR2, 0.38 * k)
+        add_glow(surf, ex, ey, 22 * k + 8, acol2, 0.38 * k)
         for i in range(3):
             a = self.ang + sweep + random.uniform(-0.4, 0.4)
             ln = random.uniform(6, 18) * k
             thick_line(surf, (ex, ey), (ex + math.cos(a) * ln, ey + math.sin(a) * ln),
-                       1.5, EMANET_COLOR2)
+                       1.5, acol2)
+        if ev == 2:
+            # yay boyunca savrulan kan damlaları
+            for i in range(0, len(outer), 3):
+                q = 1.0 - k
+                dx_, dy_ = outer[i][0] - self.x, outer[i][1] - self.y
+                d_ = math.hypot(dx_, dy_) or 1.0
+                circle_aa(surf, outer[i][0] + dx_ / d_ * 14 * q, outer[i][1] + dy_ / d_ * 14 * q + 10 * q * q,
+                          2.6 * k + 0.8, (190, 24, 40))
+        elif ev >= 3:
+            _sparkle(surf, ex, ey, 7 + 5 * k, (255, 250, 220))
+            if evo_rich():
+                for i in range(2, len(outer) - 1, 4):
+                    _sparkle(surf, outer[i][0], outer[i][1], 3.5 * k + 1, acol2)
 
 
 # kalkan ve pentagram (çizim yardımcıları)
@@ -16538,28 +16817,49 @@ def _shield_outline_pts(r, rot=0.0):
     return pts
 
 
-def draw_shield_book(surf, x, y, ang, k=1.0, charged=True, t=0.0, phase=0.0):
-    """Oyuncunun çevresinde süzülen kalkan."""
-    r = 13.0 * k
+def draw_shield_book(surf, x, y, ang, k=1.0, charged=True, t=0.0, phase=0.0, ev=0):
+    """Oyuncunun çevresinde süzülen kalkan. ev: evrim kademesi (II çelik sur, III kutsal kalkan)."""
+    r = 13.0 * k * (1.0 + 0.12 * max(0, ev - 1))
     tilt = math.sin(t * 2.2 + phase) * 0.10
     bob = math.sin(t * 2.6 + phase * 1.3) * 1.6 * k
     y = y + bob
+    s_col, s_col2, s_trim = ((SHIELD_COLOR, SHIELD_COLOR2, SHIELD_TRIM), (SHIELD_COLOR, SHIELD_COLOR2, SHIELD_TRIM),
+                             ((118, 128, 150), (226, 232, 246), (200, 70, 60)),
+                             ((246, 214, 120), (255, 252, 230), (255, 255, 255)))[ev]
+    if charged and ev >= 3:
+        # kutsal kalkan: arkada dönen ışık hüzmeleri + üstünde hâle
+        for i in range(4):
+            a = t * 0.9 + phase + i * math.tau / 4
+            taper_line(surf, [(x + math.cos(a) * r, y + math.sin(a) * r),
+                              (x + math.cos(a) * r * 1.7, y + math.sin(a) * r * 1.7)],
+                       2.2, 0.4, scale_col((255, 236, 170), 0.45))
+        pygame.draw.ellipse(surf, (255, 240, 170), (int(x - r * 0.75), int(y - r * 1.65), int(r * 1.5),
+                                                    int(r * 0.5)), 2)
 
     if charged:
-        face = SHIELD_COLOR
-        face_lo = scale_col(SHIELD_COLOR, 0.42)
-        trim = SHIELD_TRIM
-        boss_hi = SHIELD_COLOR2
-        add_glow(surf, x, y, r * 2.0, SHIELD_COLOR,
-                 0.30 + 0.14 * math.sin(t * 4 + phase))
+        face = s_col
+        face_lo = scale_col(s_col, 0.42)
+        trim = s_trim
+        boss_hi = s_col2
+        add_glow(surf, x, y, r * 2.0, s_col,
+                 0.30 + 0.14 * math.sin(t * 4 + phase) + 0.08 * ev)
     else:
-        face = scale_col(SHIELD_COLOR, 0.30)
-        face_lo = scale_col(SHIELD_COLOR, 0.15)
-        trim = scale_col(SHIELD_TRIM, 0.28)
-        boss_hi = scale_col(SHIELD_COLOR2, 0.30)
+        face = scale_col(s_col, 0.30)
+        face_lo = scale_col(s_col, 0.15)
+        trim = scale_col(s_trim, 0.28)
+        boss_hi = scale_col(s_col2, 0.30)
 
     local = _shield_outline_pts(r, tilt)
     world = [(x + px, y + py) for px, py in local]
+    if ev == 2:
+        # çelik sur: kenardan çıkan sivri çiviler
+        n_ = len(local)
+        for j in range(0, n_, max(1, n_ // 7)):
+            px, py = local[j]
+            d_ = math.hypot(px, py) or 1.0
+            ux_, uy_ = px / d_, py / d_
+            poly_aa(surf, [(x + px - uy_ * 3, y + py + ux_ * 3), (x + px + ux_ * 7 * k, y + py + uy_ * 7 * k),
+                           (x + px + uy_ * 3, y + py - ux_ * 3)], (190, 196, 214))
 
     # 1) kontur/gölge - hafif aşağı kaydırılmış koyu silüet
     poly_aa(surf, [(x + px, y + py + 1.4 * k) for px, py in local], OUTLINE)
@@ -16592,24 +16892,44 @@ def draw_shield_book(surf, x, y, ang, k=1.0, charged=True, t=0.0, phase=0.0):
               scale_col(face_lo, 1.05), 5)
     if charged:
         circle_aa(surf, ux - r * 0.10, uy - r * 0.12, max(1.0, r * 0.08), WHITE)
+        if ev >= 3:
+            evo_heal_cross(surf, ux, uy + r * 0.5, r * 0.22, (255, 255, 255))
+        elif ev == 2:
+            circle_aa(surf, ux, uy, r * 0.12, (200, 60, 50))
         # 6) dolu kalkanın üstünde süzülen tılsım zerreleri
         for i in range(2):
             ph = (t * 0.9 + phase * 0.3 + i * 0.5) % 1.0
             sy = y - r * 1.35 - ph * 12 * k
             sx = x + math.sin(t * 3 + i * 2.2 + phase) * 5 * k
-            circle_aa(surf, sx, sy, max(1.0, 2.0 * k * (1 - ph)), SHIELD_COLOR2)
+            circle_aa(surf, sx, sy, max(1.0, 2.0 * k * (1 - ph)), s_col2)
     else:
         # boşta: yüzeyde bir çatlak izi kalır
         thick_line(surf, (x - r * 0.30, y - r * 0.10), (x + r * 0.20, y + r * 0.50),
-                   max(1.0, r * 0.07), scale_col(SHIELD_COLOR, 0.42))
+                   max(1.0, r * 0.07), scale_col(s_col, 0.42))
 
 
-def draw_pentagram(surf, cx, cy, r, ang, t=0.0, color=PENTA_COLOR, color2=PENTA_COLOR2):
-    """Oyuncunun ayağının altında dönen pentagram alanı."""
+def draw_pentagram(surf, cx, cy, r, ang, t=0.0, color=PENTA_COLOR, color2=PENTA_COLOR2, ev=0):
+    """Oyuncunun ayağının altında dönen pentagram alanı. ev: evrim kademesi
+    (II alev mührü: yanan mühür, III cehennem kapısı: ortası kapkara geçit, buz sisi)."""
     if r < 6:
         return
+    if ev == 2:
+        color, color2 = (255, 104, 40), (255, 214, 130)
+    elif ev >= 3:
+        color, color2 = (196, 26, 56), (255, 130, 90)
     pulse = 0.5 + 0.5 * math.sin(t * 3.1)
     low = gfx_level() == 0
+    if ev >= 3:
+        # cehennem kapısı: ortada dönen karanlık geçit
+        vr = min(r * 0.34, 90)
+        blit_disc(surf, cx, cy, vr, (16, 4, 10), 120)
+        for arm in range(4):
+            pts_ = []
+            for j in range(9):
+                q = j / 8.0
+                a = -t * 2.2 + arm * math.tau / 4 + q * 2.4
+                pts_.append((cx + math.cos(a) * vr * (1 - q * 0.9), cy + math.sin(a) * vr * (1 - q * 0.9)))
+            pygame.draw.lines(surf, scale_col(color2, 0.55), False, pts_, 2)
     # 1) alanın kendisi - kanla dolu soluk daire
     blit_disc(surf, cx, cy, r, color, int(30 + 14 * pulse))
     if not MOBILE and not low:      # telefonda büyük toplamalı parlama yok (alan zaten dolu)
@@ -16626,12 +16946,27 @@ def draw_pentagram(surf, cx, cy, r, ang, t=0.0, color=PENTA_COLOR, color2=PENTA_
     star_col = scale_col(color2, 0.60 + 0.25 * pulse)
     for i in range(5):
         pygame.draw.line(surf, star_col, pts[order[i]], pts[order[i + 1]], 3)
+    if ev >= 2:
+        # köşelerde alev dilleri (düşük grafikte de: evrimin imzası)
+        fh = clamp(r * 0.10, 16, 34)
+        for i, (px, py) in enumerate(pts):
+            evo_flame(surf, px, py + 3, fh, fh * 0.32, t, i * 1.7)
+    if ev >= 3:
+        evo_rune_ring(surf, cx, cy, r * 1.08, t, scale_col(color2, 0.7), n=14, speed=-0.7)
+        if not low:
+            # kapının kenarından taşan buz sisi (yavaşlatma)
+            for i in range(6):
+                ph = (t * 0.6 + i / 6.0) % 1.0
+                a = i * 1.05 + t * 0.3
+                blit_disc(surf, cx + math.cos(a) * r * (0.7 + 0.3 * ph), cy + math.sin(a) * r * (0.7 + 0.3 * ph),
+                          10 + 10 * ph, (150, 210, 255), int(70 * (1 - ph)))
     if low:
         return              # düşük grafik: mumlar sönük, dönen işaretler yok
     # 4) köşelerde yanan mumlar
-    for (px, py) in pts:
-        pygame.draw.circle(surf, color2, (int(px), int(py)), 4)
-        pygame.draw.circle(surf, WHITE, (int(px), int(py)), 2)
+    if ev < 2:
+        for (px, py) in pts:
+            pygame.draw.circle(surf, color2, (int(px), int(py)), 4)
+            pygame.draw.circle(surf, WHITE, (int(px), int(py)), 2)
     # 5) çember boyunca dönen işaretler
     rune_col = scale_col(color, 0.55)
     for i in range(12):
@@ -16887,13 +17222,30 @@ class GhostBlade:
 
     def draw(self, surf, t):
         bob = 1.0 + 0.06 * math.sin(t * 4 + self.idx)
+        ev = evo_of(self)
+        # II ruh emici (kızıl), III ölüm melekleri (altın-beyaz, kanatlı, hâleli)
+        col = (GHOST_COLOR, GHOST_COLOR, (255, 76, 104), (255, 236, 170))[ev]
+        k = bob * (1.0 + 0.12 * max(0, ev - 1))
         if self.state != "idle":
             for i, (gx, gy, ga) in enumerate(self.trail[:-1]):
                 fade = (i + 1) / max(1, len(self.trail))
-                draw_ghost_blade(surf, gx, gy, ga, 0.9 * bob, GHOST_COLOR,
+                draw_ghost_blade(surf, gx, gy, ga, 0.9 * k, col,
                                  alpha_k=0.25 + 0.35 * fade, glow=0.0)
-        draw_ghost_blade(surf, self.x, self.y, self.ang, bob, GHOST_COLOR,
-                         alpha_k=1.0, glow=0.55 if self.state != "idle" else 0.35)
+                if ev == 2 and i % 2 == 0:
+                    circle_aa(surf, gx + math.sin(t * 9 + i) * 4, gy + math.cos(t * 7 + i) * 4,
+                              2.5 * fade + 0.6, (255, 120, 140))
+        if ev >= 3:
+            ca, sa = math.cos(self.ang), math.sin(self.ang)
+            gx_, gy_ = self.x - ca * 26 * k * 0.35, self.y - sa * 26 * k * 0.35
+            flap = math.sin(t * 9 + self.idx)
+            for sg in (-1, 1):
+                evo_wing(surf, gx_, gy_, self.ang, 14 * k, flap, (255, 250, 230), sg, edge=(255, 220, 120))
+        draw_ghost_blade(surf, self.x, self.y, self.ang, k, col,
+                         alpha_k=1.0, glow=(0.55 if self.state != "idle" else 0.35) + 0.1 * ev)
+        if ev >= 3:
+            ca, sa = math.cos(self.ang), math.sin(self.ang)
+            hx, hy = self.x + ca * 30 * k, self.y + sa * 30 * k
+            pygame.draw.ellipse(surf, (255, 236, 150), (int(hx - 7), int(hy - 3), 14, 6), 2)
 
 
 class SpectralWolf:
@@ -17003,7 +17355,9 @@ class SpectralWolf:
 
     def draw(self, surf, t):
         """Gerçek bir kurt silueti (derin göğüs, ince bel, uzun burun, sivri kulak, kabarık kuyruk)"""
-        s = WOLF_DRAW_SCALE
+        ev = evo_of(self)
+        # II alfa sürüsü (gümüş-çelik, iri, kızıl göz, zırh), III cehennem tazıları (alevli)
+        s = WOLF_DRAW_SCALE * (1.0 + 0.14 * max(0, ev - 1))
         x, y, f = self.x, self.y, self.face
         spd = math.hypot(self.vx, self.vy)
         moving = spd > 30
@@ -17011,7 +17365,8 @@ class SpectralWolf:
         howl = self.howl_t > 0
         gal = math.sin(self.run_ph) if moving else 0.0
         lunge = 4.0 * (self.bite_t / 0.18) if self.bite_t > 0 else 0.0
-        col = mix_col(WOLF_COLOR, (255, 120, 150), 0.35) if frenzy else WOLF_COLOR
+        wbase = (WOLF_COLOR, WOLF_COLOR, (196, 202, 226), (236, 104, 44))[ev]
+        col = mix_col(wbase, (255, 120, 150), 0.35) if frenzy else wbase
         body = scale_col(col, 0.80)
         dark = scale_col(col, 0.42)
         lite = lighten(col, 0.55)
@@ -17056,10 +17411,20 @@ class SpectralWolf:
         poly_aa(surf, torso, body)
         poly_aa(surf, [T(lx, ly) for lx, ly in self._SADDLE], dark)
         poly_aa(surf, [T(lx, ly) for lx, ly in self._BELLY], lite)
+        if ev == 2:
+            # alfa: sırtında perçinli çelik zırh
+            plate = [T(-8, -9.5), T(6, -10.5), T(8, -5.5), T(-9, -4.8)]
+            poly_aa(surf, [(px_, py_ + 1) for px_, py_ in plate], OUTLINE)
+            poly_aa(surf, plate, (120, 128, 150))
+            for j in range(3):
+                circle_aa(surf, *T(-5 + j * 5, -8.2), 1.0 * s, (220, 226, 240))
         for j in range(6):
             bx_, by_ = T(9 - j * 4, -8.6 + j * 0.25)
             tip_ = T(9 - j * 4 - 2.6, -12.0 + j * 0.45)
-            poly_aa(surf, [(bx_ - 1.9 * s, by_), tip_, (bx_ + 1.9 * s, by_)], dark)
+            if ev >= 3:
+                evo_flame(surf, bx_, by_ + 1, (9 + 3 * (j % 2)) * s, 2.2 * s, t, j + self.idx * 2.0)
+            else:
+                poly_aa(surf, [(bx_ - 1.9 * s, by_), tip_, (bx_ + 1.9 * s, by_)], dark)
         # baş (ulurken burnu göğe kalkar, ısırırken ileri atılır)
         px0, py0 = self._NECK_PIVOT
         ang = -0.95 if howl else 0.0
@@ -17093,12 +17458,18 @@ class SpectralWolf:
                 thick_line(surf, H(21 + j * 2.4, -6.6), H(21 + j * 2.4, -5.0), 0.9 * s, WHITE)
         # badem göz
         ex_, ey_ = H(20, -11.6)
-        eye_col = (255, 170, 190) if frenzy else WOLF_COLOR2
+        eye_col = (255, 170, 190) if frenzy else (WOLF_COLOR2, WOLF_COLOR2, (255, 60, 60), (255, 236, 120))[ev]
         add_glow(surf, ex_, ey_, 9 * s, eye_col, 0.75)
         poly_aa(surf, [H(18, -11.4), H(20.2, -12.6), H(22.4, -11.6), H(20.2, -10.8)], eye_col)
         circle_aa(surf, ex_ + f * 0.4 * s, ey_ - 0.3 * s, 0.6 * s, WHITE)
         # hayalet kontur ışıltısı (sırt + kuyruk)
         thick_line(surf, T(-12, -7.6), T(8, -9.2), 1.1 * s, lite)
+        if ev >= 3:
+            tx_, ty_ = T(-24.5, 1)
+            evo_flame(surf, tx_, ty_ + 2, 13 * s, 3.2 * s, t, self.idx)
+            if moving and evo_rich():
+                for i, (gx_, gy_) in enumerate(self.trail[:-1:2]):
+                    evo_flame(surf, gx_, gy_ + 10 * s, 7 * s * (i + 1) / max(1, len(self.trail)), 2.2 * s, t, i)
         if howl:
             for j in range(3):
                 ph = ((WOLF_HOWL_T - self.howl_t) * 2.4 + j * 0.33) % 1.0
@@ -17175,11 +17546,23 @@ class MeteorStrike:
         if self.boom_t >= 0:
             return
         k = clamp(self.t / self.max_delay, 0.0, 1.0)
-        blit_disc(surf, self.x, self.y, self.radius, METEOR_COLOR, int(18 + 40 * k))
+        ev = evo_of(self)
+        mc = (METEOR_COLOR, METEOR_COLOR, (90, 160, 255), (150, 80, 230))[ev]
+        blit_disc(surf, self.x, self.y, self.radius, mc, int(18 + 40 * k))
+        if ev >= 3:
+            # çekim kuyusu: yere inen sarmal
+            for arm in range(3):
+                pts_ = []
+                for j in range(8):
+                    q = j / 7.0
+                    a = t * 3.0 + arm * math.tau / 3 + q * 2.2
+                    pts_.append((self.x + math.cos(a) * self.radius * (1 - q * 0.85),
+                                 self.y + math.sin(a) * self.radius * (1 - q * 0.85)))
+                pygame.draw.lines(surf, scale_col((210, 170, 255), 0.4 + 0.5 * k), False, pts_, 2)
         rr = max(2, int(self.radius))
-        pygame.draw.circle(surf, scale_col(METEOR_COLOR, 0.5 + 0.5 * k),
+        pygame.draw.circle(surf, scale_col(mc, 0.5 + 0.5 * k),
                            (int(self.x), int(self.y)), rr, 2)
-        pygame.draw.circle(surf, METEOR_COLOR2, (int(self.x), int(self.y)),
+        pygame.draw.circle(surf, lighten(mc, 0.5), (int(self.x), int(self.y)),
                            max(2, int(self.radius * (1.0 - k))), 1)
 
     def _rock(self, cx, cy, R, rot):
@@ -17194,10 +17577,29 @@ class MeteorStrike:
 
     def draw(self, surf, t):
         """Düşen alevli göktaşı ve çarpışma (en üst katman). küçük dairelerden ibaret değil; kraterli kaya"""
+        ev = evo_of(self)
+        # II göktaşı sağanağı (mavi-beyaz kuyrukluyıldız), III çekim kuyusu (mor boşluk taşı)
+        mc = (METEOR_COLOR, METEOR_COLOR, (90, 160, 255), (150, 80, 230))[ev]
+        tails = (((226, 84, 34), (255, 150, 52), (255, 230, 150)),) * 2 + (
+            ((60, 110, 230), (130, 190, 255), (235, 245, 255)),
+            ((90, 40, 170), (170, 100, 255), (240, 210, 255)))
+        tcols = tails[ev]
         if self.boom_t >= 0:
             q = clamp(self.boom_t / 0.45, 0.0, 1.0)
-            add_glow(surf, self.x, self.y, self.radius * (1.0 + 0.4 * q), METEOR_COLOR,
+            add_glow(surf, self.x, self.y, self.radius * (1.0 + 0.4 * q), mc,
                      0.9 * (1.0 - q))
+            if ev == 2:
+                ring_aa(surf, self.x, self.y, self.radius * (0.4 + 0.8 * q), scale_col((200, 230, 255), 1 - q), 3)
+            elif ev >= 3:
+                blit_disc(surf, self.x, self.y, self.radius * 0.5 * (1 - q) + 4, (20, 6, 30), int(200 * (1 - q)))
+                for arm in range(4):
+                    pts_ = []
+                    for j in range(8):
+                        qq = j / 7.0
+                        a = -self.boom_t * 9 + arm * math.tau / 4 + qq * 2.6
+                        pts_.append((self.x + math.cos(a) * self.radius * qq * (1 - 0.5 * q),
+                                     self.y + math.sin(a) * self.radius * qq * (1 - 0.5 * q)))
+                    pygame.draw.lines(surf, scale_col((210, 160, 255), 1 - q), False, pts_, 3)
             # krater ve dağılan kaya parçaları
             pygame.draw.ellipse(surf, scale_col((60, 36, 28), 1.0),
                                 (int(self.x - self.radius * 0.45), int(self.y - self.radius * 0.22),
@@ -17212,14 +17614,14 @@ class MeteorStrike:
         fall = (1.0 - k) ** 1.6
         mx = self.x + 260 * fall
         my = self.y - 520 * fall
-        R = 11.0 + min(9.0, self.radius * 0.06)
+        R = (11.0 + min(9.0, self.radius * 0.06)) * (1.0 + 0.15 * max(0, ev - 1))
         # gidiş yönü (sağ üstten sol alta) ve kuyruk yönü
         dx, dy = -0.447, 0.894
         ux, uy = -dx, -dy
         nx_, ny_ = -uy, ux
         Lt = R * (5.0 + 2.0 * fall)
         flick = 0.85 + 0.15 * math.sin(t * 30 + self.seed)
-        for scale, col in ((1.0, (226, 84, 34)), (0.72, (255, 150, 52)), (0.42, (255, 230, 150))):
+        for scale, col in zip((1.0, 0.72, 0.42), tcols):
             w_ = R * 1.05 * scale
             tail = [(mx + nx_ * w_, my + ny_ * w_),
                     (mx + ux * Lt * scale * flick + nx_ * w_ * 0.25, my + uy * Lt * scale * flick + ny_ * w_ * 0.25),
@@ -17231,8 +17633,8 @@ class MeteorStrike:
             ph = (t * 3.0 + i * 0.27 + self.seed) % 1.0
             ex_ = mx + ux * Lt * (0.4 + ph) + nx_ * math.sin(i * 2.1 + t * 9) * R * 0.8
             ey_ = my + uy * Lt * (0.4 + ph) + ny_ * math.sin(i * 2.1 + t * 9) * R * 0.8
-            circle_aa(surf, ex_, ey_, 2.2 * (1 - ph) + 0.6, (255, 200, 90))
-        add_glow(surf, mx, my, R * 3.0, METEOR_COLOR, 0.85)
+            circle_aa(surf, ex_, ey_, 2.2 * (1 - ph) + 0.6, tcols[2])
+        add_glow(surf, mx, my, R * 3.0, mc, 0.85)
         rot = t * 2.0 + self.seed
         rock = self._rock(mx, my, R, rot)
         poly_aa(surf, [(px_ + 1.5, py_ + 2) for px_, py_ in rock], OUTLINE)
@@ -17243,7 +17645,7 @@ class MeteorStrike:
             a = rot + i * 2.1
             thick_line(surf, (mx + math.cos(a) * R * 0.15, my + math.sin(a) * R * 0.15),
                        (mx + math.cos(a + 0.4) * R * 0.85, my + math.sin(a + 0.4) * R * 0.85),
-                       1.8, (255, 150, 60))
+                       1.8, tcols[1])
         circle_aa(surf, mx + math.cos(rot + 1.0) * R * 0.45, my + math.sin(rot + 1.0) * R * 0.45,
                   R * 0.18, (70, 44, 34))
 
@@ -17290,6 +17692,10 @@ class SunBeam:
     def draw(self, surf, t):
         k = clamp(self.t / BEAM_SWEEP_T, 0.0, 1.0)
         fade = min(1.0, (1.0 - k) * 4.0, self.t * 8.0)
+        ev = evo_of(self)
+        if ev >= 2:
+            self._draw_evo(surf, t, fade, ev)
+            return
         for i in range(self.n):
             a = self.ang + i * math.tau / self.n
             ca, sa = math.cos(a), math.sin(a)
@@ -17307,6 +17713,41 @@ class SunBeam:
                        4.0 * fade + 1, 1.2, BEAM_COLOR2)
             add_glow(surf, ex, ey, 20, BEAM_COLOR, 0.6 * fade)
         add_glow(surf, self.x, self.y, 34, BEAM_COLOR, 0.45 * fade)
+
+    def _draw_evo(self, surf, t, fade, ev):
+        """II güneş patlaması: kalın, alev saçan ışın. III yargı ışını: beyaz-altın,
+        yazıt halkalı kutsal ışın."""
+        c1, c2 = ((255, 112, 40), (255, 222, 150)) if ev == 2 else ((255, 228, 140), (255, 255, 255))
+        wk = 1.45 if ev == 2 else 1.25
+        rich = evo_rich()
+        for i in range(self.n):
+            a = self.ang + i * math.tau / self.n
+            ca, sa = math.cos(a), math.sin(a)
+            ex, ey = self.x + ca * self.length, self.y + sa * self.length
+            for j in range(1, 4):
+                b = a - j * 0.09
+                taper_line(surf, [(self.x, self.y), (self.x + math.cos(b) * self.length,
+                                                     self.y + math.sin(b) * self.length)],
+                           (4.0 - j) * wk, 0.6, scale_col(c1, 0.75 - 0.15 * j))
+            taper_line(surf, [(self.x + ca * 14, self.y + sa * 14), (ex, ey)],
+                       BEAM_WIDTH * 0.9 * fade * wk + 1, 3.0, scale_col(c1, 0.6 + 0.4 * fade))
+            taper_line(surf, [(self.x + ca * 14, self.y + sa * 14), (ex, ey)],
+                       5.0 * fade + 1, 1.2, c2)
+            if ev == 2:
+                for j in range(4 if rich else 2):
+                    q = (j + 0.5) / (4 if rich else 2)
+                    evo_flame(surf, self.x + ca * self.length * q, self.y + sa * self.length * q + 4,
+                              (14 + 6 * (j % 2)) * fade, 4.5, t, j + i * 3)
+            else:
+                for j in range(3):
+                    q = (j + 1) / 4.0
+                    _sparkle(surf, self.x + ca * self.length * q, self.y + sa * self.length * q,
+                             4 + 3 * math.sin(t * 8 + j * 2), c2)
+                evo_rune_ring(surf, ex, ey, 16, t * 2, scale_col(c1, 0.8 * fade + 0.2), n=6, speed=2.0)
+            add_glow(surf, ex, ey, 26, c1, 0.7 * fade)
+        add_glow(surf, self.x, self.y, 40, c1, 0.5 * fade)
+        if ev >= 3:
+            evo_rune_ring(surf, self.x, self.y, 42, t, scale_col(c1, 0.75 * fade + 0.2), n=10, speed=1.2)
 
 
 # yeni silahlar - 2. paket: şahin, yarasa sürüsü, ayaz patlaması, bıçak
@@ -17567,7 +18008,27 @@ class Hawk:
                 q = (i + 1) / max(1, len(self.trail))
                 circle_aa(surf, gx, gy, 2 + 4 * q, scale_col(HAWK_COLOR, 0.25 + 0.45 * q))
             add_glow(surf, bx, by, 34, HAWK_COLOR, 0.55)
-        draw_hawk_shape(surf, bx, by, self.ang, self.flap, k, HAWK_COLOR, dive=dive)
+        ev = evo_of(self)
+        if ev == 2:
+            # ateş kanadı: kanat uçlarından ve kuyruktan alev
+            ca, sn = math.cos(self.ang), math.sin(self.ang)
+            for i in range(3 if evo_rich() else 1):
+                ph = (t * 2.2 + i * 0.33) % 1.0
+                evo_flame(surf, bx - ca * (18 + 18 * ph) * k, by - sn * (18 + 18 * ph) * k + 6,
+                          14 * (1 - ph) + 4, 4, t, i)
+            add_glow(surf, bx, by, 40, (255, 120, 40), 0.45)
+            draw_hawk_shape(surf, bx, by, self.ang, self.flap, k * 1.1, (255, 116, 44), dive=dive)
+        elif ev >= 3:
+            add_glow(surf, bx, by, 46, (255, 214, 110), 0.5)
+            if evo_rich():
+                for i, (gx, gy) in enumerate(self.trail[:-1]):
+                    _sparkle(surf, gx, gy, 2 + 3 * (i + 1) / max(1, len(self.trail)), (255, 236, 160))
+            kk = k * 1.25
+            draw_hawk_shape(surf, bx, by, self.ang, self.flap, kk, (255, 206, 100), dive=dive)
+            ca, sn = math.cos(self.ang), math.sin(self.ang)
+            evo_crown(surf, bx + ca * 10 * kk, by + sn * 10 * kk - 9, 0.9)
+        else:
+            draw_hawk_shape(surf, bx, by, self.ang, self.flap, k, HAWK_COLOR, dive=dive)
 
 
 class BatSwarmBat:
@@ -17610,10 +18071,20 @@ class BatSwarmBat:
         """Gerçek yarasa silueti: parmak kemikli zar kanatlar, sivri kulaklar, kırmızı gözler."""
         flap = math.sin(t * 22 + self.a0 * 3)
         fade = min(1.0, (BAT_LIFE - self.t) * 5.0)
-        col = scale_col((92, 56, 120), 0.55 + 0.45 * fade)
-        mem = scale_col(BAT_COLOR, 0.45 + 0.4 * fade)
+        ev = evo_of(self)
+        # II veba sürüsü (zehir yeşili, arkada zehir bulutu), III kont'un gecesi (kızıl, iri, kan izi)
+        bcol, bmem = (((92, 56, 120), BAT_COLOR), ((92, 56, 120), BAT_COLOR),
+                      ((46, 84, 40), (128, 214, 86)), ((70, 16, 26), (214, 34, 60)))[ev]
+        col = scale_col(bcol, 0.55 + 0.45 * fade)
+        mem = scale_col(bmem, 0.45 + 0.4 * fade)
         x0, y0 = self.x, self.y
-        S_ = 1.4
+        S_ = 1.4 * (1.0 + 0.22 * max(0, ev - 1))
+        if ev == 2 and evo_rich():
+            blit_disc(surf, x0 - math.cos(self.a0 + self.t * 4) * 10, y0 + 6, 9, (120, 210, 80), int(60 * fade))
+        elif ev >= 3:
+            for i in range(2):
+                ph = (self.t * 3 + i * 0.5) % 1.0
+                circle_aa(surf, x0 + (i * 2 - 1) * 4, y0 + 6 + ph * 14, 1.8 * (1 - ph) + 0.6, (200, 20, 40))
 
         def B(dx, dy):
             return (x0 + dx * S_, y0 + dy * S_)
@@ -17634,7 +18105,10 @@ class BatSwarmBat:
         circle_aa(surf, *B(0, 1), 3.8 * S_, col)
         for sg in (-1, 1):
             poly_aa(surf, [B(sg * 1.2, -2), B(sg * 3.4, -7), B(sg * 3.6, -1.5)], col)
-            circle_aa(surf, *B(sg * 1.5, -0.2), 0.95 * S_, (255, 90, 120))
+            eye = (255, 90, 120) if ev < 2 else ((210, 255, 120) if ev == 2 else (255, 40, 50))
+            if ev >= 3:
+                add_glow(surf, *B(sg * 1.5, -0.2), 6, eye, 0.7)
+            circle_aa(surf, *B(sg * 1.5, -0.2), 0.95 * S_, eye)
 
 
 class FrostNova:
@@ -17658,6 +18132,19 @@ class FrostNova:
         fade = 1.0 - clamp((self.t - 0.25) / 0.30, 0.0, 1.0)
         r = self.radius * (0.25 + 0.75 * ease_out_cubic(k))
         x, y = self.x, self.y
+        ev = evo_of(self)
+        if ev >= 3:
+            # kutup yıldızı: sekiz kollu altın-beyaz yıldız patlaması
+            spts = []
+            for j in range(16):
+                a = j * math.tau / 16 + self.shards[0]
+                rr = r * (1.15 if j % 2 == 0 else 0.42)
+                spts.append((x + math.cos(a) * rr, y + math.sin(a) * rr))
+            poly_aa(surf, spts, scale_col((255, 236, 170), 0.35 + 0.5 * fade))
+            for j in range(0, 16, 2):
+                a = j * math.tau / 16 + self.shards[0]
+                taper_line(surf, [(x, y), (x + math.cos(a) * r * 1.3, y + math.sin(a) * r * 1.3)],
+                           5 * fade + 1, 0.5, (255, 252, 230))
         blit_disc(surf, x, y, r, NOVA_COLOR, int(70 * fade))
         pygame.draw.circle(surf, scale_col(NOVA_COLOR2, 0.4 + 0.6 * fade), (int(x), int(y)),
                            max(2, int(r)), max(1, int(5 * fade) + 1))
@@ -17673,8 +18160,24 @@ class FrostNova:
             poly_aa(surf, crystal, scale_col(NOVA_COLOR, 0.55 + 0.45 * fade))
             thick_line(surf, (bx, by), (bx + ca * L_ * 0.9, by + sa * L_ * 0.9), 1.2,
                        scale_col(NOVA_COLOR2, 0.6 + 0.4 * fade))
+        if ev == 2:
+            # donmuş zaman: ortada duran saat + çevrede ikinci kristal halkası
+            cr = 20 * fade + 4
+            ring_aa(surf, x, y, cr, NOVA_COLOR2, 3)
+            for j in range(12):
+                a = j * math.tau / 12
+                thick_line(surf, (x + math.cos(a) * cr * 0.8, y + math.sin(a) * cr * 0.8),
+                           (x + math.cos(a) * cr, y + math.sin(a) * cr), 1.5, NOVA_COLOR2)
+            thick_line(surf, (x, y), (x, y - cr * 0.7), 2.5, WHITE)
+            thick_line(surf, (x, y), (x + cr * 0.5, y + cr * 0.15), 2.0, WHITE)
+            for i, a in enumerate(self.shards[::2]):
+                ca, sa = math.cos(a + 0.2), math.sin(a + 0.2)
+                bx, by = x + ca * r * 0.62, y + sa * r * 0.62
+                L_ = 16 * (0.5 + 0.5 * fade)
+                poly_aa(surf, [(bx - sa * 4, by + ca * 4), (bx + ca * L_, by + sa * L_), (bx + sa * 4, by - ca * 4)],
+                        scale_col(NOVA_COLOR2, 0.5 + 0.5 * fade))
         # ortadaki kar tanesi
-        sk = 18 * fade
+        sk = 18 * fade if ev != 2 else 0
         if sk > 2:
             for j in range(6):
                 a = j * math.pi / 3 + t
@@ -17732,13 +18235,27 @@ class ThrownKnife:
 
         def P(f, s_):
             return (x + ca * f + nx * s_, y + sa * f + ny * s_)
-        taper_line(surf, [P(-46, 0), P(-12, 0)], 0.5, 4.0, scale_col(KNIFE_COLOR, 0.30))
+        ev = evo_of(self)
+        # II kan yelpazesi (kızıl ağız, kan izi), III ölüm dansı (mor hayalet hançer, art görüntüler)
+        kc = (KNIFE_COLOR, KNIFE_COLOR, (226, 70, 80), (176, 120, 255))[ev]
+        if ev >= 3:
+            for g in (2, 1):
+                gx_, gy_ = x - ca * 22 * g, y - sa * 22 * g
+                ghost = [(gx_ + ca * f + nx * s_, gy_ + sa * f + ny * s_) for f, s_ in
+                         ((16, 0), (10, 3.4), (-10, 2.4), (-10, -2.4), (10, -2.6))]
+                poly_aa(surf, ghost, scale_col(kc, 0.55 - 0.18 * g))
+            add_glow(surf, x, y, 22, kc, 0.45)
+        elif ev == 2:
+            for j in range(3):
+                circle_aa(surf, *P(-14 - j * 9, math.sin(t * 20 + j) * 2), 2.2 - j * 0.5, (190, 24, 40))
+        taper_line(surf, [P(-46, 0), P(-12, 0)], 0.5, 4.0, scale_col(kc, 0.30))
         thick_line(surf, P(-30, 3), P(-14, 1.5), 1.0, scale_col(KNIFE_COLOR2, 0.35))
         thick_line(surf, P(-30, -3), P(-14, -1.5), 1.0, scale_col(KNIFE_COLOR2, 0.35))
         blade = [P(16, 0), P(10, 3.4), P(0, 3.6), P(0, -2.6), P(10, -2.6)]
         poly_aa(surf, [(px_ + 1, py_ + 1.5) for px_, py_ in blade], OUTLINE)
-        poly_aa(surf, blade, KNIFE_COLOR)
-        poly_aa(surf, [P(15, 0.2), P(10, 3.0), P(1, 3.1), P(1, 1.0), P(10, 1.0)], (160, 172, 196))
+        poly_aa(surf, blade, kc)
+        poly_aa(surf, [P(15, 0.2), P(10, 3.0), P(1, 3.1), P(1, 1.0), P(10, 1.0)],
+                (160, 172, 196) if ev < 2 else scale_col(kc, 0.65))
         thick_line(surf, P(1, -1.4), P(14, -0.4), 1.0, KNIFE_COLOR2)
         thick_line(surf, P(0, 5.5), P(0, -4.5), 2.6, OUTLINE)
         thick_line(surf, P(0, 5.0), P(0, -4.0), 1.8, (214, 170, 80))
@@ -17813,20 +18330,39 @@ class QuakeCharge:
     def draw(self, surf, t):
         x, y = self.x, self.y
         R = self.radius
+        ev = evo_of(self)
         if self.boom_t >= 0:
             q = clamp(self.boom_t / 0.45, 0.0, 1.0)
             fade = 1.0 - q
+            if ev >= 3:
+                # magma yarığı: yarıklardan sızan lav (patlamadan sonra da kızgın kalır)
+                blit_disc(surf, x, y, R * 0.7, (255, 90, 20), int(110 * fade))
             blit_disc(surf, x, y, R * (0.9 + 0.2 * q), QUAKE_COLOR, int(90 * fade))
+            if ev >= 2:
+                # titan adımı: havaya fırlayan kaya parçaları
+                for i, segs in enumerate(self.cracks):
+                    a = segs[-1][0] if segs else i
+                    d = R * (0.5 + 0.6 * q)
+                    hy = math.sin(q * math.pi) * (30 + 10 * (i % 3))
+                    rx_, ry_ = x + math.cos(a) * d, y + math.sin(a) * d * 0.7 - hy
+                    rock = [(rx_ + math.cos(j * 2.1 + i) * 6, ry_ + math.sin(j * 2.1 + i) * 5) for j in range(3)]
+                    poly_aa(surf, [(px_ + 1, py_ + 1.5) for px_, py_ in rock], OUTLINE)
+                    poly_aa(surf, rock, QUAKE_ROCK)
             pygame.draw.circle(surf, scale_col(QUAKE_COLOR2, 0.4 + 0.6 * fade), (int(x), int(y)),
                                max(2, int(R * (0.95 + 0.25 * q))), max(1, int(6 * fade) + 1))
             for segs in self.cracks:
                 px_, py_ = x, y
                 for (a, f) in segs:
                     nx_, ny_ = x + math.cos(a) * R * f, y + math.sin(a) * R * f
-                    thick_line(surf, (px_, py_), (nx_, ny_), 3.4 * fade + 0.6,
-                               scale_col(QUAKE_COLOR2, 0.5 + 0.5 * fade))
+                    if ev >= 3:
+                        thick_line(surf, (px_, py_), (nx_, ny_), 6.0 * fade + 1.5, (90, 30, 10))
+                        thick_line(surf, (px_, py_), (nx_, ny_), 3.4 * fade + 0.8, (255, 120, 30))
+                        thick_line(surf, (px_, py_), (nx_, ny_), 1.4, (255, 230, 140))
+                    else:
+                        thick_line(surf, (px_, py_), (nx_, ny_), (3.4 + 1.6 * (ev >= 2)) * fade + 0.6,
+                                   scale_col(QUAKE_COLOR2, 0.5 + 0.5 * fade))
                     px_, py_ = nx_, ny_
-            add_glow(surf, x, y, R * 0.9, QUAKE_COLOR, 0.55 * fade)
+            add_glow(surf, x, y, R * 0.9, (255, 110, 30) if ev >= 3 else QUAKE_COLOR, 0.55 * fade)
             return
         k = clamp(self.t / QUAKE_CHARGE_T, 0.0, 1.0)
         ek = ease_out_cubic(k)
@@ -17855,9 +18391,14 @@ class QuakeCharge:
                 if f > ek + 1e-6:
                     break
                 nx_, ny_ = x + math.cos(a) * R * f, y + math.sin(a) * R * f
-                thick_line(surf, (px_, py_), (nx_, ny_), 2.6, (36, 22, 14))
-                thick_line(surf, (px_, py_), (nx_, ny_), 1.2,
-                           scale_col(QUAKE_COLOR2, 0.35 + 0.65 * k * pulse))
+                thick_line(surf, (px_, py_), (nx_, ny_), 2.6 + 2.0 * (ev >= 3), (36, 22, 14))
+                if ev >= 3:
+                    # magma yarığı: çatlaklardan sızan lav
+                    thick_line(surf, (px_, py_), (nx_, ny_), 2.4, (255, 110, 30))
+                    thick_line(surf, (px_, py_), (nx_, ny_), 1.0, (255, 230, 140))
+                else:
+                    thick_line(surf, (px_, py_), (nx_, ny_), 1.2,
+                               scale_col(QUAKE_COLOR2, 0.35 + 0.65 * k * pulse))
                 px_, py_ = nx_, ny_
         # titreşen kaya parçaları (yer kalkıyor)
         for (a, f, sz) in self.rocks:
@@ -17868,7 +18409,17 @@ class QuakeCharge:
             circle_aa(surf, rx, ry + 1.5, sz, OUTLINE)
             circle_aa(surf, rx, ry, sz, QUAKE_ROCK)
             circle_aa(surf, rx - sz * 0.3, ry - sz * 0.3, sz * 0.45, (168, 136, 104))
-        add_glow(surf, x, y, r * 0.7, QUAKE_COLOR, 0.15 + 0.35 * k)
+        if ev >= 2:
+            # titan adımı: kenarda yükselen sivri kaya dişleri
+            n_ = 12 if evo_rich() else 6
+            for i in range(n_):
+                a = i * math.tau / n_ + 0.2
+                bx, by = x + math.cos(a) * R, y + math.sin(a) * R
+                h = (10 + 8 * (i % 3)) * ek
+                rock = [(bx - 6, by + 3), (bx - 2, by - h), (bx + 3, by - h * 0.7), (bx + 6, by + 3)]
+                poly_aa(surf, [(px_ + 1, py_ + 1.5) for px_, py_ in rock], OUTLINE)
+                poly_aa(surf, rock, (255, 120, 40) if ev >= 3 and i % 2 else QUAKE_ROCK)
+        add_glow(surf, x, y, r * 0.7, (255, 110, 30) if ev >= 3 else QUAKE_COLOR, 0.15 + 0.35 * k)
 
 
 # _fire_weapon ile atılmazlar; kendi güncelleme yerlerinde işlenirler (kalkan,
@@ -18372,7 +18923,8 @@ def draw_pentagram_field(surf, p, t):
     lvl = p.weapons.get("pentagram", 0)
     if lvl <= 0:
         return
-    draw_pentagram(surf, p.x, p.y, penta_radius(lvl), p.penta_angle, t)
+    draw_pentagram(surf, p.x, p.y, penta_radius(lvl), p.penta_angle, t,
+                   ev=evo_tier(p, "pentagram") if getattr(p, "evolved", None) else 0)
 
 
 def draw_shield_books(surf, p, t, layer="front"):
@@ -18381,6 +18933,7 @@ def draw_shield_books(surf, p, t, layer="front"):
     if lvl <= 0:
         return
     n_book = weapon_count(lvl)
+    ev = evo_tier(p, "book") if getattr(p, "evolved", None) else 0
     for i in range(n_book):
         bx, by, a = book_slot_pos(p, i, n_book)
         back = math.sin(a) < 0
@@ -18390,7 +18943,7 @@ def draw_shield_books(surf, p, t, layer="front"):
         depth = (math.sin(a) + 1.0) * 0.5          # 0 = en arka, 1 = en ön
         k = (0.82 + 0.30 * depth) * (1.0 + 0.012 * (lvl - 1))
         charged = not (i < len(p.book_charges) and p.book_charges[i] > 0)
-        draw_shield_book(surf, bx, by, a, k, charged, t, phase=i * 1.7)
+        draw_shield_book(surf, bx, by, a, k, charged, t, phase=i * 1.7, ev=ev)
 
 
 # ---- silah açılışları ----
@@ -30299,8 +30852,27 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
                 if getattr(obj, "_wsrc", None) is None:
                     obj._wsrc = key
 
+    def _stamp_evo_objects(self):
+        """Silah nesnelerine sahibinin evrim kademesini yazar (çizim buna göre değişir)."""
+        p = self.player
+        if not getattr(p, "evolved", None):
+            return
+        for ln, key in EVO_OBJ_LISTS:
+            tr = evo_tier(p, key)
+            if tr:
+                for ob in getattr(self, ln, ()):
+                    if getattr(ob, "evo", 0) != tr:
+                        ob.evo = tr
+        trs, trf = evo_tier(p, "shoe"), evo_tier(p, "frost")
+        if trs or trf:
+            for ob in self.fire_rings:
+                tr = trf if ob.ice else trs
+                if tr and getattr(ob, "evo", 0) != tr:
+                    ob.evo = tr
+
     def update_weapon_objects(self, dt):
         """Su birikintileri, ateş halkaları, hortumlar, baltalar, kırbaçlar."""
+        self._stamp_evo_objects()
         for lst_name in self.WEAPON_OBJECT_LISTS:
             lst = getattr(self, lst_name)
             for obj in list(lst):
@@ -30600,9 +31172,23 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
                     if d < best:
                         nxt, best = e, d
                 cur = nxt
+            ev = evo_tier(p, "tesla") if getattr(p, "evolved", None) else 0
+            # II gök gürültüsü (mavi, her vuruşta şok halkası), III zeus'un öfkesi (altın, gökten yıldırım)
+            tc1, tc2 = ((TESLA_COLOR, TESLA_COLOR2), (TESLA_COLOR, TESLA_COLOR2),
+                        ((150, 200, 255), (236, 246, 255)), ((255, 206, 70), (255, 250, 210)))[ev]
             for a_, b_ in zip(pts, pts[1:]):
-                self.fx.bolt(zigzag(a_[0], a_[1], b_[0], b_[1], 6, 14), TESLA_COLOR, 0.22)
-                self.fx.bolt(zigzag(a_[0], a_[1], b_[0], b_[1], 4, 6), TESLA_COLOR2, 0.14)
+                self.fx.bolt(zigzag(a_[0], a_[1], b_[0], b_[1], 6, 14), tc1, 0.22 + 0.06 * ev)
+                self.fx.bolt(zigzag(a_[0], a_[1], b_[0], b_[1], 4, 6), tc2, 0.14)
+                if ev >= 2:
+                    self.fx.bolt(zigzag(a_[0], a_[1], b_[0], b_[1], 7, 20), scale_col(tc1, 0.7), 0.18)
+            if ev >= 2:
+                for (hx, hy) in pts[1:]:
+                    self.fx.shockwave(hx, hy, 46 + 12 * ev, tc1, 0.25, 3)
+            if ev >= 3 and len(pts) > 1:
+                hx, hy = pts[1]
+                self.fx.bolt(zigzag(hx + 30, hy - 340, hx, hy, 8, 24), tc1, 0.32)
+                self.fx.bolt(zigzag(hx + 30, hy - 340, hx, hy, 6, 10), tc2, 0.22)
+                self.fx.shockwave(hx, hy, 90, tc2, 0.35, 5)
             sfx("lightning", 0.36, 0.06)
 
         elif key == "meteor":
@@ -36486,6 +37072,23 @@ def draw_invisible_player(world, p, t):
     world.blit(tmp, (ox - size * 0.5, oy - size * 0.5))
     # çevresinde dönen gizlilik halkası + savrulan zerreler
     pulse = 0.5 + 0.5 * math.sin(t * 3.4)
+    ev = evo_tier(p, "cloak") if getattr(p, "evolved", None) else 0
+    if ev >= 3:
+        # karanlık efendisi: koyu gölge örtüsü, parlayan gözler, gölge tacı
+        blit_disc(world, ox, oy, 46, (20, 10, 34), 120)
+        for i in range(9):
+            a = -t * 0.8 + i * math.tau / 9
+            bx_, by_ = ox + math.cos(a) * 34, oy - 6 + math.sin(a) * 12
+            poly_aa(world, [(bx_ - 4, by_), (bx_, by_ - 14 - 4 * math.sin(t * 4 + i)), (bx_ + 4, by_)],
+                    (70, 40, 120))
+        for sg in (-1, 1):
+            add_glow(world, ox + sg * 7, oy - 6, 9, (190, 120, 255), 0.9)
+            circle_aa(world, ox + sg * 7, oy - 6, 2.4, (230, 200, 255))
+    elif ev == 2:
+        for i in range(4):
+            ph = (t * 0.7 + i * 0.25) % 1.0
+            evo_heal_cross(world, ox + math.sin(i * 2.3 + t) * 22, oy + 10 - ph * 44, 4 * (1 - ph) + 1.5,
+                           mix_col((150, 255, 190), CLOAK_COLOR2, 0.3))
     add_glow(world, ox, oy, 54, CLOAK_COLOR, 0.18 + 0.10 * pulse)
     for i in range(10):
         a = t * 1.6 + i * math.tau / 10
@@ -49873,6 +50476,12 @@ class EvoPreview:
         if run is None:
             pygame.draw.rect(canvas, (14, 10, 12), rect, border_radius=10)
             return
+        # görüntü iki karede bir yeniden çizilir (video gibi ~30 kare; menü akıcı kalır)
+        self._n = getattr(self, "_n", 0) + 1
+        img = getattr(self, "_img", None)
+        if img is not None and img.get_size() == rect.size and self._n % 2:
+            canvas.blit(img, rect.topleft)
+            return
         try:
             draw_run(self.surf, run, t, world_only=True)
         except Exception as e:
@@ -49889,6 +50498,7 @@ class EvoPreview:
             img = pygame.transform.smoothscale(self.surf.subsurface(src), rect.size)
         except Exception:
             img = pygame.transform.scale(self.surf.subsurface(src), rect.size)
+        self._img = img
         canvas.blit(img, rect.topleft)
 
 
