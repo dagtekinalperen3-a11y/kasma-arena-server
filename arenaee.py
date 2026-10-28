@@ -28525,6 +28525,48 @@ class WorldExtrasMixin:
         ev = getattr(self, "event_wave_changed", None)
         if ev is not None:
             ev()
+        self._roulette_wave_changed()
+
+    def _roulette_wave_changed(self):
+        """10 / 15 / 20. dalgada haritada bir rulet masası belirir."""
+        if (not self.extras_active() or getattr(self, "is_coop", False) or self.biome == "hell"
+                or int(self.waves.wave) not in ROULETTE_WAVES):
+            return
+        x, y = self._far_point(520, max_player=1250)
+        tier = roulette_roll_tier(self.player.eff_luck())
+        self.roulette = RouletteTable(x, y, tier)
+        self.find_note = (self.run_time, L("rl.appear", L("rl.tier.%s" % ROULETTE_TIERS[tier][0])),
+                          ROULETTE_TIERS[tier][1])
+        sfx("ach", 0.6, 0.0)
+
+    def update_roulette(self, dt, input_state, portal_used=False):
+        rt = getattr(self, "roulette", None)
+        if rt is None:
+            return
+        rt.update(dt)
+        p = self.player
+        if (not portal_used and not rt.used and not self.roulette_open and not self.merchant_open
+                and p.alive and self.curse_offers is None and input_state.get("use_pressed")
+                and rt.in_range(p)):
+            self.roulette_open = True
+
+    def roulette_spin(self, key):
+        """Çark: seçilen silah için sonucu çeker ve uygular. Döner: (kazandı mı, seviye değişimi)."""
+        rt = self.roulette
+        if rt is None or rt.used or key not in self.player.weapons:
+            return None
+        name, col, chance, up, down, _w = ROULETTE_TIERS[rt.tier]
+        p = self.player
+        w = WEAPON_BY_KEY.get(key)
+        mx = weapon_max_level(w) if w else 99
+        old = p.weapons[key]
+        win = random.random() < chance
+        if win:
+            p.weapons[key] = min(mx, old + up)
+        else:
+            p.weapons[key] = max(1, old - down)
+        rt.used = True
+        return win, p.weapons[key] - old
 
     def extras_update(self, dt):
         if not self.extras_active():
@@ -28548,6 +28590,11 @@ def draw_world_extras(world, run, cam, t):
     cv = getattr(run, "caravan", None)
     if cv is not None and cam.inflate(400, 400).collidepoint(cv.x, cv.y):
         cv.draw(world, t)
+    rt = getattr(run, "roulette", None)
+    if rt is not None and cam.inflate(400, 400).collidepoint(rt.x, rt.y):
+        rt.draw(world, t)
+        if p.alive:
+            rt.draw_prompt(world, t, p)
 
 
 def _buff_ring(surf, cx, cy, r, col, frac, icon):
@@ -28938,6 +28985,31 @@ STRINGS.update({
                       "libro raro: basta con tenerlo", "seltenes Buch: Besitz genügt",
                       "редкая книга: достаточно иметь"),
     "evo.watch":  _T("EVRİMİ İZLE", "WATCH EVOLUTION", "VER EVOLUCIÓN", "EVOLUTION ANSEHEN", "СМОТРЕТЬ ЭВОЛЮЦИЮ"),
+    "rl.title": _T("RULET MASASI", "ROULETTE TABLE", "MESA DE RULETA", "ROULETTE-TISCH", "СТОЛ РУЛЕТКИ"),
+    "rl.tier.common": _T("YAYGIN MASA", "COMMON TABLE", "MESA COMÚN", "GEWÖHNLICHER TISCH", "ОБЫЧНЫЙ СТОЛ"),
+    "rl.tier.epic": _T("EPİK MASA", "EPIC TABLE", "MESA ÉPICA", "EPISCHER TISCH", "ЭПИЧЕСКИЙ СТОЛ"),
+    "rl.tier.legend": _T("EFSANEVİ MASA", "LEGENDARY TABLE", "MESA LEGENDARIA", "LEGENDÄRER TISCH", "ЛЕГЕНДАРНЫЙ СТОЛ"),
+    "rl.prompt": _T("[{0}] {1}", "[{0}] {1}", "[{0}] {1}", "[{0}] {1}", "[{0}] {1}"),
+    "rl.appear": _T("Haritada bir {0} belirdi: bul ve şansını dene!", "A {0} appeared on the map - find it and try your luck!",
+                    "Apareció una {0} en el mapa: ¡búscala y prueba suerte!", "Ein {0} ist auf der Karte erschienen!",
+                    "На карте появился {0}: найди и испытай удачу!"),
+    "rl.odds": _T("%{0} şansla silah +{1} seviye  ·  tutmazsa -{2} seviye",
+                  "{0}% chance: weapon +{1} levels  ·  miss: -{2} levels",
+                  "{0}% de probabilidad: arma +{1} niveles  ·  si fallas: -{2}",
+                  "{0}% Chance: Waffe +{1} Stufen  ·  sonst -{2}",
+                  "Шанс {0}%: оружие +{1} ур.  ·  промах: -{2} ур."),
+    "rl.legend_win": _T("YEŞİL: +{0} seviye", "GREEN: +{0} levels", "VERDE: +{0} niveles", "GRÜN: +{0} Stufen",
+                        "ЗЕЛЁНЫЙ: +{0} ур."),
+    "rl.legend_lose": _T("KIRMIZI: -{0} seviye", "RED: -{0} levels", "ROJO: -{0} niveles", "ROT: -{0} Stufen",
+                         "КРАСНЫЙ: -{0} ур."),
+    "rl.pick": _T("Hangi silahla oynuyorsun? Birine tıkla, çark döner.", "Which weapon do you bet? Click one to spin.",
+                  "¿Qué arma apuestas? Haz clic para girar.", "Welche Waffe setzt du? Klicke zum Drehen.",
+                  "Какое оружие ставишь? Нажми, чтобы крутить."),
+    "rl.spinning": _T("ÇARK DÖNÜYOR...", "SPINNING...", "GIRANDO...", "DREHT SICH...", "КРУТИТСЯ..."),
+    "rl.win": _T("TUTTU!", "JACKPOT!", "¡PREMIO!", "GEWONNEN!", "ВЫИГРЫШ!"),
+    "rl.lose": _T("TUTMADI...", "NO LUCK...", "SIN SUERTE...", "PECH...", "НЕ ПОВЕЗЛО..."),
+    "rl.leave": _T("VAZGEÇ", "LEAVE", "SALIR", "VERLASSEN", "УЙТИ"),
+    "rl.continue": _T("DEVAM", "CONTINUE", "CONTINUAR", "WEITER", "ДАЛЕЕ"),
     "ui.evo_table": _T("EVRİMLER", "EVOLUTIONS", "EVOLUCIONES", "EVOLUTIONEN", "ЭВОЛЮЦИИ"),
     "ui.evo_table_sub": _T("Silah + eş kitap. I: Lv{0} + kitap Lv{1}  ·  II: Lv{2} + kitap Lv{3}  ·  III: Lv{4} + kitap Lv{5}. Şartlar tamamsa seviye atlarken mor EVRİM kartı çıkar.",
                            "Weapon + paired book. I: Lv{0} + book Lv{1}  ·  II: Lv{2} + book Lv{3}  ·  III: Lv{4} + book Lv{5}. Then a purple EVOLUTION card shows up on level-up.",
@@ -30101,6 +30173,8 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
         # gösterilmez); konuşmak isteğe bağlı.
         self.merchant = None
         self.merchant_open = False
+        self.roulette = None        # haritadaki rulet masası (10 / 15 / 20. dalga)
+        self.roulette_open = False
         self.merchant_hand = []     # [(yemin, kademe), ...] - bir kez çekilir
         self.merchant_hand_lvl = 0  # elin çekildiği seviye (bilgi amaçlı)
         self.merchant_rerolls = 0   # altınla yapılan yenileme sayısı (en çok 3)
@@ -32868,6 +32942,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
         self.update_cursed(dt, input_state, portal_used)
         # ---- gezgin tüccar (koşu boyunca haritada) ----
         self.update_merchant(dt, input_state, portal_used)
+        self.update_roulette(dt, input_state, portal_used)
 
         self._skill_tick(dt)
         self.combo.update(dt)
@@ -36406,6 +36481,9 @@ def draw_offscreen_markers(surf, run, cam, t):
     _lc = getattr(run, "legend_chest", None)
     if _lc is not None and not _lc.opened:
         marks.append((_lc.x, _lc.y, LEGEND_COLOR, "gem"))
+    _rt = getattr(run, "roulette", None)
+    if _rt is not None and not _rt.used:
+        marks.append((_rt.x, _rt.y, _rt.color, "star"))
     for (wx, wy, col, icon) in marks:
         if cam.collidepoint(wx, wy):
             continue
@@ -41286,6 +41364,110 @@ def draw_merchant_figure(surf, x, y, s, t, blink_seed=0.0, talking=False):
     circle_aa(surf, x - 25 * s, y - 40 * s + breath, 5 * s, (226, 186, 150))
 
 
+# ---- rulet masası ----
+# 10., 15. ve 20. dalgada haritada rastgele bir yerde bir rulet masası belirir
+# (yaygın: demir, epik: mor, efsanevi: altın). E ile oturulur, bir silah seçilip
+# çark çevrilir: tutarsa silah seviye atlar, tutmazsa seviye kaybeder. Masa
+# nadirleştikçe ödül de risk de büyür. Bir masa bir kez çevrilir.
+ROULETTE_WAVES = (10, 15, 20)
+# (anahtar, renk, kazanma şansı, kazanınca +seviye, kaybedince -seviye, çıkma ağırlığı)
+ROULETTE_TIERS = (
+    ("common", (176, 184, 198), 0.60, 2, 1, 55.0),
+    ("epic", (190, 120, 255), 0.55, 3, 2, 33.0),
+    ("legend", (255, 205, 90), 0.49, 4, 3, 12.0),
+)
+ROULETTE_SPIN_T = 2.6
+
+
+def roulette_roll_tier(luck=0.0):
+    """Masanın nadirliği: şans efsanevi payını biraz büyütür."""
+    w = [t[5] for t in ROULETTE_TIERS]
+    w[2] *= 1.0 + max(0.0, luck)
+    w[1] *= 1.0 + 0.5 * max(0.0, luck)
+    return random.choices(range(len(ROULETTE_TIERS)), weights=w, k=1)[0]
+
+
+class RouletteTable:
+    """Haritadaki rulet masası: yeşil çuha, dönen çark, kademe renginde çerçeve."""
+
+    def __init__(self, x, y, tier):
+        self.x, self.y = x, y
+        self.tier = int(tier)
+        self.used = False
+        self.t = random.uniform(0, 10)
+
+    @property
+    def color(self):
+        return ROULETTE_TIERS[self.tier][1]
+
+    def in_range(self, p):
+        return dist(self.x, self.y, p.x, p.y) < 100
+
+    def update(self, dt):
+        self.t += dt
+
+    def draw(self, surf, t):
+        x, y = self.x, self.y
+        col = self.color
+        add_glow(surf, x, y - 10, 150, col, 0.18 + (0.0 if self.used else 0.08 * math.sin(self.t * 3)))
+        surf.blit(shadow_sprite(150), (x - 75, y + 4))
+        # masa: oval çuha + kademe renginde kenar
+        top = pygame.Rect(0, 0, 150, 84)
+        top.center = (int(x), int(y))
+        pygame.draw.ellipse(surf, OUTLINE, top.inflate(8, 8))
+        pygame.draw.ellipse(surf, scale_col(col, 0.55), top.inflate(4, 4))
+        pygame.draw.ellipse(surf, (34, 96, 62), top)
+        pygame.draw.ellipse(surf, (46, 120, 78), top.inflate(-24, -16), 2)
+        # çark
+        r = 26
+        cx, cy = x, y - 4
+        circle_aa(surf, cx, cy, r + 4, OUTLINE)
+        circle_aa(surf, cx, cy, r + 2, col)
+        n = 12
+        rot = 0.0 if self.used else self.t * 1.6
+        for i in range(n):
+            a0 = rot + i * math.tau / n
+            a1 = a0 + math.tau / n
+            c_ = (190, 50, 50) if i % 2 == 0 else (24, 22, 28)
+            if i == 0:
+                c_ = (40, 160, 80)
+            pts = [(cx, cy)] + [(cx + math.cos(a0 + (a1 - a0) * k / 3) * r,
+                                 cy + math.sin(a0 + (a1 - a0) * k / 3) * r * 0.62) for k in range(4)]
+            pygame.draw.polygon(surf, c_, pts)
+        circle_aa(surf, cx, cy, 6, col)
+        circle_aa(surf, cx, cy, 3, (250, 240, 220))
+        # küçük fişler
+        for i, fc in enumerate(((220, 60, 60), (60, 120, 230), (240, 200, 80))):
+            fx_, fy_ = x + 44 + i * 4, y + 10 - i * 4
+            pygame.draw.ellipse(surf, OUTLINE, (fx_ - 9, fy_ - 5, 18, 10))
+            pygame.draw.ellipse(surf, fc, (fx_ - 8, fy_ - 4, 16, 8))
+        if not self.used:
+            by = y - 74 + math.sin(self.t * 4) * 5
+            add_glow(surf, x, by, 22, col, 0.5)
+            pygame.draw.circle(surf, OUTLINE, (int(x), int(by)), 14)
+            pygame.draw.circle(surf, col, (int(x), int(by)), 12)
+            draw_text(surf, "?", (x, by - 1), 18, (30, 20, 10), bold=True, center=True, shadow=False)
+
+    def draw_prompt(self, surf, t, p):
+        if self.used:
+            return
+        d = dist(self.x, self.y, p.x, p.y)
+        a = clamp((300 - d) / 120.0, 0.0, 1.0)
+        if a <= 0:
+            return
+        txt = L("rl.prompt", key_label_short("use"), L("rl.tier.%s" % ROULETTE_TIERS[self.tier][0]))
+        y = self.y - 112 + math.sin(t * 3) * 3
+        w_ = text_width(txt, 15, True) + 28
+        r_ = pygame.Rect(0, 0, int(w_), 28)
+        r_.center = (int(self.x), int(y))
+        bg = pygame.Surface(r_.size, pygame.SRCALPHA)
+        pygame.draw.rect(bg, (24, 20, 30, int(230 * a)), bg.get_rect(), border_radius=13)
+        pygame.draw.rect(bg, (*self.color, int(255 * a)), bg.get_rect(), width=2, border_radius=13)
+        surf.blit(bg, r_.topleft)
+        draw_text(surf, txt, r_.center, 15, (250, 244, 230), bold=True, center=True, shadow=False,
+                  alpha=int(255 * a))
+
+
 class Merchant:
     """Haritadaki gezgin tüccar: çizgili tenteli küçük bir tezgâh ve tüccar."""
 
@@ -42074,6 +42256,7 @@ STATE_PAUSE = "pause"
 STATE_LEVELUP = "levelup"
 STATE_CURSE = "curse"           # lanetli sandık teklif ekranı
 STATE_MERCHANT = "merchant"     # tüccarın mağarası (yemin)
+STATE_ROULETTE = "roulette"     # rulet masası
 STATE_MAP_SELECT = "map_select" # oyna -> harita seçimi
 STATE_RUN_SHOP = "run_shop"
 STATE_GAMEOVER = "gameover"
@@ -50088,7 +50271,8 @@ def coop_guest_class(name):
 _coop_static_tables()
 
 
-RUN_OVERLAY_STATES = (STATE_PAUSE, STATE_LEVELUP, STATE_CURSE, STATE_MERCHANT, STATE_RUN_SHOP)
+RUN_OVERLAY_STATES = (STATE_PAUSE, STATE_LEVELUP, STATE_CURSE, STATE_MERCHANT, STATE_RUN_SHOP,
+                      STATE_ROULETTE)
 
 
 
@@ -51083,7 +51267,7 @@ REPLAY_AFTER = 1.4               # 2 kişilikte ölümden sonra kayıt bu kadar 
 _rp_h = VIRTUAL_H - 68
 REPLAY_VIEW = pygame.Rect((VIRTUAL_W - VIRTUAL_W * _rp_h // VIRTUAL_H) // 2, 34, VIRTUAL_W * _rp_h // VIRTUAL_H, _rp_h)
 # bu ekranlarda tekrar bellekte kalır, başka yere geçince silinir
-REPLAY_KEEP_STATES = frozenset((STATE_PLAY, STATE_PAUSE, STATE_LEVELUP, STATE_CURSE, STATE_MERCHANT,
+REPLAY_KEEP_STATES = frozenset((STATE_PLAY, STATE_PAUSE, STATE_LEVELUP, STATE_CURSE, STATE_MERCHANT, STATE_ROULETTE,
                                 STATE_RUN_SHOP, STATE_GAMEOVER, STATE_NAME_ENTRY, "coop_pause", "coop_end"))
 try:
     from collections import deque as _rp_deque
@@ -52396,6 +52580,7 @@ class App:
             elif self.state == STATE_LEVELUP: self.update_levelup(dt, mouse_pos, clicked)
             elif self.state == STATE_CURSE: self.update_curse(dt, mouse_pos, clicked)
             elif self.state == STATE_MERCHANT: self.update_merchant(dt, mouse_pos, clicked)
+            elif self.state == STATE_ROULETTE: self.update_roulette(dt, mouse_pos, clicked)
             elif self.state == STATE_MAP_SELECT: self.update_map_select(dt, mouse_pos, clicked)
             elif self.state == STATE_RUN_SHOP: self.update_run_shop(dt, mouse_pos, clicked)
             elif self.state == STATE_GAMEOVER: self.update_gameover(dt, mouse_pos, clicked)
@@ -52636,6 +52821,11 @@ class App:
             self.run.choose_oath(None)
             self.state = STATE_PLAY
         elif self.state == STATE_PAUSE: self.resume_run()
+        elif self.state == STATE_ROULETTE:
+            # çark dönerken kaçılmaz; sonuç ekranı ya da seçim ekranı kapanır
+            ru = getattr(self, "roul_ui", None) or {}
+            if ru.get("phase") != "spin":
+                self._close_roulette()
         elif self.state == STATE_RUN_SHOP: self.state = STATE_PLAY
         elif self.state == STATE_CURSE:
             self.run.decline_curse()
@@ -52833,6 +53023,10 @@ class App:
         if self.state == STATE_PLAY and self.run.merchant_open and not self.run.game_over:
             self.merchant_ui.reset()
             self.state = STATE_MERCHANT
+        # rulet masasına oturuldu (oyun durur)
+        if self.state == STATE_PLAY and getattr(self.run, "roulette_open", False) and not self.run.game_over:
+            self.roul_ui = {"phase": "pick", "t": 0.0}
+            self.state = STATE_ROULETTE
 
         if self.run.game_over:
             self.pending_board_rank = -1
@@ -53086,6 +53280,150 @@ class App:
         if clicked and hov:
             self.pause_evo = False
             sfx("click", 0.5, 0.0)
+
+    def _close_roulette(self):
+        run = self.run
+        if run is not None:
+            run.roulette_open = False
+            if run.roulette is not None and run.roulette.used:
+                run.roulette = None
+        self.roul_ui = None
+        self.state = STATE_PLAY
+
+    def update_roulette(self, dt, mouse_pos, clicked):
+        """Rulet masası: silah seç, çarkı çevir, sonucu gör."""
+        canvas = self.display.canvas
+        run = self.run
+        self._draw_run_frame(canvas)
+        ov = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+        ov.fill((8, 10, 14, 212))
+        canvas.blit(ov, (0, 0))
+        rt = run.roulette
+        ui = getattr(self, "roul_ui", None) or {"phase": "pick", "t": 0.0}
+        self.roul_ui = ui
+        ui["t"] += dt
+        if rt is None:
+            self._close_roulette()
+            return
+        tk, col, chance, up, down, _w = ROULETTE_TIERS[rt.tier]
+        p = run.player
+        cx = VIRTUAL_W // 2
+        # başlık
+        draw_text(canvas, L("rl.title"), (cx, 52), 40, col, bold=True, center=True)
+        chip_t = L("rl.tier.%s" % tk)
+        cw_ = text_width(chip_t, 15, True) + 36
+        cr = pygame.Rect(0, 0, cw_, 28)
+        cr.center = (cx, 92)
+        tag_chip(canvas, cr, col, 13, tint=0.3)
+        draw_text(canvas, chip_t, cr.center, 15, lighten(col, 0.3), bold=True, center=True, shadow=False)
+        draw_text(canvas, L("rl.odds", int(round(chance * 100)), up, down), (cx, 126), 16, TEXT, bold=True,
+                  center=True)
+        # çark
+        wc = (cx, 300)
+        R = 130
+        n = 20
+        win_n = max(1, int(round(chance * n)))
+        spin_a = ui.get("angle", 0.0)
+        if ui["phase"] == "spin":
+            k = clamp(ui["t"] / ROULETTE_SPIN_T, 0.0, 1.0)
+            spin_a = ui["a0"] + (ui["a1"] - ui["a0"]) * (1 - (1 - k) ** 3)
+            # tıkırtı
+            seg_now = int(spin_a / (math.tau / n))
+            if seg_now != ui.get("seg"):
+                ui["seg"] = seg_now
+                sfx("click", 0.25, 0.0)
+            if k >= 1.0:
+                ui["phase"] = "result"
+                ui["t"] = 0.0
+                ui["angle"] = spin_a
+                win, delta = ui["res"]
+                sfx("levelup" if win else "hurt", 1.0, 0.0)
+        add_glow(canvas, wc[0], wc[1], R + 60, col, 0.22)
+        circle_aa(canvas, wc[0], wc[1], R + 12, OUTLINE)
+        circle_aa(canvas, wc[0], wc[1], R + 8, col)
+        for i in range(n):
+            a0 = spin_a + i * math.tau / n - math.pi / 2
+            a1 = a0 + math.tau / n
+            c_ = (46, 170, 90) if i < win_n else ((190, 50, 56) if i % 2 == 0 else (150, 36, 44))
+            pts = [wc] + [(wc[0] + math.cos(a0 + (a1 - a0) * j / 4) * R,
+                           wc[1] + math.sin(a0 + (a1 - a0) * j / 4) * R) for j in range(5)]
+            pygame.draw.polygon(canvas, c_, pts)
+            pygame.draw.line(canvas, (20, 14, 18), wc, pts[1], 1)
+        circle_aa(canvas, wc[0], wc[1], 26, OUTLINE)
+        circle_aa(canvas, wc[0], wc[1], 22, col)
+        draw_text(canvas, "+%d" % up, (wc[0], wc[1]), 16, (30, 20, 10), bold=True, center=True, shadow=False)
+        # ok (üstte)
+        pygame.draw.polygon(canvas, OUTLINE, [(wc[0] - 16, wc[1] - R - 26), (wc[0] + 16, wc[1] - R - 26),
+                                              (wc[0], wc[1] - R + 6)])
+        pygame.draw.polygon(canvas, (250, 244, 230), [(wc[0] - 12, wc[1] - R - 23), (wc[0] + 12, wc[1] - R - 23),
+                                                      (wc[0], wc[1] - R + 1)])
+        # lejant
+        lw_t, ll_t = L("rl.legend_win", up), L("rl.legend_lose", down)
+        tot_w = text_width(lw_t, 14, True) + text_width(ll_t, 14, True) + 70
+        lx_ = cx - tot_w / 2
+        ly_ = wc[1] + R + 26
+        circle_aa(canvas, lx_ + 7, ly_, 6, (46, 170, 90))
+        draw_text(canvas, lw_t, (lx_ + 18, ly_ - 9), 14, (110, 230, 150), bold=True)
+        lx2 = lx_ + 18 + text_width(lw_t, 14, True) + 34
+        circle_aa(canvas, lx2 + 7, ly_, 6, (190, 50, 56))
+        draw_text(canvas, ll_t, (lx2 + 18, ly_ - 9), 14, (255, 120, 120), bold=True)
+
+        if ui["phase"] == "pick":
+            draw_text(canvas, L("rl.pick"), (cx, 488), 16, TEXT_DIM, center=True)
+            keys = list(p.weapons.keys())
+            cw, ch, gap = 150, 92, 14
+            x0 = cx - (len(keys) * cw + (len(keys) - 1) * gap) / 2
+            for i, k_ in enumerate(keys):
+                w = WEAPON_BY_KEY.get(k_)
+                r_ = pygame.Rect(int(x0 + i * (cw + gap)), 508, cw, ch)
+                hov = r_.collidepoint(mouse_pos)
+                mx = weapon_max_level(w) if w else 99
+                full = p.weapons[k_] >= mx
+                pygame.draw.rect(canvas, (60, 44, 70) if hov and not full else (36, 28, 34), r_, border_radius=12)
+                ink_frame(canvas, r_, col if hov and not full else None, 12, 2)
+                if w:
+                    blit_sigil(canvas, r_.centerx, r_.y + 30, 16, k_, tuple(w["color"]))
+                    draw_text(canvas, _fit_text(w_name(w), 12, cw - 12, bold=True), (r_.centerx, r_.y + 56), 12,
+                              TEXT if not full else TEXT_DIM, bold=True, center=True, shadow=False)
+                draw_text(canvas, ("Lv %d" % p.weapons[k_]) + ("  (MAKS)" if full else ""), (r_.centerx, r_.y + 74),
+                          11, GOLD if not full else TEXT_DIM, bold=True, center=True, shadow=False)
+                if clicked and hov and not full:
+                    res = run.roulette_spin(k_)
+                    if res is not None:
+                        win, delta = res
+                        # çark kazanırsa yeşil, kaybederse kırmızı dilimde dursun
+                        seg = (random.randrange(0, win_n) if win else random.randrange(win_n, n)) + 0.5
+                        target = -(seg * math.tau / n)          # o dilim oka (üste) gelsin
+                        a0 = ui.get("angle", 0.0)
+                        a1 = target - math.tau * 6
+                        ui.update(phase="spin", t=0.0, a0=a0, a1=a1, res=res, key=k_)
+                        sfx("buy", 0.8, 0.0)
+            back = Button((cx - 100, 626, 200, 40), L("rl.leave"), self._close_roulette)
+            back.update(mouse_pos, dt)
+            back.draw(canvas)
+            if clicked:
+                back.click(mouse_pos)
+        elif ui["phase"] == "spin":
+            draw_text(canvas, L("rl.spinning"), (cx, 500), 26, GOLD, bold=True, center=True)
+        else:
+            win, delta = ui["res"]
+            k_ = ui.get("key")
+            w = WEAPON_BY_KEY.get(k_)
+            nm = w_name(w) if w else k_
+            msg = L("rl.win") if win else L("rl.lose")
+            mcol = (110, 240, 150) if win else (255, 110, 110)
+            pop = ease_out_cubic(clamp(ui["t"] / 0.3, 0.0, 1.0))
+            draw_text(canvas, msg, (cx, 486), int(34 + 10 * (1 - pop)), mcol, bold=True, center=True)
+            draw_text(canvas, "%s  Lv %d  (%+d)" % (nm, p.weapons.get(k_, 0), delta), (cx, 532), 20, TEXT,
+                      bold=True, center=True)
+            if win:
+                add_glow(canvas, cx, 486, 200, mcol, 0.18)
+            ok = Button((cx - 100, 610, 200, 46), L("rl.continue"), self._close_roulette,
+                        color=(60, 130, 90), hover_color=(80, 170, 115))
+            ok.update(mouse_pos, dt)
+            ok.draw(canvas)
+            if clicked:
+                ok.click(mouse_pos)
 
     def update_pause(self, dt, mouse_pos, clicked):
         """Duraklatma ekranı (ESC)."""
