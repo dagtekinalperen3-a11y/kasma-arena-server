@@ -17,16 +17,9 @@ _os_boot.environ.setdefault("SDL_RENDER_SCALE_QUALITY", "1")
 # Windows'ta ekran ölçeği (%125 / %150...) açıkken süreç "DPI farkında"
 # değilse Windows pencereyi bir de kendisi gerip bulanıklaştırıyordu (2K / 4K
 # ekranlarda belirgin). Gerçek piksellerle çalış; ölçeklemeyi yalnız SDL yapsın.
+# (Yalnız SDL ipucu: doğrudan Windows API çağrısı antivirüslerin sezgisel
+# taramasına takılıyordu.)
 _os_boot.environ.setdefault("SDL_WINDOWS_DPI_AWARENESS", "permonitorv2")
-if _os_boot.name == "nt":
-    try:
-        import ctypes as _ct_boot
-        try:
-            _ct_boot.windll.shcore.SetProcessDpiAwareness(2)
-        except Exception:
-            _ct_boot.windll.user32.SetProcessDPIAware()
-    except Exception:
-        pass
 import pygame
 try:
     # Kenarları yumuşatılmış (anti-aliased) çizim.
@@ -45128,7 +45121,7 @@ class VideoAd:
         self.audio_ok = False
         self._open()
         if self.backend is None:
-            raise RuntimeError("video çözücü yok (opencv-python / av / ffmpeg)")
+            raise RuntimeError("video çözücü yok (opencv-python / av)")
         if audio_path:
             try:
                 pygame.mixer.music.load(audio_path)
@@ -45171,25 +45164,9 @@ class VideoAd:
             return
         except Exception:
             pass
-        try:
-            import shutil
-            import subprocess
-            exe = shutil.which("ffmpeg")
-            if not exe:
-                for nm in ("ffmpeg.exe", "ffmpeg"):
-                    cand = _ad_asset(nm)
-                    if cand:
-                        exe = cand
-                        break
-            if exe:
-                flags = 0x08000000 if sys.platform.startswith("win") else 0   # CREATE_NO_WINDOW
-                self.proc = subprocess.Popen(
-                    [exe, "-loglevel", "error", "-i", self.path, "-vf", "scale=%d:%d" % (self.W, self.H),
-                     "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
-                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, creationflags=flags)
-                self.backend = "ffmpeg"
-        except Exception:
-            self.proc = None
+        # ffmpeg'i gizli pencerede başlatan yol kaldırıldı: antivirüsler
+        # "gizli süreç başlatıyor" diye virüs sanıyordu. Çözücü yoksa
+        # make_house_ad oyun turuna düşer.
 
     def _read_one(self):
         try:
