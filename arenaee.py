@@ -3574,6 +3574,109 @@ STRINGS.update({
     "ui.st_def": _T("SAVUNMA", "DEFENSE", "DEFENSA", "VERTEIDIGUNG", "ЗАЩИТА"),
     "ui.st_mob": _T("HAREKET", "MOBILITY", "MOVILIDAD", "BEWEGUNG", "МОБИЛЬНОСТЬ"),
     "ui.st_eco": _T("KAZANÇ", "ECONOMY", "ECONOMÍA", "ERTRAG", "ДОХОД"),
+    "gd.flow_t": _T("BİR KOŞU NASIL GEÇER?", "HOW A RUN GOES", "ASÍ VA UNA PARTIDA", "SO LÄUFT EIN LAUF", "КАК ИДЁТ ЗАБЕГ"),
+    "gd.flow1.t": _T("ÖLDÜR", "KILL", "ELIMINA", "BESIEGE", "УБИВАЙ"),
+    "gd.flow1": _T("Silahların kendi ateş eder, sen nişan al ve kaç", "Weapons fire on their own - aim and dodge",
+                   "Las armas disparan solas: apunta y esquiva", "Waffen feuern selbst - zielen und ausweichen",
+                   "Оружие стреляет само - целься и уклоняйся"),
+    "gd.flow2.t": _T("TOPLA", "COLLECT", "RECOGE", "SAMMELN", "СОБИРАЙ"),
+    "gd.flow2": _T("Mavi taşlar deneyim, sarılar altın", "Blue gems are XP, yellow ones gold",
+                   "Gemas azules = XP, amarillas = oro", "Blaue Steine = EP, gelbe = Gold", "Синие - опыт, жёлтые - золото"),
+    "gd.flow3.t": _T("SEVİYE ATLA", "LEVEL UP", "SUBE DE NIVEL", "AUFSTEIGEN", "УРОВЕНЬ"),
+    "gd.flow3": _T("3 karttan birini seç: silah, kitap, evrim", "Pick 1 of 3: weapon, book, evolution",
+                   "Elige 1 de 3: arma, libro, evolución", "Wähle 1 von 3: Waffe, Buch, Evolution",
+                   "Выбери 1 из 3: оружие, книга, эволюция"),
+    "gd.flow4.t": _T("GÜÇLEN", "POWER UP", "MEJÓRATE", "STÄRKEN", "УСИЛЬСЯ"),
+    "gd.flow4": _T("B ile markete gir, altını harca", "Press B, spend gold in the shop",
+                   "Pulsa B y gasta oro en la tienda", "B drücken, Gold im Shop ausgeben", "Жми B, трать золото"),
+    "gd.flow5.t": _T("PATRONU YEN", "BEAT BOSSES", "VENCE JEFES", "BOSSE BESIEGEN", "ПОБЕЖДАЙ БОССОВ"),
+    "gd.flow5": _T("10. dalgadan sonra her 5 dalgada; sandık bırakır", "Every 5 waves from 10; they drop chests",
+                   "Cada 5 oleadas desde la 10; dejan cofres", "Alle 5 Wellen ab 10; sie lassen Truhen fallen",
+                   "Каждые 5 волн с 10-й; оставляют сундуки"),
+    "gd.flow6.t": _T("CEHENNEM", "HELL", "INFIERNO", "HÖLLE", "АД"),
+    "gd.flow6": _T("25. dalgada kapı açılır: evrimle gir", "The gate opens at wave 25: enter evolved",
+                   "La puerta se abre en la 25: entra evolucionado", "Das Tor öffnet in Welle 25: mit Evolution rein",
+                   "Врата на 25-й волне: входи с эволюцией"),
+    "gd.build_t": _T("EVRİM ÇİFTLERİ - SİLAH + EŞ KİTAP", "EVOLUTION PAIRS - WEAPON + PAIRED BOOK",
+                     "PAREJAS DE EVOLUCIÓN - ARMA + LIBRO", "EVOLUTIONSPAARE - WAFFE + PARTNERBUCH",
+                     "ПАРЫ ЭВОЛЮЦИИ - ОРУЖИЕ + КНИГА"),
+    "gd.tab_keys": _T("KONTROLLER", "CONTROLS", "CONTROLES", "STEUERUNG", "УПРАВЛЕНИЕ"),
+    "gd.tab_run": _T("KOŞU", "THE RUN", "LA PARTIDA", "DER LAUF", "ЗАБЕГ"),
+    "gd.tab_evo": _T("EVRİM", "EVOLUTION", "EVOLUCIÓN", "EVOLUTION", "ЭВОЛЮЦИЯ"),
+    "gd.tab_pro": _T("USTA İPUÇLARI", "PRO TIPS", "TRUCOS PRO", "PROFI-TIPPS", "СОВЕТЫ ПРО"),
+    "gd.replay_tut": _T("EĞİTİMİ TEKRAR OYNAT", "REPLAY TUTORIAL", "REPETIR TUTORIAL", "TUTORIAL WIEDERHOLEN", "ПОВТОРИТЬ ОБУЧЕНИЕ"),
+    "gd.evo_need": _T("Silah Lv{0} + eş kitap Lv{1}", "Weapon Lv{0} + paired book Lv{1}", "Arma Nv{0} + libro pareja Nv{1}",
+                      "Waffe St.{0} + Partnerbuch St.{1}", "Оружие Ур.{0} + парная книга Ур.{1}"),
+    "gd.evo_mult": _T("silah hasarı x{0}", "weapon damage x{0}", "daño del arma x{0}", "Waffenschaden x{0}", "урон оружия x{0}"),
+    "gd.evo_t1": _T("yeni görünüm + özel vuruş etkisi", "new look + special on-hit effect", "nuevo aspecto + efecto especial",
+                    "neues Aussehen + Spezialeffekt", "новый вид + особый эффект"),
+    "gd.evo_t2": _T("ikinci etki eklenir, renk değişir", "a second effect, new colours", "segundo efecto, nuevos colores",
+                    "zweiter Effekt, neue Farben", "второй эффект, новые цвета"),
+    "gd.evo_t3": _T("altın kademe: en güçlü hâli", "golden tier: its strongest form", "nivel dorado: su forma más fuerte",
+                    "goldene Stufe: stärkste Form", "золотой уровень: сильнейшая форма"),
+    "gd.evo_r1": _T("Şartlar tamam olunca seviye atlama kartlarında mor EVRİM kartı çıkar - seç, silah evrilsin.",
+                    "When the requirements are met, a purple EVOLUTION card shows up on level-up - pick it.",
+                    "Con los requisitos cumplidos aparece una carta morada de EVOLUCIÓN al subir de nivel.",
+                    "Sind die Bedingungen erfüllt, erscheint beim Aufstieg eine lila EVOLUTIONS-Karte.",
+                    "Когда условия выполнены, при повышении уровня появится фиолетовая карта ЭВОЛЮЦИИ."),
+    "gd.evo_r3": _T("Her silahın eş kitabı farklı: SİLAHLIK'ta silaha tıkla, EŞ KİTAP kartında yazar.",
+                    "Every weapon has its own paired book: click a weapon in the ARMORY to see it.",
+                    "Cada arma tiene su libro pareja: míralo en el ARSENAL.",
+                    "Jede Waffe hat ihr eigenes Partnerbuch: in der WAFFENKAMMER nachsehen.",
+                    "У каждого оружия своя парная книга: смотри в АРСЕНАЛЕ."),
+    "gd.evo_r4": _T("SİLAHLIK'taki EVRİMİ İZLE düğmesiyle her kademeyi canlı görebilirsin. Cehenneme evrimsiz girme!",
+                    "Watch every tier live with WATCH EVOLUTION in the ARMORY. Never enter Hell without one!",
+                    "Mira cada nivel en vivo con VER EVOLUCIÓN en el ARSENAL. ¡No entres al Infierno sin una!",
+                    "Mit EVOLUTION ANSEHEN in der WAFFENKAMMER siehst du jede Stufe live. Nie ohne in die Hölle!",
+                    "Смотри каждый уровень вживую кнопкой ЭВОЛЮЦИЯ в АРСЕНАЛЕ. Не входи в Ад без неё!"),
+    "gd.pro1.t": _T("DASH = ÖLÜMSÜZLÜK", "DASH = I-FRAMES", "IMPULSO = INVULNERABLE", "DASH = UNVERWUNDBAR", "РЫВОК = НЕУЯЗВИМОСТЬ"),
+    "gd.pro1": _T("Dash atarken hasar almazsın: kuşatıldığında düşmanların içinden geç.",
+                  "You take no damage while dashing: dash straight through a surrounding crowd.",
+                  "No recibes daño durante el impulso: atraviesa a la multitud.",
+                  "Beim Dash kein Schaden: einfach durch die Menge dashen.",
+                  "Во время рывка урона нет: прорывайся сквозь толпу."),
+    "gd.pro2.t": _T("KİTAP ERKEN", "BOOKS EARLY", "LIBROS PRONTO", "BÜCHER FRÜH", "КНИГИ РАНО"),
+    "gd.pro2": _T("Erken aldığın kitap Lv30'a kadar büyür ve evrimin anahtarıdır.",
+                  "Books picked early grow up to Lv30 and unlock evolutions.",
+                  "Los libros tempranos crecen hasta Nv30 y abren evoluciones.",
+                  "Früh gewählte Bücher wachsen bis St.30 und öffnen Evolutionen.",
+                  "Ранние книги растут до Ур.30 и открывают эволюции."),
+    "gd.pro3.t": _T("İKİ SİLAHA ODAKLAN", "FOCUS TWO WEAPONS", "CÉNTRATE EN DOS", "ZWEI WAFFEN FOKUS", "ДВА ОРУЖИЯ"),
+    "gd.pro3": _T("Koşuda en çok 2 silah evrilir: iki silahı Lv10-20-25'e yükselt, diğerleri destek.",
+                  "Only 2 weapons evolve per run: push two to Lv10-20-25, the rest are support.",
+                  "Solo 2 armas evolucionan por partida: sube dos a Nv10-20-25.",
+                  "Nur 2 Waffen entwickeln sich pro Lauf: zwei auf St.10-20-25 bringen.",
+                  "За забег эволюционируют лишь 2 оружия: качай два до 10-20-25."),
+    "gd.pro4.t": _T("ALTINI HARCA", "SPEND YOUR GOLD", "GASTA TU ORO", "GOLD AUSGEBEN", "ТРАТЬ ЗОЛОТО"),
+    "gd.pro4": _T("B ile markete gir: çekirdeklerin sınırı yok, her dalga arası biraz güç al.",
+                  "Open the shop with B: cores have no cap, buy a little power between waves.",
+                  "Abre la tienda con B: los núcleos no tienen tope.",
+                  "Shop mit B öffnen: Kerne haben kein Limit.",
+                  "Открой магазин на B: у ядер нет предела."),
+    "gd.pro5.t": _T("PATRON DANSI", "BOSS DANCE", "BAILE CON EL JEFE", "BOSS-TANZ", "ТАНЕЦ С БОССОМ"),
+    "gd.pro5": _T("Patronun etrafında daire çiz; saldırıdan hemen önce dash at. Sandığı kaçırma.",
+                  "Circle the boss and dash right before its attack lands. Grab its chest.",
+                  "Gira alrededor del jefe y usa el impulso justo antes del golpe.",
+                  "Kreise um den Boss und dashe kurz vor seinem Angriff.",
+                  "Кружи вокруг босса и делай рывок перед ударом."),
+    "gd.pro6.t": _T("CEHENNEM HAZIRLIĞI", "HELL PREP", "PREPARA EL INFIERNO", "HÖLLEN-VORBEREITUNG", "ПОДГОТОВКА К АДУ"),
+    "gd.pro6": _T("Cehennemde düşmanlar 2.5 kat dayanıklı: en az bir evrim ve dolu kitap yuvası şart.",
+                  "Hell enemies are 2.5x tougher: bring at least one evolution and full book slots.",
+                  "En el Infierno son 2,5x más duros: lleva una evolución y libros.",
+                  "In der Hölle sind Gegner 2,5x zäher: mind. eine Evolution mitbringen.",
+                  "В Аду враги в 2,5 раза крепче: нужна хотя бы одна эволюция."),
+    "gd.pro7.t": _T("GÖREVLER = ELMAS", "QUESTS = GEMS", "MISIONES = GEMAS", "AUFGABEN = EDELSTEINE", "ЗАДАНИЯ = КРИСТАЛЛЫ"),
+    "gd.pro7": _T("Sol taraftaki koşu görevleri elmas verir; elmasla skin, kıyafet ve ustalık alırsın.",
+                  "Run quests on the left pay gems - spend them on skins, outfits and mastery.",
+                  "Las misiones dan gemas para skins, ropa y maestría.",
+                  "Laufaufgaben geben Edelsteine für Skins, Outfits und Meisterschaft.",
+                  "Задания дают кристаллы на скины, одежду и мастерство."),
+    "gd.pro8.t": _T("TAKIM BONUSU", "SET BONUS", "BONUS DE SET", "SET-BONUS", "БОНУС НАБОРА"),
+    "gd.pro8": _T("Aynı takımdan şapka + gözlük + pelerin giy: üç parça ek bonus verir.",
+                  "Wear hat + glasses + cape from the same set for an extra 3-piece bonus.",
+                  "Lleva sombrero, gafas y capa del mismo set para un bonus extra.",
+                  "Hut + Brille + Umhang aus einem Set geben einen Extra-Bonus.",
+                  "Шляпа + очки + плащ из одного набора дают доп. бонус."),
     "ui.rc_title": _T("KOŞU KARNESİ", "RUN REPORT", "INFORME DE PARTIDA", "LAUFBERICHT", "ИТОГИ ЗАБЕГА"),
     "ui.rc_dps": _T("SANİYELİK HASAR", "DAMAGE / SEC", "DAÑO / SEG", "SCHADEN / SEK", "УРОН / СЕК"),
     "ui.rc_kpm": _T("DAKİKADA ÖLDÜRME", "KILLS / MIN", "BAJAS / MIN", "KILLS / MIN", "УБИЙСТВ / МИН"),
@@ -31609,6 +31712,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
 
     def do_bonk(self):
         DMG_SRC[0] = "bonk"
+        self.bonk_uses = getattr(self, "bonk_uses", 0) + 1
         p = self.player
         # yeşil dev - ezici darbe: 10 saniyede bir, bonk tüm arenayı kaplar ve
         # patronlar dışındaki her düşmanın canını yarıya indirir.
@@ -50204,6 +50308,21 @@ STRINGS.update({
                       "Muévete con WASD, apunta con el ratón, CLIC IZQUIERDO para disparar. ¡Elimina a un enemigo!",
                       "Laufen mit WASD, zielen mit der Maus, LINKSKLICK schießt. Erledige einen Gegner!",
                       "WASD - ходьба, мышь - прицел, ЛКМ - выстрел. Убей врага!"),
+    "tut.dash":    _T("Güzel! Şimdi SHIFT (ya da SAĞ TIK) ile DASH at: dash sırasında hasar almazsın, kuşatılınca içlerinden geç.",
+                      "Nice! Now DASH with SHIFT (or RIGHT CLICK): you take no damage while dashing - go right through a crowd.",
+                      "¡Bien! Ahora usa el IMPULSO con MAYÚS (o CLIC DER.): no recibes daño mientras lo haces.",
+                      "Gut! Jetzt mit UMSCHALT (oder RECHTSKLICK) DASHEN: währenddessen nimmst du keinen Schaden.",
+                      "Отлично! Теперь РЫВОК на SHIFT (или ПКМ): во время рывка урона нет."),
+    "tut.bonk":    _T("Bir de SPACE'e bas: BONK çevrendeki herkese vurur ve geri iter. Sıkıştığında hayat kurtarır!",
+                      "Now press SPACE: BONK hits and knocks back everything around you. A lifesaver when you're cornered!",
+                      "Ahora pulsa ESPACIO: el BONK golpea y empuja todo a tu alrededor.",
+                      "Jetzt LEERTASTE: BONK trifft und stößt alles um dich herum zurück.",
+                      "Теперь ПРОБЕЛ: БОНК бьёт и отталкивает всех вокруг."),
+    "tut.evo":     _T("Son sır: EVRİM! Bir silahı Lv10'a, eş kitabını Lv3'e çıkar - seviye atlarken mor EVRİM kartı çıkar. Mavi taşları topla, seviye atla, kart seç!",
+                      "Last secret: EVOLUTION! Get a weapon to Lv10 and its paired book to Lv3 - a purple EVOLUTION card appears on level-up. Grab blue gems, level up, pick cards!",
+                      "Último secreto: ¡EVOLUCIÓN! Arma a Nv10 + su libro pareja a Nv3 = carta morada de EVOLUCIÓN al subir de nivel.",
+                      "Letztes Geheimnis: EVOLUTION! Waffe auf St.10 + Partnerbuch auf St.3 = lila EVOLUTIONS-Karte beim Aufstieg.",
+                      "Последний секрет: ЭВОЛЮЦИЯ! Оружие Ур.10 + парная книга Ур.3 = фиолетовая карта ЭВОЛЮЦИИ."),
     "tut.shop":    _T("Harika! Şimdi B'ye bas: koşu marketi açılır.", "Nice shot! Now press B to open the run shop.",
                       "¡Bien! Pulsa B para abrir la tienda.", "Stark! Drück B für den Laden.", "Отлично! Жми B - откроется магазин."),
     "tut.shop2":   _T("Topladığın altınla burada güçlenirsin. ESC ya da B ile kapat, oyuna dön.",
@@ -50215,8 +50334,183 @@ STRINGS.update({
                       "¡Eso es todo! ¡A disfrutar!", "Das war's - viel Spaß!", "Вот и всё - удачи!"),
 })
 
+# ---- koç ipuçları ----
+# Eğitimden sonra da yeni oyuncu yalnız kalmasın: bir durum ilk kez
+# yaşandığında (ilk seviye atlama, can azalınca, ilk patron, evrim kartı...)
+# kısa bir ipucu kartı çıkar. Her ipucu bir kez gösterilir (kayda yazılır);
+# Rehber'deki "EĞİTİMİ TEKRAR OYNAT" hepsini sıfırlar.
+STRINGS.update({
+    "tip.title": _T("İPUCU", "TIP", "CONSEJO", "TIPP", "СОВЕТ"),
+    "tip.levelup": _T("Bir kart seç (1-2-3 tuşları da olur). SİLAH yeni silah verir, KİTAP bütün silahlarını güçlendirir. Beğenmezsen YENİLE.",
+                      "Pick a card (keys 1-2-3 work too). WEAPON adds a gun, BOOK boosts all your weapons. Don't like them? REROLL.",
+                      "Elige una carta (teclas 1-2-3). ARMA añade un arma, LIBRO mejora todas. ¿No te gustan? RENOVAR.",
+                      "Wähle eine Karte (Tasten 1-2-3). WAFFE gibt eine neue Waffe, BUCH stärkt alle. Gefällt nichts? NEU MISCHEN.",
+                      "Выбери карту (клавиши 1-2-3). ОРУЖИЕ - новое оружие, КНИГА усиливает всё. Не нравится? ОБНОВИТЬ."),
+    "tip.lowhp": _T("Canın azaldı! SHIFT ile dash at - dash anında hasar almazsın. Can kitabı ve Can Çekirdeği hayat kurtarır.",
+                    "Low health! DASH with SHIFT - you're untouchable while dashing. Health books and Health Cores save lives.",
+                    "¡Poca vida! Usa el IMPULSO (MAYÚS): eres invulnerable. Libros y núcleos de vida salvan partidas.",
+                    "Wenig Leben! Mit UMSCHALT dashen - dabei unverwundbar. Lebensbücher und -kerne retten Läufe.",
+                    "Мало здоровья! Рывок на SHIFT - во время него ты неуязвим. Книги и ядра здоровья спасают."),
+    "tip.boss": _T("PATRON geldi! Ondan kaçılmaz: etrafında daire çiz, saldırısından hemen önce dash at. Ölünce sandık bırakır.",
+                   "A BOSS is here! You can't outrun it: circle around and dash right before it strikes. It drops a chest.",
+                   "¡Llegó un JEFE! No puedes huir: rodéalo y usa el impulso justo antes del golpe. Suelta un cofre.",
+                   "Ein BOSS! Weglaufen geht nicht: umkreise ihn und dashe kurz vor dem Angriff. Er lässt eine Truhe fallen.",
+                   "БОСС! От него не убежать: кружи вокруг и делай рывок перед ударом. Оставит сундук."),
+    "tip.gold": _T("Altının birikti: B ile markete gir. Çekirdeklerin sınırı yok, her dalga arası biraz güç al.",
+                   "Your gold is piling up: press B for the shop. Cores have no cap - buy a little power every wave.",
+                   "Tienes oro: pulsa B para la tienda. Los núcleos no tienen tope.",
+                   "Dein Gold stapelt sich: B für den Shop. Kerne haben kein Limit.",
+                   "Золото копится: жми B - магазин. У ядер нет предела."),
+    "tip.evo_card": _T("Mor EVRİM kartı! Seçersen silahın evrilir: yeni görünüm, özel etki ve çok daha fazla hasar.",
+                       "A purple EVOLUTION card! Pick it and your weapon evolves: new look, special effect and far more damage.",
+                       "¡Carta morada de EVOLUCIÓN! Elígela: nuevo aspecto, efecto especial y mucho más daño.",
+                       "Eine lila EVOLUTIONS-Karte! Wähle sie: neues Aussehen, Spezialeffekt, viel mehr Schaden.",
+                       "Фиолетовая карта ЭВОЛЮЦИИ! Выбери её: новый вид, особый эффект и намного больше урона."),
+    "tip.evo_near": _T("{0} Lv{1}! Lv10 olunca eş kitabı {2} Lv3 ise seviye atlarken EVRİM kartı çıkar.",
+                       "{0} is Lv{1}! At Lv10, with its paired book {2} at Lv3, an EVOLUTION card appears on level-up.",
+                       "¡{0} Nv{1}! En Nv10, con su libro {2} en Nv3, aparece una carta de EVOLUCIÓN.",
+                       "{0} St.{1}! Mit St.10 und Partnerbuch {2} auf St.3 erscheint eine EVOLUTIONS-Karte.",
+                       "{0} Ур.{1}! На Ур.10 при книге {2} Ур.3 появится карта ЭВОЛЮЦИИ."),
+    "tip.no_books": _T("Henüz kitabın yok: kitaplar bütün silahlarını büyütür ve evrimin anahtarıdır. Seviye atlarken kitap da seç.",
+                       "No books yet: books power up every weapon and unlock evolutions. Pick some on level-up.",
+                       "Aún no tienes libros: mejoran todas las armas y abren evoluciones.",
+                       "Noch keine Bücher: Bücher stärken alle Waffen und öffnen Evolutionen.",
+                       "Пока нет книг: книги усиливают всё оружие и открывают эволюции."),
+    "tip.hell": _T("CEHENNEM KAPISI açıldı (mor portal, E). İçeride düşmanlar 2.5 kat dayanıklı: en az bir evrimle gir.",
+                   "The HELL GATE is open (purple portal, E). Enemies inside are 2.5x tougher - go in with an evolution.",
+                   "La PUERTA DEL INFIERNO está abierta (portal morado, E). Entra con al menos una evolución.",
+                   "Das HÖLLENTOR ist offen (lila Portal, E). Geh mit mindestens einer Evolution hinein.",
+                   "ВРАТА АДА открыты (фиолетовый портал, E). Входи хотя бы с одной эволюцией."),
+    "tip.event": _T("Dalga olayı! Üstteki şerit ne olduğunu ve kalan süreyi gösterir - bazıları ödül, bazıları tehlike.",
+                    "Wave event! The strip at the top shows what it is and how long it lasts - some reward, some threaten.",
+                    "¡Evento de oleada! La barra superior muestra cuál es y cuánto dura.",
+                    "Wellen-Ereignis! Die Leiste oben zeigt, was es ist und wie lange es dauert.",
+                    "Событие волны! Полоска сверху показывает, что это и сколько продлится."),
+})
+
+
+class CoachTips:
+    """İlk kez yaşanan durumlara kısa ipucu kartı (her ipucu bir kez)."""
+    SHOW_T = 7.0
+
+    def __init__(self, app):
+        self.app = app
+        self.cur = None          # (anahtar, metin, kalan süre)
+        self.check_t = 0.0
+        self.lowhp_t = 0.0
+
+    def _seen(self):
+        st = self.app.save.data.setdefault("settings", {})
+        sv = st.get("tips_seen")
+        if not isinstance(sv, list):
+            sv = st["tips_seen"] = []
+        return sv
+
+    def _show(self, key, text):
+        seen = self._seen()
+        if key in seen:
+            return False
+        seen.append(key)
+        self.cur = [key, text, self.SHOW_T]
+        sfx("click", 0.45, 0.0)
+        return True
+
+    def update(self, dt):
+        a = self.app
+        if self.cur is not None:
+            self.cur[2] -= dt
+            # kart ipuçları kart ekranı kapanınca kalmasın
+            if self.cur[2] <= 0 or (self.cur[0] in ("levelup", "evo_card") and a.state != STATE_LEVELUP):
+                self.cur = None
+        run = a.run
+        if (run is None or a.coop is not None or getattr(a, "shadow", False)
+                or (a.tut is not None and a.tut.active)):
+            return
+        self.check_t -= dt
+        if self.check_t > 0 or self.cur is not None:
+            return
+        self.check_t = 0.3
+        p = run.player
+        st = a.state
+        try:
+            if st == STATE_LEVELUP:
+                if any(c.get("kind") == "evo" for c in (run.levelup_choices or ())):
+                    if self._show("evo_card", L("tip.evo_card")):
+                        return
+                self._show("levelup", L("tip.levelup"))
+                return
+            if st != STATE_PLAY or not p.alive:
+                return
+            if p.hp < p.max_hp * 0.35:
+                self.lowhp_t += 0.3
+                if self.lowhp_t > 0.6 and self._show("lowhp", L("tip.lowhp")):
+                    return
+            else:
+                self.lowhp_t = 0.0
+            if any(b.alive for b in run.bosses) and self._show("boss", L("tip.boss")):
+                return
+            if run.hell_portal is not None and self._show("hell", L("tip.hell")):
+                return
+            if getattr(run, "wave_event", None) and self._show("event", L("tip.event")):
+                return
+            if getattr(run, "gold_wallet", 0) >= 80 and self._show("gold", L("tip.gold")):
+                return
+            if not getattr(p, "evolved", None):
+                for k_, lv in p.weapons.items():
+                    if lv >= 7 and k_ in EVOLUTIONS and k_ in WEAPON_BY_KEY:
+                        if self._show("evo_near", L("tip.evo_near", w_name(WEAPON_BY_KEY[k_]), lv,
+                                                    evo_book_name(k_))):
+                            return
+                        break
+            if (getattr(run, "run_time", 0.0) > 150 and not p.books
+                    and self._show("no_books", L("tip.no_books"))):
+                return
+        except Exception:
+            pass
+
+    def draw(self, canvas):
+        c = self.cur
+        if c is None:
+            return
+        a = self.app
+        if a.state not in (STATE_PLAY, STATE_LEVELUP):
+            return
+        k = clamp(c[2] / 0.4, 0.0, 1.0) * clamp((self.SHOW_T - c[2]) / 0.25, 0.0, 1.0)
+        if k <= 0.02:
+            return
+        w = 420
+        lines = wrap_text(c[1], 13, w - 70)[:4]
+        h = 40 + 17 * len(lines)
+        box = pygame.Rect(0, 0, w, h)
+        if a.state == STATE_LEVELUP:
+            box.midbottom = (VIRTUAL_W // 2, VIRTUAL_H - 8)
+        else:
+            # sol tarafta, koşu görevlerinin altında (karakterin ve duyuruların uzağında)
+            box.topleft = (12, 372)
+        box = box.move(int(-30 * (1 - k)) if a.state != STATE_LEVELUP else 0, 0)
+        surf = pygame.Surface(box.size, pygame.SRCALPHA)
+        pygame.draw.rect(surf, (22, 30, 44, 236), surf.get_rect(), border_radius=12)
+        pygame.draw.rect(surf, (255, 214, 90, 255), surf.get_rect(), 2, border_radius=12)
+        surf.set_alpha(int(255 * k))
+        canvas.blit(surf, box.topleft)
+        cx, cy = box.x + 26, box.y + 22
+        add_glow(canvas, cx, cy, 22, GOLD, 0.25 * k)
+        # ampul
+        circle_aa(canvas, cx, cy - 2, 9, (255, 226, 120))
+        pygame.draw.rect(canvas, (200, 190, 170), (cx - 5, cy + 6, 10, 6), border_radius=2)
+        draw_text(canvas, L("tip.title"), (box.x + 48, box.y + 9), 12, GOLD, bold=True, shadow=False,
+                  alpha=int(255 * k))
+        # kalan süre çizgisi
+        fr = clamp(c[2] / self.SHOW_T, 0.0, 1.0)
+        pygame.draw.line(canvas, (255, 214, 90), (box.x + 48 + 52, box.y + 16),
+                         (box.x + 48 + 52 + int((w - 120) * fr), box.y + 16), 2)
+        for j, ln in enumerate(lines):
+            draw_text(canvas, ln, (box.x + 48, box.y + 28 + j * 17), 13, (232, 236, 246), shadow=False,
+                      alpha=int(255 * k))
+
+
 TUT_STEPS = ("welcome", "codex", "codex2", "back", "skin", "skin2", "skin3", "skin4", "play", "map",
-             "move", "shop", "shop2", "done")
+             "move", "dash", "bonk", "shop", "shop2", "evo", "done")
 TUT_FREE_SKIN = "ranger"
 
 
@@ -50229,6 +50523,7 @@ class Tutorial:
         self.t = 0.0
         self.active = True
         self._btns = []
+        self._base = (0, 0)
 
     @property
     def step(self):
@@ -50238,6 +50533,10 @@ class Tutorial:
         if name in TUT_STEPS:
             self.i = TUT_STEPS.index(name)
             self.t = 0.0
+            # adım başındaki sayaçlar (dash / bonk adımları "yeni" basışı bekler)
+            run = self.app.run
+            self._base = ((run.player.dash_count, getattr(run, "bonk_uses", 0)) if run is not None
+                          else (0, 0))
             sfx("click", 0.5, 0.0)
 
     def finish(self):
@@ -50312,11 +50611,15 @@ class Tutorial:
         elif s_ == "map" and st == STATE_MENU:
             self.go("play")
         elif s_ == "move" and run is not None and int(getattr(run, "kills", 0)) >= 1:
+            self.go("dash")
+        elif s_ == "dash" and run is not None and run.player.dash_count > self._base[0]:
+            self.go("bonk")
+        elif s_ == "bonk" and run is not None and getattr(run, "bonk_uses", 0) > self._base[1]:
             self.go("shop")
         elif s_ == "shop" and st == STATE_RUN_SHOP:
             self.go("shop2")
         elif s_ == "shop2" and st == STATE_PLAY:
-            self.go("done")
+            self.go("evo")
         elif s_ == "done" and self.t > 4.5:
             self.finish()
         s_ = self.step
@@ -50335,6 +50638,9 @@ class Tutorial:
             "move": (STATE_PLAY, None, "tut.move", None),
             "shop": (STATE_PLAY, None, "tut.shop", None),
             "shop2": (STATE_RUN_SHOP, None, "tut.shop2", None),
+            "dash": (STATE_PLAY, None, "tut.dash", None),
+            "bonk": (STATE_PLAY, None, "tut.bonk", None),
+            "evo": (STATE_PLAY, None, "tut.evo", "next"),
             "done": (STATE_PLAY, None, "tut.done", None),
         }
         return table.get(s_)
@@ -50356,6 +50662,8 @@ class Tutorial:
             self.go("codex")
         elif s_ == "codex2":
             self.go("back")
+        elif s_ == "evo":
+            self.go("done")
 
     def _skip(self):
         sfx("click", 0.6, 0.0)
@@ -51031,6 +51339,7 @@ class App:
         except Exception:
             self.tut = None
         self.shop_ui = RunShopOverlay()
+        self.coach = CoachTips(self)
         # L ile açılan sol alt sohbet/komut kutusu (hile kodu da buradan).
         self.chat = ChatConsole()
         self.online = OnlineClient(ONLINE_API_URL) if not self.shadow else _TourOnline()
@@ -51868,6 +52177,11 @@ class App:
                     self.tut.finish()
             if not self.tut.active:
                 self.tut = None
+        try:
+            self.coach.update(dt)
+            self.coach.draw(self.display.canvas)
+        except Exception as e:
+            log_net_error("coach", e, ("coach", ""))
         try:
             self.social.draw_overlay(self.display.canvas, mouse_pos, self.t)
         except Exception as e:
@@ -56169,45 +56483,221 @@ class App:
             b.click(mouse_pos)
 
     def update_howto(self, dt, mouse_pos, clicked):
+        """Rehber: dört sekme - kontroller, koşu, evrim, usta ipuçları."""
         canvas = self.display.canvas
         self.bg.draw(canvas)
         panel_rect = pygame.Rect(0, 0, 1216, 676)
         panel_rect.center = (VIRTUAL_W / 2, VIRTUAL_H / 2)
         panel(canvas, panel_rect, alpha=245)
         draw_text(canvas, L("ui.howto"), (panel_rect.centerx, panel_rect.y + 24), 27, CYAN, bold=True, center=True)
+        tabs = (("keys", L("gd.tab_keys")), ("run", L("gd.tab_run")),
+                ("evo", L("gd.tab_evo")), ("pro", L("gd.tab_pro")))
+        cur = getattr(self, "guide_tab", "keys")
+        tw, gap = 200, 10
+        x0 = panel_rect.centerx - (len(tabs) * tw + (len(tabs) - 1) * gap) / 2
+        for i, (k_, lab) in enumerate(tabs):
+            r_ = pygame.Rect(int(x0 + i * (tw + gap)), panel_rect.y + 50, tw, 34)
+            on = k_ == cur
+            hov = r_.collidepoint(mouse_pos)
+            pygame.draw.rect(canvas, (58, 92, 110) if on else ((60, 44, 46) if hov else (44, 32, 34)), r_,
+                             border_radius=9)
+            ink_frame(canvas, r_, CYAN if on else None, 9, 2)
+            draw_text(canvas, lab, r_.center, 13, WHITE if on else TEXT_DIM, bold=True, center=True,
+                      shadow=False)
+            if clicked and hov and not on:
+                self.guide_tab = k_
+                cur = k_
+                sfx("click", 0.5, 0.0)
+        body = pygame.Rect(panel_rect.x + 30, panel_rect.y + 100, panel_rect.w - 60, panel_rect.h - 166)
         w_, b_, r_ = MAX_RUN_WEAPONS, MAX_RUN_BOOKS, MAX_RUN_RARE_BOOKS
-        lines = [(_pick(t).format(w=w_, b=b_, r=r_), _pick(d).format(w=w_, b=b_, r=r_))
-                 for t, d in (HOWTO_TOUCH if MOBILE else HOWTO_KEYS) + HOWTO_GAME]
-        # Maddeler üç sütuna bölünür; satır aralığı sütun başına düşen madde
-        # sayısına göre hesaplanır, böylece yeni madde eklenince yazılar ne
-        # panelin dışına taşar ne de birbirinin üstüne biner.
-        NCOL = 3
-        list_top = panel_rect.y + 64
-        list_bottom = panel_rect.bottom - 64      # geri düğmesine yer bırak
-        per_col = (len(lines) + NCOL - 1) // NCOL
-        step = clamp((list_bottom - list_top) / max(1, per_col), 27, 66)
-        pad = 26
-        col_w = (panel_rect.w - pad * 2) / NCOL
-        for i, (title, desc) in enumerate(lines):
-            ci = min(NCOL - 1, i // per_col)
-            cx = panel_rect.x + pad + ci * col_w
-            y = list_top + (i % per_col) * step
-            draw_text(canvas, _fit_text(title, 14, col_w - 18, bold=True), (cx, y), 14,
-                      GOLD, bold=True)
-            draw_text(canvas, _fit_text(desc, 11, col_w - 18), (cx, y + 18), 11,
-                      TEXT_DIM, shadow=False)
-            # sütunlar arası ince ayraç
-            if ci and i % per_col == 0:
-                lx_ = cx - 13
-                pygame.draw.line(canvas, (86, 63, 65), (lx_, list_top - 6),
-                                 (lx_, list_top + (per_col - 1) * step + 24), 1)
+        if cur == "keys":
+            rows = [(_pick(t), _pick(d)) for t, d in (HOWTO_TOUCH if MOBILE else HOWTO_KEYS)]
+            icons = ("boot", "target", "fist", "dash", "coin", "star", "gem", "cross")
+            self._guide_cards(canvas, pygame.Rect(body.x, body.y, body.w, 330), rows, icons, 2, CYAN,
+                              keycap=True)
+            self._guide_flow(canvas, pygame.Rect(body.x, body.y + 350, body.w, body.h - 350))
+        elif cur == "run":
+            rows = [(_pick(t).format(w=w_, b=b_, r=r_), _pick(d).format(w=w_, b=b_, r=r_))
+                    for t, d in HOWTO_GAME]
+            icons = ("orbit", "star", "sword", "bolt", "skull", "skull", "coin", "coin", "ghost", "flame",
+                     "clover", "gem", "book", "heart", "shield", "target")
+            self._guide_cards(canvas, body, rows, icons, 2, GOLD)
+        elif cur == "evo":
+            self._guide_evo(canvas, body)
+        else:
+            rows = [(L("gd.pro%d.t" % i), L("gd.pro%d" % i)) for i in range(1, 9)]
+            self._guide_cards(canvas, pygame.Rect(body.x, body.y, body.w, 330), rows,
+                              ("dash", "book", "sword", "coin", "skull", "flame", "star", "heart"), 2,
+                              (150, 230, 170), numbered=True)
+            self._guide_build(canvas, pygame.Rect(body.x, body.y + 350, body.w, body.h - 350))
 
-        btn = Button((panel_rect.centerx - 100, panel_rect.bottom - 52, 200, 40), L("ui.back"),
-                     lambda: self.set_state(STATE_SETTINGS if self.prev_state == STATE_SETTINGS else STATE_MENU))
-        btn.update(mouse_pos, dt)
-        btn.draw(canvas)
-        if clicked:
-            btn.click(mouse_pos)
+        back = Button((panel_rect.centerx + 10, panel_rect.bottom - 52, 200, 40), L("ui.back"),
+                      lambda: self.set_state(STATE_SETTINGS if self.prev_state == STATE_SETTINGS else STATE_MENU))
+        again = Button((panel_rect.centerx - 230, panel_rect.bottom - 52, 220, 40), L("gd.replay_tut"),
+                       self._replay_tutorial)
+        for btn in (again, back):
+            btn.update(mouse_pos, dt)
+            btn.draw(canvas)
+            if clicked:
+                btn.click(mouse_pos)
+
+    def _replay_tutorial(self):
+        """Rehberden eğitimi baştan başlatır (menüden, karşılama kartıyla)."""
+        try:
+            self.save.data.setdefault("settings", {})["tut_done"] = False
+            self.save.data["settings"]["tips_seen"] = []
+        except Exception:
+            pass
+        self.set_state(STATE_MENU)
+        self.tut = Tutorial(self)
+
+    def _guide_cards(self, canvas, body, rows, icons, ncol, col, keycap=False, numbered=False):
+        """Rehber sayfası: (başlık, açıklama) maddeleri simgeli kartlar hâlinde."""
+        n = len(rows)
+        per = (n + ncol - 1) // ncol
+        gap = 10
+        cw = (body.w - gap * (ncol - 1)) / ncol
+        ch = min(70, (body.h - gap * (per - 1)) / max(1, per))
+        for i, (title, desc) in enumerate(rows):
+            c_, r_ = i // per, i % per
+            card = pygame.Rect(int(body.x + c_ * (cw + gap)), int(body.y + r_ * (ch + gap)), int(cw), int(ch))
+            pygame.draw.rect(canvas, (40, 30, 32), card, border_radius=10)
+            ink_frame(canvas, card, scale_col(col, 0.35), 10, 1)
+            ic = icons[i % len(icons)]
+            cx_ = card.x + 30
+            add_glow(canvas, cx_, card.centery, 26, col, 0.10)
+            if numbered:
+                circle_aa(canvas, cx_, card.centery, 15, scale_col(col, 0.30))
+                ring_aa(canvas, cx_, card.centery, 15, col, 2)
+                draw_text(canvas, str(i + 1), (cx_, card.centery), 15, col, bold=True, center=True, shadow=False)
+            else:
+                draw_icon(canvas, cx_, card.centery, ic, col, 11)
+            tx = card.x + 58
+            avail = card.right - tx - 12
+            if keycap:
+                kw = min(avail, text_width(title, 13, True) + 22)
+                kr = pygame.Rect(tx, card.y + 8, int(kw), 24)
+                pygame.draw.rect(canvas, (20, 16, 18), kr.move(0, 3), border_radius=6)
+                pygame.draw.rect(canvas, (226, 222, 210), kr, border_radius=6)
+                pygame.draw.rect(canvas, (150, 144, 132), kr, 1, border_radius=6)
+                draw_text(canvas, _fit_text(title, 13, kr.w - 12, bold=True), kr.center, 13, (40, 34, 30),
+                          bold=True, center=True, shadow=False)
+                dy = card.y + 38
+            else:
+                draw_text(canvas, _fit_text(title, 14, avail, bold=True), (tx, card.y + 9), 14, col,
+                          bold=True, shadow=False)
+                dy = card.y + 30
+            lines = wrap_text(desc, 12, avail)[:max(1, int((card.bottom - dy) // 15))]
+            for j, ln in enumerate(lines):
+                draw_text(canvas, ln, (tx, dy + j * 15), 12, (214, 206, 196), shadow=False)
+
+    def _guide_flow(self, canvas, box):
+        """Rehber: bir koşunun akışı - altı adım, oklarla."""
+        draw_text(canvas, L("gd.flow_t"), (box.x, box.y), 14, GOLD, bold=True, shadow=False)
+        steps = (("skull", (255, 120, 110)), ("gem", (120, 220, 255)), ("star", (200, 150, 255)),
+                 ("coin", GOLD), ("sword", (255, 170, 90)), ("flame", (255, 90, 60)))
+        n = len(steps)
+        gap = 26
+        cw = (box.w - gap * (n - 1)) / n
+        y = box.y + 26
+        h = max(90, min(124, box.h - 30))
+        for i, (ic, col) in enumerate(steps):
+            r_ = pygame.Rect(int(box.x + i * (cw + gap)), y, int(cw), h)
+            pygame.draw.rect(canvas, (40, 30, 32), r_, border_radius=12)
+            ink_frame(canvas, r_, scale_col(col, 0.6), 12, 2)
+            add_glow(canvas, r_.centerx, r_.y + 30, 34, col, 0.14)
+            draw_icon(canvas, r_.centerx, r_.y + 30, ic, col, 14)
+            draw_text(canvas, _fit_text(L("gd.flow%d.t" % (i + 1)), 13, r_.w - 12, bold=True),
+                      (r_.centerx, r_.y + 58), 13, col, bold=True, center=True, shadow=False)
+            for j, ln in enumerate(wrap_text(L("gd.flow%d" % (i + 1)), 11, r_.w - 14)[:3]):
+                draw_text(canvas, ln, (r_.centerx, r_.y + 76 + j * 14), 11, (206, 198, 188), center=True,
+                          shadow=False)
+            if i < n - 1:
+                ax = r_.right + gap / 2
+                pygame.draw.polygon(canvas, GOLD, [(ax - 6, r_.centery - 8), (ax + 6, r_.centery),
+                                                   (ax - 6, r_.centery + 8)])
+
+    def _guide_build(self, canvas, box):
+        """Rehber - örnek takım: dört silah ve her birinin eş kitabı (evrim çiftleri)."""
+        draw_text(canvas, L("gd.build_t"), (box.x, box.y), 14, (150, 230, 170), bold=True, shadow=False)
+        keys = [k_ for k_ in ("axe", "tesla", "whip", "pentagram") if k_ in WEAPON_BY_KEY and k_ in EVOLUTIONS]
+        n = max(1, len(keys))
+        gap = 18
+        cw = (box.w - gap * (n - 1)) / n
+        y = box.y + 26
+        h = max(96, min(124, box.h - 30))
+        for i, k_ in enumerate(keys):
+            w = WEAPON_BY_KEY[k_]
+            bk = BOOK_BY_KEY.get(EVOLUTIONS[k_][0])
+            col = evo_color(k_, 2)
+            r_ = pygame.Rect(int(box.x + i * (cw + gap)), y, int(cw), h)
+            pygame.draw.rect(canvas, (40, 30, 32), r_, border_radius=12)
+            ink_frame(canvas, r_, scale_col(col, 0.6), 12, 2)
+            draw_weapon_emblem(canvas, r_.x + 46, r_.y + 46, 54, w, self.t, locked=False, glow=False)
+            draw_text(canvas, "+", (r_.centerx, r_.y + 46), 24, GOLD, bold=True, center=True)
+            if bk:
+                draw_book(canvas, r_.right - 46, r_.y + 46, 50, bk, self.t, locked=False, glow=False)
+            draw_text(canvas, _fit_text(evo_name(k_, 1), 13, r_.w - 16, bold=True), (r_.centerx, r_.y + 84),
+                      13, col, bold=True, center=True, shadow=False)
+            if bk:
+                draw_text(canvas, _fit_text(w_name(w) + " + " + bk_name(bk), 11, r_.w - 16),
+                          (r_.centerx, r_.y + 102), 11, TEXT_DIM, center=True, shadow=False)
+
+    def _guide_evo(self, canvas, body):
+        """Rehber - evrim sayfası: silah + eş kitap = evrim şeması ve üç kademe."""
+        key = "axe"
+        w = WEAPON_BY_KEY.get(key)
+        bk = BOOK_BY_KEY.get(EVOLUTIONS[key][0])
+        t = self.t
+        cy = body.y + 92
+        cx = body.centerx
+        # şema: SİLAH Lv10  +  EŞ KİTAP Lv3  =  EVRİM
+        xs = (cx - 330, cx - 110, cx + 190)
+        if w:
+            draw_weapon_emblem(canvas, xs[0], cy, 110, w, t, locked=False, glow=True)
+            draw_text(canvas, w_name(w) + "  Lv 10", (xs[0], cy + 70), 15, TEXT, bold=True, center=True)
+        draw_text(canvas, "+", ((xs[0] + xs[1]) / 2, cy), 40, GOLD, bold=True, center=True)
+        if bk:
+            draw_book(canvas, xs[1], cy, 96, bk, t, locked=False, glow=True)
+            draw_text(canvas, bk_name(bk) + "  Lv 3", (xs[1], cy + 70), 15, TEXT, bold=True, center=True)
+        draw_text(canvas, "=", ((xs[1] + xs[2]) / 2 - 20, cy), 40, GOLD, bold=True, center=True)
+        ecol = evo_color(key, 3)
+        pul = 0.5 + 0.5 * math.sin(t * 3)
+        add_glow(canvas, xs[2], cy, 120 + 10 * pul, ecol, 0.30)
+        if w:
+            draw_weapon_emblem(canvas, xs[2], cy, 118, w, t, locked=False, glow=True)
+        for i in range(8):
+            a = t * 1.2 + i * math.tau / 8
+            circle_aa(canvas, xs[2] + math.cos(a) * 70, cy + math.sin(a) * 70, 2.5, lighten(ecol, 0.3))
+        draw_text(canvas, evo_name(key, 1), (xs[2], cy + 70), 17, ecol, bold=True, center=True)
+        # üç kademe kartı
+        ty = body.y + 190
+        cw = (body.w - 20) / 3.0
+        for i in range(3):
+            tier = i + 1
+            col = evo_color(key, tier)
+            r_ = pygame.Rect(int(body.x + i * (cw + 10)), ty, int(cw), 112)
+            pygame.draw.rect(canvas, (40, 30, 32), r_, border_radius=12)
+            ink_frame(canvas, r_, col, 12, 2)
+            circle_aa(canvas, r_.x + 34, r_.y + 34, 20, (22, 16, 20))
+            ring_aa(canvas, r_.x + 34, r_.y + 34, 20, col, 3)
+            draw_text(canvas, ("I", "II", "III")[i], (r_.x + 34, r_.y + 34), 16, lighten(col, 0.3), bold=True,
+                      center=True, shadow=False)
+            draw_text(canvas, _fit_text(evo_name(key, tier), 16, r_.w - 80, bold=True), (r_.x + 66, r_.y + 16),
+                      16, col, bold=True, shadow=False)
+            draw_text(canvas, L("gd.evo_need", EVO_TIER_LEVEL[i], EVO_TIER_BOOK[i]), (r_.x + 66, r_.y + 40),
+                      12, TEXT, shadow=False)
+            draw_text(canvas, L("gd.evo_mult", "%g" % EVO_TIER_MULT[i]), (r_.x + 16, r_.y + 68), 13, GOLD,
+                      bold=True, shadow=False)
+            draw_text(canvas, _fit_text(L("gd.evo_t%d" % tier), 12, r_.w - 32), (r_.x + 16, r_.y + 88), 12,
+                      (206, 196, 186), shadow=False)
+        # kurallar
+        ry = ty + 128
+        rules = [L("gd.evo_r1"), L("evo.rule", EVO_MIN_WEAPONS, EVO_MAX_PER_RUN), L("gd.evo_r3"),
+                 L("gd.evo_r4")]
+        for j, ln in enumerate(rules):
+            draw_icon(canvas, body.x + 18, ry + 9 + j * 32, "star", (200, 150, 255), 6)
+            draw_text(canvas, _fit_text(ln, 14, body.w - 50), (body.x + 34, ry + j * 32), 14, TEXT, shadow=False)
 
     # ---- ayarlar ----
     def _set_row(self, canvas, rect, label, value, vcol, mouse_pos, clicked):
