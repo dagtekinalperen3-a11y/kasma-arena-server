@@ -74,6 +74,10 @@ def _client_ip():
     return request.remote_addr or "?"
 
 
+# Dünya sıralamasının tutulduğu Supabase tablosu.
+WORLD_TABLE = "dunya_siralamasi"
+
+
 def _oops(e, msg="sunucu hatası", code=500):
     """Hatayı sunucu günlüğüne yazar, oyuncuya sabit bir metin + iz kimliği döner."""
     ref = uuid.uuid4().hex[:8]
@@ -421,7 +425,7 @@ def diag():
                         "best_score", "best_wave", "total_kills", "runs",
                         "skin_count", "pet_count", "data", "updated_at"],
         "player_events": ["account_id", "at", "kind", "delta", "total", "note"],
-        "scores": ["name", "score", "kills", "wave", "run_time", "created_at",
+        "dunya_siralamasi": ["name", "score", "kills", "wave", "run_time", "created_at",
                    "account_id", "skin", "details"],      # supabase_leaderboard.sql
         # arkadaşlar / mesajlar / 2 kişilik sıralama - VERITABANI_SOSYAL.sql
         "friends": ["id", "a", "b", "status", "created_at"],
@@ -1033,7 +1037,7 @@ def _is_banned(account_id):
 def _wipe_scores(account_id):
     """Hesabın sıralamadaki bütün skorlarını siler."""
     try:
-        supabase.table("scores").delete().eq("account_id", account_id).execute()
+        supabase.table(WORLD_TABLE).delete().eq("account_id", account_id).execute()
     except Exception:
         pass
 
@@ -2003,7 +2007,7 @@ def get_scores():
         mobile = request.args.get("platform") == "mobile"
 
         def _q(cols, plat=True):
-            q = supabase.table("scores").select(cols)
+            q = supabase.table(WORLD_TABLE).select(cols)
             if plat:
                 # SQL 5. bölümden sonra sütun not null, varsayılan 'pc'.
                 q = q.eq("platform", "mobile") if mobile else q.neq("platform", "mobile")
@@ -2187,7 +2191,7 @@ def add_score():
                 payload["details"] = build
                 payload["skin"] = skin
         try:
-            supabase.table("scores").insert(payload).execute()
+            supabase.table(WORLD_TABLE).insert(payload).execute()
         except Exception as e:
             es = str(e)
             if "platform" in es:
@@ -2198,13 +2202,13 @@ def add_score():
                     return jsonify({"success": False,
                                     "error": "mobil sıralama henüz açılmadı"}), 503
                 payload.pop("platform", None)
-                supabase.table("scores").insert(payload).execute()
+                supabase.table(WORLD_TABLE).insert(payload).execute()
             # Supabase'e "details"/"skin" sütunları henüz eklenmemişse skor
             # kartsız yine yazılsın.
             elif "details" in payload and ("details" in es or "skin" in es or "column" in es):
                 payload.pop("details", None)
                 payload.pop("skin", None)
-                supabase.table("scores").insert(payload).execute()
+                supabase.table(WORLD_TABLE).insert(payload).execute()
             else:
                 raise
         return jsonify({"success": True})
@@ -4026,7 +4030,7 @@ def social_profile():
     out["rel"] = rel
     top = []
     try:
-        rows = (supabase.table("scores").select("score,wave,kills,run_time,diff,created_at").eq(
+        rows = (supabase.table(WORLD_TABLE).select("score,wave,kills,run_time,diff,created_at").eq(
             "account_id", tgt.get("id")).order("score", desc=True).limit(3).execute().data or [])
         top = [{k: r.get(k) for k in ("score", "wave", "kills", "run_time", "diff")} for r in rows]
     except Exception:
