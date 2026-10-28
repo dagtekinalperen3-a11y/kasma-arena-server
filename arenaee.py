@@ -3570,6 +3570,10 @@ STRINGS.update({
 
 # yeni metinler
 STRINGS.update({
+    "ui.st_off": _T("SALDIRI", "OFFENSE", "ATAQUE", "ANGRIFF", "АТАКА"),
+    "ui.st_def": _T("SAVUNMA", "DEFENSE", "DEFENSA", "VERTEIDIGUNG", "ЗАЩИТА"),
+    "ui.st_mob": _T("HAREKET", "MOBILITY", "MOVILIDAD", "BEWEGUNG", "МОБИЛЬНОСТЬ"),
+    "ui.st_eco": _T("KAZANÇ", "ECONOMY", "ECONOMÍA", "ERTRAG", "ДОХОД"),
     "ui.rc_title": _T("KOŞU KARNESİ", "RUN REPORT", "INFORME DE PARTIDA", "LAUFBERICHT", "ИТОГИ ЗАБЕГА"),
     "ui.rc_dps": _T("SANİYELİK HASAR", "DAMAGE / SEC", "DAÑO / SEG", "SCHADEN / SEK", "УРОН / СЕК"),
     "ui.rc_kpm": _T("DAKİKADA ÖLDÜRME", "KILLS / MIN", "BAJAS / MIN", "KILLS / MIN", "УБИЙСТВ / МИН"),
@@ -8098,6 +8102,38 @@ def coin_label_width(text, size=17, icon_r=8, bold=True, gap=6):
 
 
 # skinler (kozmetik - güç vermez, ama her biri farklı silah/mermi/efekt taşır)
+
+_STYLE_W = (
+    # saldırı
+    {"skin_power": 0.25, "crit_chance": 0.12, "crit_dmg_mult": 0.6, "skin_aspd": 0.3,
+     "proj_speed_mult": 0.5, "run_dmg_mult": 0.25, "pierce_bonus": 2, "multishot_level": 2,
+     "bonk_mult": 0.6},
+    # savunma
+    {"base_max_hp": 60, "_hp": 60, "base_regen": 2.0, "base_armor": 0.12, "dmg_taken_mult": -0.2,
+     "second_wind_charges": 1},
+    # hareket
+    {"base_speed": 30, "dash_cd_mult": -0.3, "dash_dist_mult": 0.4, "bonk_radius_mult": 0.6},
+    # kazanç
+    {"coin_mult": 0.3, "xp_mult": 0.3, "luck": 0.15, "base_pickup": 50},
+)
+
+
+def skin_style_scores(sk):
+    """Skinin dört oyun tarzı puanı (0..1): sabit artılar + seviye tavanları."""
+    vals = dict(sk.get("perk_add") or {})
+    for k_, v in (sk.get("perk_level") or {}).items():
+        cap = v[1] if isinstance(v, (tuple, list)) and len(v) > 1 else 0
+        vals[k_] = vals.get(k_, 0) + cap
+    out = []
+    for w in _STYLE_W:
+        tot = 0.0
+        for k_, unit in w.items():
+            v = vals.get(k_)
+            if isinstance(v, (int, float)) and unit:
+                tot += max(0.0, v / unit)
+        out.append(clamp(0.18 + 0.32 * tot, 0.12, 1.0))
+    return out
+
 
 SKINS = [
     # Her skinin bir "büyüme" satırı var: skin_power = hasar çarpanı (eff_dmg),
@@ -58923,6 +58959,25 @@ class App:
         else:
             sfx("error", 0.6, 0.0)
 
+    def _skin_style_bars(self, canvas, sk, box):
+        """Skin ayrıntısı: SALDIRI / SAVUNMA / HAREKET / KAZANÇ çubukları.
+        Değerler skinin sabit artılarından ve seviye tavanlarından hesaplanır."""
+        sc = skin_style_scores(sk)
+        cols = ((255, 140, 90), (120, 200, 255), (130, 230, 190), GOLD)
+        keys = ("ui.st_off", "ui.st_def", "ui.st_mob", "ui.st_eco")
+        cw = (box.w - 24) / 2.0
+        rows = 2
+        rh = min(34, box.h / rows)
+        for i in range(4):
+            x = box.x + (i % 2) * (cw + 24)
+            y = box.y + (i // 2) * rh
+            draw_text(canvas, L(keys[i]), (x, y), 11, scale_col(cols[i], 0.95), bold=True, shadow=False)
+            bar = pygame.Rect(int(x), int(y + 16), int(cw), 9)
+            draw_bar(canvas, bar, sc[i], cols[i], bg=(30, 22, 24), border=(70, 54, 56), radius=4)
+            for k_ in range(1, 5):
+                xx = bar.x + bar.w * k_ / 5.0
+                pygame.draw.line(canvas, (30, 22, 24), (xx, bar.y + 1), (xx, bar.bottom - 2), 1)
+
     def update_skin_detail(self, dt, mouse_pos, clicked):
         canvas = self.display.canvas
         draw_skin_market_bg(canvas, self.t)
@@ -59006,6 +59061,10 @@ class App:
 
         btn_w, btn_h, gap = 170, 46, 14
         by = panel_rect.bottom - 66
+        if by - y >= 74:
+            # panelin altı boş kalmasın: skinin oyun tarzı (dört çubuk)
+            self._skin_style_bars(canvas, sk, pygame.Rect(panel_rect.x + 40, int(y + 4),
+                                                          panel_rect.w - 80, int(by - y - 18)))
         if owned:
             play_btn = Button((panel_rect.centerx - btn_w - gap / 2, by, btn_w, btn_h), L("ui.play"),
                                self._play_with_detail_skin, color=(60, 130, 90), hover_color=(80, 170, 115))
