@@ -3570,6 +3570,36 @@ STRINGS.update({
 
 # yeni metinler
 STRINGS.update({
+    "ui.rc_title": _T("KOŞU KARNESİ", "RUN REPORT", "INFORME DE PARTIDA", "LAUFBERICHT", "ИТОГИ ЗАБЕГА"),
+    "ui.rc_dps": _T("SANİYELİK HASAR", "DAMAGE / SEC", "DAÑO / SEG", "SCHADEN / SEK", "УРОН / СЕК"),
+    "ui.rc_kpm": _T("DAKİKADA ÖLDÜRME", "KILLS / MIN", "BAJAS / MIN", "KILLS / MIN", "УБИЙСТВ / МИН"),
+    "ui.rc_evo": _T("EVRİM", "EVOLUTIONS", "EVOLUCIONES", "EVOLUTIONEN", "ЭВОЛЮЦИИ"),
+    "ui.rc_books": _T("KİTAP", "BOOKS", "LIBROS", "BÜCHER", "КНИГИ"),
+    "ui.rc_tip_evo": _T("Evrim yok: bir silahı Lv10'a çıkar ve eş kitabını Lv3 yap - silah evrilir, hasarı katlanır.",
+                        "No evolution: get a weapon to Lv10 and its paired book to Lv3 - it evolves and hits far harder.",
+                        "Sin evolución: sube un arma a Nv10 y su libro pareja a Nv3: evoluciona y pega mucho más.",
+                        "Keine Evolution: Waffe auf St.10 und Partnerbuch auf St.3 - sie entwickelt sich und trifft viel härter.",
+                        "Нет эволюции: прокачай оружие до Ур.10 и парную книгу до Ур.3 - оно эволюционирует."),
+    "ui.rc_tip_books": _T("Hiç kitap almadın: kitaplar tüm silahlarını büyütür ve evrimin anahtarıdır.",
+                          "You took no books: books boost every weapon and unlock evolutions.",
+                          "No cogiste libros: potencian todas tus armas y desbloquean evoluciones.",
+                          "Keine Bücher: Bücher stärken alle Waffen und schalten Evolutionen frei.",
+                          "Ты не взял книг: книги усиливают всё оружие и открывают эволюции."),
+    "ui.rc_tip_weapons": _T("Az silahla gittin: ilk seviyelerde silah kartlarını seç, 4 yuvayı erken doldur.",
+                            "Few weapons: pick weapon cards early and fill all 4 slots.",
+                            "Pocas armas: elige cartas de arma pronto y llena los 4 huecos.",
+                            "Wenig Waffen: früh Waffenkarten wählen und alle 4 Plätze füllen.",
+                            "Мало оружия: бери карты оружия рано и заполни все 4 ячейки."),
+    "ui.rc_tip_dash": _T("Kalabalıkta SHIFT ile dash at: dash anında hasar almazsın. SPACE (BONK) çevreni iter.",
+                         "In a crowd, dash with SHIFT: you take no damage while dashing. SPACE (BONK) pushes enemies away.",
+                         "En la multitud usa SHIFT (dash): no recibes daño. ESPACIO (BONK) empuja a los enemigos.",
+                         "Im Gedränge mit SHIFT dashen: dabei kein Schaden. LEERTASTE (BONK) stößt Gegner weg.",
+                         "В толпе жми SHIFT (рывок): во время рывка урона нет. ПРОБЕЛ (БОНК) отталкивает врагов."),
+    "ui.rc_tip_hell": _T("25. dalgada Cehennem Kapısı açılır: oraya en az bir evrimle gir, düşmanlar çok daha serttir.",
+                         "The Hell Gate opens at wave 25: enter with at least one evolution - enemies are far tougher.",
+                         "La Puerta del Infierno se abre en la oleada 25: entra con al menos una evolución.",
+                         "Das Höllentor öffnet in Welle 25: geh mit mindestens einer Evolution hinein.",
+                         "Врата Ада открываются на 25-й волне: входи хотя бы с одной эволюцией."),
  "ui.dmg_title": _T("HASAR DÖKÜMÜ", "DAMAGE BREAKDOWN", "DAÑO POR ARMA", "SCHADEN JE WAFFE", "УРОН ПО ОРУЖИЮ"),
  "ui.dmg_total": _T("Toplam hasar", "Total damage", "Daño total", "Gesamtschaden", "Всего урона"),
  "ui.dmg_none": _T("Bu koşuda hasar verilmedi.", "No damage dealt this run.", "Sin daño en esta partida.", "Kein Schaden in diesem Lauf.", "Урон не нанесён."),
@@ -8717,7 +8747,7 @@ COS_SETS = {
               ("crystal_helm",), ("frost_lens",), ("cape_ice",), (("crit", 0.06), ("taken", 0.06))),
     "shadow": (("GÖLGE TAKIMI", "SHADOW SET", "SET SOMBRA", "SCHATTEN-SET", "НАБОР ТЕНИ"), (170, 120, 255),
                ("ninja_hood",), ("blindfold",), ("cape_shadow", "cape_bat"),
-               (("crit", 0.06), ("dashd", 0.15), ("speed", 10))),
+               (("crit", 0.08), ("dashd", 0.20))),
     "royal": (("KRALİYET TAKIMI", "ROYAL SET", "SET REAL", "KÖNIGS-SET", "КОРОЛЕВСКИЙ НАБОР"), (255, 210, 100),
               ("crown_gold", "top_hat"), ("monocle",), ("cape_royal", "cape_gold_trim"),
               (("gold", 0.15), ("xp", 0.10))),
@@ -8727,7 +8757,7 @@ COS_SETS = {
               ("halo_ring",), ("star_glasses",), ("wings_angelic",), (("hp", 40), ("regen", 0.8))),
     "pink": (("PEMBE TAKIM", "PINK SET", "SET ROSA", "PINK-SET", "РОЗОВЫЙ НАБОР"), (255, 140, 210),
              ("pink_bow",), ("pink_shades", "heart_glasses"), ("cape_pink",),
-             (("crit", 0.06), ("speed", 10), ("luck", 0.05))),
+             (("crit", 0.07), ("luck", 0.08))),
     "tech": (("TEKNOLOJİ TAKIMI", "TECH SET", "SET TECNO", "TECH-SET", "ТЕХНО-НАБОР"), (120, 220, 255),
              ("space_helmet", "neon_headband"), ("visor", "laser_visor", "steampunk_goggles"), ("cape_storm",),
              (("aspd", 0.08), ("pspeed", 0.10))),
@@ -28634,6 +28664,25 @@ STRINGS.update({
                       "libro raro: basta con tenerlo", "seltenes Buch: Besitz genügt",
                       "редкая книга: достаточно иметь"),
     "evo.watch":  _T("EVRİMİ İZLE", "WATCH EVOLUTION", "VER EVOLUCIÓN", "EVOLUTION ANSEHEN", "СМОТРЕТЬ ЭВОЛЮЦИЮ"),
+    "ui.badge_book": _T("KİTAP", "BOOK", "LIBRO", "BUCH", "КНИГА"),
+    "ui.evo_pair_of": _T("BU KİTAPLA EVRİLEN SİLAH", "WEAPON THIS BOOK EVOLVES", "ARMA QUE EVOLUCIONA",
+                         "WAFFE, DIE ES ENTWICKELT", "ОРУЖИЕ ДЛЯ ЭВОЛЮЦИИ"),
+    "ui.book_tip_t": _T("KOŞUDA", "IN A RUN", "EN LA PARTIDA", "IM LAUF", "В ЗАБЕГЕ"),
+    "ui.book_tip_std": _T("Seviye atlama kartlarında çıkar. Her seçişte bir seviye büyür (en çok Lv.{0}); 4 kitap yuvan var, erken seçtiğin kitap en çok büyür.",
+                          "Shows up on level-up cards. Each pick adds a level (max Lv.{0}); you have 4 book slots, so early picks grow the most.",
+                          "Aparece en las cartas al subir de nivel. Cada elección suma un nivel (máx. Nv.{0}); tienes 4 huecos, lo que eliges pronto crece más.",
+                          "Erscheint auf Level-up-Karten. Jede Wahl gibt eine Stufe (max. St.{0}); 4 Buchplätze - frühe Wahl wächst am meisten.",
+                          "Появляется на карточках уровня. Каждый выбор +1 уровень (макс. Ур.{0}); 4 ячейки книг - ранний выбор растёт сильнее."),
+    "ui.book_tip_rare": _T("Nadir kitap her 5 seviyede bir gelen nadir kartta çıkar. Koşuda yalnızca bir tane taşıyabilirsin: seçimini iyi yap.",
+                           "Rare books appear on the rare card every 5 levels. You can carry only one per run, so choose well.",
+                           "Los libros raros salen en la carta rara cada 5 niveles. Solo puedes llevar uno por partida: elige bien.",
+                           "Seltene Bücher erscheinen alle 5 Stufen auf der seltenen Karte. Nur eines pro Lauf - wähle gut.",
+                           "Редкие книги выпадают на редкой карте каждые 5 уровней. В забеге можно нести лишь одну - выбирай с умом."),
+    "ui.pair_need": _T("kitap seviyesi: Lv {0}", "book level: Lv {0}", "nivel del libro: Nv {0}",
+                       "Buchstufe: St {0}", "уровень книги: Ур {0}"),
+    "ui.pair_book": _T("EŞ KİTAP", "PAIRED BOOK", "LIBRO PAREJA", "PARTNERBUCH", "ПАРНАЯ КНИГА"),
+    "ui.pair_rare": _T("nadir: elde olması yeter", "rare: owning it is enough", "raro: basta con tenerlo",
+                       "selten: Besitz genügt", "редкая: достаточно иметь"),
     "evo.path":   _T("EVRİM YOLU", "EVOLUTION PATH", "CAMINO DE EVOLUCIÓN", "EVOLUTIONSPFAD", "ПУТЬ ЭВОЛЮЦИИ"),
     "evo.base":   _T("TEMEL", "BASE", "BASE", "BASIS", "БАЗА"),
     "evo.live":   _T("CANLI ÖNİZLEME", "LIVE PREVIEW", "VISTA EN VIVO", "LIVE-VORSCHAU", "ЖИВОЙ ПОКАЗ"),
@@ -29844,10 +29893,9 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
             q["done"] = True
             col = QUEST_TIER_COLORS[q["tier"]]
             gems = QUEST_GEMS[q["tier"]]
-            # oyuncunun altında: sunak/sandık yazılarıyla üst üste binmesin
-            self.fx.popup(p.x, p.y + 74, L("q.done"), col, 26, life=2.2)
-            self.fx.popup(p.x, p.y + 100, L("q." + q["key"], q["goal"]) + "  +%d" % gems,
-                          GEM_COLOR, 16, life=2.2)
+            # dünyada uçan yazı yerine ekranın alt üçte birinde sabit bir şerit:
+            # oyuncunun, kalkanların ve hasar sayılarının üstüne binmez
+            self.quest_toast = [L("q.done"), L("q." + q["key"], q["goal"]) + "  +%d" % gems, col, 2.6]
             self.fx.ring(p.x, p.y, col, n=26, speed=260, life=0.6, r=3.5)
             self.quest_flash = 2.4
             sfx("ach", 0.8, 0.0)
@@ -32215,6 +32263,9 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
                 self.check_map_achs()
         if self.quest_flash > 0:
             self.quest_flash = max(0.0, self.quest_flash - dt)
+        _qt = getattr(self, "quest_toast", None)
+        if _qt:
+            _qt[3] -= dt
         # sur yemini: 40 sn'de bir kalkan dolar (en çok 3).
         if self.oath == "bulwark":
             self.oath_t += dt
@@ -36623,7 +36674,8 @@ def stats_panel_rect(n_rows, n_groups=0):
     h = (STATS_HEAD_H + n_rows * STATS_ROW_H
          + n_groups * STATS_GROUP_HEAD_H
          + max(0, n_groups - 1) * STATS_GROUP_GAP + 10)
-    return pygame.Rect(VIRTUAL_W - STATS_PANEL_W - 10, b.bottom + 6, STATS_PANEL_W, h)
+    # skor kutusunun altından başlar ("Öldürme" satırını örtmesin)
+    return pygame.Rect(VIRTUAL_W - STATS_PANEL_W - 10, max(b.bottom + 6, 58), STATS_PANEL_W, h)
 
 
 def _pct(v):
@@ -37185,11 +37237,15 @@ def _draw_hud_top(surf, run, t):
         gx = gbar.x + int(gbar.w * clamp(w.goal_progress(), 0.0, 1.0))
         add_glow(surf, gx, gbar.centery, 12, wave_col, 0.35 + 0.15 * math.sin(t * 6))
         circle_aa(surf, gx, gbar.centery, 3.0, lighten(wave_col, 0.4))
-        draw_text(surf, L("ui.next_wave_in", fmt_time(w.time_left())),
-                  (VIRTUAL_W / 2, 64), 10, TEXT_DIM, center=True, shadow=False)
         if surge:
-            draw_text(surf, L("ui.surge", f"{w.surge_timer:0.1f}"), (gbar.right + 10, 49), 12,
-                      ORANGE, bold=True, shadow=False)
+            # yoğunluk sayacı üst plakanın içinde, sonraki dalga satırında (eskiden
+            # plakanın kenarına taşıp çerçevenin üstüne biniyordu)
+            draw_text(surf, L("ui.next_wave_in", fmt_time(w.time_left())) + "  ·  "
+                      + L("ui.surge", f"{w.surge_timer:0.1f}"),
+                      (VIRTUAL_W / 2, 64), 10, ORANGE, bold=True, center=True, shadow=False)
+        else:
+            draw_text(surf, L("ui.next_wave_in", fmt_time(w.time_left())),
+                      (VIRTUAL_W / 2, 64), 10, TEXT_DIM, center=True, shadow=False)
     if getattr(run, "curse_score_bonus", 0) > 0:
         ctxt = L("cu.hud", "%.2f" % (1.0 + run.curse_score_bonus) if lang() != "tr"
                  else ("%.2f" % (1.0 + run.curse_score_bonus)).replace(".", ","))
@@ -37290,6 +37346,25 @@ def _draw_hud_center(surf, run, t):
         draw_bar(surf, br, run.combo.timer / run.combo.window, col, radius=3)
 
     draw_reward_card(surf, run, t)
+
+    qt = getattr(run, "quest_toast", None)
+    if qt:
+        a = clamp(qt[3] / 0.5, 0.0, 1.0) * clamp((2.6 - qt[3]) / 0.18, 0.0, 1.0)
+        if qt[3] <= 0:
+            run.quest_toast = None
+        elif a > 0.02:
+            w_ = max(text_width(qt[0], 20, True), text_width(qt[1], 13, True)) + 56
+            card = pygame.Rect(0, 0, int(w_), 54)
+            card.center = (VIRTUAL_W // 2, int(VIRTUAL_H * 0.73 + 10 * (1 - a)))
+            pl = _hud_plate(card.w, card.h, qt[2])
+            pl.set_alpha(int(255 * a))
+            surf.blit(pl, card.topleft)
+            pl.set_alpha(None)
+            draw_icon(surf, card.x + 22, card.y + 18, "star", qt[2], 8)
+            draw_text(surf, qt[0], (card.centerx + 8, card.y + 17), 20, qt[2], bold=True, center=True,
+                      alpha=int(255 * a))
+            draw_text(surf, qt[1], (card.centerx + 8, card.y + 38), 13, GEM_COLOR, bold=True, center=True,
+                      alpha=int(255 * a))
 
     if run.waves.announce_timer > 0 and run.waves.announce_text:
         a = clamp(run.waves.announce_timer / 2.2, 0, 1)
@@ -39406,9 +39481,13 @@ class LevelUpOverlay:
         if cls._DIM is None:
             d = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
             d.fill((5, 6, 14, 196))
+            # draw.rect saydam yüzeyde pikseli karıştırmaz, değiştirir: kenar
+            # halkaları doğrudan daha koyu (yüksek alfa) yazılır. (Eskiden alfa 9
+            # yazılıyordu: kenarlar neredeyse saydam kalıyor, arkadaki HUD
+            # yazıları başlığın arkasından okunuyordu.)
             for k in range(16):
-                pygame.draw.rect(d, (2, 2, 8, 9), d.get_rect().inflate(-k * 34, -k * 20),
-                                 width=18, border_radius=80)
+                pygame.draw.rect(d, (3, 3, 10, int(236 - k * 2.6)),
+                                 d.get_rect().inflate(-k * 34, -k * 20), width=18, border_radius=80)
             cls._DIM = d
         return cls._DIM
 
@@ -52954,6 +53033,55 @@ class App:
             rest = sum(v for v, _k in rows[len(shown):])
             draw_text(canvas, "+%d - %s" % (len(rows) - len(shown), fmt_num(int(rest))),
                       (rect.centerx, rect.bottom - 20), 11, TEXT_DIM, center=True, shadow=False)
+        elif rect.bottom - y >= 150:
+            # panelin altı boş kalmasın: koşu karnesi + bir sonraki koşu için ipucu
+            self._draw_run_card(canvas, r, pygame.Rect(rect.x + 16, y + 6, rect.w - 32,
+                                                       rect.bottom - y - 22), total)
+
+    def _draw_run_card(self, canvas, r, box, total):
+        """Ölüm ekranı: dört küçük karne kutusu (saniyelik hasar, dakikada
+        öldürme, evrim, kitap) ve koşuya göre seçilmiş tek satırlık ipucu."""
+        p = r.player
+        secs = max(1.0, float(getattr(r, "run_time", 0.0) or 0.0))
+        evo_n = len(getattr(p, "evolved", ()) or ())
+        nb = p.normal_book_count() if hasattr(p, "normal_book_count") else len(getattr(p, "books", {}))
+        tiles = [(L("ui.rc_dps"), fmt_num(int(total / secs)), "fist", (255, 170, 90)),
+                 (L("ui.rc_kpm"), fmt_num(int(getattr(r, "kills", 0) * 60.0 / secs)), "skull", (255, 110, 110)),
+                 (L("ui.rc_evo"), str(evo_n), "star", (200, 150, 255)),
+                 (L("ui.rc_books"), str(nb), "book", (130, 220, 150))]
+        pygame.draw.line(canvas, (70, 52, 54), (box.x, box.y), (box.right, box.y), 1)
+        draw_text(canvas, L("ui.rc_title"), (box.x, box.y + 10), 12, TEXT_DIM, bold=True, shadow=False)
+        tw = (box.w - 10) / 2.0
+        ty = box.y + 30
+        for i, (lab, val, ic, col) in enumerate(tiles):
+            tr = pygame.Rect(int(box.x + (i % 2) * (tw + 10)), int(ty + (i // 2) * 52), int(tw), 44)
+            pygame.draw.rect(canvas, (32, 23, 25), tr, border_radius=9)
+            ink_frame(canvas, tr, scale_col(col, 0.5), 9, 1)
+            draw_icon(canvas, tr.x + 18, tr.centery, ic, col, 8)
+            draw_text(canvas, _fit_text(lab, 10, tr.w - 40, bold=True), (tr.x + 34, tr.y + 6), 10,
+                      TEXT_DIM, bold=True, shadow=False)
+            draw_text(canvas, val, (tr.x + 34, tr.y + 19), 17, col, bold=True, shadow=False)
+        # ipucu: koşunun zayıf yerine göre
+        if evo_n == 0 and getattr(r.waves, "wave", 0) >= 8:
+            tip = L("ui.rc_tip_evo")
+        elif nb == 0:
+            tip = L("ui.rc_tip_books")
+        elif len(p.weapons) < 3:
+            tip = L("ui.rc_tip_weapons")
+        elif getattr(r.waves, "wave", 0) < 10:
+            tip = L("ui.rc_tip_dash")
+        else:
+            tip = L("ui.rc_tip_hell")
+        yy = ty + 108
+        if box.bottom - yy >= 30:
+            lines = wrap_text(tip, 12, box.w - 36)[:max(1, int((box.bottom - yy - 14) // 16))]
+            card = pygame.Rect(box.x, int(yy), box.w, 14 + 16 * len(lines))
+            pygame.draw.rect(canvas, (40, 34, 22), card, border_radius=9)
+            ink_frame(canvas, card, (150, 120, 60), 9, 1)
+            draw_icon(canvas, card.x + 14, card.y + 15, "star", GOLD, 6)
+            for j, ln in enumerate(lines):
+                draw_text(canvas, ln, (card.x + 26, card.y + 7 + j * 16), 12, (240, 214, 150),
+                          shadow=False)
 
     # ---- isim girişi ----
     def _text_box_active(self):
@@ -57957,6 +58085,54 @@ class App:
             yy += 32
         return yy - top
 
+    def _wd_left_extra(self, canvas, w, rect, y0, y1):
+        """Silah penceresinin sol sütun altı: eş kitap kartı ve üç evrim
+        kademesinin madalyonları (kademe rengi, gereken seviye)."""
+        key = w["key"]
+        if key not in EVOLUTIONS or y1 - y0 < 70:
+            return
+        x0, x1 = rect.x + 30, rect.x + 270
+        cw = x1 - x0
+        y = y0
+        bk = BOOK_BY_KEY.get(EVOLUTIONS[key][0])
+        if bk is not None and y1 - y0 >= 190:
+            box = pygame.Rect(x0, y, cw, 74)
+            pygame.draw.rect(canvas, (30, 22, 24), box, border_radius=10)
+            ink_frame(canvas, box, scale_col(bk["color"], 0.55), 10, 2)
+            draw_book(canvas, box.x + 30, box.centery + 1, 50, bk, self.t,
+                      locked=not self.save.owns_book(bk["key"]), glow=False)
+            tx = box.x + 62
+            draw_text(canvas, L("ui.pair_book"), (tx, box.y + 9), 10, TEXT_DIM, bold=True, shadow=False)
+            draw_text(canvas, _fit_text(bk_name(bk), 14, box.right - tx - 10, bold=True),
+                      (tx, box.y + 24), 14, lighten(bk["color"], 0.25), bold=True, shadow=False)
+            if bk.get("rare"):
+                need = L("ui.pair_rare")
+            else:
+                need = "Lv " + "  >  ".join(str(evo_book_need(key, i)) for i in (1, 2, 3))
+            draw_text(canvas, _fit_text(need, 11, box.right - tx - 10), (tx, box.y + 48), 11,
+                      (206, 190, 170), shadow=False)
+            y = box.bottom + 14
+        # evrim kademeleri: üç madalyon, aralarında yol çizgisi
+        if y1 - y < 84:
+            return
+        draw_text(canvas, L("evo.path"), (x0, y), 10, TEXT_DIM, bold=True, shadow=False)
+        cy = y + 44
+        xs = [x0 + 36 + i * (cw - 72) / 2.0 for i in range(3)]
+        pygame.draw.line(canvas, (70, 54, 56), (xs[0], cy), (xs[2], cy), 3)
+        for i, cx in enumerate(xs):
+            tier = i + 1
+            col = evo_color(key, tier)
+            pul = 0.5 + 0.5 * math.sin(self.t * 2.2 + i * 1.3)
+            add_glow(canvas, cx, cy, 30 + 4 * pul, col, 0.16 + 0.06 * tier)
+            pygame.draw.circle(canvas, (22, 16, 20), (int(cx), cy), 21)
+            pygame.draw.circle(canvas, col, (int(cx), cy), 21, 3)
+            if tier == 3:
+                pygame.draw.circle(canvas, (255, 220, 120), (int(cx), cy), 25, 1)
+            draw_text(canvas, ("I", "II", "III")[i], (cx, cy), 15, lighten(col, 0.3),
+                      bold=True, center=True, shadow=False)
+            draw_text(canvas, "Lv %d" % evo_level_need(key, tier), (cx, cy + 32), 11,
+                      TEXT, bold=True, center=True, shadow=False)
+
     def _draw_weapon_detail(self, canvas, dt, mouse_pos, clicked):
         """Silaha tıklayınca açılan tanıtım penceresi."""
         w = WEAPON_BY_KEY.get(self.weapon_detail)
@@ -58016,6 +58192,10 @@ class App:
             draw_text(canvas, lab, (lx - 92, yy), 10, TEXT_DIM, bold=True, shadow=False)
             draw_text(canvas, val, (lx - 92, yy + 14), 13, TEXT, shadow=False)
             yy += 40
+        if k >= 1.0:
+            # sol sütunun altı boş kalmasın: eş kitap kartı + evrim madalyonları
+            self._wd_left_extra(canvas, w, rect, yy + 4,
+                                rect.bottom - (66 if owned else 62))
 
         pygame.draw.line(canvas, (77, 56, 58), (rect.x + 290, rect.y + 34),
                          (rect.x + 290, rect.bottom - 34), 2)
@@ -58291,6 +58471,49 @@ class App:
             # Kitabı açan tıklama yukarıda tüketildi; pencereye geçirilmez.
             self._draw_book_detail(canvas, dt, mouse_pos, clicked and not opened_now)
 
+    def _bd_evo_pairs(self, canvas, bk, right, y0, y1):
+        """Kitap sayfasının alt kısmı: bu kitabı eş kitap olarak kullanan
+        silahlar (arma + evrim adı + gereken kitap seviyeleri). Eşi olmayan
+        kitaplarda koşu içi kısa bir kullanım notu."""
+        if y1 - y0 < 60:
+            return
+        pairs = [WEAPON_BY_KEY[wk] for wk, ev in EVOLUTIONS.items()
+                 if ev[0] == bk["key"] and wk in WEAPON_BY_KEY]
+        pygame.draw.line(canvas, (206, 196, 172), (right.x + 26, y0), (right.right - 26, y0), 1)
+        y = y0 + 12
+        draw_text(canvas, L("ui.evo_pair_of") if pairs else L("ui.book_tip_t"),
+                  (right.centerx, y), 13, (150, 96, 30), bold=True, center=True, shadow=False)
+        y += 22
+        if not pairs:
+            tip = L("ui.book_tip_rare") if bk.get("rare") else L("ui.book_tip_std", book_max_level(bk))
+            for ln in wrap_text(tip, 12, right.w - 60)[:4]:
+                if y + 14 > y1:
+                    break
+                draw_text(canvas, ln, (right.centerx, y), 12, (96, 88, 74), center=True, shadow=False)
+                y += 17
+            return
+        for w in pairs:
+            if y + 58 > y1:
+                break
+            row = pygame.Rect(right.x + 30, y, right.w - 60, 58)
+            pygame.draw.rect(canvas, (226, 216, 192), row, border_radius=9)
+            pygame.draw.rect(canvas, (190, 176, 146), row, 1, border_radius=9)
+            owned_w = self.save.owns_weapon(w["key"])
+            draw_weapon_emblem(canvas, row.x + 30, row.centery, 40, w, self.t,
+                               locked=not owned_w, glow=False)
+            tx = row.x + 62
+            aw = row.right - tx - 10
+            draw_text(canvas, _fit_text(w_name(w), 13, aw, bold=True), (tx, row.y + 6), 13,
+                      (52, 44, 32), bold=True, shadow=False)
+            nm = " > ".join(evo_name(w["key"], i) for i in (1, 2, 3))
+            draw_text(canvas, _fit_text(nm, 10, aw, bold=True), (tx, row.y + 24), 10,
+                      scale_col(evo_color(w["key"], 2), 0.55), bold=True, shadow=False)
+            need = (L("ui.pair_need", " > ".join(str(evo_book_need(w["key"], i)) for i in (1, 2, 3)))
+                    if not bk.get("rare") else L("ui.pair_rare"))
+            draw_text(canvas, _fit_text(need, 10, aw), (tx, row.y + 39), 10,
+                      (120, 108, 86), shadow=False)
+            y += 64
+
     def _draw_book_detail(self, canvas, dt, mouse_pos, clicked):
         """Kitaba tıklayınca açılan okuma penceresi."""
         bk = BOOK_BY_KEY.get(self.book_detail)
@@ -58333,31 +58556,33 @@ class App:
             ny += 28
 
         # nadirlik rozeti
-        badge_txt = "NADİR KİTAP" if rare else "KİTAP"
-        badge_col = (168, 122, 30) if rare else (96, 88, 74)
+        badge_txt = L("ui.rare_book_b") if rare else L("ui.badge_book")
+        badge_col = (255, 214, 110) if rare else (236, 226, 204)
         bw = text_width(badge_txt, 12, True) + (34 if rare else 24)
         br = pygame.Rect(0, 0, int(bw), 22)
         br.center = (left.centerx, int(ny + 12))
         tag_chip(canvas, br, badge_col, 11, tint=0.28)
         if rare:
             draw_icon(canvas, br.x + 13, br.centery, "star", badge_col, 6)
-            draw_text(canvas, badge_txt, (br.centerx + 7, br.centery - 7), 12, badge_col,
+            draw_text(canvas, badge_txt, (br.centerx + 7, br.centery), 12, badge_col,
                       bold=True, center=True, shadow=False)
         else:
-            draw_text(canvas, badge_txt, (br.centerx, br.centery - 7), 12, badge_col,
+            draw_text(canvas, badge_txt, (br.centerx, br.centery), 12, badge_col,
                       bold=True, center=True, shadow=False)
 
         # durum satırı
         sy = ny + 46
         if owned:
-            draw_icon(canvas, left.centerx - 44, sy + 7, "star", (44, 116, 72), 7)
+            draw_icon(canvas, left.centerx - 3 - text_width(L("ui.unlocked"), 15, True) / 2, sy + 9,
+                      "star", (44, 116, 72), 7)
             draw_text(canvas, L("ui.unlocked"), (left.centerx + 10, sy), 15, (44, 116, 72),
                       bold=True, center=True, shadow=False)
             hint = (L("ui.rare_only_one") if rare else L("ui.grows_to", book_max_level(bk)))
             draw_text(canvas, hint, (left.centerx, sy + 22), 11,
                       (108, 100, 84), center=True, shadow=False)
         else:
-            draw_icon(canvas, left.centerx - 46, sy + 7, "shield", (150, 92, 40), 7)
+            draw_icon(canvas, left.centerx - 3 - text_width(L("ui.locked"), 15, True) / 2, sy + 9,
+                      "shield", (150, 92, 40), 7)
             draw_text(canvas, L("ui.locked"), (left.centerx + 10, sy), 15, (150, 92, 40),
                       bold=True, center=True, shadow=False)
             draw_text(canvas, L("ui.finish_task"), (left.centerx, sy + 22), 11,
@@ -58477,6 +58702,9 @@ class App:
                                   center=True, shadow=False)
                         y += 15
                 break
+
+        # sayfanın altı boş kalmasın: bu kitapla evrilen silahlar
+        self._bd_evo_pairs(canvas, bk, right, y + 10, right.bottom - 40)
 
         draw_text(canvas, f"- {(BOOKS.index(bk) + 1 if bk in BOOKS else 0)} -",
                   (right.centerx, right.bottom - 26), 11, (158, 148, 126),
