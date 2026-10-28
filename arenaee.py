@@ -2344,21 +2344,21 @@ STRINGS = {
     "diff.normal":    _T("NORMAL", "NORMAL", "NORMAL", "NORMAL", "ОБЫЧНАЯ"),
     "diff.hard":      _T("ZOR", "HARD", "DIFÍCIL", "SCHWER", "СЛОЖНАЯ"),
     "diff.nightmare": _T("KABUS", "NIGHTMARE", "PESADILLA", "ALBTRAUM", "КОШМАР"),
-    "diffd.normal":    _T("Sakin tempo. 25 dalga 70 dakika sürer, düşmanlar daha seyrek gelir.",
-                          "Calm pace. 25 waves take 70 minutes, enemies come less often.",
-                          "Ritmo tranquilo. 25 oleadas en 70 minutos, menos enemigos.",
-                          "Ruhiges Tempo. 25 Wellen dauern 70 Minuten, weniger Gegner.",
-                          "Спокойный темп. 25 волн за 70 минут, врагов меньше."),
-    "diffd.hard":      _T("Dengeli tempo. 25 dalga 60 dakika sürer, düşmanlar düzenli akar.",
-                          "Balanced pace. 25 waves take 60 minutes, enemies keep coming.",
-                          "Ritmo equilibrado. 25 oleadas en 60 minutos.",
-                          "Ausgewogenes Tempo. 25 Wellen dauern 60 Minuten.",
-                          "Ровный темп. 25 волн за 60 минут."),
-    "diffd.nightmare": _T("Hızlı tempo. 25 dalga 40 dakika sürer, düşmanlar çok daha sık gelir!",
-                          "Fast pace. 25 waves take 40 minutes, enemies come far more often!",
-                          "Ritmo rápido. 25 oleadas en 40 minutos, muchos más enemigos.",
-                          "Schnelles Tempo. 25 Wellen in 40 Minuten, viel mehr Gegner!",
-                          "Быстрый темп. 25 волн за 40 минут, врагов гораздо больше!"),
+    "diffd.normal":    _T("Sakin tempo: 25 dalga 70 dakika. Skor x1.0. Aynı yaratık, aynı seviye - sadece yavaş akar.",
+                          "Calm pace: 25 waves in 70 minutes. Score x1.0. Same monsters, same levels - just slower.",
+                          "Ritmo tranquilo: 25 oleadas en 70 min. Puntos x1.0. Mismos monstruos, más lento.",
+                          "Ruhiges Tempo: 25 Wellen in 70 Min. Punkte x1.0. Gleiche Monster, nur langsamer.",
+                          "Спокойный темп: 25 волн за 70 минут. Очки x1.0. Те же монстры, просто медленнее."),
+    "diffd.hard":      _T("Dengeli tempo: 25 dalga 60 dakika. Skor x1.25. Yaratıklar daha sık, sahada daha kalabalık.",
+                          "Balanced pace: 25 waves in 60 minutes. Score x1.25. Monsters come faster, bigger crowds.",
+                          "Ritmo equilibrado: 25 oleadas en 60 min. Puntos x1.25. Más rápido y más multitud.",
+                          "Ausgewogenes Tempo: 25 Wellen in 60 Min. Punkte x1.25. Schneller, größere Horden.",
+                          "Ровный темп: 25 волн за 60 минут. Очки x1.25. Монстры быстрее, толпы больше."),
+    "diffd.nightmare": _T("Kabus: 25 dalga 40 dakika. Skor x1.5. Aynı sürü 40 dakikaya sıkışır, ekran dolup taşar!",
+                          "Nightmare: 25 waves in 40 minutes. Score x1.5. The same horde crammed into 40 minutes!",
+                          "Pesadilla: 25 oleadas en 40 min. Puntos x1.5. La misma horda en 40 minutos.",
+                          "Albtraum: 25 Wellen in 40 Min. Punkte x1.5. Dieselbe Horde in 40 Minuten!",
+                          "Кошмар: 25 волн за 40 минут. Очки x1.5. Та же орда за 40 минут!"),
     "ui.n_gem_packs":  _T("{0} elmas paketi", "{0} gem packs", "{0} packs de gemas", "{0} Edelsteinpakete", "{0} наборов кристаллов"),
     "ui.n_prem_pets":  _T("{0} skin - {1} pet", "{0} skins - {1} pets",
                           "{0} skins premium - {1} mascotas", "{0} Premium-Skins - {1} Haustiere",
@@ -3258,7 +3258,7 @@ STRINGS.update({
  "s.lucky_coin.name": _T("Uğurlu Akçe","Lucky Coin","Moneda de la Suerte","Glücksmünze","Счастливая Монета"),
  "s.lucky_coin.desc": _T("Altın +%15, kritik şans +%2 ve Şans +%10","Gold +15%, crit chance +2% and Luck +10%","Oro +15%, prob. crítica +2% y Suerte +10%","Gold +15%, Kritchance +2% und Glück +10%","Золото +15%, шанс крита +2% и Удача +10%"),
  "s.core_luck.name": _T("Şans Çekirdeği","Luck Core","Núcleo de Suerte","Glückskern","Ядро Удачи"),
- "s.core_luck.desc": _T("Şans +%8 (tavanı yok, her alımda biraz azalır)","Luck +8% (no cap - diminishing)","Suerte +8% (sin tope - decreciente)","Glück +8% (kein Limit - abnehmend)","Удача +8% (без предела — убывает)"),
+ "s.core_luck.desc": _T("Şans +%8 (tavanı yok)","Luck +8% (no cap)","Suerte +8% (sin tope)","Glück +8% (kein Limit)","Удача +8% (без предела)"),
  "s.gambler_dice.name": _T("Kumarbazın Zarı","Gambler's Dice","Dados del Apostador","Spielerwürfel","Кости Игрока"),
  "s.gambler_dice.desc": _T("Şans +%25 ama hareket hızı -%5","Luck +25% but movement speed -5%","Suerte +25% pero velocidad -5%","Glück +25%, aber Bewegungstempo -5%","Удача +25%, но скорость передвижения -5%"),
  "s.gale_boots.name": _T("Rüzgâr Çizmesi","Gale Boots","Botas de Vendaval","Sturmstiefel","Штормовые Сапоги"),
@@ -3312,6 +3312,12 @@ STRINGS.update({
  "s.chain.name": _T("Zincir Şok","Chain Shock","Descarga en Cadena","Kettenschock","Цепной Разряд"),
  "s.chain.desc": _T("BONK yakındaki ekstra düşmanlara sıçrar","BONK jumps to extra nearby enemies","El BONK salta a enemigos cercanos","BONK springt auf nahe Gegner über","БОНК перескакивает на ближних врагов"),
  "s.frenzy.name": _T("Çılgınlık Çekirdeği","Frenzy Core","Núcleo de Frenesí","Rauschkern","Ядро Ярости"),
+ "s.venom_shot.name": _T("Zehir Oku","Venom Shot","Flecha Venenosa","Giftpfeil","Ядовитая стрела"),
+ "s.venom_shot.desc": _T("Vuruşların zehirler: saniyede +3 hasar, ölene kadar sürer","Hits poison: +3 damage per second until death","Tus golpes envenenan: +3 daño/s hasta morir","Treffer vergiften: +3 Schaden/s bis zum Tod","Попадания отравляют: +3 урона/с до смерти"),
+ "s.shock_round.name": _T("Şok Mermisi","Shock Round","Bala de Choque","Schockgeschoss","Шоковый патрон"),
+ "s.shock_round.desc": _T("Vuruşların %8 ihtimalle yakındaki 2 düşmana sıçrar","Hits have an 8% chance to arc to 2 nearby enemies","Los golpes tienen un 8% de saltar a 2 enemigos cercanos","Treffer springen mit 8% auf 2 Gegner in der Nähe über","Попадания с шансом 8% перескакивают на 2 врагов"),
+ "s.shatter.name": _T("Buz Kırığı","Shatter","Fractura de Hielo","Eisbruch","Ледяной раскол"),
+ "s.shatter.desc": _T("Yavaşlamış düşmanlara hasar +%10","+10% damage to slowed enemies","+10% de daño a enemigos ralentizados","+10% Schaden gegen verlangsamte Gegner","+10% урона по замедленным врагам"),
  "s.frenzy.desc": _T("Ardışık öldürmeler hız ve hasarı artırır","Consecutive kills raise speed and damage","Las muertes seguidas suben velocidad y daño","Kills in Folge erhöhen Tempo und Schaden","Серия убийств повышает скорость и урон"),
  "s.second_wind.name": _T("İkinci Nefes","Second Wind","Segundo Aliento","Zweiter Atem","Второе Дыхание"),
  "s.second_wind.desc": _T("Öleceğin darbede %50 canla dirilirsin","Revive at 50% health on a fatal blow","Revives al 50% de vida con un golpe mortal","Bei tödlichem Treffer mit 50% Leben zurück","При смертельном ударе воскресаешь с 50% здоровья"),
@@ -3645,12 +3651,12 @@ STRINGS.update({
                   "Los libros tempranos crecen hasta Nv30 y abren evoluciones.",
                   "Früh gewählte Bücher wachsen bis St.30 und öffnen Evolutionen.",
                   "Ранние книги растут до Ур.30 и открывают эволюции."),
-    "gd.pro3.t": _T("İKİ SİLAHA ODAKLAN", "FOCUS TWO WEAPONS", "CÉNTRATE EN DOS", "ZWEI WAFFEN FOKUS", "ДВА ОРУЖИЯ"),
-    "gd.pro3": _T("Koşuda en çok 2 silah evrilir: iki silahı Lv10-20-25'e yükselt, diğerleri destek.",
-                  "Only 2 weapons evolve per run: push two to Lv10-20-25, the rest are support.",
-                  "Solo 2 armas evolucionan por partida: sube dos a Nv10-20-25.",
-                  "Nur 2 Waffen entwickeln sich pro Lauf: zwei auf St.10-20-25 bringen.",
-                  "За забег эволюционируют лишь 2 оружия: качай два до 10-20-25."),
+    "gd.pro3.t": _T("DÖRT EVRİM", "FOUR EVOLUTIONS", "CUATRO EVOLUCIONES", "VIER EVOLUTIONEN", "ЧЕТЫРЕ ЭВОЛЮЦИИ"),
+    "gd.pro3": _T("Koşuda en çok 4 silah evrilir: eş kitaplarını erken topla, evrim kartlarını kaçırma.",
+                  "Up to 4 weapons evolve per run: grab their paired books early and never skip an evolution card.",
+                  "Hasta 4 armas evolucionan por partida: consigue pronto sus libros pareja.",
+                  "Bis zu 4 Waffen entwickeln sich pro Lauf: hol dir früh ihre Partnerbücher.",
+                  "За забег эволюционируют до 4 оружий: собирай парные книги заранее."),
     "gd.pro4.t": _T("ALTINI HARCA", "SPEND YOUR GOLD", "GASTA TU ORO", "GOLD AUSGEBEN", "ТРАТЬ ЗОЛОТО"),
     "gd.pro4": _T("B ile markete gir: çekirdeklerin sınırı yok, her dalga arası biraz güç al.",
                   "Open the shop with B: cores have no cap, buy a little power between waves.",
@@ -12214,8 +12220,8 @@ SHOP_ITEMS = [
     # x1,30 -> 45 x1,20): kitaplar nadirliğe göre verdiği için şans her yapıya
     # lazım; "şans kitabı" kurmayan oyuncu da birkaç çekirdekle makul bir şans
     # tabanı toplayabilsin.
-    {"key": "core_luck",     "name": "Şans Çekirdeği",      "desc": "Şans +%8 (tavanı yok, her alımda biraz azalır)",
-     "cost": 45,  "cost_mult": 1.20, "max": 999, "endless": True, "icon": "horseshoe", "color": (110, 225, 130), "tier": 1, "cat": "core"},
+    {"key": "core_luck",     "name": "Şans Çekirdeği",      "desc": "Şans +%8 (tavanı yok)",
+     "cost": 45,  "cost_mult": 1.22, "max": 999, "endless": True, "icon": "horseshoe", "color": (110, 225, 130), "tier": 1, "cat": "core"},
 
     # ---- arena genişlemesi ----
     # Aşağıdaki eşyalar arenanın farklı ihtiyaçlarını (tempo, dayanıklılık,
@@ -12294,7 +12300,11 @@ SHOP_ITEMS = [
     {"key": "chain",     "name": "Zincir Şok",      "desc": "BONK yakındaki ekstra düşmanlara sıçrar", "cost": 110, "cost_mult": 1.85, "max": 4, "icon": "bolt", "color": (120, 200, 255), "tier": 3, "cat": "elemental"},
     # Güdüm yeteneği yalnızca yönelmeli şahin skini ve onun özel yeteneğiyle
     # gelir; markette satılmaz.
-    {"key": "frenzy",    "name": "Çılgınlık Çekirdeği", "desc": "Ardışık öldürmeler hız ve hasarı artırır", "cost": 100, "cost_mult": 1.8, "max": 5, "icon": "clover", "color": (200, 230, 100), "tier": 3, "cat": "elemental"},
+    # Çılgınlık Çekirdeği pazardan kalktı (Çılgın Canavar skininin kendi
+    # özelliği olarak kaldı). Yerine üç ölçülü element eşyası:
+    {"key": "venom_shot", "name": "Zehir Oku", "desc": "Vuruşların zehirler: saniyede +3 hasar, ölene kadar sürer", "cost": 70, "cost_mult": 1.65, "max": 3, "icon": "drop", "color": (150, 230, 100), "tier": 2, "cat": "elemental"},
+    {"key": "shock_round", "name": "Şok Mermisi", "desc": "Vuruşların %8 ihtimalle yakındaki 2 düşmana sıçrar", "cost": 95, "cost_mult": 1.7, "max": 4, "icon": "bolt", "color": (255, 236, 120), "tier": 3, "cat": "elemental"},
+    {"key": "shatter",   "name": "Buz Kırığı", "desc": "Yavaşlamış düşmanlara hasar +%10", "cost": 80, "cost_mult": 1.65, "max": 4, "icon": "snow", "color": (170, 230, 255), "tier": 2, "cat": "elemental"},
     # İkinci Nefes (diriliş) pazardan kalktı: diriliş yalnız efsane sekmesinde
     # (Anka Külü), o da bir kez.
     {"key": "storm",     "name": "Fırtına",         "desc": "Rastgele düşmanlara yıldırım düşer", "cost": 140, "cost_mult": 1.95, "max": 5, "icon": "bolt", "color": (190, 215, 255), "tier": 3, "cat": "elemental"},
@@ -12405,6 +12415,10 @@ def _shop_soft(raw, soft):
 def apply_shop_item(player, key):
     luck0, xp0 = player.run_luck_bonus, player.run_xp_mult
     _apply_shop_item_raw(player, key)
+    if key.startswith("core_"):
+        # çekirdekler açıklamalarında yazanı tam verir (ikinci bir yumuşatma
+        # katmanı 10 şans çekirdeğini +%80 yerine +%35'te bırakıyordu)
+        return
     d_luck = player.run_luck_bonus - luck0
     d_xp = player.run_xp_mult - xp0
     if d_luck > 0:
@@ -12486,9 +12500,7 @@ def _apply_shop_item_raw(player, key):
         player.run_crit_bonus += 0.02
         player.run_luck_bonus += LUCKY_COIN_LUCK
     elif key == "core_luck":
-        lv = max(1, int(player.shop_levels.get("core_luck", 1)))
-        player.run_luck_bonus += (stack_bonus(CORE_LUCK_PER_LEVEL, lv, CORE_LUCK_SOFT)
-                                  - stack_bonus(CORE_LUCK_PER_LEVEL, lv - 1, CORE_LUCK_SOFT))
+        player.run_luck_bonus += CORE_LUCK_FLAT
     elif key == "gambler_dice":
         player.run_luck_bonus += GAMBLER_DICE_LUCK
         player.run_spd_mult = max(0.5, player.run_spd_mult - 0.05)
@@ -12584,8 +12596,12 @@ def _apply_shop_item_raw(player, key):
         player.enemy_hp_curse += 0.12
     elif key == "chain":
         player.chain_level += 1
-    elif key == "frenzy":
-        player.frenzy_level += 1
+    elif key == "venom_shot":
+        player.poison_level += 1
+    elif key == "shock_round":
+        player.shock_level += 1
+    elif key == "shatter":
+        player.shatter_level += 1
     elif key == "second_wind":
         player.second_wind_charges += 1
     elif key == "storm":
@@ -13429,8 +13445,10 @@ def xp_level_softcap(level, total_wave):
 
 
 def econ_wave_factor(wave, biome="arena", kind="gold", diff="normal"):
-    """O dalgada yaratıktan düşen tecrübe ("xp") / altın ("gold") çarpanı."""
-    tk = econ_time_factor(wave, diff, biome)
+    """O dalgada yaratıktan düşen tecrübe ("xp") / altın ("gold") çarpanı.
+    Zorluktan bağımsız tek takvim (normal) + zorluk telafisi (DIFF_ECON): aynı
+    25 dalgada her zorlukta aynı seviyeye ve altına ulaşılır."""
+    tk = econ_time_factor(wave, "normal", biome) * DIFF_ECON.get(diff, 1.0)
     if biome == "hell":
         return (ECON_HELL_XP if kind == "xp" else 1.0) * tk
     early = ECON_XP_EARLY if kind == "xp" else ECON_GOLD_EARLY
@@ -13482,6 +13500,7 @@ CORE_LUCK_SOFT = 6.0            # şans çekirdeği: azalan getiri ...
 # ... ilk alım tam +%8 versin diye (stack_bonus ilk adımda per*soft/(soft+1)
 # verir): sonsuz alımda toplam +%56'ya yaklaşır.
 CORE_LUCK_PER_LEVEL = 0.08 * (CORE_LUCK_SOFT + 1.0) / CORE_LUCK_SOFT
+CORE_LUCK_FLAT = 0.08           # şans çekirdeği: her alım tam +%8 (10 çekirdek = +%80)
 LUCKY_COIN_LUCK = 0.10          # uğurlu akçe: ek +%10 şans
 GAMBLER_DICE_LUCK = 0.25        # kumarbazın zarı: +%25 şans
 LUCK_FREE_REROLL_K = 0.20       # şanslı yenileme olasılığı = şans * K ...
@@ -13571,8 +13590,12 @@ FOCUS_PARRY = 0.05
 FOCUS_HURT = 0.22             # vurulunca (en çok 0.6 sn'de bir)
 FOCUS_IDLE_AFTER = 1.5        # bu kadar ateş edilmezse odak söner
 FOCUS_IDLE_DECAY = 0.07       # sn başına
-FOCUS_DMG_LO, FOCUS_DMG_HI = 0.8, 1.2
-FOCUS_SCORE_LO, FOCUS_SCORE_HI = 0.6, 2.0
+# Odak çubuğu (karakterin altındaki) artık skoru değil hasarı, atış hızını ve
+# hareket hızını etkiler; dolu olsa bile ölçülü (çok hızlanmayalım).
+FOCUS_DMG_LO, FOCUS_DMG_HI = 0.90, 1.15
+FOCUS_ASPD_LO, FOCUS_ASPD_HI = 0.95, 1.12
+FOCUS_SPD_LO, FOCUS_SPD_HI = 1.00, 1.08
+FOCUS_SCORE_FIXED = 1.3       # skor çarpanı sabit (eski ortalama)
 ADRENALINE_T = 2.5
 ADRENALINE_DMG = 0.25
 DODGE_SLOWMO = 0.22           # kusursuz kaçışta ağır çekim (sn, tek kişilik)
@@ -13738,6 +13761,8 @@ class Player:
         self.fire_level = 0
         self.ice_level = 0
         self.poison_level = 0
+        self.shock_level = 0        # şok mermisi: vuruş yakına sıçrar
+        self.shatter_level = 0      # buz kırığı: yavaşlamışa ek hasar
         # ---- kitaplara özel (markette satılmayan) etkiler ----
         self.kill_heal = 0.0        # düşman öldürünce kazanılan sabit can
         self.kill_heal_level = 0    # kan kitabı seviyesi (oransal iyileşme)
@@ -13931,12 +13956,8 @@ class Player:
                 setattr(self, attr, val)
             if item.get("perk_stats"):
                 cos_stats_apply(self, item["perk_stats"])
-        # takım bonusu: aynı takımın 3 parçası birlikte
+        # (takım bonusu kaldırıldı: her parça yalnız kendi özelliğini verir)
         self.cos_sets = []
-        for sid, row in COS_SETS.items():
-            if cos_set_count(sid, self.cosmetics) >= 3:
-                cos_stats_apply(self, row[5])
-                self.cos_sets.append(sid)
 
         self.max_hp = self.base_max_hp
         self.hp = float(self.max_hp)
@@ -13960,7 +13981,7 @@ class Player:
         return soft_speed_mult(m) + tmp
 
     def eff_speed(self):
-        sp = self.base_speed * self.run_speed_mult() * (1.0 + self.shrine_spd)
+        sp = self.base_speed * self.run_speed_mult() * (1.0 + self.shrine_spd) * self.focus_spd_mult()
         # Patron yavaşlatması (kolos'un sarsıntısı gibi) hızı doğrudan keser.
         if self.slow_t > 0:
             sp *= self.slow_mult
@@ -13988,14 +14009,23 @@ class Player:
         return m
 
     def focus_score_mult(self):
+        """Odak artık skoru değiştirmez (sabit çarpan)."""
+        return FOCUS_SCORE_FIXED
+
+    def focus_aspd_mult(self):
         f = clamp(getattr(self, "focus", FOCUS_START), 0.0, 1.0)
-        return FOCUS_SCORE_LO + (FOCUS_SCORE_HI - FOCUS_SCORE_LO) * f
+        return FOCUS_ASPD_LO + (FOCUS_ASPD_HI - FOCUS_ASPD_LO) * f
+
+    def focus_spd_mult(self):
+        f = clamp(getattr(self, "focus", FOCUS_START), 0.0, 1.0)
+        return FOCUS_SPD_LO + (FOCUS_SPD_HI - FOCUS_SPD_LO) * f
 
     def add_focus(self, v):
         self.focus = clamp(getattr(self, "focus", FOCUS_START) + v, 0.0, 1.0)
 
     def eff_atk_cd(self):
-        return max(0.07, self.base_atk_cd / (self.run_aspd_mult * (1.0 + self.skin_aspd)))
+        return max(0.07, self.base_atk_cd / (self.run_aspd_mult * (1.0 + self.skin_aspd)
+                                             * self.focus_aspd_mult()))
 
     def eff_pickup(self):
         return self.base_pickup * self.run_pickup_mult
@@ -19954,7 +19984,17 @@ def scaled_coin_gain(base, mult, biome):
 # kazanılır - tek fark düşmanların ne kadar hızlı geldiği ve dalgaların ne
 # kadar hızlı ilerlediğidir.
 DIFF_MULT = {"normal": 1.0, "hard": 1.0, "nightmare": 1.0}
-DIFF_PACE = {"normal": 0.72, "hard": 1.0, "nightmare": 1.55}
+# Zorluk = tempo. 25 dalgada gelen toplam yaratık her zorlukta aynı: normal 70
+# dakikaya yayar, kabus 40 dakikaya sıkıştırır (doğma hızı buna göre).
+DIFF_PACE = {"normal": 0.83, "hard": 1.0, "nightmare": 1.82}
+# Aynı anda sahada olabilecek yaratık tavanı: kabus gerçekten kabus olsun.
+DIFF_CAP = {"normal": 1.0, "hard": 1.10, "nightmare": 1.28}
+# Kısa sürede aynı seviyeye ulaşılsın diye yaratık başına tecrübe/altın:
+# kabusta yaratıklar tavanı doldurduğu için oyuncu 40 dakikada 70 dakikadaki
+# kadar öldüremez; bu pay farkı kapatır (simülasyonla ayarlandı).
+DIFF_ECON = {"normal": 1.0, "hard": 1.05, "nightmare": 1.27}
+# Skor çarpanı: kabus hızlı akar ve skoru 1.5 kat sayar.
+DIFF_SCORE = {"normal": 1.0, "hard": 1.25, "nightmare": 1.5}
 
 # Düşmanın görünen şekliyle çarpışma kutusu birebir örtüşsün diye, her tür için
 # çizilen görselin gerçek kapladığı alana göre bir çarpışma yarıçapı çarpanı.
@@ -26668,11 +26708,12 @@ def spawn_tempo_wave(wave, biome):
 
 
 # Arenada aynı anda yaşayabilecek azami düşman sayısı.
-def max_alive_enemies(wave):
-    """Aynı anda arenada yaşayabilecek en çok yaratık."""
+def max_alive_enemies(wave, diff="normal"):
+    """Aynı anda arenada yaşayabilecek en çok yaratık (zorlukla büyür)."""
     # mobil: telefonda tavan 120 - ekranda yine kalabalık, kare hızı akıcı.
     # Mobilin dünya sıralaması ayrı olduğu için skorlar PC ile yarışmaz.
-    return int(min(MOBILE_MAX_ALIVE if MOBILE else 175, 70 + wave * 4))
+    k = DIFF_CAP.get(diff, 1.0)
+    return int(min((MOBILE_MAX_ALIVE if MOBILE else 175) * k, (70 + wave * 4) * k))
 
 
 MOBILE_MAX_ALIVE = 120
@@ -27049,7 +27090,7 @@ class WaveManager:
         if self.spawn_timer <= 0:
             self.spawn_timer = base_interval
             # Kalabalık tavanı: arena tıkanmışsa bu turda yeni düşman doğmaz.
-            cap = max_alive_enemies(tw)
+            cap = max_alive_enemies(tw, self.diff)
             if self.cap_mult != 1.0:
                 cap = int(cap * self.cap_mult)
                 if self.cap_max:
@@ -27671,11 +27712,11 @@ STRINGS.update({
     "sk.parry":    _T("SAVUŞTURMA x{0}", "PARRY x{0}", "PARADA x{0}", "PARADE x{0}", "ОТРАЖЕНИЕ x{0}"),
     "sk.focus":    _T("ODAK", "FOCUS", "FOCO", "FOKUS", "ФОКУС"),
     "sk.focus_x":  _T("ODAK x{0}", "FOCUS x{0}", "FOCO x{0}", "FOKUS x{0}", "ФОКУС x{0}"),
-    "sk.hint":     _T("ODAK: elle vur, vurulma, atılarak kaç = daha çok hasar ve skor",
-                      "FOCUS: aim, don't get hit, dash through attacks = more damage & score",
-                      "FOCO: apunta, que no te den, esquiva = más daño y puntos",
-                      "FOKUS: zielen, nicht treffen lassen, ausweichen = mehr Schaden & Punkte",
-                      "ФОКУС: целься, не попадайся, уклоняйся = больше урона и очков"),
+    "sk.hint":     _T("ODAK: elle vur, vurulma, atılarak kaç = daha çok hasar, atış ve hareket hızı",
+                      "FOCUS: aim, don't get hit, dash through attacks = more damage, fire rate & speed",
+                      "FOCO: apunta, que no te den, esquiva = más daño, cadencia y velocidad",
+                      "FOKUS: zielen, nicht treffen lassen, ausweichen = mehr Schaden, Feuerrate & Tempo",
+                      "ФОКУС: целься, не попадайся, уклоняйся = больше урона, скорострельности и скорости"),
     "fd.appear":   _T("Haritada bir şey var: {0}", "Something on the map: {0}", "Algo en el mapa: {0}",
                       "Etwas auf der Karte: {0}", "Что-то на карте: {0}"),
     "fd.gone":     _T("kaçırdın: {0}", "missed: {0}", "perdido: {0}", "verpasst: {0}", "упущено: {0}"),
@@ -28564,7 +28605,7 @@ EVO_ROMAN = ("", "I", "II", "III")
 EVO_LEVEL = EVO_TIER_LEVEL[0]
 EVO_BOOK_LEVEL = EVO_TIER_BOOK[0]
 EVO_MIN_WEAPONS = 3
-EVO_MAX_PER_RUN = 2
+EVO_MAX_PER_RUN = 4
 EVO_DMG_MULT = EVO_TIER_MULT[0]
 EVO_ROOT_T = 0.5                # zincir / mutlak sıfır: yere çakılma süresi
 EVO_HAVEN_HEAL = 0.02           # zemzem II: suyun içinde saniyede maks canın %2'si
@@ -28831,6 +28872,12 @@ STRINGS.update({
                       "libro raro: basta con tenerlo", "seltenes Buch: Besitz genügt",
                       "редкая книга: достаточно иметь"),
     "evo.watch":  _T("EVRİMİ İZLE", "WATCH EVOLUTION", "VER EVOLUCIÓN", "EVOLUTION ANSEHEN", "СМОТРЕТЬ ЭВОЛЮЦИЮ"),
+    "ui.evo_table": _T("EVRİMLER", "EVOLUTIONS", "EVOLUCIONES", "EVOLUTIONEN", "ЭВОЛЮЦИИ"),
+    "ui.evo_table_sub": _T("Silah + eş kitap. I: Lv{0} + kitap Lv{1}  ·  II: Lv{2} + kitap Lv{3}  ·  III: Lv{4} + kitap Lv{5}. Şartlar tamamsa seviye atlarken mor EVRİM kartı çıkar.",
+                           "Weapon + paired book. I: Lv{0} + book Lv{1}  ·  II: Lv{2} + book Lv{3}  ·  III: Lv{4} + book Lv{5}. Then a purple EVOLUTION card shows up on level-up.",
+                           "Arma + libro pareja. I: Nv{0} + libro Nv{1}  ·  II: Nv{2} + libro Nv{3}  ·  III: Nv{4} + libro Nv{5}.",
+                           "Waffe + Partnerbuch. I: St.{0} + Buch St.{1}  ·  II: St.{2} + Buch St.{3}  ·  III: St.{4} + Buch St.{5}.",
+                           "Оружие + книга. I: Ур.{0} + книга Ур.{1}  ·  II: Ур.{2} + книга Ур.{3}  ·  III: Ур.{4} + книга Ур.{5}."),
     "ui.badge_book": _T("KİTAP", "BOOK", "LIBRO", "BUCH", "КНИГА"),
     "ui.evo_pair_of": _T("BU KİTAPLA EVRİLEN SİLAH", "WEAPON THIS BOOK EVOLVES", "ARMA QUE EVOLUCIONA",
                          "WAFFE, DIE ES ENTWICKELT", "ОРУЖИЕ ДЛЯ ЭВОЛЮЦИИ"),
@@ -32344,7 +32391,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
         if DMG_SRC[0] == "gun":
             p.add_focus(FOCUS_KILL)
         gain = (e.score * combo_mult * (1.0 + self.curse_score_bonus) * SCORE_GAIN
-                * p.focus_score_mult() + self.score_frac)
+                * p.focus_score_mult() * DIFF_SCORE.get(self.diff, 1.0) + self.score_frac)
         self.score += int(gain)
         self.score_frac = gain - int(gain)
         if not getattr(e, "raised", False):
@@ -32774,6 +32821,9 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
                         # patron avcısı kitabı: patron ve elitlere ek hasar
                         if p.boss_hunter > 0 and (getattr(e, "is_boss", False) or e.kind == "elite"):
                             dmg *= (1.0 + p.boss_hunter_bonus())
+                        # buz kırığı: yavaşlamış düşmana ek hasar
+                        if p.shatter_level > 0 and getattr(e, "slow_timer", 0.0) > 0:
+                            dmg *= 1.0 + 0.10 * p.shatter_level
                         dmg = self._apply_execute(p, e, dmg)
                         kx, ky = norm_dir(p.x, p.y, e.x, e.y)
                         kb = 12 if getattr(e, "is_boss", False) else 90
@@ -32791,6 +32841,9 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
                         # hasar.
                         if p.poison_level > 0 and hasattr(e, "apply_poison"):
                             e.apply_poison(3.0 * p.poison_level)
+                        # şok mermisi: %8 x seviye ihtimalle 2 düşmana sıçrar
+                        if p.shock_level > 0 and random.random() < 0.08 * p.shock_level:
+                            self.evo_chain(e, dmg * 0.6, "shock")
                         if p.vamp_level > 0:
                             p.lifesteal(dmg * 0.02 * p.vamp_level)
                         self.fx.burst((proj.x + e.x) / 2, (proj.y + e.y) / 2,
@@ -34613,9 +34666,9 @@ QUEST_DEFS = {
     "cave":   ("ghost", (190, 120, 255), (None, 1, 2)),
 }
 # "elmas çok kazanıyoruz, %50 azalt": 14/28/56 -> 7/14/28.
-QUEST_GEMS = (7, 14, 28)                         # kolay / orta / zor ödülü (-%50)
+QUEST_GEMS = (4, 7, 14)                          # kolay / orta / zor ödülü (yine -%50)
 # Koşu sonunda toplanan altının elmasa dönüşme oranı (2 kişilik de bunu kullanır).
-RUN_GEM_RATE = 0.0336           # elmas -%50 (0.0672 -> 0.0336)
+RUN_GEM_RATE = 0.0168           # elmas yine -%50 (0.0336 -> 0.0168)
 QUEST_TIER_COLORS = ((110, 220, 140), (100, 160, 240), (170, 120, 230))
 
 BIOME_STYLE["frost"] = dict(BIOME_STYLE["arena"], **{
@@ -37167,7 +37220,8 @@ def draw_hud(surf, run, t):
         size = (VIRTUAL_W, HUD_TOP_H)
         mob_layer(surf, "hud_top", run, t, 0, size, lambda b: _draw_hud_top(b, run, t))
         mob_layer(surf, "hud_map", run, t, 2, size,
-                  lambda b: (draw_minimap(b, run, t), _draw_key_counter(b, run, t)))
+                  lambda b: (draw_minimap(b, run, t), _draw_key_counter(b, run, t),
+                                    _draw_badges(b, run, t)))
     else:
         hud_layer(surf, "top", run, t, lambda b: _draw_hud_top(b, run, t), 0)
     _draw_hud_center(surf, run, t)
@@ -37498,10 +37552,20 @@ def _draw_hud_top(surf, run, t):
         draw_icon(surf, pr_.x + 10, pr_.centery, "shield", (255, 160, 120), 5)
         draw_text(surf, ptxt, (pr_.x + 18, pr_.y + 2), 10, (255, 180, 150), bold=True, shadow=False)
 
-    icon_x = rx
+
+
+def _draw_badges(surf, run, t):
+    """Pazardan/kitaplardan gelen etkilerin rozetleri: küçük haritanın (ve
+    anahtar sayacının) altında, koyu bir panelde 7'şerli ızgara. Eskiden skor
+    kutusunun altına tek sıra diziliyordu; çoğalınca harita başlığının ve zırh
+    delme rozetinin üstüne biniyordu."""
+    p = run.player
     badges = []
     if p.fire_level: badges.append(("bolt", ORANGE, p.fire_level))
     if p.ice_level: badges.append(("target", CYAN, p.ice_level))
+    if getattr(p, "poison_level", 0): badges.append(("drop", (150, 230, 100), p.poison_level))
+    if getattr(p, "shock_level", 0): badges.append(("bolt", (255, 236, 120), p.shock_level))
+    if getattr(p, "shatter_level", 0): badges.append(("snow", (170, 230, 255), p.shatter_level))
     if p.shield_charges: badges.append(("shield", (160, 170, 200), p.shield_charges))
     if p.pierce_bonus: badges.append(("sword", RED, p.pierce_bonus))
     if p.multishot_level: badges.append(("star", PURPLE, p.multishot_level))
@@ -37518,11 +37582,29 @@ def _draw_hud_top(surf, run, t):
     if p.angel_wing: badges.append(("boot", (220, 240, 255), p.angel_wing))
     if p.purgatory_level: badges.append(("shield", (255, 215, 120), p.purgatory_level))
     if p.execute_threshold > 0: badges.append(("sword", GOLD, round(p.execute_threshold * 100)))
-    by = 62
-    for kind, col, lvl in badges[:14]:
-        icon_x -= 26
-        draw_icon(surf, icon_x, by, kind, col, 11)
-        draw_text(surf, f"x{lvl}", (icon_x + 12, by + 6), 11, col, shadow=False)
+    if not badges:
+        return
+    badges = badges[:21]
+    mr = minimap_rect(False)
+    y0 = mr.bottom + 6
+    chest = getattr(run, "legend_chest", None)
+    if (chest is not None and not chest.opened) or getattr(run, "map_keys", None):
+        y0 += 28                       # anahtar sayacının altına
+    per = 7
+    cw, ch = 28, 26
+    rows = (len(badges) + per - 1) // per
+    cols = min(per, len(badges))
+    panel_r = pygame.Rect(0, 0, cols * cw + 8, rows * ch + 6)
+    panel_r.topright = (mr.right, y0)
+    bg = pygame.Surface(panel_r.size, pygame.SRCALPHA)
+    pygame.draw.rect(bg, (18, 13, 16, 190), bg.get_rect(), border_radius=8)
+    surf.blit(bg, panel_r.topleft)
+    for i, (kind, col, lvl) in enumerate(badges):
+        cx = panel_r.right - 4 - cw * (i % per) - cw / 2
+        cy = panel_r.y + 3 + ch * (i // per) + 9
+        draw_icon(surf, cx, cy, kind, col, 8)
+        txt = "x%d" % lvl
+        draw_text(surf, txt, (cx, cy + 12), 9, col, bold=True, center=True, shadow=False)
 
 
 def draw_focus_bar(surf, p, t):
@@ -38061,7 +38143,8 @@ def draw_run(surf, run, t, aim_pos=None, shake=(0, 0), world_only=False):
     _MOB_FRAME[0] += 1
     draw_hud(surf, run, t)
     if not MOBILE:              # telefonda ikisi de draw_hud'un hazır görüntüsünde
-        hud_layer(surf, "map", run, t, lambda b: (draw_minimap(b, run, t), _draw_key_counter(b, run, t)), 1)
+        hud_layer(surf, "map", run, t, lambda b: (draw_minimap(b, run, t), _draw_key_counter(b, run, t),
+                                    _draw_badges(b, run, t)), 1)
     # M ile açılan büyük harita: küçük haritanın aynısı, ekranın ortasında.
     # Oyun bu sırada durmaz - harita bir mola değil, bir bakış.
     if getattr(run, "show_map", False):
@@ -52389,6 +52472,9 @@ class App:
         if self.replay.playing():
             self.replay.stop()
             return
+        if getattr(self, "pause_evo", False):
+            self.pause_evo = False              # ESC: önce evrim tablosu kapanır
+            return
         if self.state == STATE_LOGIN and self.contact is not None:
             self.contact = None
             return
@@ -52820,6 +52906,69 @@ class App:
             self.save.data.setdefault("settings", {})["hud_scale"] = hud_scale_pct()
             self.save.save()
 
+    def _draw_evo_table(self, canvas, mouse_pos, clicked):
+        """Mola > EVRİMLER: 20 silahın eş kitabı ve üç evrim kademesi. Bu koşuda
+        taşınan silahlar vurgulu; seviye / kitap seviyesi / ulaşılan kademe yazar."""
+        run = self.run
+        p = run.player if run is not None else None
+        pr = pygame.Rect(0, 0, 1240, 690)
+        pr.center = (VIRTUAL_W // 2, VIRTUAL_H // 2)
+        panel(canvas, pr, bg=(30, 22, 26), edge=(150, 110, 220), alpha=248, radius=16, edge_w=2)
+        draw_text(canvas, L("ui.evo_table"), (pr.centerx, pr.y + 22), 28, (200, 150, 255), bold=True, center=True)
+        draw_text(canvas, L("ui.evo_table_sub", EVO_TIER_LEVEL[0], EVO_TIER_BOOK[0], EVO_TIER_LEVEL[1],
+                            EVO_TIER_BOOK[1], EVO_TIER_LEVEL[2], EVO_TIER_BOOK[2]),
+                  (pr.centerx, pr.y + 50), 12, TEXT_DIM, center=True, shadow=False)
+        keys = [w["key"] for w in BOSS_WEAPONS if w["key"] in EVOLUTIONS]
+        mine = [k for k in keys if p is not None and k in p.weapons]
+        keys = mine + [k for k in keys if k not in mine]       # bu koşudakiler üstte
+        cols, per = 2, (len(keys) + 1) // 2
+        top = pr.y + 70
+        rh = min(58, (pr.bottom - 56 - top) / max(1, per))
+        cw = (pr.w - 40) / cols
+        for i, key in enumerate(keys):
+            w = WEAPON_BY_KEY[key]
+            bk = BOOK_BY_KEY.get(EVOLUTIONS[key][0])
+            c_, r_ = i // per, i % per
+            row = pygame.Rect(int(pr.x + 16 + c_ * (cw + 8)), int(top + r_ * rh), int(cw - 8), int(rh - 4))
+            have = p is not None and key in p.weapons
+            tier = evo_tier(p, key) if (p is not None and getattr(p, "evolved", None)) else 0
+            pygame.draw.rect(canvas, (52, 38, 58) if have else (38, 29, 32), row, border_radius=9)
+            ink_frame(canvas, row, evo_color(key, max(1, tier)) if have else None, 9, 1)
+            blit_sigil(canvas, row.x + 24, row.centery, 15, key, tuple(w["color"]))
+            nx = row.x + 48
+            draw_text(canvas, _fit_text(w_name(w), 13, 132, bold=True), (nx, row.y + 4), 13,
+                      TEXT if have else (200, 192, 196), bold=True, shadow=False)
+            sub = "+ " + (bk_name(bk) if bk else EVOLUTIONS[key][0])
+            draw_text(canvas, _fit_text(sub, 10, 132), (nx, row.y + 21), 10, (170, 210, 170), shadow=False)
+            if have:
+                lv = p.weapons.get(key, 0)
+                blv = p.books.get(EVOLUTIONS[key][0], 0) if bk else 0
+                draw_text(canvas, _fit_text("Lv %d  ·  %s Lv %d" % (lv, L("ui.badge_book"), blv), 9, 132, bold=True),
+                          (nx, row.y + 34), 9, GOLD, bold=True, shadow=False)
+            # üç kademe: üstte "I · Lv10 + 3", altta evrim adı (tam genişlik)
+            tx = row.x + 186
+            tw_ = (row.right - tx - 6) / 3.0
+            for t_ in range(1, 4):
+                col = evo_color(key, t_)
+                done = tier >= t_
+                cx_ = tx + (t_ - 1) * tw_
+                rr = pygame.Rect(int(cx_), row.y + 4, int(tw_ - 5), row.h - 8)
+                pygame.draw.rect(canvas, scale_col(col, 0.28) if done else (30, 22, 26), rr, border_radius=7)
+                pygame.draw.rect(canvas, col if done else scale_col(col, 0.5), rr, 1, border_radius=7)
+                draw_text(canvas, "%s  ·  Lv %d + %d" % (("I", "II", "III")[t_ - 1], evo_level_need(key, t_),
+                                                         evo_book_need(key, t_)),
+                          (rr.x + 7, rr.y + 4), 9, col if done else TEXT_DIM, bold=True, shadow=False)
+                draw_text(canvas, _fit_text(evo_name(key, t_), 11, rr.w - 12, bold=True), (rr.x + 7, rr.y + 19),
+                          11, col if done else lighten(scale_col(col, 0.8), 0.1), bold=True, shadow=False)
+        cb = pygame.Rect(0, 0, 200, 38)
+        cb.midbottom = (pr.centerx, pr.bottom - 10)
+        hov = cb.collidepoint(mouse_pos)
+        face = key_button(canvas, cb, (120, 100, 90), hov)
+        draw_text(canvas, L("ui.close_esc"), face.center, 14, TEXT, bold=True, center=True, shadow=False)
+        if clicked and hov:
+            self.pause_evo = False
+            sfx("click", 0.5, 0.0)
+
     def update_pause(self, dt, mouse_pos, clicked):
         """Duraklatma ekranı (ESC)."""
         canvas = self.display.canvas
@@ -52827,6 +52976,9 @@ class App:
         overlay = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
         pygame.draw.rect(overlay, (17, 12, 12, 206), overlay.get_rect())
         canvas.blit(overlay, (0, 0))
+        if getattr(self, "pause_evo", False):
+            self._draw_evo_table(canvas, mouse_pos, clicked)
+            return
 
         down = pygame.mouse.get_pressed()[0] and not self.chat.open
         cx = VIRTUAL_W / 2
@@ -52847,6 +52999,17 @@ class App:
                   L("ui.pause_line", self.run.waves.wave, self.run.player.level,
                     fmt_num(self.run.score)),
                   (cx, ty + 30), 14, TEXT_DIM, center=True, shadow=False)
+        # evrim tablosu: hangi silah hangi kitapla evrilir (video izlemeden)
+        er = pygame.Rect(pr.right - 168, pr.y + 14, 150, 34)
+        ehov = er.collidepoint(mouse_pos)
+        face = key_button(canvas, er, (130, 90, 200), ehov)
+        draw_icon(canvas, face.x + 18, face.centery, "star", WHITE, 7)
+        draw_text(canvas, L("ui.evo_table"), (face.centerx + 10, face.centery), 14, WHITE,
+                  bold=True, center=True, shadow=False)
+        if clicked and ehov:
+            self.pause_evo = True
+            sfx("click", 0.6, 0.0)
+            return
 
         # ---- iki sütun: solda görünüm ayarları, sağda düğmeler ----
         colw = 320
@@ -59795,16 +59958,6 @@ class App:
                 perk_txt = _fit_text(TRX(perk_txt), 11, rect.w - 34, bold=True)
                 draw_icon(canvas, rect.centerx - text_width(perk_txt, 11, True) / 2 - 12, rect.y + 150, "star", pcol, 6)
                 draw_text(canvas, perk_txt, (rect.centerx, rect.y + 150), 11, pcol, bold=True, center=True)
-            sid = cos_set_of(item["id"])
-            if sid:
-                # takım: kaç parçası giyili + 3 parçanın bonusu
-                srow = COS_SETS[sid]
-                n_on = cos_set_count(sid, self.save.equipped_cosmetics())
-                scol = srow[1] if n_on >= 3 else scale_col(srow[1], 0.75)
-                draw_text(canvas, "%s  %d/3" % (cos_set_name(sid), n_on), (rect.centerx, rect.y + 168), 10,
-                          scol, bold=True, center=True, shadow=False)
-                draw_text(canvas, _fit_text(TRX(cos_stats_text(srow[5], 0)), 9, rect.w - 20),
-                          (rect.centerx, rect.y + 183), 9, scale_col(scol, 0.9), center=True, shadow=False)
 
             if is_equipped:
                 draw_text(canvas, L("ui.equipped_off"), (rect.centerx, rect.bottom - 18), 10, CYAN, bold=True, center=True)
