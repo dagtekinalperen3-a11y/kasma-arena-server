@@ -36,6 +36,7 @@ import hashlib
 import base64
 import io
 import zlib
+import collections
 import secrets
 import urllib.parse
 import asyncio
@@ -794,7 +795,49 @@ NEW_YEAR_THEME = _new_year_active()
 FPS = 60
 # kare hızı sınırı ayarlardan seçiliyor. Varsayılan 60; güçlü bilgisayarlar
 # 240'a kadar çıkabilir (oyun dt tabanlı, hız değişmez).
-FPS_CHOICES = [60, 90, 120, 144, 165, 240]
+FPS_CHOICES = [60, 90, 120, 144, 165, 240, 360, 0]     # 0 = sınırsız
+
+
+class FrameClock:
+    """pygame Clock yerine hassas kare sınırı. pygame'in tick'i milisaniyeyi
+    tam sayıya yuvarlayıp işletim sisteminin uykusuna güveniyordu; Windows'ta
+    uyku ~1-2 ms geç uyanır, 120 sınırı pratikte ~105 FPS'te kalıyordu. Burada
+    hedef zamana kadar uyunur, son ~1.5 ms kısa bir bekleme döngüsüyle
+    tamamlanır; kare süreleri de perf_counter ile (kesirli ms) ölçülür."""
+
+    def __init__(self):
+        self._last = self._dl = time.perf_counter()
+        self._hist = collections.deque(maxlen=40)
+
+    def tick(self, cap=0):
+        now = time.perf_counter()
+        if cap and cap > 0:
+            per = 1.0 / cap
+            dl = self._dl + per
+            if dl > now:
+                rem = dl - now
+                if rem > 0.002:
+                    time.sleep(rem - 0.0015)
+                while time.perf_counter() < dl:
+                    pass
+                now = time.perf_counter()
+                self._dl = dl
+            else:
+                # geç kaldık: biraz geç kaldıysak açığı kapatmaya izin ver,
+                # çok geride kaldıysak hedefi şimdiye çek (kare yağmuru olmasın)
+                self._dl = dl if now - dl < per else now
+        else:
+            self._dl = now
+        dt = now - self._last
+        self._last = now
+        self._hist.append(dt)
+        return dt * 1000.0
+
+    def get_fps(self):
+        s = sum(self._hist)
+        return len(self._hist) / s if s > 0 else 0.0
+
+
 # ---- silah / eşya efekt görünürlüğü ----
 # Artık %0 ile %100 arasında sürekli bir değer ve oyun içinden (ESC)
 # ayarlanıyor: oyuncu ekranı kalabalıklaştığı anda, oyundan çıkmadan efektleri
@@ -1806,6 +1849,7 @@ STRINGS = {
     "ui.gfx_low":     _T("DÜŞÜK", "LOW", "BAJA", "NIEDRIG", "НИЗКОЕ"),
     "ui.gfx_mid":     _T("ORTA", "MEDIUM", "MEDIA", "MITTEL", "СРЕДНЕЕ"),
     "ui.gfx_high":    _T("YÜKSEK", "HIGH", "ALTA", "HOCH", "ВЫСОКОЕ"),
+    "ui.fps_unlim":   _T("SINIRSIZ", "UNLIMITED", "ILIMITADO", "UNBEGRENZT", "БЕЗ ОГРАНИЧЕНИЙ"),
     "ui.fps_cap":     _T("FPS SINIRI", "FPS LIMIT", "LÍMITE DE FPS", "FPS-GRENZE", "ОГРАНИЧЕНИЕ FPS"),
     "ui.pet_show":    _T("PET GÖRÜNÜMÜ", "SHOW PET", "MOSTRAR MASCOTA", "HAUSTIER ZEIGEN", "ПОКАЗЫВАТЬ ПИТОМЦА"),
     "ui.skill_size":  _T("YETENEK ÇUBUĞU BOYUTU", "SKILL BAR SIZE", "TAMAÑO DE LA BARRA", "GRÖSSE DER LEISTE", "РАЗМЕР ПАНЕЛИ"),
@@ -16769,9 +16813,11 @@ class WhipLash:
         # gerçekten sivrilir, eski hâlindeki gibi kalın bir hortum kalmaz:
         # 2) kamçı - dört katman: kontur, koyu deri, açık deri, kenar ışığı.
         PA(surf, self._ribbon(pts, w + 3.2, 2.0), OUTLINE)
-        PA(surf, self._ribbon(pts, w, 1.0), dark)
+        if gl:
+            PA(surf, self._ribbon(pts, w, 1.0), dark)
         PA(surf, self._ribbon(pts, w * 0.78, 0.8), mid)
-        PA(surf, self._ribbon(pts, w * 0.52, 0.6), body)
+        if gl:
+            PA(surf, self._ribbon(pts, w * 0.52, 0.6), body)
         # Işık şeridi: gövdenin bir yanına kaçmış ince bir hat. Deriye yuvarlak
         # bir hacim veren tek çizgi bu.
         PA(surf, self._ribbon(pts, w * 0.30, 0.5, off=-w * 0.24),
@@ -21641,8 +21687,13 @@ class Enemy:
 
     def _ensure_shared(self, t, r):
         ang = math.atan2(self.face_y, self.face_x)
-        fb = int(round(ang / math.tau * 16)) % 16
-        wb = int(self.walk / Enemy.ATLAS_WALK_STEP) % Enemy.ATLAS_WALK_N
+        # düşük/orta grafik: daha az yön ve yürüme karesi - atlas çabuk dolar,
+        # sonra her kare hazır görüntüden basılır (yeniden çizim yok)
+        _gl = gfx_level()
+        nf = 16 if _gl >= 2 else 8
+        fb = (int(round(ang / math.tau * nf)) % nf) * (16 // nf)
+        wn = Enemy.ATLAS_WALK_N if _gl >= 2 else (24 if _gl == 1 else 14)
+        wb = int(self.walk / (math.tau * 5.0 / wn)) % wn
         if self.kind in Enemy._SHOOTERS:
             sc = self.shoot_cd
             if self.shape in ("j_frog", "d_archer"):
@@ -21656,7 +21707,7 @@ class Enemy:
                getattr(self, "split_gen", 0), fb, wb, 6,
                int(getattr(self, "red_intensity", 0.0) * 6),
                int(getattr(self, "block_flash", 0.0) * 6), sb, self.dash_t > 0,
-               getattr(self, "necro_cd", 9.0) < 1.0)
+               getattr(self, "necro_cd", 9.0) < 1.0, wn)
         if key == self._spr_key:
             return
         ent = Enemy._ATLAS.get(key)
@@ -21666,7 +21717,7 @@ class Enemy:
                 fr[0], fr[1] = t, 0
             ok = self._spr_key or (0,) * 7
             turn = abs(ok[6] - fb) % 16
-            if (self._spr is not None and fr[1] >= Enemy.ATLAS_BUDGET
+            if (self._spr is not None and fr[1] >= (Enemy.ATLAS_BUDGET if _gl >= 2 else 3)
                     and int(r * 2) == ok[4] and min(turn, 16 - turn) < 2):
                 return                    # bütçe doldu: eski kare bir an daha
             fr[1] += 1
@@ -21685,7 +21736,7 @@ class Enemy:
         miss = object()
         saved = [(a, d.get(a, miss)) for a in Enemy._CANON_ATTRS]
         fb, wb, bl, ri, bf, sb = key[6], key[7], key[8], key[9], key[10], key[11]
-        walk = wb * Enemy.ATLAS_WALK_STEP
+        walk = wb * (math.tau * 5.0 / key[14])
         a = fb * math.tau / 16
         global _GLOW_ON_ALPHA
         try:
@@ -36860,8 +36911,9 @@ _HUD_LAYERS = {}
 
 
 def hud_period():
-    """Masaüstü HUD katmanlarının kaç karede bir tazeleneceği (yüksek grafik 2, orta/düşük 3)."""
-    return 2 if gfx_level() >= 2 else 3
+    """Masaüstü HUD katmanlarının kaç karede bir tazeleneceği (yüksek 2, orta 3, düşük 5)."""
+    gl = gfx_level()
+    return 2 if gl >= 2 else (3 if gl == 1 else 5)
 
 
 def hud_layer(surf, name, run, t, draw, phase=0):
@@ -50840,7 +50892,7 @@ class App:
                 pass
         else:
             self.display = _TourDisplay()
-        self.clock = pygame.time.Clock()
+        self.clock = pygame.time.Clock() if IS_WEB else FrameClock()
         self.bg = Background()
         self.t = 0.0
         self.state = STATE_MENU
@@ -56093,7 +56145,8 @@ class App:
         y = pr.y + 88
         cap = CFG.get("fps_cap", 60)
         if self._set_row(canvas, pygame.Rect(rx, y, cw, ROW_H), L("ui.fps_cap"),
-                         f"{cap} FPS  »", CYAN if cap <= 144 else ORANGE, mouse_pos, clicked):
+                         (f"{cap} FPS  »" if cap else L("ui.fps_unlim") + "  »"),
+                         CYAN if 0 < cap <= 144 else ORANGE, mouse_pos, clicked):
             i = FPS_CHOICES.index(cap) if cap in FPS_CHOICES else 0
             st["fps_cap"] = FPS_CHOICES[(i + 1) % len(FPS_CHOICES)]
             save_cfg()
