@@ -3562,12 +3562,11 @@ def _coop_top(n):
     rows = (supabase.table("coop_scores").select("*").order("score", desc=True).limit(1000)
             .execute().data or [])
     rows.sort(key=lambda r: float(r.get("score") or 0), reverse=True)
-    out, seen = [], set()
+    out = []
     for r in rows:
+        # aynı ikili tabloda birden çok kez yer alabilir (tek kişilikteki gibi:
+        # hem 1. hem 2. olabilirsin) - her koşu kendi satırı
         pk = r.get("pair_key")
-        if pk in seen:
-            continue                     # aynı ikili tabloda bir kez (en iyi koşusu)
-        seen.add(pk)
         d = r.get("details")
         if isinstance(d, str):
             try:

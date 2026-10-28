@@ -1897,6 +1897,18 @@ STRINGS = {
     "ui.chest":       _T("PATRON SANDIĞI", "BOSS CHEST", "COFRE DEL JEFE", "BOSS-TRUHE", "СУНДУК БОССА"),
     "ui.chest_hint":  _T("yaklaş ve aç", "walk up to open", "acércate para abrir", "herangehen zum Öffnen", "подойди, чтобы открыть"),
     "ui.hell_gate":   _T("CEHENNEM KAPISI", "HELL GATE", "PUERTA DEL INFIERNO", "HÖLLENTOR", "ВРАТА АДА"),
+    "hell.not_ready": _T("EVRİMSİZ GİRME: CEHENNEM ÇOK GÜÇLÜ", "DON'T ENTER UNEVOLVED: HELL IS BRUTAL",
+                         "NO ENTRES SIN EVOLUCIÓN: EL INFIERNO ES BRUTAL", "NICHT OHNE EVOLUTION: DIE HÖLLE IST BRUTAL",
+                         "БЕЗ ЭВОЛЮЦИИ НЕ ВХОДИ: АД БЕСПОЩАДЕН"),
+    "hell.ready":     _T("HAZIRSIN  ·  EVRİM: {0}", "READY  ·  EVOLUTIONS: {0}", "LISTO  ·  EVOLUCIONES: {0}",
+                         "BEREIT  ·  EVOLUTIONEN: {0}", "ГОТОВ  ·  ЭВОЛЮЦИЙ: {0}"),
+    "hell.warn1":     _T("DAHA GÜÇLÜ OLMALISIN!", "YOU NEED MORE POWER!", "¡NECESITAS MÁS PODER!",
+                         "DU BRAUCHST MEHR KRAFT!", "НУЖНО БОЛЬШЕ СИЛЫ!"),
+    "hell.warn2":     _T("Önce bir silahını evrilt. Yine de girmek için tekrar E.",
+                         "Evolve a weapon first. Press E again to enter anyway.",
+                         "Evoluciona un arma antes. Pulsa E otra vez para entrar igual.",
+                         "Entwickle erst eine Waffe. Nochmal E, um trotzdem reinzugehen.",
+                         "Сначала эволюционируй оружие. Нажми E ещё раз, чтобы войти."),
     "ui.press_e":     _T("GİRMEK İÇİN  E", "PRESS  E  TO ENTER", "PULSA  E  PARA ENTRAR", "E  ZUM BETRETEN", "НАЖМИ  E"),
     "ui.lifesteal_pop": _T("CAN ÇALDI", "LIFESTEAL", "ROBO DE VIDA", "LEBENSRAUB", "ВАМПИРИЗМ"),
     "ui.armor_pct":   _T("ZIRH %{0}", "ARMOR {0}%", "ARMADURA {0}%", "RÜSTUNG {0}%", "БРОНЯ {0}%"),
@@ -8029,30 +8041,31 @@ SKINS = [
     dict(id="ranger", name="Yeşil Öncü",       color=(120, 210, 140), accent=(225, 255, 210), cost=0,
          weapon="crossbow", proj="feather",   aura="motes",   sfx="a", wlen=27,
          desc="İkinci ücretsiz karakter. Hafif ekipmanlı, çevik bir öncü.",
-         perks=["Toplama Menzili +20", "Hareket Hızı +10",
+         perks=["Toplama Menzili +20", "Hareket Hızı +10", "Dash Bekleme Süresi -%10",
                 "Her seviye: Atış Hızı +%0.6 (en çok %30)"],
-         perk_add=dict(base_pickup=20, base_speed=10),
+         perk_add=dict(base_pickup=20, base_speed=10, dash_cd_mult=-0.10),
          perk_level=dict(skin_aspd=(0.006, 0.30))),
     dict(id="crimson", name="Kızıl Şahin",     color=(225, 70, 85),   accent=(255, 190, 160), cost=150,
          weapon="crossbow", proj="feather",   aura="wings",   sfx="a", wlen=26,
          desc="Kanatlarını çırpar, tüy gibi keskin oklar yağdırır.",
-         perks=["Mermi Hızı +%12",
+         perks=["Mermi Hızı +%12", "Kritik Şans +%5",
                 "Her seviye: Kritik Hasar +%1.2 (en çok %60), Hasar +%0.4 (en çok %24)"],
-         perk_add=dict(proj_speed_mult=0.12),
+         perk_add=dict(proj_speed_mult=0.12, crit_chance=0.05),
          perk_level=dict(crit_dmg_mult=(0.012, 0.60), skin_power=(0.004, 0.24))),
     dict(id="royal",   name="Kraliyet Moru",   color=(175, 120, 235), accent=(255, 220, 120), cost=320,
          weapon="scepter",  proj="star",      aura="stars",   sfx="a", wlen=38,
          desc="Tacını takar, asasıyla dönen yıldızlar fırlatır.",
-         perks=["Deneyim Kazancı +%10", "Kritik Hasar +%10",
+         perks=["Deneyim Kazancı +%10", "Kritik Hasar +%10", "Şans +%5",
                 "Her seviye: Kritik Hasar +%1 (en çok %50)"],
-         perk_add=dict(xp_mult=0.10, crit_dmg_mult=0.10),
+         perk_add=dict(xp_mult=0.10, crit_dmg_mult=0.10, luck=0.05),
          perk_level=dict(crit_dmg_mult=(0.010, 0.50))),
     dict(id="cyan",    name="Elektrik Cyan",   color=(100, 225, 225), accent=(230, 255, 255), cost=480,
          weapon="tesla",    proj="lightning", aura="arcs",    sfx="c", wlen=30,
          desc="Tesla bobini. Bedeninde her an bir zincir yıldırım hazır bekler.",
-         perks=["Zincir Yıldırım Lv.2 ile başlar",
+         perks=["Zincir Yıldırım Lv.2 ile başlar", "Atış Hızı +%8",
                 "Her 15 seviyede Zincir Yıldırım +1 (en çok Lv.5)", "Her seviye: Hasar +%0.3"],
          perk_set=dict(chain_level=2),
+         perk_add=dict(skin_aspd=0.08),
          perk_every=dict(chain_level=(15, 5)),
          perk_level=dict(skin_power=(0.003, 0.15))),
     dict(id="shadow",  name="Gölge Suikastçı", color=(58, 52, 82),    accent=(175, 100, 255), cost=400,
@@ -8065,24 +8078,24 @@ SKINS = [
     dict(id="inferno", name="İnferno",         color=(245, 125, 40),  accent=(255, 225, 110), cost=480,
          weapon="cannon",   proj="fireball",  aura="flames",  sfx="d", wlen=28,
          desc="Tepesinde alev, elinde alev topu atan top. Yaktıkça yanar.",
-         perks=["BONK Yarıçapı +%15", "BONK Hasarı +%10",
+         perks=["BONK Yarıçapı +%15", "BONK Hasarı +%10", "Can +30",
                 "Her seviye: Hasar +%0.5 (en çok %30), BONK Hasarı +%1"],
-         perk_add=dict(bonk_radius_mult=0.15, bonk_mult=0.10),
+         perk_add=dict(bonk_radius_mult=0.15, bonk_mult=0.10, base_max_hp=30),
          perk_level=dict(skin_power=(0.005, 0.30), bonk_mult=(0.01, 0.60))),
     dict(id="gold",    name="Altın Efsane",    color=(232, 186, 90),  accent=(255, 245, 190), cost=700,
          weapon="goldgun",  proj="gold",      aura="halo",    sfx="a", wlen=33,
          desc="Halesi ve işlemeli altın tüfeğiyle gerçek bir efsane.",
-         perks=["Altın Kazancı +%20", "Toplama Menzili +20",
+         perks=["Altın Kazancı +%20", "Toplama Menzili +20", "Hasar +%10",
                 "Her seviye: Hasar +%0.4, Şans +%0.2 (en çok %24 / %12)"],
-         perk_add=dict(coin_mult=0.20, base_pickup=20),
+         perk_add=dict(coin_mult=0.20, base_pickup=20, skin_power=0.10),
          perk_level=dict(skin_power=(0.004, 0.24), luck=(0.002, 0.12))),
     dict(id="prism",   name="Prizma",          color=(255, 120, 200), accent=(255, 255, 255), cost=1000,
          weapon="crystal",  proj="prism",     aura="prism",   sfx="c", wlen=30,
          desc="Sürekli renk değiştiren kristal silah ve mermiler.",
-         perks=["Çoklu Atış Lv. +1", "Mermi Hızı +%10",
-                "Her seviye: Hasar +%0.4 (en çok %24)"],
-         perk_add=dict(multishot_level=1, proj_speed_mult=0.10),
-         perk_level=dict(skin_power=(0.004, 0.24))),
+         perks=["Çoklu Atış Lv. +1", "Mermi Hızı +%10", "Mermi Delme +1", "Kritik Şans +%6",
+                "Her seviye: Hasar +%0.6 (en çok %36)"],
+         perk_add=dict(multishot_level=1, proj_speed_mult=0.10, pierce_bonus=1, crit_chance=0.06),
+         perk_level=dict(skin_power=(0.006, 0.36))),
 
     # ---- yeni: özel yetenekli skinler (elmasla alınan kalıcı avantajlar) ----
     dict(id="shadow_hunter", name="Gölge Avcı", color=(52, 44, 78), accent=(200, 150, 255), cost=650,
@@ -8095,20 +8108,20 @@ SKINS = [
     dict(id="frost_witch", name="Buz Büyücüsü", color=(160, 225, 255), accent=(255, 255, 255), cost=850,
          weapon="scepter", proj="star", aura="stars", sfx="a", wlen=36,
          desc="Asasının ucu buz gibi soğuk. Düşmanları donduran kristaller fırlatır.",
-         perks=["Buz Lv.2 ile başlar (yavaşlatma)", "Kritik Vuruş Şansı +%8",
+         perks=["Buz Lv.2 ile başlar (yavaşlatma)", "Kritik Vuruş Şansı +%8", "Hasar +%6",
                 "Her 15 seviyede Buz +1 (en çok Lv.5)", "Her seviye: Hasar +%0.3"],
          perk_set=dict(ice_level=2),
-         perk_add=dict(crit_chance=0.08),
+         perk_add=dict(crit_chance=0.08, skin_power=0.06),
          perk_every=dict(ice_level=(15, 5)),
          perk_level=dict(skin_power=(0.003, 0.18))),
     dict(id="blood_countess", name="Kan Kontesi", color=(200, 30, 55), accent=(255, 120, 130), cost=850,
          weapon="flask", proj="toxic", aura="bubbles", sfx="d", wlen=24,
          desc="Şişesinde kendi kanını taşır. Her vuruşta biraz can çalar.",
-         perks=["Kan Emme Lv.2 ile başlar", "Can Yenilenmesi +0.8/sn",
+         perks=["Kan Emme Lv.2 ile başlar", "Can Yenilenmesi +0.8/sn", "Hasar +%6",
                 "Her 15 seviyede Kan Emme +1 (en çok Lv.5)",
                 "Her seviye: saniyede maks canın %0.012'si yenilenir (en çok %0.6)"],
          perk_set=dict(vamp_level=2),
-         perk_add=dict(base_regen=0.8),
+         perk_add=dict(base_regen=0.8, skin_power=0.06),
          perk_every=dict(vamp_level=(15, 5)),
          perk_level=dict(regen_pct=(0.00012, 0.006))),
     dict(id="iron_sentinel", name="Zırhlı Devriye", color=(120, 128, 145), accent=(230, 235, 245), cost=750,
@@ -8121,10 +8134,10 @@ SKINS = [
     dict(id="storm_bringer", name="Fırtına Getirici", color=(90, 150, 245), accent=(230, 245, 255), cost=1200,
          weapon="cannon", proj="fireball", aura="flames", sfx="c", wlen=29,
          desc="Gökyüzünü kendine bağlamış. Etrafına düzenli yıldırım fırtınası çağırır.",
-         perks=["Fırtına Lv.1 ile başlar (periyodik alan hasarı)", "Mermi Hızı +%18",
+         perks=["Fırtına Lv.1 ile başlar (periyodik alan hasarı)", "Mermi Hızı +%18", "Atış Hızı +%8",
                 "Her 12 seviyede Fırtına +1 (en çok Lv.5)", "Her seviye: Hasar +%0.3"],
          perk_set=dict(storm_level=1),
-         perk_add=dict(proj_speed_mult=0.18),
+         perk_add=dict(proj_speed_mult=0.18, skin_aspd=0.08),
          perk_every=dict(storm_level=(12, 5)),
          perk_level=dict(skin_power=(0.003, 0.18))),
 
@@ -8132,38 +8145,39 @@ SKINS = [
     dict(id="venom_striker", name="Zehir Vuruşçu", color=(90, 205, 115), accent=(220, 255, 210), cost=600,
          weapon="flask", proj="toxic", aura="bubbles", sfx="d", wlen=25,
          desc="Zehirli şişesiyle yakın dövüşe girer, teması bile acıtır.",
-         perks=["Dikenler Lv.1 ile başlar (temas hasarına karşılık verir)", "Can Yenilenmesi +0.5/sn",
+         perks=["Dikenler Lv.1 ile başlar (temas hasarına karşılık verir)", "Can Yenilenmesi +0.5/sn", "Hasar +%8",
                 "Her 12 seviyede Dikenler +1 (en çok Lv.5)",
                 "Her seviye: saniyede maks canın %0.01'i yenilenir (en çok %0.5)"],
          perk_set=dict(thorns_level=1),
-         perk_add=dict(base_regen=0.5),
+         perk_add=dict(base_regen=0.5, skin_power=0.08),
          perk_every=dict(thorns_level=(12, 5)),
          perk_level=dict(regen_pct=(0.0001, 0.005))),
     dict(id="homing_falcon", name="Yönelmeli Şahin", color=(90, 160, 245), accent=(220, 240, 255), cost=700,
          weapon="crossbow", proj="feather", aura="wings", sfx="a", wlen=27,
          desc="Okları hedefi asla şaşırmaz; havada bile yön değiştirir.",
-         perks=["Yönelme Lv.1 ile başlar (mermiler hedefe yönelir)", "Dash Bekleme Süresi -%10",
+         perks=["Yönelme Lv.1 ile başlar (mermiler hedefe yönelir)", "Dash Bekleme Süresi -%10", "Hasar +%10",
                 "Her 15 seviyede Yönelme +1 (en çok Lv.4)", "Her seviye: Hasar +%0.4 (en çok %24)"],
          perk_set=dict(homing_level=1),
-         perk_add=dict(dash_cd_mult=-0.10),
+         perk_add=dict(dash_cd_mult=-0.10, skin_power=0.10),
          perk_every=dict(homing_level=(15, 4)),
          perk_level=dict(skin_power=(0.004, 0.24))),
     dict(id="frenzy_beast", name="Çılgın Canavar", color=(220, 60, 40), accent=(255, 180, 90), cost=800,
          weapon="cannon", proj="fireball", aura="flames", sfx="d", wlen=28,
          desc="Ne kadar çok vurursa o kadar çılgınlaşır, durmak bilmez.",
-         perks=["Çılgınlık Lv.1 ile başlar (ardışık vuruşta güçlenir)", "Can +20",
-                "Her 15 seviyede Çılgınlık +1 (en çok Lv.4)", "Her seviye: Can +3 (en çok +180)"],
-         perk_set=dict(frenzy_level=1),
-         perk_add=dict(base_max_hp=20),
+         perks=["Çılgınlık Lv.2 ile başlar (ardışık vuruşta güçlenir)", "Can +40", "Hasar +%10",
+                "Her 15 seviyede Çılgınlık +1 (en çok Lv.4)",
+                "Her seviye: Can +3 (en çok +180), Hasar +%0.4 (en çok %24)"],
+         perk_set=dict(frenzy_level=2),
+         perk_add=dict(base_max_hp=40, skin_power=0.10),
          perk_every=dict(frenzy_level=(15, 4)),
-         perk_level=dict(_hp=(3, 180))),
+         perk_level=dict(_hp=(3, 180), skin_power=(0.004, 0.24))),
     dict(id="orbit_guardian", name="Yörünge Bekçisi", color=(70, 200, 190), accent=(220, 255, 250), cost=900,
          weapon="scepter", proj="star", aura="stars", sfx="a", wlen=37,
          desc="Etrafında dönen bir yıldız kalkanı ile korunur.",
-         perks=["Yörünge Lv.1 ile başlar (etrafında dönen mermi)", "Zırh +%5",
+         perks=["Yörünge Lv.1 ile başlar (etrafında dönen mermi)", "Zırh +%5", "Can +30",
                 "Her 12 seviyede Yörünge +1 (en çok Lv.5)", "Her seviye: Hasar Alma -%0.2 (en çok %12)"],
          perk_set=dict(orbit_level=1),
-         perk_add=dict(base_armor=0.05),
+         perk_add=dict(base_armor=0.05, base_max_hp=30),
          perk_every=dict(orbit_level=(12, 5)),
          perk_level=dict(dmg_taken_mult=(-0.002, -0.12))),
     # premium skinler - elmasla değil, gerçek parayla alınır.
@@ -8207,18 +8221,18 @@ SKINS = [
          weapon="scepter", proj="star", aura="halo", sfx="a", wlen=36,
          desc="Tepeden tırnağa pembe. Stiliyle olduğu kadar gücüyle de göz doldurur. "
               "Pembe şapka, gözlük ve pelerinle tamamla.",
-         perks=["Can Yenilenmesi +0.6/sn", "Kritik Şans +%10", "Toplama Menzili +25",
+         perks=["Can Yenilenmesi +0.6/sn", "Kritik Şans +%10", "Toplama Menzili +25", "Hasar +%8",
                 "Her seviye: saniyede maks canın %0.01'i yenilenir, Kritik Şans +%0.1"],
-         perk_add=dict(base_regen=0.6, crit_chance=0.10, base_pickup=25),
+         perk_add=dict(base_regen=0.6, crit_chance=0.10, base_pickup=25, skin_power=0.08),
          perk_level=dict(regen_pct=(0.0001, 0.005), crit_chance=(0.001, 0.06))),
 
     # şans skini (Megabonk'taki Tilki gibi): şansı seviyeyle büyür.
     dict(id="lucky_fox", name="Kurnaz Tilki", color=(240, 140, 60), accent=(255, 236, 214), cost=900,
          weapon="crossbow", proj="feather", aura="stars", sfx="b", wlen=27,
          desc="Kuyruğunda uğur taşıyan kurnaz bir tilki: seviye atladıkça şansı da büyür.",
-         perks=["Şans +%5 ile başlar", "Her seviye atladığında Şans +%1",
+         perks=["Şans +%5 ile başlar", "Her seviye atladığında Şans +%1", "Hasar +%8",
                 "Her seviye: Hasar +%0.2 (en çok %12)"],
-         perk_add=dict(luck=0.05, luck_per_level=0.01),
+         perk_add=dict(luck=0.05, luck_per_level=0.01, skin_power=0.08),
          perk_level=dict(skin_power=(0.002, 0.12))),
 
     # yeni skin: kozmik gezgin - çevresinde minik gezegenler döner, yeteneği
@@ -8358,6 +8372,9 @@ SKIN_ULTS = {
                        desc="Maks canının %25'ini yeniler, 6 saniye kritik şansın %25 artar ve "
                             "çevredeki düşmanlar korkup kaçar."),
 }
+
+# yetenek hasarı = (bu kadar saniyelik tam atış) x yeteneğin çarpanı
+ULT_DPS_K = 0.55
 
 # Ortak kural: her yetenek düşmanları bu kadar süre dondurur.
 ULT_FREEZE_ON_CAST = 0.5
@@ -8584,6 +8601,151 @@ COSMETICS = [
          perk_text="Zırh +%3", perk_add=dict(base_armor=0.03)),
 ]
 COSMETIC_BY_ID = {c["id"]: c for c in COSMETICS}
+
+# ---- kıyafet güçleri + takımlar ----
+# "Kıyafet özellikleri çok boş": her parça artık temasına uygun iki güç verir
+# (fiyatla ölçekli) ve aynı takımın üç parçası (şapka + gözlük + pelerin)
+# birlikte giyilince ayrıca TAKIM bonusu gelir.
+COS_STATS = {
+    # anahtar: (oyuncu alanı, biçim, tr, en, es, de, ru)
+    "speed": ("base_speed", "flat", "Hareket Hızı +{v}", "Move Speed +{v}", "Velocidad +{v}", "Tempo +{v}", "Скорость +{v}"),
+    "hp": ("base_max_hp", "flat", "Can +{v}", "HP +{v}", "Vida +{v}", "Leben +{v}", "Здоровье +{v}"),
+    "regen": ("base_regen", "regen", "Can Yenilenmesi +{v}/sn", "HP Regen +{v}/s", "Regeneración +{v}/s",
+              "Regeneration +{v}/s", "Реген +{v}/с"),
+    "xp": ("xp_mult", "pct", "Deneyim +%{v}", "XP +{v}%", "EXP +{v}%", "EP +{v}%", "Опыт +{v}%"),
+    "gold": ("coin_mult", "pct", "Altın +%{v}", "Gold +{v}%", "Oro +{v}%", "Gold +{v}%", "Золото +{v}%"),
+    "dmg": ("skin_power", "pct", "Hasar +%{v}", "Damage +{v}%", "Daño +{v}%", "Schaden +{v}%", "Урон +{v}%"),
+    "crit": ("crit_chance", "pct", "Kritik Şans +%{v}", "Crit Chance +{v}%", "Prob. crítica +{v}%",
+             "Krit. Chance +{v}%", "Шанс крита +{v}%"),
+    "critd": ("crit_dmg_mult", "pct", "Kritik Hasar +%{v}", "Crit Damage +{v}%", "Daño crítico +{v}%",
+              "Krit. Schaden +{v}%", "Крит. урон +{v}%"),
+    "aspd": ("skin_aspd", "pct", "Atış Hızı +%{v}", "Fire Rate +{v}%", "Cadencia +{v}%", "Feuerrate +{v}%",
+             "Скорострельность +{v}%"),
+    "armor": ("base_armor", "pct", "Zırh +%{v}", "Armor +{v}%", "Armadura +{v}%", "Rüstung +{v}%", "Броня +{v}%"),
+    "pickup": ("base_pickup", "flat", "Toplama Menzili +{v}", "Pickup Range +{v}", "Alcance de recogida +{v}",
+               "Aufsammelweite +{v}", "Радиус подбора +{v}"),
+    "luck": ("luck", "pct", "Şans +%{v}", "Luck +{v}%", "Suerte +{v}%", "Glück +{v}%", "Удача +{v}%"),
+    "dashcd": ("dash_cd_mult", "neg", "Dash Bekleme -%{v}", "Dash Cooldown -{v}%", "Recarga de dash -{v}%",
+               "Dash-Abklingzeit -{v}%", "Перезарядка рывка -{v}%"),
+    "dashd": ("dash_dist_mult", "pct", "Dash Mesafesi +%{v}", "Dash Distance +{v}%", "Distancia de dash +{v}%",
+              "Dash-Weite +{v}%", "Дальность рывка +{v}%"),
+    "pspeed": ("proj_speed_mult", "pct", "Mermi Hızı +%{v}", "Projectile Speed +{v}%", "Vel. de proyectil +{v}%",
+               "Geschosstempo +{v}%", "Скорость снарядов +{v}%"),
+    "bonk": ("bonk_mult", "pct", "BONK Hasarı +%{v}", "BONK Damage +{v}%", "Daño de BONK +{v}%",
+             "BONK-Schaden +{v}%", "Урон БОНК +{v}%"),
+    "bonkr": ("bonk_radius_mult", "pct", "BONK Alanı +%{v}", "BONK Area +{v}%", "Área de BONK +{v}%",
+              "BONK-Fläche +{v}%", "Область БОНК +{v}%"),
+    "taken": ("dmg_taken_mult", "neg", "Hasar Alma -%{v}", "Damage Taken -{v}%", "Daño recibido -{v}%",
+              "Erlittener Schaden -{v}%", "Получаемый урон -{v}%"),
+}
+COS_PERKS = {
+    "cap_red": (("speed", 12), ("dashcd", 0.05)), "wizard_hat": (("xp", 0.12), ("crit", 0.03)),
+    "crown_gold": (("gold", 0.15), ("luck", 0.05)), "halo_ring": (("regen", 0.8), ("hp", 20)),
+    "beanie_gray": (("gold", 0.08), ("pickup", 15)), "viking_helm": (("hp", 35), ("bonk", 0.10)),
+    "ninja_hood": (("dashd", 0.15), ("crit", 0.04)), "flower_crown": (("regen", 0.5), ("luck", 0.08)),
+    "top_hat": (("xp", 0.10), ("gold", 0.08)), "dragon_horns": (("bonk", 0.15), ("dmg", 0.06)),
+    "space_helmet": (("armor", 0.06), ("pickup", 20)), "pink_bow": (("crit", 0.06), ("speed", 8)),
+    "shades": (("crit", 0.05), ("pspeed", 0.06)), "goggles": (("armor", 0.04), ("pspeed", 0.08)),
+    "monocle": (("xp", 0.08), ("critd", 0.08)), "visor": (("pspeed", 0.12), ("aspd", 0.04)),
+    "round_glasses": (("pickup", 20), ("xp", 0.04)), "heart_glasses": (("gold", 0.06), ("luck", 0.08)),
+    "steampunk_goggles": (("pspeed", 0.08), ("aspd", 0.05)), "ski_mask": (("taken", 0.05), ("hp", 15)),
+    "laser_visor": (("critd", 0.12), ("crit", 0.03)), "blindfold": (("crit", 0.08), ("critd", 0.08)),
+    "star_glasses": (("bonkr", 0.10), ("luck", 0.05)), "pink_shades": (("speed", 14), ("crit", 0.03)),
+    "cape_red": (("bonk", 0.08), ("hp", 15)), "cape_royal": (("gold", 0.10), ("xp", 0.06)),
+    "cape_shadow": (("dashd", 0.15), ("dashcd", 0.08)), "wings_angelic": (("hp", 40), ("regen", 0.6)),
+    "cape_forest": (("regen", 0.5), ("luck", 0.06)), "cape_ice": (("dashcd", 0.10), ("taken", 0.04)),
+    "cape_flame": (("bonk", 0.10), ("dmg", 0.05)), "cape_storm": (("pspeed", 0.10), ("aspd", 0.05)),
+    "cape_starlight": (("xp", 0.12), ("luck", 0.06)), "cape_bat": (("dashd", 0.10), ("regen", 0.4)),
+    "cape_gold_trim": (("gold", 0.12), ("dmg", 0.05)), "cape_pink": (("hp", 25), ("crit", 0.04)),
+    "cap_blue": (("pspeed", 0.08), ("speed", 6)), "leaf_crown": (("pickup", 18), ("regen", 0.3)),
+    "neon_headband": (("dashcd", 0.08), ("aspd", 0.04)), "ember_horns": (("bonkr", 0.10), ("bonk", 0.08)),
+    "dragon_helm": (("dmg", 0.10), ("hp", 20)), "immortal_helm": (("armor", 0.08), ("hp", 40)),
+    "nightmare_helm": (("speed", 16), ("critd", 0.10)), "crystal_helm": (("crit", 0.07), ("aspd", 0.05)),
+    "leaf_visor": (("regen", 0.4), ("pickup", 12)), "frost_lens": (("taken", 0.05), ("crit", 0.03)),
+    "ember_shades": (("critd", 0.08), ("dmg", 0.04)), "cape_steel": (("armor", 0.06), ("hp", 20)),
+}
+# takım: (ad 5 dil, renk, şapkalar, gözlükler, pelerinler, bonus)
+COS_SETS = {
+    "dragon": (("EJDER TAKIMI", "DRAGON SET", "SET DRAGÓN", "DRACHEN-SET", "НАБОР ДРАКОНА"), (255, 120, 50),
+               ("dragon_horns", "dragon_helm", "ember_horns"), ("ember_shades",), ("cape_flame",),
+               (("dmg", 0.10), ("bonk", 0.15))),
+    "frost": (("BUZ TAKIMI", "FROST SET", "SET ESCARCHA", "FROST-SET", "НАБОР ИНЕЯ"), (150, 220, 255),
+              ("crystal_helm",), ("frost_lens",), ("cape_ice",), (("crit", 0.06), ("taken", 0.06))),
+    "shadow": (("GÖLGE TAKIMI", "SHADOW SET", "SET SOMBRA", "SCHATTEN-SET", "НАБОР ТЕНИ"), (170, 120, 255),
+               ("ninja_hood",), ("blindfold",), ("cape_shadow", "cape_bat"),
+               (("crit", 0.06), ("dashd", 0.15), ("speed", 10))),
+    "royal": (("KRALİYET TAKIMI", "ROYAL SET", "SET REAL", "KÖNIGS-SET", "КОРОЛЕВСКИЙ НАБОР"), (255, 210, 100),
+              ("crown_gold", "top_hat"), ("monocle",), ("cape_royal", "cape_gold_trim"),
+              (("gold", 0.15), ("xp", 0.10))),
+    "nature": (("DOĞA TAKIMI", "NATURE SET", "SET NATURALEZA", "NATUR-SET", "НАБОР ПРИРОДЫ"), (120, 220, 120),
+               ("flower_crown", "leaf_crown"), ("leaf_visor",), ("cape_forest",), (("regen", 1.0), ("luck", 0.08))),
+    "angel": (("MELEK TAKIMI", "ANGEL SET", "SET ÁNGEL", "ENGEL-SET", "НАБОР АНГЕЛА"), (255, 245, 200),
+              ("halo_ring",), ("star_glasses",), ("wings_angelic",), (("hp", 40), ("regen", 0.8))),
+    "pink": (("PEMBE TAKIM", "PINK SET", "SET ROSA", "PINK-SET", "РОЗОВЫЙ НАБОР"), (255, 140, 210),
+             ("pink_bow",), ("pink_shades", "heart_glasses"), ("cape_pink",),
+             (("crit", 0.06), ("speed", 10), ("luck", 0.05))),
+    "tech": (("TEKNOLOJİ TAKIMI", "TECH SET", "SET TECNO", "TECH-SET", "ТЕХНО-НАБОР"), (120, 220, 255),
+             ("space_helmet", "neon_headband"), ("visor", "laser_visor", "steampunk_goggles"), ("cape_storm",),
+             (("aspd", 0.08), ("pspeed", 0.10))),
+    "warrior": (("SAVAŞÇI TAKIMI", "WARRIOR SET", "SET GUERRERO", "KRIEGER-SET", "НАБОР ВОИНА"), (210, 180, 140),
+                ("viking_helm", "immortal_helm"), ("ski_mask", "goggles"), ("cape_red", "cape_steel"),
+                (("armor", 0.06), ("hp", 30))),
+}
+
+
+def _cos_stat_text(key, v, li):
+    st = COS_STATS[key]
+    kind = st[1]
+    if kind in ("pct", "neg"):
+        num = ("%g" % round(abs(v) * 100, 1))
+    elif kind == "regen":
+        num = "%g" % v
+    else:
+        num = "%d" % v
+    return st[2 + li].replace("{v}", num)
+
+
+def cos_stats_text(stats, li=0):
+    return " · ".join(_cos_stat_text(k, v, li) for k, v in stats)
+
+
+def cos_stats_apply(obj, stats):
+    for k, v in stats:
+        attr, kind = COS_STATS[k][0], COS_STATS[k][1]
+        if kind == "neg":
+            v = -abs(v)
+        setattr(obj, attr, getattr(obj, attr, 0) + v)
+
+
+def cos_set_of(cid):
+    for sid, row in COS_SETS.items():
+        if cid in row[2] or cid in row[3] or cid in row[4]:
+            return sid
+    return None
+
+
+def cos_set_count(sid, equipped):
+    """Takımın kaç parçası giyili (0..3)."""
+    row = COS_SETS[sid]
+    eq = equipped or {}
+    return sum(1 for slot, ids in (("hat", row[2]), ("eyewear", row[3]), ("cape", row[4])) if eq.get(slot) in ids)
+
+
+def cos_set_name(sid):
+    return COS_SETS[sid][0][min(4, _LANG_IDX.get(lang(), 0))]
+
+
+for _c in COSMETICS:
+    _st = COS_PERKS.get(_c["id"])
+    if _st:
+        _c["perk_add"] = {}
+        _c["perk_stats"] = _st
+        _c["perk_text"] = cos_stats_text(_st, 0)
+        TEXT_TR[_c["perk_text"]] = tuple(cos_stats_text(_st, i) for i in range(1, 5))
+for _sid, _row in COS_SETS.items():
+    _t = cos_stats_text(_row[5], 0)
+    TEXT_TR[_t] = tuple(cos_stats_text(_row[5], i) for i in range(1, 5))
+
 COSMETIC_SLOTS = ["hat", "eyewear", "cape"]
 SLOT_LABELS = {"hat": "ŞAPKA", "eyewear": "GÖZLÜK", "cape": "PELERİN", "pet": "PET"}
 # Kıyafet marketindeki sekmeler: üç giysi slotu + pet.
@@ -11888,7 +12050,7 @@ SHOP_ITEMS = [
      "tier": 3, "cat": "defense"},
     {"key": "phoenix_ash", "name": "Anka Külü",
      "desc": "Bir kez daha dirilirsin ve saniyede +1.5 can yenilenir",
-     "cost": 520, "cost_mult": 2.8, "max": 2, "icon": "flame", "color": GOLD,
+     "cost": 520, "cost_mult": 2.8, "max": 1, "icon": "flame", "color": GOLD,
      "tier": 4, "cat": "legendary", "legendary": True},
     {"key": "kings_ransom", "name": "Hazine Fermanı",
      "desc": "Altın +%45 ve deneyim +%20, geç dalgalarda market açılır",
@@ -11916,7 +12078,8 @@ SHOP_ITEMS = [
     # Güdüm yeteneği yalnızca yönelmeli şahin skini ve onun özel yeteneğiyle
     # gelir; markette satılmaz.
     {"key": "frenzy",    "name": "Çılgınlık Çekirdeği", "desc": "Ardışık öldürmeler hız ve hasarı artırır", "cost": 100, "cost_mult": 1.8, "max": 5, "icon": "clover", "color": (200, 230, 100), "tier": 3, "cat": "elemental"},
-    {"key": "second_wind", "name": "İkinci Nefes",  "desc": "Öleceğin darbede %50 canla dirilirsin", "cost": 380, "cost_mult": 2.7, "max": 3, "icon": "heart", "color": (255, 215, 120), "tier": 3, "cat": "defense"},
+    # İkinci Nefes (diriliş) pazardan kalktı: diriliş yalnız efsane sekmesinde
+    # (Anka Külü), o da bir kez.
     {"key": "storm",     "name": "Fırtına",         "desc": "Rastgele düşmanlara yıldırım düşer", "cost": 140, "cost_mult": 1.95, "max": 5, "icon": "bolt", "color": (190, 215, 255), "tier": 3, "cat": "elemental"},
     # ---- Tier 4 - efsanevi (Dalga 10+) ----
     {"key": "overcharge", "name": "Aşırı Yük",      "desc": "BONK hasarı ve alanı çok büyük ölçüde artar", "cost": 240, "cost_mult": 2.2, "max": 4, "icon": "fist", "color": GOLD, "tier": 4, "cat": "legendary", "legendary": True},
@@ -13549,6 +13712,14 @@ class Player:
                 setattr(self, attr, getattr(self, attr, 0) + delta)
             for attr, val in item.get("perk_set", {}).items():
                 setattr(self, attr, val)
+            if item.get("perk_stats"):
+                cos_stats_apply(self, item["perk_stats"])
+        # takım bonusu: aynı takımın 3 parçası birlikte
+        self.cos_sets = []
+        for sid, row in COS_SETS.items():
+            if cos_set_count(sid, self.cosmetics) >= 3:
+                cos_stats_apply(self, row[5])
+                self.cos_sets.append(sid)
 
         self.max_hp = self.base_max_hp
         self.hp = float(self.max_hp)
@@ -15225,8 +15396,11 @@ def hell_pick_kind(wave):
 HELL_BASE_WAVE = 25
 # denge düğmeleri. "cehenneme çok güçlü giriyoruz, cehennemi buffla": 1.10 ->
 # 1.25, cehennem yaratıklarına ayrıca %12 hasar.
-HELL_HP_BOOST = 1.60        # cehennem canının taban çarpanı
-HELL_DMG_BOOST = 1.35       # cehennem yaratık hasarının taban çarpanı
+# "25. dalganın gücüyle cehennem basit geliyor": can 1.60 -> 2.50, hasar
+# 1.35 -> 1.65, zırh ve dalga eğrisi de sertleşti. Cehenneme evrimsiz girmek
+# artık zor; kapı da bunu söylüyor (HellPortal).
+HELL_HP_BOOST = 2.50        # cehennem canının taban çarpanı
+HELL_DMG_BOOST = 1.65       # cehennem yaratık hasarının taban çarpanı
 # cehennemin sonu: cehennem 40 dalgadır.
 HELL_FINAL_WAVE = None
 HELL_SPEED_BASE_WAVE = 12   # cehennem 1. dalgasının hız temposu (8 -> 12)
@@ -15240,9 +15414,9 @@ HELL_SPEED_BASE_WAVE = 12   # cehennem 1. dalgasının hız temposu (8 -> 12)
 
 # Cehennemde de zırh var ve dalga başına açılıyor:
 # 25. dalgadan sonra arena yaratıkları zırhlanırken portaldan geçen oyuncu
-HELL_ARMOR_BASE = 0.18          # 0.10 -> 0.13, 0.18
+HELL_ARMOR_BASE = 0.24          # 0.10 -> 0.13, 0.18, 0.24
 HELL_ARMOR_PER_WAVE = 0.018     # 0.014 -> 0.018 (plato kırıldı)
-HELL_ARMOR_MAX = 0.50           # 0.40 -> 0.50
+HELL_ARMOR_MAX = 0.55           # 0.40 -> 0.50, 0.55
 
 # cehennem baskısı - arena_pressure'ın cehennemdeki karşılığı.
 HELL_PRESSURE_FROM = 6          # bu dalgadan sonra devreye girer (12 -> 10, 6)
@@ -15272,7 +15446,7 @@ def hell_hp_mult(wave):
     """Cehennem dalgasının can çarpanı."""
     w = max(1, int(wave))
     base = arena_hp_mult(HELL_BASE_WAVE) * HELL_HP_BOOST
-    curve = 1.0 + (w - 1) * 0.32 + 0.008 * (w - 1) ** 2
+    curve = 1.0 + (w - 1) * 0.38 + 0.010 * (w - 1) ** 2
     return base * curve
 
 
@@ -15319,6 +15493,10 @@ def hell_boss_index(wave):
     return HELL_BOSS_INDEX_BASE + max(0, (int(wave) - HELL_BOSS_FIRST_WAVE) // HELL_BOSS_STEP)
 
 
+HELL_READY_EVOS = 1             # cehennem için önerilen en az evrim
+HELL_CONFIRM_T = 4.0            # evrimsiz girerken ikinci E için süre
+
+
 class HellPortal:
     """25. dalga patronundan sonra açılan mor portal."""
 
@@ -15343,8 +15521,22 @@ class HellPortal:
     def in_range(self, player):
         return dist(self.x, self.y, player.x, player.y) < self.r + 70
 
+    ready = None                    # koşu her karede yazar: kaç silah evrildi
+
     def draw(self, surf, t):
         pulse = 0.5 + 0.5 * math.sin(self.t * 2.4)
+        n_evo = self.ready
+        if n_evo is not None:
+            # hazırlık uyarısı: evrimsiz giren oyuncu ne beklediğini bilsin
+            ok = n_evo >= HELL_READY_EVOS
+            col = (130, 230, 150) if ok else (255, 110, 110)
+            txt = L("hell.ready", n_evo) if ok else L("hell.not_ready")
+            w_ = text_width(txt, 13, True) + 26
+            wr = pygame.Rect(0, 0, w_, 24)
+            wr.center = (int(self.x), int(self.y - self.r - 70))
+            pygame.draw.rect(surf, (30, 14, 22), wr, border_radius=12)
+            ink_frame(surf, wr, col, 12, 2)
+            draw_text(surf, txt, (wr.centerx, wr.centery - 8), 13, col, bold=True, center=True, shadow=False)
         # dış hale
         add_glow(surf, self.x, self.y, self.r * 4.2, HELL_PORTAL_COLOR, 0.30 + 0.16 * pulse)
         add_glow(surf, self.x, self.y, self.r * 2.0, HELL_PORTAL_COLOR2, 0.26 + 0.12 * pulse)
@@ -30029,6 +30221,20 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
         self.waves.announce_text = "CEHENNEM KAPISI AÇILDI - E İLE GİR"
         sfx("boss", 1.0, 0.0)
 
+    def hell_entry_ok(self):
+        """Evrimsiz girişte ilk E yalnız uyarır; birkaç saniye içinde ikinci E girer."""
+        p = self.player
+        if len(getattr(p, "evolved", ()) or ()) >= HELL_READY_EVOS:
+            return True
+        last = getattr(self, "_hell_warned", -99.0)
+        if self.run_time - last <= HELL_CONFIRM_T:
+            return True
+        self._hell_warned = self.run_time
+        self.fx.popup(p.x, p.y - 80, L("hell.warn1"), (255, 120, 110), 22, life=2.6)
+        self.fx.popup(p.x, p.y - 54, L("hell.warn2"), (255, 210, 200), 15, life=2.6)
+        sfx("error", 0.7, 0.0)
+        return False
+
     def enter_hell(self):
         """Portala girildiğinde 2. haritaya (cehennem) geçer."""
         if self.biome == "hell":
@@ -31441,6 +31647,16 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
         """Zamanı durdurur: düşmanlar, patronlar, mermileri ve tuzakları donar."""
         self.time_stop = max(self.time_stop, float(duration))
 
+    def _ult_unit(self):
+        """Yetenek hasarının birimi. Eskiden tek merminin hasarıydı (geç oyunda
+        yıldırım yeteneği "40 hasar" vuruyordu); artık oyuncunun gerçek ateş
+        gücüyle büyür: ~ULT_DPS_K saniyelik tam atış."""
+        p = self.player
+        try:
+            return max(p.eff_dmg(), p.estimated_dps() * ULT_DPS_K)
+        except Exception:
+            return p.eff_dmg()
+
     def _ult_spawn_nova(self, n, mult, pierce=1, homing=0, style=None, spread=math.tau,
                         base_ang=None, speed=640):
         """Oyuncunun çevresine halka biçiminde mermi saçar."""
@@ -31454,7 +31670,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
             vx, vy = math.cos(ang) * speed, math.sin(ang) * speed
             self.player_projectiles.append(PlayerProjectile(
                 p.x + math.cos(ang) * (p.radius + 6), p.y + math.sin(ang) * (p.radius + 6),
-                vx, vy, p.eff_dmg() * mult, p.eff_pierce_hits() + pierce,
+                vx, vy, self._ult_unit() * mult, p.eff_pierce_hits() + pierce,
                 p.eff_crit_chance(), p.eff_crit_dmg(), homing=homing,
                 style=style or sk["proj"], color=sk["color"], accent=sk["accent"]))
             self.player_projectiles[-1]._wsrc = "ult"
@@ -31492,7 +31708,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
             if p.thorn_field_tick <= 0:
                 p.thorn_field_tick = 0.5
                 for e in self._ult_targets(p.thorn_field_r):
-                    self._ult_hit(e, p.eff_dmg() * 0.35)
+                    self._ult_hit(e, self._ult_unit() * 0.35)
                     if hasattr(e, "apply_slow"):
                         e.apply_slow(0.7, 0.8)
                 self.fx.shockwave(p.x, p.y, p.thorn_field_r, (120, 220, 140), 0.3, 3)
@@ -31546,7 +31762,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
                     e.apply_poison(6.0)
                 if hasattr(e, "apply_slow"):
                     e.apply_slow(0.6, 3.0)
-                self._ult_hit(e, p.eff_dmg() * 0.5)
+                self._ult_hit(e, self._ult_unit() * 0.5)
             self.fx.shockwave(p.x, p.y, rad, col, 0.5, 6)
             self._ult_banner(name, col)
             sfx("explosion", 0.7, 0.0)
@@ -31556,7 +31772,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
             targets = self._ult_targets()
             random.shuffle(targets)
             for e in targets[:int(ult.get("n", 7))]:
-                self._ult_hit(e, p.eff_dmg() * float(ult.get("mult", 1.35)), kb=90)
+                self._ult_hit(e, self._ult_unit() * float(ult.get("mult", 1.35)), kb=90)
                 self.fx.burst(e.x, e.y, col, n=10, speed=150, life=0.4, r=3)
                 self.fx.shockwave(e.x, e.y, 54, col, 0.3, 3)
             self._ult_banner(name, col)
@@ -31567,7 +31783,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
             # Haritadaki herkese yıldırım düşer:
             # - sıradan düşman / elit: azami canının %20'si gider
             # - patron: Lv.3 fırtına hasarı (yüzde değil)
-            boss_dmg = p.eff_dmg() * (0.9 + 0.35 * 3)
+            boss_dmg = self._ult_unit() * (0.9 + 0.35 * 3)
             for e in self._ult_targets():
                 if getattr(e, "is_boss", False):
                     self._ult_hit(e, boss_dmg)
@@ -31596,7 +31812,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
         elif kind == "fire_ring":
             rad = float(ult.get("radius", 330))
             for e in self._ult_targets(rad):
-                self._ult_hit(e, p.eff_dmg() * 1.1, kb=140)
+                self._ult_hit(e, self._ult_unit() * 1.1, kb=140)
                 if hasattr(e, "apply_burn"):
                     e.apply_burn(10.0, 4.0)
             for k in range(3):
@@ -31609,7 +31825,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
         elif kind == "midas":
             rad = float(ult.get("radius", 340))
             for e in self._ult_targets(rad):
-                self._ult_hit(e, p.eff_dmg() * 0.9)
+                self._ult_hit(e, self._ult_unit() * 0.9)
                 if e.alive:
                     self.pickups.append(Pickup(e.x + random.uniform(-10, 10),
                                                e.y + random.uniform(-10, 10), "coin",
@@ -31635,7 +31851,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
             freeze = float(ult.get("freeze", 2.5))
             self.freeze_enemies(freeze)
             for e in self._ult_targets():
-                self._ult_hit(e, p.eff_dmg() * 0.7)
+                self._ult_hit(e, self._ult_unit() * 0.7)
                 if hasattr(e, "apply_slow"):
                     e.apply_slow(0.45, freeze + 5.0)
             self.fx.do_flash(col, 0.3)
@@ -31648,7 +31864,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
             rad = float(ult.get("radius", 320))
             drained = 0.0
             for e in self._ult_targets(rad):
-                dmg = e.max_hp * 0.10 + p.eff_dmg() * 0.5
+                dmg = e.max_hp * 0.10 + self._ult_unit() * 0.5
                 before = e.hp
                 self._ult_hit(e, dmg)
                 drained += max(0.0, before - max(0.0, e.hp))
@@ -31665,7 +31881,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
             p.add_temp_buff(dur, dmg_taken_mult=-0.55)
             p.shield_charges += 1
             for e in self._ult_targets(260):
-                self._ult_hit(e, p.eff_dmg() * 0.6, kb=420)
+                self._ult_hit(e, self._ult_unit() * 0.6, kb=420)
             self.fx.shockwave(p.x, p.y, 260, col, 0.45, 6)
             self._ult_banner(name, col)
             sfx("shield", 1.0, 0.0)
@@ -31676,7 +31892,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
             random.shuffle(targets)
             n = int(ult.get("n", 6))
             for e in targets[:n] if targets else []:
-                self._ult_hit(e, p.eff_dmg() * float(ult.get("mult", 1.6)))
+                self._ult_hit(e, self._ult_unit() * float(ult.get("mult", 1.6)))
                 self._ult_lightning_fx(e.x, e.y, col)
             self.fx.do_flash(col, 0.3)
             self._ult_banner(name, col)
@@ -31716,7 +31932,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
             for e in self._ult_targets(rad):
                 if hasattr(e, "apply_slow"):
                     e.apply_slow(0.12, 4.0)
-                self._ult_hit(e, p.eff_dmg() * 0.6)
+                self._ult_hit(e, self._ult_unit() * 0.6)
                 self.fx.bolt([(p.x, p.y), (e.x, e.y)], (240, 240, 255), 0.3)
             self.fx.shockwave(p.x, p.y, rad, col, 0.45, 5)
             self._ult_banner(name, col)
@@ -31727,7 +31943,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
             rad = float(ult.get("radius", 230))
             total = 0.0
             for e in self._ult_targets(rad):
-                dmg = p.eff_dmg() * float(ult.get("mult", 2.0))
+                dmg = self._ult_unit() * float(ult.get("mult", 2.0))
                 before = e.hp
                 self._ult_hit(e, dmg, kb=260)
                 total += max(0.0, before - max(0.0, e.hp))
@@ -31741,7 +31957,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
         # ---- yeşil dev: yer sarsıntısı ----
         elif kind == "quake":
             for e in self._ult_targets():
-                self._ult_hit(e, p.eff_dmg() * float(ult.get("mult", 1.3)), kb=360)
+                self._ult_hit(e, self._ult_unit() * float(ult.get("mult", 1.3)), kb=360)
                 self.fx.spark(e.x, e.y, col, 0, -50, 0.5, 3)
             self.fx.shake(18, 0.5)
             for k in range(4):
@@ -31766,7 +31982,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
             p.heal(p.max_hp * 0.25)
             p.add_temp_buff(dur, run_crit_bonus=0.25)
             for e in self._ult_targets(rad):
-                self._ult_hit(e, p.eff_dmg() * 0.7)
+                self._ult_hit(e, self._ult_unit() * 0.7)
                 if hasattr(e, "fear_timer"):
                     e.fear_timer = max(e.fear_timer, 3.0)
             self.fx.shockwave(p.x, p.y, rad, col, 0.5, 6)
@@ -32201,8 +32417,9 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
         portal_used = False
         if self.hell_portal is not None:
             self.hell_portal.update(dt)
+            self.hell_portal.ready = len(getattr(p, "evolved", ()) or ())
             if (p.alive and input_state.get("use_pressed")
-                    and self.hell_portal.in_range(p)):
+                    and self.hell_portal.in_range(p) and self.hell_entry_ok()):
                 self.enter_hell()
                 portal_used = True
 
@@ -47802,8 +48019,10 @@ class CoopRunState(RunState):
             self._ctx_use(i)
             inp = inputs[i] if i < len(inputs) else {}
             p = self.player
+            if self.hell_portal is not None and i == 0:
+                self.hell_portal.ready = len(getattr(p, "evolved", ()) or ())
             if (self.hell_portal is not None and not portal_used and p.alive
-                    and inp.get("use_pressed") and self.hell_portal.in_range(p)):
+                    and inp.get("use_pressed") and self.hell_portal.in_range(p) and self.hell_entry_ok()):
                 self.enter_hell()
                 portal_used = True
             had = self.curse_offers
@@ -49382,6 +49601,24 @@ STRINGS.update({
 
 # içerik çevirileri: Türkçe metin -> (en, es, de, ru)
 TEXT_TR.update({
+    # az oynanan skinlere eklenen güçler
+    'Kritik Şans +%5': ('Crit Chance +5%', 'Prob. crítica +5%', 'Krit. Chance +5%', 'Шанс крита +5%'),
+    'Kritik Şans +%6': ('Crit Chance +6%', 'Prob. crítica +6%', 'Krit. Chance +6%', 'Шанс крита +6%'),
+    'Şans +%5': ('Luck +5%', 'Suerte +5%', 'Glück +5%', 'Удача +5%'),
+    'Atış Hızı +%8': ('Fire Rate +8%', 'Cadencia +8%', 'Feuerrate +8%', 'Скорострельность +8%'),
+    'Hasar +%10': ('Damage +10%', 'Daño +10%', 'Schaden +10%', 'Урон +10%'),
+    'Hasar +%8': ('Damage +8%', 'Daño +8%', 'Schaden +8%', 'Урон +8%'),
+    'Hasar +%6': ('Damage +6%', 'Daño +6%', 'Schaden +6%', 'Урон +6%'),
+    'Can +30': ('HP +30', 'Vida +30', 'Leben +30', 'Здоровье +30'),
+    'Her seviye: Hasar +%0.6 (en çok %36)': ('Per level: Damage +0.6% (max 36%)', 'Por nivel: Daño +0.6% (máx. 36%)',
+                                              'Pro Stufe: Schaden +0.6% (max. 36%)', 'За уровень: урон +0,6% (макс. 36%)'),
+    'Çılgınlık Lv.2 ile başlar (ardışık vuruşta güçlenir)': ('Starts with Frenzy Lv.2 (stronger with consecutive hits)',
+                                                              'Empieza con Frenesí Nv.2 (más fuerte con golpes seguidos)',
+                                                              'Startet mit Raserei St.2 (stärker bei Trefferserien)',
+                                                              'Начинает с Безумием ур.2 (сильнее при серии ударов)'),
+    'Her seviye: Can +3 (en çok +180), Hasar +%0.4 (en çok %24)': (
+        'Per level: HP +3 (max +180), Damage +0.4% (max 24%)', 'Por nivel: Vida +3 (máx. +180), Daño +0.4% (máx. 24%)',
+        'Pro Stufe: Leben +3 (max. +180), Schaden +0.4% (max. 24%)', 'За уровень: здоровье +3 (макс. +180), урон +0,4% (макс. 24%)'),
     'Toplam 150 yaratık öldür': ('Kill 150 monsters in total', 'Mata 150 monstruos en total', 'Töte insgesamt 150 Monster', 'Убей всего 150 монстров'),
     'Elini kirlet: 150 yaratık devir': ('Get your hands dirty: kill 150 monsters', 'Mánchate las manos: mata 150 monstruos', 'Mach dir die Hände schmutzig: 150 Monster', 'Испачкай руки: убей 150 монстров'),
     '8. dalgaya ulaş': ('Reach wave 8', 'Llega a la oleada 8', 'Erreiche Welle 8', 'Дойди до 8-й волны'),
@@ -50396,6 +50633,7 @@ class DeathReplay:
 # gerçekleşir (şerit + parlama) ve yeni hâli savaşırken görünür.
 EVO_PV_SECS = 14.0              # bir döngünün süresi; sonra baştan
 EVO_PV_EVOLVE_AT = 1.6          # döngünün bu anında evrim olur
+EVO_PV_FIRE_EVERY = 2.0         # önizlemede her silah en geç bu kadar saniyede bir atılır
 
 
 class EvoPreview:
@@ -50463,6 +50701,7 @@ class EvoPreview:
                 self.evolved_now = True
                 self.run.evolve_weapon(self.key)
             self.pilot.step(min(dt, 1 / 30))
+            self._force_fire()
         except Exception as e:
             log_net_error("evo preview", e, ("evo", ""))
             self.run = None
@@ -50470,6 +50709,22 @@ class EvoPreview:
             return
         if self.t >= EVO_PV_SECS:
             self._restart()
+
+    def _force_fire(self):
+        """Önizlemede her silah en geç 2 sn'de bir atılır: uzun beklemeli silahlar
+        (hortum, pelerin, meteor...) da pencerede görülebilsin."""
+        run = self.run
+        p = run.player
+        for k in list(p.weapon_timers):
+            p.weapon_timers[k] = min(p.weapon_timers[k], EVO_PV_FIRE_EVERY)
+        if "cloak" in p.weapons:
+            if getattr(p, "invis_t", 0.0) > 0:
+                p.invis_t = min(p.invis_t, 2.5)
+            else:
+                p.cloak_timer = min(getattr(p, "cloak_timer", 0.0), EVO_PV_FIRE_EVERY)
+        for ob in list(run.ghost_blades) + list(run.hawks):
+            if getattr(ob, "cd", 0.0) > EVO_PV_FIRE_EVERY:
+                ob.cd = EVO_PV_FIRE_EVERY
 
     def draw(self, canvas, rect, t):
         run = self.run
@@ -58596,7 +58851,7 @@ class App:
         list_top = 158
         items = cosmetics_by_slot(self.cosmetic_tab)
         cols = 4
-        card_w, card_h = 270, 200
+        card_w, card_h = 270, 228
         gap_x, gap_y = 20, 18
         start_x = (VIRTUAL_W - (cols * card_w + (cols - 1) * gap_x)) / 2
         list_bottom = VIRTUAL_H - 70
@@ -58645,8 +58900,19 @@ class App:
             perk_txt = perk_tr(item.get("perk_text")) if item.get("perk_text") else ""
             if perk_txt:
                 pcol = lighten(item["color"], .55)
-                draw_icon(canvas, rect.centerx - text_width(perk_txt, 11, True) / 2 - 12, rect.y + 154, "star", pcol, 6)
-                draw_text(canvas, perk_txt, (rect.centerx, rect.y + 154), 11, pcol, bold=True, center=True)
+                perk_txt = _fit_text(TRX(perk_txt), 11, rect.w - 34, bold=True)
+                draw_icon(canvas, rect.centerx - text_width(perk_txt, 11, True) / 2 - 12, rect.y + 150, "star", pcol, 6)
+                draw_text(canvas, perk_txt, (rect.centerx, rect.y + 150), 11, pcol, bold=True, center=True)
+            sid = cos_set_of(item["id"])
+            if sid:
+                # takım: kaç parçası giyili + 3 parçanın bonusu
+                srow = COS_SETS[sid]
+                n_on = cos_set_count(sid, self.save.equipped_cosmetics())
+                scol = srow[1] if n_on >= 3 else scale_col(srow[1], 0.75)
+                draw_text(canvas, "%s  %d/3" % (cos_set_name(sid), n_on), (rect.centerx, rect.y + 168), 10,
+                          scol, bold=True, center=True, shadow=False)
+                draw_text(canvas, _fit_text(TRX(cos_stats_text(srow[5], 0)), 9, rect.w - 20),
+                          (rect.centerx, rect.y + 183), 9, scale_col(scol, 0.9), center=True, shadow=False)
 
             if is_equipped:
                 draw_text(canvas, L("ui.equipped_off"), (rect.centerx, rect.bottom - 18), 10, CYAN, bold=True, center=True)
