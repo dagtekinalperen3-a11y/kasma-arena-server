@@ -14,11 +14,9 @@ Değişiklik notları CHANGELOG.md'de.
 # oyun 1280x720 çizilip pencereye SDL ile ölçekleniyor (pygame.SCALED).
 import os as _os_boot
 _os_boot.environ.setdefault("SDL_RENDER_SCALE_QUALITY", "1")
-# Windows'ta ekran ölçeği (%125 / %150...) açıkken süreç "DPI farkında"
-# değilse Windows pencereyi bir de kendisi gerip bulanıklaştırıyordu (2K / 4K
-# ekranlarda belirgin). Gerçek piksellerle çalış; ölçeklemeyi yalnız SDL yapsın.
-# (Yalnız SDL ipucu: doğrudan Windows API çağrısı antivirüslerin sezgisel
-# taramasına takılıyordu.)
+# Windows'ta ekran ölçeği (%125 / %150...) açıkken Windows pencereyi bir de
+# kendisi gerip bulanıklaştırıyordu (2K / 4K ekranlarda belirgin). Gerçek
+# piksellerle çalış; ölçeklemeyi yalnız SDL yapsın.
 _os_boot.environ.setdefault("SDL_WINDOWS_DPI_AWARENESS", "permonitorv2")
 import pygame
 try:
@@ -26741,27 +26739,6 @@ LATE_BOOST_COUNT_EVERY = 6      # bu kadar dalgada bir doğum başına +1 yarat�
 LATE_BOOST_COUNT_MAX = 4
 
 
-# orta dalga güçlenmesi: 10. dalgaya doğru oyuncu çok güçleniyordu. 7.
-# dalgadan sonra yeni doğan yaratıklar biraz daha canlı ve sert gelir (10.
-# dalgada can +%18 / hasar +%9, 17. dalgada tavan +%60 / +%30). Uyarlanır can
-# (adapt_hp_mult) bunu referansına katmaz: güçlü oyuncuda da fark hissedilsin.
-# Arayüzde gösterilmez.
-MID_BOOST_FROM = 7
-MID_BOOST_HP = 0.06             # dalga başına ek can payı
-MID_BOOST_DMG = 0.03            # dalga başına ek hasar payı
-MID_BOOST_CAP = 10              # en çok bu kadar dalga (17. dalga)
-
-
-def mid_wave_boost(wave, biome="arena"):
-    """(can çarpanı, hasar çarpanı) - yalnız arena dalgaları."""
-    if biome == "hell":
-        return 1.0, 1.0
-    over = min(MID_BOOST_CAP, max(0, int(wave) - MID_BOOST_FROM))
-    if over <= 0:
-        return 1.0, 1.0
-    return 1.0 + MID_BOOST_HP * over, 1.0 + MID_BOOST_DMG * over
-
-
 def late_wave_boost(wave, biome="arena"):
     """(can çarpanı, hasar çarpanı, ek yaratık sayısı)."""
     w = int(wave) + (HELL_BASE_WAVE if biome == "hell" else 0)
@@ -27146,9 +27123,6 @@ class WaveManager:
     def _late_boost(self, e):
         """Geç dalga güçlenmesi -"""
         hp_k, dmg_k, _extra = late_wave_boost(self.wave, self.biome)
-        mh, md = mid_wave_boost(self.wave, self.biome)
-        hp_k *= mh
-        dmg_k *= md
         dmg_k *= getattr(self, "dmg_mult", 1.0)
         if hp_k == 1.0 and dmg_k == 1.0:
             return
@@ -34275,7 +34249,7 @@ class Display:
         if self.fullscreen:
             s = min(dw / float(VIRTUAL_W), dh / float(VIRTUAL_H))
         else:
-            # görev çubuğu + başlık payı: ekranın ~%88'i
+            # görev çubuğu + başlık payı
             fit = min(dw * 0.92 / VIRTUAL_W, dh * 0.86 / VIRTUAL_H)
             k = int(fit)
             if k >= 2:
@@ -45121,7 +45095,7 @@ class VideoAd:
         self.audio_ok = False
         self._open()
         if self.backend is None:
-            raise RuntimeError("video çözücü yok (opencv-python / av)")
+            raise RuntimeError("video çözücü yok (opencv-python / av / ffmpeg)")
         if audio_path:
             try:
                 pygame.mixer.music.load(audio_path)
@@ -45164,9 +45138,25 @@ class VideoAd:
             return
         except Exception:
             pass
-        # ffmpeg'i gizli pencerede başlatan yol kaldırıldı: antivirüsler
-        # "gizli süreç başlatıyor" diye virüs sanıyordu. Çözücü yoksa
-        # make_house_ad oyun turuna düşer.
+        try:
+            import shutil
+            import subprocess
+            exe = shutil.which("ffmpeg")
+            if not exe:
+                for nm in ("ffmpeg.exe", "ffmpeg"):
+                    cand = _ad_asset(nm)
+                    if cand:
+                        exe = cand
+                        break
+            if exe:
+                flags = 0x08000000 if sys.platform.startswith("win") else 0   # CREATE_NO_WINDOW
+                self.proc = subprocess.Popen(
+                    [exe, "-loglevel", "error", "-i", self.path, "-vf", "scale=%d:%d" % (self.W, self.H),
+                     "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, creationflags=flags)
+                self.backend = "ffmpeg"
+        except Exception:
+            self.proc = None
 
     def _read_one(self):
         try:
