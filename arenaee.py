@@ -45119,7 +45119,7 @@ class VideoAd:
         self.audio_ok = False
         self._open()
         if self.backend is None:
-            raise RuntimeError("video çözücü yok (opencv-python / av / ffmpeg)")
+            raise RuntimeError("video çözücü yok (opencv-python / av)")
         if audio_path:
             try:
                 pygame.mixer.music.load(audio_path)
@@ -45162,25 +45162,9 @@ class VideoAd:
             return
         except Exception:
             pass
-        try:
-            import shutil
-            import subprocess
-            exe = shutil.which("ffmpeg")
-            if not exe:
-                for nm in ("ffmpeg.exe", "ffmpeg"):
-                    cand = _ad_asset(nm)
-                    if cand:
-                        exe = cand
-                        break
-            if exe:
-                flags = 0x08000000 if sys.platform.startswith("win") else 0   # CREATE_NO_WINDOW
-                self.proc = subprocess.Popen(
-                    [exe, "-loglevel", "error", "-i", self.path, "-vf", "scale=%d:%d" % (self.W, self.H),
-                     "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
-                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, creationflags=flags)
-                self.backend = "ffmpeg"
-        except Exception:
-            self.proc = None
+        # (ffmpeg'i gizli pencerede başlatan yol kaldırıldı: antivirüsler "gizli
+        # süreç başlatıyor" diye virüs sanıyordu. Çözücü yoksa make_house_ad
+        # oyun turuna düşer.)
 
     def _read_one(self):
         try:
