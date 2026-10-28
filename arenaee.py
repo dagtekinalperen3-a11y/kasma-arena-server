@@ -22922,6 +22922,15 @@ def boss_wound(wave, hellish=False):
 # 2) patron canı ayrıca bu çarpanla %20 yükseltiliyor.
 BOSS_HP_BONUS = 1.20
 BOSS_TELEGRAPH_EXTRA = 0.40
+# Geç patronların refleksi (15. / 20. / 25. dalga = patron sırası 2 / 3 / 4):
+# saldırı öncesi uyarı kısalır, daha sık vurur ve isabet aldıkça yana atılır.
+BOSS_REFLEX_TELE = 0.10         # patron sırası başına uyarı süresi kısalması
+BOSS_REFLEX_TELE_MIN = 0.36     # uyarı hiçbir zaman bundan kısa olmaz (adil kalsın)
+BOSS_REFLEX_CADENCE = 0.07      # patron sırası başına ek saldırı sıklığı
+BOSS_DODGE_FROM = 2             # yana atılma bu patron sırasından
+BOSS_DODGE_CD = (0, 0, 4.2, 3.2, 2.4)   # patron sırasına göre atılma bekleme süresi
+BOSS_DODGE_T = 0.22
+BOSS_DODGE_DIST = 170.0
 # "ilk patron tam kıvamında, sonrakilerde biz de güçlendiğimiz için eşit
 # kalıyoruz": 2. patrondan itibaren her patron dövüşü biraz daha uzun ve
 # darbesi biraz daha sert. 1. patrona dokunulmaz.
@@ -24931,6 +24940,7 @@ class Boss(MapBossArt):
             if not self.alive:
                 return
         scale_in = ease_out_cubic(self.spawn_t / 0.6)
+        self._update_dodge(dt, player, fx)
         # Baktığı yön oyuncuya doğru yumuşakça döner + yürüyüş fazı ilerler.
         if player.alive:
             tfx, tfy = norm_dir(self.x, self.y, player.x, player.y)
@@ -25090,6 +25100,8 @@ class Boss(MapBossArt):
                 # sık vurur.
                 cadence = 0.32 if self.desperate else (0.46 if self.enraged else 0.85)
                 cadence *= max(0.45, 1.0 - (self.boss_index - 1) * 0.11)
+                if self.boss_index >= 2:
+                    cadence *= max(0.70, 1.0 - BOSS_REFLEX_CADENCE * (self.boss_index - 1))
                 if self.buff_t > 0:
                     cadence *= BOSS_BUFF_CADENCE
                 self.atk_timer = random.uniform(0.9, 1.45) * cadence
@@ -25133,9 +25145,49 @@ class Boss(MapBossArt):
         fx.popup(self.x, self.y - self.radius - 10, "YARATIKLAR ÇAĞIRIYOR!", self.color, 16, life=0.9)
         sfx("warn", 0.6, 0.0)
 
+    def _update_dodge(self, dt, player, fx):
+        """Geç patron refleksi: isabet alırken arada bir oyuncunun nişan
+        çizgisinden yana doğru hızla atılır (telgraf/hücum/uçuş sırasında değil)."""
+        bi = getattr(self, "boss_index", 1)
+        if bi < BOSS_DODGE_FROM or not player.alive:
+            return
+        self.recent_hit = max(0.0, getattr(self, "recent_hit", 0.0) - dt)
+        dcd = getattr(self, "dodge_cd", None)
+        if dcd is None:
+            dcd = self.dodge_cd = BOSS_DODGE_CD[min(bi, len(BOSS_DODGE_CD) - 1)]
+        self.dodge_cd = max(0.0, dcd - dt)
+        dt_ = getattr(self, "dodge_t", 0.0)
+        if dt_ > 0:
+            self.dodge_t = dt_ - dt
+            sp = BOSS_DODGE_DIST / BOSS_DODGE_T
+            self.x += self.dodge_dx * sp * dt
+            self.y += self.dodge_dy * sp * dt
+            if random.random() < dt * 40:
+                fx.spark(self.x, self.y, self.color, -self.dodge_dx * 120, -self.dodge_dy * 120, 0.3, 4)
+            return
+        busy = (self.telegraph is not None or getattr(self, "charge_t", 0.0) > 0
+                or getattr(self, "fly_t", 0.0) > 0 or self.is_hidden())
+        if self.recent_hit > 0 and self.dodge_cd <= 0 and not busy and self.spawn_t > 2.0:
+            # oyuncuya dik yönde, merkezden uzaklaşmayan tarafa
+            dx, dy = norm_dir(player.x, player.y, self.x, self.y)
+            sx, sy = -dy, dx
+            if random.random() < 0.5:
+                sx, sy = -sx, -sy
+            nx, ny = self.x + sx * BOSS_DODGE_DIST, self.y + sy * BOSS_DODGE_DIST
+            if not ARENA_RECT.inflate(-self.radius * 2, -self.radius * 2).collidepoint(nx, ny):
+                sx, sy = -sx, -sy
+            self.dodge_dx, self.dodge_dy = sx, sy
+            self.dodge_t = BOSS_DODGE_T
+            self.dodge_cd = BOSS_DODGE_CD[min(bi, len(BOSS_DODGE_CD) - 1)] * random.uniform(0.85, 1.2)
+            fx.burst(self.x, self.y, self.color, n=10, speed=200, life=0.3, r=3.5)
+
     def _set_telegraph(self, kind, a, b, c, dur):
         """Patronun tüm saldırıları bu kapıdan geçer."""
         total = dur + BOSS_TELEGRAPH_EXTRA
+        bi = getattr(self, "boss_index", 1)
+        if bi >= 2:
+            # geç patron daha çabuk davranır (uyarı kısalır, yine de görülür)
+            total = max(BOSS_REFLEX_TELE_MIN, total * (1.0 - BOSS_REFLEX_TELE * (bi - 1)))
         self.telegraph = (kind, a, b, c, total, total)
 
     def _lead_point(self, player, lead=0.34):
@@ -25536,6 +25588,8 @@ class Boss(MapBossArt):
                                            c * 0.8, 0.3 + k * 0.28, self.dmg * 1.15, owner=self))
 
     def take_damage(self, amount, crit, fx, kx=0.0, ky=0.0, quiet=False):
+        if not quiet:
+            self.recent_hit = 0.5           # refleks: vurulduğunu fark eder
         # dokunulmazlık: kalkan sürerken hiçbir hasar işlemez.
         if getattr(self, "ward_t", 0.0) > 0:
             if not quiet and getattr(self, "ward_pop", 0.0) <= 0:
@@ -27187,7 +27241,7 @@ class WaveManager:
         hp_k, dmg_k, _extra = late_wave_boost(self.wave, self.biome)
         mh, md = mid_wave_boost(self.wave, self.biome)
         hp_k *= mh
-        dmg_k *= md
+        dmg_k *= md * run_event_mod("dmg")
         dmg_k *= getattr(self, "dmg_mult", 1.0)
         if hp_k == 1.0 and dmg_k == 1.0:
             return
@@ -28507,16 +28561,28 @@ def _buff_ring(surf, cx, cy, r, col, frac, icon):
     draw_icon(surf, cx, cy, icon, lighten(col, 0.3), 8)
 
 
+HUD_NOTE_MAX_W = 650             # sol paneller ile küçük harita arasına sığsın
+
+
 def _hud_note(surf, text, y, col, a):
-    """Üstteki duyuru satırı: koyu zemin üstünde (dünyada süzülen yazılar altta kalsa da okunur)."""
-    w_ = text_width(text, 17, True) + 34
-    r = pygame.Rect(0, 0, w_, 28)
-    r.center = (VIRTUAL_W // 2, int(y))
+    """Üstteki duyuru satırı: koyu zemin üstünde (dünyada süzülen yazılar altta kalsa da okunur).
+    Uzun not iki satıra kırılır: sol panellerin ve haritanın üstüne taşmasın."""
+    size = 17
+    lines = [text]
+    if text_width(text, size, True) + 34 > HUD_NOTE_MAX_W:
+        size = 15
+        lines = wrap_text(text, size, HUD_NOTE_MAX_W - 34)[:2]
+    lh = size + 8
+    w_ = min(HUD_NOTE_MAX_W, max(text_width(ln, size, True) for ln in lines) + 34)
+    r = pygame.Rect(0, 0, int(w_), 10 + lh * len(lines))
+    r.midtop = (VIRTUAL_W // 2, int(y - 14))
     bg = pygame.Surface(r.size, pygame.SRCALPHA)
     pygame.draw.rect(bg, (*INK, int(150 * a / 255)), bg.get_rect(), border_radius=8)
     pygame.draw.rect(bg, (24, 20, 30, int(215 * a / 255)), bg.get_rect().inflate(-4, -4), border_radius=7)
     surf.blit(bg, r.topleft)
-    draw_text(surf, text, r.center, 17, col, bold=True, center=True, alpha=a)
+    for i, ln in enumerate(lines):
+        draw_text(surf, _fit_text(ln, size, HUD_NOTE_MAX_W - 34, bold=True),
+                  (r.centerx, r.y + 5 + lh * i + lh / 2), size, col, bold=True, center=True, alpha=a)
 
 
 def draw_extras_hud(surf, run, t):
@@ -29184,7 +29250,19 @@ WAVE_EVENTS = {
     "feast":       ((170, 120, 255), "orbit", dict(gun=0.5, weapons=1.6)),
     "sniper":      ((120, 210, 255), "target", dict(gun=1.5, weapons=0.6)),
     "blackmarket": ((200, 160, 255), "coin", dict(price=0.6)),
+    # yeni: iki çok iyi (nadir) ve iki kötü olay
+    "jackpot":     ((120, 255, 160), "horseshoe", dict(luck=0.5, gold=1.3)),
+    "power":       ((255, 120, 220), "fist", dict(gun=1.4, weapons=1.4)),
+    "ironskin":    ((170, 180, 200), "shield", dict(hp=1.6, dmg=1.2, xp=1.2)),
+    "drought":     ((190, 150, 110), "drop", dict(xp=0.6, gold=0.6, spawn=0.7)),
 }
+# Olayların çıkma ihtimali (%): güçlüler nadir ("oha bu geldi!"), zayıflar yaygın.
+WAVE_EVENT_ODDS = {
+    "feast": 22.0, "sniper": 18.0, "swarm": 16.0, "ironskin": 12.0, "drought": 10.0,
+    "goldrain": 8.0, "hunt": 6.0, "bloodmoon": 3.0, "blackmarket": 2.5,
+    "jackpot": 1.5, "power": 1.0,
+}
+WAVE_EVENT_RARE = 3.0           # bu yüzdenin altındakiler "NADİR OLAY" diye duyurulur
 RUN_EVENT = [None]              # o an işleyen koşunun olayı (vuruş/şifa kancaları okur)
 HUNT_HP = 1.6                   # av elitlerinin can çarpanı
 
@@ -29242,6 +29320,31 @@ STRINGS.update({
                            "todo el mercado con 40% de descuento esta oleada",
                            "diese Welle ist alles im Markt 40% günstiger",
                            "в эту волну всё на рынке со скидкой 40%"),
+    "ev.rare": _T("★ NADİR OLAY!", "★ RARE EVENT!", "★ ¡EVENTO RARO!", "★ SELTENES EREIGNIS!", "★ РЕДКОЕ СОБЫТИЕ!"),
+    "ev.jackpot": _T("ŞANS DALGASI", "LUCKY WAVE", "OLEADA DE SUERTE", "GLÜCKSWELLE", "ВОЛНА УДАЧИ"),
+    "ev.jackpot.d": _T("Şans +%50 ve altın x1.3: kartlar, sandıklar, mağaralar bu dalga çok daha nadir gelir",
+                       "Luck +50% and gold x1.3: cards, chests and caves roll far rarer this wave",
+                       "Suerte +50% y oro x1,3: cartas y cofres mucho más raros esta oleada",
+                       "Glück +50% und Gold x1,3: Karten und Truhen diese Welle viel seltener",
+                       "Удача +50% и золото x1,3: карты и сундуки в эту волну гораздо реже"),
+    "ev.power": _T("AŞKIN GÜÇ", "OVERDRIVE", "SOBRECARGA", "ÜBERLADUNG", "ПЕРЕГРУЗКА"),
+    "ev.power.d": _T("ana silahın ve bütün silahların +%40 vurur",
+                     "your main gun and all weapons hit 40% harder",
+                     "tu arma principal y todas las armas pegan +40%",
+                     "Hauptwaffe und alle Waffen +40% Schaden",
+                     "основное и всё остальное оружие +40% урона"),
+    "ev.ironskin": _T("ÇELİK DERİ", "IRON SKIN", "PIEL DE ACERO", "EISENHAUT", "СТАЛЬНАЯ КОЖА"),
+    "ev.ironskin.d": _T("yaratıklar %60 dayanıklı ve %20 sert vurur - tecrübe yalnız x1.2",
+                        "enemies 60% tougher and hit 20% harder - only XP x1.2",
+                        "enemigos 60% más duros y pegan 20% más - solo EXP x1,2",
+                        "Gegner 60% zäher, 20% mehr Schaden - nur EP x1,2",
+                        "враги на 60% крепче и бьют на 20% сильнее - лишь опыт x1,2"),
+    "ev.drought": _T("KITLIK", "FAMINE", "HAMBRUNA", "HUNGERSNOT", "ГОЛОД"),
+    "ev.drought.d": _T("tecrübe ve altın x0.6, yaratıklar %30 seyrek - sabırla kes",
+                       "XP and gold x0.6, 30% fewer enemies - grind patiently",
+                       "EXP y oro x0,6, 30% menos enemigos",
+                       "EP und Gold x0,6, 30% weniger Gegner",
+                       "опыт и золото x0,6, врагов на 30% меньше"),
     "ev.hunt_left": _T("AV: {0}/{1}", "HUNT: {0}/{1}", "CAZA: {0}/{1}", "JAGD: {0}/{1}", "ОХОТА: {0}/{1}"),
     "ev.hunt_done": _T("AV TAMAM!", "HUNT COMPLETE!", "¡CAZA COMPLETA!", "JAGD ERFÜLLT!", "ОХОТА ЗАВЕРШЕНА!"),
     "ev.hunt_fail": _T("Av kaçtı...", "The hunt got away...", "La presa escapó...", "Die Beute entkam...",
@@ -29277,7 +29380,8 @@ class WaveEventMixin:
         if (w >= WAVE_EVENT_FIRST and (w - WAVE_EVENT_FIRST) % WAVE_EVENT_EVERY == 0
                 and not self.waves.is_boss_wave(w) and not self.waves.boss_active):
             keys = [k for k in WAVE_EVENTS if k != self.wave_event_last]
-            self.start_wave_event(random.choice(keys))
+            self.start_wave_event(random.choices(keys, weights=[WAVE_EVENT_ODDS.get(k, 5.0) for k in keys],
+                                                 k=1)[0])
 
     def start_wave_event(self, key):
         col, icon, mods = WAVE_EVENTS[key]
@@ -29287,10 +29391,11 @@ class WaveEventMixin:
         RUN_EVENT[0] = key
         self.wave_event_mults = []
         for q in self._event_players():
-            xm, gm = mods.get("xp", 1.0), mods.get("gold", 1.0)
+            xm, gm, lk = mods.get("xp", 1.0), mods.get("gold", 1.0), mods.get("luck", 0.0)
             q.run_xp_mult *= xm
             q.run_coin_mult *= gm
-            self.wave_event_mults.append((q, xm, gm))
+            q.run_luck_bonus += lk
+            self.wave_event_mults.append((q, xm, gm, lk))
         self._apply_wave_mods()
         if mods.get("hunt"):
             self._spawn_hunt(int(mods["hunt"]))
@@ -29299,16 +29404,24 @@ class WaveEventMixin:
         self.waves.announce_timer = 3.0
         self.fx.do_flash(col, 0.25)
         self.fx.ring(p.x, p.y, col, n=26, speed=300, life=0.7, r=4)
-        self.find_note = (self.run_time, L("ev." + key) + ": " + L("ev." + key + ".d"), col)
+        rare = WAVE_EVENT_ODDS.get(key, 5.0) <= WAVE_EVENT_RARE
+        if rare:
+            self.waves.announce_text = L("ev.rare") + " " + L("ev." + key)
+            self.fx.shake(6, 0.3)
+        self.find_note = (self.run_time, (L("ev.rare") + " " if rare else "") + L("ev." + key) + ": "
+                          + L("ev." + key + ".d"), col)
         sfx("second", 0.8, 0.0)
+        if rare:
+            sfx("ach", 0.9, 0.0)
 
     def end_wave_event(self):
         key = self.wave_event
         if key is None:
             return
-        for q, xm, gm in self.wave_event_mults:
+        for q, xm, gm, lk in self.wave_event_mults:
             q.run_xp_mult /= xm
             q.run_coin_mult /= gm
+            q.run_luck_bonus -= lk
         self.wave_event_mults = []
         if key == "hunt" and self.hunt_left > 0:
             for e in self.enemies:
@@ -31462,6 +31575,19 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
         if p.level >= 10 and self.ach:
             self.ach.unlock("lvl10")
 
+    def _gain_gold(self, v):
+        """Toplanan parayı yazar. Paralar kesirli olabilir: kesirler birikir,
+        cüzdana tam sayı geçer. Döner: cüzdana eklenen tam altın."""
+        v = max(0.0, float(v))
+        self.gem_coins += v / (coin_drop_scale(self.biome)
+                               * econ_wave_factor(self.waves.wave, self.biome, "gold", self.diff))
+        f = self.__dict__.get("gold_frac", 0.0) + v
+        add = int(f)
+        self.gold_frac = f - add
+        self.coins_earned += add
+        self.gold_wallet += add
+        return add
+
     def collect_all_pickups(self):
         """Yerdeki bütün altın ve tecrübeyi anında oyuncuya yazar."""
         p = self.player
@@ -31473,10 +31599,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
                 if lv > 0:
                     self.pending_levelups += lv
             elif pu.kind == "coin":
-                self.coins_earned += pu.value
-                self.gem_coins += pu.value / (coin_drop_scale(self.biome)
-                                              * econ_wave_factor(self.waves.wave, self.biome, "gold", self.diff))
-                self.gold_wallet += pu.value
+                self._gain_gold(pu.value)
             pu.collected = True
 
     def collect_magnet(self, mg):
@@ -32306,12 +32429,13 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
 
     # Yerdeki eşya sayısının üst sınırı. Bu sayının üstünde birleştirme
     # yarıçapı büyür; yani eşyalar kaybolmaz, tek yığında toplanır.
-    PICKUP_SOFT_CAP = 160
-    PICKUP_MERGE_R = 30.0
-    PICKUP_MERGE_R_BUSY = 95.0
-    # son emniyet: yerdeki eşya sayısı bunu aşarsa yeni bir nesne hiç eklenmez;
-    # düşen kazanç en yakın aynı türden yığına katılır.
-    PICKUP_HARD_CAP = 240
+    # Artık birleştirme yok: her yaratık kendi altınını ve tecrübesini ayrı
+    # düşürür. Yalnız yerde çok fazla eşya birikirse (kare hızı) en yakın
+    # yığına katılır; kazanç kaybolmaz.
+    PICKUP_SOFT_CAP = 520
+    PICKUP_MERGE_R = 0.0
+    PICKUP_MERGE_R_BUSY = 60.0
+    PICKUP_HARD_CAP = 640
 
     def drop_pickup(self, x, y, kind, value):
         """Yere altın/tecrübe düşürür; yakındaki aynı türden eşyayla birleştirir."""
@@ -32320,7 +32444,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
         merge_r = (self.PICKUP_MERGE_R_BUSY if len(self.pickups) > self.PICKUP_SOFT_CAP
                    else self.PICKUP_MERGE_R)
         best, best_d = None, merge_r
-        for pu in self.pickups:
+        for pu in (self.pickups if merge_r > 0 else ()):
             if pu.kind != kind or pu.collected or pu.magnet:
                 continue
             # altın: yalnızca yeterince yeni bir parayla birleşir.
@@ -32378,11 +32502,11 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
         combo_mult = self.combo.multiplier()
         # kesirli altın birikir: rastgele yuvarlamada art arda hiç düşmeyen
         # öldürmeler olmasın (ortalama aynı)
-        cx_ = (max(0.0, e.coin * p.eff_coin_mult()
-                   * econ_wave_factor(self.waves.wave, self.biome, "gold", self.diff)
-                   * coin_drop_scale(self.biome)) + self.__dict__.get("coin_carry", 0.0))
-        coin_gain = int(cx_)
-        self.coin_carry = cx_ - coin_gain
+        # her yaratık kendi parasını düşürür (kesirli olabilir; toplanınca
+        # _gain_gold kesirleri biriktirip cüzdana tam sayı yazar)
+        coin_gain = max(0.0, e.coin * p.eff_coin_mult()
+                        * econ_wave_factor(self.waves.wave, self.biome, "gold", self.diff)
+                        * coin_drop_scale(self.biome))
         xp_gain = (e.xp * econ_wave_factor(self.waves.wave, self.biome, "xp", self.diff)
                    * xp_level_softcap(p.level, self.total_wave()))
         if getattr(e, "kind", "") == "goblin":
@@ -32879,12 +33003,9 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
                 else:
                     # Altın yalnızca burada, yani parayı gerçekten toplayınca
                     # kazanılır.
-                    self.coins_earned += pu.value
-                    # elmas, dalga kısıntısından etkilenmez
-                    self.gem_coins += pu.value / (coin_drop_scale(self.biome)
-                                                  * econ_wave_factor(self.waves.wave, self.biome, "gold", self.diff))
-                    self.gold_wallet += pu.value
-                    self.fx.popup(pu.x, pu.y - 10, f"+{pu.value}", GOLD, 14, life=0.5)
+                    add = self._gain_gold(pu.value)
+                    if add > 0:
+                        self.fx.popup(pu.x, pu.y - 10, f"+{add}", GOLD, 14, life=0.5)
                     sfx("coin", 0.4, 0.02)
         self.pickups = [pu for pu in self.pickups if not (pu.collected or pu.dead)]
 
@@ -37681,7 +37802,7 @@ def _draw_hud_center(surf, run, t):
         else:
             col = CYAN
         # karakterin üstüne binmesin: ekranın üst üçte birinde
-        draw_text(surf, run.waves.announce_text, (VIRTUAL_W / 2, VIRTUAL_H * 0.29), size, col,
+        draw_text(surf, run.waves.announce_text, (VIRTUAL_W / 2, VIRTUAL_H * 0.335), size, col,
                   bold=True, center=True, alpha=alpha)
 
     if frac < 0.3 and p.alive:
@@ -48132,7 +48253,7 @@ class CoopRunState(RunState):
         for pu in self.pickups:
             if pu.magnet and pu.kind in ("coin", "xp") and not (pu.collected or pu.dead):
                 v = pu.value
-                mine = v / 2.0 if pu.kind == "xp" else (int(v) + 1) // 2
+                mine = v / 2.0
                 halves.append((pu, v, v - mine))
                 pu.value = mine
         RunState._update_pickups(self, dt)
@@ -48154,10 +48275,7 @@ class CoopRunState(RunState):
                         if lv > 0:
                             self.pending_levelups += lv
                     else:
-                        self.coins_earned += v
-                        self.gem_coins += v / (coin_drop_scale(self.biome)
-                                               * econ_wave_factor(self.waves.wave, self.biome, "gold", self.diff))
-                        self.gold_wallet += v
+                        self._gain_gold(v)
             finally:
                 self._ctx_use(prev)
 
