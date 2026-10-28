@@ -35,6 +35,7 @@ python -m pip install --upgrade nuitka ordered-set zstandard pygame-ce
 
 python -m nuitka ^
   --onefile ^
+  --lto=no ^
   --windows-console-mode=disable ^
   --assume-yes-for-downloads ^
   --include-package-data=pygame ^
