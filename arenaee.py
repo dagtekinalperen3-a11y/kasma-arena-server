@@ -14,6 +14,19 @@ Değişiklik notları CHANGELOG.md'de.
 # oyun 1280x720 çizilip pencereye SDL ile ölçekleniyor (pygame.SCALED).
 import os as _os_boot
 _os_boot.environ.setdefault("SDL_RENDER_SCALE_QUALITY", "1")
+# Windows'ta ekran ölçeği (%125 / %150...) açıkken süreç "DPI farkında"
+# değilse Windows pencereyi bir de kendisi gerip bulanıklaştırıyordu (2K / 4K
+# ekranlarda belirgin). Gerçek piksellerle çalış; ölçeklemeyi yalnız SDL yapsın.
+_os_boot.environ.setdefault("SDL_WINDOWS_DPI_AWARENESS", "permonitorv2")
+if _os_boot.name == "nt":
+    try:
+        import ctypes as _ct_boot
+        try:
+            _ct_boot.windll.shcore.SetProcessDpiAwareness(2)
+        except Exception:
+            _ct_boot.windll.user32.SetProcessDPIAware()
+    except Exception:
+        pass
 import pygame
 try:
     # Kenarları yumuşatılmış (anti-aliased) çizim.
@@ -26735,6 +26748,27 @@ LATE_BOOST_COUNT_EVERY = 6      # bu kadar dalgada bir doğum başına +1 yarat�
 LATE_BOOST_COUNT_MAX = 4
 
 
+# orta dalga güçlenmesi: 10. dalgaya doğru oyuncu çok güçleniyordu. 7.
+# dalgadan sonra yeni doğan yaratıklar biraz daha canlı ve sert gelir (10.
+# dalgada can +%18 / hasar +%9, 17. dalgada tavan +%60 / +%30). Uyarlanır can
+# (adapt_hp_mult) bunu referansına katmaz: güçlü oyuncuda da fark hissedilsin.
+# Arayüzde gösterilmez.
+MID_BOOST_FROM = 7
+MID_BOOST_HP = 0.06             # dalga başına ek can payı
+MID_BOOST_DMG = 0.03            # dalga başına ek hasar payı
+MID_BOOST_CAP = 10              # en çok bu kadar dalga (17. dalga)
+
+
+def mid_wave_boost(wave, biome="arena"):
+    """(can çarpanı, hasar çarpanı) - yalnız arena dalgaları."""
+    if biome == "hell":
+        return 1.0, 1.0
+    over = min(MID_BOOST_CAP, max(0, int(wave) - MID_BOOST_FROM))
+    if over <= 0:
+        return 1.0, 1.0
+    return 1.0 + MID_BOOST_HP * over, 1.0 + MID_BOOST_DMG * over
+
+
 def late_wave_boost(wave, biome="arena"):
     """(can çarpanı, hasar çarpanı, ek yaratık sayısı)."""
     w = int(wave) + (HELL_BASE_WAVE if biome == "hell" else 0)
@@ -27119,6 +27153,9 @@ class WaveManager:
     def _late_boost(self, e):
         """Geç dalga güçlenmesi -"""
         hp_k, dmg_k, _extra = late_wave_boost(self.wave, self.biome)
+        mh, md = mid_wave_boost(self.wave, self.biome)
+        hp_k *= mh
+        dmg_k *= md
         dmg_k *= getattr(self, "dmg_mult", 1.0)
         if hp_k == 1.0 and dmg_k == 1.0:
             return
@@ -34211,6 +34248,7 @@ class Display:
             return pygame.display.set_mode((SCREEN_W, VIRTUAL_H))
         flags = pygame.FULLSCREEN if self.fullscreen else pygame.RESIZABLE
         want = (0, 0) if self.fullscreen else (size or (VIRTUAL_W, VIRTUAL_H))
+        win_size = self._pick_scale_filter()
         # dikey senkron (vsync): açıkken FPS monitörün yenileme hızında (ör.
         # 144) takılır. Varsayılan KAPALI: sınır yalnız FPS SINIRI ayarıdır.
         vs = 1 if bool(self.save.data.get("settings", {}).get("vsync", False)) else 0
@@ -34222,10 +34260,59 @@ class Display:
                 sc = pygame.display.set_mode((VIRTUAL_W, VIRTUAL_H),
                                              flags | pygame.SCALED)
             self.scaled_mode = True
+            if win_size is not None:
+                self._fit_window(win_size)
             return sc
         except Exception:
             self.scaled_mode = False
             return pygame.display.set_mode(want, flags)
+
+    def _pick_scale_filter(self):
+        """2K / 4K ekranlarda keskin görüntü: 1280x720 tam katla (2x, 3x)
+        büyüyorsa en yakın piksel filtresi (bulanıklık yok), arada bir oranda
+        yumuşak filtre. Pencere kipinde ekrana göre iyi bir pencere boyu da
+        seçilir. Döner: istenen pencere boyu (ya da None)."""
+        try:
+            dw, dh = pygame.display.get_desktop_sizes()[0]
+        except Exception:
+            return None
+        if dw <= 0 or dh <= 0:
+            return None
+        win = None
+        if self.fullscreen:
+            s = min(dw / float(VIRTUAL_W), dh / float(VIRTUAL_H))
+        else:
+            # görev çubuğu + başlık payı: ekranın ~%88'i
+            fit = min(dw * 0.92 / VIRTUAL_W, dh * 0.86 / VIRTUAL_H)
+            k = int(fit)
+            if k >= 2:
+                s = float(k)            # tam kat pencere: keskin
+            elif fit >= 1.3:
+                s = fit                 # 1440p vb.: büyük pencere, yumuşak filtre
+            else:
+                s = 1.0
+            win = (int(VIRTUAL_W * s), int(VIRTUAL_H * s))
+        frac = abs(s - round(s))
+        sharp = s >= 1.95 and (frac < 0.04 or s >= 2.45)
+        mode = str(self.save.data.get("settings", {}).get("scale_filter", "auto"))
+        if mode == "sharp":
+            sharp = True
+        elif mode == "smooth":
+            sharp = False
+        _os_boot.environ["SDL_RENDER_SCALE_QUALITY"] = "0" if sharp else "1"
+        self.scale_sharp = sharp
+        return win
+
+    def _fit_window(self, size):
+        """SCALED pencereyi istenen boya getirip ortalar (SDL kendisi yalnız tam
+        katları seçiyordu: 2K ekranda pencere küçücük kalıyordu)."""
+        try:
+            win = pygame.Window.from_display_module()
+            if tuple(win.size) != tuple(size):
+                win.size = size
+                win.position = pygame.WINDOWPOS_CENTERED
+        except Exception:
+            pass
 
     def _bind_canvas(self):
         """Masaüstü SCALED kipinde oyun doğrudan pencere yüzeyine çizilir: her
