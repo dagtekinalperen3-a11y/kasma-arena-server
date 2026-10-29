@@ -5530,6 +5530,11 @@ class SaveManager:
     def is_tainted(self):
         return bool(self.data.get("tainted"))
 
+    def used_cheat_code(self):
+        """Dünya sıralamasını kapatan tek şaibe: oyun içi hile kodu. (Elmas /
+        kayıt tutarsızlığı artık engellemez: sunucu ilerlemeyi zaten eşitliyor.)"""
+        return self.is_tainted() and "cheat_code" in (self.data.get("taint_reasons") or [])
+
     def is_board_banned(self):
         """Yasak yok (eski kayıtlarda kalan bayrak da sayılmaz)."""
         return False
@@ -5885,8 +5890,8 @@ class SaveManager:
                 pass          # eşitleme oyunun yoluna çıkmasın
 
     def can_spend(self):
-        """Şaibeli kayıt elmas harcayamaz (satın alma / kuşanma kilitli)."""
-        return not self.is_tainted()
+        """Hile kodu kullanılmış kayıt elmas harcayamaz (satın alma kilitli)."""
+        return not self.used_cheat_code()
 
     def get_gems(self):
         return self.data.get("gems", 0)
@@ -36833,6 +36838,8 @@ STRINGS.update({
     "ui.ad_wait":     _T("Sonraki: {0}", "Next: {0}", "Siguiente: {0}", "Nächste: {0}", "Следующая: {0}"),
     "ui.ad_tomorrow": _T("Yarın yenilenir ({0})", "Resets tomorrow ({0})", "Se renueva mañana ({0})",
                          "Morgen wieder ({0})", "Обновится завтра ({0})"),
+    "ui.gift_streak": _T("Seri: {0}. gün / {1}", "Streak: day {0} / {1}", "Racha: día {0} / {1}",
+                         "Serie: Tag {0} / {1}", "Серия: день {0} / {1}"),
     "ui.visit_site":  _T("MAĞAZAMIZI GEZ", "VISIT OUR SHOP", "VISITA NUESTRA TIENDA",
                          "UNSEREN SHOP BESUCHEN", "ПОСЕТИ НАШ МАГАЗИН"),
     "ui.visit_plus":  _T("GEZ  +{0}", "VISIT  +{0}", "VISITA  +{0}", "BESUCHEN  +{0}", "ПОСЕТИТЬ  +{0}"),
@@ -54792,6 +54799,22 @@ def draw_lucky_wheel(surf, cx, cy, R, angle, t, lights=True):
     circle_aa(surf, cx, cy - R - 22, 6, (255, 214, 120))
 
 
+def draw_wheel_icon(surf, cx, cy, r, angle_deg=0.0):
+    """Küçük çark simgesi (menü kartı): renkli dilimler, göbek, minik ok."""
+    n = len(WHEEL_ORDER)
+    a0 = math.radians(-angle_deg)
+    pygame.draw.circle(surf, OUTLINE, (int(cx), int(cy)), int(r + 2))
+    for i, pz in enumerate(WHEEL_ORDER):
+        s0 = a0 - math.pi / 2 + i * math.tau / n
+        s1 = s0 + math.tau / n
+        pts = [(cx, cy)] + [(cx + math.cos(s0 + (s1 - s0) * k / 3.0) * r, cy + math.sin(s0 + (s1 - s0) * k / 3.0) * r)
+                            for k in range(4)]
+        pygame.draw.polygon(surf, WHEEL_COLORS[pz], pts)
+    ring_aa(surf, cx, cy, r, (255, 214, 120), 2)
+    circle_aa(surf, cx, cy, max(2.0, r * 0.22), (255, 226, 150))
+    poly_aa(surf, [(cx - r * 0.32, cy - r - 4), (cx + r * 0.32, cy - r - 4), (cx, cy - r + 3)], (240, 60, 70))
+
+
 def _tr_day():
     return time.strftime("%Y-%m-%d", time.gmtime(time.time() + 3 * 3600))
 
@@ -57633,7 +57656,7 @@ class App:
             return L("ui.world_needs_login")
         if self.account.needs_username():
             return L("ui.pick_name_why")
-        if self.save.is_tainted():
+        if self.save.used_cheat_code():
             return L("ui.taint_prefix", self.save.taint_text())
         if self.run is not None and not self.run.run_is_clean():
             return f"koşu doğrulanamadı ({self.run.cheat_flag})"
@@ -58550,7 +58573,7 @@ class App:
         # ---- şaibeli kayıt uyarısı ----
         # Oyuncu neden sıralamaya giremediğini sonuç ekranında değil, burada
         # öğrensin; sessizce engellemek "oyun bozuk" hissi verirdi.
-        if self.save.is_tainted():
+        if self.save.used_cheat_code():
             wr = pygame.Rect(0, 0, 560, 46)
             wr.center = (VIRTUAL_W / 2, 300)
             panel(canvas, wr, bg=(44, 18, 22), edge=(92, 44, 48), alpha=238, radius=10, edge_w=2)
@@ -58690,10 +58713,34 @@ class App:
         img = cache.get(key)
         if img is None:
             img = pygame.Surface((w, h), pygame.SRCALPHA)
-            img.fill((*((56, 43, 42) if hover else (46, 35, 36)), 250))
+            top, bot = ((52, 40, 70), (40, 24, 34)) if hover else ((44, 34, 60), (34, 20, 30))
+            for y in range(h):
+                img.fill((*mix_col(top, bot, y / max(1.0, h - 1.0)), 250), (0, y, w, 1))
+            # ince elmas deseni
+            for yy in range(10, h, 22):
+                for xx in range(10 + (yy // 22 % 2) * 11, w, 22):
+                    pygame.draw.polygon(img, (255, 255, 255, 9), [(xx, yy - 5), (xx + 5, yy), (xx, yy + 5), (xx - 5, yy)])
+            # üstte yumuşak parıltı şeridi
+            for y in range(46):
+                img.fill((255, 230, 190, int(16 * (1 - y / 46.0))), (0, y, w, 1), special_flags=0)
             hand_mask(img, 14)
             cache[key] = img
         return img
+
+    def _shine(self, canvas, r, period=3.2, offset=0.0, alpha=60):
+        """Düğmenin üstünden ara ara kayan ince parıltı."""
+        ph = ((self.t + offset) % period) / period
+        if ph > 0.35:
+            return
+        k = ph / 0.35
+        prev = canvas.get_clip()
+        canvas.set_clip(r.clip(prev) if prev else r)
+        x = r.x - 30 + (r.w + 60) * k
+        band = pygame.Surface((18, r.h), pygame.SRCALPHA)
+        for i in range(18):
+            band.fill((255, 255, 255, int(alpha * math.sin(i / 17.0 * math.pi))), (i, 0, 1, r.h))
+        canvas.blit(pygame.transform.rotate(band, -18), (int(x), r.y - 4))
+        canvas.set_clip(prev)
 
     def _mini_button(self, canvas, r, label, col, hover, enabled=True, icon=None, text_col=None,
                      size=12):
@@ -58744,12 +58791,18 @@ class App:
 
         canvas.blit(_panel_shadow(rect.w, rect.h, 18), (rect.x - 6, rect.y - 2))
         canvas.blit(self._card_body(rect.w, rect.h, hover), rect.topleft)
-        ink_frame(canvas, rect, (74, 66, 86), 18, 2)
+        ink_frame(canvas, rect, (150, 118, 70) if hover else (112, 90, 62), 18, 2)
+        # süzülen minik parıltılar
+        for k_ in range(6):
+            ph_ = (self.t * 0.18 + k_ * 0.17) % 1.0
+            sx_ = rect.x + 16 + (k_ * 37) % (rect.w - 32)
+            sy_ = rect.bottom - 20 - ph_ * (rect.h - 40)
+            _sparkle(canvas, sx_, sy_, 1.5 + 1.5 * math.sin(ph_ * math.pi), (255, 230, 170))
 
         pl, pr_ = rect.x + 12, rect.right - 12
 
         # ---- başlık ----
-        bx, by = rect.x + 28, rect.y + 32
+        bx, by = rect.x + 28, rect.y + 30
         add_glow(canvas, bx, by, 26, accent, 0.28 + pulse * 0.20)
         for k_ in range(10):
             a = self.t * 0.5 + k_ * math.tau / 10
@@ -58761,10 +58814,10 @@ class App:
         ring_aa(canvas, bx, by, 13, accent, 2)
         draw_icon(canvas, bx, by, "gem", lighten(accent, 0.3), 9)
         tx = rect.x + 52
-        draw_text(canvas, L("ui.store"), (tx, rect.y + 15), 16, accent, bold=True, shadow=True)
-        draw_text(canvas, _fit_text(L("ui.store_card_sub"), 10, pr_ - tx), (tx, rect.y + 35), 10,
-                  TEXT_DIM, shadow=False)
-        if rw.anything_ready():
+        draw_text(canvas, L("ui.store"), (tx, rect.y + 13), 17, lighten(accent, 0.15), bold=True, shadow=True)
+        draw_text(canvas, _fit_text(L("ui.store_card_sub"), 10, pr_ - tx), (tx, rect.y + 34), 10,
+                  (196, 186, 206), shadow=False)
+        if rw.anything_ready() or self.wheel.ready():
             # bildirim noktası: alınacak bedava bir şey var
             k = 0.5 + 0.5 * math.sin(self.t * 5)
             add_glow(canvas, rect.right - 8, rect.y + 8, 20, RED, 0.3 + 0.3 * k)
@@ -58778,21 +58831,24 @@ class App:
         ph = (self.store_card_t % self.SHOWCASE_EVERY) / self.SHOWCASE_EVERY
         fade = min(1.0, ph / 0.08, (1.0 - ph) / 0.08)
         kind, it = items[idx]
-        sc = pygame.Rect(pl, rect.y + 56, pr_ - pl, 128)
+        sc = pygame.Rect(pl, rect.y + 58, pr_ - pl, 110)
         sc_hover = sc.collidepoint(mouse_pos)
         icol = tuple(it.get("color", accent))
-        pygame.draw.rect(canvas, (28, 20, 21), sc, border_radius=12)
+        pygame.draw.rect(canvas, (24, 16, 22), sc, border_radius=12)
         prev_clip = canvas.get_clip()
         canvas.set_clip(sc.inflate(-2, -2))
-        add_glow(canvas, sc.centerx, sc.y + 50, 90, icol, 0.22 * fade + 0.05)
+        # spot ışığı + kaide
+        add_glow(canvas, sc.centerx, sc.y + 44, 80, icol, 0.24 * fade + 0.06)
         for k_ in range(8):
             a = self.t * 0.35 + k_ * math.tau / 8
-            p0 = (sc.centerx, sc.y + 50)
-            thick_line(canvas, p0, (p0[0] + math.cos(a) * 90, p0[1] + math.sin(a) * 90), 6,
-                       scale_col(icol, 0.18 * fade + 0.05), cap=False)
-        cy_ = sc.y + 50 + math.sin(self.t * 2) * 2
+            p0 = (sc.centerx, sc.y + 44)
+            thick_line(canvas, p0, (p0[0] + math.cos(a) * 80, p0[1] + math.sin(a) * 80), 6,
+                       scale_col(icol, 0.16 * fade + 0.05), cap=False)
+        pygame.draw.ellipse(canvas, scale_col(icol, 0.30), (sc.centerx - 34, sc.y + 60, 68, 12))
+        pygame.draw.ellipse(canvas, scale_col(icol, 0.55), (sc.centerx - 34, sc.y + 60, 68, 12), 1)
+        cy_ = sc.y + 44 + math.sin(self.t * 2) * 2
         if kind == "skin":
-            draw_skin_preview(canvas, it, sc.centerx, cy_, self.t, r=int(16 + 4 * fade))
+            draw_skin_preview(canvas, it, sc.centerx, cy_, self.t, r=int(15 + 4 * fade))
             tag, price = L("ui.showcase_premium"), None
             name = skin_name(it)
         elif kind == "pet":
@@ -58801,103 +58857,145 @@ class App:
             tag, price = L("ui.showcase_pet"), None
             name = it["name"]
         else:
-            for j in range(4):
-                ang = -math.pi / 2 + (j - 1.5) * 0.55
+            for j_ in range(4):
+                ang = -math.pi / 2 + (j_ - 1.5) * 0.55
                 draw_icon(canvas, sc.centerx + math.cos(ang) * 22, cy_ + 6 + math.sin(ang) * 8,
                           "gem", it["color"], int(10 + 3 * fade))
             tag, price, name = L("ui.tab_gems"), None, fmt_num(gem_pack_total(it)) + " " + L("ui.gem")
         canvas.set_clip(prev_clip)
         ink_frame(canvas, sc, lighten(icol, 0.2) if sc_hover else scale_col(icol, 0.7), 12, 2)
+        # altın köşe süsleri
+        for cx_, cy2, sx, sy in ((sc.x, sc.y, 1, 1), (sc.right, sc.y, -1, 1), (sc.x, sc.bottom, 1, -1),
+                                 (sc.right, sc.bottom, -1, -1)):
+            thick_line(canvas, (cx_ + sx * 2, cy2 + sy * 2), (cx_ + sx * 12, cy2 + sy * 2), 2, (230, 190, 110))
+            thick_line(canvas, (cx_ + sx * 2, cy2 + sy * 2), (cx_ + sx * 2, cy2 + sy * 12), 2, (230, 190, 110))
         # etiket şeridi
         tg = _fit_text(tag, 9, sc.w - 20, bold=True)
         tgw = text_width(tg, 9, True) + 16
         tr = pygame.Rect(0, 0, int(tgw), 16)
-        tr.midtop = (sc.centerx, sc.y - 6)
+        tr.midtop = (sc.centerx, sc.y - 7)
         pygame.draw.rect(canvas, PURPLE if kind != "pack" else (40, 110, 155), tr, border_radius=8)
+        ink_frame(canvas, tr, (255, 230, 255), 8, 1)
         draw_text(canvas, tg, tr.center, 9, WHITE, bold=True, center=True, shadow=False)
-        draw_text(canvas, _fit_text(name, 13, sc.w - 12, bold=True), (sc.centerx, sc.y + 86), 13,
+        draw_text(canvas, _fit_text(name, 12, sc.w - 12, bold=True), (sc.centerx, sc.y + 80), 12,
                   TEXT, bold=True, center=True, alpha=int(255 * max(0.3, fade)))
-        if price is not None:
-            draw_coin_label(canvas, sc.centerx, sc.y + 108, fmt_num(price), GEM_COLOR, 13,
-                            icon="gem", icon_r=7, gap=5)
-        else:
-            draw_text(canvas, it.get("price_hint", ""), (sc.centerx, sc.y + 108), 13, GOLD,
-                      bold=True, center=True)
+        ptxt = fmt_num(price) if price is not None else str(it.get("price_hint", ""))
+        if ptxt:
+            pw_ = text_width(ptxt, 11, True) + 18
+            pr2 = pygame.Rect(0, 0, int(pw_), 17)
+            pr2.center = (sc.centerx, sc.y + 98)
+            pygame.draw.rect(canvas, (70, 52, 18), pr2, border_radius=8)
+            ink_frame(canvas, pr2, GOLD, 8, 1)
+            draw_text(canvas, ptxt, pr2.center, 11, GOLD, bold=True, center=True, shadow=False)
         # nokta göstergesi
         n = len(items)
         dx0 = sc.centerx - (n - 1) * 7 / 2
-        for j in range(n):
-            circle_aa(canvas, dx0 + j * 7, sc.bottom + 8, 2.4 if j == idx else 1.6,
-                      accent if j == idx else (70, 78, 104))
+        for j_ in range(n):
+            circle_aa(canvas, dx0 + j_ * 7, sc.bottom + 7, 2.4 if j_ == idx else 1.6,
+                      accent if j_ == idx else (70, 78, 104))
 
-        # ---- ücretsiz elmas: reklam ----
-        y = rect.y + 202
-        free_lbl = _fit_text(L("ui.free_gems"), 11, pr_ - pl, bold=True)
-        draw_text(canvas, free_lbl, (pl, y), 11, (140, 230, 160), bold=True, shadow=False)
-        ab = pygame.Rect(pl, y + 18, pr_ - pl, 32)
-        ab_hover = ab.collidepoint(mouse_pos)
+        def row(y0, col):
+            r_ = pygame.Rect(pl, y0, pr_ - pl, 50)
+            hv = r_.collidepoint(mouse_pos)
+            pygame.draw.rect(canvas, scale_col(col, 0.22 if hv else 0.16), r_, border_radius=10)
+            ink_frame(canvas, r_, scale_col(col, 0.75 if hv else 0.5), 10, 1)
+            return r_, hv
+
+        # ---- 1) reklam ----
         ready = rw.ad_ready()
+        gcol = (90, 210, 130)
+        ar, ar_h = row(rect.y + 186, gcol)
+        ix, iy = ar.x + 20, ar.centery
+        disc_grad(canvas, ix, iy, 13, (70, 170, 100), (20, 54, 34), 6)
+        ring_aa(canvas, ix, iy, 13, lighten(gcol, 0.3), 2)
+        poly_aa(canvas, [(ix - 4, iy - 6), (ix - 4, iy + 6), (ix + 7, iy)], (240, 255, 244))
+        draw_text(canvas, _fit_text(L("ui.free_gems"), 10, ar.w - 44, bold=True), (ar.x + 40, ar.y + 6), 10,
+                  (150, 236, 170), bold=True, shadow=False)
         if ready:
-            k = 0.5 + 0.5 * math.sin(self.t * 3.2)
-            add_glow(canvas, ab.centerx, ab.centery, 70, (90, 220, 120), 0.10 + 0.10 * k)
-            self._mini_button(canvas, ab, L("ui.watch_plus", AD_REWARD_GEMS), (54, 150, 86),
-                              ab_hover, icon="play")
-            sub = L("ui.ads_left", rw.ads_left(), AD_DAILY_LIMIT)
+            lab, en = "+%d" % AD_REWARD_GEMS, True
         elif rw.ads_left() > 0:
-            self._mini_button(canvas, ab, L("ui.ad_wait", fmt_clock(rw.ad_cooldown())),
-                              (54, 150, 86), False, enabled=False)
-            sub = L("ui.ads_left", rw.ads_left(), AD_DAILY_LIMIT)
+            lab, en = fmt_clock(rw.ad_cooldown()), False
         else:
-            self._mini_button(canvas, ab, L("ui.ad_tomorrow", fmt_clock(seconds_to_midnight())),
-                              (54, 150, 86), False, enabled=False)
-            sub = ""
-        ft = L("ui.free_tag")
-        fw = text_width(ft, 9, True) + 12
-        if ready and text_width(free_lbl, 11, True) + fw + 4 < pr_ - pl:
-            # bedava etiketi düğmenin köşesine iğneli (yazıyla çakışmıyorsa)
-            fr = pygame.Rect(ab.right - int(fw) + 6, ab.y - 9, int(fw), 15)
-            pygame.draw.rect(canvas, (210, 56, 66), fr, border_radius=7)
-            ink_frame(canvas, fr, (255, 150, 150), 7, 1)
-            draw_text(canvas, ft, fr.center, 9, WHITE, bold=True, center=True, shadow=False)
-        if sub:
-            draw_text(canvas, sub, (ab.centerx, ab.bottom + 11), 10, TEXT_DIM, center=True,
-                      shadow=False)
-        if ready:
-            touch_ad_zone(ab)
-        if clicked and ab_hover:
+            lab, en = fmt_clock(seconds_to_midnight()), False
+        ab = pygame.Rect(ar.x + 40, ar.y + 19, ar.w - 46, 20)
+        self._mini_button(canvas, ab, lab, (54, 150, 86), ar_h and en, enabled=en, icon="gem" if en else None,
+                          size=11)
+        if en:
+            self._shine(canvas, ab, 3.4, 0.0)
+            touch_ad_zone(ar)
+        pips = AD_DAILY_LIMIT
+        used = pips - rw.ads_left()
+        for j_ in range(pips):
+            circle_aa(canvas, ab.centerx - (pips - 1) * 3.5 + j_ * 7, ar.y + 44, 2.0,
+                      (90, 74, 80) if j_ < used else gcol)
+        if clicked and ar_h:
             handled = True
             if ready:
                 self._ad_start()
             else:
                 sfx("error", 0.4, 0.0)
+        ab_hover = ar_h
 
-        # ---- günlük hediye ----
-        y = rect.y + 274
-        pygame.draw.line(canvas, (91, 66, 68), (pl, y - 6), (pr_, y - 6), 1)
+        # ---- 2) günlük hediye ----
         gift_ok = rw.gift_ready()
-        self._gift_icon(canvas, pl + 14, y + 22, 11, t=self.t if gift_ok else 0.0)
-        draw_text(canvas, _fit_text(L("ui.daily_gift"), 11, pr_ - pl - 34, bold=True),
-                  (pl + 34, y + 2), 11, GOLD, bold=True, shadow=False)
-        gb = pygame.Rect(pl + 34, y + 20, pr_ - pl - 34, 28)
-        gb_hover = gb.collidepoint(mouse_pos)
+        gr, gr_h = row(rect.y + 240, GOLD)
+        hop = abs(math.sin(self.t * 4.0)) * 3 if gift_ok else 0.0
         if gift_ok:
-            self._mini_button(canvas, gb, L("ui.claim", rw.gift_amount()), (176, 128, 40),
-                              gb_hover, icon="gem")
+            add_glow(canvas, gr.x + 20, gr.centery, 26, GOLD, 0.25 + 0.15 * math.sin(self.t * 4))
+        self._gift_icon(canvas, gr.x + 20, gr.centery + 3 - hop, 8, t=self.t if gift_ok else 0.0)
+        draw_text(canvas, _fit_text(L("ui.daily_gift"), 10, gr.w - 44, bold=True), (gr.x + 40, gr.y + 6), 10,
+                  GOLD, bold=True, shadow=False)
+        today = rw.gift_day_index()
+        nd = len(DAILY_GIFT_GEMS)
+        gb = pygame.Rect(gr.x + 40, gr.y + 19, gr.w - 46, 20)
+        for j_ in range(nd):
+            got = j_ < today or (j_ == today and not gift_ok)
+            cur_ = j_ == today and gift_ok
+            circle_aa(canvas, gb.centerx - (nd - 1) * 3.5 + j_ * 7, gr.y + 44, 2.5 if cur_ else 2.0,
+                      GOLD if cur_ else ((110, 200, 140) if got else (90, 74, 80)))
+        if gift_ok:
+            self._mini_button(canvas, gb, "+%d" % rw.gift_amount(), (176, 128, 40), gr_h, icon="gem", size=11)
+            self._shine(canvas, gb, 2.6, 1.1)
         else:
-            self._mini_button(canvas, gb, L("ui.claimed_in", fmt_clock(seconds_to_midnight())),
-                              (176, 128, 40), False, enabled=False)
-        if clicked and gb_hover:
+            self._mini_button(canvas, gb, fmt_clock(seconds_to_midnight()), (176, 128, 40), False, enabled=False,
+                              size=11)
+        if clicked and gr_h:
             handled = True
             if gift_ok:
                 self._claim_gift(gb.centerx, gb.y)
             else:
                 sfx("error", 0.4, 0.0)
+        gb_hover = gr_h
+
+        # ---- 3) şans çarkı ----
+        wh = self.wheel
+        wcol = (255, 190, 80)
+        wr, wr_h = row(rect.y + 294, wcol)
+        draw_wheel_icon(canvas, wr.x + 20, wr.centery + 2, 12, self.t * 40.0)
+        draw_text(canvas, _fit_text(L("wh.title"), 10, wr.w - 44, bold=True), (wr.x + 40, wr.y + 6), 10,
+                  (255, 214, 140), bold=True, shadow=False)
+        wl = wh.left()
+        wb = pygame.Rect(wr.x + 40, wr.y + 19, wr.w - 46, 20)
+        wready = wh.ready()
+        self._mini_button(canvas, wb, L("wh.spin_now") if wready else L("wh.open"), (200, 140, 30),
+                          wr_h, enabled=wl > 0 or wready, size=11)
+        if wl > 0:
+            self._shine(canvas, wb, 3.0, 2.0)
+        for j_ in range(WHEEL_DAILY):
+            circle_aa(canvas, wb.centerx - (WHEEL_DAILY - 1) * 3.5 + j_ * 7, wr.y + 44, 2.0,
+                      wcol if j_ >= WHEEL_DAILY - wl else (90, 74, 80))
+        if clicked and wr_h:
+            handled = True
+            self.store_tab = "free"
+            self.goto(STATE_GEM_STORE)
+            wh.show()
 
         # ---- mağazaya git ----
-        cta = pygame.Rect(pl, rect.bottom - 44, pr_ - pl, 32)
+        cta = pygame.Rect(pl, rect.bottom - 40, pr_ - pl, 28)
         cta_hover = cta.collidepoint(mouse_pos)
         self._mini_button(canvas, cta, L("ui.store_go"), (40, 110, 160), cta_hover or
-                          (hover and not (ab_hover or gb_hover)))
+                          (hover and not (ab_hover or gb_hover or wr_h)))
+        self._shine(canvas, cta, 4.0, 0.6, 45)
 
         if clicked and hover and not handled:
             if sc_hover:
@@ -59381,7 +59479,7 @@ class App:
         gift_ok = rw.gift_ready()
         today = rw.gift_day_index()
         n = len(DAILY_GIFT_GEMS)
-        tw_, th_ = 38, 64
+        tw_, th_ = 34, 64
         tx0 = r.centerx - (n * tw_ + (n - 1) * 4) / 2
         for j, amt in enumerate(DAILY_GIFT_GEMS):
             tr = pygame.Rect(int(tx0 + j * (tw_ + 4)), r.y + 60, tw_, th_)
@@ -59402,9 +59500,17 @@ class App:
                                 t=t if cur else 0.0)
             draw_text(canvas, str(amt), (tr.centerx, tr.bottom - 11), 10,
                       GEM_COLOR if not got else (110, 170, 140), bold=True, center=True, shadow=False)
-        self._gift_icon(canvas, r.centerx, r.y + 170, 22, t=t if gift_ok else 0.0)
         if gift_ok:
-            add_glow(canvas, r.centerx, r.y + 168, 70, GOLD, 0.18 + 0.12 * math.sin(t * 3))
+            add_glow(canvas, r.centerx, r.y + 168, 80, GOLD, 0.20 + 0.12 * math.sin(t * 3))
+            for j in range(10):
+                a = t * 0.6 + j * math.tau / 10
+                thick_line(canvas, (r.centerx + math.cos(a) * 36, r.y + 168 + math.sin(a) * 36),
+                           (r.centerx + math.cos(a) * 48, r.y + 168 + math.sin(a) * 48), 2,
+                           scale_col(GOLD, 0.45), cap=False)
+        hop = abs(math.sin(t * 4.0)) * 4 if gift_ok else 0.0
+        self._gift_icon(canvas, r.centerx, r.y + 170 - hop, 22, t=t if gift_ok else 0.0)
+        draw_text(canvas, L("ui.gift_streak", today + 1, n), (r.centerx, r.y + 214), 11,
+                  (230, 200, 140), center=True, shadow=False)
         b = pygame.Rect(r.x + 24, r.bottom - 56, r.w - 48, 40)
         bh = b.collidepoint(mouse_pos)
         if gift_ok:
@@ -59439,8 +59545,8 @@ class App:
         wcol = (255, 190, 80)
         r = card(3, wcol, L("wh.title"))
         wh = self.wheel
-        cx, cy = r.centerx, r.y + 146
-        draw_lucky_wheel(canvas, cx, cy, 72, wh.angle if not wh.open else t * 9.0, t, lights=True)
+        cx, cy = r.centerx, r.y + 152
+        draw_lucky_wheel(canvas, cx, cy, 68, wh.angle if not wh.open else t * 9.0, t, lights=True)
         if not wh.open:
             wh.angle += dt * 9.0
         left_w = wh.left()
