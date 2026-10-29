@@ -10,6 +10,8 @@ import hashlib
 import threading
 import urllib.parse
 import urllib.request
+import datetime
+import re as _re
 from collections import defaultdict, deque
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -75,7 +77,7 @@ def _client_ip():
 
 
 # Dünya sıralamasının tutulduğu Supabase tablosu.
-WORLD_TABLE = "dunya_siralamasi"
+WORLD_TABLE = "scores"          # veritabanında: skorlar
 
 
 def _oops(e, msg="sunucu hatası", code=500):
@@ -104,6 +106,217 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 supabase: Client = None
 if SUPABASE_URL and SUPABASE_KEY:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+
+# ---- veritabanı katmanı ----
+# Kod İngilizce alan adlarıyla çalışır; veritabanında tablolar ve sütunlar
+# Türkçe ve okunaklı (VERITABANI.sql). db("accounts") gibi çağrılar adları
+# çevirir. Zamanlar kodda epoch saniye (float), veritabanında gerçek tarih
+# (timestamptz): yazarken ve okurken o da çevrilir.
+#   kod adı: (tablo, {kod sütunu: veritabanı sütunu}, {zaman sütunları})
+DB_TABLES = {
+    "accounts": ("oyuncular", {
+        "username": "kullanici_adi", "email": "eposta", "provider": "giris_yontemi",
+        "password_hash": "sifre_ozeti", "google_sub": "google_kimligi", "name": "google_adi",
+        "created_at": "kayit_tarihi", "last_login": "son_giris", "last_seen": "son_gorulme",
+        "last_logout": "son_cikis", "play_seconds": "toplam_oynama_sn",
+        "play_sessions": "oturum_sayisi", "version": "surum"},
+        {"created_at", "last_login", "last_seen", "last_logout"}),
+    "sessions": ("oturumlar", {
+        "token_hash": "token_ozeti", "account_id": "oyuncu_id", "device_hash": "cihaz_ozeti",
+        "created_at": "olusturma", "expires_at": "bitis"},
+        {"created_at", "expires_at"}),
+    "player_data": ("ilerleme", {
+        "account_id": "oyuncu_id", "gems": "elmas", "gems_earned": "kazanilan_elmas",
+        "gems_spent": "harcanan_elmas", "best_score": "en_iyi_skor", "best_wave": "en_iyi_dalga",
+        "total_kills": "toplam_oldurme", "runs": "kosu_sayisi", "skin_count": "skin_sayisi",
+        "pet_count": "pet_sayisi", "data": "veri", "updated_at": "guncelleme"},
+        {"updated_at"}),
+    "player_events": ("olay_gunlugu", {
+        "account_id": "oyuncu_id", "at": "zaman", "kind": "tur", "delta": "degisim",
+        "total": "toplam", "note": "aciklama"},
+        {"at"}),
+    "scores": ("skorlar", {
+        "account_id": "oyuncu_id", "name": "kullanici_adi", "score": "skor", "kills": "oldurme",
+        "wave": "dalga", "run_time": "sure_sn", "diff": "zorluk", "map": "harita",
+        "ranked": "dunya_siralamasi", "details": "kosu_karti", "created_at": "tarih",
+        "sig": "imza"},
+        {"created_at"}),
+    "play_sessions": ("oyun_oturumlari", {
+        "account_id": "oyuncu_id", "started_at": "giris", "ended_at": "cikis",
+        "seconds": "sure_sn", "open": "acik", "version": "surum"},
+        {"started_at", "ended_at"}),
+    "friends": ("arkadaslar", {
+        "a": "isteyen_id", "b": "istenen_id", "status": "durum", "created_at": "tarih"},
+        {"created_at"}),
+    "messages": ("mesajlar", {
+        "sender": "gonderen_id", "receiver": "alici_id", "kind": "tur", "body": "metin",
+        "created_at": "tarih", "read_at": "okunma"},
+        {"created_at", "read_at"}),
+    "coop_scores": ("ikili_skorlar", {
+        "pair_key": "ikili_anahtari", "account_a": "oyuncu_a_id", "account_b": "oyuncu_b_id",
+        "name_a": "oyuncu_a", "name_b": "oyuncu_b", "score": "skor", "kills": "oldurme",
+        "wave": "dalga", "run_time": "sure_sn", "diff": "zorluk", "details": "kosu_karti",
+        "created_at": "tarih"},
+        {"created_at"}),
+    "feedback": ("geri_bildirim", {
+        "created_at": "tarih", "kind": "tur", "message": "mesaj", "email": "eposta",
+        "account_id": "oyuncu_id", "username": "kullanici_adi", "ip_hash": "ip_ozeti",
+        "version": "surum", "status": "durum"},
+        {"created_at"}),
+    "shop_orders": ("siparisler", {
+        "account_id": "oyuncu_id", "product_id": "urun_id", "kind": "tur",
+        "amount": "tutar_kurus", "currency": "para_birimi", "status": "durum",
+        "provider": "saglayici", "provider_ref": "saglayici_ref", "payload": "ek_veri",
+        "created_at": "olusturma", "paid_at": "odeme", "granted_at": "teslim", "error": "hata"},
+        {"created_at", "paid_at", "granted_at"}),
+}
+_DB_REV = {k: {v: c for c, v in cols.items()} for k, (_t, cols, _z) in DB_TABLES.items()}
+
+
+def _to_ts(v):
+    """epoch saniye -> ISO tarih (0 / boş -> NULL)."""
+    if v is None or isinstance(v, bool) or not isinstance(v, (int, float)):
+        return v
+    if not math.isfinite(v) or v <= 0:
+        return None
+    return datetime.datetime.fromtimestamp(float(v), datetime.timezone.utc).isoformat()
+
+
+def _from_ts(v):
+    """ISO tarih -> epoch saniye (boş -> 0)."""
+    if v is None:
+        return 0.0
+    if isinstance(v, (int, float)):
+        return float(v)
+    t = str(v).strip().replace(" ", "T")
+    if t.endswith("Z"):
+        t = t[:-1] + "+00:00"
+    # Python 3.10 ve öncesi yalnızca 3 ya da 6 haneli kesir okur
+    m = _re.match(r"^(.*T\d\d:\d\d:\d\d)(?:\.(\d+))?(.*)$", t)
+    if m:
+        frac = (m.group(2) or "")[:6].ljust(6, "0")
+        tz = m.group(3) or "+00:00"
+        if _re.match(r"^[+-]\d\d$", tz):
+            tz += ":00"
+        t = m.group(1) + "." + frac + tz
+    try:
+        return datetime.datetime.fromisoformat(t).timestamp()
+    except ValueError:
+        return 0.0
+
+
+class _DbResult:
+    __slots__ = ("data", "count")
+
+    def __init__(self, data, count=None):
+        self.data = data
+        self.count = count
+
+
+class _DbQuery:
+    """Supabase sorgusunu saran ince katman: sütun adlarını ve zamanları çevirir."""
+    __slots__ = ("_q", "_key")
+
+    def __init__(self, q, key):
+        self._q = q
+        self._key = key
+
+    def _col(self, c):
+        spec = DB_TABLES.get(self._key)
+        return spec[1].get(c, c) if spec else c
+
+    def _val(self, c, v):
+        spec = DB_TABLES.get(self._key)
+        return _to_ts(v) if spec and c in spec[2] else v
+
+    def _row_in(self, d):
+        return {self._col(k): self._val(k, v) for k, v in d.items()}
+
+    def _row_out(self, d):
+        if not isinstance(d, dict):
+            return d
+        rev = _DB_REV.get(self._key)
+        if not rev:
+            return d
+        zc = DB_TABLES[self._key][2]
+        out = {}
+        for k, v in d.items():
+            c = rev.get(k, k)
+            out[c] = _from_ts(v) if c in zc else v
+        return out
+
+    def _wrap(self, q):
+        return _DbQuery(q, self._key)
+
+    # ---- okuma / yazma ----
+    def select(self, cols="*", **kw):
+        if str(cols).strip() != "*":
+            cols = ",".join(self._col(c.strip()) for c in str(cols).split(",") if c.strip())
+        return self._wrap(self._q.select(cols, **kw))
+
+    def insert(self, rows, **kw):
+        rows = [self._row_in(r) for r in rows] if isinstance(rows, list) else self._row_in(rows)
+        return self._wrap(self._q.insert(rows, **kw))
+
+    def update(self, d, **kw):
+        return self._wrap(self._q.update(self._row_in(d), **kw))
+
+    def delete(self, **kw):
+        return self._wrap(self._q.delete(**kw))
+
+    # ---- süzgeçler ----
+    def _f(self, name, col, val):
+        return self._wrap(getattr(self._q, name)(self._col(col), self._val(col, val)))
+
+    def eq(self, c, v):
+        return self._f("eq", c, v)
+
+    def neq(self, c, v):
+        return self._f("neq", c, v)
+
+    def gt(self, c, v):
+        return self._f("gt", c, v)
+
+    def gte(self, c, v):
+        return self._f("gte", c, v)
+
+    def lt(self, c, v):
+        return self._f("lt", c, v)
+
+    def lte(self, c, v):
+        return self._f("lte", c, v)
+
+    def ilike(self, c, v):
+        return self._wrap(self._q.ilike(self._col(c), v))
+
+    def is_(self, c, v):
+        return self._wrap(self._q.is_(self._col(c), v))
+
+    def in_(self, c, vals):
+        return self._wrap(self._q.in_(self._col(c), [self._val(c, v) for v in vals]))
+
+    def order(self, c, **kw):
+        return self._wrap(self._q.order(self._col(c), **kw))
+
+    def limit(self, n, **kw):
+        return self._wrap(self._q.limit(n, **kw))
+
+    def execute(self):
+        res = self._q.execute()
+        data = getattr(res, "data", None)
+        if isinstance(data, list):
+            data = [self._row_out(r) for r in data]
+        elif isinstance(data, dict):
+            data = self._row_out(data)
+        return _DbResult(data, getattr(res, "count", None))
+
+
+def db(key):
+    """db("accounts") -> oyuncular tablosu (adlar çevrilir)."""
+    spec = DB_TABLES.get(key)
+    return _DbQuery(supabase.table(spec[0] if spec else key), key)
+
 
 def _body():
     """İstek gövdesi - her zaman sözlük."""
@@ -232,12 +445,13 @@ def _clean_device(d):
 
 def _new_session(account_id, device=""):
     """Yeni oturum jetonu (veritabanına özeti yazılır). Hesabın eski oturumları kapanır."""
+    _sess_cache_drop(account_id=account_id)
     try:
-        supabase.table("sessions").delete().eq("account_id", account_id).execute()
+        db("sessions").delete().eq("account_id", account_id).execute()
     except Exception:
         pass        # silinemezse bile yeni oturum açılsın; en kötü ihtimalle eski kalır
     tok = secrets.token_urlsafe(32)
-    supabase.table("sessions").insert({
+    db("sessions").insert({
         "token_hash": _token_hash(tok),
         "account_id": account_id,
         "device_hash": _clean_device(device),
@@ -257,18 +471,45 @@ def _acct(data, check_device=True):
                                data.get("device_legacy", ""))
 
 
+# oturum önbelleği: arkadaş yoklaması, mesaj, ping gibi sık istekler her
+# seferinde iki veritabanı okuması yapmasın (mesajlar bu yüzden geç gidiyordu).
+# Çıkış, şifre değişimi ve ad seçimi önbelleği hemen temizler.
+SESSION_CACHE_TTL = 30.0
+_SESS_CACHE = {}
+_sess_cache_lock = threading.Lock()
+
+
+def _sess_cache_drop(token_hash=None, account_id=None):
+    with _sess_cache_lock:
+        if token_hash is not None:
+            _SESS_CACHE.pop(token_hash, None)
+        if account_id is not None:
+            for k in [k for k, v in _SESS_CACHE.items()
+                      if str(v[1].get("account_id")) == str(account_id)]:
+                _SESS_CACHE.pop(k, None)
+
+
 def _account_by_session(tok, device=None, device_legacy=None):
     """Jetondan hesabı bulur; süresi geçmişse ya da cihaz tutmuyorsa None."""
     if not tok or not supabase:
         return None
-    rows = supabase.table("sessions").select("*").eq(
-        "token_hash", _token_hash(tok)).execute()
-    if not rows.data:
-        return None
-    sess = rows.data[0]
+    th = _token_hash(tok)
+    now = time.time()
+    with _sess_cache_lock:
+        hit = _SESS_CACHE.get(th)
+    if hit and now - hit[0] < SESSION_CACHE_TTL:
+        sess, acc_row = hit[1], hit[2]
+    else:
+        rows = db("sessions").select("*").eq("token_hash", th).execute()
+        if not rows.data:
+            _sess_cache_drop(th)
+            return None
+        sess = rows.data[0]
+        acc_row = None
     if float(sess.get("expires_at", 0)) < time.time():
+        _sess_cache_drop(sess.get("token_hash"))
         try:
-            supabase.table("sessions").delete().eq(
+            db("sessions").delete().eq(
                 "token_hash", sess["token_hash"]).execute()
         except Exception:
             pass
@@ -283,11 +524,18 @@ def _account_by_session(tok, device=None, device_legacy=None):
             ok_dev = _clean_device(device_legacy) == want
         if not ok_dev:
             return None
-    # select("*") bilerek: tek tek sayınca yeni sütun unutuluyor. Dışarı
-    # giden alanları zaten _public_account süzüyor.
-    acc = supabase.table("accounts").select("*").eq(
-        "id", sess["account_id"]).execute()
-    return acc.data[0] if acc.data else None
+    if acc_row is None:
+        # select("*") bilerek: tek tek sayınca yeni sütun unutuluyor. Dışarı
+        # giden alanları zaten _public_account süzüyor.
+        acc = db("accounts").select("*").eq("id", sess["account_id"]).execute()
+        if not acc.data:
+            return None
+        acc_row = acc.data[0]
+        with _sess_cache_lock:
+            if len(_SESS_CACHE) > 20000:
+                _SESS_CACHE.clear()
+            _SESS_CACHE[th] = (now, sess, acc_row)
+    return dict(acc_row)
 
 
 def _public_account(acc):
@@ -324,11 +572,11 @@ def _accounts_by_username(u, cols="*"):
     if not low:
         return []
     pat = low.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-    q = supabase.table("accounts").select(cols)
+    q = db("accounts").select(cols)
     try:
         rows = q.ilike("username", pat).execute().data or []
     except AttributeError:          # ilike'ı olmayan (eski / sahte) istemci
-        rows = supabase.table("accounts").select(cols).execute().data or []
+        rows = db("accounts").select(cols).execute().data or []
     return [r for r in rows if str(r.get("username") or "").lower() == low]
 
 
@@ -363,7 +611,7 @@ def _verify_google_id_token(id_token):
 
 def _find_or_create_account(email, name, provider, password_hash=None, google_sub=None):
     email = email.strip().lower()
-    rows = supabase.table("accounts").select("*").eq("email", email).execute()
+    rows = db("accounts").select("*").eq("email", email).execute()
     if rows.data:
         acc = rows.data[0]
         # Kayıtta yazılan e-posta doğrulanmadığı için Google girişi sadece aynı
@@ -381,7 +629,7 @@ def _find_or_create_account(email, name, provider, password_hash=None, google_su
         if name and not acc.get("name"):
             patch["name"] = name[:NAME_MAX]
         if patch:
-            supabase.table("accounts").update(patch).eq("id", acc["id"]).execute()
+            db("accounts").update(patch).eq("id", acc["id"]).execute()
             acc.update(patch)
         return acc, False
     new = {
@@ -396,7 +644,7 @@ def _find_or_create_account(email, name, provider, password_hash=None, google_su
         new["password_hash"] = password_hash
     if google_sub:
         new["google_sub"] = google_sub
-    res = supabase.table("accounts").insert(new).execute()
+    res = db("accounts").insert(new).execute()
     return res.data[0], True
 
 
@@ -417,21 +665,23 @@ def diag():
                                 "(service_role anahtarı olmalı)")
         return jsonify(out)
     # Her tablodan tek satır okumayı dene; hata metni eksik olanı söyler.
+    # kod adları (db() veritabanındaki Türkçe adlara çevirir)
     need = {
         "accounts": ["id", "username", "email", "provider", "password_hash",
-                     "google_sub", "created_at"],
+                     "google_sub", "created_at", "last_seen", "play_seconds"],
         "sessions": ["token_hash", "account_id", "device_hash", "expires_at"],
         "player_data": ["account_id", "gems", "gems_earned", "gems_spent",
                         "best_score", "best_wave", "total_kills", "runs",
                         "skin_count", "pet_count", "data", "updated_at"],
         "player_events": ["account_id", "at", "kind", "delta", "total", "note"],
-        "dunya_siralamasi": ["name", "score", "kills", "wave", "run_time", "created_at",
-                   "account_id", "skin", "details"],      # supabase_leaderboard.sql
-        # arkadaşlar / mesajlar / 2 kişilik sıralama - VERITABANI_SOSYAL.sql
+        "scores": ["name", "score", "kills", "wave", "run_time", "created_at",
+                   "account_id", "skin", "details", "platform", "ranked", "sig"],
+        "play_sessions": ["account_id", "started_at", "ended_at", "seconds", "open"],
         "friends": ["id", "a", "b", "status", "created_at"],
         "messages": ["id", "sender", "receiver", "kind", "body", "created_at", "read_at"],
         "coop_scores": ["id", "pair_key", "account_a", "account_b", "name_a", "name_b", "score",
                         "kills", "wave", "run_time", "diff", "details", "created_at"],
+        "feedback": ["id", "created_at", "kind", "message"],
         # gerçek para (TL) siparişleri - bkz. README_ODEME.md
         "shop_orders": ["id", "account_id", "product_id", "kind", "amount", "currency",
                         "status", "provider", "provider_ref", "payload", "created_at",
@@ -440,7 +690,7 @@ def diag():
     for tbl, cols in need.items():
         info = {"var": False, "eksik_sutunlar": []}
         try:
-            supabase.table(tbl).select("*").limit(1).execute()
+            db(tbl).select("*").limit(1).execute()
             info["var"] = True
         except Exception:
             # Ham Supabase metni değil: yalnızca "yok" bilgisi. Ayrıntı Render
@@ -451,19 +701,21 @@ def diag():
                 pass
             info["var"] = False
             out["ok"] = False
-            sql = "VERITABANI_SOSYAL.sql" if tbl in ("friends", "messages", "coop_scores") else "VERITABANI.sql"
-            out["yapilacak"].append(f"'{tbl}' tablosu yok, {sql}'i çalıştır")
+            real = DB_TABLES.get(tbl, (tbl,))[0]
+            out["yapilacak"].append(f"'{real}' tablosu yok, VERITABANI.sql'i çalıştır")
             out["tables"][tbl] = info
             continue
         for c in cols:
             try:
-                supabase.table(tbl).select(c).limit(1).execute()
+                db(tbl).select(c).limit(1).execute()
             except Exception:
                 info["eksik_sutunlar"].append(c)
         if info["eksik_sutunlar"]:
             out["ok"] = False
+            spec = DB_TABLES.get(tbl, (tbl, {}))
             out["yapilacak"].append(
-                f"'{tbl}' tablosunda eksik sütun: " + ", ".join(info["eksik_sutunlar"]))
+                f"'{spec[0]}' tablosunda eksik sütun: "
+                + ", ".join(spec[1].get(c, c) for c in info["eksik_sutunlar"]))
         out["tables"][tbl] = info
     if not _google_enabled():
         out["yapilacak"].append("Google girişi kapalı (GOOGLE_CLIENT_ID / "
@@ -516,7 +768,7 @@ def auth_register():
             return jsonify({"success": False,
                             "error": "bu kullanıcı adı alınmış"}), 409
         if email:
-            rows = supabase.table("accounts").select("id").eq("email", email).execute()
+            rows = db("accounts").select("id").eq("email", email).execute()
             if rows.data:
                 return jsonify({"success": False,
                                 "error": "bu e-posta zaten kayıtlı"}), 409
@@ -528,7 +780,7 @@ def auth_register():
             "password_hash": _hash_password(password),
             "created_at": time.time(),
         }
-        acc = supabase.table("accounts").insert(new_acc).execute().data[0]
+        acc = db("accounts").insert(new_acc).execute().data[0]
         tok = _new_session(acc["id"], data.get("device"))
         return jsonify({"success": True, "token": tok, "account": _public_account(acc)})
     except Exception as e:
@@ -556,7 +808,7 @@ def auth_login():
     try:
         acc = None
         if "@" in who:
-            rows = supabase.table("accounts").select("*").eq(
+            rows = db("accounts").select("*").eq(
                 "email", who.lower()).execute()
             acc = rows.data[0] if rows.data else None
         else:
@@ -674,7 +926,7 @@ def _find_account_by_who(who):
     if not who:
         return None
     if "@" in who:
-        rows = supabase.table("accounts").select("*").eq("email", who.lower()).execute()
+        rows = db("accounts").select("*").eq("email", who.lower()).execute()
         return rows.data[0] if rows.data else None
     found = _accounts_by_username(who)
     return found[0] if found else None
@@ -772,10 +1024,11 @@ def auth_reset():
             return bad
         _reset_codes.pop(aid, None)     # kod tek kullanımlık
     try:
-        supabase.table("accounts").update(
+        db("accounts").update(
             {"password_hash": _hash_password(new_pw)}).eq("id", acc["id"]).execute()
         # Şifre neden sıfırlanıyorsa (unutuldu / çalındı) eski oturumlar gider.
-        supabase.table("sessions").delete().eq("account_id", acc["id"]).execute()
+        db("sessions").delete().eq("account_id", acc["id"]).execute()
+        _sess_cache_drop(account_id=acc["id"])
         tok = _new_session(acc["id"], data.get("device"))
     except Exception as e:
         return _oops(e)
@@ -882,8 +1135,9 @@ def auth_set_username():
         return jsonify({"success": False, "error": uname}), 400
     if _username_taken(uname, except_id=acc["id"]):
         return jsonify({"success": False, "error": "bu kullanıcı adı alınmış"}), 409
-    supabase.table("accounts").update(
+    db("accounts").update(
         {"username": uname, "name": uname}).eq("id", acc["id"]).execute()
+    _sess_cache_drop(account_id=acc["id"])
     acc["username"] = uname
     acc["name"] = uname
     return jsonify({"success": True, "account": _public_account(acc)})
@@ -896,11 +1150,13 @@ def auth_set_username():
 
 # Bir koşudan kazanılabilecek elmas için cömert bir üst sınır. Amaç oyunu
 # kısıtlamak değil, "tek istekle 1.000.000 elmas" yolunu kapatmak.
-GEM_GAIN_CAP_PER_PUSH = 4000
+GEM_GAIN_CAP_PER_PUSH = 5_000_000
 # zamana bağlı elmas bütçesi. Hesabın bir "elmas kovası" var: en fazla
 # GEM_BURST dolar, saatte GEM_RATE_PER_HOUR kadar yeniden dolar.
-GEM_BURST = 4000
-GEM_RATE_PER_HOUR = 3000
+# (oyunda iyi bir cehennem koşusu yüz binlerce elmas getiriyor; eski 4.000'lik
+# sınır oyuncunun elmasını sunucuda eksik gösteriyordu)
+GEM_BURST = 5_000_000
+GEM_RATE_PER_HOUR = 5_000_000
 PROGRESS_LISTS = ("skins_owned", "cosmetics_owned", "books_owned", "weapons_owned")
 # gerçek parayla satılan içerik: oyunun gönderdiği listeye yeni eklenmişse
 # kabul edilmez.
@@ -993,7 +1249,7 @@ REMOVED_BOOKS = frozenset({"r_multi"})
 
 
 def _player_row(account_id):
-    rows = supabase.table("player_data").select("*").eq(
+    rows = db("player_data").select("*").eq(
         "account_id", account_id).execute()
     return rows.data[0] if rows.data else None
 
@@ -1026,57 +1282,15 @@ def _stored_progress(row):
     return out
 
 
+# Dünya sıralaması yasakları kaldırıldı: hiçbir skor "imkânsız" diye
+# reddedilmez, hiçbir hesap sıralamadan atılmaz. Bu iki işlev eski çağrılar
+# kırılmasın diye duruyor.
 def _is_banned(account_id):
-    """Bu hesap dünya sıralamasından kalıcı olarak çıkarılmış mı?"""
-    try:
-        return bool(_stored_progress(_player_row(account_id)).get("board_banned"))
-    except Exception:
-        return False
-
-
-def _wipe_scores(account_id):
-    """Hesabın sıralamadaki bütün skorlarını siler."""
-    try:
-        supabase.table(WORLD_TABLE).delete().eq("account_id", account_id).execute()
-    except Exception:
-        pass
+    return False
 
 
 def _ban_account(account_id, reason):
-    """Hesabı kalıcı olarak sıralama dışına alır ve skorlarını siler."""
-    with _acct_lock(account_id):
-        _ban_account_locked(account_id, reason)
-    _wipe_scores(account_id)
-
-
-def _ban_account_locked(account_id, reason):
-    try:
-        row = _player_row(account_id)
-        prog = _stored_progress(row)
-        rs = list(prog.get("ban_reasons") or [])
-        if reason not in rs:
-            rs.append(str(reason)[:24])
-        prog["board_banned"] = True
-        prog["ban_reasons"] = rs[:8]
-        payload = {
-            "account_id": account_id,
-            "data": {k: v for k, v in prog.items()
-                     if k not in ("gems", "gems_earned", "gems_spent")},
-            "updated_at": time.time(),
-        }
-        if row:
-            supabase.table("player_data").update(payload).eq(
-                "account_id", account_id).execute()
-        else:
-            payload.update(gems=0, gems_earned=0, gems_spent=0)
-            supabase.table("player_data").insert(payload).execute()
-    except Exception:
-        pass
-    _wipe_scores(account_id)
-    try:
-        _log_event(account_id, "yasak", 0, 0, str(reason)[:120])
-    except Exception:
-        pass
+    return None
 
 
 # hesap kilidi: aynı hesaba aynı anda gelen iki istek (ör. otomatik kayıt +
@@ -1142,8 +1356,8 @@ def _merge_progress(old, new, gem_cap=GEM_GAIN_CAP_PER_PUSH):
     # dönemez - ama yeni bir yasak yalnızca sunucunun kendi doğruladığı yoldan
     # gelir: /submit'teki imzalı skor-makullük denetimi ya da elle (admin)
     # müdahale.
-    out["board_banned"] = bool(old.get("board_banned"))
-    out["ban_reasons"] = list(old.get("ban_reasons") or [])[:8] if out["board_banned"] else []
+    out["board_banned"] = False         # yasak yok
+    out["ban_reasons"] = []
     # ücretsiz elmas sayaçları: reklam ve günlük hediye hesaplarda yalnızca
     # sunucuda işler.
     out["rewards"] = dict(old.get("rewards") or {})
@@ -1195,7 +1409,7 @@ def player_load():
 def _log_event(account_id, kind, delta, total, note=""):
     """Oyuncunun ilerlemesindeki her değişikliği zamanıyla kaydeder."""
     try:
-        supabase.table("player_events").insert({
+        db("player_events").insert({
             "account_id": account_id,
             "at": time.time(),
             "kind": str(kind)[:16],
@@ -1222,11 +1436,8 @@ def _public_progress(prog):
 
 def _store_progress(account_id, row, before, merged):
     """Birleştirilmiş ilerlemeyi yazar ve olay günlüğünü tutar."""
-    # oyun hile bildirdi: yasak ilk kez burada öğrenildiyse, o hesabın
-    # tablodaki eski skorları da şimdi silinir.
-    if merged.get("board_banned") and not before.get("board_banned"):
-        _wipe_scores(account_id)
-        _log_event(account_id, "yasak", 0, 0, "oyun bildirdi")
+    merged["board_banned"] = False
+    merged["ban_reasons"] = []
     st = merged.get("stats") or {}
     st_before = before.get("stats") or {}
     payload = {
@@ -1249,10 +1460,10 @@ def _store_progress(account_id, row, before, merged):
     }
     try:
         if row:
-            supabase.table("player_data").update(payload).eq(
+            db("player_data").update(payload).eq(
                 "account_id", account_id).execute()
         else:
-            supabase.table("player_data").insert(payload).execute()
+            db("player_data").insert(payload).execute()
     except Exception as e:
         # Ayrıntı Render günlüğünde, oyuncuda bildirebileceği bir iz kimliği
         # var; eksik sütunu /diag söyler.
@@ -1292,6 +1503,7 @@ def player_save():
     incoming = data.get("progress")
     if not isinstance(incoming, dict):
         return jsonify({"success": False, "error": "ilerleme verisi yok"}), 400
+    _touch_play(acc, data)
     with _acct_lock(acc["id"]):
         row = _player_row(acc["id"])
         before = _stored_progress(row)
@@ -1304,6 +1516,116 @@ def player_save():
     if err is not None:
         return err
     return jsonify({"success": True, "progress": _public_progress(merged)})
+
+
+# ---- oynama süresi: ne zaman girdi, ne zaman çıktı, ne kadar oynadı ----
+# Oyun açıkken dakikada bir /player/ping gelir (arkadaş yoklaması, skor ve
+# kayıt da sayılır). PLAY_GAP'ten uzun sessizlik = oyun kapanmış; sonraki ping
+# yeni bir oyun oturumu açar. Oyun kapanırken /player/bye çıkışı hemen yazar.
+# Durum bellekte tutulur, veritabanına en çok PLAY_WRITE_EVERY saniyede bir
+# yazılır (tek süreç: gunicorn -w 1).
+PLAY_GAP = 240.0
+PLAY_WRITE_EVERY = 55.0
+_PLAY = {}
+_PLAY_LOCKS = [threading.Lock() for _ in range(32)]
+
+
+def _play_lock(aid):
+    return _PLAY_LOCKS[int(hashlib.sha1(str(aid).encode()).hexdigest()[:8], 16) % 32]
+
+
+def _client_meta(data):
+    data = data or {}
+    ver = _clean_text(data.get("version"), 16) if data.get("version") else ""
+    plat = "mobile" if data.get("platform") == "mobile" else "pc"
+    return ver, plat
+
+
+def _touch_play(acc, data=None, closing=False):
+    """Oyuncu şu an oyunda: oynama süresini ve giriş/çıkış zamanlarını işler."""
+    if not acc or not supabase:
+        return
+    aid = acc.get("id")
+    if aid is None:
+        return
+    now = time.time()
+    ver, plat = _client_meta(data)
+    try:
+        with _play_lock(aid):
+            st = _PLAY.get(aid)
+            if st is None:
+                # sunucu yeni açıldı: hesabın kayıtlı toplamından devam et
+                st = {"sid": None, "start": now, "last": 0.0, "written": 0.0,
+                      "total": float(_num(acc.get("play_seconds"), 0)),
+                      "count": int(_num(acc.get("play_sessions"), 0))}
+                seen = _num(acc.get("last_seen"), 0)
+                if seen and now - seen < PLAY_GAP and _num(acc.get("last_logout"), 0) < seen:
+                    rows = (db("play_sessions").select("id,started_at,open").eq("account_id", aid)
+                            .order("id", desc=True).limit(1).execute().data or [])
+                    if rows and rows[0].get("open"):
+                        st.update(sid=rows[0]["id"], start=_num(rows[0].get("started_at"), now),
+                                  last=seen, written=seen)
+                _PLAY[aid] = st
+            if st["sid"] is None or now - st["last"] > PLAY_GAP:
+                if closing:
+                    return
+                # yeni oyun oturumu
+                row = {"account_id": aid, "started_at": now, "ended_at": now, "seconds": 0,
+                       "open": True, "platform": plat}
+                if ver:
+                    row["version"] = ver
+                res = db("play_sessions").insert(row).execute()
+                st.update(sid=(res.data or [{}])[0].get("id"), start=now, last=now, written=now)
+                st["count"] += 1
+                patch = {"last_login": now, "last_seen": now, "play_sessions": st["count"],
+                         "platform": plat}
+                if ver:
+                    patch["version"] = ver
+                db("accounts").update(patch).eq("id", aid).execute()
+                return
+            st["total"] += max(0.0, now - st["last"])
+            st["last"] = now
+            if closing or now - st["written"] >= PLAY_WRITE_EVERY:
+                st["written"] = now
+                patch = {"last_seen": now, "play_seconds": int(st["total"])}
+                if closing:
+                    patch["last_logout"] = now
+                db("accounts").update(patch).eq("id", aid).execute()
+                if st["sid"] is not None:
+                    db("play_sessions").update({
+                        "ended_at": now, "seconds": int(now - st["start"]),
+                        "open": not closing}).eq("id", st["sid"]).execute()
+            if closing:
+                st["sid"] = None
+                st["last"] = 0.0
+    except Exception:
+        # süre tutulamadı diye oyuncunun isteği bozulmasın
+        app.logger.exception("oynama süresi yazılamadı")
+
+
+@app.route("/player/ping", methods=["POST"])
+def player_ping():
+    """Oyun açık: dakikada bir gelir."""
+    if not _accounts_enabled():
+        return jsonify({"success": False}), 503
+    data = _body()
+    acc = _acct(data)
+    if not acc:
+        return jsonify({"success": False, "error": "oturum geçersiz"}), 401
+    _touch_play(acc, data)
+    return jsonify({"success": True})
+
+
+@app.route("/player/bye", methods=["POST"])
+def player_bye():
+    """Oyun kapanıyor: çıkış saatini yaz."""
+    if not _accounts_enabled():
+        return jsonify({"success": True})
+    data = _body()
+    acc = _acct(data)
+    if acc:
+        _touch_play(acc, data, closing=True)
+    return jsonify({"success": True})
 
 
 # ---- oyunun kendi hile itirafı ----
@@ -1320,12 +1642,9 @@ def player_report_cheat():
     acc = _acct(data)
     if not acc:
         return jsonify({"success": False, "error": "oturum geçersiz"}), 401
-    reason = str(data.get("reason") or "")
-    if reason not in CHEAT_REPORT_REASONS:
-        reason = "cheat_code"
-    _ban_account(acc["id"], "oyun:" + reason)
+    # yasak yok: eski oyun sürümleri bu ucu çağırabilir, sessizce geçilir
     prog = _stored_progress(_player_row(acc["id"]))
-    return jsonify({"success": True, "banned": True, "progress": _public_progress(prog)})
+    return jsonify({"success": True, "banned": False, "progress": _public_progress(prog)})
 
 
 # ---- ücretsiz elmas: günlük hediye + reklam ----
@@ -1437,7 +1756,7 @@ def contact_message():
             "status": "yeni",
         }
         try:
-            supabase.table("feedback").insert(row).execute()
+            db("feedback").insert(row).execute()
         except Exception as e:
             return _oops(e, "mesaj kaydedilemedi")
         return jsonify({"success": True})
@@ -1574,10 +1893,18 @@ def _claim_locked(acc, data):
 def auth_logout():
     if not _accounts_enabled():
         return jsonify({"success": True})
-    tok = str((_body()).get("token", ""))
+    data = _body()
+    tok = str(data.get("token", ""))
     if tok:
         try:
-            supabase.table("sessions").delete().eq(
+            acc = _account_by_session(tok)
+            if acc:
+                _touch_play(acc, data, closing=True)
+        except Exception:
+            pass
+        _sess_cache_drop(_token_hash(tok))
+        try:
+            db("sessions").delete().eq(
                 "token_hash", _token_hash(tok)).execute()
         except Exception:
             pass
@@ -1594,7 +1921,8 @@ def auth_logout_all():
     if not acc:
         return jsonify({"success": False, "error": "oturum geçersiz"}), 401
     try:
-        supabase.table("sessions").delete().eq("account_id", acc["id"]).execute()
+        db("sessions").delete().eq("account_id", acc["id"]).execute()
+        _sess_cache_drop(account_id=acc["id"])
     except Exception as e:
         return _oops(e)
     return jsonify({"success": True})
@@ -1622,11 +1950,12 @@ def auth_email():
         _login_failed(str(acc.get("username") or "").lower())
         return jsonify({"success": False, "error": "mevcut şifre hatalı"}), 403
     try:
-        rows = supabase.table("accounts").select("id").eq("email", email).execute()
+        rows = db("accounts").select("id").eq("email", email).execute()
         if any(str(r.get("id")) != str(acc["id"]) for r in (rows.data or [])):
             return jsonify({"success": False,
                             "error": "bu e-posta zaten kayıtlı"}), 409
-        supabase.table("accounts").update({"email": email}).eq("id", acc["id"]).execute()
+        db("accounts").update({"email": email}).eq("id", acc["id"]).execute()
+        _sess_cache_drop(account_id=acc["id"])
         acc = dict(acc, email=email)
     except Exception as e:
         return _oops(e)
@@ -1654,10 +1983,11 @@ def auth_password():
             _login_failed(str(acc.get("username") or "").lower())
             return jsonify({"success": False, "error": "mevcut şifre hatalı"}), 403
     try:
-        supabase.table("accounts").update(
+        db("accounts").update(
             {"password_hash": _hash_password(new_pw)}).eq("id", acc["id"]).execute()
         # Bütün oturumları kes, sonra çağırana yeni bir tane ver.
-        supabase.table("sessions").delete().eq("account_id", acc["id"]).execute()
+        db("sessions").delete().eq("account_id", acc["id"]).execute()
+        _sess_cache_drop(account_id=acc["id"])
         tok = _new_session(acc["id"], data.get("device"))
     except Exception as e:
         return _oops(e)
@@ -1676,22 +2006,13 @@ SUBMIT_SECRET = os.environ.get("KASMA_SUBMIT_SECRET",
 # İmza zorunlu mu? Eski istemcilerin bir süre çalışabilmesi için kapatılabilir.
 REQUIRE_SIGNATURE = os.environ.get("KASMA_REQUIRE_SIG", "1") == "1"
 
-# ---- makullük sınırları ----
-# Hepsi oyunun kendi eğrilerinden türetildi ve dürüst bir oyuncunun asla
-# takılmayacağı kadar geniş bırakıldı.
-MAX_SCORE_PER_KILL = 900.0     # bir öldürmeden çıkabilecek en yüksek skor
-# lanetli sandık: kabul edilen lanetler skor kazancını en çok x2,5 büyütüyor
-# (CURSE_SCORE_ROOM) ve sahaya daha çok yaratık getiriyor (bölünenler,
-# kalabalık).
-CURSE_SCORE_ROOM = 2.5
-# Lanetli cehennemde dürüst ama çok güçlü bir koşu saniyede ~100 öldürmeye
-# çıkabiliyor; sınırlar ölçülen uç değerin 2-4 katı.
-MAX_SCORE_PER_SEC = 25000.0    # saniyede üretilebilecek en yüksek skor
-MAX_KILLS_PER_SEC = 200.0      # saniyede devrilebilecek en çok yaratık
-MIN_RUN_TIME = 5.0             # bundan kısa bir koşu skor üretemez
-MAX_RUN_TIME = 6 * 3600.0      # 6 saatten uzun koşu kabul edilmez
-MAX_WAVE = 400
-MAX_SCORE = 500_000_000
+# ---- sınırlar ----
+# "İmkânsız skor" denetimi yok: dürüst ama çok güçlü koşular da reddediliyordu.
+# Yalnızca veritabanını bozacak uç değerler (negatif, taşan sayı) kırpılır.
+MAX_RUN_TIME = 24 * 3600.0
+MAX_WAVE = 100_000
+MAX_SCORE = 9_000_000_000_000
+MAX_KILLS = 9_000_000_000
 # istatistik tavanları: kurcalanmış istemci "10^18 öldürme" yazıp tabloları
 # bozamasın. Gerçek oyuncu bunlara yaklaşamaz.
 STAT_CAP_DEFAULT = 10 ** 9
@@ -1704,15 +2025,9 @@ STAT_CAP = {
     "bosses": 1_000_000,
     "total_shots": 1_000_000_000,
 }
-SCORE_FLOOR = 6000.0           # bu skorun altında makullük aranmaz
-# oyunda dalgaların asgari süresi var; güçlü oyuncu skor hedefini doldurduktan
-# sonra da kesmeye devam ettiği için dalga başına hedeften fazla skor
-# toplayabilir.
-SCORE_TIME_SLACK = 150.0       # koşu saniyesi başına ek skor payı
-
 # ---- hız sınırı ----
 RATE_WINDOW = 300.0            # saniye
-RATE_MAX = 12                  # bu pencerede aynı kaynaktan en çok kaç gönderi
+RATE_MAX = 40                  # bu pencerede aynı kaynaktan en çok kaç gönderi
 _rate_hits = defaultdict(deque)
 _rate_lock = threading.Lock()
 
@@ -1781,31 +2096,6 @@ def _rate_ok(key, max_n=RATE_MAX, window=RATE_WINDOW):
 
 # Oyundaki SUBMIT_SIG_FIELDS ile birebir aynı olmalı.
 SUBMIT_SIG_FIELDS = ("name", "score", "kills", "wave", "run_time", "created_at", "diff")
-
-# Gönderinin created_at'i sunucu saatinden bu kadar sapabilir (saniye).
-SUBMIT_TIME_WINDOW = 600.0
-# Görülen imzalar: aynı gönderi iki kez sayılmasın. Pencere zaten created_at
-# ile sınırlı olduğu için kısa süre tutmak yeterli.
-_seen_sigs = {}
-_seen_lock = threading.Lock()
-
-
-def _submit_once(sig):
-    """Bu imza ilk kez mi görülüyor? (aynı gönderi iki kez yazılmasın)"""
-    if not sig:
-        return True
-    now = time.time()
-    with _seen_lock:
-        for k, t in [(k, t) for k, t in _seen_sigs.items()
-                     if now - t > SUBMIT_TIME_WINDOW * 2]:
-            _seen_sigs.pop(k, None)
-        if sig in _seen_sigs:
-            return False
-        if len(_seen_sigs) > 20000:          # bellek freni
-            _seen_sigs.clear()
-        _seen_sigs[sig] = now
-        return True
-
 
 SCORE_PUBLIC_FIELDS = ("name", "score", "kills", "wave", "run_time", "diff",
                        "created_at", "skin", "build")
@@ -1915,231 +2205,82 @@ def _expected_sig(payload):
                     hashlib.sha256).hexdigest()
 
 
-def _wave_goal(wave):
-    """Oyundaki dalga skor hedefinin kaba karşılığı."""
-    w = max(1, int(wave))
-    table = {1: 600, 2: 2300, 3: 2900, 4: 3500, 5: 4100}
-    if w in table:
-        return table[w]
-    return 4100 + 5.9 * (w - 5) * (900 + 60 * (w - 5))
-
-
-# süreli dalgalar - oyundaki takvimin ESKİ (kısa) hâli. Oyunda süreler 2
-# katına çıktı (WAVE_PLAN_SCALE); burası bilerek kısa kaldı: denetim "bu dalgaya
-# bu kadar kısa sürede ulaşılamaz" diye alt sınır koyar, uzun koşu her zaman
-# geçer, eski sürümü kullanan oyuncunun skoru da reddedilmez.
-WAVE_PLAN_COUNT = 25
-WAVE_PLAN_GROW = 0.07
-WAVE_PLAN_TOTAL = {
-    "arena": {"normal": 35 * 60.0, "hard": 30 * 60.0, "nightmare": 20 * 60.0},
-    "hell": {"normal": 40 * 60.0, "hard": 40 * 60.0 * 30 / 35, "nightmare": 40 * 60.0 * 20 / 35},
-}
-_WAVE_PLAN_W = sum(1.0 + WAVE_PLAN_GROW * (i - 1) for i in range(1, WAVE_PLAN_COUNT + 1))
-
-
-def _wave_len(w, diff, biome):
-    tbl = WAVE_PLAN_TOTAL["hell" if biome == "hell" else "arena"]
-    w = min(WAVE_PLAN_COUNT, max(1, int(w)))
-    return tbl.get(diff, tbl["normal"]) * (1.0 + WAVE_PLAN_GROW * (w - 1)) / _WAVE_PLAN_W
-
-
-def _wave_start(w, diff, biome):
-    w = max(1, int(w))
-    t = 0.0
-    for i in range(1, min(w, WAVE_PLAN_COUNT + 1)):
-        t += _wave_len(i, diff, biome)
-    if w > WAVE_PLAN_COUNT + 1:
-        t += (w - WAVE_PLAN_COUNT - 1) * _wave_len(WAVE_PLAN_COUNT, diff, biome)
-    return t
-
-
-def _time_wave_ok(wave, run_time, diff):
-    """Toplam dalgaya (arena + cehennem) bu sürede ulaşılabilir mi?"""
-    w = max(1, min(int(wave), MAX_WAVE))
-    if w <= 2:
-        return True
-    w -= 1
-    need = _wave_start(w, diff, "arena")
-    for a in range(WAVE_PLAN_COUNT, w):
-        need = min(need, _wave_start(a, diff, "arena") + _wave_start(w - a, diff, "hell"))
-    return need <= float(run_time) + 10.0
-
-
-def score_is_plausible(name, score, kills, wave, run_time, wmode=""):
-    """Gönderilen skor oyunun kuralları içinde üretilebilir mi?"""
-    if not (0 <= score <= MAX_SCORE):
-        return False, "skor aralık dışı"
-    if not (0 <= kills <= 2_000_000):
-        return False, "öldürme sayısı aralık dışı"
-    if not (1 <= wave <= MAX_WAVE):
-        return False, "dalga aralık dışı"
-    if not (0 < run_time <= MAX_RUN_TIME):
-        return False, "süre aralık dışı"
-    # temel tutarlılık her gönderide aranır (düşük skorlarda da)
-    if run_time < MIN_RUN_TIME:
-        return False, "koşu süresi çok kısa"
-    if kills > MAX_KILLS_PER_SEC * run_time + 50:
-        return False, "öldürme sayısı süreye göre imkânsız"
-    if score > MAX_SCORE_PER_KILL * (kills + 10):
-        return False, "skor öldürme sayısına göre imkânsız"
-    if score / run_time > MAX_SCORE_PER_SEC:
-        return False, "saniyelik skor imkânsız"
-    # Dalga-hedefi denetimi yalnızca yüksek skorlarda: ilk dalgalarda hedefler
-    # küçük olduğu için bu denetim yanlış pozitif verebiliyor. süreli dalgalı
-    # istemcide dalga skorla bağlı değil; o gönderilerde bu denetim yapılmaz
-    # (dalga/süre uyumu ayrıca, ban'sız denetlenir).
-    if score >= SCORE_FLOOR and wmode != "time":
-        goal_sum = sum(_wave_goal(w) for w in range(1, int(wave) + 2))
-        if score > (goal_sum * 2.5 + SCORE_FLOOR + run_time * SCORE_TIME_SLACK) * CURSE_SCORE_ROOM:
-            return False, "skor ulaşılan dalgaya göre imkânsız"
-    return True, ""
-
-
 # ---- skor tablosu ----
+
+WORLD_LB_ROWS = 50              # sıralamada gösterilen koşu sayısı
+
 
 @app.route("/scores", methods=["GET"])
 def get_scores():
     if not supabase:
         return jsonify({"error": "Supabase bağlantısı yapılandırılmamış!"}), 500
     try:
-        # Sadece gereken sütunlar (account_id gibi iç alanlar dışarı çıkmasın).
         # Bir oyuncu tabloda birden çok kez yer alabilir, her koşu ayrı satır.
         # ?platform=mobile telefon tablosunu verir.
-        mobile = request.args.get("platform") == "mobile"
-
-        def _q(cols, plat=True):
-            q = supabase.table(WORLD_TABLE).select(cols)
-            if plat:
-                # SQL 5. bölümden sonra sütun not null, varsayılan 'pc'.
-                q = q.eq("platform", "mobile") if mobile else q.neq("platform", "mobile")
-            # düzeltme - "skorlarım 1-2-3'e yansıyor, 4-5'e yansımıyor":
-            # "score" sütunu bazı kurulumlarda hâlâ metin tipinde kalmış
-            # olabilir.
-            return q.order("score", desc=True).limit(1000).execute()
-        COLS = ("name,score,kills,wave,run_time,diff,created_at,skin,details",
-                "name,score,kills,wave,run_time,diff,created_at")
-        response = None
-        for plat in (True, False):
-            for cols in COLS:
-                try:
-                    response = _q(cols, plat)
-                    break
-                except Exception:
-                    continue       # sütun eksik (skin/details/platform): dar sorgu
-            if response is not None:
-                break
-            if mobile:
-                # "platform" sütunu yok (SQL 5. bölüm çalışmamış): mobil tablo
-                # boş görünür, PC skorları ona karışmaz.
-                return jsonify([])
-        if response is None:
-            raise RuntimeError("scores okunamadı")
-
-        def _sc(r):
-            try:
-                return float(r.get("score") or 0)
-            except (TypeError, ValueError):
-                return 0.0
+        plat = "mobile" if request.args.get("platform") == "mobile" else "pc"
+        rows = (db(WORLD_TABLE).select("name,score,kills,wave,run_time,diff,created_at,skin,details")
+                .eq("platform", plat).eq("ranked", True)
+                .order("score", desc=True).limit(WORLD_LB_ROWS).execute().data or [])
         out = []
-        for r in sorted(response.data or [], key=_sc, reverse=True):
+        for r in rows:
             row = dict(r)
-            if isinstance(row.get("details"), str):
-                try:
-                    row["details"] = json.loads(row["details"])
-                except Exception:
-                    row["details"] = None
             row["build"] = row.pop("details", None)
             row["skin"] = str(row.get("skin") or (row["build"] or {}).get("skin") or "default")[:40]
             out.append(_public_score(row))
-            if len(out) >= 10:
-                break
         return jsonify(out)
     except Exception as e:
         return _oops(e)
 
+
+def _is_duplicate_error(e):
+    t = str(e).lower()
+    return "23505" in t or "duplicate key" in t or "already exists" in t
+
+
 @app.route("/submit", methods=["POST"])
 def add_score():
+    """Biten koşuyu kaydeder. Taş Meydan koşuları dünya sıralamasına girer,
+    öbür haritalar yalnızca oyuncunun geçmişine yazılır.
+
+    Aynı gönderi (aynı imza) ikinci kez gelirse - oyun cevabı alamayıp yeniden
+    denediğinde - hata değil "kaydedildi" döner."""
     if not supabase:
-        return jsonify({"error": "Supabase bağlantısı yapılandırılmamış!"}), 500
+        return jsonify({"success": False, "error": "sunucu hazır değil"}), 500
     try:
         data = _body()
         name = str(data.get("name", "Anonim"))[:14]
-        try:
-            score = int(data.get("score", 0))
-            kills = int(data.get("kills", 0))
-            wave = int(data.get("wave", 0))
-            run_time = float(data.get("run_time", 0))
-            created_at = float(data.get("created_at", 0))
-        except (TypeError, ValueError, OverflowError):
-            return jsonify({"success": False, "error": "geçersiz gönderi"}), 400
-        if not (math.isfinite(run_time) and math.isfinite(created_at)):
-            return jsonify({"success": False, "error": "geçersiz gönderi"}), 400
-        # zorluk: sıralamada görünür, o yüzden imzanın içinde. Bilinmeyen bir
-        # değer gelirse "normal" sayılır (uydurma etiket yazılamasın).
+        score = _int(data.get("score"), 0)
+        kills = _int(data.get("kills"), 0)
+        wave = _int(data.get("wave"), 0)
+        run_time = _num(data.get("run_time"), 0.0)
         diff = str(data.get("diff", "normal"))
         if diff not in ("normal", "hard", "nightmare"):
             diff = "normal"
 
-        # ---- süzgeç 3: hız sınırı ----
-        src = _client_ip()
-        src = src.split(",")[0].strip()
-        if not _rate_ok(src):
-            return jsonify({"success": False, "error": "çok sık gönderim"}), 429
+        if not _rate_ok("sub:" + _client_ip()):
+            return jsonify({"success": False, "error": "çok sık gönderim, biraz bekle"}), 429
 
-        # ---- süzgeç 1: imza ----
-        sig = str(data.get("sig") or "")
+        # ---- imza: sıralamaya elle (curl ile) skor yazılamasın ----
+        sig = str(data.get("sig") or "")[:128]
         if REQUIRE_SIGNATURE:
             build_h = ""
             if data.get("details") is not None:
-                build_h, raw_len = _build_hash(data.get("details"))
-                if raw_len > BUILD_RAW_MAX or str(data.get("build") or "") != build_h:
-                    return jsonify({"success": False, "error": "koşu kartı doğrulanamadı"}), 403
+                build_h, _raw_len = _build_hash(data.get("details"))
             want = _expected_sig({
-                "name": name, "score": score, "kills": kills, "wave": wave,
-                "run_time": run_time, "created_at": created_at,
+                "name": name, "score": data.get("score", 0), "kills": data.get("kills", 0),
+                "wave": data.get("wave", 0), "run_time": data.get("run_time", 0),
+                "created_at": data.get("created_at", 0),
                 "diff": str(data.get("diff", "normal")), "build": build_h,
                 "platform": "mobile" if data.get("platform") == "mobile" else "",
                 "wmode": "time" if data.get("wmode") == "time" else "",
             })
             if not sig or not hmac.compare_digest(sig, want):
-                return jsonify({"success": False, "error": "imza doğrulanamadı"}), 403
+                return jsonify({"success": False,
+                                "error": "oyun sürümün eski, oyunu güncelle"}), 403
 
-        # ---- süzgeç 2a: tarih ----
-        # created_at istemciden geliyor ve imzanın içinde, o yüzden imza
-        # doğrulaması için gerekli; ama veritabanına yazılmaz.
-        now = time.time()
-        if abs(now - created_at) > SUBMIT_TIME_WINDOW:
-            return jsonify({"success": False,
-                            "error": "gönderi zamanı geçersiz"}), 422
-
-        # ---- süzgeç 2b: tekrar oynatma ----
-        # Görülen imzalar kısa süre akılda tutuluyor (pencere zaten created_at
-        # ile sınırlı).
-        if REQUIRE_SIGNATURE and not _submit_once(sig):
-            return jsonify({"success": False,
-                            "error": "bu gönderi zaten alındı"}), 409
-
-        # ---- süzgeç 2c: makullük ----
-        # İmzası doğru ama oyunun üretemeyeceği sayılar = kurcalanmış oyun.
-        # Reddedilmekle kalmaz, hesap sıralamadan kalıcı çıkar. 2 kişilik
-        # koşular bundan önce elenir (tek kişilik tavanlara takılmasınlar).
         if str(data.get("mode") or "") == "coop":
-            return jsonify({"success": False, "error": "2 kişilik koşular sıralamaya girmez"}), 422
-        wmode = "time" if data.get("wmode") == "time" else ""
-        # Süreli dalgada dalga/süre uyumsuzluğu ban sebebi değildir (saat
-        # oynaması, yavaş makine vb.); skor yalnızca reddedilir.
-        if wmode == "time" and not _time_wave_ok(wave, run_time, diff):
-            return jsonify({"success": False, "error": "skor reddedildi: dalga süreye sığmıyor"}), 422
-        ok, why = score_is_plausible(name, score, kills, wave, run_time, wmode)
-        if not ok:
-            bad_acc = _acct(data)
-            if bad_acc:
-                _ban_account(bad_acc.get("id"), f"imkansiz_skor:{why}"[:24])
-            return jsonify({"success": False, "error": f"skor reddedildi: {why}",
-                            "banned": bool(bad_acc)}), 422
+            return jsonify({"success": False, "error": "2 kişilik koşular buradan gönderilmez"}), 422
 
-        # ---- hesap zorunlu ----
-        # dünya sıralaması yalnızca giriş yapmış oyunculara açık.
         acc = _acct(data)
         if not acc:
             return jsonify({"success": False,
@@ -2148,73 +2289,58 @@ def add_score():
             return jsonify({"success": False,
                             "error": "önce kullanıcı adı seçmelisin"}), 409
         account_id = acc.get("id")
+        _touch_play(acc, data)
 
-        # ---- kalıcı sıralama yasağı ----
-        # Hilesi yakalanmış hesap bir daha asla tabloya yazılmaz.
-        if _is_banned(account_id):
-            _wipe_scores(account_id)
-            return jsonify({"success": False, "banned": True,
-                            "error": "bu hesap dünya sıralamasından "
-                                     "kalıcı olarak çıkarıldı"}), 403
+        # aynı koşu ikinci kez geldiyse: zaten yazılı
+        if sig:
+            seen = db(WORLD_TABLE).select("id").eq("sig", sig).limit(1).execute().data
+            if seen:
+                return jsonify({"success": True, "again": True})
 
-        # Oyun kendi denetiminde hile yakaladıysa bunu dürüstçe bildirir.
-        if data.get("tainted") or data.get("board_banned"):
-            _ban_account(account_id, "oyun_hile_bildirdi")
-            return jsonify({"success": False, "banned": True,
-                            "error": "bu hesap dünya sıralamasından "
-                                     "kalıcı olarak çıkarıldı"}), 403
-
-        # Ad sunucudan gelir, istemciden değil: kimse başkasının adıyla skor
-        # gönderemez.
-        name = str(acc.get("username"))[:14]
-
-        payload = {
-            "name": name,
-            "score": score,
-            "kills": kills,
-            "wave": wave,
-            "run_time": run_time,
-            # Tarihi sunucu koyar; istemciden gelen değer yalnızca imza
-            # doğrulamasında kullanıldı.
-            "created_at": now,
-            "diff": diff,
-        }
-        if account_id is not None:
-            payload["account_id"] = account_id
-        # mobil skorlar ayrı tabloya (aynı tablo, "platform" sütunu)
         platform = "mobile" if data.get("platform") == "mobile" else "pc"
-        payload["platform"] = platform
-        # koşu kartı: süzülmüş hâliyle
+        payload = {
+            "account_id": account_id,
+            # ad sunucudan gelir: kimse başkasının adıyla skor gönderemez
+            "name": str(acc.get("username"))[:14],
+            "score": max(0, min(score, MAX_SCORE)),
+            "kills": max(0, min(kills, MAX_KILLS)),
+            "wave": max(0, min(wave, MAX_WAVE)),
+            "run_time": max(0.0, min(run_time, MAX_RUN_TIME)),
+            "diff": diff,
+            "platform": platform,
+            "created_at": time.time(),
+            "sig": sig or None,
+        }
+        mp = "stone"
         if data.get("details") is not None:
             owned = set(_stored_progress(_player_row(account_id)).get("skins_owned") or [])
             build, skin = _clean_build(data.get("details"), owned)
             if build is not None:
                 payload["details"] = build
                 payload["skin"] = skin
+                mp = build.get("map") or "stone"
+        payload["map"] = mp
+        # dünya sıralaması yalnızca Taş Meydan'da (öbür haritaların kuralları
+        # skoru kolaylaştırıyor); öbür koşular oyuncunun geçmişinde durur
+        payload["ranked"] = (mp == "stone")
         try:
-            supabase.table(WORLD_TABLE).insert(payload).execute()
+            db(WORLD_TABLE).insert(payload).execute()
         except Exception as e:
-            es = str(e)
-            if "platform" in es:
-                # "platform" sütunu henüz yok (SQL'in 5. bölümü
-                # çalıştırılmamış). PC skoru eskisi gibi yazılır; mobil skor PC
-                # tablosuna karışmasın diye reddedilir.
-                if platform == "mobile":
-                    return jsonify({"success": False,
-                                    "error": "mobil sıralama henüz açılmadı"}), 503
-                payload.pop("platform", None)
-                supabase.table(WORLD_TABLE).insert(payload).execute()
-            # Supabase'e "details"/"skin" sütunları henüz eklenmemişse skor
-            # kartsız yine yazılsın.
-            elif "details" in payload and ("details" in es or "skin" in es or "column" in es):
-                payload.pop("details", None)
-                payload.pop("skin", None)
-                supabase.table(WORLD_TABLE).insert(payload).execute()
-            else:
-                raise
-        return jsonify({"success": True})
+            if sig and _is_duplicate_error(e):
+                return jsonify({"success": True, "again": True})
+            raise
+        rank = None
+        if payload["ranked"]:
+            try:
+                res = (db(WORLD_TABLE).select("id", count="exact").eq("platform", platform)
+                       .eq("ranked", True).gt("score", payload["score"]).limit(1).execute())
+                if res.count is not None:
+                    rank = int(res.count) + 1
+            except Exception:
+                rank = None
+        return jsonify({"success": True, "ranked": payload["ranked"], "rank": rank})
     except Exception as e:
-        return _oops(e)
+        return _oops(e, "skor kaydedilemedi")
 
 
 # ---- eski steam uçları (oyun artık kullanmıyor, varsayılan kapalı) ----
@@ -2242,7 +2368,7 @@ def get_player():
             return jsonify({"error": "steam_id gereklidir!"}), 400
 
         # Oyuncuyu benzersiz steam_id'si ile veritabanında arıyoruz
-        response = supabase.table("players").select("*").eq("steam_id", steam_id).execute()
+        response = db("players").select("*").eq("steam_id", steam_id).execute()
         
         if response.data and len(response.data) > 0:
             return jsonify({"success": True, "data": response.data[0]})
@@ -2256,7 +2382,7 @@ def get_player():
                 "skins": "default",
                 "selected_skin": "default"
             }
-            ins_res = supabase.table("players").insert(new_player).execute()
+            ins_res = db("players").insert(new_player).execute()
             return jsonify({"success": True, "data": ins_res.data[0]})
     except Exception as e:
         return _oops(e)
@@ -2278,7 +2404,7 @@ def update_player():
         # hile koruması: bu uç nokta artık "gems" ve "skins" kabul etmiyor.
         payload = {}
         if selected_skin is not None:
-            row = supabase.table("players").select("skins").eq(
+            row = db("players").select("skins").eq(
                 "steam_id", steam_id).execute()
             owned = (row.data[0].get("skins") if row.data else "") or "default"
             owned_list = [x.strip() for x in str(owned).split(",") if x.strip()]
@@ -2290,7 +2416,7 @@ def update_player():
             return jsonify({"success": True, "data": []})
 
         # Steam ID'ye göre oyuncunun verilerini güvenle güncelliyoruz
-        response = supabase.table("players").update(payload).eq("steam_id", steam_id).execute()
+        response = db("players").update(payload).eq("steam_id", steam_id).execute()
         return jsonify({"success": True, "data": response.data})
     except Exception as e:
         return _oops(e)
@@ -2343,7 +2469,7 @@ def begin_purchase():
         gems, desc, amount, currency = GEM_PACKS[item_id]
         orderid = uuid.uuid4().int >> 76        # 52 bitlik benzersiz sipariş no
 
-        supabase.table("purchases").insert({
+        db("purchases").insert({
             "orderid": str(orderid),
             "steam_id": steam_id,
             "item_id": item_id,
@@ -2388,7 +2514,7 @@ def finalize_purchase():
         if not orderid.isdigit():
             return jsonify({"success": False, "message": "Geçersiz orderid"}), 400
 
-        rows = supabase.table("purchases").select("*").eq("orderid", orderid).execute()
+        rows = db("purchases").select("*").eq("orderid", orderid).execute()
         if not rows.data:
             return jsonify({"success": False, "message": "Sipariş bulunamadı"}), 404
         order = rows.data[0]
@@ -2401,15 +2527,15 @@ def finalize_purchase():
             "appid": STEAM_APP_ID,
         })
         if res.get("response", {}).get("result") != "OK":
-            supabase.table("purchases").update({"status": "failed"}).eq("orderid", orderid).execute()
+            db("purchases").update({"status": "failed"}).eq("orderid", orderid).execute()
             return jsonify({"success": False, "message": "Steam ödemeyi onaylamadı."}), 402
 
         steam_id = order["steam_id"]
         gems = int(order["gems"])
-        pl = supabase.table("players").select("gems").eq("steam_id", steam_id).execute()
+        pl = db("players").select("gems").eq("steam_id", steam_id).execute()
         cur = int(pl.data[0]["gems"]) if pl.data else 0
-        supabase.table("players").update({"gems": cur + gems}).eq("steam_id", steam_id).execute()
-        supabase.table("purchases").update({"status": "completed"}).eq("orderid", orderid).execute()
+        db("players").update({"gems": cur + gems}).eq("steam_id", steam_id).execute()
+        db("purchases").update({"status": "completed"}).eq("orderid", orderid).execute()
         return jsonify({"success": True, "gems": cur + gems,
                         "message": f"{gems} elmas hesabına eklendi."})
     except Exception as e:
@@ -2565,7 +2691,7 @@ def _tl(kurus):
 
 
 def _order_row(order_id):
-    rows = supabase.table("shop_orders").select("*").eq("id", str(order_id)).execute()
+    rows = db("shop_orders").select("*").eq("id", str(order_id)).execute()
     return rows.data[0] if rows.data else None
 
 
@@ -2615,7 +2741,7 @@ def shop_checkout():
     # aynı ürün için açık sipariş varsa yenisi açılmaz, aynı ödeme sayfası döner
     # (iki sekmede iki kez ödenmesin)
     try:
-        open_rows = (supabase.table("shop_orders").select("*")
+        open_rows = (db("shop_orders").select("*")
                      .eq("account_id", acc["id"]).execute().data or [])
     except Exception:
         open_rows = []
@@ -2645,7 +2771,7 @@ def shop_checkout():
         payload["design"] = design
     oid = "AB" + time.strftime("%y%m%d") + secrets.token_hex(6).upper()
     try:
-        supabase.table("shop_orders").insert({
+        db("shop_orders").insert({
             "id": oid, "account_id": acc["id"], "product_id": pid, "kind": prod["kind"],
             "amount": int(prod["price"]), "currency": "TRY", "status": "pending",
             "provider": SHOP_PROVIDER, "provider_ref": "", "payload": payload,
@@ -2702,23 +2828,32 @@ def shop_custom_pet_gems():
     with _acct_lock(acc["id"]):
         row = _player_row(acc["id"])
         before = _stored_progress(row)
-        if before.get("gem_pet_bought"):
+        # oyun güncel ilerlemesini de yolluyor: son koşudan gelen elmas henüz
+        # kaydedilmediyse burada sayılsın ("elmasım var ama yetmiyor" diyordu)
+        cur = before
+        if isinstance(data.get("progress"), dict):
+            now_ = time.time()
+            allow = _gem_allowance(before, now_)
+            cur = _merge_progress(before, data["progress"], gem_cap=allow)
+            gained = int(cur["gems_earned"]) - int(before.get("gems_earned", 0) or 0)
+            cur["_gem_clock"] = {"t": now_, "left": max(0.0, allow - max(0, gained))}
+        if cur.get("gem_pet_bought"):
             return jsonify({"success": False, "error": "elmasla PET hakkını zaten kullandın"}), 409
-        if len(before.get("custom_pets") or []) >= CUSTOM_PET_MAX:
+        if len(cur.get("custom_pets") or []) >= CUSTOM_PET_MAX:
             return jsonify({"success": False, "error": "özel PET sınırına ulaştın"}), 409
-        earned = int(before.get("gems_earned", 0) or 0)
-        spent = int(before.get("gems_spent", 0) or 0)
+        earned = int(cur.get("gems_earned", 0) or 0)
+        spent = int(cur.get("gems_spent", 0) or 0)
         if earned - spent < GEM_PET_PRICE:
             return jsonify({"success": False,
                             "error": f"yeterli elmas yok ({max(0, earned - spent)} / {GEM_PET_PRICE})"}), 402
-        merged = json.loads(json.dumps(before))
+        merged = json.loads(json.dumps(cur))
         merged["gems_spent"] = spent + GEM_PET_PRICE
         merged["gems"] = max(0, earned - merged["gems_spent"])
         pet_id = "pet_custom_g" + secrets.token_hex(4)
-        pets = list(before.get("custom_pets") or [])
+        pets = list(cur.get("custom_pets") or [])
         pets.append({"id": pet_id, "design": design, "gems": GEM_PET_PRICE, "at": time.time()})
         merged["custom_pets"] = pets
-        lst = list(before.get("cosmetics_owned") or [])
+        lst = list(cur.get("cosmetics_owned") or [])
         if pet_id not in lst:
             lst.append(pet_id)
         merged["cosmetics_owned"] = lst
@@ -2732,7 +2867,7 @@ def shop_custom_pet_gems():
 
 def _mark_order(order_id, fields, only_status=None):
     """Siparişi koşullu günceller; değişen satır varsa True."""
-    q = supabase.table("shop_orders").update(fields).eq("id", order_id)
+    q = db("shop_orders").update(fields).eq("id", order_id)
     if only_status is not None:
         q = q.eq("status", only_status)
     res = q.execute()
@@ -2877,7 +3012,7 @@ def shop_pay(order_id):
     prod = SHOP_PRODUCTS.get(str(order.get("product_id")))
     if not prod:
         return _result_page(False, "Ürün artık satılmıyor.")
-    acc_rows = supabase.table("accounts").select("*").eq("id", order["account_id"]).execute()
+    acc_rows = db("accounts").select("*").eq("id", order["account_id"]).execute()
     acc = acc_rows.data[0] if acc_rows.data else {}
     try:
         if SHOP_PROVIDER == "iyzico":
@@ -3079,7 +3214,7 @@ def shop_callback_shopier():
         _fail_order(oid, "shopier: payment_id yok")
         return _result_page(False, "Ödeme doğrulanamadı.")
     try:
-        dup = supabase.table("shop_orders").select("id").eq("provider_ref", pay_id).execute().data or []
+        dup = db("shop_orders").select("id").eq("provider_ref", pay_id).execute().data or []
     except Exception:
         dup = []
     if any(str(d.get("id")) != oid for d in dup):
@@ -3504,7 +3639,7 @@ def _clean_coop_player(d, owned):
     out = build or {"v": 1, "skin": "default", "w": [], "b": [], "d": [], "st": {}}
     evo = d.get("evo")
     out["evo"] = sorted({str(k) for k in evo if str(k) in BUILD_WEAPONS})[:4] if isinstance(evo, list) else []
-    for k, hi in (("score", MAX_SCORE), ("kills", 2_000_000), ("lv", 999), ("combo", 100000)):
+    for k, hi in (("score", MAX_SCORE), ("kills", MAX_KILLS), ("lv", 999), ("combo", 100000)):
         out[k] = int(max(0, min(hi, _num(d.get(k), 0))))
     return out
 
@@ -3571,15 +3706,12 @@ def coop_submit():
         # gönderilen skor aynen yazılır. Yalnızca veritabanını bozacak uç
         # değerler (negatif, taşan sayı) sınırlanır; ret yok.
         score = max(0, min(score, MAX_SCORE))
-        kills = max(0, min(kills, 2_000_000))
+        kills = max(0, min(kills, MAX_KILLS))
         wave = max(1, min(wave, MAX_WAVE))
         run_time = max(0.0, min(run_time, float(MAX_RUN_TIME)))
-        gacc = supabase.table("accounts").select("id,username").eq("id", gid).execute().data or []
+        gacc = db("accounts").select("id,username").eq("id", gid).execute().data or []
         if not gacc or not acc.get("username") or not gacc[0].get("username"):
             return jsonify({"success": False, "error": "iki oyuncunun da kullanıcı adı olmalı"}), 409
-        if _is_banned(aid) or _is_banned(gid):
-            return jsonify({"success": False, "banned": True,
-                            "error": "oyunculardan biri sıralamadan çıkarılmış"}), 403
         pls = data.get("players") if isinstance(data.get("players"), list) else []
         pls = (pls + [{}, {}])[:2]
         details = {"v": 1, "a": _clean_coop_player(pls[0], _owned_skins(aid)),
@@ -3591,11 +3723,11 @@ def coop_submit():
                "score": score, "kills": kills, "wave": wave, "run_time": run_time, "diff": diff,
                "details": details, "created_at": now}
         try:
-            supabase.table("coop_scores").insert(row).execute()
+            db("coop_scores").insert(row).execute()
         except Exception as e:
             app.logger.exception("coop_scores insert")
             return jsonify({"success": False, "error": "2 kişilik sıralama henüz kurulmamış "
-                                                       "(VERITABANI_SOSYAL.sql)"}), 503
+                                                       "(VERITABANI.sql)"}), 503
         rank = None
         try:
             for i, r in enumerate(_coop_top(COOP_LB_SIZE)):
@@ -3610,7 +3742,7 @@ def coop_submit():
 
 
 def _coop_top(n):
-    rows = (supabase.table("coop_scores").select("*").order("score", desc=True).limit(1000)
+    rows = (db("coop_scores").select("*").order("score", desc=True).limit(1000)
             .execute().data or [])
     rows.sort(key=lambda r: float(r.get("score") or 0), reverse=True)
     out, seen = [], set()
@@ -3685,6 +3817,7 @@ def _social_acc(data):
             for k in [k for k, v in _PRESENCE.items() if v[0] < cut]:
                 _PRESENCE.pop(k, None)
         _PRESENCE[aid] = (time.time(), st if st in SOCIAL_STATUSES else "menu")
+    _touch_play(acc, data)
     return acc
 
 
@@ -3720,12 +3853,12 @@ def _social_setup_error():
         return jsonify({"success": False, "ref": ref,
                         "error": "sunucu şu an yanıt vermedi, birazdan tekrar dene"}), 500
     return jsonify({"success": False, "setup": False,
-                    "error": "arkadaş sistemi henüz kurulmamış (VERITABANI_SOSYAL.sql)"}), 503
+                    "error": "arkadaş sistemi henüz kurulmamış (VERITABANI.sql)"}), 503
 
 
 def _friend_rows(aid):
-    a = supabase.table("friends").select("*").eq("a", aid).execute().data or []
-    b = supabase.table("friends").select("*").eq("b", aid).execute().data or []
+    a = db("friends").select("*").eq("a", aid).execute().data or []
+    b = db("friends").select("*").eq("b", aid).execute().data or []
     return a + b
 
 
@@ -3734,17 +3867,30 @@ def _names_for(ids):
     if not ids:
         return {}
     try:
-        rows = supabase.table("accounts").select("id,username").in_("id", ids).execute().data or []
+        rows = db("accounts").select("id,username").in_("id", ids).execute().data or []
     except AttributeError:
         rows = []
         for i in ids:
-            rows += supabase.table("accounts").select("id,username").eq("id", i).execute().data or []
+            rows += db("accounts").select("id,username").eq("id", i).execute().data or []
     return {str(r.get("id")): str(r.get("username") or "") for r in rows}
 
 
+_NAME_CACHE = {}
+
+
 def _account_named(name):
+    """Kullanıcı adından hesap (kısa önbellekli: ad bir kez seçilir, değişmez)."""
+    key = str(name or "").strip().lower()
+    hit = _NAME_CACHE.get(key)
+    if hit and time.time() - hit[0] < 300.0:
+        return dict(hit[1])
     rows = _twice(_accounts_by_username, name, "id,username,created_at")
-    return rows[0] if rows else None
+    if not rows:
+        return None
+    if len(_NAME_CACHE) > 20000:
+        _NAME_CACHE.clear()
+    _NAME_CACHE[key] = (time.time(), rows[0])
+    return dict(rows[0])
 
 
 def _are_friends(aid, bid):
@@ -3767,7 +3913,7 @@ def social_sync():
     aid = str(acc.get("id"))
     try:
         rows = _friend_rows(aid)
-        unread = supabase.table("messages").select("id,sender,kind,body,created_at").eq(
+        unread = db("messages").select("id,sender,kind,body,created_at").eq(
             "receiver", aid).is_("read_at", "null").limit(500).execute().data or []
     except Exception:
         app.logger.exception("social_sync")
@@ -3833,7 +3979,7 @@ def social_request():
                 return jsonify({"success": True, "state": "friends", "name": tgt.get("username")})
             if str(r.get("a")) == tid:
                 # o da beni eklemiş: iki taraf da istiyor, arkadaş oldunuz
-                supabase.table("friends").update({"status": "accepted"}).eq("id", r.get("id")).execute()
+                db("friends").update({"status": "accepted"}).eq("id", r.get("id")).execute()
                 return jsonify({"success": True, "state": "friends", "name": tgt.get("username")})
             return jsonify({"success": True, "state": "pending", "name": tgt.get("username")})
         acc_n = sum(1 for r in rows if r.get("status") == "accepted")
@@ -3842,7 +3988,7 @@ def social_request():
             return jsonify({"success": False, "error": "arkadaş listen dolu (%d)" % SOCIAL_MAX_FRIENDS}), 409
         if pend_n >= SOCIAL_MAX_PENDING:
             return jsonify({"success": False, "error": "bekleyen isteğin çok fazla"}), 409
-        supabase.table("friends").insert({"a": aid, "b": tid, "status": "pending",
+        db("friends").insert({"a": aid, "b": tid, "status": "pending",
                                           "created_at": time.time()}).execute()
     except Exception:
         app.logger.exception("social_request")
@@ -3869,9 +4015,9 @@ def social_respond():
         if not rows:
             return jsonify({"success": False, "error": "istek bulunamadı"}), 404
         if data.get("accept"):
-            supabase.table("friends").update({"status": "accepted"}).eq("id", rows[0].get("id")).execute()
+            db("friends").update({"status": "accepted"}).eq("id", rows[0].get("id")).execute()
         else:
-            supabase.table("friends").delete().eq("id", rows[0].get("id")).execute()
+            db("friends").delete().eq("id", rows[0].get("id")).execute()
     except Exception:
         app.logger.exception("social_respond")
         return _social_setup_error()
@@ -3894,7 +4040,7 @@ def social_remove():
     try:
         for r in _friend_rows(aid):
             if {str(r.get("a")), str(r.get("b"))} == {aid, tid}:
-                supabase.table("friends").delete().eq("id", r.get("id")).execute()
+                db("friends").delete().eq("id", r.get("id")).execute()
     except Exception:
         app.logger.exception("social_remove")
         return _social_setup_error()
@@ -3925,8 +4071,8 @@ def social_messages():
     try:
         if not _are_friends(aid, tid):
             return jsonify({"success": False, "error": "yalnızca arkadaşlarınla yazışabilirsin"}), 403
-        q1 = supabase.table("messages").select("*").eq("sender", aid).eq("receiver", tid).eq("kind", "text")
-        q2 = supabase.table("messages").select("*").eq("sender", tid).eq("receiver", aid).eq("kind", "text")
+        q1 = db("messages").select("*").eq("sender", aid).eq("receiver", tid).eq("kind", "text")
+        q2 = db("messages").select("*").eq("sender", tid).eq("receiver", aid).eq("kind", "text")
         if after > 0:
             q1, q2 = q1.gt("id", after), q2.gt("id", after)
         rows = (q1.order("id", desc=True).limit(60).execute().data or []) + \
@@ -3934,7 +4080,7 @@ def social_messages():
         rows.sort(key=lambda m: int(m.get("id") or 0))
         rows = rows[-60:]
         if any(str(m.get("sender")) == tid and not m.get("read_at") for m in rows):
-            supabase.table("messages").update({"read_at": time.time()}).eq("receiver", aid).eq(
+            db("messages").update({"read_at": time.time()}).eq("receiver", aid).eq(
                 "sender", tid).eq("kind", "text").is_("read_at", "null").execute()
     except Exception:
         app.logger.exception("social_messages")
@@ -3966,7 +4112,7 @@ def social_send():
     try:
         if not _are_friends(aid, tid):
             return jsonify({"success": False, "error": "yalnızca arkadaşlarınla yazışabilirsin"}), 403
-        res = supabase.table("messages").insert({"sender": aid, "receiver": tid, "kind": "text",
+        res = db("messages").insert({"sender": aid, "receiver": tid, "kind": "text",
                                                  "body": text, "created_at": time.time()}).execute()
     except Exception:
         app.logger.exception("social_send")
@@ -4006,9 +4152,9 @@ def social_invite():
         if not _are_friends(aid, tid):
             return jsonify({"success": False, "error": "yalnızca arkadaşlarını davet edebilirsin"}), 403
         # eski davetleri kapat: aynı kişiye tek geçerli davet
-        supabase.table("messages").update({"read_at": time.time()}).eq("sender", aid).eq(
+        db("messages").update({"read_at": time.time()}).eq("sender", aid).eq(
             "receiver", tid).eq("kind", "invite").is_("read_at", "null").execute()
-        supabase.table("messages").insert({"sender": aid, "receiver": tid, "kind": "invite", "body": code,
+        db("messages").insert({"sender": aid, "receiver": tid, "kind": "invite", "body": code,
                                            "created_at": time.time()}).execute()
     except Exception:
         app.logger.exception("social_invite")
@@ -4027,7 +4173,7 @@ def social_invite_seen():
         return _social_need_login()
     mid = _int(data.get("id"), 0)
     try:
-        supabase.table("messages").update({"read_at": time.time()}).eq("id", mid).eq(
+        db("messages").update({"read_at": time.time()}).eq("id", mid).eq(
             "receiver", str(acc.get("id"))).eq("kind", "invite").execute()
     except Exception:
         return _social_setup_error()
@@ -4063,7 +4209,7 @@ def social_profile():
            "bosses": _n(st.get("bosses")), "best_combo": _n(st.get("best_combo")),
            "skins": _n(row.get("skin_count")) or len(prog.get("skins_owned") or []),
            "skin": str(prog.get("equipped_skin") or "default")[:40],
-           "banned": bool(prog.get("board_banned"))}
+           "banned": False}
     on, stt = _presence(tid)
     out["online"], out["status"] = on, stt
     rel = "self" if tid == aid else "none"
@@ -4077,17 +4223,18 @@ def social_profile():
     out["rel"] = rel
     top = []
     try:
-        rows = (supabase.table(WORLD_TABLE).select("score,wave,kills,run_time,diff,created_at").eq(
-            "account_id", tgt.get("id")).order("score", desc=True).limit(3).execute().data or [])
+        rows = (db(WORLD_TABLE).select("score,wave,kills,run_time,diff,created_at").eq(
+            "account_id", tgt.get("id")).eq("ranked", True).order("score", desc=True)
+            .limit(3).execute().data or [])
         top = [{k: r.get(k) for k in ("score", "wave", "kills", "run_time", "diff")} for r in rows]
     except Exception:
         pass
     out["top"] = top
     coop = []
     try:
-        ra = supabase.table("coop_scores").select("name_a,name_b,score,wave,account_a").eq(
+        ra = db("coop_scores").select("name_a,name_b,score,wave,account_a").eq(
             "account_a", tid).order("score", desc=True).limit(3).execute().data or []
-        rb = supabase.table("coop_scores").select("name_a,name_b,score,wave,account_a").eq(
+        rb = db("coop_scores").select("name_a,name_b,score,wave,account_a").eq(
             "account_b", tid).order("score", desc=True).limit(3).execute().data or []
         for r in sorted(ra + rb, key=lambda r: -float(r.get("score") or 0))[:3]:
             mate = r.get("name_b") if str(r.get("account_a")) == tid else r.get("name_a")
@@ -4168,10 +4315,10 @@ def admin_unban():
                 "updated_at": time.time(),
             }
             if row:
-                supabase.table("player_data").update(payload).eq("account_id", tid).execute()
+                db("player_data").update(payload).eq("account_id", tid).execute()
             else:
                 payload.update(gems=0, gems_earned=0, gems_spent=0)
-                supabase.table("player_data").insert(payload).execute()
+                db("player_data").insert(payload).execute()
         _log_event(tid, "yasak", 0, 0, ("kaldırıldı: " + str(acc.get("username")))[:120])
     except Exception as e:
         return _oops(e, "ban kaldırılamadı")
@@ -4221,9 +4368,9 @@ def admin_give_gems():
                 "updated_at": time.time(),
             }
             if row:
-                supabase.table("player_data").update(payload).eq("account_id", tid).execute()
+                db("player_data").update(payload).eq("account_id", tid).execute()
             else:
-                supabase.table("player_data").insert(payload).execute()
+                db("player_data").insert(payload).execute()
         _log_event(tid, "gem", add, total, ("yönetici: " + str(acc.get("username")))[:120])
     except Exception as e:
         return _oops(e, "elmas verilemedi")

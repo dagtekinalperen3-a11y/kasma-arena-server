@@ -1460,6 +1460,12 @@ STRINGS = {
     "map.doom": _T("ÖLÜM DUVARI! Bu haritada cehennem yok", "DEATH WALL! No hell on this map",
                    "¡MURO MORTAL! Este mapa no tiene infierno", "TODESMAUER! Keine Hölle auf dieser Karte",
                    "СТЕНА СМЕРТИ! На этой карте нет ада"),
+    "map.no_world_saved": _T("Bu harita dünya sıralamasına girmez; skor geçmişine kaydedildi.",
+                             "This map is not on the world ranking; the run was saved to your history.",
+                             "Este mapa no entra al ranking mundial; la partida se guardó en tu historial.",
+                             "Diese Karte zählt nicht für die Weltrangliste; der Lauf wurde gespeichert.",
+                             "Эта карта не входит в мировой рейтинг; забег сохранён в истории."),
+    "ui.world_place": _T("{0}. sıradasın!", "you are #{0}!", "¡estás #{0}!", "Platz {0}!", "ты на {0} месте!"),
     "map.no_world": _T("Bu haritanın skoru dünya sıralamasına girmez (yalnız Taş Meydan).",
                        "This map's score doesn't count for the world ranking (Stone Plaza only).",
                        "La puntuación de este mapa no cuenta para el ranking mundial (solo Plaza de Piedra).",
@@ -5424,7 +5430,8 @@ class SaveManager:
     #      düşürüyor.
     #   board_banned: "bu hesap bir daha ASLA dünya sıralamasına girmez"
     #      kalıcı. Yalnızca masum açıklaması olmayan
-    BAN_REASONS = ("cheat_code", "gems", "stats", "run")
+    # Dünya sıralaması yasağı kaldırıldı: hiçbir sebep hesabı sıralamadan atmaz.
+    BAN_REASONS = ()
 
     @staticmethod
     def _mark_tainted_dict(data, reason):
@@ -5457,8 +5464,8 @@ class SaveManager:
         return bool(self.data.get("tainted"))
 
     def is_board_banned(self):
-        """Dünya sıralamasından kalıcı olarak çıkarıldı mı?"""
-        return bool(self.data.get("board_banned"))
+        """Yasak yok (eski kayıtlarda kalan bayrak da sayılmaz)."""
+        return False
 
     def clear_board_ban(self):
         """Yönetici komutu: yerel yasağı kaldırır. Şaibe damgası bilerek kalır;
@@ -5611,10 +5618,8 @@ class SaveManager:
             self.data["rewards"]["pid"] = self.profile_id()
             self.data["tainted"] = False
             self.data["taint_reasons"] = []
-            # Yasak hiçbir yerde kalkmaz.
-            self.data["board_banned"] = was_banned or bool(prog.get("board_banned"))
-            self.data["ban_reasons"] = self._merge_ban_reasons(
-                was_reasons, prog.get("ban_reasons")) if self.data["board_banned"] else []
+            self.data["board_banned"] = False       # yasak yok
+            self.data["ban_reasons"] = []
             if "default" not in self.data.get("skins_owned", []):
                 self.data.setdefault("skins_owned", []).append("default")
             self.save()
@@ -5688,9 +5693,8 @@ class SaveManager:
         self.data["taint_reasons"] = []
         # yasak ayrı: sunucu da biz de bir kez "yasaklı" dediysek öyle kalır.
         # İkisinden biri yeterli; hiçbir yerde False'a dönmez.
-        self.data["board_banned"] = was_banned or bool(prog.get("board_banned"))
-        self.data["ban_reasons"] = self._merge_ban_reasons(
-            was_reasons, prog.get("ban_reasons")) if self.data["board_banned"] else []
+        self.data["board_banned"] = False
+        self.data["ban_reasons"] = []
         if "default" not in self.data.get("skins_owned", []):
             self.data.setdefault("skins_owned", []).append("default")
         self.save()
@@ -7219,6 +7223,44 @@ class AccountClient:
     async def _post(self, path, payload, timeout=20):
         return await http_json(self.base_url + path, payload, timeout)
 
+    # ---- oynama süresi ----
+    # Oyun açıkken dakikada bir sunucuya "buradayım" denir; sunucu oyuncunun
+    # ne zaman girdiğini, ne kadar oynadığını ve ne zaman çıktığını tutar.
+    PING_EVERY = 60.0
+    _ping_t = 3.0
+
+    def _presence_payload(self):
+        return {"token": self.token, "device": device_id(), "device_legacy": device_id_legacy(),
+                "version": GAME_VERSION, "platform": PLATFORM_TAG}
+
+    def tick_presence(self, dt):
+        if not (self.enabled and self.token and self.logged_in()):
+            return
+        self._ping_t -= dt
+        if self._ping_t > 0:
+            return
+        self._ping_t = self.PING_EVERY
+        payload = self._presence_payload()
+
+        async def worker():
+            try:
+                await self._post("/player/ping", payload, timeout=15)
+            except Exception:
+                pass
+        spawn(worker)
+
+    def say_bye(self):
+        """Oyun kapanıyor: çıkış saatini sunucuya yaz (en çok ~2 sn bekler)."""
+        if IS_WEB or not (self.enabled and self.token and self.logged_in()):
+            return
+        try:
+            req = urllib.request.Request(
+                self.base_url + "/player/bye", json.dumps(self._presence_payload()).encode("utf-8"),
+                {"Content-Type": "application/json"})
+            urllib.request.urlopen(req, timeout=2.0).close()
+        except Exception:
+            pass
+
     def _err_text(self, e):
         """Sunucunun hata gövdesini okunur bir cümleye çevirir."""
         try:
@@ -7867,8 +7909,11 @@ class OnlineClient:
 
     async def _send_once(self, payload):
         """Tek gönderim denemesi -> (başarılı, sebep, tekrar denenebilir mi)."""
+        self.last_result = {}
         try:
             res = await http_json(self.base_url + "/submit", payload, SUBMIT_TIMEOUT)
+            if isinstance(res, dict):
+                self.last_result = res
             if bool(res.get("success", True)):
                 return True, "", False
             return False, str(res.get("error", "")), False       # sunucu bilerek reddetti
@@ -7894,13 +7939,17 @@ class OnlineClient:
             ok, why, retry = await self._send_once(payload)
             if ok or not retry:
                 break
+        res = dict(getattr(self, "last_result", {}) or {})
         if ok:
             await self._flush_pending()      # eskiden kalan skorlar da gitsin
         elif retry:
             self._pending_add(payload)
             why = (why + " - " if why else "") + "skor cihaza kaydedildi, bağlantı gelince otomatik gönderilir"
         if on_done:
-            on_done(ok, why)
+            try:
+                on_done(ok, why, res)
+            except TypeError:
+                on_done(ok, why)
 
 
 # parçacık / efekt sistemi
@@ -28466,9 +28515,6 @@ RUNCHK_HP_CAP = 400000.0
 RUNCHK_SPEED_BASE = 4.5         # 1. seviyedeki hız tavanı (taban hızın katı)
 RUNCHK_SPEED_PER_LEVEL = 0.52
 RUNCHK_SPEED_CAP = 60.0
-RUNCHK_SCORE_PER_KILL = 900.0   # bir öldürmeden çıkabilecek en yüksek skor
-RUNCHK_SCORE_FLOOR = 6000.0     # bu skorun altında tutarlılık aranmaz
-RUNCHK_SCORE_TIME_SLACK = 150.0  # koşu saniyesi başına ek skor payı
 
 
 def run_integrity_check(run):
@@ -28500,29 +28546,8 @@ def run_integrity_check(run):
 
 
 def run_score_plausible(run):
-    """Koşu bitti: skor; öldürme, dalga ve süreyle tutarlı mı?"""
-    score = float(getattr(run, "score", 0))
-    # lanetli sandık: lanetlerin skor payı ayrılır (dürüst lanetli koşu
-    # "imkânsız skor" sayılmasın). Sunucu da aynı payı tanıyor
-    # (CURSE_SCORE_ROOM).
-    score /= (1.0 + clamp(float(getattr(run, "curse_score_bonus", 0.0) or 0.0),
-                          0.0, CURSE_SCORE_MAX))
-    if score < RUNCHK_SCORE_FLOOR:
-        return True
-    kills = max(0, int(getattr(run, "kills", 0)))
-    # Cehennemde arenada geçilen dalgalar da sayılır.
-    wave = max(1, int(run.total_wave() if hasattr(run, "total_wave")
-                      else getattr(run.waves, "wave", 1)))
-    rt = max(1.0, float(getattr(run, "run_time", 1.0)))
-    # 1) Öldürme başına düşen skorun tavanı var.
-    if score > RUNCHK_SCORE_PER_KILL * (kills + 10):
-        return False
-    _ = wave
-    # 3) Saniyede üretilebilecek skorun bir tavanı var. lanetli cehennemde
-    #    dürüst uç bot saniyede ~2.700 (lanet payı ayrılmış) üretti; pay geniş
-    #    tutuldu (sunucu: MAX_SCORE_PER_SEC).
-    if score / rt > 12000.0:
-        return False
+    """Koşu bitti: skor denetimi kapalı - güçlü ama dürüst koşular "imkânsız"
+    sayılıp sıralamadan atılıyordu. Her koşu geçerli."""
     return True
 
 
@@ -54652,9 +54677,7 @@ class App:
         # şaibe en son: damgadan sonra kayda hiçbir şey eklenmez.
         self.save.mark_tainted("cheat_code")
         self.chat.say(f"HİLE KODU KABUL EDİLDİ - +{fmt_num(CHAT_CHEAT_GEMS)} elmas", GOLD)
-        self.chat.say("DİKKAT: bu kayıt artık dünya sıralamasına giremez.", RED)
-        if self.account.logged_in():
-            self.chat.say("Hesabın sunucuda da kalıcı yasaklandı; hile içeriği hesaba yazılmaz.", RED)
+        self.chat.say("DİKKAT: hile içeriği hesaba yazılmaz, bu koşu dünya sıralamasına giremez.", RED)
         self.chat.say(
             f"açıldı: {added['skins']} skin, {added['cosmetics']} kıyafet, "
             f"{added['pets']} pet, {added['books']} kitap, {added['weapons']} silah", CYAN)
@@ -54666,6 +54689,7 @@ class App:
         while self.running:
             self.frame()
         self.save.save()
+        self.account.say_bye()
         pygame.quit()
 
     async def run_loop_async(self):
@@ -54970,6 +54994,7 @@ class App:
             if self.tut is None and not getattr(self, "shadow", False):
                 self.tut = Tutorial(self)
         self.social.tick(dt)
+        self.account.tick_presence(dt)
         if self.social.take_click(mouse_pos, clicked):
             clicked = False
         tut = self.tut
@@ -56099,9 +56124,7 @@ class App:
         self.state = s
 
     def world_block_reason(self):
-        """Bu koşu dünya sıralamasına neden giremiyor?"""
-        if self.save.is_board_banned():
-            return L("ui.banned_title")
+        """Bu koşu sunucuya neden gönderilemiyor?"""
         if not self.account.logged_in():
             return L("ui.world_needs_login")
         if self.account.needs_username():
@@ -56110,10 +56133,8 @@ class App:
             return L("ui.taint_prefix", self.save.taint_text())
         if self.run is not None and not self.run.run_is_clean():
             return f"koşu doğrulanamadı ({self.run.cheat_flag})"
-        # dünya sıralaması yalnız taş meydan'da. Öbür haritalar başarım/silah
-        # açmak için; kendi kuralları skoru kolaylaştırabilir.
-        if self.run is not None and getattr(self.run, "map_theme", "stone") != "stone":
-            return L("map.no_world")
+        # Öbür haritaların koşuları da gönderilir: sunucu onları dünya
+        # sıralamasına değil, yalnızca oyuncunun skor geçmişine yazar.
         return None
 
     def _maybe_submit_online(self):
@@ -56136,8 +56157,13 @@ class App:
             self.online_block_text = blocked
             return
 
-        def on_done(ok, why=""):
-            self.online_submit_status = "gönderildi" if ok else "başarısız"
+        def on_done(ok, why="", res=None):
+            res = res or {}
+            if ok and res.get("ranked") is False:
+                self.online_submit_status = "harita"
+            else:
+                self.online_submit_status = "gönderildi" if ok else "başarısız"
+            self.online_rank = res.get("rank") if ok else None
             self.online_block_text = "" if ok else why
 
         if self.online.enabled:
@@ -56353,12 +56379,6 @@ class App:
         if getattr(r, "quest_gems", 0):
             draw_text(canvas, L("q.paid", r.quest_gems), (lx_, y), 12, GEM_COLOR, bold=True, shadow=False)
             y += 18
-        if self.save.is_board_banned():
-            bar = pygame.Rect(left.x + 18, y, left.w - 36, 30)
-            panel(canvas, bar, bg=(50, 20, 24), edge=(100, 46, 52), alpha=240, radius=8, edge_w=2)
-            draw_text(canvas, L("ui.banned_title") + " - " + L("ui.banned_why", self.save.ban_text()),
-                      bar.center, 12, (255, 160, 160), bold=True, center=True, shadow=False)
-            y += 36
         if not r.run_is_clean():
             draw_text(canvas, L("ui.run_invalid") + f"  ({r.cheat_flag})", (lx_, y), 14,
                       RED, bold=True, shadow=False)
@@ -56373,11 +56393,18 @@ class App:
             for ln in wrap_text(getattr(self, "online_block_text", ""), 11, left.w - 70)[:2]:
                 draw_text(canvas, ln, (lx_, y), 11, (210, 140, 140), shadow=False)
                 y += 14
+        elif self.online.enabled and self.online_submit_status == "harita":
+            for ln in wrap_text(L("map.no_world_saved"), 11, left.w - 70)[:2]:
+                draw_text(canvas, ln, (lx_, y), 11, TEXT_DIM, shadow=False)
+                y += 14
         elif self.online.enabled and self.online_submit_status:
             status_col = {"gönderiliyor": TEXT_DIM, "gönderildi": GREEN,
                           "başarısız": RED}.get(self.online_submit_status, TEXT_DIM)
-            draw_text(canvas, L("ui.submit_state", self.online_submit_status), (lx_, y), 12,
-                      status_col, shadow=False)
+            txt = L("ui.submit_state", self.online_submit_status)
+            rk = getattr(self, "online_rank", None)
+            if self.online_submit_status == "gönderildi" and rk:
+                txt += "  -  " + L("ui.world_place", int(rk))
+            draw_text(canvas, txt, (lx_, y), 12, status_col, bold=bool(rk), shadow=False)
             y += 18
         new_w = [WEAPON_BY_KEY[k]["name"] for k in getattr(r, "new_weapons", []) if k in WEAPON_BY_KEY]
         new_b = [BOOK_BY_KEY[k]["name"] for k in getattr(r, "new_books", []) if k in BOOK_BY_KEY]
@@ -58771,7 +58798,9 @@ class App:
             pd["msg_t"] = 5.0
             pd["confetti"] = 0.0
 
-        acc.reward_call("/shop/custom_pet_gems", {"design": design}, done)
+        # güncel ilerleme de gider: son koşunun elması henüz yazılmadıysa sayılsın
+        acc.reward_call("/shop/custom_pet_gems",
+                        {"design": design, "progress": self.save.export_progress()}, done)
 
     def _buy_custom_pet(self):
         pd = self.pd
@@ -64491,10 +64520,12 @@ App.coop = None
 # üstte belirir (koşu sırasında yalnızca küçük not). Arkadaşlar ekranı açıkken
 # yoklama sıklaşır, sohbet açıkken mesajlar birkaç saniyede bir çekilir.
 STATE_FRIENDS = "friends"
-SOCIAL_POLL_BG = 25.0
-SOCIAL_POLL_FG = 5.0
-SOCIAL_POLL_PLAY = 45.0
-SOCIAL_CHAT_POLL = 3.0
+# yoklama aralıkları (sn): yeni mesaj menüde ~8, oyunda ~15 saniyede düşer;
+# sohbet açıkken 1,5 saniyede bir bakılır.
+SOCIAL_POLL_BG = 8.0
+SOCIAL_POLL_FG = 3.0
+SOCIAL_POLL_PLAY = 15.0
+SOCIAL_CHAT_POLL = 1.5
 SOCIAL_MSG_MAX = 240
 SOCIAL_PROFILE_TTL = 60.0
 COOP_LB_ROWS = 10
@@ -64916,21 +64947,30 @@ class SocialClient:
         finally:
             self.chat_busy = False
 
+    _tmp_id = 0
+
     def send(self, text):
         text = " ".join(str(text or "").split())[:SOCIAL_MSG_MAX]
         if not text or not self.chat_with:
             return False
-        spawn(self._send, self.chat_with, text)
+        # mesaj ekranda hemen görünür; sunucu onaylayınca gerçek kaydıyla değişir
+        SocialClient._tmp_id -= 1
+        tmp = {"id": SocialClient._tmp_id, "me": True, "text": text, "at": time.time(),
+               "pending": True}
+        self.messages.append(tmp)
+        spawn(self._send, self.chat_with, text, tmp["id"])
         return True
 
-    async def _send(self, name, text):
+    async def _send(self, name, text, tmp_id=None):
         res = await self._call("/social/send", self._payload(name=name, text=text))
+        self.messages = [x for x in self.messages if x.get("id") != tmp_id]
         if res.get("success"):
             m = res.get("message") or {}
             if self.chat_with == name and isinstance(m, dict):
                 if m.get("id") not in {x.get("id") for x in self.messages}:
                     self.messages.append(m)
                 self.last_id = max(self.last_id, int(m.get("id") or 0))
+            self.chat_t = min(self.chat_t, 0.3)      # cevap varsa hemen gelsin
         else:
             self.say(res.get("error") or "?", (255, 150, 150))
 
@@ -65593,7 +65633,11 @@ def _app_update_friends(self, dt, mouse_pos, clicked, wheel_y=0.0):
                 else:
                     br.x = CH.x + 12
                 if br.bottom > CH.y and br.y < CH.bottom:
-                    pygame.draw.rect(canvas, (74, 60, 30) if mine else (46, 44, 70), br, border_radius=12)
+                    # gönderiliyor: biraz soluk (sunucu onaylayınca normal renge döner)
+                    bcol = (74, 60, 30) if mine else (46, 44, 70)
+                    if m.get("pending"):
+                        bcol = (52, 46, 34)
+                    pygame.draw.rect(canvas, bcol, br, border_radius=12)
                     ink_frame(canvas, br, None, 12, 1)
                     for i, ln in enumerate(lines):
                         draw_text(canvas, ln, (br.x + 13, br.y + 6 + i * 19), 14,
