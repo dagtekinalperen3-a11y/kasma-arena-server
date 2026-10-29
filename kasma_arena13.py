@@ -1754,11 +1754,11 @@ STRINGS = {
     "ui.mastery_spent": _T("ustalığa yatırılan: {0}", "invested in mastery: {0}",
                            "invertido en maestría: {0}", "in Meisterschaft investiert: {0}",
                            "вложено в мастерство: {0}"),
-    "ui.mastery_hint": _T("5. kademeden sonra prestij: sınırsız yükselir ama her kademe daha az katar.",
-                          "After tier 5 prestige begins: you can keep upgrading forever, but each tier adds less.",
-                          "Tras el nivel 5 empieza el PRESTIGIO: puedes seguir mejorando siempre, pero cada nivel aporta menos.",
-                          "Ab Stufe 5 beginnt PRESTIGE: du kannst ewig aufrüsten, aber jede Stufe bringt weniger.",
-                          "После 5-й ступени начинается ПРЕСТИЖ: улучшать можно вечно, но каждая ступень даёт меньше."),
+    "ui.mastery_hint": _T("5. kademeden sonra prestij: sınırsız yükselir ama her kademe daha az katar. 7. prestijden sonra bedel uçar.",
+                          "After tier 5 prestige begins: upgrade forever, each tier adds less. Beyond prestige 7 the price skyrockets.",
+                          "Tras el nivel 5 empieza el PRESTIGIO: cada nivel aporta menos. Pasado el prestigio 7 el precio se dispara.",
+                          "Ab Stufe 5 beginnt PRESTIGE: jede Stufe bringt weniger. Ab Prestige 7 explodiert der Preis.",
+                          "После 5-й ступени ПРЕСТИЖ: каждая ступень даёт меньше. После 7-го престижа цена взлетает."),
     "mastery.m_dmg.name": _T("GÜÇ", "POWER", "POTENCIA", "KRAFT", "СИЛА"),
     "mastery.m_dmg.desc": _T("Bütün hasarın artar", "All your damage increases",
                              "Todo tu daño aumenta", "Dein gesamter Schaden steigt",
@@ -8696,7 +8696,7 @@ SKIN_ULTS = {
                  kind="chain_storm", mode="auto",
                  desc="Haritadaki herkese yıldırım düşer: düşmanların canının %20'si gider "
                       "(patronlara Lv.3 yıldırım hasarı)."),
-    "shadow": dict(name="GÖLGE DURUŞU", icon="skull", color=(190, 120, 255), cd=60.0,
+    "shadow": dict(name="GÖLGE DURUŞU", icon="skull", color=(190, 120, 255), cd=90.0,
                    kind="death_defy", mode="trigger", duration=5.0,
                    desc="Ölümcül darbede canını 1'e sabitler ve 5 saniye zamanı durdurur - "
                         "sen serbestçe hareket edersin."),
@@ -13419,6 +13419,11 @@ def screen_to_world(x, y, cam):
 
 # arena ustalığı - koşular arası kalıcı ilerleme.
 MASTERY_TIERS = 5               # doğrusal kademe sayısı (sonrası prestij)
+# 7. prestijden sonra bedel uçar: 8. prestij 100.000 elmas (GÜÇ dalı), sonra
+# her prestij 4 katı (400 bin, 1,6 milyon, 6,4 milyon ...).
+MASTERY_STEEP_FROM = 7
+MASTERY_STEEP_BASE = 100_000
+MASTERY_STEEP_GROWTH = 4.0
 
 
 MASTERY = [
@@ -13460,6 +13465,9 @@ def mastery_cost(m, lvl):
     # prestij, son doğrusal kademenin üstünden devam eder.
     son = m["cost"] * (m["growth"] ** (MASTERY_TIERS - 1))
     n = lvl - MASTERY_TIERS
+    if n >= MASTERY_STEEP_FROM:
+        return int(round(MASTERY_STEEP_BASE * (m["cost"] / 120.0)
+                         * (MASTERY_STEEP_GROWTH ** (n - MASTERY_STEEP_FROM))))
     return int(round(son * (1.35 ** (n + 1))))
 
 
@@ -20735,6 +20743,31 @@ def _minion_hazard(e, player, lead, r, delay, dmg, color):
     return True
 
 
+_CROWN_CACHE = {}
+
+
+def _bloodlord_crown_sprite(r):
+    """Kan lordunun boynuzları ve tacı (yarıçapa göre önbellekli)."""
+    ri = max(4, int(r))
+    s = _CROWN_CACHE.get(ri)
+    if s is None:
+        sz = ri * 4
+        s = pygame.Surface((sz, sz), pygame.SRCALPHA)
+        x = y = sz / 2.0
+        r = float(ri)
+        for sg in (-1, 1):
+            pts = [(x + sg * r * 0.35, y - r * 0.75), (x + sg * r * 0.85, y - r * 1.45),
+                   (x + sg * r * 0.62, y - r * 0.62)]
+            poly_aa(s, [(px + 1, py + 1) for px, py in pts], OUTLINE)
+            poly_aa(s, pts, (230, 220, 200))
+        cr = [(x - r * 0.4, y - r * 0.8), (x - r * 0.4, y - r * 1.1), (x - r * 0.15, y - r * 0.92),
+              (x, y - r * 1.2), (x + r * 0.15, y - r * 0.92), (x + r * 0.4, y - r * 1.1),
+              (x + r * 0.4, y - r * 0.8)]
+        poly_aa(s, cr, (220, 180, 60))
+        _CROWN_CACHE[ri] = s
+    return s
+
+
 class Enemy:
     def __init__(self, kind, x, y, wave_mult, diff_mult=1.0, wave=1,
                  variant=None, biome="arena"):
@@ -20913,18 +20946,21 @@ class Enemy:
             pulse = 0.5 + 0.5 * math.sin(t * 4 + self.wobble)
             add_glow(surf, x, y, r * (2.0 + 0.3 * pulse), (220, 20, 50), 0.40 + 0.12 * pulse)
             return
-        for sg in (-1, 1):
-            pts = [(x + sg * r * 0.35, y - r * 0.75), (x + sg * r * 0.85, y - r * 1.45),
-                   (x + sg * r * 0.62, y - r * 0.62)]
-            poly_aa(surf, [(px + 1, py + 1) for px, py in pts], OUTLINE)
-            poly_aa(surf, pts, (230, 220, 200))
-        cr = [(x - r * 0.4, y - r * 0.8), (x - r * 0.4, y - r * 1.1), (x - r * 0.15, y - r * 0.92),
-              (x, y - r * 1.2), (x + r * 0.15, y - r * 0.92), (x + r * 0.4, y - r * 1.1), (x + r * 0.4, y - r * 0.8)]
-        poly_aa(surf, cr, (220, 180, 60))
+        cs = _bloodlord_crown_sprite(r)
+        surf.blit(cs, (int(x) - cs.get_width() // 2, int(y) - cs.get_height() // 2))
         for i in range(2):
             ph = (t * 1.2 + i * 0.5 + self.wobble * 0.1) % 1.0
             circle_aa(surf, x + (i * 2 - 1) * r * 0.4, y + r * 0.6 + ph * r * 0.8, 2.2 * (1 - ph) + 0.8,
                       (200, 20, 40))
+        if self.__dict__.get("drain_fx", 0.0) > 0:
+            self.drain_fx -= 1 / 60.0
+            ring_aa(surf, x, y, r + 10 + 20 * (0.35 - self.drain_fx), (255, 60, 80), 3)
+
+    def _draw_bloodlord_crowd(self, surf, t):
+        """kalabalıkta kan lordu: hazır taç + emme halkası (kan damlası yok)."""
+        x, y, r = self.x, self.y, self.radius
+        cs = _bloodlord_crown_sprite(r)
+        surf.blit(cs, (int(x) - cs.get_width() // 2, int(y) - cs.get_height() // 2))
         if self.__dict__.get("drain_fx", 0.0) > 0:
             self.drain_fx -= 1 / 60.0
             ring_aa(surf, x, y, r + 10 + 20 * (0.35 - self.drain_fx), (255, 60, 80), 3)
@@ -22507,6 +22543,7 @@ class Enemy:
     # Bütçe hep listenin başındakilere gidiyordu; sondakiler hiç tazelenmeyip
     # eski yöne bakıyordu. Bu kadar kare bekleyen yaratık sırayı beklemez.
     SPR_STARVE = 4
+    _spr_starve = [4]            # kalabalıkta büyür (draw_run ayarlar)
 
     def _blink_at(self, t):
         """Göz kırpma katsayısı (1.0 = tam açık). ~4 saniyede bir, her yaratık kendi fazında."""
@@ -22621,7 +22658,7 @@ class Enemy:
             urgent = (len(old) != len(key) or old[3] != key[3]
                       or old[4] != key[4]                      # boy / hasar parlaması
                       or min(turn, steps - turn) >= 2          # oyuncuya dönüyor
-                      or fr[2] - getattr(self, "_spr_fn", 0) >= self.SPR_STARVE)
+                      or fr[2] - getattr(self, "_spr_fn", 0) >= Enemy._spr_starve[0])
             if not urgent and fr[1] >= Enemy._spr_budget[0]:
                 key = old                                     # bütçe doldu: eskisini bas
             else:
@@ -36811,22 +36848,26 @@ class Display:
             return None
         if dw <= 0 or dh <= 0:
             return None
+        # Filtre monitörün TAM EKRAN ölçeğine göre seçilir, pencereye göre
+        # değil: SDL filtreyi ekran açılırken bir kez alıyor ve F11 aynı
+        # filtreyle devam ediyor. Eskiden 27" 1440p ekranda pencere 1,72 kat
+        # (yumuşak filtre) açılıyor, F11'den sonra tam 2 katlık tam ekran da
+        # bulanık kalıyordu.
+        full = min(dw / float(VIRTUAL_W), dh / float(VIRTUAL_H))
+        frac = abs(full - round(full))
+        sharp = full >= 1.95 and (frac < 0.04 or full >= 2.45)
         win = None
-        if self.fullscreen:
-            s = min(dw / float(VIRTUAL_W), dh / float(VIRTUAL_H))
-        else:
+        if not self.fullscreen:
             # görev çubuğu + başlık payı
             fit = min(dw * 0.92 / VIRTUAL_W, dh * 0.86 / VIRTUAL_H)
             k = int(fit)
-            if k >= 2:
-                s = float(k)            # tam kat pencere: keskin
+            if sharp or k >= 2:
+                s = float(max(1, k))    # tam kat pencere: keskin
             elif fit >= 1.3:
-                s = fit                 # 1440p vb.: büyük pencere, yumuşak filtre
+                s = fit                 # 1080p'nin üstü, 1440p'nin altı: yumuşak
             else:
                 s = 1.0
             win = (int(VIRTUAL_W * s), int(VIRTUAL_H * s))
-        frac = abs(s - round(s))
-        sharp = s >= 1.95 and (frac < 0.04 or s >= 2.45)
         mode = str(self.save.data.get("settings", {}).get("scale_filter", "auto"))
         if mode == "sharp":
             sharp = True
@@ -40422,20 +40463,63 @@ def _status_ring_sprite(r, slow, burn, poison):
     return img
 
 
+# Bu kadar yaratığın üstünde mor / mutant / kudurmuş yaratıklar da ortak hazır
+# karelerden çizilir (üstlerinde yalnız hâle ve halka). Geç dalgada neredeyse
+# hepsi böyle ve tek tek çizilince cehennemde kare hızı 20'ye düşüyordu.
+ENEMY_CROWD_N = 60
+
+
 def _draw_enemies_fast(world, ens, t):
-    """telefon: sıradan yaratıklar toplu blit (fblits) ile çizilir."""
+    """sıradan yaratıklar toplu blit (fblits) ile çizilir."""
     tick = Enemy._spr_tick[0]
     batch = []
     flash = None
+    crowd = len(ens) > ENEMY_CROWD_N
+    post = []
+    if crowd:
+        # kalabalık: mor / mutant / kudurmuş hâleleri tek toplu blit (hepsi
+        # gövdelerin altında)
+        glows = []
+        for e in ens:
+            ed = e.__dict__
+            if ed.get("voidling"):
+                pulse = 0.5 + 0.5 * math.sin(t * 5 + e.wobble)
+                rr, col, k = e.radius * (2.1 + 0.3 * pulse), VOID_COLOR, 0.42 + 0.14 * pulse
+            elif e.kind == "bloodlord":
+                pulse = 0.5 + 0.5 * math.sin(t * 4 + e.wobble)
+                rr, col, k = e.radius * (2.0 + 0.3 * pulse), (220, 20, 50), 0.40 + 0.12 * pulse
+            elif e.mutant:
+                rr, col, k = e.radius * 2.0, (210, 255, 200), 0.28
+            elif e.rage > 0:
+                rr, col, k = e.radius * (2.0 + 0.8 * e.rage), e.rage_col, 0.30 + 0.45 * e.rage
+            else:
+                continue
+            if rr < _GFX_GLOW_R[0]:
+                continue
+            lv = int(clamp(k, 0.0, 1.0) * 8 + 0.5)
+            ri = max(2, int(rr) // 2 * 2)
+            glows.append((glow_sprite(ri, (int(col[0]), int(col[1]), int(col[2])), lv),
+                          (int(e.x - ri), int(e.y - ri))))
+        if glows:
+            fb = getattr(world, "fblits", None)
+            if fb is not None:
+                fb(glows, pygame.BLEND_RGB_ADD)
+            else:
+                for g, pos in glows:
+                    world.blit(g, pos, special_flags=pygame.BLEND_RGB_ADD)
     for e in sorted(ens, key=_enemy_y):
-        if (e.spawn_t < 0.3 or e.phased or e.rage > 0 or e.mutant or e.kind in ("kamikaze", "bloodlord")
-                or e.__dict__.get("voidling") or e.__dict__.get("_freeze_t", 0.0) > 0
-                or e.__dict__.get("_stun_t", 0.0) > 0 or e.__dict__.get("army")):
+        ed = e.__dict__
+        blord = e.kind == "bloodlord"
+        cosmetic = e.rage > 0 or e.mutant or ed.get("voidling") or blord
+        status = ed.get("_freeze_t", 0.0) > 0 or ed.get("_stun_t", 0.0) > 0
+        if (e.spawn_t < 0.3 or e.phased or e.kind == "kamikaze" or ed.get("army")
+                or ((cosmetic or status) and not crowd)):
             if batch:
                 _fast_blits(world, batch)
                 batch = []
             e.draw(world, t)
             continue
+
         stg = e.__dict__.get("_stg")
         if stg is None:
             stg = e._stg = (id(e) >> 4) % 3
@@ -40467,8 +40551,21 @@ def _draw_enemies_fast(world, ens, t):
             if d is None:
                 d = flash[r] = disc_sprite(r, (255, 255, 255), 90)
             batch.append((d, (x - r, y - r)))
+        if status or (cosmetic and (ed.get("voidling") or blord)):
+            post.append(e)
     if batch:
         _fast_blits(world, batch)
+    # gövdelerin üstündeki ince katmanlar (mor halka, buz, sersemleme)
+    for e in post:
+        ed = e.__dict__
+        if ed.get("voidling"):
+            ring_aa(world, e.x, e.y, e.radius + 5, VOID_COLOR2, 2)
+        if e.kind == "bloodlord":
+            e._draw_bloodlord_crowd(world, t)
+        if ed.get("_freeze_t", 0.0) > 0:
+            draw_frozen_overlay(world, e.x, e.y, e.radius)
+        if ed.get("_stun_t", 0.0) > 0:
+            draw_stun_stars(world, e.x, e.y - e.radius - 6, e.radius, t)
 
 
 REWARD_CARD_LIFE = 2.8
@@ -40626,6 +40723,9 @@ def draw_run(surf, run, t, aim_pos=None, shake=(0, 0), world_only=False):
         _wfx_end(world, _snap)
     _vis_en = [e for e in run.enemies if vis_near.collidepoint(e.x, e.y)]
     Enemy._spr_budget[0] = int(clamp(len(_vis_en) * 0.36, Enemy.SPR_BUDGET, Enemy.SPR_BUDGET_MAX))
+    # her yaratık en geç bu kadar karede bir tazelenir; kalabalıkta bütçeyi
+    # aşmasın diye uzar
+    Enemy._spr_starve[0] = max(Enemy.SPR_STARVE, int(len(_vis_en) * 1.5 / Enemy.SPR_BUDGET_MAX))
     Enemy._spr_tick[0] += 1
     # Buzul / Orman / Çöl yaratıkları (ayrıntılı gövdeler) her karede yeniden
     # çizilince bu haritalarda kare hızı Taş Meydan'ın gerisinde kalıyordu
