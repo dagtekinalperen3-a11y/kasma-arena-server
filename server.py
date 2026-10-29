@@ -1823,7 +1823,8 @@ BUILD_BOOKS = frozenset((
     "r_armor", "r_aspd", "r_bonk", "r_bosshunter", "r_clover", "r_coin", "r_crit",
     "r_critd", "r_dashslow", "r_dmg", "r_echo", "r_evade", "r_execute", "r_hp",
     "r_hp_big", "r_killheal", "r_lasthope", "r_luck", "r_mag", "r_pierce", "r_poison",
-    "r_rage", "r_regen", "r_roar", "r_spd", "r_swarm", "r_vamp", "r_wspd", "r_xp"))
+    "r_rage", "r_regen", "r_roar", "r_spd", "r_swarm", "r_vamp", "r_wspd", "r_xp",
+    "r_ice"))
 BUILD_DMG_EXTRA = frozenset(("gun", "bonk", "storm", "ult", "orbit", "other"))
 BUILD_MAPS = frozenset(("stone", "frost", "jungle", "desert"))
 BUILD_WEAPON_MAX = 6            # oyunda 4 yuva (+ pay)
