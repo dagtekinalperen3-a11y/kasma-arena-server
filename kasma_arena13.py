@@ -22385,6 +22385,8 @@ class Enemy:
             draw_frozen_overlay(surf, x, y, r)
         if self.__dict__.get("_stun_t", 0.0) > 0:
             draw_stun_stars(surf, x, y - r - 6, r, t)
+        if self.__dict__.get("army"):
+            draw_army_shield(surf, self, t)
 
     def _ensure_spr(self, t, r):
         """Gövde önbelleğini (self._spr) günceller - 2D çizim ve 2.5D/3D ortak."""
@@ -27753,6 +27755,9 @@ class WaveManager:
                 cap = int(cap * self.cap_mult)
                 if self.cap_max:
                     cap = min(cap, int(self.cap_max))
+            gm = getattr(self, "grave_mult", 1.0)
+            if gm != 1.0:
+                cap = int(cap * gm)
             if boss_time:
                 cap = max(6, int(cap * BOSS_CROWD_SHARE))
             # kalabalık laneti: kalabalık tavanı büyür
@@ -27860,6 +27865,9 @@ class WaveManager:
         """Geç dalga güçlenmesi -"""
         hp_k, dmg_k, _extra = late_wave_boost(self.wave, self.biome)
         mh, md = mid_wave_boost(self.wave, self.biome)
+        gm = getattr(self, "grave_mult", 1.0)
+        hp_k *= gm
+        dmg_k *= gm
         hp_k *= mh
         dmg_k *= md * run_event_mod("dmg")
         dmg_k *= getattr(self, "dmg_mult", 1.0)
@@ -29217,6 +29225,523 @@ def draw_world_extras(world, run, cam, t):
         rt.draw(world, t)
         if p.alive:
             rt.draw_prompt(world, t, p)
+    draw_relics(world, run, cam, t)
+
+
+# ---- haritanın yeni nesneleri: meydan taşı, mezarlıklar, kürsü ----
+# meydan taşı: koşunun başında (0. dalga) haritada durur. [E] ile çağrılınca
+#   kalkanlı, oyuncudan biraz hızlı 15 askerlik bir ordu gelir. Ordu sabit
+#   güçtedir: ilk dalgada açan büyük ihtimalle ölür, birkaç dalga sonra açan
+#   keser. Hepsi devrilince epik sandık + 1.000 altın + 3 seviye.
+# mezarlık: haritaya rastgele 10 tane serpilir. [E] ile her biri oyunun
+#   zorluğunu %7,5 artırır (yaratık canı, hasarı, hızı, doğum sıklığı ve
+#   kalabalık) - kendine güvenen daha çok yaratık, daha çok skor/altın/tecrübe
+#   kazanır.
+# kürsü: 7. dalgada haritanın bir yerine gizlice gelir (haritada görünmez).
+#   1.000 altınla açılır; içinde oyuncuda olmayan (ve kapatmadığı) 3 kitap
+#   vardır, biri 9.000 altına alınır. 4 kitabı dolu olana hiç gelmez.
+RALLY_COLOR = (230, 170, 80)
+RALLY_R = 110.0                 # [E] menzili
+ARMY_SIZE = 15
+ARMY_REF_WAVE = 9               # ordunun gücü bu dalganın yaratığı kadar (sabit)
+ARMY_HP_K = 2.6                 # ... bunun katı can
+ARMY_DMG_K = 1.6                # ... bunun katı hasar
+ARMY_SPEED_K = 1.08             # oyuncudan biraz hızlı
+ARMY_SCORE_K = 3.0              # askerler daha çok skor verir
+ARMY_GOLD = 1000
+ARMY_LEVELS = 3
+ARMY_CHEST_TIER = 3             # epik sandık
+GRAVE_COUNT = 10
+GRAVE_COLOR = (150, 200, 120)
+GRAVE_R = 70.0
+GRAVE_STEP = 0.075              # her mezarlık zorluğu %7,5 artırır
+LECTERN_WAVE = 7
+LECTERN_COLOR = (200, 160, 255)
+LECTERN_R = 90.0
+LECTERN_OPEN_COST = 1000
+LECTERN_BOOK_COST = 9000
+
+
+class RallyStone:
+    """Meydan taşı: yontulmuş, rünlü dikili taş."""
+
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+        self.used = False           # ordu çağrıldı
+        self.done = False           # ordu devrildi
+        self.t = random.uniform(0, 10)
+
+    def in_range(self, p):
+        return dist(self.x, self.y, p.x, p.y) < RALLY_R
+
+    def update(self, dt):
+        self.t += dt
+
+    def draw(self, surf, t):
+        x, y = self.x, self.y
+        col = (255, 70, 60) if (self.used and not self.done) else RALLY_COLOR
+        if self.done:
+            col = (150, 140, 130)
+        pulse = 0.5 + 0.5 * math.sin(self.t * 3)
+        add_glow(surf, x, y - 30, 120, col, 0.16 + (0.0 if self.done else 0.10 * pulse))
+        surf.blit(shadow_sprite(96), (int(x - 48), int(y + 6)))
+        stone = [(x - 24, y + 12), (x - 28, y - 40), (x - 14, y - 70), (x + 10, y - 74),
+                 (x + 26, y - 46), (x + 24, y + 12)]
+        poly_aa(surf, [(px + 2, py + 3) for px, py in stone], OUTLINE)
+        poly_aa(surf, stone, (118, 112, 120))
+        poly_aa(surf, poly_inset(stone, 0.7, dx=-4, dy=-4), (146, 140, 150))
+        # rünler: çapraz iki kılıç + kalkan
+        rc = scale_col(col, 0.6 + 0.4 * pulse)
+        thick_line(surf, (x - 14, y - 58), (x + 10, y - 24), 3, rc)
+        thick_line(surf, (x + 10, y - 58), (x - 14, y - 24), 3, rc)
+        thick_line(surf, (x - 12, y - 30), (x - 6, y - 36), 2, rc)
+        thick_line(surf, (x + 8, y - 30), (x + 2, y - 36), 2, rc)
+        ring_aa(surf, x - 2, y - 8, 7, rc, 2)
+        # taban: kırık taşlar
+        for i, (ox, oy) in enumerate(((-34, 14), (30, 12), (-14, 20), (16, 22))):
+            pygame.draw.ellipse(surf, OUTLINE, (int(x + ox - 7), int(y + oy - 4), 14, 9))
+            pygame.draw.ellipse(surf, (110, 104, 112), (int(x + ox - 6), int(y + oy - 3), 12, 7))
+        if not self.used:
+            by = y - 98 + math.sin(self.t * 4) * 4
+            add_glow(surf, x, by, 20, col, 0.5)
+            draw_icon(surf, x, by, "sword", col, 10)
+
+    def draw_prompt(self, surf, t, p):
+        if self.used:
+            return
+        _relic_prompt(surf, self.x, self.y - 128, t, p, L("rel.rally_prompt", key_label_short("use")),
+                      RALLY_COLOR, dist(self.x, self.y, p.x, p.y))
+
+
+class Graveyard:
+    """Küçük, sevimli mezarlık: toprak höyük, iki minik taş, kurukafa ve
+    kemik; üstünden yeşilimsi koku dumanı yükselir."""
+
+    def __init__(self, x, y, seed):
+        self.x, self.y = x, y
+        self.used = False
+        self.fade = 0.0
+        self.seed = seed
+        self.t = random.uniform(0, 10)
+
+    def in_range(self, p):
+        return dist(self.x, self.y, p.x, p.y) < GRAVE_R
+
+    def update(self, dt):
+        self.t += dt
+        if self.used:
+            self.fade += dt
+
+    def draw(self, surf, t):
+        a = 1.0 - clamp(self.fade / 1.0, 0.0, 1.0)
+        if a <= 0:
+            return
+        x, y = self.x, self.y
+        # höyük
+        pygame.draw.ellipse(surf, OUTLINE, (int(x - 24), int(y - 4), 48, 22))
+        pygame.draw.ellipse(surf, scale_col((96, 74, 56), 0.6 + 0.4 * a), (int(x - 22), int(y - 3), 44, 18))
+        pygame.draw.ellipse(surf, scale_col((120, 94, 70), 0.6 + 0.4 * a), (int(x - 16), int(y - 1), 30, 9))
+        # iki minik mezar taşı
+        for ox, h in ((-12, 20), (10, 16)):
+            r_ = pygame.Rect(int(x + ox - 6), int(y - h), 12, h)
+            pygame.draw.rect(surf, OUTLINE, r_.inflate(4, 4), border_top_left_radius=7, border_top_right_radius=7)
+            pygame.draw.rect(surf, (150, 150, 160), r_, border_top_left_radius=6, border_top_right_radius=6)
+            thick_line(surf, (x + ox, y - h + 5), (x + ox, y - h + 11), 1.5, (100, 100, 112))
+            thick_line(surf, (x + ox - 3, y - h + 7), (x + ox + 3, y - h + 7), 1.5, (100, 100, 112))
+        # kurukafa ve çapraz kemik
+        sx, sy = x + 1, y + 6
+        thick_line(surf, (sx - 9, sy + 5), (sx + 9, sy - 3), 3, (236, 230, 214))
+        thick_line(surf, (sx - 9, sy - 3), (sx + 9, sy + 5), 3, (236, 230, 214))
+        circle_aa(surf, sx, sy - 1, 6.5, OUTLINE)
+        circle_aa(surf, sx, sy - 1, 5.5, (244, 238, 222))
+        circle_aa(surf, sx - 2, sy - 2, 1.4, (40, 30, 30))
+        circle_aa(surf, sx + 2, sy - 2, 1.4, (40, 30, 30))
+        # koku dumanı: kıvrılarak yükselen yeşilimsi puflar
+        if not self.used:
+            for i in range(3):
+                ph = (self.t * 0.45 + i / 3.0 + self.seed) % 1.0
+                px = x - 6 + i * 6 + math.sin(self.t * 2.0 + i * 2.1) * (4 + 8 * ph)
+                py = y - 12 - ph * 42
+                blit_disc(surf, px, py, 3 + 6 * ph, (170, 230, 130), int(170 * (1.0 - ph)))
+        else:
+            blit_disc(surf, x, y - 10, 30 * (1 - a) + 6, (200, 255, 190), int(110 * a))
+
+    def draw_prompt(self, surf, t, p):
+        if self.used:
+            return
+        _relic_prompt(surf, self.x, self.y - 56, t, p, L("rel.grave_prompt", key_label_short("use")),
+                      GRAVE_COLOR, dist(self.x, self.y, p.x, p.y), near=220)
+
+
+class Lectern:
+    """Kürsü: üstünde açık bir kitap duran, mumlu ahşap okuma kürsüsü."""
+
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+        self.opened = False         # 1.000 altın ödendi
+        self.used = False           # bir kitap alındı
+        self.offers = []            # kitap anahtarları
+        self.t = random.uniform(0, 10)
+
+    def in_range(self, p):
+        return dist(self.x, self.y, p.x, p.y) < LECTERN_R
+
+    def update(self, dt):
+        self.t += dt
+
+    def draw(self, surf, t):
+        x, y = self.x, self.y
+        col = LECTERN_COLOR if not self.used else (140, 130, 150)
+        add_glow(surf, x, y - 40, 70, col, 0.10 + (0.0 if self.used else 0.06 * math.sin(self.t * 2)))
+        surf.blit(shadow_sprite(60), (int(x - 30), int(y + 4)))
+        # ayak + sehpa
+        thick_line(surf, (x, y + 8), (x, y - 28), 9, OUTLINE)
+        thick_line(surf, (x, y + 8), (x, y - 28), 6, (120, 80, 50))
+        pygame.draw.ellipse(surf, OUTLINE, (int(x - 18), int(y + 2), 36, 12))
+        pygame.draw.ellipse(surf, (100, 66, 40), (int(x - 16), int(y + 3), 32, 9))
+        top = [(x - 26, y - 30), (x + 26, y - 30), (x + 20, y - 46), (x - 20, y - 46)]
+        poly_aa(surf, [(px + 1, py + 2) for px, py in top], OUTLINE)
+        poly_aa(surf, top, (140, 96, 60))
+        # açık kitap
+        for sg in (-1, 1):
+            pg = [(x, y - 44), (x + sg * 18, y - 48), (x + sg * 17, y - 36), (x, y - 34)]
+            poly_aa(surf, pg, (240, 232, 210))
+            for j in range(3):
+                thick_line(surf, (x + sg * 4, y - 44 + j * 3), (x + sg * 14, y - 46 + j * 3), 1, (170, 160, 140))
+        if not self.used:
+            # sayfalardan süzülen ışık zerreleri
+            for i in range(3):
+                ph = (self.t * 0.5 + i / 3.0) % 1.0
+                _sparkle(surf, x - 8 + i * 8 + math.sin(self.t * 2 + i) * 4, y - 52 - ph * 30,
+                         2.5 * (1 - ph) + 0.8, col)
+        # mum
+        thick_line(surf, (x + 22, y - 46), (x + 22, y - 56), 4, (236, 226, 200))
+        evo_flame(surf, x + 22, y - 56, 8, 2.4, t, 1.3)
+
+    def draw_prompt(self, surf, t, p):
+        if self.used:
+            return
+        txt = (L("rel.lect_prompt_open", key_label_short("use")) if self.opened
+               else L("rel.lect_prompt", key_label_short("use"), fmt_num(LECTERN_OPEN_COST)))
+        _relic_prompt(surf, self.x, self.y - 92, t, p, txt, LECTERN_COLOR, dist(self.x, self.y, p.x, p.y))
+
+
+def _relic_prompt(surf, x, y, t, p, txt, col, d, near=300):
+    a = clamp((near - d) / 120.0, 0.0, 1.0)
+    if a <= 0:
+        return
+    y = y + math.sin(t * 3) * 3
+    w_ = text_width(txt, 15, True) + 28
+    r_ = pygame.Rect(0, 0, int(w_), 28)
+    r_.center = (int(x), int(y))
+    bg = pygame.Surface(r_.size, pygame.SRCALPHA)
+    pygame.draw.rect(bg, (24, 20, 30, int(230 * a)), bg.get_rect(), border_radius=13)
+    pygame.draw.rect(bg, (*col, int(255 * a)), bg.get_rect(), width=2, border_radius=13)
+    surf.blit(bg, r_.topleft)
+    draw_text(surf, txt, r_.center, 15, (250, 244, 230), bold=True, center=True, shadow=False,
+              alpha=int(255 * a))
+
+
+def draw_army_shield(surf, e, t):
+    """Ordu askeri: baktığı yöne tuttuğu kalkan."""
+    fx_, fy_ = e.face_x, e.face_y
+    ln = math.hypot(fx_, fy_) or 1.0
+    fx_, fy_ = fx_ / ln, fy_ / ln
+    r = e.radius
+    cx, cy = e.x + fx_ * r * 0.85, e.y + fy_ * r * 0.85
+    nx, ny = -fy_, fx_
+    pts = [(cx + nx * r * 0.75, cy + ny * r * 0.75), (cx + fx_ * r * 0.25 + nx * r * 0.55, cy + fy_ * r * 0.25 + ny * r * 0.55),
+           (cx + fx_ * r * 0.45, cy + fy_ * r * 0.45),
+           (cx + fx_ * r * 0.25 - nx * r * 0.55, cy + fy_ * r * 0.25 - ny * r * 0.55), (cx - nx * r * 0.75, cy - ny * r * 0.75)]
+    poly_aa(surf, [(px + 1, py + 2) for px, py in pts], OUTLINE)
+    poly_aa(surf, pts, (170, 176, 196))
+    poly_aa(surf, poly_inset(pts, 0.6), (226, 186, 98))
+    circle_aa(surf, cx + fx_ * r * 0.2, cy + fy_ * r * 0.2, max(2.0, r * 0.14), (120, 40, 40))
+
+
+class RelicsMixin:
+    """RunState'e meydan taşı, mezarlıklar ve kürsü (karışım sınıf)."""
+
+    def relics_init(self):
+        self.rally = None
+        self.army = []
+        self.graves = []
+        self.grave_n = 0
+        self.lectern = None
+        self.lectern_open = False
+        self.lectern_done = False
+        if not self.relics_active():
+            return
+        p = self.player
+        x, y = self._relic_spot(420, 700, ())
+        self.rally = RallyStone(x, y)
+        rnd = random.Random()
+        placed = [(x, y)]
+        for i in range(GRAVE_COUNT):
+            gx, gy = self._relic_spot(500, max(ARENA_RECT.w, ARENA_RECT.h), placed, anywhere=True)
+            placed.append((gx, gy))
+            self.graves.append(Graveyard(gx, gy, rnd.random()))
+
+    def relics_active(self):
+        return not getattr(self, "is_coop", False) and not getattr(self, "is_guest", False)
+
+    def _relic_spot(self, dmin, dmax, avoid, anywhere=False):
+        p = self.player
+        inner = ARENA_RECT.inflate(-260, -260)
+        x, y = p.x, p.y
+        for _ in range(120):
+            if anywhere:
+                x = random.uniform(inner.left, inner.right)
+                y = random.uniform(inner.top, inner.bottom)
+                if dist(x, y, p.x, p.y) < dmin:
+                    continue
+            else:
+                a = random.uniform(0, math.tau)
+                d = random.uniform(dmin, dmax)
+                x = clamp(p.x + math.cos(a) * d, inner.left, inner.right)
+                y = clamp(p.y + math.sin(a) * d, inner.top, inner.bottom)
+            if all(dist(x, y, ox, oy) > 380 for ox, oy in avoid):
+                break
+        return x, y
+
+    def grave_mult(self):
+        return 1.0 + GRAVE_STEP * int(getattr(self, "grave_n", 0) or 0)
+
+    def relics_clear(self):
+        """Cehenneme geçişte taş/mezarlık/kürsü arenada kalır (mezarlıkların
+        zorluğu sürer)."""
+        self.rally = None
+        self.graves = []
+        self.lectern = None
+        self.lectern_open = False
+
+    # ---- meydan taşı: ordu ----
+    def _call_army(self):
+        p = self.player
+        rs = self.rally
+        rs.used = True
+        wmult = arena_hp_mult(ARMY_REF_WAVE) * ARMY_HP_K
+        spd = p.eff_speed() * ARMY_SPEED_K
+        self.army = []
+        for i in range(ARMY_SIZE):
+            a = i * math.tau / ARMY_SIZE + random.uniform(-0.1, 0.1)
+            d = random.uniform(430, 560)
+            x = clamp(p.x + math.cos(a) * d, ARENA_RECT.left + 40, ARENA_RECT.right - 40)
+            y = clamp(p.y + math.sin(a) * d, ARENA_RECT.top + 40, ARENA_RECT.bottom - 40)
+            e = Enemy("brute", x, y, wmult, 1.0, wave=ARMY_REF_WAVE, biome="arena")
+            e.army = True
+            e.speed = max(e.speed, spd)
+            e.dmg *= ARMY_DMG_K
+            e.contact_dps *= ARMY_DMG_K
+            e.armor = min(0.5, e.armor + 0.15)
+            e.score = int(e.score * ARMY_SCORE_K)
+            e.xp = int(e.xp * 2)
+            e.coin = int(e.coin * 2)
+            e.color = (170, 60, 50)
+            e.disp_name = L("rel.soldier")
+            self.army.append(e)
+            self.enemies.append(e)
+            self.fx.ring(x, y, (255, 90, 70), n=12, speed=180, life=0.35, r=3)
+        self.waves.announce_timer = 3.0
+        self.waves.announce_text = L("rel.army_come")
+        self.fx.do_flash((255, 70, 50), 0.35)
+        self.fx.shake(8, 0.35)
+        self.fx.shockwave(rs.x, rs.y, 360, (255, 120, 80), 0.6, 7)
+        sfx("boss", 0.9, 0.0)
+
+    def _army_won(self):
+        p = self.player
+        rs = self.rally
+        if rs is not None:
+            rs.done = True
+        self.army = []
+        ch = BossChest(p.x + 80, p.y - 20, "army")
+        ch.force_tier = ARMY_CHEST_TIER
+        self.chests.append(ch)
+        self.gold_wallet += ARMY_GOLD
+        self.coins_earned += ARMY_GOLD
+        p.level += ARMY_LEVELS
+        for _ in range(ARMY_LEVELS):
+            p.xp_to_next = xp_next_need(p.xp_to_next, p.level)
+        p.on_level_up(ARMY_LEVELS)
+        self.pending_levelups += ARMY_LEVELS
+        self.waves.announce_timer = 3.0
+        self.waves.announce_text = L("rel.army_won")
+        self.fx.popup(p.x, p.y - 96, L("rel.army_reward", fmt_num(ARMY_GOLD), ARMY_LEVELS), GOLD, 22, life=2.6)
+        self.fx.do_flash(GOLD, 0.4)
+        for rr in (220, 420):
+            self.fx.shockwave(p.x, p.y, rr, GOLD, 0.6, 5)
+        sfx("levelup", 1.0, 0.0)
+
+    # ---- mezarlık ----
+    def _open_grave(self, g):
+        p = self.player
+        g.used = True
+        self.grave_n = int(getattr(self, "grave_n", 0)) + 1
+        self._apply_wave_mods()
+        tot = GRAVE_STEP * self.grave_n
+        self.find_note = (self.run_time, L("rel.grave_note", fmt_pct1(GRAVE_STEP), fmt_pct1(tot)), GRAVE_COLOR)
+        self.fx.popup(g.x, g.y - 60, L("rel.grave_pop", fmt_pct1(GRAVE_STEP)), (200, 255, 180), 20, life=1.6)
+        self.fx.burst(g.x, g.y - 10, (190, 240, 170), n=18, speed=140, life=0.8, r=3.2, gravity=-60)
+        self.fx.ring(g.x, g.y, (120, 200, 110), n=20, speed=220, life=0.5, r=3)
+        sfx("warn", 0.5, 0.0)
+
+    # ---- kürsü ----
+    def lectern_candidates(self):
+        p = self.player
+        if p.normal_book_count() >= slot_max(p, "b"):
+            return []
+        return [b["key"] for b in self.save.unlocked_books()
+                if not b.get("rare") and p.books.get(b["key"], 0) <= 0]
+
+    def _spawn_lectern(self):
+        if self.lectern is not None or self.lectern_done or not self.relics_active():
+            return
+        if not self.lectern_candidates():
+            return
+        x, y = self._relic_spot(800, 1400, [(g.x, g.y) for g in self.graves])
+        self.lectern = Lectern(x, y)
+        self.find_note = (self.run_time, L("rel.lect_appear"), LECTERN_COLOR)
+        sfx("second", 0.5, 0.0)
+
+    def _use_lectern(self):
+        lc = self.lectern
+        p = self.player
+        if not lc.opened:
+            if self.gold_wallet < LECTERN_OPEN_COST:
+                self.fx.popup(lc.x, lc.y - 70, L("rel.need_gold", fmt_num(LECTERN_OPEN_COST)), (255, 150, 130),
+                              16, life=1.2)
+                sfx("hurt", 0.4, 0.2)
+                return
+            cands = self.lectern_candidates()
+            if not cands:
+                self.fx.popup(lc.x, lc.y - 70, L("rel.lect_full"), (255, 150, 130), 16, life=1.4)
+                return
+            self.gold_wallet -= LECTERN_OPEN_COST
+            lc.opened = True
+            random.shuffle(cands)
+            lc.offers = cands[:3]
+            sfx("buy", 0.8, 0.0)
+        self.lectern_open = True
+
+    def lectern_buy(self, key):
+        """Kürsüden kitap alır (9.000 altın). Döner: True/False."""
+        lc = self.lectern
+        p = self.player
+        if lc is None or lc.used or key not in lc.offers:
+            return False
+        if self.gold_wallet < LECTERN_BOOK_COST:
+            return False
+        lvl = p.take_book(key, 0)
+        if lvl <= 0:
+            return False
+        self.gold_wallet -= LECTERN_BOOK_COST
+        lc.used = True
+        self.lectern_done = True
+        bk = BOOK_BY_KEY.get(key)
+        self.fx.popup(p.x, p.y - 70, bk_name(bk) if bk else key, LECTERN_COLOR, 24, life=1.6)
+        self.fx.ring(p.x, p.y, LECTERN_COLOR, n=24, speed=240, life=0.5, r=3.4)
+        sfx("levelup", 0.8, 0.0)
+        return True
+
+    def relics_update(self, dt, input_state, portal_used=False):
+        if not self.relics_active():
+            return
+        p = self.player
+        use = (bool(input_state.get("use_pressed")) and not portal_used and p.alive
+               and not self.merchant_open and not getattr(self, "roulette_open", False)
+               and self.curse_offers is None)
+        rs = self.rally
+        if rs is not None:
+            rs.update(dt)
+            if not rs.used and use and rs.in_range(p):
+                self._call_army()
+                use = False
+            elif rs.used and not rs.done:
+                self.army = [e for e in self.army if e.alive]
+                if not self.army:
+                    self._army_won()
+        for g in self.graves:
+            g.update(dt)
+            if not g.used and use and g.in_range(p):
+                self._open_grave(g)
+                use = False
+        self.graves = [g for g in self.graves if g.fade < 1.0]
+        if (self.lectern is None and not self.lectern_done and self.biome != "hell"
+                and int(self.waves.wave) >= LECTERN_WAVE):
+            if not getattr(self, "_lectern_tried", False):
+                self._lectern_tried = True
+                self._spawn_lectern()
+        lc = self.lectern
+        if lc is not None:
+            lc.update(dt)
+            if not lc.used and use and lc.in_range(p) and not self.lectern_open:
+                self._use_lectern()
+            if lc.used and not self.lectern_open:
+                self.lectern = None
+
+
+def draw_relics(world, run, cam, t):
+    """Zemindeki meydan taşı, mezarlıklar ve kürsü."""
+    p = run.player
+    view = cam.inflate(300, 300)
+    for g in getattr(run, "graves", ()):
+        if view.collidepoint(g.x, g.y):
+            g.draw(world, t)
+            if p.alive:
+                g.draw_prompt(world, t, p)
+    rs = getattr(run, "rally", None)
+    if rs is not None and view.collidepoint(rs.x, rs.y):
+        rs.draw(world, t)
+        if p.alive:
+            rs.draw_prompt(world, t, p)
+    lc = getattr(run, "lectern", None)
+    if lc is not None and view.collidepoint(lc.x, lc.y):
+        lc.draw(world, t)
+        if p.alive:
+            lc.draw_prompt(world, t, p)
+
+
+STRINGS.update({
+    "rel.rally_prompt": _T("[{0}] MEYDAN TAŞI: ORDUYU ÇAĞIR", "[{0}] RALLY STONE: SUMMON THE ARMY",
+                           "[{0}] PIEDRA DE REUNIÓN: INVOCAR EL EJÉRCITO", "[{0}] SAMMELSTEIN: ARMEE RUFEN",
+                           "[{0}] КАМЕНЬ СБОРА: ПРИЗВАТЬ АРМИЮ"),
+    "rel.army_come": _T("ORDU GELİYOR!", "THE ARMY IS COMING!", "¡LLEGA EL EJÉRCITO!", "DIE ARMEE KOMMT!",
+                        "АРМИЯ ИДЁТ!"),
+    "rel.army_won": _T("ORDU DEVRİLDİ!", "THE ARMY HAS FALLEN!", "¡EL EJÉRCITO HA CAÍDO!", "DIE ARMEE IST BESIEGT!",
+                       "АРМИЯ ПАЛА!"),
+    "rel.army_reward": _T("EPİK SANDIK + {0} ALTIN + {1} SEVİYE", "EPIC CHEST + {0} GOLD + {1} LEVELS",
+                          "COFRE ÉPICO + {0} ORO + {1} NIVELES", "EPISCHE TRUHE + {0} GOLD + {1} STUFEN",
+                          "ЭПИЧЕСКИЙ СУНДУК + {0} ЗОЛОТА + {1} УР."),
+    "rel.soldier": _T("Kalkanlı Asker", "Shield Soldier", "Soldado con escudo", "Schildsoldat", "Щитоносец"),
+    "rel.grave_prompt": _T("[{0}] MEZARLIK: ZORLUK +%7,5", "[{0}] GRAVEYARD: DIFFICULTY +7.5%",
+                           "[{0}] CEMENTERIO: DIFICULTAD +7,5%", "[{0}] FRIEDHOF: SCHWIERIGKEIT +7,5%",
+                           "[{0}] КЛАДБИЩЕ: СЛОЖНОСТЬ +7,5%"),
+    "rel.grave_pop": _T("ZORLUK +{0}", "DIFFICULTY +{0}", "DIFICULTAD +{0}", "SCHWIERIGKEIT +{0}", "СЛОЖНОСТЬ +{0}"),
+    "rel.grave_note": _T("Mezarlık açıldı: zorluk {0} arttı (toplam +{1}) - daha çok yaratık, daha çok ganimet",
+                         "Graveyard opened: difficulty up {0} (total +{1}) - more enemies, more loot",
+                         "Cementerio abierto: dificultad +{0} (total +{1})", "Friedhof geöffnet: +{0} (gesamt +{1})",
+                         "Кладбище открыто: +{0} (всего +{1})"),
+    "rel.lect_appear": _T("Haritanın bir yerinde gizemli bir KÜRSÜ belirdi...", "A mysterious LECTERN appeared somewhere...",
+                          "Un ATRIL misterioso apareció en algún lugar...", "Irgendwo erschien ein geheimnisvolles PULT...",
+                          "Где-то появилась таинственная КАФЕДРА..."),
+    "rel.lect_prompt": _T("[{0}] KÜRSÜ: {1} ALTINLA AÇ", "[{0}] LECTERN: OPEN FOR {1} GOLD", "[{0}] ATRIL: ABRIR POR {1}",
+                          "[{0}] PULT: FÜR {1} GOLD ÖFFNEN", "[{0}] КАФЕДРА: ОТКРЫТЬ ЗА {1}"),
+    "rel.lect_prompt_open": _T("[{0}] KÜRSÜ", "[{0}] LECTERN", "[{0}] ATRIL", "[{0}] PULT", "[{0}] КАФЕДРА"),
+    "rel.need_gold": _T("{0} ALTIN GEREK", "NEED {0} GOLD", "NECESITAS {0} ORO", "{0} GOLD NÖTIG", "НУЖНО {0} ЗОЛОТА"),
+    "rel.lect_full": _T("kitap yuvaların dolu", "your book slots are full", "tus huecos de libro están llenos",
+                        "deine Buchplätze sind voll", "все ячейки книг заняты"),
+    "rel.lect_title": _T("KÜRSÜ", "LECTERN", "ATRIL", "PULT", "КАФЕДРА"),
+    "rel.lect_sub": _T("Sende olmayan 3 kitap. Birini {0} altına alabilirsin.",
+                       "3 books you don't have. Take one for {0} gold.",
+                       "3 libros que no tienes. Toma uno por {0} oro.",
+                       "3 Bücher, die du nicht hast. Eines für {0} Gold.",
+                       "3 книги, которых у тебя нет. Одна за {0} золота."),
+    "rel.lect_buy": _T("{0} ALTIN", "{0} GOLD", "{0} ORO", "{0} GOLD", "{0} ЗОЛОТА"),
+    "rel.lect_leave": _T("AYRIL", "LEAVE", "SALIR", "VERLASSEN", "УЙТИ"),
+    "rel.lect_gold": _T("Altının: {0}", "Your gold: {0}", "Tu oro: {0}", "Dein Gold: {0}", "Твоё золото: {0}"),
+    "rel.graves_hud": _T("MEZARLIK +{0}", "GRAVES +{0}", "TUMBAS +{0}", "GRÄBER +{0}", "КЛАДБИЩА +{0}"),
+})
 
 
 def _buff_ring(surf, cx, cy, r, col, frac, icon):
@@ -29286,6 +29811,16 @@ def draw_extras_hud(surf, run, t):
         ink_frame(surf, r_, col, 12, 2)
         draw_icon(surf, r_.x + 16, r_.centery, icon, col, 7)
         draw_text(surf, txt, (r_.x + 30, r_.centery - 8), 13, lighten(col, 0.3), bold=True, shadow=False)
+    gn = int(getattr(run, "grave_n", 0) or 0)
+    if gn:
+        txt = L("rel.graves_hud", fmt_pct1(GRAVE_STEP * gn))
+        w_ = text_width(txt, 12, True) + 36
+        r_ = pygame.Rect(0, 0, w_, 22)
+        r_.topright = (VIRTUAL_W - 16, 226)
+        pygame.draw.rect(surf, (28, 34, 24), r_, border_radius=11)
+        ink_frame(surf, r_, GRAVE_COLOR, 11, 2)
+        draw_icon(surf, r_.x + 13, r_.centery, "skull", GRAVE_COLOR, 6)
+        draw_text(surf, txt, (r_.x + 24, r_.centery - 7), 12, lighten(GRAVE_COLOR, 0.3), bold=True, shadow=False)
     if getattr(run, "_overlay", False):
         return
     ny = 168
@@ -31060,7 +31595,7 @@ def draw_evo_card(surf, r2, ch, run, t, hover):
                   bold=True, center=True, shadow=False)
 
 
-class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
+class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMixin):
     def __init__(self, save, skin_id, diff="normal", ach=None):
         self.save = save
         self.diff = diff
@@ -31079,6 +31614,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
         self.fx = EffectSystem()
         self.evo_init()
         self.extras_init()
+        self.relics_init()
         self.events_init()
         self.waves = WaveManager(diff)
         # Düşmanlar dünyanın kenarından değil, kameranın hemen dışından gelir.
@@ -31549,8 +32085,12 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
         """Harita (yalnız arenada) + yemin çarpanlarını dalga yöneticisine yazar."""
         arena = self.biome != "hell"
         ev = WAVE_EVENTS[self.wave_event][2] if getattr(self, "wave_event", None) else {}
-        self.waves.enemy_speed_mult = (self.theme_speed if arena else 1.0) * self.oath_speed * ev.get("speed", 1.0)
-        self.waves.spawn_rate_mult = (self.theme_spawn if arena else 1.0) * self.oath_spawn * ev.get("spawn", 1.0)
+        gm = self.grave_mult() if hasattr(self, "grave_mult") else 1.0
+        self.waves.grave_mult = gm      # mezarlıklar: can / hasar / hız / doğum / kalabalık
+        self.waves.enemy_speed_mult = ((self.theme_speed if arena else 1.0) * self.oath_speed * ev.get("speed", 1.0)
+                                       * gm)
+        self.waves.spawn_rate_mult = ((self.theme_spawn if arena else 1.0) * self.oath_spawn * ev.get("spawn", 1.0)
+                                      * gm)
         self.waves.theme = self.map_theme if arena else "stone"
         self.waves.doom = self.map_theme != "stone"
 
@@ -31888,6 +32428,8 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
         self.hell_portal = None
         self.market_portal = None
         self.enemies.clear()
+        self.army = []
+        self.relics_clear()
         self.bosses = []
         self.hazards.clear()
         self.enemy_projectiles.clear()
@@ -32165,6 +32707,9 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
         # şans: sandık bir nadirlik kademesi çeker; silah kademe çarpanı kadar
         # kalıcı hasar kazanır.
         tier = roll_rarity(p.eff_luck())
+        ft = getattr(chest, "force_tier", None)
+        if ft is not None:
+            tier = max(tier, int(ft))       # meydan taşının epik sandığı
         gained = p.add_weapon_boost(key, rarity_boost(tier))
         extra = False
         if (tier >= RARITY_COUNT - 1 and LEGEND_CHEST_EXTRA_LEVEL
@@ -34307,6 +34852,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
         # ---- gezgin tüccar (koşu boyunca haritada) ----
         self.update_merchant(dt, input_state, portal_used)
         self.update_roulette(dt, input_state, portal_used)
+        self.relics_update(dt, input_state, portal_used)
 
         self._skill_tick(dt)
         self.combo.update(dt)
@@ -37839,6 +38385,14 @@ def draw_minimap(surf, run, t, big=False):
         pygame.draw.rect(surf, INK, (int(px) - 5, int(py) - 5, 11, 11))
         pygame.draw.rect(surf, _f.color(), (int(px) - 4 + int(pulse), int(py) - 4 + int(pulse),
                                              9 - 2 * int(pulse), 9 - 2 * int(pulse)))
+    # meydan taşı (kürsü bilerek haritada görünmez: bulunmalı)
+    _rs = getattr(run, "rally", None)
+    if _rs is not None and not _rs.done:
+        px, py = mp(_rs.x, _rs.y)
+        pulse = 0.5 + 0.5 * math.sin(t * 4)
+        rc_ = (255, 80, 60) if _rs.used else RALLY_COLOR
+        pygame.draw.rect(surf, INK, (int(px) - 5, int(py) - 6, 10, 12))
+        pygame.draw.rect(surf, rc_, (int(px) - 4, int(py) - 5 + int(pulse), 8, 10 - int(pulse)))
     # güç sunağı
     _psh = getattr(run, "shrine", None)
     if _psh is not None and not _psh.used:
@@ -39550,7 +40104,7 @@ def _draw_enemies_fast(world, ens, t):
     for e in sorted(ens, key=_enemy_y):
         if (e.spawn_t < 0.3 or e.phased or e.rage > 0 or e.mutant or e.kind == "kamikaze"
                 or e.__dict__.get("voidling") or e.__dict__.get("_freeze_t", 0.0) > 0
-                or e.__dict__.get("_stun_t", 0.0) > 0):
+                or e.__dict__.get("_stun_t", 0.0) > 0 or e.__dict__.get("army")):
             if batch:
                 _fast_blits(world, batch)
                 batch = []
@@ -43798,6 +44352,7 @@ STATE_LEVELUP = "levelup"
 STATE_CURSE = "curse"           # lanetli sandık teklif ekranı
 STATE_MERCHANT = "merchant"     # tüccarın mağarası (yemin)
 STATE_ROULETTE = "roulette"     # rulet masası
+STATE_LECTERN = "lectern"       # kürsü (kitap satın alma)
 STATE_MAP_SELECT = "map_select" # oyna -> harita seçimi
 STATE_RUN_SHOP = "run_shop"
 STATE_GAMEOVER = "gameover"
@@ -51815,7 +52370,7 @@ _coop_static_tables()
 
 
 RUN_OVERLAY_STATES = (STATE_PAUSE, STATE_LEVELUP, STATE_CURSE, STATE_MERCHANT, STATE_RUN_SHOP,
-                      STATE_ROULETTE)
+                      STATE_ROULETTE, STATE_LECTERN)
 
 
 
@@ -52811,6 +53366,7 @@ _rp_h = VIRTUAL_H - 68
 REPLAY_VIEW = pygame.Rect((VIRTUAL_W - VIRTUAL_W * _rp_h // VIRTUAL_H) // 2, 34, VIRTUAL_W * _rp_h // VIRTUAL_H, _rp_h)
 # bu ekranlarda tekrar bellekte kalır, başka yere geçince silinir
 REPLAY_KEEP_STATES = frozenset((STATE_PLAY, STATE_PAUSE, STATE_LEVELUP, STATE_CURSE, STATE_MERCHANT, STATE_ROULETTE,
+                                STATE_LECTERN,
                                 STATE_RUN_SHOP, STATE_GAMEOVER, STATE_NAME_ENTRY, "coop_pause", "coop_end"))
 try:
     from collections import deque as _rp_deque
@@ -54129,6 +54685,7 @@ class App:
             elif self.state == STATE_CURSE: self.update_curse(dt, mouse_pos, clicked)
             elif self.state == STATE_MERCHANT: self.update_merchant(dt, mouse_pos, clicked)
             elif self.state == STATE_ROULETTE: self.update_roulette(dt, mouse_pos, clicked)
+            elif self.state == STATE_LECTERN: self.update_lectern(dt, mouse_pos, clicked)
             elif self.state == STATE_MAP_SELECT: self.update_map_select(dt, mouse_pos, clicked)
             elif self.state == STATE_RUN_SHOP: self.update_run_shop(dt, mouse_pos, clicked)
             elif self.state == STATE_GAMEOVER: self.update_gameover(dt, mouse_pos, clicked)
@@ -54369,6 +54926,8 @@ class App:
             self.run.choose_oath(None)
             self.state = STATE_PLAY
         elif self.state == STATE_PAUSE: self.resume_run()
+        elif self.state == STATE_LECTERN:
+            self._close_lectern()
         elif self.state == STATE_ROULETTE:
             # çark dönerken kaçılmaz; sonuç ekranı ya da seçim ekranı kapanır
             ru = getattr(self, "roul_ui", None) or {}
@@ -54575,6 +55134,9 @@ class App:
         if self.state == STATE_PLAY and getattr(self.run, "roulette_open", False) and not self.run.game_over:
             self.roul_ui = {"phase": "pick", "t": 0.0}
             self.state = STATE_ROULETTE
+        # kürsü açıldı: kitap seçimi (oyun durur)
+        if self.state == STATE_PLAY and getattr(self.run, "lectern_open", False) and not self.run.game_over:
+            self.state = STATE_LECTERN
 
         if self.run.game_over:
             self.pending_board_rank = -1
@@ -54828,6 +55390,66 @@ class App:
         if clicked and hov:
             self.pause_evo = False
             sfx("click", 0.5, 0.0)
+
+    def _close_lectern(self):
+        run = self.run
+        if run is not None:
+            run.lectern_open = False
+        self.state = STATE_PLAY
+
+    def update_lectern(self, dt, mouse_pos, clicked):
+        """Kürsü: sende olmayan 3 kitap; biri 9.000 altına."""
+        canvas = self.display.canvas
+        run = self.run
+        self._draw_run_frame(canvas)
+        ov = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+        ov.fill((10, 8, 16, 214))
+        canvas.blit(ov, (0, 0))
+        lc = getattr(run, "lectern", None)
+        if lc is None:
+            self._close_lectern()
+            return
+        t = getattr(self, "t", 0.0)
+        cx = VIRTUAL_W // 2
+        col = LECTERN_COLOR
+        draw_text(canvas, L("rel.lect_title"), (cx, 60), 42, col, bold=True, center=True)
+        draw_text(canvas, L("rel.lect_sub", fmt_num(LECTERN_BOOK_COST)), (cx, 104), 17, TEXT, center=True)
+        gold = int(run.gold_wallet)
+        draw_coin_label(canvas, cx, 136, L("rel.lect_gold", fmt_num(gold)), GOLD, 17)
+        p = run.player
+        room = p.normal_book_count() < slot_max(p, "b")
+        keys = [k for k in lc.offers if k in BOOK_BY_KEY]
+        cw, ch, gap = 300, 330, 28
+        x0 = cx - (len(keys) * cw + (len(keys) - 1) * gap) / 2
+        for i, k_ in enumerate(keys):
+            bk = BOOK_BY_KEY[k_]
+            r_ = pygame.Rect(int(x0 + i * (cw + gap)), 170, cw, ch)
+            hov = r_.collidepoint(mouse_pos)
+            bcol = tuple(bk.get("color", col))
+            panel(canvas, r_, bg=(40, 30, 44) if hov else (30, 24, 32), edge=bcol if hov else scale_col(bcol, 0.6),
+                  alpha=245, radius=16, edge_w=3 if hov else 2)
+            add_glow(canvas, r_.centerx, r_.y + 92, 80, bcol, 0.18)
+            draw_book(canvas, r_.centerx, r_.y + 92, 110 if hov else 104, bk, t)
+            nm, nsz = ms_fit(bk_name(bk), 20, cw - 24, True)
+            draw_text(canvas, nm, (r_.centerx, r_.y + 176), nsz, lighten(bcol, 0.25), bold=True, center=True)
+            for j, ln in enumerate(wrap_text(bk_desc(bk), 13, cw - 30)[:4]):
+                draw_text(canvas, ln, (r_.centerx, r_.y + 204 + j * 18), 13, TEXT_DIM, center=True, shadow=False)
+            br = pygame.Rect(r_.x + 24, r_.bottom - 58, cw - 48, 42)
+            ok = room and gold >= LECTERN_BOOK_COST and not lc.used
+            bh = br.collidepoint(mouse_pos)
+            self._mini_button(canvas, br, L("rel.lect_buy", fmt_num(LECTERN_BOOK_COST)), (60, 140, 80),
+                              bh and ok, icon="coin", size=16, enabled=ok)
+            if clicked and bh and ok:
+                if run.lectern_buy(k_):
+                    self._close_lectern()
+                    return
+        if not room:
+            draw_text(canvas, L("rel.lect_full"), (cx, 528), 16, (255, 150, 130), bold=True, center=True)
+        back = Button((cx - 100, 610, 200, 44), L("rel.lect_leave"), self._close_lectern)
+        back.update(mouse_pos, dt)
+        back.draw(canvas)
+        if clicked:
+            back.click(mouse_pos)
 
     def _close_roulette(self):
         run = self.run
@@ -57777,7 +58399,7 @@ class App:
         b2 = pygame.Rect(tx, box.bottom - 30 - 0, 330, 24)
         h1, h2 = b1.collidepoint(mouse_pos), b2.collidepoint(mouse_pos)
         # ---- elmasla (hesap başına yalnız 1 kez) ----
-        b3 = pygame.Rect(tx, box.bottom - 150, 330, 44)
+        b3 = pygame.Rect(tx, box.bottom - 162, 330, 42)
         h3 = b3.collidepoint(mouse_pos)
         used = bool(self.save.data.get("gem_pet_bought"))
         have = int(self.save.get_gems())
