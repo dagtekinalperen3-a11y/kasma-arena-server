@@ -4106,6 +4106,23 @@ def fmt_num(n):
     return f"{n:,}".replace(",", ".")
 
 
+def fmt_short(n):
+    """Dar yerler için kısa sayı: 12.345 / 123,4B / 12,3M / 1,2Mr."""
+    n = int(n)
+    a = abs(n)
+    if a < 100000:
+        return fmt_num(n)
+    for div, suf in ((10 ** 12, "T"), (10 ** 9, "Mr" if lang() == "tr" else "B"),
+                     (10 ** 6, "M"), (10 ** 3, "B" if lang() == "tr" else "K")):
+        if a >= div:
+            v = n / float(div)
+            txt = ("%.1f" % v) if abs(v) < 100 else ("%d" % round(v))
+            if lang() in ("tr", "es", "de", "ru"):
+                txt = txt.replace(".", ",")
+            return txt + suf
+    return fmt_num(n)
+
+
 def scale_col(c, k):
     return (int(clamp(c[0] * k, 0, 255)), int(clamp(c[1] * k, 0, 255)), int(clamp(c[2] * k, 0, 255)))
 
@@ -40396,7 +40413,10 @@ def _draw_hud_top(surf, run, t):
     gl = pygame.Surface((hp_rect.w - 4, hp_rect.h // 2 - 1), pygame.SRCALPHA)
     gl.fill((255, 255, 255, 26))
     surf.blit(gl, (hp_rect.x + 2, hp_rect.y + 2))
-    draw_text(surf, f"{int(p.hp)}/{int(p.max_hp)}", hp_rect.center, 14, WHITE, bold=True, center=True)
+    _hpt = f"{int(p.hp)}/{int(p.max_hp)}"
+    if text_width(_hpt, 14, True) > hp_rect.w - 10:
+        _hpt = f"{fmt_short(p.hp)}/{fmt_short(p.max_hp)}"     # büyük can çubuğa sığsın
+    draw_text(surf, _hpt, hp_rect.center, 14, WHITE, bold=True, center=True)
     draw_icon(surf, hp_rect.x - 12, hp_rect.centery, "heart", RED, 12)
 
     xp_rect = pygame.Rect(18, 40, 248, 10)
@@ -42115,6 +42135,26 @@ def _sparkle(surf, x, y, r, col):
     poly_aa(surf, pts, col)
 
 
+def _lu_row(surf, box, y, lbl, before, after, up_col):
+    """Seviye kartı satırı: etiket solda, "önce → sonra" sağda; sığmazsa önce
+    eski değer düşer, etiket kalan yere kısaltılır (sayıların üstüne binmesin)."""
+    xr = box.right - 10
+    wa = text_width(after, 15, True)
+    wb = (text_width("→", 13) + 5 + text_width(before, 13) + 6) if before is not None else 0
+    room = box.w - 20
+    if before is not None and wa + 6 + wb + 70 > room:
+        before, wb = None, 0
+    draw_text(surf, after, (xr, y - 1), 15, up_col, bold=True, right=True, shadow=False)
+    xr -= wa + 6
+    if before is not None:
+        draw_text(surf, "→", (xr, y), 13, (120, 126, 150), right=True, shadow=False)
+        xr -= text_width("→", 13) + 5
+        draw_text(surf, before, (xr, y), 13, (140, 146, 170), right=True, shadow=False)
+        xr -= text_width(before, 13) + 6
+    draw_text(surf, _fit_text(lbl, 13, max(30, xr - box.x - 14)), (box.x + 10, y), 13, (176, 182, 204),
+              shadow=False)
+
+
 def draw_levelup_card(surf, r2, ch, run, t, hover):
     """Tek bir seviye kartını çizer (tasarımı)."""
     if ch["kind"] == "evo":
@@ -42199,11 +42239,11 @@ def draw_levelup_card(surf, r2, ch, run, t, hover):
     else:
         mx = ch.get("max", BOOK_MAX_LEVEL)
         if ch.get("new"):
-            pill = L("lu.new_book_pill")
+            pill = L("lu.new_book_pill") + ("" if rare_book else "  ·  Lv.1/" + str(mx))
         else:
             pill = L("lu.lvl_up", ch["lvl"] - 1, ch["lvl"])
-        if not rare_book:
-            pill += "  /" + str(mx)
+            if not rare_book:
+                pill += "  /" + str(mx)
     pw_ = text_width(pill, 11, True) + 18
     pr_ = pygame.Rect(0, 0, pw_, 18)
     pr_.center = (r2.centerx, r2.y + 174)
@@ -42222,16 +42262,9 @@ def draw_levelup_card(surf, r2, ch, run, t, hover):
         up_col = lighten(rarity_color(tier_i), 0.15) if tier_i >= 1 else GREEN
         y = box.y + 9
         for lbl, before, after in rows:
-            draw_text(surf, lbl, (box.x + 10, y), 13, (176, 182, 204), shadow=False)
-            xr = box.right - 10
-            draw_text(surf, after, (xr, y - 1), 15, up_col, bold=True, right=True, shadow=False)
-            xr -= text_width(after, 15, True) + 6
             # yeni silahta satırların yanında "YENİ" yazmaz - üstteki "YENİ
             # SİLAH" hapı yeter.
-            if before is not None:
-                draw_text(surf, "→", (xr, y), 13, (120, 126, 150), right=True, shadow=False)
-                xr -= text_width("→", 13) + 5
-                draw_text(surf, before, (xr, y), 13, (140, 146, 170), right=True, shadow=False)
+            _lu_row(surf, box, y, lbl, before, after, up_col)
             y += 27
         b = float(ch.get("boost", 0.0))
         if b > 0:
@@ -42247,13 +42280,7 @@ def draw_levelup_card(surf, r2, ch, run, t, hover):
         up_col = lighten(rarity_color(tier_i), 0.15) if tier_i >= 1 else GREEN
         y = box.y + 9 + (14 if len(rows) == 1 else 0)
         for lbl, before, after in rows:
-            draw_text(surf, lbl, (box.x + 10, y), 13, (176, 182, 204), shadow=False)
-            xr = box.right - 10
-            draw_text(surf, after, (xr, y - 1), 15, up_col, bold=True, right=True, shadow=False)
-            xr -= text_width(after, 15, True) + 6
-            draw_text(surf, "→", (xr, y), 13, (120, 126, 150), right=True, shadow=False)
-            xr -= text_width("→", 13) + 5
-            draw_text(surf, before, (xr, y), 13, (140, 146, 170), right=True, shadow=False)
+            _lu_row(surf, box, y, lbl, before, after, up_col)
             y += 27
         for i, ln in enumerate(wrap_text(ch["desc"], 11, box.w - 18)[:1]):
             draw_text(surf, ln, (box.centerx, box.bottom - 16), 11, (150, 156, 180),
@@ -58054,8 +58081,10 @@ class App:
         # için pentagram); silah dışı kaynaklarda simge.
         top = rows[0][0]
         y = rect.y + 82
-        row_h = 48
         shown = rows[:10]
+        # 10'dan fazla kaynak varsa alttaki "+N" satırına yer kalsın (FPS
+        # göstergesinin altında kalıyordu)
+        row_h = 46 if len(rows) > len(shown) else 48
         medal = {0: GOLD, 1: (200, 206, 220), 2: (205, 140, 90)}
         for i, (v, k) in enumerate(shown):
             name, ic, col = dmg_src_label(k)
@@ -58074,10 +58103,13 @@ class App:
             else:
                 draw_icon(canvas, tile.centerx, tile.centery, ic, col, 10)
             tx = tile.right + 10
-            draw_text(canvas, _fit_text(name, 14, rect.right - tx - 112, bold=True), (tx, y + 1), 14, col,
+            num_txt = fmt_num(int(v))
+            # ad, sayıya yapışmasın: sayının genişliği kadar yer bırakılır
+            name_w = rect.right - 58 - text_width(num_txt, 12) - 10 - tx
+            draw_text(canvas, _fit_text(name, 14, max(40, name_w), bold=True), (tx, y + 1), 14, col,
                       bold=True, shadow=False)
             pct = v / max(1.0, total) * 100.0
-            draw_text(canvas, fmt_num(int(v)), (rect.right - 58, y + 2), 12, TEXT,
+            draw_text(canvas, num_txt, (rect.right - 58, y + 2), 12, TEXT,
                       right=True, shadow=False)
             draw_text(canvas, "%%%d" % round(pct) if lang() == "tr" else "%d%%" % round(pct),
                       (rect.right - 18, y + 2), 12, GOLD if i == 0 else TEXT_DIM,
@@ -58088,7 +58120,7 @@ class App:
         if len(rows) > len(shown):
             rest = sum(v for v, _k in rows[len(shown):])
             draw_text(canvas, "+%d - %s" % (len(rows) - len(shown), fmt_num(int(rest))),
-                      (rect.centerx, rect.bottom - 20), 11, TEXT_DIM, center=True, shadow=False)
+                      (rect.centerx, y + 4), 11, TEXT_DIM, center=True, shadow=False)
         elif rect.bottom - y >= 150:
             # panelin altı boş kalmasın: koşu karnesi + bir sonraki koşu için ipucu
             self._draw_run_card(canvas, r, pygame.Rect(rect.x + 16, y + 6, rect.w - 32,
@@ -59987,8 +60019,8 @@ class App:
         items = []
         for i in range(n):
             rel = (i - car + n / 2.0) % n - n / 2.0
-            if abs(rel) > 3.2:
-                continue
+            if abs(rel) > 2.6:
+                continue        # en dıştakiler ok düğmelerinin altında kalıyordu
             items.append((abs(rel), rel, i))
         items.sort(reverse=True)
         hit_side = None
@@ -62618,12 +62650,12 @@ class App:
                                       row.centery - 6), 10, GREEN, bold=True,
                       shadow=False)
         self._lb_hits.append((row, e, i))
-        draw_coin_label(canvas, row.x + 350, row.centery, fmt_num(e.get("score", 0)),
+        draw_coin_label(canvas, row.x + 340, row.centery, fmt_num(e.get("score", 0)),
                         GOLD if not is_me else (190, 245, 190), 16, icon="star",
                         icon_r=7, gap=5, shadow=False)
         draw_text(canvas, L("ui.lb_wave_n", e.get("wave", "-")),
-                  (row.x + 470, row.centery - 8), 13, (150, 190, 235), shadow=False)
-        _lb_diff_badge(canvas, row.x + 592, row.centery - 7, e.get("diff"))
+                  (row.x + 440, row.centery - 8), 13, (150, 190, 235), shadow=False)
+        _lb_diff_badge(canvas, row.x + 540, row.centery - 7, e.get("diff"))
         draw_text(canvas, L("ui.n_kills", fmt_num(e.get("kills", 0))),
                   (row.right - 14, row.centery - 8), 13, TEXT_DIM, right=True,
                   shadow=False)
@@ -62829,16 +62861,28 @@ class App:
                     self._draw_medal(canvas, cx - 30, my + 8, idx, 11, t)
                     self._lb_hits.append((pygame.Rect(int(cx - slot_w * 0.40), int(my - 34),
                                                       int(slot_w * 0.80), int(pod.bottom - my + 34)), e, idx))
-                    draw_text(canvas, nm, (cx, step.y + 20), 16,
-                              GREEN if is_me else TEXT, bold=True, center=True)
+                    _gl = clean_profile_style(e.get("style"))["glow"]
+                    nm_fit = _fit_text(nm, 16, step.w - 10, bold=True)
+                    if _gl and not is_me:
+                        draw_glow_name(canvas, nm_fit, (cx, step.y + 12), 16, _gl, t, center=True)
+                    else:
+                        draw_text(canvas, nm_fit, (cx, step.y + 20), 16,
+                                  GREEN if is_me else TEXT, bold=True, center=True)
                     draw_coin_label(canvas, cx, step.y + 44, fmt_num(e.get("score", 0)),
                                     col, 19, icon="star", icon_r=8, gap=5)
-                    draw_text(canvas, L("ui.lb_wave_k", e.get("wave", "-"), fmt_num(e.get("kills", 0))),
-                              (cx, step.y + 62), 10, (176, 190, 220), center=True, shadow=False)
+                    _wk = L("ui.lb_wave_k", e.get("wave", "-"), fmt_num(e.get("kills", 0)))
+                    _ws = 10 if text_width(_wk, 10) <= step.w - 10 else 9
+                    draw_text(canvas, _fit_text(_wk, _ws, step.w - 8),
+                              (cx, step.y + 62), _ws, (176, 190, 220), center=True, shadow=False)
                     _lb_diff_badge(canvas, cx, step.y + 76, e.get("diff"))
                     if is_me:
-                        draw_text(canvas, L("ui.you"), (cx, step.y + 92), 11, GREEN,
-                                  bold=True, center=True, shadow=False)
+                        # "SEN": basamağın üst kenarında küçük bir sekme
+                        yt = L("ui.you")
+                        yr = pygame.Rect(0, 0, text_width(yt, 10, True) + 14, 15)
+                        yr.center = (cx, step.y)
+                        pygame.draw.rect(canvas, (24, 70, 44), yr, border_radius=7)
+                        ink_frame(canvas, yr, GREEN, 7, 1)
+                        draw_text(canvas, yt, yr.center, 10, GREEN, bold=True, center=True, shadow=False)
                 pygame.draw.line(canvas, (58, 82, 128), (pod.x, pod.bottom),
                                  (pod.right, pod.bottom), 2)
 
