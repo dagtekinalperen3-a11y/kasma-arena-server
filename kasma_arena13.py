@@ -5380,6 +5380,9 @@ class SaveManager:
         "gems_earned": 0,
         "gems_spent": 0,
         "equipped_cosmetics": {"hat": None, "eyewear": None, "cape": None, "pet": None},
+        # profil kartı süsleri (arka plan / çerçeve / isim parlaması / söz)
+        "profile_owned": [],
+        "profile_style": {"bg": "", "frame": "", "glow": "", "motto": ""},
         # hesabın satın aldığı özel pet'ler [{"id","design",...}] - sunucunun
         # listesidir (oyun buraya kendi başına bir şey eklemez).
         "custom_pets": [],
@@ -5415,6 +5418,7 @@ class SaveManager:
         "tainted", "taint_reasons",
         "board_banned", "ban_reasons",
         "rewards", "gem_pet_bought",
+        "profile_owned", "profile_style",
     )
 
     def __init__(self):
@@ -5635,7 +5639,7 @@ class SaveManager:
                      # anahtarlar / efsanevi sandık
                      "total_keys", "legend_chests",
                      "total_chests", "total_cursed", "best_curse", "total_goblins")
-    MERGE_LISTS = ("skins_owned", "cosmetics_owned", "books_owned", "weapons_owned")
+    MERGE_LISTS = ("skins_owned", "cosmetics_owned", "books_owned", "weapons_owned", "profile_owned")
 
     def import_progress(self, prog):
         """Sunucudan gelen ilerlemeyi uygular - üzerine yazmadan, birleştirerek."""
@@ -5961,6 +5965,34 @@ class SaveManager:
     # ---- kıyafetler (kozmetik: şapka / gözlük / pelerin) ----
     def owns_cosmetic(self, cid):
         return cid in self.data.get("cosmetics_owned", [])
+
+    def buy_profile_item(self, pid):
+        """Profil süsü satın al (elmasla)."""
+        it = PROFILE_ITEMS.get(pid)
+        own = self.data.setdefault("profile_owned", [])
+        if it is None or pid in own or self.get_gems() < it["cost"] or not self.can_spend():
+            return False
+        self.add_gems(-it["cost"])
+        own.append(pid)
+        self.progress_changed()
+        return True
+
+    def set_profile_style(self, kind, val):
+        """Profil süsünü kuşan / çıkar ("" = yok). Söz için val metindir."""
+        st = clean_profile_style(self.data.get("profile_style"))
+        own = set(self.data.get("profile_owned") or [])
+        if kind == "motto":
+            if "motto" not in own:
+                return False
+            st["motto"] = clean_profile_style({"motto": val})["motto"]
+        elif kind in ("bg", "frame", "glow"):
+            if val and val not in own:
+                return False
+            st[kind] = val or ""
+        self.data["profile_style"] = st
+        self.save()
+        self.progress_changed()
+        return True
 
     def buy_cosmetic(self, cid, cost):
         if self.owns_cosmetic(cid) or self.get_gems() < cost or not self.can_spend():
@@ -55063,6 +55095,572 @@ class LuckyWheel:
                   shadow=False)
 
 
+STRINGS.update({
+    "pf.bg_skull": _T("Kurukafa", "Skulls", "Calaveras", "Totenköpfe", "Черепа"),
+    "pf.bg_rainbow": _T("Gökkuşağı", "Rainbow", "Arcoíris", "Regenbogen", "Радуга"),
+    "pf.bg_galaxy": _T("Galaksi", "Galaxy", "Galaxia", "Galaxie", "Галактика"),
+    "pf.bg_inferno": _T("Cehennem Alevi", "Inferno", "Infierno", "Inferno", "Инферно"),
+    "pf.bg_frost": _T("Buzul", "Glacier", "Glaciar", "Gletscher", "Ледник"),
+    "pf.bg_neon": _T("Neon Gece", "Neon Night", "Noche Neón", "Neonnacht", "Неоновая ночь"),
+    "pf.bg_royal": _T("Kraliyet", "Royal", "Real", "Königlich", "Королевский"),
+    "pf.bg_matrix": _T("Kod Yağmuru", "Code Rain", "Lluvia de código", "Code-Regen", "Дождь кода"),
+    "pf.bg_sakura": _T("Sakura", "Sakura", "Sakura", "Sakura", "Сакура"),
+    "pf.bg_storm": _T("Fırtına", "Storm", "Tormenta", "Sturm", "Буря"),
+    "pf.fr_bronze": _T("Bronz Çerçeve", "Bronze Frame", "Marco de Bronce", "Bronzerahmen", "Бронзовая рамка"),
+    "pf.fr_silver": _T("Gümüş Çerçeve", "Silver Frame", "Marco de Plata", "Silberrahmen", "Серебряная рамка"),
+    "pf.fr_gold": _T("Altın Çerçeve", "Gold Frame", "Marco de Oro", "Goldrahmen", "Золотая рамка"),
+    "pf.fr_fire": _T("Ateş Çerçeve", "Fire Frame", "Marco de Fuego", "Feuerrahmen", "Огненная рамка"),
+    "pf.fr_diamond": _T("Elmas Çerçeve", "Diamond Frame", "Marco de Diamante", "Diamantrahmen", "Алмазная рамка"),
+    "pf.fr_rainbow": _T("Gökkuşağı Çerçeve", "Rainbow Frame", "Marco Arcoíris", "Regenbogenrahmen", "Радужная рамка"),
+    "pf.gl_white": _T("Beyaz Parıltı", "White Glow", "Brillo Blanco", "Weißes Leuchten", "Белое сияние"),
+    "pf.gl_gold": _T("Altın Parıltı", "Gold Glow", "Brillo Dorado", "Goldenes Leuchten", "Золотое сияние"),
+    "pf.gl_red": _T("Kızıl Parıltı", "Red Glow", "Brillo Rojo", "Rotes Leuchten", "Красное сияние"),
+    "pf.gl_cyan": _T("Buz Parıltısı", "Ice Glow", "Brillo Helado", "Eisleuchten", "Ледяное сияние"),
+    "pf.gl_purple": _T("Mor Parıltı", "Purple Glow", "Brillo Morado", "Lila Leuchten", "Фиолетовое сияние"),
+    "pf.gl_rainbow": _T("Gökkuşağı İsim", "Rainbow Name", "Nombre Arcoíris", "Regenbogenname", "Радужное имя"),
+    "pf.motto": _T("Söz Hakkı", "Motto", "Lema", "Motto", "Девиз"),
+    "pf.my_profile": _T("PROFİLİM", "MY PROFILE", "MI PERFIL", "MEIN PROFIL", "МОЙ ПРОФИЛЬ"),
+    "pf.friends": _T("ARKADAŞLAR", "FRIENDS", "AMIGOS", "FREUNDE", "ДРУЗЬЯ"),
+    "pf.title": _T("PROFİLİNİ TASARLA", "DESIGN YOUR PROFILE", "DISEÑA TU PERFIL", "GESTALTE DEIN PROFIL", "СОЗДАЙ СВОЙ ПРОФИЛЬ"),
+    "pf.preview_sub": _T("Arkadaşların ve dünya sıralaması seni böyle görür", "This is how friends and the world ranking see you", "Así te ven tus amigos y el ranking", "So sehen dich Freunde und die Rangliste", "Так тебя видят друзья и рейтинг"),
+    "pf.trying": _T("DENEME", "TRYING ON", "PROBANDO", "ANPROBE", "ПРИМЕРКА"),
+    "pf.tab_bg": _T("ARKA PLAN", "BACKGROUND", "FONDO", "HINTERGRUND", "ФОН"),
+    "pf.tab_frame": _T("ÇERÇEVE", "FRAME", "MARCO", "RAHMEN", "РАМКА"),
+    "pf.tab_glow": _T("İSİM PARLAMASI", "NAME GLOW", "BRILLO DE NOMBRE", "NAMENSLEUCHTEN", "СИЯНИЕ ИМЕНИ"),
+    "pf.tab_motto": _T("SÖZ", "MOTTO", "LEMA", "MOTTO", "ДЕВИЗ"),
+    "pf.motto_title": _T("PROFİLİNE BİR SÖZ YAZ", "WRITE YOUR MOTTO", "ESCRIBE TU LEMA", "SCHREIB DEIN MOTTO", "НАПИШИ СВОЙ ДЕВИЗ"),
+    "pf.motto_hint": _T("Kartının altında görünür, en çok {0} harf.", "Shown under your name, up to {0} letters.", "Se ve bajo tu nombre, máx. {0} letras.", "Unter deinem Namen, max. {0} Zeichen.", "Под именем, до {0} символов."),
+    "pf.motto_ph": _T("ör. Cehennemin kralı benim", "e.g. King of hell", "ej. Rey del infierno", "z. B. König der Hölle", "напр. Король ада"),
+    "pf.save": _T("KAYDET", "SAVE", "GUARDAR", "SPEICHERN", "СОХРАНИТЬ"),
+    "pf.buy_motto": _T("SÖZ HAKKINI AL  {0}", "UNLOCK MOTTO  {0}", "DESBLOQUEAR LEMA  {0}", "MOTTO FREISCHALTEN  {0}", "ОТКРЫТЬ ДЕВИЗ  {0}"),
+    "pf.buy": _T("SATIN AL  {0}", "BUY  {0}", "COMPRAR  {0}", "KAUFEN  {0}", "КУПИТЬ  {0}"),
+    "pf.cancel": _T("DENEMEYİ BIRAK", "STOP TRYING", "DEJAR DE PROBAR", "ANPROBE BEENDEN", "ЗАКОНЧИТЬ ПРИМЕРКУ"),
+    "pf.equip": _T("KUŞAN", "EQUIP", "EQUIPAR", "ANLEGEN", "НАДЕТЬ"),
+    "pf.unequip": _T("ÇIKAR", "REMOVE", "QUITAR", "ABLEGEN", "СНЯТЬ"),
+    "pf.owned": _T("sende - kuşanmak için seç", "yours - select to equip", "tuyo - elige para equipar", "deins - zum Anlegen wählen", "твоё - выбери, чтобы надеть"),
+    "pf.tip": _T("Bir parçaya tıkla: almadan önce üstünde nasıl durduğunu gör", "Click an item to try it on before buying", "Haz clic para probarlo antes de comprar", "Klicke zum Anprobieren vor dem Kauf", "Нажми, чтобы примерить до покупки"),
+    "pf.sample": _T("İsim", "Name", "Nombre", "Name", "Имя"),
+})
+
+
+# ---- profil tasarımı ----
+# Oyuncu kendi profil kartını süsler: arka plan, çerçeve, isim parlaması ve
+# altta bir söz. Kart arkadaş ekranında, dünya sıralamasındaki koşu kartında
+# ve sıralama satırlarında herkese görünür. Elmasla alınır (pahalı); almadan
+# önce denenebilir. Kayıtta: profile_owned (liste) + profile_style (sözlük).
+PROFILE_MOTTO_MAX = 40
+PROFILE_ITEMS = {
+    # ---- arka planlar ----
+    "bg_skull":   dict(kind="bg", cost=50000, col=(150, 255, 150)),
+    "bg_rainbow": dict(kind="bg", cost=40000, col=(255, 150, 220)),
+    "bg_galaxy":  dict(kind="bg", cost=35000, col=(170, 140, 255)),
+    "bg_inferno": dict(kind="bg", cost=30000, col=(255, 130, 60)),
+    "bg_frost":   dict(kind="bg", cost=25000, col=(160, 220, 255)),
+    "bg_neon":    dict(kind="bg", cost=30000, col=(255, 90, 220)),
+    "bg_royal":   dict(kind="bg", cost=60000, col=(255, 210, 100)),
+    "bg_matrix":  dict(kind="bg", cost=25000, col=(90, 255, 120)),
+    "bg_sakura":  dict(kind="bg", cost=20000, col=(255, 180, 210)),
+    "bg_storm":   dict(kind="bg", cost=35000, col=(180, 200, 255)),
+    # ---- çerçeveler ----
+    "fr_bronze":  dict(kind="frame", cost=10000, col=(205, 127, 70)),
+    "fr_silver":  dict(kind="frame", cost=20000, col=(210, 220, 235)),
+    "fr_gold":    dict(kind="frame", cost=35000, col=(255, 205, 80)),
+    "fr_fire":    dict(kind="frame", cost=40000, col=(255, 120, 50)),
+    "fr_diamond": dict(kind="frame", cost=50000, col=(150, 240, 255)),
+    "fr_rainbow": dict(kind="frame", cost=75000, col=(255, 140, 220)),
+    # ---- isim parlaması ----
+    "gl_white":   dict(kind="glow", cost=10000, col=(255, 255, 255)),
+    "gl_gold":    dict(kind="glow", cost=15000, col=(255, 205, 80)),
+    "gl_red":     dict(kind="glow", cost=15000, col=(255, 70, 80)),
+    "gl_cyan":    dict(kind="glow", cost=15000, col=(90, 230, 255)),
+    "gl_purple":  dict(kind="glow", cost=20000, col=(190, 110, 255)),
+    "gl_rainbow": dict(kind="glow", cost=40000, col=(255, 150, 220)),
+    # ---- söz ----
+    "motto":      dict(kind="motto", cost=10000, col=(255, 230, 170)),
+}
+PROFILE_KINDS = ("bg", "frame", "glow", "motto")
+
+
+def pf_items(kind):
+    return [k for k, v in PROFILE_ITEMS.items() if v["kind"] == kind]
+
+
+def clean_profile_style(st):
+    """Sunucudan / kayıttan gelen profil biçimi: yalnız bilinen anahtarlar."""
+    out = {"bg": "", "frame": "", "glow": "", "motto": ""}
+    if not isinstance(st, dict):
+        return out
+    for k in ("bg", "frame", "glow"):
+        v = str(st.get(k) or "")
+        if v in PROFILE_ITEMS and PROFILE_ITEMS[v]["kind"] == k:
+            out[k] = v
+    m = "".join(ch for ch in str(st.get("motto") or "") if ch.isprintable())
+    out["motto"] = " ".join(m.split())[:PROFILE_MOTTO_MAX]
+    return out
+
+
+def _hue(h, s=0.85, v=1.0):
+    c = pygame.Color(0)
+    c.hsva = ((h % 1.0) * 360.0, s * 100.0, v * 100.0, 100.0)
+    return (c.r, c.g, c.b)
+
+
+_PF_BASE = {}
+
+
+def _pf_vgrad(w, h, top, bot):
+    s = pygame.Surface((w, h))
+    for y in range(h):
+        k = y / max(1, h - 1)
+        s.fill(mix_col(top, bot, k), (0, y, w, 1))
+    return s
+
+
+def _pf_base(bid, w, h):
+    """Arka planın dönmeyen (önbellekli) kısmı."""
+    key = (bid, w, h)
+    s = _PF_BASE.get(key)
+    if s is not None:
+        return s
+    if len(_PF_BASE) > 60:
+        _PF_BASE.clear()
+    rnd = random.Random(hash(bid) & 0xffff)
+    if bid == "bg_skull":
+        s = _pf_vgrad(w, h, (34, 12, 40), (6, 4, 10))
+        for y in range(-10, h + 30, 34):
+            for x in range(-10 + (y // 34 % 2) * 22, w + 30, 44):
+                draw_icon(s, x, y, "skull", (52, 30, 60), 9)
+    elif bid == "bg_rainbow":
+        s = pygame.Surface((w, h))
+        for x in range(w):
+            s.fill(_hue(x / max(1.0, w) * 1.2, 0.55, 0.62), (x, 0, 1, h))
+    elif bid == "bg_galaxy":
+        s = _pf_vgrad(w, h, (12, 8, 34), (4, 6, 16))
+        for _ in range(5):
+            add_glow(s, rnd.uniform(0, w), rnd.uniform(0, h), rnd.uniform(40, 110),
+                     rnd.choice(((120, 60, 200), (60, 90, 220), (200, 60, 150))), 0.35)
+        for _ in range(int(w * h / 900)):
+            v = rnd.randint(120, 255)
+            s.set_at((rnd.randrange(w), rnd.randrange(h)), (v, v, min(255, v + 20)))
+    elif bid == "bg_inferno":
+        s = _pf_vgrad(w, h, (40, 6, 4), (150, 40, 10))
+    elif bid == "bg_frost":
+        s = _pf_vgrad(w, h, (20, 50, 90), (140, 200, 235))
+        for _ in range(6):
+            x = rnd.uniform(0, w)
+            poly_aa(s, [(x - 30, h), (x, h - rnd.uniform(20, 60)), (x + 30, h)], (225, 240, 255))
+    elif bid == "bg_neon":
+        s = _pf_vgrad(w, h, (20, 6, 40), (90, 20, 90))
+        hz = int(h * 0.55)
+        sun = (int(w * 0.72), hz)
+        for i in range(14):
+            pygame.draw.circle(s, mix_col((255, 220, 90), (255, 60, 160), i / 13.0), sun, int(h * 0.30) - i)
+        for i in range(5):
+            yy = hz - int(h * 0.30 * (i + 1) / 6.0)
+            s.fill(mix_col((20, 6, 40), (90, 20, 90), yy / float(h)), (sun[0] - int(h * 0.3), yy, int(h * 0.6), 2 + i // 2))
+        s.fill((14, 4, 26), (0, hz, w, h - hz))
+    elif bid == "bg_royal":
+        s = _pf_vgrad(w, h, (60, 14, 70), (24, 6, 30))
+        for y in range(0, h + 20, 20):
+            for x in range(0, w + 20, 20):
+                pts = [(x, y - 7), (x + 7, y), (x, y + 7), (x - 7, y)]
+                pygame.draw.polygon(s, (90, 40, 90), pts, 1)
+        for x in range(30, w, 90):
+            draw_icon(s, x, h - 18, "star", (150, 110, 60), 6)
+    elif bid == "bg_matrix":
+        s = _pf_vgrad(w, h, (0, 14, 4), (0, 4, 0))
+    elif bid == "bg_sakura":
+        s = _pf_vgrad(w, h, (255, 214, 230), (190, 110, 160))
+        for _ in range(3):
+            y0 = rnd.uniform(h * 0.3, h)
+            pygame.draw.line(s, (90, 50, 60), (0, y0), (w * rnd.uniform(0.3, 0.6), y0 - 30), 4)
+    elif bid == "bg_storm":
+        s = _pf_vgrad(w, h, (26, 30, 44), (60, 66, 84))
+        for _ in range(9):
+            pygame.draw.ellipse(s, (40, 44, 60), (rnd.uniform(-40, w), rnd.uniform(-20, h * 0.4),
+                                                    rnd.uniform(80, 180), rnd.uniform(30, 60)))
+    else:
+        s = _pf_vgrad(w, h, (40, 30, 44), (20, 16, 24))
+    s = s.convert() if pygame.display.get_surface() is not None else s
+    _PF_BASE[key] = s
+    return s
+
+
+def draw_profile_bg(surf, rect, bid, t):
+    """Profil arka planı (hareketli katmanlarıyla)."""
+    if not bid:
+        pygame.draw.rect(surf, (38, 28, 36), rect)
+        return
+    w, h = max(1, rect.w), max(1, rect.h)
+    prev = surf.get_clip()
+    surf.set_clip(rect.clip(prev) if prev else rect)
+    surf.blit(_pf_base(bid, w, h), rect.topleft)
+    x0, y0 = rect.x, rect.y
+    if bid == "bg_skull":
+        for i in range(4):
+            ph = (t * 0.5 + i * 0.27) % 1.0
+            x = x0 + ((i * 97 + 30) % w)
+            y = y0 + h * (0.25 + 0.5 * ((i * 0.37) % 1.0))
+            k = math.sin(ph * math.pi)
+            add_glow(surf, x, y, 26, (90, 255, 120), 0.35 * k)
+            draw_icon(surf, x, y, "skull", mix_col((80, 50, 90), (200, 255, 200), k), 12)
+    elif bid == "bg_rainbow":
+        sh = int(t * 60) % w
+        surf.blit(_pf_base(bid, w, h), (x0 - sh, y0))
+        surf.blit(_pf_base(bid, w, h), (x0 - sh + w, y0))
+        for i in range(3):
+            add_glow(surf, x0 + ((t * 80 + i * w / 3) % w), y0 + h * 0.5, 40, (255, 255, 255), 0.18)
+    elif bid == "bg_galaxy":
+        for i in range(10):
+            k = 0.5 + 0.5 * math.sin(t * 3 + i * 1.7)
+            circle_aa(surf, x0 + (i * 131) % w, y0 + (i * 53) % h, 1.0 + 1.4 * k, (255, 255, 255))
+    elif bid == "bg_inferno":
+        for i in range(max(3, w // 60)):
+            evo_flame(surf, x0 + (i + 0.5) * w / max(3, w // 60), y0 + h + 4, h * 0.55, 14, t, i * 1.3)
+        for i in range(8):
+            ph = (t * 0.6 + i * 0.13) % 1.0
+            circle_aa(surf, x0 + (i * 71 + math.sin(t + i) * 8) % w, y0 + h - ph * h, 1.6, (255, 200, 120))
+    elif bid == "bg_frost":
+        for i in range(14):
+            ph = (t * 0.12 + i * 0.071) % 1.0
+            x = x0 + (i * 89 + math.sin(t * 0.8 + i) * 10) % w
+            y = y0 + ph * h
+            circle_aa(surf, x, y, 1.6 + (i % 3) * 0.6, (245, 250, 255))
+    elif bid == "bg_neon":
+        hz = y0 + int(h * 0.55)
+        for i in range(-8, 9):
+            pygame.draw.line(surf, (255, 60, 200), (x0 + w / 2 + i * 10, hz), (x0 + w / 2 + i * w * 0.12, y0 + h), 1)
+        for j in range(6):
+            yy = hz + ((j + (t * 0.8) % 1.0) / 6.0) ** 1.8 * (h - (hz - y0))
+            pygame.draw.line(surf, (255, 60, 200), (x0, yy), (x0 + w, yy), 1)
+    elif bid == "bg_royal":
+        sx = x0 + ((t * 0.35) % 1.6 - 0.3) * w
+        sweep = pygame.Surface((60, h), pygame.SRCALPHA)
+        for i in range(60):
+            sweep.fill((255, 230, 160, int(40 * math.sin(i / 59.0 * math.pi))), (i, 0, 1, h))
+        surf.blit(sweep, (int(sx), y0))
+    elif bid == "bg_matrix":
+        for i in range(max(4, w // 16)):
+            sp = 40 + (i * 37) % 60
+            yy = y0 + ((t * sp + i * 53) % (h + 60)) - 30
+            xx = x0 + i * 16 + 4
+            for j in range(5):
+                c = (40, 255 - j * 40, 80) if j else (200, 255, 210)
+                draw_text(surf, "01"[(i + j + int(t * 4)) % 2], (xx, yy - j * 12), 11, c, shadow=False)
+    elif bid == "bg_sakura":
+        for i in range(12):
+            ph = (t * 0.10 + i * 0.083) % 1.0
+            x = x0 + (i * 113 + math.sin(t * 1.4 + i) * 16 + ph * 40) % w
+            y = y0 + ph * h
+            pygame.draw.ellipse(surf, (255, 150, 190), (int(x), int(y), 7, 4))
+    elif bid == "bg_storm":
+        cyc = (t * 0.45) % 1.0
+        if cyc < 0.08:
+            k = 1.0 - cyc / 0.08
+            fl = pygame.Surface((w, h))
+            fl.fill((int(90 * k), int(100 * k), int(130 * k)))
+            surf.blit(fl, rect.topleft, special_flags=pygame.BLEND_RGB_ADD)
+            bx = x0 + w * (0.25 + 0.5 * ((int(t * 0.45) * 0.37) % 1.0))
+            pts = [(bx, y0)]
+            for j in range(5):
+                pts.append((pts[-1][0] + random.uniform(-14, 14), y0 + (j + 1) * h / 5))
+            pygame.draw.lines(surf, (230, 240, 255), False, pts, 2)
+    surf.set_clip(prev)
+
+
+def draw_profile_frame(surf, rect, fid, t, radius=14):
+    """Kartın çerçevesi."""
+    if not fid:
+        return
+    col = PROFILE_ITEMS.get(fid, {}).get("col", (200, 200, 200))
+    if fid == "fr_rainbow":
+        n = 48
+        per = 2 * (rect.w + rect.h)
+        for i in range(n):
+            d0, d1 = per * i / n, per * (i + 1) / n
+
+            def pt(d):
+                if d < rect.w:
+                    return (rect.x + d, rect.y)
+                d -= rect.w
+                if d < rect.h:
+                    return (rect.right, rect.y + d)
+                d -= rect.h
+                if d < rect.w:
+                    return (rect.right - d, rect.bottom)
+                return (rect.x, rect.bottom - (d - rect.w))
+            thick_line(surf, pt(d0), pt(d1), 5, _hue(i / n + t * 0.25))
+        ink_frame(surf, rect.inflate(-8, -8), (255, 255, 255), radius, 1)
+        return
+    if fid == "fr_fire":
+        ink_frame(surf, rect, (255, 120, 40), radius, 4)
+        ink_frame(surf, rect.inflate(-8, -8), (255, 210, 120), radius, 1)
+        for i in range(max(4, rect.w // 34)):
+            evo_flame(surf, rect.x + 14 + i * (rect.w - 28) / max(1, rect.w // 34 - 1), rect.y + 4, 16, 6, t, i)
+        return
+    dark = scale_col(col, 0.45)
+    ink_frame(surf, rect, dark, radius, 6)
+    ink_frame(surf, rect.inflate(-2, -2), col, radius, 3)
+    ink_frame(surf, rect.inflate(-10, -10), lighten(col, 0.4), radius, 1)
+    for cx, cy in ((rect.x + 6, rect.y + 6), (rect.right - 6, rect.y + 6),
+                   (rect.x + 6, rect.bottom - 6), (rect.right - 6, rect.bottom - 6)):
+        pts = [(cx, cy - 7), (cx + 7, cy), (cx, cy + 7), (cx - 7, cy)]
+        poly_aa(surf, pts, OUTLINE)
+        poly_aa(surf, [(x * 0.8 + cx * 0.2, y * 0.8 + cy * 0.2) for x, y in pts],
+                (120, 230, 255) if fid == "fr_diamond" else lighten(col, 0.3))
+    if fid == "fr_diamond":
+        for i in range(4):
+            ph = (t * 0.7 + i * 0.25) % 1.0
+            x = rect.x + ph * rect.w
+            _sparkle(surf, x, rect.y if i % 2 else rect.bottom, 4 + 3 * math.sin(ph * math.pi), (230, 250, 255))
+
+
+def draw_glow_name(surf, text, pos, size, gid, t, center=False, base_col=TEXT):
+    """İsim: varsa arkasında parlama (gökkuşağında harf harf renk)."""
+    text = str(text or "")
+    tw = text_width(text, size, True)
+    x, y = pos
+    if center:
+        x -= tw / 2
+    if gid:
+        col = PROFILE_ITEMS.get(gid, {}).get("col", (255, 255, 255))
+        if gid == "gl_rainbow":
+            col = _hue(t * 0.3)
+        k = 0.8 + 0.2 * math.sin(t * 3.0)
+        n = max(2, int(tw / (size * 0.9)))
+        for i in range(n + 1):
+            add_glow(surf, x + tw * i / n, y + size * 0.62, size * 1.25, col, 0.32 * k)
+    if gid == "gl_rainbow":
+        cx = x
+        for i, ch in enumerate(text):
+            draw_text(surf, ch, (cx, y), size, _hue(i * 0.08 + t * 0.4, 0.6, 1.0), bold=True)
+            cx += text_width(ch, size, True)
+        return
+    col = base_col
+    if gid:
+        col = lighten(PROFILE_ITEMS.get(gid, {}).get("col", base_col), 0.55)
+    draw_text(surf, text, (x, y), size, col, bold=True)
+
+
+def draw_profile_banner(surf, rect, name, style, t, skin_id=None, sub=None, name_size=24):
+    """Profil şeridi: arka plan + skin + parlayan isim + söz + çerçeve."""
+    st = clean_profile_style(style)
+    draw_profile_bg(surf, rect, st["bg"], t)
+    # okunurluk: sola doğru koyulaşan perde
+    shade = _pf_shade(rect.w, rect.h)
+    surf.blit(shade, rect.topleft)
+    x = rect.x + 16
+    if skin_id is not None:
+        sk = get_skin(str(skin_id or "default"))
+        add_glow(surf, rect.x + 44, rect.centery, 44, tuple(sk["color"]), 0.25)
+        try:
+            draw_skin_preview(surf, sk, rect.x + 44, rect.centery, t, r=min(26, rect.h // 3), extras=False)
+        except Exception:
+            pass
+        x = rect.x + 82
+    has_m = bool(st["motto"])
+    lines = (1 if has_m else 0) + (1 if sub else 0)
+    side = None
+    if lines == 2 and rect.h - name_size < 70:
+        # yer dar: alt yazı ismin yanına
+        side, sub = sub, None
+        lines = 1
+    ny = rect.centery - name_size * 0.62 - lines * 9
+    draw_glow_name(surf, name, (x, ny), name_size, st["glow"], t)
+    if side:
+        draw_text(surf, side, (x + text_width(name, name_size, True) + 14, ny + name_size * 0.35), 12,
+                  (200, 205, 225), shadow=False)
+    yy = ny + name_size + 6
+    if has_m:
+        draw_text(surf, "“" + st["motto"] + "”", (x, yy), 13, (255, 236, 200), shadow=True)
+        yy += 18
+    if sub:
+        draw_text(surf, sub, (x, yy), 12, (200, 205, 225), shadow=False)
+    draw_profile_frame(surf, rect, st["frame"], t)
+
+
+_PF_SHADE = {}
+
+
+def _pf_shade(w, h):
+    s = _PF_SHADE.get((w, h))
+    if s is None:
+        s = pygame.Surface((w, h), pygame.SRCALPHA)
+        for x in range(w):
+            a = int(150 * clamp(1.0 - x / max(1.0, w * 0.7), 0.0, 1.0))
+            s.fill((8, 6, 12, a), (x, 0, 1, h))
+        if len(_PF_SHADE) > 20:
+            _PF_SHADE.clear()
+        _PF_SHADE[(w, h)] = s
+    return s
+
+
+def draw_profile_item_tile(surf, rect, pid, t, label=True):
+    """Düzenleyicideki küçük önizleme kutusu."""
+    it = PROFILE_ITEMS[pid]
+    kind = it["kind"]
+    inner = rect.inflate(-8, -8)
+    if kind == "bg":
+        draw_profile_bg(surf, inner, pid, t)
+    else:
+        pygame.draw.rect(surf, (28, 22, 30), inner, border_radius=8)
+        if kind == "frame":
+            draw_profile_frame(surf, inner.inflate(-10, -10), pid, t, 8)
+        elif kind == "glow":
+            draw_glow_name(surf, L("pf.sample"), (inner.centerx, inner.centery - 10), 17, pid, t, center=True)
+        else:
+            draw_text(surf, "“ ... ”", inner.center, 22, it["col"], bold=True, center=True)
+
+
+def _app_draw_profile_editor(self, canvas, dt, mouse_pos, clicked, t):
+    """Arkadaşlar > PROFİLİM: profil kartını tasarla (dene, al, kuşan)."""
+    sv = self.save
+    owned = set(sv.data.get("profile_owned") or [])
+    cur = clean_profile_style(sv.data.get("profile_style"))
+    tryst = dict(cur)
+    tryst.update({k: v for k, v in (getattr(self, "pf_try", None) or {}).items() if k in PROFILE_KINDS})
+    if getattr(self, "fr_focus", "") == "motto" or self.fr_motto != cur["motto"]:
+        tryst["motto"] = self.fr_motto
+    name = self.account.display_name() or self.name_input.strip() or "?"
+    # ---- önizleme ----
+    pv = pygame.Rect(40, 96, VIRTUAL_W - 80, 128)
+    draw_profile_banner(canvas, pv, name, tryst, t, skin_id=sv.equipped_skin_id(),
+                        sub=L("pf.preview_sub"), name_size=30)
+    trying = any(tryst.get(k) and tryst.get(k) != cur.get(k) for k in ("bg", "frame", "glow"))
+    if trying:
+        tg = L("pf.trying")
+        tr = pygame.Rect(0, 0, text_width(tg, 12, True) + 24, 24)
+        tr.topright = (pv.right - 12, pv.y + 10)
+        pygame.draw.rect(canvas, (60, 40, 10), tr, border_radius=12)
+        ink_frame(canvas, tr, GOLD, 12, 1)
+        draw_text(canvas, tg, tr.center, 12, GOLD, bold=True, center=True, shadow=False)
+    # ---- sekmeler ----
+    tabs = (("bg", L("pf.tab_bg"), "star"), ("frame", L("pf.tab_frame"), "shield"),
+            ("glow", L("pf.tab_glow"), "bolt"), ("motto", L("pf.tab_motto"), "mail"))
+    tw_, gap = 230, 12
+    x0 = VIRTUAL_W / 2 - (len(tabs) * tw_ + (len(tabs) - 1) * gap) / 2
+    for i, (key, lab, ic) in enumerate(tabs):
+        r = pygame.Rect(int(x0 + i * (tw_ + gap)), 238, tw_, 40)
+        act = self.pf_tab == key
+        hov = r.collidepoint(mouse_pos)
+        pygame.draw.rect(canvas, (90, 70, 40) if act else ((60, 46, 52) if hov else (40, 30, 36)), r, border_radius=20)
+        ink_frame(canvas, r, GOLD if act else (100, 90, 110), 20, 2 if act else 1)
+        lw = text_width(lab, 15, True)
+        draw_icon(canvas, r.centerx - lw / 2 - 12, r.centery, ic, GOLD if act else TEXT_DIM, 8)
+        draw_text(canvas, lab, (r.centerx + 8, r.centery), 15, WHITE if act else TEXT, bold=True, center=True,
+                  shadow=False)
+        if clicked and hov and not act:
+            self.pf_tab = key
+            self.pf_sel = None
+            self.fr_focus = "motto" if key == "motto" else "add"
+            sfx("click", 0.5, 0.0)
+            clicked = False
+    gems = sv.get_gems()
+    if self.pf_tab == "motto":
+        box = pygame.Rect(VIRTUAL_W / 2 - 380, 300, 760, 250)
+        panel(canvas, box, bg=(34, 26, 32), edge=(150, 130, 90), alpha=244, radius=16, edge_w=2)
+        draw_text(canvas, L("pf.motto_title"), (box.centerx, box.y + 28), 20, GOLD, bold=True, center=True)
+        draw_text(canvas, L("pf.motto_hint", PROFILE_MOTTO_MAX), (box.centerx, box.y + 56), 12, TEXT_DIM,
+                  center=True, shadow=False)
+        ib = pygame.Rect(box.x + 40, box.y + 84, box.w - 80, 46)
+        if "motto" in owned:
+            _fr_input_box(canvas, ib, self.fr_motto, L("pf.motto_ph"), self.fr_focus == "motto", t, "fr_motto",
+                          L("pf.tab_motto"), mouse_pos, clicked)
+            if clicked and ib.collidepoint(mouse_pos):
+                self.fr_focus = "motto"
+            b = pygame.Rect(box.centerx - 150, box.y + 160, 300, 50)
+            hv = b.collidepoint(mouse_pos)
+            changed = clean_profile_style({"motto": self.fr_motto})["motto"] != cur["motto"]
+            self._mini_button(canvas, b, L("pf.save"), (60, 140, 90), hv, enabled=changed, size=18)
+            if clicked and hv and changed:
+                sv.set_profile_style("motto", self.fr_motto)
+                self.fr_motto = sv.data["profile_style"]["motto"]
+                sfx("buy", 0.8, 0.0)
+        else:
+            draw_text(canvas, "“ ... ”", (box.centerx, ib.centery), 30, (120, 110, 100), bold=True,
+                      center=True)
+            cost = PROFILE_ITEMS["motto"]["cost"]
+            b = pygame.Rect(box.centerx - 170, box.y + 160, 340, 50)
+            hv = b.collidepoint(mouse_pos)
+            ok = gems >= cost
+            self._mini_button(canvas, b, L("pf.buy_motto", fmt_num(cost)), (176, 128, 40), hv, enabled=ok,
+                              icon="gem", size=16)
+            if clicked and hv and ok and sv.buy_profile_item("motto"):
+                self.fr_focus = "motto"
+                sfx("buy", 1.0, 0.0)
+        return
+    items = pf_items(self.pf_tab)
+    cols = 5
+    cw, ch, g = 228, 140, 12
+    gx0 = VIRTUAL_W / 2 - (cols * cw + (cols - 1) * g) / 2
+    for i, pid in enumerate(items):
+        r = pygame.Rect(int(gx0 + (i % cols) * (cw + g)), 294 + (i // cols) * (ch + g), cw, ch)
+        it = PROFILE_ITEMS[pid]
+        hov = r.collidepoint(mouse_pos)
+        sel = self.pf_sel == pid
+        eq = cur.get(it["kind"]) == pid
+        has = pid in owned
+        pygame.draw.rect(canvas, (40, 30, 36), r, border_radius=12)
+        tile = pygame.Rect(r.x, r.y, r.w, r.h - 44)
+        draw_profile_item_tile(canvas, tile, pid, t)
+        ink_frame(canvas, r, CYAN if eq else (GOLD if sel else (it["col"] if hov else (80, 70, 90))), 12,
+                  3 if (sel or eq) else 1)
+        draw_text(canvas, _fit_text(L("pf." + pid), 13, r.w - 16, bold=True), (r.centerx, r.bottom - 36), 13,
+                  lighten(it["col"], 0.3), bold=True, center=True, shadow=False)
+        if eq:
+            draw_text(canvas, L("ui.equipped_off"), (r.centerx, r.bottom - 15), 11, CYAN, bold=True, center=True,
+                      shadow=False)
+        elif has:
+            draw_text(canvas, L("pf.owned"), (r.centerx, r.bottom - 15), 11, TEXT_DIM, center=True, shadow=False)
+        else:
+            draw_coin_label(canvas, r.centerx, r.bottom - 15, fmt_num(it["cost"]),
+                            GEM_COLOR if gems >= it["cost"] else (120, 120, 140), 12, icon="gem", icon_r=6)
+        if clicked and hov:
+            # tıkla = dene (almadan önce nasıl duracağını gör)
+            self.pf_sel = pid
+            self.pf_try = dict(getattr(self, "pf_try", None) or {})
+            self.pf_try[it["kind"]] = pid
+            sfx("click", 0.5, 0.0)
+            clicked = False
+    # ---- işlem şeridi ----
+    bar = pygame.Rect(VIRTUAL_W / 2 - 360, 598, 720, 46)
+    pid = self.pf_sel
+    if pid and pid in PROFILE_ITEMS:
+        it = PROFILE_ITEMS[pid]
+        kind = it["kind"]
+        has = pid in owned
+        eq = cur.get(kind) == pid
+        b1 = pygame.Rect(bar.x, bar.y, 350, 46)
+        b2 = pygame.Rect(bar.right - 350, bar.y, 350, 46)
+        h1, h2 = b1.collidepoint(mouse_pos), b2.collidepoint(mouse_pos)
+        if not has:
+            ok = gems >= it["cost"]
+            self._mini_button(canvas, b1, L("pf.buy", fmt_num(it["cost"])), (176, 128, 40), h1, enabled=ok,
+                              icon="gem", size=16)
+            self._mini_button(canvas, b2, L("pf.cancel"), (90, 70, 80), h2, size=16)
+            if clicked and h1 and ok and sv.buy_profile_item(pid):
+                sv.set_profile_style(kind, pid)
+                self.pf_try.pop(kind, None)
+                sfx("buy", 1.0, 0.0)
+            elif clicked and h2:
+                self.pf_try.pop(kind, None)
+                self.pf_sel = None
+        elif eq:
+            self._mini_button(canvas, b1, L("pf.unequip"), (110, 70, 80), h1, size=16)
+            if clicked and h1:
+                sv.set_profile_style(kind, "")
+                self.pf_try.pop(kind, None)
+                self.pf_sel = None
+        else:
+            self._mini_button(canvas, b1, L("pf.equip"), (60, 140, 90), h1, size=16)
+            if clicked and h1:
+                sv.set_profile_style(kind, pid)
+                self.pf_try.pop(kind, None)
+                sfx("click", 0.7, 0.0)
+    else:
+        draw_text(canvas, L("pf.tip"), bar.center, 13, TEXT_DIM, center=True, shadow=False)
+
+
 class App:
     def __init__(self, shadow_of=None):
         # gölge kip: shadow_of verilirse bu App gerçek oyunun yanında çalışan
@@ -61903,8 +62501,12 @@ class App:
                               row.x + 64, row.centery, t + i, r=11, weapon=False)
         except Exception:
             pass
-        draw_text(canvas, nm, (row.x + 92, row.centery - 9), 16,
-                  GREEN if is_me else TEXT, bold=is_me, shadow=False)
+        _gl = clean_profile_style(e.get("style"))["glow"]
+        if _gl and not is_me:
+            draw_glow_name(canvas, nm, (row.x + 92, row.centery - 9), 16, _gl, t)
+        else:
+            draw_text(canvas, nm, (row.x + 92, row.centery - 9), 16,
+                      GREEN if is_me else TEXT, bold=is_me, shadow=False)
         if is_me:
             draw_text(canvas, L("ui.you"), (row.x + 96 + text_width(nm, 16, True),
                                       row.centery - 6), 10, GREEN, bold=True,
@@ -62247,10 +62849,25 @@ class App:
         add_glow(canvas, R.centerx, R.y + 40, 420, col, 0.16)
         panel(canvas, R, bg=(32, 23, 24), edge=col, alpha=250, radius=18, edge_w=3)
         b = e.get("build") if isinstance(e.get("build"), dict) else None
-        # ---- başlık ----
+        # ---- başlık: oyuncunun kendi profil kartı ----
+        pst = clean_profile_style(e.get("style"))
+        hb = pygame.Rect(R.x + 6, R.y + 6, R.w - 12, 72)
+        if pst["bg"]:
+            # arka plan bütün kartı kaplar (içerik panelleri üstünde okunur kalır)
+            inner = R.inflate(-8, -8)
+            draw_profile_bg(canvas, inner, pst["bg"], t)
+            veil = pygame.Surface(inner.size, pygame.SRCALPHA)
+            veil.fill((14, 10, 14, 120))
+            veil.fill((0, 0, 0, 0), (0, 0, inner.w, 74))
+            canvas.blit(veil, inner.topleft)
+            canvas.blit(_pf_shade(hb.w, hb.h), hb.topleft)
         self._draw_medal(canvas, R.x + 44, R.y + 42, rank, 20, t)
         nm = str(e.get("name", "?"))[:14]
-        draw_text(canvas, nm, (R.x + 78, R.y + 18), 28, TEXT, bold=True)
+        draw_glow_name(canvas, nm, (R.x + 78, R.y + 16), 28, pst["glow"], t)
+        if pst["motto"]:
+            draw_text(canvas, "\u201c" + pst["motto"] + "\u201d",
+                      (R.x + 98 + text_width(nm, 28, True), R.y + 26), 13, (255, 236, 200), shadow=True)
+        draw_profile_frame(canvas, hb, pst["frame"], t, 14)
         sub = []
         if b:
             sub.append(L("ui.hell") if b.get("hell") else L("map.%s.name" % b.get("map", "stone")))
@@ -66284,9 +66901,14 @@ def _fr_input_box(canvas, rect, text, hint, focused, t, key, label="", mouse_pos
     touch_text_field(rect, key, text, focused, label=label)
 
 
-def _app_open_friends(self, back=None):
+def _app_open_friends(self, back=None, profile=False):
     self.fr_back = back or (self.state if self.state != STATE_FRIENDS else STATE_MENU)
     self.fr_focus = "add"
+    self.fr_prof = bool(profile)        # True: profil düzenleyici
+    self.pf_tab = "bg"
+    self.pf_try = {}
+    self.pf_sel = None
+    self.fr_motto = clean_profile_style(self.save.data.get("profile_style"))["motto"]
     self.fr_input = getattr(self, "fr_input", "")
     self.fr_chat = getattr(self, "fr_chat", "")
     self.fr_scroll = 0.0
@@ -66300,6 +66922,15 @@ def _app_friends_key(self, event):
     """Arkadaşlar ekranındaki iki metin kutusu (ekle / sohbet)."""
     so = self.social
     foc = getattr(self, "fr_focus", "add")
+    if getattr(self, "fr_prof", False):
+        if foc != "motto":
+            return
+        if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+            if self.save.set_profile_style("motto", self.fr_motto):
+                sfx("buy", 0.8, 0.0)
+            return
+        self.fr_motto, _ = text_edit("fr_motto", self.fr_motto, event, None, PROFILE_MOTTO_MAX)
+        return
     if event.key == pygame.K_TAB:
         self.fr_focus = "chat" if (foc == "add" and so.chat_with) else "add"
         return
@@ -66329,8 +66960,9 @@ def _app_update_friends(self, dt, mouse_pos, clicked, wheel_y=0.0):
     so = self.social
     t = self.t
     cx = VIRTUAL_W / 2
-    draw_text(canvas, L("fr.title"), (cx, 40), 32, GOLD, bold=True, center=True)
-    draw_text(canvas, L("fr.sub"), (cx, 72), 12, TEXT_DIM, center=True, shadow=False)
+    if not getattr(self, "fr_prof", False):
+        draw_text(canvas, L("fr.title"), (cx, 40), 32, GOLD, bold=True, center=True)
+        draw_text(canvas, L("fr.sub"), (cx, 72), 12, TEXT_DIM, center=True, shadow=False)
     btns = []
 
     def _back():
@@ -66338,7 +66970,23 @@ def _app_update_friends(self, dt, mouse_pos, clicked, wheel_y=0.0):
         if self.state == STATE_COOP_LOBBY and self.coop is None:
             self.open_coop()
     btns.append(Button((cx - 130, VIRTUAL_H - 62, 260, 46), L("ui.back"), _back, text_size=18))
-    if not self.account.logged_in() or not so.base:
+    # sol üst: profil düzenleyici <-> arkadaşlar
+    if self.account.logged_in():
+        prof_on = getattr(self, "fr_prof", False)
+
+        def _toggle_prof():
+            self.fr_prof = not getattr(self, "fr_prof", False)
+            self.pf_try, self.pf_sel = {}, None
+            self.fr_focus = "add"
+            self.fr_motto = clean_profile_style(self.save.data.get("profile_style"))["motto"]
+        btns.append(Button((24, 22, 200, 46), L("pf.friends") if prof_on else L("pf.my_profile"), _toggle_prof,
+                           color=(150, 100, 40) if not prof_on else (70, 90, 150),
+                           hover_color=(190, 130, 50) if not prof_on else (95, 120, 190), text_size=16))
+    if getattr(self, "fr_prof", False) and self.account.logged_in():
+        draw_text(canvas, L("pf.title"), (cx, 40), 32, GOLD, bold=True, center=True)
+        # başlık arkadaş başlığının üstüne yazıldı: alttaki alt yazıyı örtmek için şerit
+        self.draw_profile_editor(canvas, dt, mouse_pos, clicked, t)
+    elif not self.account.logged_in() or not so.base:
         pr = pygame.Rect(0, 0, 640, 170)
         pr.center = (cx, 320)
         panel(canvas, pr, alpha=245)
@@ -66466,16 +67114,12 @@ def _app_update_friends(self, dt, mouse_pos, clicked, wheel_y=0.0):
         else:
             prof = so.profile(nm) or {}
             on = bool(f.get("online"))
-            sk = get_skin(str(prof.get("skin") or "default"))
-            add_glow(canvas, RP.x + 52, RP.y + 50, 52, tuple(sk["color"]), 0.25)
-            try:
-                draw_skin_preview(canvas, sk, RP.x + 52, RP.y + 50, t, r=24, extras=False)
-            except Exception:
-                pass
-            draw_text(canvas, nm, (RP.x + 94, RP.y + 18), 24, TEXT, bold=True)
-            circle_aa(canvas, RP.x + 100, RP.y + 64, 5, GREEN if on else (90, 90, 100))
             stt = (L("fr.online") + "  ·  " + social_status_text(f.get("status"))) if on else L("fr.offline")
-            draw_text(canvas, stt, (RP.x + 112, RP.y + 56), 12, GREEN if on else TEXT_DIM, shadow=False)
+            # arkadaşın kendi tasarladığı profil kartı (arka plan, çerçeve, parlama, söz)
+            hb = pygame.Rect(RP.x + 8, RP.y + 8, RP.w - 16, 72)
+            draw_profile_banner(canvas, hb, nm, prof.get("style"), t, skin_id=prof.get("skin") or "default",
+                                sub=stt, name_size=22)
+            circle_aa(canvas, hb.x + 66, hb.y + 14, 5, GREEN if on else (90, 90, 100))
             can_inv = coop_available() and not (self.coop is not None and self.coop.phase == "play")
             btns.append(Button((RP.right - 392, RP.y + 22, 230, 48), L("fr.invite"),
                                (lambda n=nm: so.invite(n)) if can_inv else None, color=(70, 90, 170),
@@ -66704,6 +67348,7 @@ App.open_friends = _app_open_friends
 App._menu_corner_buttons = _app_menu_corner_buttons
 App.handle_friends_key = _app_friends_key
 App.update_friends = _app_update_friends
+App.draw_profile_editor = _app_draw_profile_editor
 App._coop_board = _app_coop_board
 App._coop_board_detail = _app_coop_board_detail
 App._coop_call_panel = _app_coop_call_panel

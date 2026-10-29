@@ -1157,7 +1157,32 @@ GEM_GAIN_CAP_PER_PUSH = 5_000_000
 # sınır oyuncunun elmasını sunucuda eksik gösteriyordu)
 GEM_BURST = 5_000_000
 GEM_RATE_PER_HOUR = 5_000_000
-PROGRESS_LISTS = ("skins_owned", "cosmetics_owned", "books_owned", "weapons_owned")
+PROGRESS_LISTS = ("skins_owned", "cosmetics_owned", "books_owned", "weapons_owned", "profile_owned")
+# profil kartı süsleri (oyundaki PROFILE_ITEMS ile aynı anahtarlar)
+PROFILE_ITEM_KIND = {
+    **{k: "bg" for k in ("bg_skull", "bg_rainbow", "bg_galaxy", "bg_inferno", "bg_frost", "bg_neon",
+                         "bg_royal", "bg_matrix", "bg_sakura", "bg_storm")},
+    **{k: "frame" for k in ("fr_bronze", "fr_silver", "fr_gold", "fr_fire", "fr_diamond", "fr_rainbow")},
+    **{k: "glow" for k in ("gl_white", "gl_gold", "gl_red", "gl_cyan", "gl_purple", "gl_rainbow")},
+    "motto": "motto",
+}
+PROFILE_MOTTO_MAX = 40
+
+
+def _clean_profile_style(st, owned):
+    """Profil biçimi: yalnız sahip olunan süsler, söz kısa ve düz metin."""
+    out = {"bg": "", "frame": "", "glow": "", "motto": ""}
+    if not isinstance(st, dict):
+        return out
+    own = set(owned or [])
+    for k in ("bg", "frame", "glow"):
+        v = str(st.get(k) or "")
+        if v in own and PROFILE_ITEM_KIND.get(v) == k:
+            out[k] = v
+    if "motto" in own:
+        m = _clean_text(st.get("motto"), PROFILE_MOTTO_MAX * 2).replace("\n", " ")
+        out["motto"] = " ".join(m.split())[:PROFILE_MOTTO_MAX]
+    return out
 # gerçek parayla satılan içerik: oyunun gönderdiği listeye yeni eklenmişse
 # kabul edilmez.
 PAID_SKINS = {"web_master", "ash_warrior", "green_titan", "immortal_merc"}
@@ -1330,7 +1355,11 @@ def _merge_progress(old, new, gem_cap=GEM_GAIN_CAP_PER_PUSH):
                 merged.append(v)
         if k == "books_owned":
             merged = [v for v in merged if v not in REMOVED_BOOKS]
+        if k == "profile_owned":
+            merged = [v for v in merged if v in PROFILE_ITEM_KIND]
         out[k] = merged[:400]
+    if isinstance(new.get("profile_style"), dict):
+        out["profile_style"] = _clean_profile_style(new["profile_style"], out.get("profile_owned"))
     for k in ("equipped_skin",):
         if new.get(k):
             out[k] = str(new[k])[:40]
@@ -2220,7 +2249,7 @@ def _rate_ok(key, max_n=RATE_MAX, window=RATE_WINDOW):
 SUBMIT_SIG_FIELDS = ("name", "score", "kills", "wave", "run_time", "created_at", "diff")
 
 SCORE_PUBLIC_FIELDS = ("name", "score", "kills", "wave", "run_time", "diff",
-                       "created_at", "skin", "build")
+                       "created_at", "skin", "build", "style")
 
 # ---- koşu kartı ----
 # Sıralamada bir skora tıklayınca açılan ayrıntı (skin, silahlar, kitaplar,
@@ -2340,11 +2369,23 @@ def get_scores():
         # Bir oyuncu tabloda birden çok kez yer alabilir, her koşu ayrı satır.
         # ?platform=mobile telefon tablosunu verir.
         plat = "mobile" if request.args.get("platform") == "mobile" else "pc"
-        rows = (db(WORLD_TABLE).select("name,score,kills,wave,run_time,diff,created_at,skin,details")
+        rows = (db(WORLD_TABLE).select("name,score,kills,wave,run_time,diff,created_at,skin,details,account_id")
                 .eq("platform", plat).eq("ranked", True)
                 .order("score", desc=True).limit(WORLD_LB_ROWS).execute().data or [])
+        styles = {}
+        ids = sorted({str(r.get("account_id")) for r in rows if r.get("account_id") is not None})
+        if ids:
+            try:
+                for pr in db("player_data").select("account_id,data").in_("account_id", ids).execute().data or []:
+                    d = pr.get("data") if isinstance(pr.get("data"), dict) else {}
+                    styles[str(pr.get("account_id"))] = _clean_profile_style(d.get("profile_style"),
+                                                                             d.get("profile_owned"))
+            except Exception:
+                app.logger.exception("profil biçimleri okunamadı")
         out = []
         for r in rows:
+            r = dict(r)
+            r["style"] = styles.get(str(r.pop("account_id", None)))
             row = dict(r)
             row["build"] = row.pop("details", None)
             row["skin"] = str(row.get("skin") or (row["build"] or {}).get("skin") or "default")[:40]
@@ -4331,6 +4372,7 @@ def social_profile():
            "bosses": _n(st.get("bosses")), "best_combo": _n(st.get("best_combo")),
            "skins": _n(row.get("skin_count")) or len(prog.get("skins_owned") or []),
            "skin": str(prog.get("equipped_skin") or "default")[:40],
+           "style": _clean_profile_style(prog.get("profile_style"), prog.get("profile_owned")),
            "banned": False}
     on, stt = _presence(tid)
     out["online"], out["status"] = on, stt
