@@ -17195,44 +17195,41 @@ class WhipLash:
         if self.life <= 0:
             self.alive = False
 
-    def _band(self, f, n=18):
-        """Şaklamanın orta çizgisi ve kalınlıkları: kabzadan uca açılan, hafif
-        kavisli bir hilal. f: 0..1 savrulma ilerlemesi."""
-        reveal = clamp(f / 0.38, 0.06, 1.0)
+    def _rope(self, f, n=26):
+        """Kırbacın gövdesi: elden uca giden ve uca doğru koşan bir dalga
+        (gerçek kırbaç şaklaması). f: 0..1 savrulma ilerlemesi."""
+        ext = clamp(f / 0.30, 0.0, 1.0)
+        ext = 1 - (1 - ext) ** 3
         ca, sa = math.cos(self.ang), math.sin(self.ang)
         nx, ny = -sa * self.spin, ca * self.spin
-        x0 = self.x + ca * WHIP_GRIP
-        y0 = self.y + sa * WHIP_GRIP - 6
-        L_ = max(10.0, self.length - WHIP_GRIP) * reveal
-        bow = self.hw * 0.55
-        pts, ws = [], []
+        x0 = self.x + ca * 10
+        y0 = self.y + sa * 10 - 8
+        L_ = max(14.0, self.length - 10) * (0.25 + 0.75 * ext)
+        amp = self.hw * 0.95 * (1.0 - 0.75 * f)
+        wave_pos = f * 1.25                       # dalganın kırbaç boyundaki yeri
+        pts = []
         for i in range(n + 1):
             u = i / float(n)
-            along = L_ * u
-            off = -bow * math.sin(math.pi * u) * (1.0 - 0.45 * f)
-            pts.append((x0 + ca * along + nx * off, y0 + sa * along + ny * off))
-            ws.append(self.width * (0.30 + 1.15 * math.sin(math.pi * min(1.0, u * 1.08)) ** 0.8))
-        return pts, ws
+            # elden çıkan yay + uca doğru koşan dalga tümseği
+            bow = math.sin(math.pi * u) * amp * 0.55 * (1.0 - f)
+            bump = math.exp(-((u - wave_pos) / 0.16) ** 2) * amp * 0.9
+            off = bow + bump * math.sin(u * 9.0 - f * 14.0)
+            pts.append((x0 + ca * L_ * u + nx * off, y0 + sa * L_ * u + ny * off))
+        return pts
 
     @staticmethod
-    def _ribbon_w(pts, ws, scale=1.0, off=0.0):
+    def _taper(pts, w0, w1):
         n = len(pts)
         left, right = [], []
         for i, (x, y) in enumerate(pts):
-            if i == 0:
-                ax, ay = pts[1][0] - x, pts[1][1] - y
-            elif i == n - 1:
-                ax, ay = x - pts[n - 2][0], y - pts[n - 2][1]
-            else:
-                ax, ay = pts[i + 1][0] - pts[i - 1][0], pts[i + 1][1] - pts[i - 1][1]
+            j0, j1 = max(0, i - 1), min(n - 1, i + 1)
+            ax, ay = pts[j1][0] - pts[j0][0], pts[j1][1] - pts[j0][1]
             L_ = math.hypot(ax, ay) or 1.0
             ux, uy = -ay / L_, ax / L_
-            hw = ws[i] * 0.5 * scale
-            cx, cy = x + ux * off, y + uy * off
-            left.append((cx + ux * hw, cy + uy * hw))
-            right.append((cx - ux * hw, cy - uy * hw))
-        right.reverse()
-        return left + right
+            hw = (w0 + (w1 - w0) * (i / (n - 1.0)) ** 0.8) * 0.5
+            left.append((x + ux * hw, y + uy * hw))
+            right.append((x - ux * hw, y - uy * hw))
+        return left + right[::-1]
 
     def draw(self, surf, t):
         k = clamp(self.life / self.LIFE, 0.0, 1.0)
@@ -17240,52 +17237,76 @@ class WhipLash:
         ev = self.evo
         gl = gfx_level()
         PA = poly_aa if gl >= 2 else (lambda s_, p_, c_: pygame.draw.polygon(s_, c_, p_))
-        # renkler: deri kırbacın beyaz-krem şaklaması; evrimde mavi-beyaz şimşek
-        body, lite = ((WHIP_LEATHER, WHIP_COLOR2), ((90, 120, 200), (210, 236, 255)),
-                      ((70, 120, 230), (225, 245, 255)), ((60, 150, 255), (245, 252, 255)))[min(ev, 3)]
-        fade = 0.35 + 0.65 * k
-        pts, ws = self._band(f)
-        # 1) iz: arkada sönen geniş, soluk hilal
+        # renk: koyu kahve deri, uca doğru açılan; evrimde mavi-beyaz enerji
+        leather = ((96, 58, 34), (78, 92, 150), (66, 104, 200), (80, 140, 240))[min(ev, 3)]
+        shine = ((236, 196, 140), (190, 220, 255), (210, 236, 255), (240, 250, 255))[min(ev, 3)]
+        glow = ((255, 210, 140), (150, 200, 255), (140, 200, 255), (170, 220, 255))[min(ev, 3)]
+        w = self.width * 0.62
+        pts = self._rope(f)
+        # 1) savrulma izi: önceki iki anın soluk gövdesi (hareket bulanıklığı)
         if gl:
-            PA(surf, self._ribbon_w(pts, ws, 1.9), scale_col(body, 0.28 * fade))
-        # 2) asıl şaklama: kontur, gövde, parlak çekirdek
-        PA(surf, self._ribbon_w(pts, ws, 1.25), scale_col(OUTLINE, 1.0))
-        PA(surf, self._ribbon_w(pts, ws, 1.0), scale_col(body, 0.55 + 0.45 * fade))
-        PA(surf, self._ribbon_w(pts, ws, 0.55, off=-ws[len(ws) // 2] * 0.12), scale_col(lite, 0.6 + 0.4 * fade))
-        PA(surf, self._ribbon_w(pts, ws, 0.22, off=-ws[len(ws) // 2] * 0.18), mix_col(lite, WHITE, 0.6))
-        # 3) kabza
-        hx = self.x + math.cos(self.ang) * 6
-        hy = self.y + math.sin(self.ang) * 6 - 6
-        thick_line(surf, (hx, hy), pts[0], 7.0, OUTLINE)
-        thick_line(surf, (hx, hy), pts[0], 4.4, scale_col(WHIP_LEATHER, 0.55))
-        # 4) uçta şaklama parlaması
+            for gi, df in ((2, 0.16), (1, 0.08)):
+                if f - df > 0.02:
+                    gp = self._rope(f - df, 18)
+                    PA(surf, self._taper(gp, w * 1.6, 1.0), scale_col(glow, 0.16 + 0.10 * (2 - gi)))
+        # 2) asıl kırbaç: kontur, deri, örgü, parlak sırt
+        PA(surf, self._taper(pts, w + 4.0, 2.4), OUTLINE)
+        PA(surf, self._taper(pts, w, 1.2), leather)
+        PA(surf, self._taper(pts, w * 0.45, 0.6), lighten(leather, 0.25))
+        n_ = len(pts)
+        for i in range(2, n_ - 4, 2):
+            hw = (w + (1.2 - w) * (i / (n_ - 1.0)) ** 0.8) * 0.5
+            if hw < 1.2:
+                break
+            ax, ay = pts[i + 1][0] - pts[i - 1][0], pts[i + 1][1] - pts[i - 1][1]
+            L_ = math.hypot(ax, ay) or 1.0
+            ux, uy = ax / L_, ay / L_
+            px_, py_ = -uy, ux
+            cx_, cy_ = pts[i]
+            thick_line(surf, (cx_ + px_ * hw - ux * hw * 0.7, cy_ + py_ * hw - uy * hw * 0.7),
+                       (cx_ - px_ * hw + ux * hw * 0.7, cy_ - py_ * hw + uy * hw * 0.7),
+                       max(1.0, hw * 0.4), scale_col(leather, 0.55))
+        # sırttaki ışık çizgisi
+        hl = [(x, y - 1.2) for x, y in pts[1:-3]]
+        if len(hl) > 1:
+            pygame.draw.lines(surf, scale_col(shine, 0.5 + 0.5 * k), False, [(int(x), int(y)) for x, y in hl], 1)
+        # 3) sap: elde deri sargılı kısa kabza
+        hx, hy = pts[0]
+        bx_ = hx - math.cos(self.ang) * 14
+        by_ = hy - math.sin(self.ang) * 14
+        thick_line(surf, (bx_, by_), (hx, hy), 9, OUTLINE)
+        thick_line(surf, (bx_, by_), (hx, hy), 6, (70, 42, 26))
+        leather_wrap(surf, (bx_, by_), (hx, hy), 5.5, n=3, base=(110, 70, 44))
+        circle_aa(surf, bx_, by_, 4.2, OUTLINE)
+        circle_aa(surf, bx_, by_, 3.0, (210, 170, 90))
+        # 4) uç ve şaklama: dalga uca varınca parlak patlama + halka
         tip = pts[-1]
-        add_glow(surf, tip[0], tip[1], 12 + 16 * f + 8 * ev, lite, 0.25 + 0.35 * k)
-        if f > 0.3:
-            crack = clamp((f - 0.3) / 0.7, 0.0, 1.0)
-            for i in range(3 + 2 * min(ev, 2)):
-                a = self.ang + random.uniform(-1.2, 1.2)
-                ln = random.uniform(6, 22) * crack
-                thick_line(surf, tip, (tip[0] + math.cos(a) * ln, tip[1] + math.sin(a) * ln), 1.5, lite)
-        # 5) evrim: elektrik
-        if ev == 1:
-            # ejder kırbacı: çok hafif kıvılcımlar
-            if random.random() < 0.6:
-                i = random.randrange(2, len(pts) - 1)
-                a = random.uniform(0, math.tau)
-                px_, py_ = pts[i]
-                evo_zap(surf, px_, py_, px_ + math.cos(a) * 12, py_ + math.sin(a) * 12, lite, 2, 3, 1)
-        elif ev >= 2:
-            step = 3 if (evo_rich() and ev >= 3) else 4
-            for i in range(0, len(pts) - step, step):
+        crack = clamp((f - 0.45) / 0.25, 0.0, 1.0) * clamp((1.0 - f) / 0.35, 0.0, 1.0)
+        thick_line(surf, pts[-2], tip, 2.0, shine)
+        if crack > 0:
+            add_glow(surf, tip[0], tip[1], 20 + 34 * crack + 10 * ev, glow, 0.55 * crack + 0.1)
+            ring_aa(surf, tip[0], tip[1], 6 + 26 * (1 - crack) + 10 * f, scale_col(shine, 0.5 + 0.5 * crack), 2)
+            for i in range(6):
+                a = i * math.tau / 6 + self.seed
+                ln = (10 + 14 * crack) * (1.0 if i % 2 else 0.6)
+                thick_line(surf, (tip[0] + math.cos(a) * 4, tip[1] + math.sin(a) * 4),
+                           (tip[0] + math.cos(a) * ln, tip[1] + math.sin(a) * ln), 2.0, shine)
+        # 5) evrim: deri boyunca elektrik ve uçtan sıçrayan şimşekler
+        if ev >= 1:
+            step = 5 if ev == 1 else 3
+            for i in range(0, n_ - step, step):
+                if ev == 1 and random.random() < 0.6:
+                    continue
                 evo_zap(surf, pts[i][0], pts[i][1], pts[i + step][0], pts[i + step][1],
-                        scale_col(lite, 0.7 + 0.3 * k), 3, 6 + 3 * (ev - 2), 2)
-            for i in range(2 + 2 * (ev - 2)):
-                a = random.uniform(0, math.tau)
-                evo_zap(surf, tip[0], tip[1], tip[0] + math.cos(a) * (24 + 14 * (ev - 2)),
-                        tip[1] + math.sin(a) * (24 + 14 * (ev - 2)), lite, 3, 6, 1)
+                        scale_col(glow, 0.7 + 0.3 * k), 3, 4 + 2 * ev, 1 if ev < 3 else 2)
+            if ev >= 2 and crack > 0:
+                for i in range(2 + ev):
+                    a = random.uniform(0, math.tau)
+                    ln = 22 + 12 * ev
+                    evo_zap(surf, tip[0], tip[1], tip[0] + math.cos(a) * ln, tip[1] + math.sin(a) * ln,
+                            shine, 3, 6, 1)
             if ev >= 3:
-                add_glow(surf, pts[len(pts) // 2][0], pts[len(pts) // 2][1], 60, (120, 190, 255), 0.35 * k)
+                add_glow(surf, pts[n_ // 2][0], pts[n_ // 2][1], 70, glow, 0.25 * k)
 
 
 class SwordSlash:
@@ -17715,6 +17736,8 @@ METEOR_EVO_CD = (6.0, 6.0, 1.0, 1.05)    # II-III: bekleme (saniye) - gök hiç 
 METEOR_DOOM_R = 1.35            # III: alan büyür
 METEOR_DOOM_GAP = 0.15          # III: göktaşları arası (biri düşünce öteki hemen)
 METEOR_STUN = 0.9               # II-III: taşın altında kalanın sersemleme süresi
+METEOR_KEEP_LVL = 25            # bu seviyede yerde hep METEOR_KEEP alev olur
+METEOR_KEEP = 4
 
 
 def meteor_count(lvl):
@@ -19406,7 +19429,7 @@ BOSS_WEAPONS = [
     # * mesafe kısa başlıyor ama her seviyede daha çok uzuyor,
     # * tek-atma freninden geçiyor: hiçbir seviyede tankı tek atamaz.
     dict(key="whip", name="KIRBAÇ", icon="dash", color=WHIP_COLOR,
-         cd=1.25, dmg=2.75, style=None, dpl=0.055,
+         cd=1.25, dmg=2.75, style=None, dpl=0.055, cdl=0.99075,     # 25. seviyede 1 sn
          up="erişimi uzar, yayı genişler ve daha sert savurur, birkaç "
             "seviyede bir yenisi eklenir",
          desc="Baktığın yana yatay şaklar ve önündeki her şeye vurur. Seviyeyle "
@@ -19528,7 +19551,7 @@ BOSS_WEAPONS = [
          unlock=dict(text="Kızıl Çöl'de 10. dalgaya ulaş", tkey="wu.meteor",
                      reqs=[dict(rq_ach("gunes_yakici", "«Güneş Yakıcı» başarımını aç (Kızıl Çöl'de 10. dalgaya ulaş)"), tkey="wq.gunes_yakici")])),
     dict(key="beam", name="GÜNEŞ IŞINI", icon="star", color=BEAM_COLOR,
-         cd=4.5, dmg=3.0, style=None, dpl=0.045,
+         cd=4.5, dmg=3.0, style=None, dpl=0.045, cdl=0.9125,       # 25. seviyede 0,5 sn
          up="ışın uzar ve daha sık döner, 9. ve 20. seviyede bir ışın daha",
          desc="Çevrende tam tur dönen bir güneş ışını: değdiği her yaratığı bir "
               "kez yakar. 9. seviyede iki, 20. seviyede üç ışın döner.",
@@ -19753,10 +19776,8 @@ WHIP_BAND = 24.0                # yatay şaklamanın yarı genişliği (1. sv)
 WHIP_BAND_PER = 0.75            # whip_growth puanı başına
 WHIP_DRAGON_MAX = 10            # III: bir savruluşta elektrik sarılan en çok yaratık
 WHIP_DRAGON_TOUGH = 3.0         # III: patron / elit / mor yaratığa vuruş katı
-# evrimli kırbacın bekleme çarpanı (I seri, II-III neredeyse beklemesiz);
-# Tempo Kitabı'nın her seviyesi ayrıca hızlandırır.
-WHIP_EVO_CD = (1.0, 0.55, 0.26, 0.22)
-WHIP_TEMPO_K = 0.05
+# kırbaç 25. seviyede saniyede 1 savrulur; hızı Tempo Kitabı belirler.
+WHIP_TEMPO_K = 0.08             # kırbaç hızı Tempo Kitabı'na bağlı: seviye başına +%8
 
 
 def whip_band(lvl):
@@ -19765,12 +19786,7 @@ def whip_band(lvl):
 
 def evo_cd_mult(p, key):
     """Evrimin silah bekleme süresine etkisi."""
-    if key == "whip":
-        ev = evo_tier(p, "whip")
-        if ev:
-            tempo = int(p.books.get("r_aspd", 0) or 0)
-            return WHIP_EVO_CD[min(3, ev)] / (1.0 + WHIP_TEMPO_K * tempo)
-    elif key == "zemzem":
+    if key == "zemzem":
         ev = evo_tier(p, "zemzem")
         if ev >= 2:
             return ZZ_EVO_CD[min(3, ev)]
@@ -20579,6 +20595,27 @@ def arena_hp_mult(wave):
     return 1.0 + (w - 1) * 0.22 + 0.004 * (min(w, 25) - 1) ** 2
 
 
+def late_speed_mult(tw):
+    """20. dalgadan sonra yaratıklar belirgin hızlanır; 25'ten sonra her dalga
+    bir öncekinden daha hızlı (tavan x2,3)."""
+    tw = int(tw)
+    m = 1.0 + 0.05 * clamp(tw - 20, 0, 5)
+    if tw > 25:
+        m += 0.035 * (tw - 25) ** 1.2
+    return min(2.3, m)
+
+
+def late_hp_mult(tw):
+    """25. dalgadan sonra her dalga yaratık canı artarak büyür."""
+    tw = int(tw)
+    return 1.0 + (0.045 * (tw - 25) ** 1.2 if tw > 25 else 0.0)
+
+
+def enemy_kb_mult(tw):
+    """Yaratık güçlendikçe geri itilmez: 6. dalgaya kadar tam, 20'den sonra hiç."""
+    return clamp(1.0 - (int(tw) - 6) / 14.0, 0.0, 1.0)
+
+
 def wave_speed_mult(wave):
     """Yeni başlayanlar ilk dalgalarda telaşlanmasın diye düşman hızını kısar"""
     if wave <= 7:
@@ -20677,6 +20714,15 @@ class Enemy:
         self.contact_dps = (d["contact_dps"] * dmg_mult * diff_mult * dmg_var
                             * pr_dmg * ENEMY_DMG_TUNE)
         # arı: "hızlıca koşsun ama hasarı 3 3 3 3 3 olsun".
+        # geç dalgalar: 20'den sonra hızlanır, 25'ten sonra her dalga daha
+        # hızlı ve daha canlı (cehennemde toplam dalgaya bakılır)
+        _tw = int(wave) + (HELL_WAVE_OFFSET if biome == "hell" else 0)
+        self.speed *= late_speed_mult(_tw)
+        _hk = late_hp_mult(_tw)
+        self.max_hp *= _hk
+        self.hp = self.max_hp
+        # güçlendikçe geri itilmez: 6. dalgadan sonra azalır, 20'de hiç itilmez
+        self.kb_mult = enemy_kb_mult(_tw)
         if kind == "stinger":
             self.speed = min(self.speed, BASE_SPEED * STINGER_SPEED_CAP)
             self.dmg = min(self.dmg, d["dmg"] * STINGER_DMG_CAP)
@@ -20889,8 +20935,9 @@ class Enemy:
         # göremez. Oldukları yerde kalır, ateş etmez, dokunarak hasar vermez.
         if getattr(player, "invis_t", 0.0) > 0:
             if abs(self.knock_x) > 0.5 or abs(self.knock_y) > 0.5:
-                self.x += self.knock_x * dt
-                self.y += self.knock_y * dt
+                _kb = self.__dict__.get("kb_mult", 1.0)
+                self.x += self.knock_x * dt * _kb
+                self.y += self.knock_y * dt * _kb
                 self.knock_x *= max(0.0, 1 - dt * 8)
                 self.knock_y *= max(0.0, 1 - dt * 8)
                 self.x = clamp(self.x, ARENA_RECT.left + self.radius,
@@ -20931,9 +20978,10 @@ class Enemy:
                 self.face_y /= fl
         self.walk += dt * (2.0 + eff_speed * 0.030)
 
-        if abs(self.knock_x) > 0.5 or abs(self.knock_y) > 0.5:
-            self.x += self.knock_x * dt
-            self.y += self.knock_y * dt
+        _kb = self.__dict__.get("kb_mult", 1.0)
+        if (abs(self.knock_x) > 0.5 or abs(self.knock_y) > 0.5) and _kb > 0.02:
+            self.x += self.knock_x * dt * _kb
+            self.y += self.knock_y * dt * _kb
             self.knock_x *= max(0.0, 1 - dt * 8)
             self.knock_y *= max(0.0, 1 - dt * 8)
         elif self.dash_t > 0:
@@ -30501,11 +30549,11 @@ STRINGS.update({
                               "azota en serie; más rápido con cada nivel del Libro del Ritmo",
                               "schlägt in Serie; schneller mit jeder Tempo-Stufe",
                               "бьёт сериями; быстрее с каждым уровнем Книги Темпа"),
-    "evo.perk.whip_storm": _T("elektrik belirginleşir, beklemeden tık tık tık savurur",
-                              "crackling with lightning, lashes nonstop",
-                              "crepita con rayos y azota sin parar",
-                              "knistert vor Blitzen, peitscht pausenlos",
-                              "трещит молниями, хлещет без остановки"),
+    "evo.perk.whip_storm": _T("elektrik belirginleşir, şaklamadan şimşek sıçrar",
+                              "crackling with lightning, sparks leap from every crack",
+                              "crepita con rayos; cada chasquido lanza chispas",
+                              "knistert vor Blitzen, jeder Knall sprüht Funken",
+                              "трещит молниями, каждый щелчок мечет искры"),
     "evo.perk.whip_dragon": _T("her savuruşta baktığın yöndeki yaratıkları elektrik sarar ve öldürür",
                                "every lash wraps enemies in front of you in lightning and kills them",
                                "cada latigazo envuelve en rayos a los enemigos de delante",
@@ -33136,11 +33184,59 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMix
                 out.append(b)
         return out
 
+    def _meteor_keep(self):
+        """Meteor 25. seviye: yerde hep METEOR_KEEP alev olsun - biri sönünce
+        hemen yenisi düşer."""
+        p = self.player
+        lvl = p.weapons.get("meteor", 0)
+        flames = [fr for fr in self.fire_rings if fr.alive and getattr(fr, "_wsrc", None) == "meteor"]
+        incoming = [m for m in self.meteors if m.alive and m.boom_t < 0]
+        # sönmek üzere olan alevin yerine yenisi şimdiden düşmeye başlar:
+        # tam o sönerken iner, yerde boşluk kalmaz
+        lasting = [fr for fr in flames if fr.hold or fr.life > METEOR_DELAY - 0.02]
+        need = METEOR_KEEP - len(lasting) - len(incoming)
+        if need <= 0:
+            return
+        w = WEAPON_BY_KEY["meteor"]
+        DMG_SRC[0] = "meteor"
+        dmg = weapon_damage(p, w, lvl)
+        rad = meteor_radius(lvl) * (METEOR_DOOM_R if evo_tier(p, "meteor") >= 3 else 1.15)
+        vis = self.cam_rect().inflate(-60, -60)
+        taken = [(fr.x, fr.y) for fr in flames] + [(m.x, m.y) for m in incoming]
+        pool = [e for e in self._all_targets() if e.alive and vis.collidepoint(e.x, e.y)]
+        random.shuffle(pool)
+        before = self._weapon_object_counts()
+        for _ in range(need):
+            spot = None
+            for e in pool:
+                if all(dist(e.x, e.y, x, y) > rad * 1.2 for (x, y) in taken):
+                    spot = (e.x, e.y)
+                    break
+            if spot is None:
+                for _t in range(20):
+                    x = random.uniform(vis.left, vis.right)
+                    y = random.uniform(vis.top, vis.bottom)
+                    if all(dist(x, y, ox, oy) > rad * 1.2 for (ox, oy) in taken):
+                        spot = (x, y)
+                        break
+            if spot is None:
+                spot = (p.x + random.uniform(-250, 250), p.y + random.uniform(-180, 180))
+            taken.append(spot)
+            self.meteors.append(MeteorStrike(spot[0], spot[1], rad, dmg, lvl, METEOR_DELAY))
+        self._tag_weapon_objects("meteor", before)
+        sfx("blaze", 0.30, 0.05)
+
     def update_boss_weapons(self, dt):
         """Sandıktan çıkan silahları otomatik ateşler."""
         p = self.player
         if not p.weapons or not p.alive:
             return
+        if p.weapons.get("meteor", 0) >= METEOR_KEEP_LVL:
+            # 25. seviye meteor kendi düzeniyle düşer (yerde hep 4 alev)
+            p.weapon_timers["meteor"] = 999.0
+            self._meteor_keep()
+        elif p.weapon_timers.get("meteor", 0.0) > 100.0:
+            p.weapon_timers["meteor"] = 0.0
         targets = None
         for key in list(p.weapons.keys()):
             w = WEAPON_BY_KEY.get(key)
@@ -33165,6 +33261,12 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMix
             self._tag_weapon_objects(key, before)
             p.weapon_timers[key] = (weapon_cooldown(w, lvl) / (1.0 + p.weapon_speed_bonus)
                                     * (evo_cd_mult(p, key) if EVO_ON else 1.0))
+            if key == "whip":
+                # kırbacın atma hızı Tempo Kitabı'na bağlı (evrimden bağımsız)
+                p.weapon_timers[key] /= 1.0 + WHIP_TEMPO_K * int(p.books.get("r_aspd", 0) or 0)
+            elif key == "zemzem":
+                # zemzem: önceki su kapandığı gibi yenisi dökülür
+                p.weapon_timers[key] = ZEMZEM_LIFE + 0.05
             if key == "meteor" and EVO_ON:
                 mev = evo_tier(p, "meteor")
                 if mev >= 2:
