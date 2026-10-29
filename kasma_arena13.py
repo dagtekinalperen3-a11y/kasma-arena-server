@@ -2945,11 +2945,11 @@ STRINGS.update({
                         "Un anillo de aviso marca a la multitud y cae un meteoro: todo en el área recibe daño y el suelo arde un momento. Un meteoro más en los niveles 7, 14 y 21 (hasta 4).",
                         "Ein Warnring markiert die Menge, dann schlägt ein Meteor ein: alles im Bereich wird getroffen, der Boden brennt kurz. Ein weiterer Meteor auf Stufe 7, 14 und 21 (bis 4).",
                         "Кольцо-предупреждение отмечает толпу, затем падает метеор: всё в области получает урон, земля недолго горит. Ещё один метеор на 7, 14 и 21 уровнях (до 4)."),
-    "w.meteor.up": _T("göktaşı alanı büyür, daha sık düşer, birkaç seviyede bir fazladan göktaşı",
-                      "the impact area grows and meteors fall more often - an extra meteor every few levels",
-                      "el área de impacto crece y caen más seguido - un meteoro extra cada pocos niveles",
-                      "Einschlagsfläche wächst, Meteore fallen öfter - alle paar Stufen ein zusätzlicher",
-                      "область удара растёт, метеоры падают чаще — каждые несколько уровней ещё один"),
+    "w.meteor.up": _T("göktaşı alanı büyür ve daha sert vurur, birkaç seviyede bir fazladan göktaşı",
+                      "the impact area grows and hits harder - an extra meteor every few levels",
+                      "el área de impacto crece y golpea más fuerte - un meteoro extra cada pocos niveles",
+                      "Einschlagsfläche wächst und trifft härter - alle paar Stufen ein zusätzlicher",
+                      "область удара растёт и бьёт сильнее — каждые несколько уровней ещё один"),
     "w.meteor.how": _T("Gökyüzünü kızdır: 14. dalgaya ulaş ve toplam 3.000 yaratık öldür.",
                        "Anger the sky: reach wave 14 and kill 3,000 creatures in total.",
                        "Enfurece al cielo: llega a la oleada 14 y mata 3.000 criaturas en total.",
@@ -17764,12 +17764,12 @@ def tesla_targets(lvl):
 METEOR_DELAY = 0.75             # uyarı halkasından düşüşe kadar geçen süre
 METEOR_BASE_R = 72.0
 METEOR_R_PER = 2.6
-METEOR_EVO_CD = (6.0, 6.0, 1.0, 1.05)    # II-III: bekleme (saniye) - gök hiç dinmez
 METEOR_DOOM_R = 1.35            # III: alan büyür
 METEOR_DOOM_GAP = 0.15          # III: göktaşları arası (biri düşünce öteki hemen)
 METEOR_STUN = 0.9               # II-III: taşın altında kalanın sersemleme süresi
-METEOR_KEEP_LVL = 25            # bu seviyede yerde hep METEOR_KEEP alev olur
-METEOR_KEEP = 4
+METEOR_CD = 3.0                 # göktaşının iki düşüşü arası (sn)
+ZEMZEM_CD = 4.0                 # zemzemin iki dökülüşü arası (sn)
+METEOR_FIRE_LIFE = 2.0          # düştüğü yerde alevin yanma süresi (sn)
 
 
 def meteor_count(lvl):
@@ -18414,16 +18414,16 @@ class MeteorStrike:
         ev = evo_of(self)
         if ev <= 0:
             fr_ = FireRing(self.x, self.y, self.radius * 0.75, self.dmg * 0.22,
-                           1.5, burn=self.dmg * 0.10, lvl=self.lvl)
+                           METEOR_FIRE_LIFE, burn=self.dmg * 0.10, lvl=self.lvl)
             fr_._wsrc = "meteor"
             run.fire_rings.append(fr_)
         elif ev == 1:
             # alevli yağmur: düştüğü yerde 2 sn sönmeyen alev
-            run.drop_fire(self.x, self.y, self.radius * 0.8, self.dmg * 0.30, 2.0, "meteor",
+            run.drop_fire(self.x, self.y, self.radius * 0.8, self.dmg * 0.30, METEOR_FIRE_LIFE, "meteor",
                           style="fire", burn=self.dmg * 0.12, lvl=self.lvl)
         else:
-            # sağanak / kıyamet: krater açar, düşen taş sersemletir, alev 4 sn
-            run.drop_fire(self.x, self.y, self.radius * 0.85, self.dmg * 0.32, 4.0, "meteor",
+            # sağanak / kıyamet: krater açar, düşen taş sersemletir
+            run.drop_fire(self.x, self.y, self.radius * 0.85, self.dmg * 0.32, METEOR_FIRE_LIFE, "meteor",
                           style="crater" if ev == 2 else "doom", burn=self.dmg * 0.12,
                           lvl=self.lvl, stun=METEOR_STUN)
         run.fx.shockwave(self.x, self.y, self.radius * 1.15, METEOR_COLOR, 0.4, 6)
@@ -19471,7 +19471,7 @@ BOSS_WEAPONS = [
          unlock=dict(text="Yakın dövüşe alış: toplam 40 dash at",
                      reqs=[rq_stat("total_dashes", 40, "Toplam 40 dash at")])),
     dict(key="zemzem", name="ZEMZEM", icon="drop", color=ZEMZEM_COLOR,
-         cd=10.0, dmg=2.2, style=None, dpl=0.055, cdl=1.0,
+         cd=ZEMZEM_CD, dmg=2.2, style=None, dpl=0.055, cdl=1.0,   # hep 4 sn
          up="su birikintisi genişler ve daha çok eritir",
          desc="Yere su döker: içine giren yavaşlar ve erir. 6. seviyede iki, "
               "13'te üç, 20'de dört ayrı yere döker.",
@@ -19574,8 +19574,8 @@ BOSS_WEAPONS = [
          unlock=dict(text="Buzul Vadisi'nde 12. dalgaya ulaş", tkey="wu.tesla",
                      reqs=[dict(rq_ach("donmus_simsek", "«Donmuş Şimşek» başarımını aç (Buzul Vadisi'nde 12. dalgaya ulaş)"), tkey="wq.donmus_simsek")])),
     dict(key="meteor", name="METEOR YAĞMURU", icon="flame", color=METEOR_COLOR,
-         cd=6.0, dmg=5.6, style=None, dpl=0.055, cdl=0.986,
-         up="göktaşı alanı büyür, daha sık düşer, birkaç seviyede bir fazladan göktaşı",
+         cd=METEOR_CD, dmg=5.6, style=None, dpl=0.055, cdl=1.0,   # hep 3 sn
+         up="göktaşı alanı büyür ve daha sert vurur, birkaç seviyede bir fazladan göktaşı",
          desc="Kalabalığın üstüne uyarı halkası düşer, ardından göktaşı çakılır: "
               "alandaki her şey hasar alır ve zemin kısa süre yanar. 7., 14. ve "
               "21. seviyelerde bir göktaşı daha (en çok 4).",
@@ -19739,7 +19739,6 @@ ZEMZEM_BASE_R = 94.0
 ZEMZEM_R_PER_LEVEL = 3.2        # 25. seviyede ~171 px
 ZEMZEM_LIFE = 3.0               # su birikintisinin yerde kalma süresi (sn)
 ZEMZEM_THROW = 240.0            # suyun oyuncudan atıldığı mesafe
-ZZ_EVO_CD = (1.0, 1.0, 0.6, 0.55)   # zemzem II-III: daha sık döker
 
 # ---- baran'IN papucu ----
 # 1) başlangıç alanı büyüdü (38 -> 55 px) ve seviye başına artış yükseldi,
@@ -19818,10 +19817,6 @@ def whip_band(lvl):
 
 def evo_cd_mult(p, key):
     """Evrimin silah bekleme süresine etkisi."""
-    if key == "zemzem":
-        ev = evo_tier(p, "zemzem")
-        if ev >= 2:
-            return ZZ_EVO_CD[min(3, ev)]
     return 1.0
 
 
@@ -30653,11 +30648,11 @@ STRINGS.update({
                            "aura curativa: +10 de vida por segundo dentro",
                            "grüne Heilaura: +10 LP pro Sekunde darin",
                            "зелёная аура: +10 здоровья в секунду внутри"),
-    "evo.perk.zz_flood": _T("5-6 birikinti, daha sık ve büyük; içindekiler %15 fazla hasar alır",
-                            "5-6 pools, more often and bigger; enemies inside take 15% more damage",
-                            "5-6 charcos más frecuentes y grandes; +15% de daño a los de dentro",
-                            "5-6 Pfützen, öfter und größer; +15% Schaden darin",
-                            "5-6 луж чаще и больше; враги внутри получают +15%"),
+    "evo.perk.zz_flood": _T("5-6 birikinti, daha büyük; içindekiler %15 fazla hasar alır",
+                            "5-6 pools, bigger; enemies inside take 15% more damage",
+                            "5-6 charcos más grandes; +15% de daño a los de dentro",
+                            "5-6 Pfützen, größer; +15% Schaden darin",
+                            "5-6 луж побольше; враги внутри получают +15%"),
     "evo.perk.zz_bless": _T("biri hep üstüne dökülür: içinde büyük can yenilenmesi ve hasar artışı",
                             "one always lands on you: big regen and damage boost inside",
                             "uno siempre cae sobre ti: gran regeneración y más daño",
@@ -30677,11 +30672,11 @@ STRINGS.update({
     "evo.perk.met_flame": _T("düştüğü yerde 2 sn yanan alev bırakır", "leaves fire burning for 2s where it lands",
                              "deja fuego 2 s donde cae", "hinterlässt 2 s Feuer am Einschlag",
                              "оставляет огонь на 2 с"),
-    "evo.perk.met_storm": _T("göktaşı hiç dinmez; krater açar, sersemletir, alev 4 sn",
-                             "meteors never stop; craters, stuns, 4s fire",
-                             "los meteoros no paran; cráteres, aturden, fuego 4 s",
-                             "Meteore hören nie auf; Krater, Betäubung, 4 s Feuer",
-                             "метеоры не прекращаются; кратеры, оглушение, огонь 4 с"),
+    "evo.perk.met_storm": _T("göktaşı krater açar ve sersemletir, alev 2 sn",
+                             "meteors leave craters and stun, 2s fire",
+                             "los meteoros dejan cráteres y aturden, fuego 2 s",
+                             "Meteore hinterlassen Krater und betäuben, 2 s Feuer",
+                             "метеоры оставляют кратеры и оглушают, огонь 2 с"),
     "evo.perk.met_doom": _T("6-7 zincirli göktaşı ardı ardına haritaya yağar, alanı büyük",
                             "6-7 chained meteors rain down one after another, bigger area",
                             "6-7 meteoros encadenados caen uno tras otro",
@@ -33216,58 +33211,12 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMix
                 out.append(b)
         return out
 
-    def _meteor_keep(self):
-        """Meteor 25. seviye: yerde hep METEOR_KEEP alev olsun - biri sönünce
-        hemen yenisi düşer."""
-        p = self.player
-        lvl = p.weapons.get("meteor", 0)
-        flames = [fr for fr in self.fire_rings if fr.alive and getattr(fr, "_wsrc", None) == "meteor"]
-        incoming = [m for m in self.meteors if m.alive and m.boom_t < 0]
-        # sönmek üzere olan alevin yerine yenisi şimdiden düşmeye başlar:
-        # tam o sönerken iner, yerde boşluk kalmaz
-        lasting = [fr for fr in flames if fr.hold or fr.life > METEOR_DELAY - 0.02]
-        need = METEOR_KEEP - len(lasting) - len(incoming)
-        if need <= 0:
-            return
-        w = WEAPON_BY_KEY["meteor"]
-        DMG_SRC[0] = "meteor"
-        dmg = weapon_damage(p, w, lvl)
-        rad = meteor_radius(lvl) * (METEOR_DOOM_R if evo_tier(p, "meteor") >= 3 else 1.15)
-        vis = self.cam_rect().inflate(-60, -60)
-        taken = [(fr.x, fr.y) for fr in flames] + [(m.x, m.y) for m in incoming]
-        pool = [e for e in self._all_targets() if e.alive and vis.collidepoint(e.x, e.y)]
-        random.shuffle(pool)
-        before = self._weapon_object_counts()
-        for _ in range(need):
-            spot = None
-            for e in pool:
-                if all(dist(e.x, e.y, x, y) > rad * 1.2 for (x, y) in taken):
-                    spot = (e.x, e.y)
-                    break
-            if spot is None:
-                for _t in range(20):
-                    x = random.uniform(vis.left, vis.right)
-                    y = random.uniform(vis.top, vis.bottom)
-                    if all(dist(x, y, ox, oy) > rad * 1.2 for (ox, oy) in taken):
-                        spot = (x, y)
-                        break
-            if spot is None:
-                spot = (p.x + random.uniform(-250, 250), p.y + random.uniform(-180, 180))
-            taken.append(spot)
-            self.meteors.append(MeteorStrike(spot[0], spot[1], rad, dmg, lvl, METEOR_DELAY))
-        self._tag_weapon_objects("meteor", before)
-        sfx("blaze", 0.30, 0.05)
-
     def update_boss_weapons(self, dt):
         """Sandıktan çıkan silahları otomatik ateşler."""
         p = self.player
         if not p.weapons or not p.alive:
             return
-        if p.weapons.get("meteor", 0) >= METEOR_KEEP_LVL:
-            # 25. seviye meteor kendi düzeniyle düşer (yerde hep 4 alev)
-            p.weapon_timers["meteor"] = 999.0
-            self._meteor_keep()
-        elif p.weapon_timers.get("meteor", 0.0) > 100.0:
+        if p.weapon_timers.get("meteor", 0.0) > 100.0:
             p.weapon_timers["meteor"] = 0.0
         targets = None
         for key in list(p.weapons.keys()):
@@ -33297,13 +33246,11 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMix
                 # kırbacın atma hızı Tempo Kitabı'na bağlı (evrimden bağımsız)
                 p.weapon_timers[key] /= 1.0 + WHIP_TEMPO_K * int(p.books.get("r_aspd", 0) or 0)
             elif key == "zemzem":
-                # zemzem: önceki su kapandığı gibi yenisi dökülür
-                p.weapon_timers[key] = ZEMZEM_LIFE + 0.05
-            if key == "meteor" and EVO_ON:
-                mev = evo_tier(p, "meteor")
-                if mev >= 2:
-                    # sağanak / kıyamet: gökten taş hiç dinmez
-                    p.weapon_timers[key] = min(p.weapon_timers[key], METEOR_EVO_CD[mev])
+                # zemzem her seviyede ve evrimde 4 saniyede bir dökülür
+                p.weapon_timers[key] = ZEMZEM_CD
+            elif key == "meteor":
+                # göktaşı her seviyede ve evrimde 3 saniyede bir düşer
+                p.weapon_timers[key] = METEOR_CD
 
     def _weapon_hit(self, e, dmg, kb=90, crit=None, wlvl=None):
         """Silah vuruşunun ortak kapısı: kritik, infaz, kan emme, ölüm."""
@@ -34009,7 +33956,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMix
                 rad *= 1.3
             if zev >= 3:
                 # hayat kaynağı: biri hep tam üstüne dökülür
-                self.water_zones.append(WaterZone(p.x, p.y, rad * 1.05, dmg, ZEMZEM_LIFE + 1.0, lvl=lvl))
+                self.water_zones.append(WaterZone(p.x, p.y, rad * 1.05, dmg, ZEMZEM_LIFE, lvl=lvl))
                 self.fx.burst(p.x, p.y, (200, 255, 210), n=18, speed=220, life=0.5, r=3.0)
                 self.fx.shockwave(p.x, p.y, rad, (90, 236, 130), 0.4, 5)
             # su yalnızca ekranda görünen yere dökülür.
