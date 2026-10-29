@@ -1591,6 +1591,69 @@ STRINGS = {
     "oath.hawkeye.up": _T('{} kritik, {} kritik hasarı', '{} crit, {} crit damage', '{} crítico, {} daño crítico', '{} Krit, {} Kritschaden', '{} крита, {} крит. урона'),
     "oath.hawkeye.down": _T("-%10 saldırı hızı", "-10% attack speed", "-10% vel. de ataque",
                             "-10% Angriffstempo", "-10% скорости атаки"),
+    "oath.weaponsmith.name": _T("SİLAH USTASI", "WEAPONSMITH", "MAESTRO ARMERO", "WAFFENSCHMIED", "ОРУЖЕЙНИК"),
+    "oath.weaponsmith.up": _T("Bütün silahların {} seviye", "All your weapons {} levels", "Todas tus armas {} niveles", "Alle Waffen {} Stufen", "Всё оружие {} уровней"),
+    "oath.weaponsmith.down": _T("-%10 maks can", "-10% max HP", "-10% de vida máx.", "-10% max. LP", "-10% макс. здоровья"),
+    "oath.bookworm.name": _T("KİTAP KURDU", "BOOKWORM", "RATÓN DE BIBLIOTECA", "BÜCHERWURM", "КНИЖНЫЙ ЧЕРВЬ"),
+    "oath.bookworm.up": _T("Bütün kitapların {} seviye", "All your books {} levels", "Todos tus libros {} niveles", "Alle Bücher {} Stufen", "Все книги {} уровней"),
+    "oath.bookworm.down": _T("-%10 altın", "-10% gold", "-10% de oro", "-10% Gold", "-10% золота"),
+    "oath.second_chance.name": _T("İKİNCİ ŞANS", "SECOND CHANCE", "SEGUNDA OPORTUNIDAD", "ZWEITE CHANCE", "ВТОРОЙ ШАНС"),
+    "oath.second_chance.up": _T("Ölümcül darbeyi engelleyen kalkan, {} sn'de bir dolar", "A shield blocks the killing blow, refills every {}s", "Escudo contra el golpe mortal, cada {} s", "Ein Schild blockt den Todesstoß, alle {} s neu", "Щит от смертельного удара, раз в {} с"),
+    "oath.second_chance.down": _T("-%10 hasar", "-10% damage", "-10% de daño", "-10% Schaden", "-10% урона"),
+    "oath.stormcaller.name": _T("FIRTINA ÇAĞIRAN", "STORMCALLER", "INVOCATORMENTAS", "STURMRUFER", "ПРИЗЫВАТЕЛЬ БУРИ"),
+    "oath.stormcaller.up": _T("Gökten yıldırım yağar: fırtına {}", "Lightning rains down: storm {}", "Llueven rayos: tormenta {}", "Blitze regnen: Sturm {}", "С неба бьют молнии: буря {}"),
+    "oath.stormcaller.down": _T("-%5 hareket hızı", "-5% move speed", "-5% de velocidad", "-5% Tempo", "-5% скорости"),
+    "oath.pyromancer.name": _T("ATEŞ RUHU", "PYROMANCER", "PIROMANTE", "PYROMANT", "ПИРОМАНТ"),
+    "oath.pyromancer.up": _T("Mermilerin yakar: ateş {}", "Your shots burn: fire {}", "Tus disparos queman: fuego {}", "Deine Schüsse brennen: Feuer {}", "Выстрелы поджигают: огонь {}"),
+    "oath.pyromancer.down": _T("-%5 maks can", "-5% max HP", "-5% de vida máx.", "-5% max. LP", "-5% макс. здоровья"),
+    "oath.frostheart.name": _T("BUZ KALBİ", "FROSTHEART", "CORAZÓN GÉLIDO", "FROSTHERZ", "ЛЕДЯНОЕ СЕРДЦЕ"),
+    "oath.frostheart.up": _T("Buz mermisi {}, buz kırığı {}", "Ice shot {}, shatter {}", "Disparo helado {}, quiebre {}", "Eisschuss {}, Splitter {}", "Ледяной выстрел {}, раскол {}"),
+    "oath.frostheart.down": _T("-%5 saldırı hızı", "-5% attack speed", "-5% vel. de ataque", "-5% Angriffstempo", "-5% скорости атаки"),
+    "oath.venom.name": _T("ZEHİR USTASI", "VENOM MASTER", "MAESTRO DEL VENENO", "GIFTMEISTER", "МАСТЕР ЯДА"),
+    "oath.venom.up": _T("Zehirli mermi {}, zehir gücü {}", "Poison shot {}, poison power {}", "Disparo venenoso {}, veneno {}", "Giftschuss {}, Giftstärke {}", "Ядовитый выстрел {}, сила яда {}"),
+    "oath.venom.down": _T("-%5 altın", "-5% gold", "-5% de oro", "-5% Gold", "-5% золота"),
+    "oath.thornmail.name": _T("DİKEN ZIRHI", "THORNMAIL", "MALLA DE ESPINAS", "DORNENPANZER", "ШИПОВАННАЯ БРОНЯ"),
+    "oath.thornmail.up": _T("Sana vuran yanar: diken {}, {} zırh", "Attackers get hurt: thorns {}, {} armor", "Quien te golpea sufre: espinas {}, {} armadura", "Angreifer leiden: Dornen {}, {} Rüstung", "Атакующие ранятся: шипы {}, {} брони"),
+    "oath.thornmail.down": _T("-%5 hareket hızı", "-5% move speed", "-5% de velocidad", "-5% Tempo", "-5% скорости"),
+    "oath.chainshot.name": _T("ZİNCİRLEME", "CHAIN SHOT", "DISPARO EN CADENA", "KETTENSCHUSS", "ЦЕПНОЙ ВЫСТРЕЛ"),
+    "oath.chainshot.up": _T("Mermiler yaratıktan yaratığa sıçrar: zincir {}", "Shots jump between monsters: chain {}", "Los disparos saltan entre monstruos: cadena {}", "Schüsse springen weiter: Kette {}", "Выстрелы перескакивают: цепь {}"),
+    "oath.chainshot.down": _T("-%5 hasar", "-5% damage", "-5% de daño", "-5% Schaden", "-5% урона"),
+    "oath.demolisher.name": _T("PATLAYICI", "DEMOLISHER", "DEMOLEDOR", "ZERSTÖRER", "ПОДРЫВНИК"),
+    "oath.demolisher.up": _T("Mermiler patlar: patlama {}", "Shots explode: blast {}", "Los disparos explotan: explosión {}", "Schüsse explodieren: Explosion {}", "Выстрелы взрываются: взрыв {}"),
+    "oath.demolisher.down": _T("-%5 maks can", "-5% max HP", "-5% de vida máx.", "-5% max. LP", "-5% макс. здоровья"),
+    "oath.volley.name": _T("ÇOKLU ATIŞ", "VOLLEY", "ANDANADA", "SALVE", "ЗАЛП"),
+    "oath.volley.up": _T("Her atışta {} mermi", "{} projectiles every shot", "{} proyectiles por disparo", "{} Geschosse pro Schuss", "{} снарядов за выстрел"),
+    "oath.volley.down": _T("-%8 hasar", "-8% damage", "-8% de daño", "-8% Schaden", "-8% урона"),
+    "oath.magnetist.name": _T("MIKNATIS", "MAGNETIST", "MAGNETISTA", "MAGNETIKER", "МАГНИТ"),
+    "oath.magnetist.up": _T("{} toplama alanı, {} tecrübe", "{} pickup range, {} XP", "{} radio de recogida, {} EXP", "{} Sammelradius, {} EP", "{} радиус сбора, {} опыта"),
+    "oath.magnetist.down": _T("-%5 altın", "-5% gold", "-5% de oro", "-5% Gold", "-5% золота"),
+    "oath.diamond.name": _T("ELMAS YEMİNİ", "DIAMOND OATH", "JURAMENTO DE DIAMANTE", "DIAMANTSCHWUR", "АЛМАЗНАЯ КЛЯТВА"),
+    "oath.diamond.up": _T("Koşu sonunda {} elmas", "{} gems at the end of the run", "{} gemas al final", "{} Edelsteine am Ende", "{} алмазов в конце забега"),
+    "oath.diamond.down": _T("Yaratıklar %10 dayanıklı", "Monsters have +10% HP", "Monstruos +10% de vida", "Monster +10% LP", "Монстры +10% здоровья"),
+    "oath.dancer.name": _T("ATILMA USTASI", "BLADE DANCER", "DANZARÍN", "KLINGENTÄNZER", "ТАНЦОР"),
+    "oath.dancer.up": _T("{} atılma beklemesi, {} atılma mesafesi", "{} dash cooldown, {} dash distance", "{} recarga de impulso, {} distancia", "{} Sprint-Abklingzeit, {} Sprintweite", "{} перезарядка рывка, {} дальность"),
+    "oath.dancer.down": _T("-%5 maks can", "-5% max HP", "-5% de vida máx.", "-5% max. LP", "-5% макс. здоровья"),
+    "oath.channeler.name": _T("YETENEK USTASI", "CHANNELER", "CANALIZADOR", "KANALISIERER", "ПРОВОДНИК"),
+    "oath.channeler.up": _T("Özel yetenek beklemesi {}", "Special ability cooldown {}", "Recarga de habilidad {}", "Fähigkeits-Abklingzeit {}", "Перезарядка умения {}"),
+    "oath.channeler.down": _T("-%5 hasar", "-5% damage", "-5% de daño", "-5% Schaden", "-5% урона"),
+    "oath.orbiter.name": _T("YÖRÜNGE", "ORBITER", "ÓRBITA", "UMLAUFBAHN", "ОРБИТА"),
+    "oath.orbiter.up": _T("Çevrende dönen bıçaklar: yörünge {}", "Blades orbit you: orbit {}", "Hojas te orbitan: órbita {}", "Klingen umkreisen dich: Orbit {}", "Клинки кружат вокруг: орбита {}"),
+    "oath.orbiter.down": _T("-%5 saldırı hızı", "-5% attack speed", "-5% vel. de ataque", "-5% Angriffstempo", "-5% скорости атаки"),
+    "oath.bonk_king.name": _T("BONK KRALI", "BONK KING", "REY DEL BONK", "BONK-KÖNIG", "КОРОЛЬ БОНКА"),
+    "oath.bonk_king.up": _T("{} BONK hasarı, {} BONK beklemesi", "{} BONK damage, {} BONK cooldown", "{} daño BONK, {} recarga BONK", "{} BONK-Schaden, {} BONK-Abklingzeit", "{} урона БОНК, {} перезарядки"),
+    "oath.bonk_king.down": _T("-%5 hareket hızı", "-5% move speed", "-5% de velocidad", "-5% Tempo", "-5% скорости"),
+    "oath.frenzy.name": _T("ÇILGINLIK", "FRENZY", "FRENESÍ", "RASEREI", "НЕИСТОВСТВО"),
+    "oath.frenzy.up": _T("Art arda vurdukça hızlanır, güçlenirsin: çılgınlık {}", "Chain kills speed you up: frenzy {}", "Las muertes seguidas te aceleran: frenesí {}", "Kills in Folge beschleunigen: Raserei {}", "Серия убийств ускоряет: неистовство {}"),
+    "oath.frenzy.down": _T("-%5 maks can", "-5% max HP", "-5% de vida máx.", "-5% max. LP", "-5% макс. здоровья"),
+    "oath.apocalypse.name": _T("KIYAMET ANLAŞMASI", "APOCALYPSE PACT", "PACTO APOCALÍPTICO", "APOKALYPSE-PAKT", "ПАКТ АПОКАЛИПСИСА"),
+    "oath.apocalypse.up": _T("Bütün silahların {} seviye, {} hasar", "All weapons {} levels, {} damage", "Todas las armas {} niveles, {} daño", "Alle Waffen {} Stufen, {} Schaden", "Всё оружие {} уровней, {} урона"),
+    "oath.apocalypse.down": _T("-%40 maks can, yaratıklar %20 dayanıklı", "-40% max HP, monsters +20% HP", "-40% vida máx., monstruos +20% vida", "-40% max. LP, Monster +20% LP", "-40% здоровья, монстры +20% здоровья"),
+    "oath.last_breath.name": _T("SON NEFES", "LAST BREATH", "ÚLTIMO ALIENTO", "LETZTER ATEM", "ПОСЛЕДНИЙ ВЗДОХ"),
+    "oath.last_breath.up": _T("Yarı canda dev hasar (öfke {}), can çalma {}", "Huge damage below half HP (rage {}), lifesteal {}", "Daño enorme bajo media vida (furia {}), robo {}", "Halbe LP: Riesenschaden (Wut {}), Raub {}", "Урон при <50% HP (ярость {}), вампиризм {}"),
+    "oath.last_breath.down": _T("Can yenilenmesi yok, -%25 maks can", "No HP regen, -25% max HP", "Sin regeneración, -25% vida máx.", "Keine Regeneration, -25% max. LP", "Нет регенерации, -25% здоровья"),
+    "oath.blood_price.name": _T("KAN BEDELİ", "BLOOD PRICE", "PRECIO DE SANGRE", "BLUTPREIS", "ЦЕНА КРОВИ"),
+    "oath.blood_price.up": _T("Her öldürme can verir ({}), {} hasar", "Every kill heals ({}), {} damage", "Cada muerte cura ({}), {} daño", "Jeder Kill heilt ({}), {} Schaden", "Каждое убийство лечит ({}), {} урона"),
+    "oath.blood_price.down": _T("Aldığın hasar +%35", "+35% damage taken", "+35% de daño recibido", "+35% erlittener Schaden", "+35% получаемого урона"),
     "oath.dark_tag": _T("KÖTÜ YEMİN", "DARK OATH", "JURAMENTO OSCURO", "DUNKLER SCHWUR", "ТЁМНАЯ КЛЯТВА"),
     # ---- yeni yeminler: 5 iyi (bedeli hafif) ----
     "oath.pilgrim.name": _T("HACI", "PILGRIM", "PEREGRINO", "PILGER", "ПАЛОМНИК"),
@@ -32270,10 +32333,11 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMix
     def _roll_merchant_hand(self):
         luck = self.merchant_luck()
         old = {k for k, _t in self.merchant_hand}
-        pool = [k for k, _i, _c in OATHS]
+        pool = [k for k, _i, _c in OATHS if oath_available(self, k)]
         # yenilemede mümkünse eski elin yeminleri gelmesin (gerçekten "yeni")
         fresh = [k for k in pool if k not in old]
-        keys = random.sample(fresh if len(fresh) >= 3 else pool, 3)
+        n = min(MERCHANT_HAND, len(pool))
+        keys = random.sample(fresh if len(fresh) >= n else pool, n)
         self.merchant_hand = [(k, roll_rarity(luck)) for k in keys]
         self.merchant_hand_lvl = int(self.player.level)
 
@@ -32436,7 +32500,110 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMix
         elif key == "death_wish":
             p.run_dmg_mult += v[0]
             self._scale_max_hp(0.50)
+        # ---- mekanik yeminler ----
+        elif key == "weaponsmith":
+            self._oath_weapon_levels(int(v[0]))
+            self._scale_max_hp(0.90)
+        elif key == "bookworm":
+            self._oath_book_levels(int(v[0]))
+            p.run_coin_mult -= 0.10
+        elif key == "second_chance":
+            p.purgatory_level += int(v[1])
+            p.run_dmg_mult -= 0.10
+        elif key == "stormcaller":
+            p.storm_level += int(v[0])
+            p.run_spd_mult -= 0.05
+        elif key == "pyromancer":
+            p.fire_level += int(v[0])
+            self._scale_max_hp(0.95)
+        elif key == "frostheart":
+            p.ice_level += int(v[0])
+            p.shatter_level += int(v[1])
+            p.run_aspd_mult -= 0.05
+        elif key == "venom":
+            p.poison_level += int(v[0])
+            p.poison_mult += v[1]
+            p.run_coin_mult -= 0.05
+        elif key == "thornmail":
+            p.thorns_level += int(v[0])
+            p.run_armor_bonus += v[1]
+            p.run_spd_mult -= 0.05
+        elif key == "chainshot":
+            p.chain_level += int(v[0])
+            p.run_dmg_mult -= 0.05
+        elif key == "demolisher":
+            p.explosive_level += int(v[0])
+            self._scale_max_hp(0.95)
+        elif key == "volley":
+            p.multishot_level += int(v[0])
+            p.run_dmg_mult -= 0.08
+        elif key == "magnetist":
+            p.run_pickup_mult += v[0]
+            p.run_xp_mult += v[1]
+            p.run_coin_mult -= 0.05
+        elif key == "diamond":
+            p.gem_mult += v[0]
+            p.enemy_hp_curse += 0.10
+        elif key == "dancer":
+            p.dash_cd_mult *= (1.0 - v[0])
+            p.dash_dist_mult += v[1]
+            self._scale_max_hp(0.95)
+        elif key == "channeler":
+            if p.ult:
+                p.ult_cd *= (1.0 - v[0])
+                p.ult_timer = min(p.ult_timer, p.ult_cd)
+            p.run_dmg_mult -= 0.05
+        elif key == "orbiter":
+            p.orbit_level += int(v[0])
+            p.run_aspd_mult -= 0.05
+        elif key == "bonk_king":
+            p.bonk_mult += v[0]
+            p.bonk_cd_mult *= (1.0 - v[1])
+            p.run_spd_mult -= 0.05
+        elif key == "frenzy":
+            p.frenzy_level += int(v[0])
+            self._scale_max_hp(0.95)
+        # ---- kötü mekanik yeminler ----
+        elif key == "apocalypse":
+            self._oath_weapon_levels(int(v[0]))
+            p.run_dmg_mult += v[1]
+            self._scale_max_hp(0.60)
+            p.enemy_hp_curse += 0.20
+        elif key == "last_breath":
+            p.rage_level += int(v[0])
+            p.vamp_level += v[1] / 0.02
+            p.regen_mult = 0.0
+            self._scale_max_hp(0.75)
+        elif key == "blood_price":
+            p.kill_heal_level += int(v[0])
+            p.run_dmg_mult += v[1]
+            p.dmg_taken_mult *= 1.35
         self._apply_wave_mods()
+
+    def _oath_weapon_levels(self, n):
+        """Yemin: elindeki bütün silahlar n seviye atlar (tavana kadar)."""
+        p = self.player
+        for k in list(p.weapons):
+            w = WEAPON_BY_KEY.get(k)
+            if w is None:
+                continue
+            old = int(p.weapons.get(k, 0))
+            new = min(weapon_max_level(w), old + int(n))
+            if new > old:
+                p.weapons[k] = new
+                self._weapon_leveled(k, new - old)
+        self.fx.ring(p.x, p.y, (255, 170, 90), n=28, speed=260, life=0.6, r=4)
+
+    def _oath_book_levels(self, n):
+        """Yemin: elindeki bütün (nadir olmayan) kitaplar n seviye atlar."""
+        p = self.player
+        for k in list(p.books):
+            if (BOOK_BY_KEY.get(k) or {}).get("rare"):
+                continue
+            for _ in range(int(n)):
+                if p.take_book(k, 0) <= 0:
+                    break
+        self.fx.ring(p.x, p.y, (170, 150, 255), n=28, speed=260, life=0.6, r=4)
 
     def _apply_wave_mods(self):
         """Harita (yalnız arenada) + yemin çarpanlarını dalga yöneticisine yazar."""
@@ -37149,10 +37316,10 @@ OATH_BULWARK_EVERY = 40.0            # sur yemini: kalkan dolum aralığı (sn)
 MERCHANT_LUCK_PER_LEVEL = 0.08       # tüccarın kademe şansı: seviye başına +%8
 # "tüccar her seviyede değişiyor - bir kez açalım, 3 kez parayla yenileme
 # hakkımız olsun". El ilk konuşmada bir kez çekilir ve kendiliğinden değişmez.
-MERCHANT_REROLLS = 3
+MERCHANT_REROLLS = 5
 MERCHANT_REROLL_BASE = 100           # 1. yenilemenin taban fiyatı
 MERCHANT_REROLL_WAVE = 20            # dalga başına fiyat artışı
-MERCHANT_REROLL_STEP = (1, 2, 3)     # 1. / 2. / 3. yenilemenin katı
+MERCHANT_REROLL_STEP = (1, 1, 2, 2, 3)     # 1. .. 5. yenilemenin katı
 
 
 def merchant_reroll_cost(wave, used):
@@ -37167,62 +37334,107 @@ def oath_values(key, tier=0):
     """Yeminin güç değerleri bu kademede: (değer1, değer2?)."""
     m = OATH_TIER_MULT[int(clamp(int(tier), 0, len(OATH_TIER_MULT) - 1))]
     t = int(clamp(int(tier), 0, len(OATH_TIER_MULT) - 1))
+    # (oyuncular "yeminler işe yaramıyor" dedi: güç tarafları ~2 katına çıktı)
     if key == "glass":
-        return (0.30 * m,)
+        return (0.55 * m,)
     if key == "gold_fever":
-        return (0.35 * m,)
+        return (0.70 * m,)
     if key == "turtle":
-        return (float(int(round(50 * m))), 0.08 * m)
+        return (float(int(round(120 * m))), 0.10 * m)
     if key == "scholar":
-        return (0.25 * m,)
-    if key == "gambler":
         return (0.50 * m,)
+    if key == "gambler":
+        return (0.90 * m,)
     if key == "blood":
-        return (0.02 * m,)
+        return (0.04 * m,)
     if key == "wind":
-        return (0.12 * m, 0.25 * m)
+        return (0.20 * m, 0.40 * m)
     if key == "bulwark":
-        return (float(3 + t), float(int(round(OATH_BULWARK_EVERY / m))))
+        return (float(4 + t), float(int(round(30.0 / m))))
     if key == "hunter":
-        return (1.0 * m,)
+        return (1.6 * m,)
     if key == "feast":
-        return (0.25 * m,)
+        return (0.45 * m,)
     if key == "hoard":
-        return (float(int(round(350 * m / 10.0)) * 10),)
+        return (float(int(round(900 * m / 10.0)) * 10),)
     if key == "hawkeye":
-        return (0.12 * m, 0.25 * m)
+        return (0.20 * m, 0.50 * m)
     # ---- iyi yeminler (bedeli hafif) ----
     if key == "pilgrim":
-        return (1.5 * m,)
+        return (4.0 * m,)
     if key == "sage":
-        return (0.12 * m,)
+        return (0.22 * m,)
     if key == "lucky_star":
-        return (0.25 * m,)
+        return (0.50 * m,)
     if key == "iron_will":
-        return (0.05 * m, float(int(round(30 * m))))
+        return (0.08 * m, float(int(round(80 * m))))
     if key == "trader":
-        return (0.20 * m, float(int(round(100 * m / 10.0)) * 10))
+        return (0.40 * m, float(int(round(400 * m / 10.0)) * 10))
+    # ---- mekanik yeminler: oyunu değiştiren güçler ----
+    if key == "weaponsmith":
+        return (float(2 + t),)
+    if key == "bookworm":
+        return (float(2 + t),)
+    if key == "second_chance":
+        lv = 1 + t
+        return (float(max(8, 25 - 5 * (lv - 1))), float(lv))
+    if key == "stormcaller":
+        return (float(2 + t),)
+    if key == "pyromancer":
+        return (float(2 + t),)
+    if key == "frostheart":
+        return (float(2 + t), float(1 + t // 2))
+    if key == "venom":
+        return (float(2 + t), 0.30 * m)
+    if key == "thornmail":
+        return (float(3 + t), 0.05 * m)
+    if key == "chainshot":
+        return (float(2 + t),)
+    if key == "demolisher":
+        return (float(2 + t),)
+    if key == "volley":
+        return (float(1 + t // 2),)
+    if key == "magnetist":
+        return (1.00 * m, 0.15 * m)
+    if key == "diamond":
+        return (0.50 * m,)
+    if key == "dancer":
+        return (1.0 - 1.0 / (1.0 + 0.6 * m), 0.30 * m)
+    if key == "channeler":
+        return (1.0 - 1.0 / (1.0 + 0.5 * m),)
+    if key == "orbiter":
+        return (float(2 + t),)
+    if key == "bonk_king":
+        return (1.00 * m, 0.40)
+    if key == "frenzy":
+        return (float(2 + t),)
     # ---- kötü yeminler (bedeli ağır, ödülü büyük) ----
     if key == "berserk":
-        return (0.45 * m,)
+        return (0.85 * m,)
     if key == "doomed":
-        return (0.45 * m, 0.30 * m)
+        return (0.80 * m, 0.60 * m)
     if key == "bloodthirst":
-        return (0.04 * m,)
+        return (0.08 * m,)
     if key == "greed":
-        return (0.60 * m,)
+        return (1.20 * m,)
     if key == "reckless":
-        return (0.20 * m, 0.22 * m)
+        return (0.30 * m, 0.40 * m)
     if key == "titan":
-        return (float(int(round(150 * m))), 0.15 * m)
+        return (float(int(round(400 * m))), 0.30 * m)
     if key == "sacrifice":
-        return (0.35 * m,)
+        return (0.60 * m,)
     if key == "chaos":
-        return (0.60 * m, 0.20 * m)
+        return (1.00 * m, 0.30 * m)
     if key == "horde_lord":
-        return (0.40 * m, 0.40 * m)
+        return (0.80 * m, 0.80 * m)
     if key == "death_wish":
-        return (0.70 * m,)
+        return (1.30 * m,)
+    if key == "apocalypse":
+        return (float(4 + t), 0.30 * m)
+    if key == "last_breath":
+        return (float(3 + t), 0.03 * m)
+    if key == "blood_price":
+        return (float(3 + t), 0.25 * m)
     return ()
 
 
@@ -37244,6 +37456,20 @@ def oath_up_text(key, tier=0):
         args = (pct(v[0]), "+%d" % int(v[1])) if key == "iron_will" else ("+%d" % int(v[0]), pct(v[1]))
     elif key == "trader":
         args = (pct(v[0]), fmt_num(int(v[1])))
+    elif key in ("weaponsmith", "bookworm", "stormcaller", "pyromancer", "chainshot",
+                 "demolisher", "volley", "orbiter", "frenzy"):
+        args = ("+%d" % int(v[0]),)
+    elif key == "second_chance":
+        args = ("%d" % int(v[0]),)
+    elif key == "frostheart":
+        args = ("+%d" % int(v[0]), "+%d" % int(v[1]))
+    elif key in ("venom", "thornmail", "apocalypse", "blood_price"):
+        args = ("+%d" % int(v[0]), pct(v[1]))
+    elif key == "last_breath":
+        args = ("+%d" % int(v[0]), pct(v[1]))
+    elif key in ("dancer", "channeler", "bonk_king"):
+        args = tuple(("-" + fmt_pct1(x)) if (i == 0 and key != "bonk_king") or (i == 1 and key == "bonk_king")
+                     else pct(x) for i, x in enumerate(v))
     else:
         args = tuple(pct(x) for x in v)
     return L("oath.%s.up" % key, *args)
@@ -37267,6 +37493,25 @@ OATHS = (
     ("lucky_star", "star", (255, 236, 120)),
     ("iron_will", "shield", (190, 200, 220)),
     ("trader", "coin", (250, 210, 110)),
+    # mekanik yeminler: oyunu değiştiren güçler
+    ("weaponsmith", "sword", (255, 170, 90)),
+    ("bookworm", "book", (170, 150, 255)),
+    ("second_chance", "heart", (255, 215, 120)),
+    ("stormcaller", "bolt", (190, 215, 255)),
+    ("pyromancer", "flame", (255, 130, 60)),
+    ("frostheart", "gem", (150, 220, 255)),
+    ("venom", "drop", (140, 230, 90)),
+    ("thornmail", "shield", (200, 170, 120)),
+    ("chainshot", "bolt", (120, 220, 255)),
+    ("demolisher", "flame", (255, 110, 70)),
+    ("volley", "target", (255, 220, 120)),
+    ("magnetist", "magnet", (255, 110, 120)),
+    ("diamond", "gem", (120, 210, 255)),
+    ("dancer", "dash", (150, 230, 200)),
+    ("channeler", "star", (220, 170, 255)),
+    ("orbiter", "orbit", (150, 220, 255)),
+    ("bonk_king", "fist", (255, 190, 90)),
+    ("frenzy", "bolt", (255, 120, 160)),
     # kötü yeminler (bedeli ağır, ödülü büyük)
     ("berserk", "fist", (255, 80, 70)),
     ("doomed", "skull", (170, 90, 230)),
@@ -37278,9 +37523,26 @@ OATHS = (
     ("chaos", "horseshoe", (200, 110, 255)),
     ("horde_lord", "orbit", (255, 120, 160)),
     ("death_wish", "skull", (255, 60, 60)),
+    ("apocalypse", "skull", (255, 90, 40)),
+    ("last_breath", "heart", (220, 50, 70)),
+    ("blood_price", "drop", (190, 20, 50)),
 )
 OATHS_DARK = frozenset(("berserk", "doomed", "bloodthirst", "greed", "reckless", "titan",
-                        "sacrifice", "chaos", "horde_lord", "death_wish"))
+                        "sacrifice", "chaos", "horde_lord", "death_wish", "apocalypse",
+                        "last_breath", "blood_price"))
+MERCHANT_HAND = 4                     # tüccar bu kadar yemin kartı açar
+
+
+def oath_available(run, key):
+    """Bu yemin şu an işe yarar mı? (silahsız / kitapsız / yeteneksizken boşa gitmesin)"""
+    p = run.player
+    if key in ("weaponsmith", "apocalypse"):
+        return bool(p.weapons)
+    if key == "bookworm":
+        return any(not (BOOK_BY_KEY.get(k) or {}).get("rare") for k in p.books)
+    if key == "channeler":
+        return bool(getattr(p, "ult", None))
+    return True
 OATH_BY_KEY = {k: (k, ic, col) for k, ic, col in OATHS}
 # koşu görevleri: her koşuda biri kolay, biri orta, biri zor üç görev. Hedefler
 # bot ölçümüyle ayarlandı (ortalama bot ~7-14 dk yaşıyor):
@@ -44242,9 +44504,14 @@ class MerchantOverlay(LevelUpOverlay):
         draw_text(surf, L("oath." + key + ".name"), (r2.centerx, r2.y + 150), 17, lighten(col, 0.2),
                   bold=True, center=True)
         if key in OATHS_DARK:
-            # kötü yemin: bedeli ağır - kartta belli olsun
-            draw_text(surf, L("oath.dark_tag"), (r2.centerx, r2.y + 106), 11, (255, 110, 120), bold=True,
-                      center=True, shadow=False)
+            # kötü yemin: bedeli ağır - simgenin altında kızıl bir rozet
+            tg = L("oath.dark_tag")
+            tw2 = text_width(tg, 11, True) + 18
+            pill = pygame.Rect(0, 0, tw2, 18)
+            pill.center = (r2.centerx, r2.y + 130)
+            pygame.draw.rect(surf, (70, 14, 22), pill, border_radius=9)
+            ink_frame(surf, pill, (255, 110, 120), 9, 1)
+            draw_text(surf, tg, pill.center, 11, (255, 150, 160), bold=True, center=True, shadow=False)
         y = r2.y + 170
         for j, (lbl, txt, bgc, fgc, edc, up) in enumerate((
                 (L("dr.power"), oath_up_text(key, tier), (10, 26, 16), lighten(GREEN, 0.2), GREEN, True),
@@ -44335,7 +44602,7 @@ class MerchantOverlay(LevelUpOverlay):
         draw_text(surf, L("dr.title_oath"), (VIRTUAL_W / 2, 60), 38, GOLD, bold=True, center=True)
         draw_text(surf, L("dr.sub_oath"), (VIRTUAL_W / 2, 98), 14, (226, 214, 196), center=True, shadow=False)
         n = max(1, len(hand))
-        cw, chh, gap = 272, 344, 26
+        cw, chh, gap = (272, 344, 26) if n <= 3 else (262, 344, 16)
         x0 = VIRTUAL_W / 2 - (n * cw + (n - 1) * gap) / 2
         top = 130
         self.cards = [(pygame.Rect(int(x0 + i * (cw + gap)), top, cw, chh), kt, i) for i, kt in enumerate(hand)]
@@ -44351,7 +44618,7 @@ class MerchantOverlay(LevelUpOverlay):
             draw_text(surf, str(i + 1), kb.center, 12, (200, 206, 230), bold=True, center=True, shadow=False)
             if hover and clicked:
                 result = ("oath", (key, tier))
-        for i, kc in enumerate((pygame.K_1, pygame.K_2, pygame.K_3)):
+        for i, kc in enumerate((pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4)):
             if self._key_edge(kc) and i < len(self.cards) and result is None:
                 result = ("oath", self.cards[i][1])
         bw, bg_ = 250, 16
