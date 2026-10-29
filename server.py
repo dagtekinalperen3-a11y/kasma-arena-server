@@ -1333,11 +1333,11 @@ def player_report_cheat():
 # aynı hakkı iki kez alamaz). Reklam ödülü /rewards/ad_start biletiyle ve
 # AD_MIN_WATCH dolunca verilir. Değerler oyundakilerle aynı olmalı.
 REWARD_TZ_OFFSET = 3 * 3600          # Türkiye (UTC+3)
-AD_REWARD_GEMS = 300
+AD_REWARD_GEMS = 240           # -%20
 AD_DAILY_LIMIT = 5
 AD_COOLDOWN = 90.0
 AD_MIN_WATCH = 80.0                  # reklam = 90 sn tanıtım filmi (yedek oyun turu 120 sn)
-DAILY_GIFT_GEMS = (150, 250, 350, 450, 550, 650, 750)   # (oyunla aynı)
+DAILY_GIFT_GEMS = (120, 200, 280, 360, 440, 520, 600)   # (oyunla aynı) -%20
 # kartopu savaşı (kardan adam etkinliği): günde 3 oyun, 30 sn; vurulan her
 # düşman 1 elmas (altın goblin 3).
 SNOW_DAILY = 3
@@ -2682,6 +2682,52 @@ def shop_order_status():
     elif st in ("failed", "cancelled"):
         out["reason"] = str(order.get("error") or "")[:120]
     return jsonify(out)
+
+
+# ---- özel PET'i elmasla almak (hesap başına yalnızca 1 kez) ----
+GEM_PET_PRICE = 200_000
+
+
+@app.route("/shop/custom_pet_gems", methods=["POST"])
+def shop_custom_pet_gems():
+    """Özel PET'i 200.000 elmasla verir. Her hesap bu hakkı bir kez kullanır;
+    elmas sunucudaki defterden düşülür."""
+    ctx, err = _reward_ctx()
+    if err:
+        return err
+    acc, data = ctx
+    design = _clean_pet_design(data.get("design"))
+    if design is None:
+        return jsonify({"success": False, "error": "PET tasarımı geçersiz"}), 400
+    with _acct_lock(acc["id"]):
+        row = _player_row(acc["id"])
+        before = _stored_progress(row)
+        if before.get("gem_pet_bought"):
+            return jsonify({"success": False, "error": "elmasla PET hakkını zaten kullandın"}), 409
+        if len(before.get("custom_pets") or []) >= CUSTOM_PET_MAX:
+            return jsonify({"success": False, "error": "özel PET sınırına ulaştın"}), 409
+        earned = int(before.get("gems_earned", 0) or 0)
+        spent = int(before.get("gems_spent", 0) or 0)
+        if earned - spent < GEM_PET_PRICE:
+            return jsonify({"success": False,
+                            "error": f"yeterli elmas yok ({max(0, earned - spent)} / {GEM_PET_PRICE})"}), 402
+        merged = json.loads(json.dumps(before))
+        merged["gems_spent"] = spent + GEM_PET_PRICE
+        merged["gems"] = max(0, earned - merged["gems_spent"])
+        pet_id = "pet_custom_g" + secrets.token_hex(4)
+        pets = list(before.get("custom_pets") or [])
+        pets.append({"id": pet_id, "design": design, "gems": GEM_PET_PRICE, "at": time.time()})
+        merged["custom_pets"] = pets
+        lst = list(before.get("cosmetics_owned") or [])
+        if pet_id not in lst:
+            lst.append(pet_id)
+        merged["cosmetics_owned"] = lst
+        merged["gem_pet_bought"] = True
+        e = _store_progress(acc["id"], row, before, merged)
+        if e is not None:
+            return e
+        _log_event(acc["id"], "gempet", -GEM_PET_PRICE, int(merged["gems"]), "elmasla özel PET")
+    return jsonify({"success": True, "pet_id": pet_id, "progress": _public_progress(merged)})
 
 
 def _mark_order(order_id, fields, only_status=None):

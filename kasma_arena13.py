@@ -1585,6 +1585,54 @@ STRINGS = {
     "oath.hawkeye.up": _T('{} kritik, {} kritik hasarı', '{} crit, {} crit damage', '{} crítico, {} daño crítico', '{} Krit, {} Kritschaden', '{} крита, {} крит. урона'),
     "oath.hawkeye.down": _T("-%10 saldırı hızı", "-10% attack speed", "-10% vel. de ataque",
                             "-10% Angriffstempo", "-10% скорости атаки"),
+    "oath.dark_tag": _T("KÖTÜ YEMİN", "DARK OATH", "JURAMENTO OSCURO", "DUNKLER SCHWUR", "ТЁМНАЯ КЛЯТВА"),
+    # ---- yeni yeminler: 5 iyi (bedeli hafif) ----
+    "oath.pilgrim.name": _T("HACI", "PILGRIM", "PEREGRINO", "PILGER", "ПАЛОМНИК"),
+    "oath.pilgrim.up": _T("{}/sn can yenilenmesi", "{}/s health regen", "{}/s de regeneración", "{}/s Regeneration", "{}/с регенерации"),
+    "oath.pilgrim.down": _T("-%5 altın", "-5% gold", "-5% de oro", "-5% Gold", "-5% золота"),
+    "oath.sage.name": _T("BİLGE", "SAGE", "SABIO", "WEISER", "МУДРЕЦ"),
+    "oath.sage.up": _T("{} silah hızı", "{} weapon speed", "{} vel. de armas", "{} Waffentempo", "{} скорости оружия"),
+    "oath.sage.down": _T("-%5 maks can", "-5% max HP", "-5% de vida máx.", "-5% max. LP", "-5% макс. здоровья"),
+    "oath.lucky_star.name": _T("ŞANSLI YILDIZ", "LUCKY STAR", "ESTRELLA DE LA SUERTE", "GLÜCKSSTERN", "СЧАСТЛИВАЯ ЗВЕЗДА"),
+    "oath.lucky_star.up": _T("{} şans", "{} luck", "{} de suerte", "{} Glück", "{} удачи"),
+    "oath.lucky_star.down": _T("-%5 tecrübe", "-5% XP", "-5% de EXP", "-5% EP", "-5% опыта"),
+    "oath.iron_will.name": _T("DEMİR İRADE", "IRON WILL", "VOLUNTAD DE HIERRO", "EISERNER WILLE", "ЖЕЛЕЗНАЯ ВОЛЯ"),
+    "oath.iron_will.up": _T("{} zırh, {} maks can", "{} armour, {} max HP", "{} armadura, {} vida máx.", "{} Rüstung, {} max. LP", "{} брони, {} здоровья"),
+    "oath.iron_will.down": _T("-%5 dash mesafesi", "-5% dash distance", "-5% distancia de impulso", "-5% Dash-Weite", "-5% дальности рывка"),
+    "oath.trader.name": _T("TÜCCAR DOSTU", "TRADER'S FRIEND", "AMIGO DEL MERCADER", "HÄNDLERFREUND", "ДРУГ ТОРГОВЦА"),
+    "oath.trader.up": _T("{} altın, hemen +{} altın", "{} gold, +{} gold now", "{} oro, +{} oro ya", "{} Gold, sofort +{} Gold", "{} золота, сразу +{}"),
+    "oath.trader.down": _T("-%5 hasar", "-5% damage", "-5% de daño", "-5% Schaden", "-5% урона"),
+    # ---- yeni yeminler: 10 kötü (bedeli ağır, ödülü büyük) ----
+    "oath.berserk.name": _T("ÇILGIN SAVAŞÇI", "BERSERKER", "BERSERKER", "BERSERKER", "БЕРСЕРК"),
+    "oath.berserk.up": _T("{} hasar", "{} damage", "{} de daño", "{} Schaden", "{} урона"),
+    "oath.berserk.down": _T("aldığın hasar +%30", "+30% damage taken", "+30% de daño recibido", "+30% erlittener Schaden", "+30% получаемого урона"),
+    "oath.doomed.name": _T("LANETLİ", "DOOMED", "CONDENADO", "VERDAMMT", "ПРОКЛЯТЫЙ"),
+    "oath.doomed.up": _T("{} tecrübe, {} altın", "{} XP, {} gold", "{} EXP, {} oro", "{} EP, {} Gold", "{} опыта, {} золота"),
+    "oath.doomed.down": _T("yaratıklar +%30 canlı", "enemies +30% health", "enemigos +30% de vida", "Gegner +30% Leben", "враги +30% здоровья"),
+    "oath.bloodthirst.name": _T("KAN İÇİCİ", "BLOODTHIRST", "SED DE SANGRE", "BLUTDURST", "ЖАЖДА КРОВИ"),
+    "oath.bloodthirst.up": _T("{} can çalma", "{} lifesteal", "{} de robo de vida", "{} Lebensraub", "{} вампиризма"),
+    "oath.bloodthirst.down": _T("can yenilenmesi yok, -%30 maks can", "no regen, -30% max HP", "sin regeneración, -30% vida máx.", "keine Regeneration, -30% max. LP", "нет регенерации, -30% здоровья"),
+    "oath.greed.name": _T("AÇGÖZLÜ", "GREED", "CODICIA", "GIER", "АЛЧНОСТЬ"),
+    "oath.greed.up": _T("{} altın", "{} gold", "{} de oro", "{} Gold", "{} золота"),
+    "oath.greed.down": _T("-%30 tecrübe", "-30% XP", "-30% de EXP", "-30% EP", "-30% опыта"),
+    "oath.reckless.name": _T("PERVASIZ", "RECKLESS", "TEMERARIO", "TOLLKÜHN", "БЕЗРАССУДНЫЙ"),
+    "oath.reckless.up": _T("{} hız, {} saldırı hızı", "{} speed, {} attack speed", "{} velocidad, {} vel. de ataque", "{} Tempo, {} Angriffstempo", "{} скорости, {} атаки"),
+    "oath.reckless.down": _T("aldığın hasar +%25", "+25% damage taken", "+25% de daño recibido", "+25% erlittener Schaden", "+25% получаемого урона"),
+    "oath.titan.name": _T("TİTAN", "TITAN", "TITÁN", "TITAN", "ТИТАН"),
+    "oath.titan.up": _T("{} maks can, {} hasar", "{} max HP, {} damage", "{} vida máx., {} daño", "{} max. LP, {} Schaden", "{} здоровья, {} урона"),
+    "oath.titan.down": _T("-%20 hareket hızı", "-20% move speed", "-20% de velocidad", "-20% Tempo", "-20% скорости"),
+    "oath.sacrifice.name": _T("KURBAN", "SACRIFICE", "SACRIFICIO", "OPFER", "ЖЕРТВА"),
+    "oath.sacrifice.up": _T("{} silah hızı", "{} weapon speed", "{} vel. de armas", "{} Waffentempo", "{} скорости оружия"),
+    "oath.sacrifice.down": _T("-%35 maks can", "-35% max HP", "-35% de vida máx.", "-35% max. LP", "-35% макс. здоровья"),
+    "oath.chaos.name": _T("KAOS", "CHAOS", "CAOS", "CHAOS", "ХАОС"),
+    "oath.chaos.up": _T("{} şans, {} kritik", "{} luck, {} crit", "{} suerte, {} crítico", "{} Glück, {} Krit", "{} удачи, {} крита"),
+    "oath.chaos.down": _T("yaratıklar %25 hızlı", "enemies 25% faster", "enemigos 25% más rápidos", "Gegner 25% schneller", "враги на 25% быстрее"),
+    "oath.horde_lord.name": _T("SÜRÜ BEYİ", "HORDE LORD", "SEÑOR DE LA HORDA", "HORDENFÜRST", "ВЛАДЫКА ОРДЫ"),
+    "oath.horde_lord.up": _T("{} tecrübe, {} altın", "{} XP, {} gold", "{} EXP, {} oro", "{} EP, {} Gold", "{} опыта, {} золота"),
+    "oath.horde_lord.down": _T("%40 daha çok yaratık doğar", "40% more enemies spawn", "aparecen 40% más enemigos", "40% mehr Gegner", "на 40% больше врагов"),
+    "oath.death_wish.name": _T("ÖLÜM ARZUSU", "DEATH WISH", "DESEO DE MUERTE", "TODESSEHNSUCHT", "ЖАЖДА СМЕРТИ"),
+    "oath.death_wish.up": _T("{} hasar", "{} damage", "{} de daño", "{} Schaden", "{} урона"),
+    "oath.death_wish.down": _T("-%50 maks can", "-50% max HP", "-50% de vida máx.", "-50% max. LP", "-50% макс. здоровья"),
     # ---- başlangıç seçimi ekranı ----
     # gezgin tüccar.
     "m.name": _T("GEZGİN TÜCCAR", "WANDERING MERCHANT", "MERCADER ERRANTE", "WANDERHÄNDLER",
@@ -5266,6 +5314,8 @@ class SaveManager:
         # hesabın satın aldığı özel pet'ler [{"id","design",...}] - sunucunun
         # listesidir (oyun buraya kendi başına bir şey eklemez).
         "custom_pets": [],
+        # 200.000 elmasla bir kez özel pet tasarlama hakkı kullanıldı mı
+        "gem_pet_bought": False,
         "leaderboard": [],
         "achievements": {},
         "settings": {"fullscreen": False, "player_name": "", "music_vol": 0.5, "sfx_vol": 0.7,
@@ -5295,7 +5345,7 @@ class SaveManager:
         "achievements", "stats", "leaderboard",
         "tainted", "taint_reasons",
         "board_banned", "ban_reasons",
-        "rewards",
+        "rewards", "gem_pet_bought",
     )
 
     def __init__(self):
@@ -6375,11 +6425,13 @@ class PurchaseBridge:
 #   büyür (7 günlük seri, sonra başa döner) (premium skin ve pet'ler yine
 #   yalnızca gerçek parayla satılır.)
 AD_PROVIDER = ""             # boş = ev reklamı
-AD_REWARD_GEMS = 300           # 50 -> 250, 300 (2 dakikalık yeni tanıtım filmi)
+# elmas geliri -%20 (koşu, görev, başarım, günlük hediye, reklam, site)
+GEM_INCOME_K = 0.80
+AD_REWARD_GEMS = 240           # 50 -> 250, 300 (2 dakikalık yeni tanıtım filmi), -%20
 AD_DAILY_LIMIT = 5
 AD_COOLDOWN = 90.0           # iki reklam arası (sn)
 AD_LENGTH = 120.0            # reklamın süresi - asıl değer GameTour.LENGTH
-DAILY_GIFT_GEMS = (150, 250, 350, 450, 550, 650, 750)   # (sunucu: server.py da)
+DAILY_GIFT_GEMS = (120, 200, 280, 360, 440, 520, 600)   # -%20 (sunucu: server.py da)
 
 # ücretsiz elmas: site ziyareti ("mağazamızı gör") ----
 # * siteye git -> {0} saniye pencereden uzak kal (yani gerçekten sitede dur) ->
@@ -6392,7 +6444,7 @@ DAILY_GIFT_GEMS = (150, 250, 350, 450, 550, 650, 750)   # (sunucu: server.py da)
 # görünürken periyodik bir "ping" atan) bir doğrulama ve bunu okuyan bir
 # sunucu uç noktası (ör. /rewards/claim, kind="site") gerekir; bkz. ONLINE_API_URL.
 SITE_URL = "https://volvearena.shop"
-SITE_REWARD_GEMS = 250
+SITE_REWARD_GEMS = 200
 SITE_VISIT_SECONDS = 30.0
 SITE_DAILY_LIMIT = 3
 SITE_COOLDOWN = 120.0
@@ -6848,6 +6900,10 @@ ACHIEVEMENTS = [
          icon="gem", tier="efsane", gems=250,
          track=dict(stat="ach_count", need=22)),
 ]
+# elmas geliri -%20: başarım ödülleri de (gösterilen değer = verilen değer)
+for _a in ACHIEVEMENTS:
+    if _a.get("gems"):
+        _a["gems"] = max(1, int(round(int(_a["gems"]) * GEM_INCOME_K)))
 ACH_BY_ID = {a["id"]: a for a in ACHIEVEMENTS}
 # harita başarımlarının sayaçları: istatistik -> (harita, "sum"|"max"). "sum"
 # koşu boyunca toplanır, "max" koşunun en iyisi tutulur.
@@ -9275,6 +9331,8 @@ def draw_pet(surf, kind, x, y, r, t, face=1, moving=False, col=(200, 200, 200),
 # kanat, şapka, desen, efekt, üç renk ve boyu seçer; beğenince satın alır
 # (CUSTOM_PET_PRICE_HINT).
 CUSTOM_PET_PRODUCT_ID = 3100
+# Özel pet bir kereliğine elmasla da alınabilir (sunucu: /shop/custom_pet_gems)
+GEM_PET_PRICE = 200_000
 CUSTOM_PET_PRICE_HINT = "₺159"
 CUSTOM_PET_PARTS = {
     "body": ("round", "chubby", "tall", "bean", "blob"),
@@ -20346,7 +20404,7 @@ VOID_HP = 3.4
 VOID_DMG = 1.55
 VOID_SPEED = 1.08
 VOID_ARMOR = 0.08
-VOID_SIZE = 1.18
+VOID_SIZE = 1.30
 VOID_REWARD = 2.2
 VOID_COLOR = (168, 70, 255)
 VOID_COLOR2 = (224, 180, 255)
@@ -20391,8 +20449,11 @@ STINGER_DMG_CAP = 2.0           # kendi taban hasarının en çok bu katı
 # yalnızca yaratıklar %10 yumuşadı.
 ENEMY_HP_NERF = 0.95
 ENEMY_DMG_NERF = 0.90
-ENEMY_HP_TUNE = 0.90 * ENEMY_HP_NERF
-ENEMY_DMG_TUNE = 0.90 * ENEMY_DMG_NERF
+# "ilk dalgalar çok basit": normal / zor / kabusta yaratık canı, hasarı ve
+# doğum sıklığı %10 arttı (ENEMY_BUFF).
+ENEMY_BUFF = 1.10
+ENEMY_HP_TUNE = 0.90 * ENEMY_HP_NERF * ENEMY_BUFF
+ENEMY_DMG_TUNE = 0.90 * ENEMY_DMG_NERF * ENEMY_BUFF
 
 ENEMY_DEFS = {
     "red":      {"hp": 30,  "speed": 100, "dmg": 10, "radius": 14, "coin": 5,  "xp": 4,  "score": 12,  "contact_dps": 17},
@@ -27251,7 +27312,8 @@ WAVE_GOAL_SCALE = 5.9
 # odak çarpanı (x0.6 - x2.0) ve vurulunca kırılan kombo geldi: taban skor
 # 0.175'ten kısıldı. Dikkatsiz oyun eskisinin ~üçte birini, iyi oyun daha
 # fazlasını yapar.
-SCORE_GAIN = 0.13
+# bütün düşmanların skor geliri -%40 (10 skorluk yaratık 6 verir): 0.13 -> 0.078
+SCORE_GAIN = 0.078
 # dalga hedefi: "dalga atlama hedeflerini artır, süre 15 sn olsun; oyuncu
 # saniye beklemesin, SKOR bekletsin".
 WAVE_GOAL_KILLS = 1.3
@@ -27327,7 +27389,7 @@ EARLY_BAT_NERF = 0.10
 
 # doğum hızı %10 yavaş. "Oyun çok hızlı" geri bildirimi: yaratıklar saniyede
 # %10 daha az doğar (doğum aralığı 1/0.90 = %11 uzar).
-SPAWN_RATE_TUNE = 0.90
+SPAWN_RATE_TUNE = 0.90 * 1.10   # +%10 (ENEMY_BUFF)
 
 # patron dalgası kilidi açıldı ("afk kalıp seviye kasılıyor").
 BOSS_WAVE_TIMEOUT = 30.0
@@ -27747,6 +27809,7 @@ class WaveManager:
                 self._late_boost(e_new)
                 if kind not in CURSE_KINDS:
                     self._mutate_roll(e_new)
+                    self._void_roll(e_new)
                 enemies.append(e_new)
             elite_chance = 0.12 + min(0.28, self.wave * 0.008)
             if self.surge_active():
@@ -27777,6 +27840,21 @@ class WaveManager:
         self.mutant_counter = getattr(self, "mutant_counter", 0) + 1
         if self.mutant_counter % MUTANT_EVERY == 0:
             e.mutate()
+
+    def _void_roll(self, e):
+        """mor yaratıklar: 35. dalgada her 5 yaratıktan 2'si, 40'ta 4'ü, 45'te
+        hepsi mor (cehennemde toplam dalgaya bakılır)."""
+        w = int(self.wave) + (HELL_WAVE_OFFSET if self.biome == "hell" else 0)
+        if w < VOID_FROM:
+            return
+        k = 0
+        for wv, kk in VOID_STEPS:
+            if w >= wv:
+                k = kk
+                break
+        self.void_counter = getattr(self, "void_counter", 0) + 1
+        if (self.void_counter % 5) < k:
+            e.voidify()
 
     def _late_boost(self, e):
         """Geç dalga güçlenmesi -"""
@@ -29832,6 +29910,16 @@ STRINGS.update({
     "fx.frozen": _T("DONDU!", "FROZEN!", "¡CONGELADO!", "EINGEFROREN!", "ЗАМОРОЖЕН!"),
     "fx.maxhp": _T("+{0} MAKS CAN", "+{0} MAX HP", "+{0} VIDA MÁX", "+{0} MAX LP", "+{0} МАКС. ЗДОР."),
     "fx.reap": _T("TAHSİL", "REAPED", "COBRADO", "GEERNTET", "ЖАТВА"),
+    "th.void35": _T("MOR YARATIKLAR GELDİ!", "THE PURPLE ONES ARE HERE!", "¡LLEGARON LOS MORADOS!",
+                    "DIE VIOLETTEN SIND DA!", "ПРИШЛИ ФИОЛЕТОВЫЕ!"),
+    "th.void40": _T("MOR SÜRÜ BÜYÜYOR!", "THE PURPLE HORDE GROWS!", "¡LA HORDA MORADA CRECE!",
+                    "DIE VIOLETTE HORDE WÄCHST!", "ФИОЛЕТОВАЯ ОРДА РАСТЁТ!"),
+    "th.void45": _T("HEPSİ MOR!", "ALL PURPLE!", "¡TODOS MORADOS!", "ALLE VIOLETT!", "ВСЕ ФИОЛЕТОВЫЕ!"),
+    "th.void_sub": _T("her 5 yaratıktan {0}'i mor: iri, çok canlı, sert - ama ödülü büyük",
+                      "{0} of every 5 enemies are purple: huge, tanky, brutal - big rewards",
+                      "{0} de cada 5 son morados: enormes y duros, gran botín",
+                      "{0} von 5 Gegnern violett: riesig, zäh, brutal - große Beute",
+                      "{0} из 5 врагов фиолетовые: огромные, живучие - большая награда"),
     "fx.pinned": _T("YAKALANDI!", "PINNED!", "¡ATRAPADO!", "GEPACKT!", "СХВАЧЕН!"),
     "fx.dracula": _T("DRACULA x{0}: HASAR + ZEHİR GÜÇLENDİ", "DRACULA x{0}: DAMAGE + POISON UP",
                      "DRÁCULA x{0}: MÁS DAÑO Y VENENO", "DRACULA x{0}: MEHR SCHADEN + GIFT",
@@ -31398,6 +31486,63 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
             p.run_crit_bonus += v[0]
             p.run_critdmg_bonus += v[1]
             p.run_aspd_mult -= 0.10
+        # ---- iyi yeminler ----
+        elif key == "pilgrim":
+            p.run_regen_bonus += v[0]
+            p.run_coin_mult -= 0.05
+        elif key == "sage":
+            p.weapon_speed_bonus += v[0]
+            self._scale_max_hp(0.95)
+        elif key == "lucky_star":
+            p.run_luck_bonus += v[0]
+            p.run_xp_mult -= 0.05
+        elif key == "iron_will":
+            p.run_armor_bonus += v[0]
+            p.max_hp += int(v[1])
+            p.hp = p.max_hp
+            p.dash_dist_mult -= 0.05
+        elif key == "trader":
+            p.run_coin_mult += v[0]
+            self.gold_wallet += int(v[1])
+            p.run_dmg_mult -= 0.05
+        # ---- kötü yeminler ----
+        elif key == "berserk":
+            p.run_dmg_mult += v[0]
+            p.dmg_taken_mult *= 1.30
+        elif key == "doomed":
+            p.run_xp_mult += v[0]
+            p.run_coin_mult += v[1]
+            p.enemy_hp_curse += 0.30
+        elif key == "bloodthirst":
+            p.vamp_level += v[0] / 0.02
+            p.regen_mult = 0.0
+            self._scale_max_hp(0.70)
+        elif key == "greed":
+            p.run_coin_mult += v[0]
+            p.run_xp_mult -= 0.30
+        elif key == "reckless":
+            p.run_spd_mult += v[0]
+            p.run_aspd_mult += v[1]
+            p.dmg_taken_mult *= 1.25
+        elif key == "titan":
+            p.max_hp += int(v[0])
+            p.hp = p.max_hp
+            p.run_dmg_mult += v[1]
+            p.run_spd_mult -= 0.20
+        elif key == "sacrifice":
+            p.weapon_speed_bonus += v[0]
+            self._scale_max_hp(0.65)
+        elif key == "chaos":
+            p.run_luck_bonus += v[0]
+            p.run_crit_bonus += v[1]
+            self.oath_speed = 1.25
+        elif key == "horde_lord":
+            p.run_xp_mult += v[0]
+            p.run_coin_mult += v[1]
+            self.oath_spawn = 1.40
+        elif key == "death_wish":
+            p.run_dmg_mult += v[0]
+            self._scale_max_hp(0.50)
         self._apply_wave_mods()
 
     def _apply_wave_mods(self):
@@ -31435,6 +31580,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
     CAMP_STILL_R = 170.0        # bu yarıçapın içinde kalan oyuncu "duruyor"
     CAMP_STILL_T = 7.0          # ... bu kadar süre durursa AFK sayılır
     CAMP_RING = (230.0, 430.0)  # içeride doğum halkası (oyuncuya uzaklık)
+    CAMP_RING_CORNER = (50.0, 190.0)   # köşede: doğum doğrudan oyuncunun dibinde
 
     def _update_camping(self, dt):
         p = self.player
@@ -31450,25 +31596,64 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
                   and min(p.y - ARENA_RECT.top, ARENA_RECT.bottom - p.y) < self.CAMP_EDGE)
         f = 0.0
         if edge < self.CAMP_EDGE:
-            f = 0.35
+            f = 0.55
         if corner:
-            f = 0.60
+            # köşe kampı: doğumların hepsi oyuncunun dibinde
+            f = 1.0
         if self._camp_still >= self.CAMP_STILL_T:
-            f = min(0.85, f + 0.45)
+            f = min(1.0, f + 0.45)
         self._camp_factor = f
+        self._camp_corner = corner
+        # köşede oyalanınca uzakta kalan yaratıklar (elitler dahil) dibine gelir
+        if corner and p.alive:
+            self._corner_t = getattr(self, "_corner_t", 0.0) + dt
+            self._corner_pull = getattr(self, "_corner_pull", 0.0) - dt
+            if self._corner_t > 1.5 and self._corner_pull <= 0:
+                self._corner_pull = 1.0
+                self._pull_campers()
+        else:
+            self._corner_t = 0.0
         if f >= 0.6 and p.alive and not getattr(self, "_camp_warned", False):
             self._camp_warned = True
             self.fx.popup(p.x, p.y - 100, L("fx.no_camping"), (255, 150, 120), 20, life=2.4)
 
     def _camp_spawn_point(self):
         p = self.player
+        ring = self.CAMP_RING_CORNER if getattr(self, "_camp_corner", False) else self.CAMP_RING
+        inner = ARENA_RECT.inflate(-40, -40)
         for _ in range(14):
             a = random.uniform(0, math.tau)
-            r = random.uniform(*self.CAMP_RING)
+            r = random.uniform(*ring)
             x, y = p.x + math.cos(a) * r, p.y + math.sin(a) * r
-            if ARENA_RECT.inflate(-40, -40).collidepoint(x, y):
+            if inner.collidepoint(x, y):
                 return x, y
-        return None
+        # köşede halkanın çoğu dünyanın dışında kalır: noktayı içeri çek
+        a = random.uniform(0, math.tau)
+        r = random.uniform(*ring)
+        return (clamp(p.x + math.cos(a) * r, inner.left, inner.right),
+                clamp(p.y + math.sin(a) * r, inner.top, inner.bottom))
+
+    def _pull_campers(self):
+        """Köşe kampı: uzakta kalan yaratıklar (elitler dahil, patron hariç)
+        oyuncunun çevresine ışınlanır."""
+        p = self.player
+        moved = 0
+        for e in self.enemies:
+            if moved >= 8:
+                break
+            if not e.alive or getattr(e, "is_boss", False) or getattr(e, "is_mini", False) \
+                    or getattr(e, "guard_of", None) is not None or getattr(e, "kind", "") == "goblin":
+                continue
+            if dist(e.x, e.y, p.x, p.y) < 520:
+                continue
+            pt = self._camp_spawn_point()
+            if pt is None:
+                break
+            self.fx.ring(e.x, e.y, e.color, n=8, speed=140, life=0.25, r=2.4)
+            e.x, e.y = pt
+            e.spawn_t = min(e.spawn_t, 0.12)
+            self.fx.ring(e.x, e.y, e.color, n=12, speed=190, life=0.3, r=3)
+            moved += 1
 
     def near_camera_point(self, margin=60):
         """Kameranın hemen dışında, dünyanın içinde kalan bir doğum noktası."""
@@ -34292,6 +34477,21 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin):
         if msg and p.alive:
             self.fx.popup(p.x, p.y - 118, L(msg[0]), msg[1], 22, life=3.0)
             sfx("warn", 0.5, 0.0)
+        # mor yaratıklar: 35 / 40 / 45. dalgada büyük duyuru
+        tw = w + (HELL_WAVE_OFFSET if self.biome == "hell" else 0)
+        for wv, kk in VOID_STEPS[::-1]:
+            tag = "void%d" % wv
+            if tw >= wv and tag not in seen:
+                seen.add(tag)
+                if p.alive:
+                    self.waves.announce_timer = 3.6
+                    self.waves.announce_text = L("th.void%d" % wv)
+                    self.fx.do_flash(VOID_COLOR, 0.55)
+                    self.fx.shake(10, 0.5)
+                    self.fx.shockwave(p.x, p.y, 420, VOID_COLOR2, 0.7, 8)
+                    self.fx.popup(p.x, p.y - 140, L("th.void_sub", kk), VOID_COLOR2, 20, life=3.6)
+                    sfx("boss", 0.9, 0.0)
+                break
 
     # ---- lanetli sandık ----
     def _cursed_due(self):
@@ -35812,12 +36012,54 @@ class Display:
     def toggle_fullscreen(self):
         if IS_WEB:
             return          # telefonda uygulama zaten tam ekran açılır
-        self.fullscreen = not self.fullscreen
+        # F11 basılı tutulunca (tuş tekrarı) art arda onlarca kez ekran
+        # yeniden açılıyordu: oyun donup yanıt vermez hâle geliyordu.
+        now = time.time()
+        if now - getattr(self, "_fs_t", 0.0) < 0.6:
+            return
+        self._fs_t = now
+        want = not self.fullscreen
+        done = False
+        if self.scaled_mode:
+            # SCALED kipte set_mode'u ikinci kez çağırmak bazı sürücülerde
+            # (özellikle Windows + vsync) pencereyi kilitliyordu. SDL'in kendi
+            # tam ekran geçişi aynı yüzeyi korur: çökme / donma yok.
+            try:
+                pygame.display.toggle_fullscreen()
+                done = True
+            except Exception:
+                done = False
+            if done:
+                self.fullscreen = want
+                surf = pygame.display.get_surface()
+                if surf is not None:
+                    self.screen = surf
+                    self._bind_canvas()
+                if not want:
+                    try:
+                        win = self._pick_scale_filter()
+                        if win is not None:
+                            self._fit_window(win)
+                    except Exception:
+                        pass
+        if not done:
+            self.fullscreen = want
+            try:
+                self.screen = self._make_screen()
+                self._bind_canvas()
+            except Exception:
+                self.fullscreen = not want
+                try:
+                    self.screen = self._make_screen()
+                    self._bind_canvas()
+                except Exception:
+                    pass
         try:
-            self.screen = self._make_screen()
-            self._bind_canvas()
+            # geçiş sırasında biriken pencere olayları ikinci bir geçiş
+            # tetiklemesin
+            pygame.event.clear((pygame.VIDEORESIZE, pygame.KEYDOWN))
         except Exception:
-            self.fullscreen = not self.fullscreen
+            pass
         # set_mode bazı sürücülerde imleci yeniden görünür yapıyor: gizle.
         try:
             pygame.mouse.set_visible(False)
@@ -36043,6 +36285,38 @@ def oath_values(key, tier=0):
         return (float(int(round(350 * m / 10.0)) * 10),)
     if key == "hawkeye":
         return (0.12 * m, 0.25 * m)
+    # ---- iyi yeminler (bedeli hafif) ----
+    if key == "pilgrim":
+        return (1.5 * m,)
+    if key == "sage":
+        return (0.12 * m,)
+    if key == "lucky_star":
+        return (0.25 * m,)
+    if key == "iron_will":
+        return (0.05 * m, float(int(round(30 * m))))
+    if key == "trader":
+        return (0.20 * m, float(int(round(100 * m / 10.0)) * 10))
+    # ---- kötü yeminler (bedeli ağır, ödülü büyük) ----
+    if key == "berserk":
+        return (0.45 * m,)
+    if key == "doomed":
+        return (0.45 * m, 0.30 * m)
+    if key == "bloodthirst":
+        return (0.04 * m,)
+    if key == "greed":
+        return (0.60 * m,)
+    if key == "reckless":
+        return (0.20 * m, 0.22 * m)
+    if key == "titan":
+        return (float(int(round(150 * m))), 0.15 * m)
+    if key == "sacrifice":
+        return (0.35 * m,)
+    if key == "chaos":
+        return (0.60 * m, 0.20 * m)
+    if key == "horde_lord":
+        return (0.40 * m, 0.40 * m)
+    if key == "death_wish":
+        return (0.70 * m,)
     return ()
 
 
@@ -36058,6 +36332,12 @@ def oath_up_text(key, tier=0):
         args = (fmt_num(int(v[0])),)
     elif key == "hunter":
         args = (pct(stack_bonus(0.385, v[0], soft=3.5)),)
+    elif key == "pilgrim":
+        args = ("+%s" % (("%.1f" % v[0]).replace(".", ",") if lang() == "tr" else "%.1f" % v[0]),)
+    elif key in ("iron_will", "titan"):
+        args = (pct(v[0]), "+%d" % int(v[1])) if key == "iron_will" else ("+%d" % int(v[0]), pct(v[1]))
+    elif key == "trader":
+        args = (pct(v[0]), fmt_num(int(v[1])))
     else:
         args = tuple(pct(x) for x in v)
     return L("oath.%s.up" % key, *args)
@@ -36075,7 +36355,26 @@ OATHS = (
     ("feast", "orbit", (255, 170, 210)),
     ("hoard", "coin", (240, 190, 90)),
     ("hawkeye", "target", (255, 240, 140)),
+    # iyi yeminler (bedeli hafif)
+    ("pilgrim", "cross", (130, 230, 170)),
+    ("sage", "bolt", (150, 200, 255)),
+    ("lucky_star", "star", (255, 236, 120)),
+    ("iron_will", "shield", (190, 200, 220)),
+    ("trader", "coin", (250, 210, 110)),
+    # kötü yeminler (bedeli ağır, ödülü büyük)
+    ("berserk", "fist", (255, 80, 70)),
+    ("doomed", "skull", (170, 90, 230)),
+    ("bloodthirst", "drop", (200, 30, 60)),
+    ("greed", "coin", (255, 190, 40)),
+    ("reckless", "boot", (255, 150, 90)),
+    ("titan", "heart", (220, 140, 110)),
+    ("sacrifice", "cross", (230, 70, 110)),
+    ("chaos", "horseshoe", (200, 110, 255)),
+    ("horde_lord", "orbit", (255, 120, 160)),
+    ("death_wish", "skull", (255, 60, 60)),
 )
+OATHS_DARK = frozenset(("berserk", "doomed", "bloodthirst", "greed", "reckless", "titan",
+                        "sacrifice", "chaos", "horde_lord", "death_wish"))
 OATH_BY_KEY = {k: (k, ic, col) for k, ic, col in OATHS}
 # koşu görevleri: her koşuda biri kolay, biri orta, biri zor üç görev. Hedefler
 # bot ölçümüyle ayarlandı (ortalama bot ~7-14 dk yaşıyor):
@@ -36090,9 +36389,9 @@ QUEST_DEFS = {
     "cave":   ("ghost", (190, 120, 255), (None, 1, 2)),
 }
 # "elmas çok kazanıyoruz, %50 azalt": 14/28/56 -> 7/14/28.
-QUEST_GEMS = (4, 7, 14)                          # kolay / orta / zor ödülü (yine -%50)
+QUEST_GEMS = (3, 6, 11)                          # kolay / orta / zor ödülü (-%50, sonra -%20)
 # Koşu sonunda toplanan altının elmasa dönüşme oranı (2 kişilik de bunu kullanır).
-RUN_GEM_RATE = 0.0168           # elmas yine -%50 (0.0336 -> 0.0168)
+RUN_GEM_RATE = 0.01344          # elmas yine -%50 (0.0336 -> 0.0168), sonra -%20
 QUEST_TIER_COLORS = ((110, 220, 140), (100, 160, 240), (170, 120, 230))
 
 BIOME_STYLE["frost"] = dict(BIOME_STYLE["arena"], **{
@@ -39448,7 +39747,11 @@ def draw_run(surf, run, t, aim_pos=None, shake=(0, 0), world_only=False):
     _vis_en = [e for e in run.enemies if vis_near.collidepoint(e.x, e.y)]
     Enemy._spr_budget[0] = int(clamp(len(_vis_en) * 0.36, Enemy.SPR_BUDGET, Enemy.SPR_BUDGET_MAX))
     Enemy._spr_tick[0] += 1
-    if MOBILE or gfx_level() < 2 or len(_vis_en) > 40:
+    # Buzul / Orman / Çöl yaratıkları (ayrıntılı gövdeler) her karede yeniden
+    # çizilince bu haritalarda kare hızı Taş Meydan'ın gerisinde kalıyordu
+    # (~40 FPS): orada yaratıklar hep ortak hazır karelerden basılır.
+    if (MOBILE or gfx_level() < 2 or len(_vis_en) > 40
+            or (getattr(run, "map_theme", "stone") != "stone" and run.biome != "hell")):
         # yüksek grafikte de kalabalıkta (40+ yaratık) ortak karelere geçilir
         # telefon ve orta/düşük grafik: aynı türden yaratıklar ortak hazır
         # karelerden çizilir, toplu blit (yaratık başına yeniden çizim yok)
@@ -42958,6 +43261,10 @@ class MerchantOverlay(LevelUpOverlay):
         draw_icon(surf, ecx, ecy, icon, lighten(col, 0.15), 22 if hover else 20)
         draw_text(surf, L("oath." + key + ".name"), (r2.centerx, r2.y + 150), 17, lighten(col, 0.2),
                   bold=True, center=True)
+        if key in OATHS_DARK:
+            # kötü yemin: bedeli ağır - kartta belli olsun
+            draw_text(surf, L("oath.dark_tag"), (r2.centerx, r2.y + 106), 11, (255, 110, 120), bold=True,
+                      center=True, shadow=False)
         y = r2.y + 170
         for j, (lbl, txt, bgc, fgc, edc, up) in enumerate((
                 (L("dr.power"), oath_up_text(key, tier), (10, 26, 16), lighten(GREEN, 0.2), GREEN, True),
@@ -53627,7 +53934,8 @@ class App:
                     # yolu da burada).
                     self.handle_keybind_key(event)
                 elif event.key == pygame.K_F11:
-                    self.display.toggle_fullscreen()
+                    if not getattr(event, "repeat", False):
+                        self.display.toggle_fullscreen()
                 elif event.key == pygame.K_F3:
                     CFG["fps"] = not CFG["fps"]
                 elif event.key == pygame.K_ESCAPE:
@@ -57468,6 +57776,22 @@ class App:
         b1 = pygame.Rect(tx, box.bottom - 84, 330, 50)
         b2 = pygame.Rect(tx, box.bottom - 30 - 0, 330, 24)
         h1, h2 = b1.collidepoint(mouse_pos), b2.collidepoint(mouse_pos)
+        # ---- elmasla (hesap başına yalnız 1 kez) ----
+        b3 = pygame.Rect(tx, box.bottom - 150, 330, 44)
+        h3 = b3.collidepoint(mouse_pos)
+        used = bool(self.save.data.get("gem_pet_bought"))
+        have = int(self.save.get_gems())
+        can = (not used) and have >= GEM_PET_PRICE and not pd.get("gem_busy")
+        lbl = (_tc("ELMAS HAKKI KULLANILDI", "GEM PET ALREADY USED") if used else
+               _tc("%s ELMASLA AL", "BUY FOR %s GEMS") % fmt_num(GEM_PET_PRICE))
+        self._mini_button(canvas, b3, lbl, (60, 120, 200), h3 and can, icon="gem", size=15, enabled=can)
+        if not used:
+            draw_text(canvas, _tc("elmasla yalnızca 1 kez  ·  sende %s", "gems: once per account  ·  you have %s")
+                      % fmt_num(have), (b3.centerx, b3.y - 13), 11,
+                      GEM_COLOR if have >= GEM_PET_PRICE else (225, 150, 130), center=True, shadow=False)
+        if clicked and h3 and can:
+            self._buy_custom_pet_gems()
+            return
         if pb.available():
             self._mini_button(canvas, b1, _tc("ÖDEMEYE GEÇ", "GO TO PAYMENT"), (54, 150, 86), h1,
                               icon="gem", size=17)
@@ -57490,6 +57814,41 @@ class App:
         if clicked and (h2 or not box.collidepoint(mouse_pos)):
             pd["confirm"] = False
             sfx("click", 0.5, 0.0)
+
+    def _buy_custom_pet_gems(self):
+        """Özel peti 200.000 elmasla alır (hesap başına bir kez, sunucu doğrular)."""
+        pd = self.pd
+        design = clean_custom_pet(pd["design"])
+        acc = getattr(self, "account", None)
+        if acc is None or not acc.logged_in():
+            pd["msg"] = L("ui.shop_login")
+            pd["msg_ok"] = False
+            pd["msg_t"] = 4.0
+            return
+        pd["gem_busy"] = True
+        before = {e.get("id") for e in (self.save.data.get("custom_pets") or []) if isinstance(e, dict)}
+
+        def done(ok, err, res):
+            pd["gem_busy"] = False
+            pd["confirm"] = False
+            if ok:
+                new = [e.get("id") for e in (self.save.data.get("custom_pets") or [])
+                       if isinstance(e, dict) and e.get("id") not in before]
+                if new:
+                    self.save.equip_cosmetic("pet", new[-1])
+                self.save.data["gem_pet_bought"] = True
+                self.save.save()
+                pd["msg"] = _tc("{0} hazır ve kuşanıldı! Arenada peşinden koşacak.",
+                                "{0} is ready and equipped! It will follow you in the arena.").format(
+                    design.get("name", ""))
+                sfx("levelup", 1.0, 0.0)
+            else:
+                pd["msg"] = err or L("ui.shop_failed")
+            pd["msg_ok"] = ok
+            pd["msg_t"] = 5.0
+            pd["confetti"] = 0.0
+
+        acc.reward_call("/shop/custom_pet_gems", {"design": design}, done)
 
     def _buy_custom_pet(self):
         pd = self.pd
