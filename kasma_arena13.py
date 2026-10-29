@@ -9050,6 +9050,11 @@ COSMETICS = [
          color=(120, 128, 145), accent=(235, 240, 250),
          desc="Dövülmüş çelik plakalardan örülmüş ağır bir pelerin.",
          perk_text="Zırh +%3", perk_add=dict(base_armor=0.03)),
+    # yalnızca şans çarkından (%2) çıkar, satılmaz
+    dict(id="crown_god", slot="hat", name="GOD Tacı", cost=0, wheel_only=True,
+         color=(255, 205, 60), accent=(255, 246, 200),
+         desc="Şans Çarkı'nın en nadir tacı. Yalnızca tanrılar takar.",
+         perk_text="Hasar +%12, Şans +%12", perk_add=dict()),
 ]
 COSMETIC_BY_ID = {c["id"]: c for c in COSMETICS}
 
@@ -9114,6 +9119,7 @@ COS_PERKS = {
     "nightmare_helm": (("speed", 16), ("critd", 0.10)), "crystal_helm": (("crit", 0.07), ("aspd", 0.05)),
     "leaf_visor": (("regen", 0.4), ("pickup", 12)), "frost_lens": (("taken", 0.05), ("crit", 0.03)),
     "ember_shades": (("critd", 0.08), ("dmg", 0.04)), "cape_steel": (("armor", 0.06), ("hp", 20)),
+    "crown_god": (("dmg", 0.12), ("luck", 0.12)),
 }
 # takım: (ad 5 dil, renk, şapkalar, gözlükler, pelerinler, bonus)
 COS_SETS = {
@@ -10900,6 +10906,10 @@ def _draw_cosmetic_hat_raw(surf, p, px, py, t):
             pygame.draw.circle(surf, OUTLINE, (int(gx), int(gy)), 3)
             pygame.draw.circle(surf, gc, (int(gx), int(gy)), 2)
         add_glow(surf, px, by, 18, col, .40 + .18 * math.sin(t * 3.4))
+
+    elif item["id"] == "crown_god":
+        # GOD tacı: ışınlı, taşlı, "GOD" yazılı büyük altın taç
+        draw_god_crown(surf, px, py - r - 4, max(12.0, r * 0.62), t)
 
     elif item["id"] == "halo_ring":
         # Çift halka + yumuşak nabız; hafifçe süzülür.
@@ -54525,6 +54535,534 @@ def replay_button_draw(canvas, rect, mouse_pos, t):
     return hov
 
 
+STRINGS.update({
+    "wh.title": _T("ŞANS ÇARKI", "LUCKY WHEEL", "RUEDA DE LA SUERTE", "GLÜCKSRAD", "КОЛЕСО УДАЧИ"),
+    "wh.card_desc": _T("Siteye git, {0} sn kal, dön ve çevir!", "Visit the site, stay {0}s, come back and spin!",
+                       "Visita el sitio, quédate {0}s, vuelve y gira", "Seite besuchen, {0}s bleiben, zurück und drehen!",
+                       "Зайди на сайт, побудь {0}с, вернись и крути!"),
+    "wh.open": _T("ÇARKI AÇ", "OPEN WHEEL", "ABRIR RUEDA", "RAD ÖFFNEN", "ОТКРЫТЬ"),
+    "wh.spin_go": _T("ÇEVİR", "SPIN", "GIRAR", "DREHEN", "КРУТИТЬ"),
+    "wh.spin_now": _T("ÇEVİR!", "SPIN!", "¡GIRA!", "DREHEN!", "КРУТИ!"),
+    "wh.reopen": _T("SİTEYİ AÇ", "OPEN SITE", "ABRIR SITIO", "SEITE ÖFFNEN", "ОТКРЫТЬ САЙТ"),
+    "wh.away": _T("Sitede {0} sn daha kal, sonra oyuna dön", "Stay {0}s more on the site, then come back",
+                  "Quédate {0}s más en el sitio y vuelve", "Noch {0}s auf der Seite bleiben, dann zurück",
+                  "Побудь на сайте ещё {0}с и вернись"),
+    "wh.come_back": _T("Süre doldu: oyuna dönünce çevirebilirsin", "Time's up: come back to the game to spin",
+                       "¡Listo! Vuelve al juego para girar", "Fertig: zurück ins Spiel und drehen",
+                       "Готово: вернись в игру и крути"),
+    "wh.left": _T("Bugün kalan çevirme: {0}/{1}", "Spins left today: {0}/{1}", "Giros hoy: {0}/{1}",
+                  "Heute übrig: {0}/{1}", "Осталось сегодня: {0}/{1}"),
+    "wh.none_left": _T("Yarın yenilenir ({0})", "Resets tomorrow ({0})", "Mañana se renueva ({0})",
+                       "Morgen wieder ({0})", "Обновится завтра ({0})"),
+    "wh.need_login": _T("Çark için giriş yap", "Sign in to spin", "Inicia sesión para girar", "Zum Drehen anmelden",
+                        "Войди, чтобы крутить"),
+    "wh.too_fast": _T("Çok çabuk döndün! Sitede {0} sn daha kal.", "Too fast! Stay {0}s more on the site.",
+                      "¡Muy rápido! Quédate {0}s más.", "Zu schnell! Noch {0}s bleiben.", "Слишком быстро! Ещё {0}с."),
+    "wh.odds": _T("ÇARKTA NELER VAR?", "WHAT'S ON THE WHEEL?", "¿QUÉ HAY EN LA RUEDA?", "WAS GIBT ES?", "ЧТО НА КОЛЕСЕ?"),
+    "wh.won": _T("KAZANDIN!", "YOU WON!", "¡GANASTE!", "GEWONNEN!", "ТЫ ВЫИГРАЛ!"),
+    "wh.gems": _T("{0} Elmas", "{0} Gems", "{0} Gemas", "{0} Edelsteine", "{0} кристаллов"),
+    "wh.crown": _T("GOD Tacı", "GOD Crown", "Corona GOD", "GOD-Krone", "Корона GOD"),
+    "wh.dupe": _T("Zaten sendeydi: yerine +{0} elmas!", "Already yours: +{0} gems instead!",
+                  "Ya lo tenías: ¡+{0} gemas!", "Schon deins: +{0} Edelsteine!", "Уже было: +{0} кристаллов!"),
+    "wh.crown_won": _T("GOD tacı artık senin ve kafanda!", "The GOD crown is yours and equipped!",
+                       "¡La corona GOD es tuya y está equipada!", "Die GOD-Krone gehört dir und sitzt!",
+                       "Корона GOD твоя и уже надета!"),
+    "wh.skin_won": _T("Yeni skin! Karakter seçiminden kuşan.", "New skin! Equip it in character select.",
+                      "¡Nueva skin! Equípala al elegir personaje.", "Neuer Skin! In der Charakterwahl anlegen.",
+                      "Новый скин! Надень его при выборе героя."),
+    "wh.gems_won": _T("+{0} elmas hesabına eklendi", "+{0} gems added to your account",
+                      "+{0} gemas añadidas", "+{0} Edelsteine gutgeschrieben", "+{0} кристаллов на счёт"),
+    "wh.tap_close": _T("kapatmak için tıkla", "click to close", "clic para cerrar", "klicken zum Schließen",
+                       "нажми, чтобы закрыть"),
+    "wh.wheel_only": _T("ŞANS ÇARKI'NDAN", "FROM THE WHEEL", "DE LA RUEDA", "AUS DEM RAD", "С КОЛЕСА"),
+    "c.crown_god.name": _T("GOD Tacı", "GOD Crown", "Corona GOD", "GOD-Krone", "Корона GOD"),
+})
+
+
+# ---- şans çarkı ----
+# Mağaza > ücretsiz sekmesindeki çark. ÇEVİR: sunucudan bilet alınır, site
+# açılır; oyuncu sitede WHEEL_MIN_AWAY saniye kalıp dönünce çark çevrilir.
+# Sonucu sunucu seçer (server.py WHEEL_PRIZES ile aynı tablo), oyun yalnızca
+# çarkı o dilime döndürür. Çevirmeden de içindekiler ve oranları görünür.
+WHEEL_DAILY = 3
+WHEEL_MIN_AWAY = 30.0
+WHEEL_PRIZES = (            # (ödül, yüzde olasılık) - sunucuyla aynı
+    ("g200", 25.0), ("g300", 22.0), ("g500", 18.0), ("g1000", 14.5), ("g2500", 10.0),
+    ("g5000", 7.1), ("g10000", 1.0), ("crown_god", 2.0),
+    ("ash_warrior", 0.1), ("green_titan", 0.1), ("immortal_merc", 0.1), ("web_master", 0.1),
+)
+WHEEL_ODDS = dict(WHEEL_PRIZES)
+WHEEL_DUPE_GEMS = 5000
+# çarkın üstündeki dilim sırası (renkler karışık dursun diye)
+WHEEL_ORDER = ("g200", "g2500", "g300", "ash_warrior", "g500", "crown_god",
+               "g1000", "green_titan", "g5000", "immortal_merc", "g10000", "web_master")
+WHEEL_COLORS = {
+    "g200": (64, 120, 196), "g300": (52, 150, 186), "g500": (44, 170, 150),
+    "g1000": (70, 170, 92), "g2500": (128, 92, 210), "g5000": (196, 84, 168),
+    "g10000": (232, 168, 40), "crown_god": (250, 200, 60),
+    "ash_warrior": (190, 60, 64), "green_titan": (72, 160, 70),
+    "immortal_merc": (150, 36, 52), "web_master": (60, 96, 196),
+}
+
+
+def wheel_is_gems(pz):
+    """Elmas ödülü mü? ("g200" gibi; "green_titan" değil)"""
+    return pz[:1] == "g" and pz[1:].isdigit()
+
+
+def wheel_prize_name(pz):
+    if wheel_is_gems(pz):
+        return L("wh.gems", fmt_num(int(pz[1:])))
+    if pz == "crown_god":
+        return L("wh.crown")
+    sk = SKIN_BY_ID.get(pz)
+    return skin_name(sk) if sk else pz
+
+
+def wheel_short(pz):
+    """Dilimin üstündeki kısa yazı."""
+    if wheel_is_gems(pz):
+        n = int(pz[1:])
+        return ("%dK" % (n // 1000)) if n >= 1000 and n % 1000 == 0 else (
+            ("%.1fK" % (n / 1000.0)).replace(".", ",") if n >= 1000 else str(n))
+    if pz == "crown_god":
+        return "GOD"
+    return "SKIN"
+
+
+def fmt_odds(p):
+    s = ("%.1f" % p) if p < 10 and abs(p - round(p)) > 1e-6 else ("%d" % round(p))
+    if lang() == "tr":
+        return "%" + s.replace(".", ",")
+    return s + "%"
+
+
+def draw_god_crown(surf, cx, cy, s, t, glow=True):
+    """GOD tacı: beş uçlu, taşlı, ışınlı altın taç (s: yarı genişlik)."""
+    gold, lite, dark = (255, 205, 60), (255, 246, 200), (170, 110, 20)
+    if glow:
+        k = 0.5 + 0.5 * math.sin(t * 3.0)
+        add_glow(surf, cx, cy - s * 0.2, s * 2.4, gold, 0.30 + 0.15 * k)
+        for i in range(7):
+            # ışınlar yalnız üst yarıda (yüzün üstüne düşmesin), hafifçe salınır
+            a = -math.pi + (i + 0.5) * math.pi / 7 + 0.12 * math.sin(t * 1.3 + i)
+            thick_line(surf, (cx + math.cos(a) * s * 1.05, cy - s * 0.2 + math.sin(a) * s * 1.05),
+                       (cx + math.cos(a) * s * (1.45 + 0.12 * k), cy - s * 0.2 + math.sin(a) * s * (1.45 + 0.12 * k)),
+                       max(1.0, s * 0.07), scale_col(gold, 0.55 + 0.3 * k), cap=False)
+    base_y = cy + s * 0.45
+    pts = [(cx - s, base_y), (cx - s, cy - s * 0.25), (cx - s * 0.55, cy + s * 0.12),
+           (cx - s * 0.28, cy - s * 0.62), (cx, cy - s * 0.05), (cx + s * 0.28, cy - s * 0.62),
+           (cx + s * 0.55, cy + s * 0.12), (cx + s, cy - s * 0.25), (cx + s, base_y)]
+    poly_aa(surf, [(x, y + max(1.5, s * 0.08)) for x, y in pts], OUTLINE)
+    poly_aa(surf, pts, gold)
+    pygame.draw.lines(surf, lite, False, [(int(x), int(y)) for x, y in pts[1:-1]], max(1, int(s * 0.06)))
+    band = pygame.Rect(int(cx - s * 1.05), int(base_y - s * 0.32), int(s * 2.1), max(4, int(s * 0.42)))
+    pygame.draw.rect(surf, OUTLINE, band.inflate(2, 2), border_radius=max(2, int(s * 0.1)))
+    pygame.draw.rect(surf, dark, band, border_radius=max(2, int(s * 0.1)))
+    if s >= 10:
+        draw_text(surf, "GOD", band.center, max(7, int(s * 0.38)), lite, bold=True, center=True, shadow=False)
+    for gx, gy, gc in ((cx - s * 0.28, cy - s * 0.62, (230, 60, 90)), (cx + s * 0.28, cy - s * 0.62, (90, 190, 255)),
+                       (cx - s, cy - s * 0.25, (120, 235, 150)), (cx + s, cy - s * 0.25, (200, 120, 255))):
+        circle_aa(surf, gx, gy, max(1.6, s * 0.13), OUTLINE)
+        circle_aa(surf, gx, gy, max(1.0, s * 0.09), gc)
+
+
+def _wheel_icon(surf, pz, x, y, s, t=0.0):
+    if wheel_is_gems(pz):
+        n = int(pz[1:])
+        cnt = 1 if n < 1000 else (2 if n < 5000 else 3)
+        for i in range(cnt):
+            ox = (i - (cnt - 1) / 2.0) * s * 0.75
+            draw_icon(surf, x + ox, y + (abs(ox) * 0.25), "gem", GEM_COLOR if n < 10000 else GOLD, s * 0.62)
+    elif pz == "crown_god":
+        draw_god_crown(surf, x, y, s * 0.85, t, glow=False)
+    else:
+        sk = SKIN_BY_ID.get(pz)
+        if sk:
+            draw_skin_preview(surf, sk, x, y, t, r=max(8, int(s * 0.75)), weapon=False, extras=False)
+
+
+_WHEEL_FACE = {}
+
+
+def wheel_face(R):
+    """Çarkın dönmeyen yüzü (dilimler, simgeler, yazılar) - önbellekli."""
+    f = _WHEEL_FACE.get(R)
+    if f is not None:
+        return f
+    sz = R * 2 + 4
+    f = pygame.Surface((sz, sz), pygame.SRCALPHA)
+    c = sz / 2.0
+    n = len(WHEEL_ORDER)
+    seg = math.tau / n
+    for i, pz in enumerate(WHEEL_ORDER):
+        a0 = -math.pi / 2 + i * seg
+        a1 = a0 + seg
+        col = WHEEL_COLORS[pz]
+        pts = [(c, c)] + [(c + math.cos(a0 + (a1 - a0) * k / 12.0) * R, c + math.sin(a0 + (a1 - a0) * k / 12.0) * R)
+                          for k in range(13)]
+        pygame.draw.polygon(f, scale_col(col, 0.78 if i % 2 else 0.92), pts)
+        # iç parlaklık: dilimin dış kenarına doğru açılan şerit
+        pts2 = [(c + math.cos(a0 + 0.02) * R * 0.62, c + math.sin(a0 + 0.02) * R * 0.62)] + \
+               [(c + math.cos(a0 + (a1 - a0) * k / 10.0) * R * 0.97, c + math.sin(a0 + (a1 - a0) * k / 10.0) * R * 0.97)
+                for k in range(1, 10)] + \
+               [(c + math.cos(a1 - 0.02) * R * 0.62, c + math.sin(a1 - 0.02) * R * 0.62)]
+        pygame.draw.polygon(f, lighten(col, 0.18), pts2)
+        pygame.draw.line(f, (40, 26, 20), (c, c), (c + math.cos(a0) * R, c + math.sin(a0) * R), 3)
+        am = (a0 + a1) / 2
+        # simge ve kısa yazı (dışa bakan)
+        ix, iy = c + math.cos(am) * R * 0.70, c + math.sin(am) * R * 0.70
+        _wheel_icon(f, pz, ix, iy, R * 0.12)
+        if R < 120:
+            continue            # küçük çark (mağaza kartı): yalnız simgeler
+        lab = wheel_short(pz)
+        ts = pygame.Surface((R, int(R * 0.3)), pygame.SRCALPHA)
+        draw_text(ts, lab, (ts.get_width() / 2, ts.get_height() / 2), max(11, int(R * 0.085)),
+                  WHITE if pz not in ("g10000", "crown_god") else (60, 34, 10), bold=True, center=True,
+                  shadow=pz not in ("g10000", "crown_god"))
+        rot = pygame.transform.rotate(ts, -math.degrees(am) - 90)
+        tx, ty = c + math.cos(am) * R * 0.44, c + math.sin(am) * R * 0.44
+        f.blit(rot, (int(tx - rot.get_width() / 2), int(ty - rot.get_height() / 2)))
+    pygame.draw.circle(f, (40, 26, 20), (int(c), int(c)), R, 5)
+    _WHEEL_FACE[R] = f
+    return f
+
+
+def draw_lucky_wheel(surf, cx, cy, R, angle, t, lights=True):
+    """Çark: dönen yüz + sabit dış halka, ampuller ve üstte ok."""
+    k = 0.5 + 0.5 * math.sin(t * 2.0)
+    add_glow(surf, cx, cy, R * 1.5, (255, 190, 80), 0.16 + 0.06 * k)
+    pygame.draw.circle(surf, (26, 16, 12), (int(cx), int(cy + 6)), R + 18)
+    disc_grad(surf, cx, cy, R + 16, (120, 70, 30), (60, 34, 16), 6)
+    face = pygame.transform.rotozoom(wheel_face(R), angle, 1.0)
+    surf.blit(face, (int(cx - face.get_width() / 2), int(cy - face.get_height() / 2)))
+    ring_aa(surf, cx, cy, R + 9, (255, 214, 120), 4)
+    if lights:
+        nb = 24
+        for i in range(nb):
+            a = i * math.tau / nb
+            on = (int(t * 6) + i) % 2 == 0
+            bx, by = cx + math.cos(a) * (R + 9), cy + math.sin(a) * (R + 9)
+            if on:
+                add_glow(surf, bx, by, 9, (255, 240, 180), 0.6)
+            circle_aa(surf, bx, by, 3.6, (255, 248, 210) if on else (150, 110, 60))
+    # göbek
+    disc_grad(surf, cx, cy, R * 0.16, (255, 236, 160), (190, 120, 30), 6)
+    ring_aa(surf, cx, cy, R * 0.16, OUTLINE, 3)
+    draw_icon(surf, cx, cy, "star", (120, 60, 10), R * 0.08)
+    # ok (üstte, aşağı bakar)
+    tip = (cx, cy - R + 14)
+    arrow = [(cx - 18, cy - R - 22), (cx + 18, cy - R - 22), tip]
+    poly_aa(surf, [(x, y + 3) for x, y in arrow], OUTLINE)
+    poly_aa(surf, arrow, (240, 60, 70))
+    poly_aa(surf, [(cx - 9, cy - R - 18), (cx + 2, cy - R - 18), tip], (255, 140, 140))
+    circle_aa(surf, cx, cy - R - 22, 8, OUTLINE)
+    circle_aa(surf, cx, cy - R - 22, 6, (255, 214, 120))
+
+
+def _tr_day():
+    return time.strftime("%Y-%m-%d", time.gmtime(time.time() + 3 * 3600))
+
+
+class LuckyWheel:
+    """Şans çarkı penceresi (mağaza > ücretsiz)."""
+
+    SPIN_TIME = 5.6
+
+    def __init__(self, app):
+        self.app = app
+        self.open = False
+        self.state = "idle"      # idle | starting | away | spinning | result
+        self.ticket = ""
+        self.start_at = 0.0
+        self.left_at = 0.0
+        self.angle = 0.0
+        self.spin = None         # (başlangıç açısı, hedef açı, geçen süre)
+        self.prize = None
+        self.res = {}
+        self.msg = ""
+        self.msg_t = 0.0
+        self.last_seg = -1
+        self.confetti = []
+
+    # ---- durum ----
+    def used_today(self):
+        rw = self.app.save.data.get("rewards") or {}
+        return int(rw.get("wheel_count", 0) or 0) if rw.get("wheel_day") == _tr_day() else 0
+
+    def left(self):
+        return max(0, WHEEL_DAILY - self.used_today())
+
+    def ready(self):
+        return self.state == "away" and self.left_at > 0 and time.time() - self.start_at >= WHEEL_MIN_AWAY
+
+    def say(self, txt, t=3.5):
+        self.msg, self.msg_t = str(txt or ""), t
+
+    def show(self):
+        self.open = True
+        sfx("click", 0.6, 0.0)
+
+    # ---- akış ----
+    def begin(self):
+        """ÇEVİR: bilet al, siteyi aç."""
+        acc = self.app.account
+        if not acc.logged_in():
+            self.say(L("wh.need_login"))
+            sfx("error", 0.5, 0.0)
+            return
+        if self.left() <= 0:
+            self.say(L("wh.none_left", fmt_clock(seconds_to_midnight())))
+            sfx("error", 0.5, 0.0)
+            return
+        self.state = "starting"
+
+        def done(ok, err, res):
+            if not ok:
+                self.state = "idle"
+                self.say(err or L("ui.op_fail"))
+                return
+            self.ticket = str((res or {}).get("ticket") or "")
+            self.start_at = time.time()
+            self.left_at = 0.0
+            self.state = "away"
+            self.open_site()
+        acc.reward_call("/rewards/wheel_start", {}, done)
+
+    def open_site(self):
+        try:
+            if webbrowser is not None:
+                webbrowser.open(SITE_URL)
+        except Exception:
+            pass
+
+    def on_focus(self, gained):
+        """Pencere odağı: siteye gitti mi, ne zaman döndü?"""
+        if self.state != "away":
+            return
+        if not gained:
+            if self.left_at <= 0:
+                self.left_at = time.time()
+            return
+        if self.left_at <= 0:
+            return
+        self.open = True
+        rest = WHEEL_MIN_AWAY - (time.time() - self.start_at)
+        if rest > 0:
+            self.say(L("wh.too_fast", int(math.ceil(rest))), 4.0)
+            sfx("error", 0.5, 0.0)
+        else:
+            sfx("levelup", 0.5, 0.0)
+
+    def do_spin(self):
+        if not self.ready():
+            return
+        self.state = "starting"
+
+        def done(ok, err, res):
+            if not ok:
+                self.state = "away"
+                self.say(err or L("ui.op_fail"))
+                return
+            pz = str((res or {}).get("prize") or "")
+            if pz not in WHEEL_ODDS:
+                self.state = "idle"
+                return
+            self.prize, self.res = pz, dict(res or {})
+            n = len(WHEEL_ORDER)
+            segd = 360.0 / n
+            i = WHEEL_ORDER.index(pz)
+            want = (i + 0.5 + random.uniform(-0.32, 0.32)) * segd
+            cur = self.angle % 360.0
+            delta = (want - cur) % 360.0
+            self.spin = (self.angle, self.angle + delta + 360.0 * 7, 0.0)
+            self.state = "spinning"
+            sfx("click", 0.7, 0.0)
+        self.app.account.reward_call("/rewards/wheel_spin", {"ticket": self.ticket}, done)
+
+    def _finish(self):
+        pz = self.prize
+        sv = self.app.save
+        if pz == "crown_god" and not self.res.get("dupe"):
+            try:
+                sv.equip_cosmetic("hat", "crown_god")
+                sv.save()
+            except Exception:
+                pass
+        self.state = "result"
+        self.ticket = ""
+        sfx("levelup", 1.0, 0.0)
+        big = pz in ("g10000", "crown_god") or pz in SKIN_BY_ID
+        for i in range(140 if big else 70):
+            a = random.uniform(0, math.tau)
+            sp = random.uniform(160, 520 if big else 380)
+            self.confetti.append([VIRTUAL_W / 2, VIRTUAL_H / 2 - 40, math.cos(a) * sp, math.sin(a) * sp - 200,
+                                  random.choice(((255, 214, 120), (120, 210, 255), (255, 120, 160),
+                                                 (140, 240, 150), (220, 160, 255))), random.uniform(1.2, 2.2)])
+
+    # ---- çizim ----
+    def draw(self, canvas, dt, mouse_pos, clicked):
+        """Pencere açıksa çizer; tıklamayı yuttuysa True."""
+        if not self.open:
+            return False
+        app, t = self.app, self.app.t
+        if self.msg_t > 0:
+            self.msg_t -= dt
+        # dönme
+        if self.state == "spinning" and self.spin:
+            a0, a1, el = self.spin
+            el += dt
+            k = clamp(el / self.SPIN_TIME, 0.0, 1.0)
+            e = 1.0 - (1.0 - k) ** 3.6
+            self.angle = a0 + (a1 - a0) * e
+            self.spin = (a0, a1, el)
+            segn = int(self.angle / (360.0 / len(WHEEL_ORDER)))
+            if segn != self.last_seg:
+                self.last_seg = segn
+                sfx("click", 0.25 + 0.25 * (1.0 - k), 0.0)
+            if k >= 1.0:
+                self.spin = None
+                self._finish()
+        elif self.state in ("idle", "away"):
+            self.angle += dt * 9.0
+        dim = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+        dim.fill((6, 4, 10, 210))
+        canvas.blit(dim, (0, 0))
+        box = pygame.Rect(70, 40, VIRTUAL_W - 140, VIRTUAL_H - 80)
+        panel(canvas, box, bg=(30, 20, 26), edge=(255, 196, 90), alpha=250, radius=24, edge_w=3)
+        draw_text(canvas, L("wh.title"), (box.x + 300, box.y + 34), 34, GOLD, bold=True, center=True)
+        # çark
+        cx, cy, R = box.x + 300, box.y + 318, 196
+        draw_lucky_wheel(canvas, cx, cy, R, self.angle, t)
+        # sağ: neler var
+        lx = box.x + 600
+        draw_text(canvas, L("wh.odds"), (lx, box.y + 22), 20, (255, 226, 160), bold=True)
+        rows = sorted(WHEEL_PRIZES, key=lambda q: -q[1])
+        rh = 34
+        for j, (pz, od) in enumerate(rows):
+            rr = pygame.Rect(lx, box.y + 56 + j * rh, box.right - lx - 30, rh - 4)
+            rare = od <= 2.0
+            col = WHEEL_COLORS[pz]
+            pygame.draw.rect(canvas, scale_col(col, 0.30), rr, border_radius=9)
+            ink_frame(canvas, rr, scale_col(col, 0.85) if rare else scale_col(col, 0.55), 9, 2 if rare else 1)
+            _wheel_icon(canvas, pz, rr.x + 20, rr.centery, 12, t)
+            draw_text(canvas, _fit_text(wheel_prize_name(pz), 15, rr.w - 140, bold=True), (rr.x + 42, rr.centery - 10),
+                      15, lighten(col, 0.45), bold=True, shadow=False)
+            if pz in SKIN_BY_ID:
+                draw_text(canvas, "SKIN", (rr.right - 110, rr.centery - 8), 11, (255, 170, 170), bold=True,
+                          shadow=False)
+            draw_text(canvas, fmt_odds(od), (rr.right - 14 - text_width(fmt_odds(od), 15, True), rr.centery - 10),
+                      15, GOLD if rare else TEXT, bold=True, shadow=False)
+        # alt: düğme + durum
+        by = box.bottom - 84
+        bt = pygame.Rect(cx - 170, by, 340, 54)
+        hov = bt.collidepoint(mouse_pos)
+        left = self.left()
+        draw_text(canvas, L("wh.left", left, WHEEL_DAILY), (cx, box.y + 66), 13,
+                  TEXT if left else (255, 150, 150), center=True, shadow=False)
+        act = None
+        if self.state == "starting" or self.state == "spinning":
+            app._mini_button(canvas, bt, "...", (120, 90, 40), False, enabled=False, size=18)
+        elif self.state == "away":
+            if self.ready():
+                pk = 0.5 + 0.5 * math.sin(t * 6)
+                add_glow(canvas, bt.centerx, bt.centery, 180, GOLD, 0.25 + 0.2 * pk)
+                app._mini_button(canvas, bt, L("wh.spin_now"), (200, 140, 30), hov, size=22)
+                act = "spin"
+            else:
+                rest = max(0, int(math.ceil(WHEEL_MIN_AWAY - (time.time() - self.start_at))))
+                app._mini_button(canvas, bt, L("wh.reopen"), (58, 128, 196), hov, size=16)
+                draw_text(canvas, L("wh.away", rest) if rest > 0 else L("wh.come_back"), (cx, by + 62),
+                          12, (190, 210, 255), center=True, shadow=False)
+                act = "site"
+        elif left > 0:
+            if app.account.logged_in():
+                app._mini_button(canvas, bt, L("wh.spin_go"), (200, 140, 30), hov, size=20)
+                draw_text(canvas, L("wh.card_desc", int(WHEEL_MIN_AWAY)), (cx, by + 62), 12, TEXT_DIM,
+                          center=True, shadow=False)
+                act = "begin"
+            else:
+                app._mini_button(canvas, bt, L("ui.sign_in"), (40, 110, 160), hov, size=18)
+                act = "login"
+        else:
+            app._mini_button(canvas, bt, L("wh.none_left", fmt_clock(seconds_to_midnight())),
+                             (90, 70, 60), False, enabled=False, size=14)
+        # kapat
+        xb = pygame.Rect(box.right - 52, box.y + 12, 40, 40)
+        xh = xb.collidepoint(mouse_pos)
+        pygame.draw.rect(canvas, (90, 40, 46) if xh else (60, 30, 34), xb, border_radius=12)
+        ink_frame(canvas, xb, (255, 150, 150), 12, 2)
+        thick_line(canvas, (xb.x + 13, xb.y + 13), (xb.right - 13, xb.bottom - 13), 3, WHITE)
+        thick_line(canvas, (xb.right - 13, xb.y + 13), (xb.x + 13, xb.bottom - 13), 3, WHITE)
+        if self.msg_t > 0 and self.msg:
+            mw = text_width(self.msg, 14, True) + 40
+            mr = pygame.Rect(0, 0, mw, 36)
+            mr.center = (cx, box.y + 72)
+            panel(canvas, mr, bg=(60, 24, 30), edge=(255, 140, 140), alpha=245, radius=12, edge_w=2)
+            draw_text(canvas, self.msg, mr.center, 14, (255, 210, 210), bold=True, center=True, shadow=False)
+        # sonuç
+        if self.state == "result":
+            self._draw_result(canvas, dt, t)
+            if clicked:
+                self.state = "idle"
+                self.prize = None
+                self.confetti = []
+            return True
+        if clicked:
+            if xh and self.state != "spinning":
+                self.open = False
+                sfx("click", 0.5, 0.0)
+            elif hov and act == "begin":
+                self.begin()
+            elif hov and act == "spin":
+                self.do_spin()
+            elif hov and act == "site":
+                self.open_site()
+            elif hov and act == "login":
+                self.open = False
+                app.goto(STATE_LOGIN)
+        return bool(clicked)
+
+    def _draw_result(self, canvas, dt, t):
+        pz = self.prize or "g200"
+        col = WHEEL_COLORS.get(pz, GOLD)
+        for c in self.confetti:
+            c[0] += c[2] * dt
+            c[1] += c[3] * dt
+            c[3] += 520 * dt
+            c[5] -= dt
+            if c[5] > 0:
+                pygame.draw.rect(canvas, c[4], (int(c[0]), int(c[1]), 6, 4))
+        self.confetti = [c for c in self.confetti if c[5] > 0]
+        box = pygame.Rect(0, 0, 520, 300)
+        box.center = (VIRTUAL_W / 2, VIRTUAL_H / 2)
+        add_glow(canvas, box.centerx, box.centery, 360, col, 0.25)
+        panel(canvas, box, bg=(34, 22, 26), edge=lighten(col, 0.2), alpha=252, radius=22, edge_w=3)
+        draw_text(canvas, L("wh.won"), (box.centerx, box.y + 36), 34, GOLD, bold=True, center=True)
+        cy = box.y + 128
+        if pz == "crown_god":
+            draw_god_crown(canvas, box.centerx, cy, 46, t)
+        elif pz in SKIN_BY_ID:
+            add_glow(canvas, box.centerx, cy, 110, col, 0.4)
+            draw_skin_preview(canvas, SKIN_BY_ID[pz], box.centerx, cy, t, r=42, weapon=True)
+        else:
+            add_glow(canvas, box.centerx, cy, 100, GEM_COLOR, 0.35)
+            _wheel_icon(canvas, pz, box.centerx, cy, 46, t)
+        draw_text(canvas, wheel_prize_name(pz), (box.centerx, box.y + 200), 24, lighten(col, 0.45), bold=True,
+                  center=True)
+        if self.res.get("dupe"):
+            sub = L("wh.dupe", fmt_num(WHEEL_DUPE_GEMS))
+        elif pz == "crown_god":
+            sub = L("wh.crown_won")
+        elif pz in SKIN_BY_ID:
+            sub = L("wh.skin_won")
+        else:
+            sub = L("wh.gems_won", fmt_num(int(pz[1:])))
+        draw_text(canvas, sub, (box.centerx, box.y + 236), 14, TEXT, center=True, shadow=False)
+        draw_text(canvas, L("wh.tap_close"), (box.centerx, box.bottom - 24), 11, TEXT_DIM, center=True,
+                  shadow=False)
+
+
 class App:
     def __init__(self, shadow_of=None):
         # gölge kip: shadow_of verilirse bu App gerçek oyunun yanında çalışan
@@ -54642,6 +55180,7 @@ class App:
         self.ad_done = False          # reklam sonuna kadar izlendi mi
         self.site_click_at = 0.0      # site ziyaret düğmesine ne zaman basıldı (time.time())
         self.site_left_at = 0.0       # pencere odağı ne zaman ilk kez gitti (time.time())
+        self.wheel = LuckyWheel(self)   # şans çarkı (mağaza > ücretsiz)
         self.reward_fx = []           # "+250 ELMAS!" kutlamaları: [x, y, t, miktar]
         self.store_card_t = 0.0       # menüdeki mağaza vitrininin dönme saati
         # ---- yılbaşı süsleri + açılış ekranı ----
@@ -57787,6 +58326,9 @@ class App:
 
     def note_site_focus(self, gained):
         """Ana döngüdeki pencere odak olayından çağrılır (bkz. _focus_gained)."""
+        wh = getattr(self, "wheel", None)
+        if wh is not None:
+            wh.on_focus(gained)
         if self.site_click_at <= 0:
             return
         # Düğmeye basılalı çok uzun süre oldu ve hâlâ gitmediyse (tarayıcı
@@ -58295,40 +58837,26 @@ class App:
             self.goto(STATE_ACHIEVEMENTS)
             sfx("click", 0.6, 0.0)
 
-        # ---- 4) site ziyareti ----
-        scol = (90, 170, 230)
-        r = card(3, scol, L("ui.visit_site"))
-        waiting = self.site_click_at > 0
-        cx, cy = r.centerx, r.y + 100
-        k = 0.5 + 0.5 * math.sin(t * 3)
-        add_glow(canvas, cx, cy, 80, scol, 0.22 + 0.14 * k)
-        disc_grad(canvas, cx, cy, 36, lighten(scol, 0.1), (18, 40, 60), 8)
-        ring_aa(canvas, cx, cy, 36, lighten(scol, 0.3), 3)
-        draw_text(canvas, "WWW", (cx, cy), 14, WHITE, bold=True, center=True, shadow=False)
-        draw_text(canvas, _fit_text(L("ui.visit_desc", int(SITE_VISIT_SECONDS), SITE_REWARD_GEMS),
-                                    11, r.w - 36), (cx, r.y + 150), 11, TEXT_DIM, center=True,
-                  shadow=False)
-        used_s = rw.sites_used()
-        pw = 22
-        px0 = cx - (SITE_DAILY_LIMIT * pw + (SITE_DAILY_LIMIT - 1) * 6) / 2
-        for j in range(SITE_DAILY_LIMIT):
-            pr = pygame.Rect(int(px0 + j * (pw + 6)), r.y + 175, pw, 10)
-            pygame.draw.rect(canvas, (60, 70, 90) if j < used_s else scol, pr, border_radius=5)
+        # ---- 4) şans çarkı ----
+        wcol = (255, 190, 80)
+        r = card(3, wcol, L("wh.title"))
+        wh = self.wheel
+        cx, cy = r.centerx, r.y + 146
+        draw_lucky_wheel(canvas, cx, cy, 72, wh.angle if not wh.open else t * 9.0, t, lights=True)
+        if not wh.open:
+            wh.angle += dt * 9.0
+        left_w = wh.left()
+        draw_text(canvas, L("wh.left", left_w, WHEEL_DAILY), (cx, r.y + 238), 11,
+                  TEXT if left_w else (255, 150, 150), center=True, shadow=False)
         b = pygame.Rect(r.x + 24, r.bottom - 56, r.w - 48, 40)
         bh = b.collidepoint(mouse_pos)
-        site_ready_ = rw.site_ready()
-        if waiting:
-            self._mini_button(canvas, b, L("ui.visit_wait"), (70, 100, 130), False, enabled=False)
-        elif site_ready_:
-            self._mini_button(canvas, b, L("ui.visit_plus", SITE_REWARD_GEMS), (58, 128, 196), bh)
-        elif rw.sites_left() > 0:
-            self._mini_button(canvas, b, L("ui.ad_wait", fmt_clock(rw.site_cooldown())),
-                              (58, 128, 196), False, enabled=False)
+        if wh.ready():
+            add_glow(canvas, b.centerx, b.centery, 120, GOLD, 0.25 + 0.15 * math.sin(t * 6))
+            self._mini_button(canvas, b, L("wh.spin_now"), (200, 140, 30), bh)
         else:
-            self._mini_button(canvas, b, L("ui.ad_tomorrow", fmt_clock(seconds_to_midnight())),
-                              (58, 128, 196), False, enabled=False)
-        if clicked and bh and site_ready_ and not waiting:
-            self._site_visit_start()
+            self._mini_button(canvas, b, L("wh.open"), (200, 140, 30), bh, icon="star")
+        if clicked and (bh or pygame.Rect(r.x, r.y + 40, r.w, 200).collidepoint(mouse_pos)):
+            wh.show()
 
     def _trophy(self, canvas, cx, cy, s, col, t=0.0):
         """Altın kupa (başarımlar ve mağaza)."""
@@ -59246,6 +59774,9 @@ class App:
         # düğmeler tıklanmaz
         ui_click = (clicked and self.ad_play is None and self.gem_msg_timer <= 0
                     and not self.purchase.waiting())
+        wheel_click = ui_click
+        if self.wheel.open:
+            ui_click = False          # çark açıkken arkadaki düğmeler tıklanmaz
 
         # ================= üst şerit =================
         top = pygame.Surface((VIRTUAL_W, 70), pygame.SRCALPHA)
@@ -59283,6 +59814,7 @@ class App:
         self._store_status(canvas, mouse_pos, ui_click,
                            pygame.Rect(240, VIRTUAL_H - 58, VIRTUAL_W - 480, 42))
 
+        self.wheel.draw(canvas, dt, mouse_pos, wheel_click)
         self._draw_payment_wait(canvas, mouse_pos, overlay_click and self.gem_msg_timer <= 0)
         if self.gem_msg_timer > 0:
             self.gem_msg_timer -= dt
@@ -63316,6 +63848,12 @@ class App:
             self.set_state(STATE_GEM_STORE)
             sfx("click", 0.6, 0.0)
             return
+        if item.get("wheel_only"):
+            # satılmaz: şans çarkına götür
+            self.store_tab = "free"
+            self.set_state(STATE_GEM_STORE)
+            self.wheel.show()
+            return
         if self.save.get_gems() >= item["cost"]:
             if self.save.buy_cosmetic(item["id"], item["cost"]):
                 self.save.equip_cosmetic(slot, item["id"])
@@ -63389,7 +63927,7 @@ class App:
             is_pet = item["slot"] == "pet"
             is_equipped = equipped_id == item["id"]
             hover = rect.collidepoint(mouse_pos) and list_rect.collidepoint(mouse_pos)
-            affordable = (not is_pet) and self.save.get_gems() >= item["cost"]
+            affordable = (not is_pet) and not item.get("wheel_only") and self.save.get_gems() >= item["cost"]
             edge = CYAN if is_equipped else (
                 item["color"] if (owned or affordable or is_pet) else (60, 62, 82))
             panel(canvas, rect, bg=(30, 34, 54) if hover else (20, 22, 36), edge=edge, alpha=240, radius=14, edge_w=2)
@@ -63421,6 +63959,9 @@ class App:
                 draw_text(canvas, L("ui.from_store_click"),
                           (rect.centerx, rect.bottom - 15), 10, TEXT_DIM, center=True,
                           shadow=False)
+            elif item.get("wheel_only"):
+                draw_text(canvas, L("wh.wheel_only"), (rect.centerx, rect.bottom - 20), 12, GOLD, bold=True,
+                          center=True)
             else:
                 pcol = GEM_COLOR if affordable else (100, 105, 130)
                 cost_txt = str(item["cost"])

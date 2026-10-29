@@ -1161,13 +1161,15 @@ PROGRESS_LISTS = ("skins_owned", "cosmetics_owned", "books_owned", "weapons_owne
 # gerçek parayla satılan içerik: oyunun gönderdiği listeye yeni eklenmişse
 # kabul edilmez.
 PAID_SKINS = {"web_master", "ash_warrior", "green_titan", "immortal_merc"}
+# yalnızca şans çarkından (sunucu) çıkan kozmetikler
+WHEEL_ONLY_COSMETICS = {"crown_god"}
 
 
 def _is_paid(list_key, item):
     if list_key == "skins_owned":
         return item in PAID_SKINS
     if list_key == "cosmetics_owned":
-        return str(item).startswith("pet_")
+        return str(item).startswith("pet_") or item in WHEEL_ONLY_COSMETICS
     return False
 
 # ---- arena ustalığı (koşular arası kalıcı yükseltme) ----
@@ -1430,6 +1432,8 @@ def _public_progress(prog):
     rw.pop("ad_started", None)
     rw.pop("snow_nonce", None)          # kartopu bileti de gizli
     rw.pop("snow_started", None)
+    rw.pop("wheel_nonce", None)         # çark bileti de
+    rw.pop("wheel_started", None)
     out["rewards"] = rw
     return out
 
@@ -1813,6 +1817,124 @@ def _ad_start_locked(acc):
     if e is not None:
         return e
     return jsonify({"success": True, "ticket": nonce})
+
+
+# ---- şans çarkı ----
+# Oyuncu ÇEVİR'e basar -> /rewards/wheel_start bilet verir ve oyun siteyi açar.
+# Sitede en az WHEEL_MIN_AWAY saniye kalıp dönünce /rewards/wheel_spin çarkı
+# çevirir: sonucu SUNUCU seçer (oyun yalnızca çarkı o dilime döndürür), ödül
+# hesaba burada yazılır. Günde WHEEL_DAILY hak. Oyundaki WHEEL_PRIZES ile aynı
+# olmalı (oyun oranları ekranda gösteriyor).
+WHEEL_DAILY = 3
+WHEEL_COOLDOWN = 60.0
+WHEEL_MIN_AWAY = 30.0
+WHEEL_MAX_AWAY = 30 * 60.0
+WHEEL_PRIZES = (            # (ödül, yüzde olasılık)
+    ("g200", 25.0), ("g300", 22.0), ("g500", 18.0), ("g1000", 14.5), ("g2500", 10.0),
+    ("g5000", 7.1), ("g10000", 1.0), ("crown_god", 2.0),
+    ("ash_warrior", 0.1), ("green_titan", 0.1), ("immortal_merc", 0.1), ("web_master", 0.1),
+)
+WHEEL_DUPE_GEMS = 5000       # zaten sahip olunan taç / skin çıkarsa yerine elmas
+_wheel_rng = secrets.SystemRandom()
+
+
+def _wheel_pick():
+    total = sum(w for _p, w in WHEEL_PRIZES)
+    x = _wheel_rng.uniform(0.0, total)
+    for prize, w in WHEEL_PRIZES:
+        x -= w
+        if x <= 0:
+            return prize
+    return WHEEL_PRIZES[0][0]
+
+
+def _wheel_used_today(rw):
+    return int(rw.get("wheel_count", 0) or 0) if rw.get("wheel_day") == _server_day() else 0
+
+
+@app.route("/rewards/wheel_start", methods=["POST"])
+def rewards_wheel_start():
+    ctx, err = _reward_ctx()
+    if err:
+        return err
+    acc, _data = ctx
+    with _acct_lock(acc["id"]):
+        row, before, rw = _reward_row(acc["id"])
+        used = _wheel_used_today(rw)
+        if used >= WHEEL_DAILY:
+            return jsonify({"success": False, "error": "bugünkü çark hakkın bitti", "left": 0}), 429
+        if time.time() - _num(rw.get("wheel_last"), 0) < WHEEL_COOLDOWN - 2:
+            return jsonify({"success": False, "error": "bir sonraki çevirme için biraz bekle"}), 429
+        nonce = secrets.token_hex(12)
+        rw["wheel_nonce"] = nonce
+        rw["wheel_started"] = time.time()
+        merged = dict(before)
+        merged["rewards"] = rw
+        e = _store_progress(acc["id"], row, before, merged)
+        if e is not None:
+            return e
+    return jsonify({"success": True, "ticket": nonce, "left": WHEEL_DAILY - used,
+                    "wait": WHEEL_MIN_AWAY})
+
+
+@app.route("/rewards/wheel_spin", methods=["POST"])
+def rewards_wheel_spin():
+    ctx, err = _reward_ctx()
+    if err:
+        return err
+    acc, data = ctx
+    with _acct_lock(acc["id"]):
+        row, before, rw = _reward_row(acc["id"])
+        ticket = str(data.get("ticket") or "")
+        if not ticket or not hmac.compare_digest(ticket, str(rw.get("wheel_nonce") or "")):
+            return jsonify({"success": False, "error": "çark bileti geçersiz"}), 403
+        el = time.time() - _num(rw.get("wheel_started"), 0)
+        if el < WHEEL_MIN_AWAY - 1.0:
+            return jsonify({"success": False, "error": "sitede %d saniye kalmalısın" % int(WHEEL_MIN_AWAY),
+                            "wait": max(0.0, WHEEL_MIN_AWAY - el)}), 403
+        if el > WHEEL_MAX_AWAY:
+            rw.pop("wheel_nonce", None)
+            return jsonify({"success": False, "error": "çark biletinin süresi doldu"}), 403
+        if _wheel_used_today(rw) >= WHEEL_DAILY:
+            return jsonify({"success": False, "error": "bugünkü çark hakkın bitti"}), 429
+        prize = _wheel_pick()
+        merged = json.loads(json.dumps(before))
+        gems = 0
+        dupe = False
+        if prize[:1] == "g" and prize[1:].isdigit():        # "g200" (green_titan değil)
+            gems = int(prize[1:])
+        elif prize in WHEEL_ONLY_COSMETICS:
+            lst = list(merged.get("cosmetics_owned") or [])
+            if prize in lst:
+                dupe, gems = True, WHEEL_DUPE_GEMS
+            else:
+                lst.append(prize)
+                merged["cosmetics_owned"] = lst
+        else:
+            lst = list(merged.get("skins_owned") or ["default"])
+            if prize in lst:
+                dupe, gems = True, WHEEL_DUPE_GEMS
+            else:
+                lst.append(prize)
+                merged["skins_owned"] = lst
+        if gems:
+            merged["gems_earned"] = int(before.get("gems_earned", 0) or 0) + gems
+            merged["gems"] = max(0, merged["gems_earned"] - int(before.get("gems_spent", 0) or 0))
+        rw["wheel_count"] = _wheel_used_today(rw) + 1
+        rw["wheel_day"] = _server_day()
+        rw["wheel_last"] = time.time()
+        rw["wheel_total"] = int(rw.get("wheel_total", 0) or 0) + 1
+        rw.pop("wheel_nonce", None)          # bilet bir kez kullanılır
+        rw.pop("wheel_started", None)
+        merged["rewards"] = rw
+        e = _store_progress(acc["id"], row, before, merged)
+        if e is not None:
+            return e
+        _log_event(acc["id"], "cark", gems, int(merged.get("gems", 0) or 0),
+                   ("şans çarkı: " + prize + (" (zaten vardı)" if dupe else ""))[:120])
+    return jsonify({"success": True, "prize": prize, "gems": gems, "dupe": dupe,
+                    "left": WHEEL_DAILY - int(rw["wheel_count"]),
+                    "progress": _public_progress(merged)})
 
 
 @app.route("/rewards/claim", methods=["POST"])
