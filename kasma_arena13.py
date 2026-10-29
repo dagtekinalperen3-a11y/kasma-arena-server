@@ -12984,44 +12984,44 @@ BOOKS = [
     # Alındığı anda bütün nadir kitaplar havuzdan çıkar. Hepsi tek seferlik ve
     # büyük etkilidir; seviyesi yükselmez.
     {"key": "r_poison", "name": "Zehir Kitabı",
-     "desc": "Vurduğun düşmanı ölene kadar zehirler, zehir üst üste birikir",
+     "desc": "Vurduğun düşmanı ölene kadar zehirler (silahların da), zehir üst üste birikir",
      "color": (120, 225, 90), "icon": "drop", "rare": True,
      "unlock": dict(text="Binlerce düşmanı devir, birini bile kaçırma",
                     reqs=[rq_stat("total_kills", 4000, "Toplam 4.000 düşman öldür"),
                           rq_stat("best_run_kills", 300, "Tek koşuda 300 düşman öldür")])},
     {"key": "r_echo", "name": "Yankı Kitabı",
-     "desc": "Her 4. atışın çift hasar vurur",
+     "desc": "Her 3. atışın +%150 hasar vurur",
      "color": (255, 225, 140), "icon": "bolt", "rare": True,
      "unlock": dict(text="Tetiği bırakma: 30.000 mermi at",
                     reqs=[rq_stat("total_shots", 30000, "Toplam 30.000 mermi at"),
                           rq_stat("best_wave", 10, "10. dalgaya ulaş")])},
     {"key": "r_killheal", "name": "Kan Kitabı",
-     "desc": "Öldürdüğün her düşman maks canının %3'ü kadar can verir",
+     "desc": "Öldürdüğün her düşman maks canının %4'ü kadar can verir",
      "color": (220, 60, 90), "icon": "heart", "rare": True,
      "unlock": dict(text="Kan Emici'yi Lv.4'e çıkar ve 6.000 can çal",
                     reqs=[rq_shop("vampiric", 4, "Kan Emici'yi markette Lv.4'e çıkar"),
                           rq_stat("total_lifesteal", 6000, "Kan Emici ile toplam 6.000 can çal")])},
     {"key": "r_rage", "name": "Öfke Kitabı",
-     "desc": "Canın yarısının altındayken hasarın %35 artar",
+     "desc": "Canın %60'ının altındayken hasarın %49 artar",
      "color": (250, 70, 50), "icon": "flame", "rare": True,
      "unlock": dict(text="Patronların kâbusu ol",
                     reqs=[rq_stat("bosses", 6, "6 patron devir"),
                           rq_stat("best_run_kills", 350, "Tek koşuda 350 düşman öldür")])},
     {"key": "r_execute", "name": "İnfaz Kitabı",
-     "desc": "Canı %8'in altına düşen sıradan düşmanlar anında ölür (zırhlılarda yarısı)",
+     "desc": "Canı %12'nin altına düşen sıradan düşmanlar anında ölür (zırhlılarda yarısı)",
      "color": (255, 160, 60), "icon": "skull", "rare": True,
      "unlock": dict(text="Bitirmeyi öğren: 16. dalgaya ulaş",
                     reqs=[rq_stat("best_wave", 16, "16. dalgaya ulaş"),
                           rq_stat("total_kills", 5000, "Toplam 5.000 düşman öldür")])},
     {"key": "r_roar", "name": "Kükreme Kitabı",
-     "desc": "BONK'ladığın düşmanlar korkup kaçar ve korkarken %30 fazla hasar alır",
+     "desc": "BONK'ladığın düşmanlar korkup kaçar ve korkarken %45 fazla hasar alır",
      "color": (235, 140, 60), "icon": "skull", "rare": True,
      "unlock": dict(text="Arena senin kükremeni tanısın",
                     reqs=[rq_stat("total_bonks", 700, "Toplam 700 kez BONK at"),
                           rq_stat("total_bonk_hits", 3500, "BONK ile toplam 3.500 düşmana vur"),
                           rq_book("r_bonk", "Önce BONK Kitabı'nı aç")])},
     {"key": "r_dashslow", "name": "Zaman Kitabı",
-     "desc": "Dash bekleme -%10; dash attığında çevrendeki düşmanlar %45 yavaşlar ve sana %35 az hasar verir",
+     "desc": "Dash bekleme -%20; dash attığında çevrendeki düşmanlar %45 yavaşlar ve sana %35 az hasar verir",
      "color": (150, 200, 255), "icon": "snow", "rare": True,
      "unlock": dict(text="Zamanla yarış",
                     reqs=[rq_stat("best_wave", 11, "11. dalgaya ulaş"),
@@ -13029,20 +13029,20 @@ BOOKS = [
                           rq_book("r_spd", "Önce Rüzgâr Kitabı'nı aç")])},
     # Eski kayıtlardaki anahtarı zararsız.
     {"key": "r_lasthope", "name": "Son Umut Kitabı",
-     "desc": "Canın %40'ının altındayken aldığın hasar %35 azalır ve saniyede +2 can yenilersin",
+     "desc": "Canın %50'sinin altındayken aldığın hasar %40 azalır ve saniyede +4 can yenilersin",
      "color": (255, 215, 120), "icon": "shield", "rare": True,
      "unlock": dict(text="Ölümün kıyısında ayakta kal",
                     reqs=[rq_stat("best_wave", 14, "14. dalgaya ulaş"),
                           rq_shop("shield", 5, "Kalkan'ı markette Lv.5'e çıkar")])},
     {"key": "r_clover", "name": "Dört Yapraklı Yonca Kitabı",
-     "desc": "Şans +%60 ve bundan sonra her seviye atladığında Şans +%5",
+     "desc": "Şans +%80 ve bundan sonra her seviye atladığında Şans +%6",
      "color": (90, 235, 120), "icon": "clover4", "rare": True,
      "unlock": dict(text="Şansın kendisi ol",
                     reqs=[rq_book("r_luck", "Önce Şans Kitabı'nı aç"),
                           rq_stat("total_chests", 30, "Toplam 30 patron sandığı aç"),
                           rq_stat("best_wave", 15, "15. dalgaya ulaş")])},
     {"key": "r_hp_big", "name": "Dev Kitabı",
-     "desc": "Maks canın +250 artar ama biraz yavaşlarsın",
+     "desc": "Maks canın +450, zırhın +%5 artar, saniyede +1,5 can yenilersin; çok az yavaşlarsın",
      "color": (200, 140, 90), "icon": "skull", "rare": True,
      "unlock": dict(text="Devleşecek kadar dayan",
                     reqs=[rq_stat("best_combo", 40, "40'lık bir kombo yap"),
@@ -13621,8 +13621,8 @@ WEAPON_BOOST_CAP = 1.00         # silah başına en fazla +%100
 LEGEND_CHEST_EXTRA_LEVEL = True
 LUCK_BOOK_PER_LEVEL = 0.075     # şans kitabı: 1-10. seviye +%7,5 ...
 LUCK_BOOK_LATE = 0.025          # ... 11-30. seviye +%2,5
-CLOVER_LUCK_ON_TAKE = 0.60      # dört yapraklı yonca: alınınca +%60
-CLOVER_LUCK_PER_LEVEL = 0.05    # ... ve sonraki her seviyede +%5
+CLOVER_LUCK_ON_TAKE = 0.80      # dört yapraklı yonca: alınınca +%80 (nadir kitaplar güçlendi)
+CLOVER_LUCK_PER_LEVEL = 0.06    # ... ve sonraki her seviyede +%6
 CORE_LUCK_SOFT = 6.0            # şans çekirdeği: azalan getiri ...
 # ... ilk alım tam +%8 versin diye (stack_bonus ilk adımda per*soft/(soft+1)
 # verir): sonsuz alımda toplam +%56'ya yaklaşır.
@@ -13635,17 +13635,24 @@ LUCK_FREE_REROLL_MAX = 0.35     # ... en fazla %35
 LUCK_RARE_BOOK_K = 0.5          # nadir kitap ağırlığı * (1 + K * şans)
 LUCK_MAGNET_K = 0.5             # mıknatıs şansı * (1 + K * şans)
 # Kitap ayarları
-DEV_BOOK_HP = 250
+DEV_BOOK_HP = 450               # nadir kitaplar güçlendi: 250 -> 450 (+ zırh, can yenilenmesi)
+DEV_BOOK_ARMOR = 0.05
+DEV_BOOK_REGEN = 1.5
+DEV_BOOK_SLOW = 8
 # infaz: "tek İnfaz almak yetiyor" - eşikler küçüldü, toplam tavan düştü ve
 # ağır yaratıklarda yarıya iniyor.
-EXECUTE_BOOK = 0.08
+EXECUTE_BOOK = 0.12
 EXECUTE_EDGE = 0.05
 EXECUTE_SUNDER = 0.03
-EXECUTE_MAX = 0.25
+EXECUTE_MAX = 0.30
 EXECUTE_TOUGH_K = 0.5           # ağır yaratıkta eşiğin çarpanı
-LASTHOPE_HP_FRAC = 0.40
-LASTHOPE_DR = 0.35
-LASTHOPE_REGEN = 2.0            # son umut eşiğin altında can/sn
+LASTHOPE_HP_FRAC = 0.50
+LASTHOPE_DR = 0.40
+LASTHOPE_REGEN = 4.0            # son umut eşiğin altında can/sn
+RAGE_HP_FRAC = 0.60             # öfke kitabı: bu can oranının altında
+POISON_BOOK_WEAPON_K = 0.08     # zehir kitabı: silah vuruşları da zehirler (vuruşun payı)
+ECHO_EVERY = 3                  # yankı kitabı: her 3. atış
+ECHO_MULT = 1.5                 # ... +%150 hasar
 
 
 def rarity_weights(luck):
@@ -14125,7 +14132,7 @@ class Player:
         if self.soul_stacks > 0:
             d *= (1.0 + 0.04 * self.soul_stacks)
         # öfke kitabı: canın yarısının altındayken hasar belirgin artar.
-        if self.rage_level > 0 and self.max_hp > 0 and self.hp < self.max_hp * 0.5:
+        if self.rage_level > 0 and self.max_hp > 0 and self.hp < self.max_hp * RAGE_HP_FRAC:
             d *= (1.0 + self.rage_bonus())
         # pelerin: görünmezken vuruşlar daha ağır.
         if self.invis_t > 0:
@@ -14201,7 +14208,7 @@ class Player:
         """kan kitabı'nın öldürme başına verdiği can."""
         if self.kill_heal_level <= 0:
             return 0.0
-        return max(4.0, self.max_hp * 0.03)
+        return max(6.0, self.max_hp * 0.04)
 
     def eff_evasion(self):
         """Kaçınma kitabı: bir darbeden tamamen sıyrılma olasılığı (tavan %36)."""
@@ -14278,7 +14285,7 @@ class Player:
 
     def rage_bonus(self):
         """Öfke kitabının düşük canda hasar bonusu (azalan getirili)."""
-        return stack_bonus(0.47, self.rage_level, soft=3.0)
+        return stack_bonus(0.65, self.rage_level, soft=3.0)
 
     def book_level(self, key):
         """Bu koşuda o kitabın kaçıncı seviyesi alınmış (yoksa 0)."""
@@ -14519,7 +14526,7 @@ class Player:
         elif key == "r_dashslow":
             # güçlendi: daha geniş/uzun/sert yavaşlatma ve dash -%10.
             self.dash_slow_level += 1
-            self.dash_cd_mult = max(0.35, self.dash_cd_mult - 0.10)
+            self.dash_cd_mult = max(0.35, self.dash_cd_mult - 0.20)
         elif key == "r_luck":
             # 1-10. seviye +%7,5, sonrası +%2,5 (30. seviyede toplam +%125)
             self.run_luck_bonus += LUCK_BOOK_PER_LEVEL if lvl <= 10 else LUCK_BOOK_LATE
@@ -14536,7 +14543,9 @@ class Player:
             gain = DEV_BOOK_HP
             self.max_hp += gain
             self.hp = min(self.max_hp, self.hp + gain)
-            self.base_speed = max(60, self.base_speed - 18)
+            self.run_armor_bonus += DEV_BOOK_ARMOR
+            self.run_regen_bonus += DEV_BOOK_REGEN
+            self.base_speed = max(60, self.base_speed - DEV_BOOK_SLOW)
         elif key == "r_pierce":
             # 5 seviyede duruyor.
             self.pierce_bonus += 1
@@ -30455,6 +30464,52 @@ STRINGS.update({
                       "{0} de cada 5 son morados: enormes y duros, gran botín",
                       "{0} von 5 Gegnern violett: riesig, zäh, brutal - große Beute",
                       "{0} из 5 врагов фиолетовые: огромные, живучие - большая награда"),
+    # ---- nadir kitaplar güçlendi ----
+    "b.r_poison.desc": _T("Vurduğun düşmanı ölene kadar zehirler (silahların da), zehir üst üste birikir",
+                          "Poisons whatever you hit until it dies (weapons too) - the poison stacks",
+                          "Envenena hasta morir (también tus armas) - el veneno se acumula",
+                          "Vergiftet bis zum Tod (auch Waffen) - Gift stapelt sich",
+                          "Отравляет до смерти (и оружием) — яд складывается"),
+    "b.r_echo.desc": _T("Her 3. atışın +%150 hasar vurur", "Every 3rd shot deals +150% damage",
+                        "Cada 3er disparo hace +150% de daño", "Jeder 3. Schuss macht +150% Schaden",
+                        "Каждый 3-й выстрел наносит +150% урона"),
+    "b.r_killheal.desc": _T("Öldürdüğün her düşman maks canının %4'ü kadar can verir",
+                            "Every kill restores 4% of your max health",
+                            "Cada muerte restaura el 4% de tu vida máxima", "Jeder Kill heilt 4% deines max. Lebens",
+                            "Каждое убийство восстанавливает 4% макс. здоровья"),
+    "b.r_rage.desc": _T("Canın %60'ının altındayken hasarın %49 artar", "+49% damage while below 60% health",
+                        "+49% de daño con menos del 60% de vida", "+49% Schaden unter 60% Leben",
+                        "+49% урона при здоровье ниже 60%"),
+    "b.r_execute.desc": _T("Canı %12'nin altına düşen sıradan düşmanlar anında ölür (zırhlılarda yarısı)",
+                           "Ordinary enemies below 12% health die instantly (half on armored ones)",
+                           "Los enemigos normales bajo el 12% mueren al instante (la mitad con armadura)",
+                           "Gewöhnliche Gegner unter 12% Leben sterben sofort (gepanzerte: halb)",
+                           "Обычные враги ниже 12% здоровья умирают сразу (бронированные — вдвое меньше)"),
+    "b.r_roar.desc": _T("BONK'ladığın düşmanlar korkup kaçar ve korkarken %45 fazla hasar alır",
+                        "Enemies you BONK panic and flee, taking 45% more damage while afraid",
+                        "Los enemigos golpeados huyen y reciben 45% más daño mientras temen",
+                        "Von BONK getroffene Gegner fliehen und erleiden 45% mehr Schaden",
+                        "Враги после БОНК убегают и получают на 45% больше урона"),
+    "b.r_dashslow.desc": _T("Dash bekleme -%20; dash attığında çevrendeki düşmanlar %45 yavaşlar ve sana %35 az hasar verir",
+                            "Dash cooldown -20%; dashing slows nearby enemies by 45% and they deal 35% less damage to you",
+                            "Recarga del impulso -20%; al impulsarte frenas un 45% a los cercanos",
+                            "Dash-Abklingzeit -20%; ein Dash verlangsamt nahe Gegner um 45%",
+                            "Перезарядка рывка -20%; рывок замедляет врагов рядом на 45%"),
+    "b.r_lasthope.desc": _T("Canın %50'sinin altındayken aldığın hasar %40 azalır ve saniyede +4 can yenilersin",
+                            "Below 50% health: take 40% less damage and regenerate +4 HP/s",
+                            "Bajo el 50% de vida: 40% menos de daño y +4 de vida/s",
+                            "Unter 50% Leben: 40% weniger Schaden und +4 Leben/s",
+                            "Ниже 50% здоровья: на 40% меньше урона и +4 здоровья/с"),
+    "b.r_hp_big.desc": _T("Maks canın +450, zırhın +%5 artar, saniyede +1,5 can yenilersin; çok az yavaşlarsın",
+                          "Max health +450, armour +5%, +1.5 HP/s regen; you move very slightly slower",
+                          "Vida máxima +450, armadura +5%, +1,5 de vida/s; apenas más lento",
+                          "Max. Leben +450, Rüstung +5%, +1,5 LP/s; kaum langsamer",
+                          "Макс. здоровье +450, броня +5%, +1,5 здоровья/с; чуть медленнее"),
+    "b.r_clover.desc": _T("Şans +%80 ve bundan sonra her seviye atladığında Şans +%6",
+                          "Luck +80%, then +6% Luck every time you level up",
+                          "Suerte +80% y +6% cada vez que subes de nivel",
+                          "Glück +80%, danach +6% bei jedem Stufenaufstieg",
+                          "Удача +80%, затем +6% за каждый уровень"),
     "fx.pinned": _T("YAKALANDI!", "PINNED!", "¡ATRAPADO!", "GEPACKT!", "СХВАЧЕН!"),
     "fx.dracula": _T("DRACULA x{0}: HASAR + ZEHİR GÜÇLENDİ", "DRACULA x{0}: DAMAGE + POISON UP",
                      "DRÁCULA x{0}: MÁS DAÑO Y VENENO", "DRACULA x{0}: MEHR SCHADEN + GIFT",
@@ -32535,9 +32590,9 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMix
         echo_shot = False
         if p.echo_level > 0:
             p.echo_count += 1
-            if p.echo_count % 4 == 0:
-                # yankı kitabı: her 4. atış çift hasar vurur
-                atk_mult *= (1.0 + 1.0 * p.echo_level)
+            if p.echo_count % ECHO_EVERY == 0:
+                # yankı kitabı: her 3. atış +%150 hasar vurur
+                atk_mult *= (1.0 + ECHO_MULT * p.echo_level)
                 echo_shot = True
         if p.swarm_level > 0:
             # sürü kitabı: çevrende 3+ düşman varsa hasarın artar
@@ -32968,6 +33023,12 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMix
         died = e.take_damage(dmg, crit, self.fx, kx * real_kb, ky * real_kb)
         if p.vamp_level > 0:
             p.lifesteal(dmg * 0.02 * p.vamp_level)
+        if p.poison_level > 0 and not died and e.alive:
+            # zehir kitabı: silahlar da zehirler (aynı yaratığa yarım saniyede bir)
+            d_ = e.__dict__
+            if d_.get("_pb_cd", -1.0) <= self.run_time and hasattr(e, "apply_poison"):
+                d_["_pb_cd"] = self.run_time + 0.5
+                e.apply_poison(dmg * POISON_BOOK_WEAPON_K * p.poison_level)
         if died:
             self.on_enemy_killed(e)
         return died
@@ -33919,10 +33980,10 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMix
                 died = e.take_damage(final_dmg, crit, self.fx, kx * 260, ky * 260)
                 # kükreme kitabı: bonk yiyen sıradan düşmanlar korkup kaçar
                 if p.roar_level > 0 and not getattr(e, "is_boss", False) and hasattr(e, "fear_timer"):
-                    e.fear_timer = max(e.fear_timer, 1.0 + 0.6 * p.roar_level)
-                    # Korkan yaratık savunmasız kalır: Lv.1 +%30, Lv.5 +%50.
+                    e.fear_timer = max(e.fear_timer, 1.5 + 0.6 * p.roar_level)
+                    # Korkan yaratık savunmasız kalır: Lv.1 +%45.
                     e.fear_vuln = max(e.fear_vuln,
-                                      min(0.60, 0.25 + 0.05 * p.roar_level))
+                                      min(0.75, 0.40 + 0.05 * p.roar_level))
                 if p.vamp_level > 0:
                     p.lifesteal(final_dmg * 0.02 * p.vamp_level)
                 if died:
