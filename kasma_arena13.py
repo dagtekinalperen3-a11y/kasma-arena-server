@@ -20329,6 +20329,7 @@ class LegendChest(BossChest):
 ARENA_GEAR = ("red", "blue", "yellow", "tank", "sprinter", "brute")
 
 ENEMY_COLORS = {
+    "bloodlord": (150, 20, 40),
     "red":    (222, 70, 78),
     "blue":   (78, 150, 232),
     "yellow": (235, 210, 70),
@@ -20441,6 +20442,14 @@ HEALER_MAX_TARGETS = 6          # bir tikte en çok kaç yaratık (kare hızı)
 # gelemez, üstüne gitmek zorunda kalır:
 # 15. dalgadan sonra seyrek gelir. Yakın dövüşe hiç girmez: uzakta durup
 WIZARD_KEEP = 330               # oyuncuya bundan yakın durmaz
+BLOODLORD_FROM = 15             # kan lordu bu dalgadan sonra gelir (toplam dalga)
+BLOODLORD_KEEP = 270            # oyuncuya bundan yakın durmaz
+BLOODLORD_SHOT_CD = (1.5, 2.2)
+BLOODLORD_SHOT_SPEED = 250
+BLOODLORD_ARMOR = 0.22          # tank: kalın zırh
+BLOODLORD_LEECH = 3.0           # vurduğu hasarın katı kadar iyileşir
+BLOODLORD_DRAIN_CD = 4.0        # kan bağı: bu kadar saniyede bir
+BLOODLORD_DRAIN_R = 330.0
 WIZARD_SHOOT_CD = (2.1, 3.0)    # iki ok arası
 WIZARD_SHOT_SPEED = 215
 WIZARD_POISON_MULT = 0.55       # zehrin saniyelik hasarı = dmg * bu
@@ -20462,7 +20471,8 @@ ENEMY_DMG_NERF = 0.90
 # doğum sıklığı %10 arttı (ENEMY_BUFF).
 ENEMY_BUFF = 1.10
 ENEMY_HP_TUNE = 0.90 * ENEMY_HP_NERF * ENEMY_BUFF
-ENEMY_DMG_TUNE = 0.90 * ENEMY_DMG_NERF * ENEMY_BUFF
+ENEMY_DMG_TUNE = 0.90 * ENEMY_DMG_NERF * ENEMY_BUFF * 1.10   # +%10 hasar (2. tur)
+ENEMY_SPEED_BUFF = 1.10         # bütün yaratıklar +%10 hızlı
 
 ENEMY_DEFS = {
     "red":      {"hp": 30,  "speed": 100, "dmg": 10, "radius": 14, "coin": 5,  "xp": 4,  "score": 12,  "contact_dps": 17},
@@ -20502,6 +20512,10 @@ ENEMY_DEFS = {
     "splitter":  {"hp": 46,  "speed": 110, "dmg": 11, "radius": 18, "coin": 5,  "xp": 6,  "score": 22,  "contact_dps": 15},
     "necro":     {"hp": 84,  "speed": 82,  "dmg": 6,  "radius": 16, "coin": 10, "xp": 13, "score": 40,  "contact_dps": 6},
     "ghost":     {"hp": 34,  "speed": 150, "dmg": 9,  "radius": 14, "coin": 5,  "xp": 6,  "score": 24,  "contact_dps": 13},
+    # kan lordu (15. dalgadan sonra): elit sınıfı. Zırhlı ve çok canlı (tank),
+    # uzaktan kan oku atar (nişancı), değen her vuruş ve kan bağı onu
+    # iyileştirir (can çalar). Evrimle güçlenen oyuncu için.
+    "bloodlord": {"hp": 560, "speed": 74,  "dmg": 17, "radius": 25, "coin": 30, "xp": 36, "score": 170, "contact_dps": 30},
 }
 
 # denge düğmesi - altın akışı. Yere düşen her altın bu çarpanla küçülür.
@@ -20548,7 +20562,7 @@ DIFF_SCORE = {"normal": 1.0, "hard": 1.25, "nightmare": 1.5}
 # çizilen görselin gerçek kapladığı alana göre bir çarpışma yarıçapı çarpanı.
 ENEMY_HITBOX_FACTOR = {
     "red": 1.0, "blue": 0.72, "yellow": 0.8, "tank": 0.95,
-    "sprinter": 0.8, "brute": 0.92, "elite": 1.0,
+    "sprinter": 0.8, "brute": 0.92, "elite": 1.0, "bloodlord": 0.95,
     # cehennem yaratıkları - vuruş alanı görünen gövdeye göre ayarlandı (kanat,
     # kuyruk ve zincir gibi uzantılar isabet alanına girmez).
     "imp": 0.82, "hound": 0.86, "reaver": 0.94, "seer": 0.88,
@@ -20627,7 +20641,7 @@ class Enemy:
         # çizdirmiyor: kanıtlanmış gövdeleri renk ve davranış farkıyla yeniden
         # kullanıyorlar.
         SHAPE_ALIAS = {"bomber": "brute", "healer": "yellow",
-                       "wizard": "yellow", "stinger": "sprinter"}
+                       "wizard": "yellow", "stinger": "sprinter", "bloodlord": "tank"}
         self.shape = (var["shape"] if var
                       else SHAPE_ALIAS.get(kind, kind))      # çizim biçimi
         # Ölüm nedeni / arayüz adı.
@@ -20650,7 +20664,7 @@ class Enemy:
 
         self.max_hp = d["hp"] * wave_mult * hp_var * pr_hp * ENEMY_HP_TUNE
         self.hp = self.max_hp
-        self.speed = d["speed"] * wave_speed_mult(spd_wave) * pr_spd
+        self.speed = d["speed"] * wave_speed_mult(spd_wave) * pr_spd * ENEMY_SPEED_BUFF
         dmg_mult = late_wave_dmg_mult(dmg_wave, LATE_DMG_COEF_HELL if biome == "hell" else None)
         self.dmg = (d["dmg"] * dmg_mult * diff_mult * dmg_var * pr_dmg
                     * ENEMY_DMG_TUNE)
@@ -20756,6 +20770,42 @@ class Enemy:
         if self.slow_timer <= 0 or mult < self.slow_mult:
             self.slow_mult = mult
         self.slow_timer = max(self.slow_timer, duration)
+
+    def hit_player(self, player, dmg, fx, x, y):
+        """Kan lordu: oyuncuya değen vuruşu kadar (ve fazlası) iyileşir."""
+        before = player.hp
+        player.take_damage(dmg, fx, x, y, src=self.disp_name)
+        dealt = max(0.0, before - player.hp)
+        if self.alive and (dealt > 0 or self.kind == "bloodlord"):
+            gain = dealt * BLOODLORD_LEECH + self.max_hp * 0.02
+            self.hp = min(self.max_hp, self.hp + gain)
+            self.heal_flash = 0.3
+            if gain >= 1:
+                fx.popup(self.x, self.y - self.radius - 10, "+%d" % int(gain), (255, 70, 90), 14, life=0.5)
+            if dealt > 0:
+                fx.bolt(zigzag(player.x, player.y, self.x, self.y, 5, 6), (230, 30, 60), 0.2)
+
+    def _draw_bloodlord(self, surf, x, y, r, t, under):
+        """kan lordu: altta kızıl hâle; üstte boynuzlu taç ve damlayan kan."""
+        if under:
+            pulse = 0.5 + 0.5 * math.sin(t * 4 + self.wobble)
+            add_glow(surf, x, y, r * (2.0 + 0.3 * pulse), (220, 20, 50), 0.40 + 0.12 * pulse)
+            return
+        for sg in (-1, 1):
+            pts = [(x + sg * r * 0.35, y - r * 0.75), (x + sg * r * 0.85, y - r * 1.45),
+                   (x + sg * r * 0.62, y - r * 0.62)]
+            poly_aa(surf, [(px + 1, py + 1) for px, py in pts], OUTLINE)
+            poly_aa(surf, pts, (230, 220, 200))
+        cr = [(x - r * 0.4, y - r * 0.8), (x - r * 0.4, y - r * 1.1), (x - r * 0.15, y - r * 0.92),
+              (x, y - r * 1.2), (x + r * 0.15, y - r * 0.92), (x + r * 0.4, y - r * 1.1), (x + r * 0.4, y - r * 0.8)]
+        poly_aa(surf, cr, (220, 180, 60))
+        for i in range(2):
+            ph = (t * 1.2 + i * 0.5 + self.wobble * 0.1) % 1.0
+            circle_aa(surf, x + (i * 2 - 1) * r * 0.4, y + r * 0.6 + ph * r * 0.8, 2.2 * (1 - ph) + 0.8,
+                      (200, 20, 40))
+        if self.__dict__.get("drain_fx", 0.0) > 0:
+            self.drain_fx -= 1 / 60.0
+            ring_aa(surf, x, y, r + 10 + 20 * (0.35 - self.drain_fx), (255, 60, 80), 3)
 
     def _kamikaze_blast(self, player, fx):
         """Kamikaze patlar: menzildeki oyuncuya büyük hasar, kendisi yok olur (ödül yok - kill_cb çağrılmaz)."""
@@ -20960,7 +21010,33 @@ class Enemy:
                         player.take_damage(self.contact_dps * 0.12 * 6, fx,
                                            self.x, self.y, self.disp_name)
                 return
-            if self.kind == "wizard":
+            if self.kind == "bloodlord":
+                # kan lordu: mesafesini korur, üçlü kan oku atar, ara ara kan
+                # bağıyla oyuncudan can emer
+                d = dist(self.x, self.y, player.x, player.y)
+                if d < BLOODLORD_KEEP:
+                    dx, dy = -dx, -dy
+                elif d < BLOODLORD_KEEP + 90:
+                    dx, dy = -dy, dx
+                self.shoot_cd -= dt
+                if self.shoot_cd <= 0 and self.spawn_t > 0.6:
+                    self.shoot_cd = random.uniform(*BLOODLORD_SHOT_CD)
+                    a0 = math.atan2(player.y - self.y, player.x - self.x)
+                    for k_ in (-1, 0, 1):
+                        a_ = a0 + k_ * 0.18
+                        projectiles.append(EnemyProjectile(
+                            self.x, self.y, math.cos(a_) * BLOODLORD_SHOT_SPEED,
+                            math.sin(a_) * BLOODLORD_SHOT_SPEED, self.dmg,
+                            color=(220, 30, 50), r=8, owner=self))
+                    fx.ring(self.x, self.y, (220, 40, 60), n=10, speed=140, life=0.3, r=2.6)
+                    sfx("shoot_c", 0.32, 0.08)
+                self.drain_cd = getattr(self, "drain_cd", BLOODLORD_DRAIN_CD) - dt
+                if (self.drain_cd <= 0 and player.alive and d < BLOODLORD_DRAIN_R
+                        and getattr(player, "invis_t", 0.0) <= 0):
+                    self.drain_cd = BLOODLORD_DRAIN_CD
+                    self.drain_fx = 0.35
+                    self.hit_player(player, self.dmg * 0.8, fx, self.x, self.y)
+            elif self.kind == "wizard":
                 # büyücü: oyuncunun üstüne gitmez, uzaktan zehir oku atar. Oku
                 # az vurur ama zehri uzun sürer; oyuncu ya üstüne gider ya da
                 # sürekli can kaybeder.
@@ -22379,6 +22455,8 @@ class Enemy:
             self._draw_mutant(surf, x, y, r, t, under=True)
         if self.__dict__.get("voidling"):
             self._draw_void(surf, x, y, r, t, under=True)
+        if self.kind == "bloodlord":
+            self._draw_bloodlord(surf, x, y, r, t, under=True)
         surf.blit(self._spr, (int(x) - self._spr_off[0], int(y) - self._spr_off[1]))
         if MOBILE and self.hit_flash > 0:
             blit_disc(surf, x, y, r * 0.9, (255, 255, 255), 90)
@@ -22388,6 +22466,8 @@ class Enemy:
             self._draw_mutant(surf, x, y, r, t, under=False)
         if self.__dict__.get("voidling"):
             self._draw_void(surf, x, y, r, t, under=False)
+        if self.kind == "bloodlord":
+            self._draw_bloodlord(surf, x, y, r, t, under=False)
         if self.kind == "kamikaze":
             self._draw_fuse(surf, x, y, r, t)
         if self.__dict__.get("_freeze_t", 0.0) > 0:
@@ -24785,10 +24865,10 @@ class Boss(MapBossArt):
         self.armor = pw_armor
         self.max_hp = d["hp"] * hp_mult * diff_mult * pw_hp * BOSS_HP_NERF * BOSS_HP_BONUS
         self.hp = self.max_hp
-        self.speed = d["speed"]
+        self.speed = d["speed"] * ENEMY_SPEED_BUFF
         self.dmg = (d["dmg"] * diff_mult * pw_dmg * (0.55 + 0.45 * dmgm) * BOSS_DMG_NERF
                     * (1.0 + BOSS_LATE_DMG * max(0, self.boss_index - 1))
-                    * boss_late_boost(self.boss_index))
+                    * boss_late_boost(self.boss_index) * 1.10)
         self.radius = d["radius"]
         self.hit_r = self.radius * 0.92
         self.color = HELL_BOSS_COLORS.get(kind, d["color"]) if hellish else d["color"]
@@ -27348,9 +27428,14 @@ def wave_score_goal(wave, pace=1.0):
 
 # Dalga atlandıktan sonraki "yoğunluk" penceresi: bu süre boyunca düşmanlar
 # belirgin biçimde daha sık ve daha kalabalık gelir, sonra tempo normale döner.
-SURGE_DURATION = 8.0
-SURGE_RATE = 0.62      # spawn aralığı çarpanı (küçük = daha sık)
-SURGE_EXTRA = 1        # her spawn'da kaç ek düşman
+SURGE_DURATION = 15.0
+SURGE_RATE = 0.50      # spawn aralığı çarpanı (küçük = daha sık)
+SURGE_EXTRA = 2        # her spawn'da kaç ek düşman
+# yoğunluk penceresinde doğan yaratıklar daha canlı, sert ve hızlı; pencere
+# kapanınca (15 sn) dalganın normal değerlerine dönerler.
+SURGE_HP = 1.35
+SURGE_DMG = 1.30
+SURGE_SPD = 1.12
 # Dalga atladıktan sonra yoğunluk penceresinin açılmasını bekleyen sükûnet.
 SURGE_CALM = 2.0       # sıradan dalga
 SURGE_CALM_BOSS = 3.2  # patron dalgası (kart/market nefesi daha uzun)
@@ -27668,6 +27753,9 @@ class WaveManager:
 
     def pick_base_kind(self):
         if self.biome == "hell":
+            # cehennemde de kan lordları gelir (toplam dalga 26+)
+            if random.random() < 0.035:
+                return "bloodlord"
             return hell_pick_kind(self.wave)
         w = self.wave
         weights = {
@@ -27689,6 +27777,8 @@ class WaveManager:
             "stinger": max(0, min((w - 24) * 2, 10)) if w >= 25 else 0,
             # kamikaze 20. dalgada girer, yavaş yavaş çoğalır.
             "kamikaze": max(0, min(w - 19, 5)) if w >= KAMIKAZE_WAVE else 0,
+            # kan lordu: 15. dalgadan sonra, seyrek ama tehlikeli
+            "bloodlord": min(2.5, 0.8 + 0.25 * (w - BLOODLORD_FROM)) if w >= BLOODLORD_FROM else 0,
         }
         kinds = list(weights.keys())
         wts = list(weights.values())
@@ -27745,6 +27835,12 @@ class WaveManager:
         # Zorluk düşman istatistiklerini değil yalnızca TEMPOyu (pace) etkiler
         # - spawn hızı tamamen self.pace üzerinden belirlenir.
         tw = spawn_tempo_wave(self.wave, self.biome)
+        # yoğunluk penceresi kapandı: o sırada doğan güçlü yaratıklar normale döner
+        surging = self.surge_active() and not boss_time
+        if getattr(self, "_surge_was", False) and not surging:
+            for e_ in enemies:
+                self._surge_revert(e_)
+        self._surge_was = surging
         base_interval = max(0.20, 1.15 - tw * 0.035) / (self.pace * SPAWN_RATE_TUNE
                                                          * self.spawn_rate_mult)
         if boss_time:
@@ -27767,6 +27863,8 @@ class WaveManager:
             gm = getattr(self, "grave_mult", 1.0)
             if gm != 1.0:
                 cap = int(cap * gm)
+            if surging:
+                cap = int(cap * 1.25)       # yoğunlukta arena daha kalabalık
             if boss_time:
                 cap = max(6, int(cap * BOSS_CROWD_SHARE))
             # kalabalık laneti: kalabalık tavanı büyür
@@ -27803,9 +27901,11 @@ class WaveManager:
             for _ in range(count):
                 kind = self.pick_kind()
                 x, y = self.spawn_pos()
-                if kind in CURSE_KINDS:
+                if kind in CURSE_KINDS or kind == "bloodlord":
                     e_new = Enemy(kind, x, y, wave_mult_fn(self.wave), 1.0, wave=self.wave,
                                   biome=self.biome)
+                    if kind == "bloodlord":
+                        e_new.armor = min(0.65, e_new.armor + BLOODLORD_ARMOR)
                 elif hell:
                     e_new = Enemy(None, x, y, wave_mult_fn(self.wave), 1.0,
                                   wave=self.wave, variant=kind, biome="hell")
@@ -27824,6 +27924,8 @@ class WaveManager:
                 if kind not in CURSE_KINDS:
                     self._mutate_roll(e_new)
                     self._void_roll(e_new)
+                if surging:
+                    self._surge_buff(e_new)
                 enemies.append(e_new)
             elite_chance = 0.12 + min(0.28, self.wave * 0.008)
             if self.surge_active():
@@ -27840,6 +27942,8 @@ class WaveManager:
                     if self.doom:
                         self._doomify(el)
                 self._late_boost(el)
+                if surging:
+                    self._surge_buff(el)
                 enemies.append(el)
 
         return wave_changed
@@ -27854,6 +27958,28 @@ class WaveManager:
         self.mutant_counter = getattr(self, "mutant_counter", 0) + 1
         if self.mutant_counter % MUTANT_EVERY == 0:
             e.mutate()
+
+    def _surge_buff(self, e):
+        """Yoğunluk penceresinde doğan yaratık: daha canlı, sert, hızlı."""
+        if e.__dict__.get("_surge"):
+            return
+        e._surge = True
+        e.max_hp *= SURGE_HP
+        e.hp *= SURGE_HP
+        e.dmg *= SURGE_DMG
+        e.contact_dps *= SURGE_DMG
+        e.speed *= SURGE_SPD
+
+    def _surge_revert(self, e):
+        if not e.__dict__.get("_surge") or getattr(e, "is_boss", False):
+            return
+        e._surge = False
+        frac = e.hp / max(1e-6, e.max_hp)
+        e.max_hp /= SURGE_HP
+        e.hp = e.max_hp * frac
+        e.dmg /= SURGE_DMG
+        e.contact_dps /= SURGE_DMG
+        e.speed /= SURGE_SPD
 
     def _void_roll(self, e):
         """mor yaratıklar: 35. dalgada her 5 yaratıktan 2'si, 40'ta 4'ü, 45'te
@@ -29251,16 +29377,20 @@ def draw_world_extras(world, run, cam, t):
 #   vardır, biri 9.000 altına alınır. 4 kitabı dolu olana hiç gelmez.
 RALLY_COLOR = (230, 170, 80)
 RALLY_R = 110.0                 # [E] menzili
-ARMY_SIZE = 15
-ARMY_REF_WAVE = 9               # ordunun gücü bu dalganın yaratığı kadar (sabit)
-ARMY_HP_K = 2.6                 # ... bunun katı can
-ARMY_DMG_K = 1.6                # ... bunun katı hasar
-ARMY_SPEED_K = 1.08             # oyuncudan biraz hızlı
+ARMY_SIZE = 24
+ARMY_REF_WAVE = 15              # ordunun gücü bu dalganın yaratığı kadar (sabit)
+ARMY_HP_K = 4.2                 # ... bunun katı can
+ARMY_DMG_K = 2.3                # ... bunun katı hasar
+ARMY_SPEED_K = 1.18             # oyuncudan belirgin hızlı
+ARMY_ARMOR = 0.25               # kalkanlı: gelen hasarın %25'i kesilir
+ARMY_CAPTAIN_HP = 4.0           # komutan (elit): askerin bu katı can
+ARMY_WAVE2_T = 14.0             # ikinci bölük bu kadar saniye sonra gelir
+ARMY_WAVE2 = 12
 ARMY_SCORE_K = 3.0              # askerler daha çok skor verir
 ARMY_GOLD = 1000
 ARMY_LEVELS = 3
 ARMY_CHEST_TIER = 3             # epik sandık
-GRAVE_COUNT = 10
+GRAVE_COUNT = 15
 GRAVE_COLOR = (150, 200, 120)
 GRAVE_R = 70.0
 GRAVE_STEP = 0.075              # her mezarlık zorluğu %7,5 artırır
@@ -29479,6 +29609,7 @@ class RelicsMixin:
         self.lectern = None
         self.lectern_open = False
         self.lectern_done = False
+        self.army_wave2_t = None
         if not self.relics_active():
             return
         p = self.player
@@ -29525,38 +29656,60 @@ class RelicsMixin:
         self.lectern_open = False
 
     # ---- meydan taşı: ordu ----
-    def _call_army(self):
+    def _make_soldier(self, x, y, captain=False):
         p = self.player
+        wmult = arena_hp_mult(ARMY_REF_WAVE) * ARMY_HP_K
+        e = Enemy("elite" if captain else "brute", x, y, wmult * (ARMY_CAPTAIN_HP / 3.0 if captain else 1.0),
+                  1.0, wave=ARMY_REF_WAVE, biome="arena")
+        e.army = True
+        e.speed = max(e.speed, p.eff_speed() * (ARMY_SPEED_K * (0.9 if captain else 1.0)))
+        e.dmg *= ARMY_DMG_K
+        e.contact_dps *= ARMY_DMG_K
+        e.armor = min(0.6, e.armor + ARMY_ARMOR)
+        e.score = int(e.score * ARMY_SCORE_K)
+        e.xp = int(e.xp * 2)
+        e.coin = int(e.coin * 2)
+        e.color = (200, 150, 60) if captain else (170, 60, 50)
+        e.disp_name = L("rel.captain") if captain else L("rel.soldier")
+        self.army.append(e)
+        self.enemies.append(e)
+        self.fx.ring(x, y, (255, 90, 70), n=12, speed=180, life=0.35, r=3)
+        return e
+
+    def _army_ring(self, n, r0, r1):
+        p = self.player
+        out = []
+        for i in range(n):
+            a = i * math.tau / n + random.uniform(-0.1, 0.1)
+            d = random.uniform(r0, r1)
+            out.append((clamp(p.x + math.cos(a) * d, ARENA_RECT.left + 40, ARENA_RECT.right - 40),
+                        clamp(p.y + math.sin(a) * d, ARENA_RECT.top + 40, ARENA_RECT.bottom - 40)))
+        return out
+
+    def _call_army(self):
         rs = self.rally
         rs.used = True
-        wmult = arena_hp_mult(ARMY_REF_WAVE) * ARMY_HP_K
-        spd = p.eff_speed() * ARMY_SPEED_K
         self.army = []
-        for i in range(ARMY_SIZE):
-            a = i * math.tau / ARMY_SIZE + random.uniform(-0.1, 0.1)
-            d = random.uniform(430, 560)
-            x = clamp(p.x + math.cos(a) * d, ARENA_RECT.left + 40, ARENA_RECT.right - 40)
-            y = clamp(p.y + math.sin(a) * d, ARENA_RECT.top + 40, ARENA_RECT.bottom - 40)
-            e = Enemy("brute", x, y, wmult, 1.0, wave=ARMY_REF_WAVE, biome="arena")
-            e.army = True
-            e.speed = max(e.speed, spd)
-            e.dmg *= ARMY_DMG_K
-            e.contact_dps *= ARMY_DMG_K
-            e.armor = min(0.5, e.armor + 0.15)
-            e.score = int(e.score * ARMY_SCORE_K)
-            e.xp = int(e.xp * 2)
-            e.coin = int(e.coin * 2)
-            e.color = (170, 60, 50)
-            e.disp_name = L("rel.soldier")
-            self.army.append(e)
-            self.enemies.append(e)
-            self.fx.ring(x, y, (255, 90, 70), n=12, speed=180, life=0.35, r=3)
+        for (x, y) in self._army_ring(ARMY_SIZE, 420, 560):
+            self._make_soldier(x, y)
+        cx, cy = self._army_ring(1, 600, 640)[0]
+        self._make_soldier(cx, cy, captain=True)
+        self.army_wave2_t = self.run_time + ARMY_WAVE2_T
         self.waves.announce_timer = 3.0
         self.waves.announce_text = L("rel.army_come")
         self.fx.do_flash((255, 70, 50), 0.35)
         self.fx.shake(8, 0.35)
         self.fx.shockwave(rs.x, rs.y, 360, (255, 120, 80), 0.6, 7)
         sfx("boss", 0.9, 0.0)
+
+    def _army_wave2(self):
+        self.army_wave2_t = None
+        for (x, y) in self._army_ring(ARMY_WAVE2, 450, 600):
+            self._make_soldier(x, y)
+        self.waves.announce_timer = 2.6
+        self.waves.announce_text = L("rel.army_wave2")
+        self.fx.do_flash((255, 70, 50), 0.25)
+        sfx("boss", 0.7, 0.0)
 
     def _army_won(self):
         p = self.player
@@ -29667,8 +29820,10 @@ class RelicsMixin:
                 self._call_army()
                 use = False
             elif rs.used and not rs.done:
+                if getattr(self, "army_wave2_t", None) is not None and self.run_time >= self.army_wave2_t:
+                    self._army_wave2()
                 self.army = [e for e in self.army if e.alive]
-                if not self.army:
+                if not self.army and getattr(self, "army_wave2_t", None) is None:
                     self._army_won()
         for g in self.graves:
             g.update(dt)
@@ -29749,6 +29904,10 @@ STRINGS.update({
     "rel.lect_buy": _T("{0} ALTIN", "{0} GOLD", "{0} ORO", "{0} GOLD", "{0} ЗОЛОТА"),
     "rel.lect_leave": _T("AYRIL", "LEAVE", "SALIR", "VERLASSEN", "УЙТИ"),
     "rel.lect_gold": _T("Altının: {0}", "Your gold: {0}", "Tu oro: {0}", "Dein Gold: {0}", "Твоё золото: {0}"),
+    "st.graves": _T("Mezarlık", "Graveyards", "Cementerios", "Friedhöfe", "Кладбища"),
+    "rel.army_wave2": _T("İKİNCİ BÖLÜK GELİYOR!", "THE SECOND COMPANY IS COMING!", "¡LLEGA LA SEGUNDA COMPAÑÍA!",
+                         "DIE ZWEITE KOMPANIE KOMMT!", "ИДЁТ ВТОРАЯ РОТА!"),
+    "rel.captain": _T("Ordu Komutanı", "Army Captain", "Capitán del Ejército", "Armeehauptmann", "Капитан армии"),
     "rel.graves_hud": _T("MEZARLIK +{0}", "GRAVES +{0}", "TUMBAS +{0}", "GRÄBER +{0}", "КЛАДБИЩА +{0}"),
 })
 
@@ -30454,6 +30613,12 @@ STRINGS.update({
     "fx.frozen": _T("DONDU!", "FROZEN!", "¡CONGELADO!", "EINGEFROREN!", "ЗАМОРОЖЕН!"),
     "fx.maxhp": _T("+{0} MAKS CAN", "+{0} MAX HP", "+{0} VIDA MÁX", "+{0} MAX LP", "+{0} МАКС. ЗДОР."),
     "fx.reap": _T("TAHSİL", "REAPED", "COBRADO", "GEERNTET", "ЖАТВА"),
+    "th.bloodlord": _T("KAN LORDLARI GELDİ: uzaktan vurur, zırhlıdır, can çalar!",
+                       "BLOOD LORDS ARRIVE: ranged, armoured and they drain life!",
+                       "LLEGAN LOS SEÑORES DE SANGRE: a distancia, blindados, roban vida",
+                       "BLUTFÜRSTEN KOMMEN: Fernkampf, gepanzert, Lebensraub!",
+                       "ПРИШЛИ КРОВАВЫЕ ЛОРДЫ: стреляют, в броне, крадут жизнь!"),
+    "en.bloodlord": _T("Kan Lordu", "Blood Lord", "Señor de Sangre", "Blutfürst", "Кровавый лорд"),
     "th.void35": _T("MOR YARATIKLAR GELDİ!", "THE PURPLE ONES ARE HERE!", "¡LLEGARON LOS MORADOS!",
                     "DIE VIOLETTEN SIND DA!", "ПРИШЛИ ФИОЛЕТОВЫЕ!"),
     "th.void40": _T("MOR SÜRÜ BÜYÜYOR!", "THE PURPLE HORDE GROWS!", "¡LA HORDA MORADA CRECE!",
@@ -35066,6 +35231,9 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMix
             if w > PIERCE_FROM and "pierce" not in seen:
                 seen.add("pierce")
                 msg = ("th.pierce", (255, 170, 120))
+            elif w >= BLOODLORD_FROM and "bloodlord" not in seen:
+                seen.add("bloodlord")
+                msg = ("th.bloodlord", (255, 70, 90))
             elif w >= KAMIKAZE_WAVE and "kamikaze" not in seen:
                 seen.add("kamikaze")
                 msg = ("th.kamikaze", ENEMY_COLORS["kamikaze"])
@@ -39369,6 +39537,13 @@ def player_stat_groups(p, run):
         kazanc.append((L("st.souls"), f"{p.soul_stacks}", (200, 120, 255)))
     # koşunun yemini (kademesiyle, kademe renginde)
     _oath = getattr(run, "oath", None) if run is not None else None
+    if run is not None and hasattr(run, "grave_n"):
+        # mezarlıklar: açılan sayı ve toplam zorluk artışı
+        _gn = int(getattr(run, "grave_n", 0) or 0)
+        kazanc.append((L("st.graves"), "+%s  (%d/%d)" % (fmt_pct1(GRAVE_STEP * _gn), _gn, GRAVE_COUNT),
+                       GRAVE_COLOR if _gn else TEXT_DIM))
+    if getattr(p, "ice_book", 0) > 0:
+        hasar.append((L("bs.ice"), fmt_book_stat(ice_freeze_time(p.ice_book), "sec"), (150, 220, 255)))
     if _oath in OATH_BY_KEY:
         _tier = int(getattr(run, "oath_tier", 0) or 0)
         _nm, _col = L("oath.%s.name" % _oath), OATH_BY_KEY[_oath][2]
@@ -40163,7 +40338,7 @@ def _draw_enemies_fast(world, ens, t):
     batch = []
     flash = None
     for e in sorted(ens, key=_enemy_y):
-        if (e.spawn_t < 0.3 or e.phased or e.rage > 0 or e.mutant or e.kind == "kamikaze"
+        if (e.spawn_t < 0.3 or e.phased or e.rage > 0 or e.mutant or e.kind in ("kamikaze", "bloodlord")
                 or e.__dict__.get("voidling") or e.__dict__.get("_freeze_t", 0.0) > 0
                 or e.__dict__.get("_stun_t", 0.0) > 0 or e.__dict__.get("army")):
             if batch:
