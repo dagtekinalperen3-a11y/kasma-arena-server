@@ -2716,11 +2716,11 @@ STRINGS.update({
                           "Печать жаждет крови. Победи босса и убей 400 тварей."),
 
     "w.whip.name": _T("KIRBAÇ", "WHIP", "LÁTIGO", "PEITSCHE", "КНУТ"),
-    "w.whip.desc": _T("Baktığın yana yatay şaklar ve önündeki her şeye vurur. Seviyeyle uzar; eklenen kırbaçlar yanına gelen yaratıklara saldırır (bir yaratığa en çok 2 kırbaç).",
-                      "Lashes horizontally to the side you face, hitting everything in its band. Grows with level; extra whips strike enemies closing in (at most 2 whips per enemy).",
-                      "Azota en horizontal hacia el lado al que miras. Crece por nivel; los látigos extra atacan a quien se acerca (máx. 2 por enemigo).",
-                      "Peitscht waagerecht zur Blickseite. Wächst mit der Stufe; weitere Peitschen treffen nahe Gegner (max. 2 pro Gegner).",
-                      "Хлещет горизонтально в сторону взгляда. Растёт с уровнем; доп. кнуты бьют подошедших врагов (не больше 2 на врага)."),
+    "w.whip.desc": _T("Baktığın yöne savrulup şaklar, önündeki koniye vurur. Seviyeyle uzar; eklenen kırbaçlar çevreye dağılır, sonunda sağa, üste, sola ve aşağı ikişer kırbaç atar.",
+                      "Swings and cracks toward where you face, hitting the cone ahead. Grows with level; extra whips spread around you, ending with two whips each to the right, up, left and down.",
+                      "Azota hacia donde miras y golpea el cono delante. Crece por nivel; los látigos extra se reparten alrededor, al final dos a cada lado: derecha, arriba, izquierda y abajo.",
+                      "Schwingt und knallt in Blickrichtung und trifft den Kegel davor. Wächst mit der Stufe; weitere Peitschen verteilen sich, am Ende je zwei nach rechts, oben, links und unten.",
+                      "Хлещет в сторону взгляда, поражая конус впереди. Растёт с уровнем; доп. кнуты расходятся вокруг, в итоге по два вправо, вверх, влево и вниз."),
     "w.whip.up": _T("erişimi uzar, yayı genişler ve daha sert savurur, birkaç seviyede bir yenisi eklenir",
                     "longer reach, wider arc, harder knockback - a new one every few levels",
                     "más alcance, arco más amplio, más empuje - uno nuevo cada pocos niveles",
@@ -17168,21 +17168,22 @@ WHIP_LEATHER2 = (246, 212, 160)
 
 
 class WhipLash:
-    """Kırbacın şaklaması - yatay, uzun ve ince bir hilal (klasik "vampir
-    avcısı" kırbacı). Hasar atıldığı anda hesaplanır; bu nesne yalnızca
-    şaklama anını çizer."""
+    """Kırbacın savruluşu - yan yana yay çizerek şaklayan ince deri kamçı.
+    Hasar atıldığı anda hesaplanır; bu nesne yalnızca savruluşu çizer."""
 
-    LIFE = 0.24
+    LIFE = 0.30
+    SEGS = 24                 # gövdeyi oluşturan nokta sayısı
+    GHOSTS = 2                # arkada bırakılan hayalet kırbaç sayısı
 
     def __init__(self, player, ang, length, width, color=WHIP_COLOR, spin=1, hw=26.0, ev=0):
         self.p = player
         self.x, self.y = player.x, player.y
-        self.ang = ang               # kırbacın uzandığı yön
+        self.ang = ang               # savurmanın orta açısı
         self.length = length
-        self.width = max(6.0, float(width))
-        self.hw = float(hw)          # vuruş bandının yarı genişliği
+        self.width = max(3.5, float(width))
+        self.hw = float(hw)
         self.color = color
-        self.spin = 1 if spin >= 0 else -1   # hilalin kavis yönü
+        self.spin = 1 if spin >= 0 else -1   # saat yönü / tersi
         self.life = self.LIFE
         self.alive = True
         self.evo = int(ev or 0)
@@ -17195,118 +17196,149 @@ class WhipLash:
         if self.life <= 0:
             self.alive = False
 
-    def _rope(self, f, n=26):
-        """Kırbacın gövdesi: elden uca giden ve uca doğru koşan bir dalga
-        (gerçek kırbaç şaklaması). f: 0..1 savrulma ilerlemesi."""
-        ext = clamp(f / 0.30, 0.0, 1.0)
-        ext = 1 - (1 - ext) ** 3
-        ca, sa = math.cos(self.ang), math.sin(self.ang)
-        nx, ny = -sa * self.spin, ca * self.spin
-        x0 = self.x + ca * 10
-        y0 = self.y + sa * 10 - 8
-        L_ = max(14.0, self.length - 10) * (0.25 + 0.75 * ext)
-        amp = self.hw * 0.95 * (1.0 - 0.75 * f)
-        wave_pos = f * 1.25                       # dalganın kırbaç boyundaki yeri
+    # ---- geometri ----
+    def _curve(self, f, segs=None):
+        """Savurmanın f anındaki kabza ucu, kabza açısı ve gövde noktaları."""
+        segs = segs or self.SEGS
+        e = ease_out_cubic(clamp(f, 0.0, 1.0))
+        swing = self.spin * WHIP_SWING * (2.0 * e - 1.0)
+        a_grip = self.ang + swing * 0.30      # el, ucun yalnızca bir kısmı kadar döner
+        a_tip = self.ang + swing
+        # kırbaç savrulurken açılır, ortalarda tam boyuna ulaşır
+        reach = self.length * (0.46 + 0.54 * ease_out_cubic(min(1.0, f * 1.35)))
+        gx = self.x + math.cos(a_grip) * WHIP_GRIP
+        gy = self.y + math.sin(a_grip) * WHIP_GRIP
+        span = max(8.0, reach - WHIP_GRIP)
         pts = []
-        for i in range(n + 1):
-            u = i / float(n)
-            # elden çıkan yay + uca doğru koşan dalga tümseği
-            bow = math.sin(math.pi * u) * amp * 0.55 * (1.0 - f)
-            bump = math.exp(-((u - wave_pos) / 0.16) ** 2) * amp * 0.9
-            off = bow + bump * math.sin(u * 9.0 - f * 14.0)
-            pts.append((x0 + ca * L_ * u + nx * off, y0 + sa * L_ * u + ny * off))
-        return pts
+        for i in range(segs + 1):
+            fr = i / segs
+            # uca doğru savurma açısına yaklaşır (kabzaya yakın kısım geride
+            # kalır - kırbacın kıvrımını doğuran gecikme), ortası dışa kabarır:
+            # S kıvrımı; savurma bitince kırbaç gerilir.
+            a = lerp(a_grip, a_tip, fr ** 0.55)
+            a -= self.spin * WHIP_CURL * math.sin(fr * math.pi) * (1.0 - e * 0.60)
+            rr = span * fr
+            pts.append((gx + math.cos(a) * rr, gy + math.sin(a) * rr))
+        return (gx, gy), a_grip, pts
 
     @staticmethod
-    def _taper(pts, w0, w1):
+    def _ribbon(pts, w0, w1, power=1.05, off=0.0):
+        """Nokta dizisini, kalınlığı w0'dan w1'e inen kapalı çokgene çevirir."""
         n = len(pts)
+        if n < 2:
+            return []
         left, right = [], []
         for i, (x, y) in enumerate(pts):
-            j0, j1 = max(0, i - 1), min(n - 1, i + 1)
-            ax, ay = pts[j1][0] - pts[j0][0], pts[j1][1] - pts[j0][1]
-            L_ = math.hypot(ax, ay) or 1.0
-            ux, uy = -ay / L_, ax / L_
-            hw = (w0 + (w1 - w0) * (i / (n - 1.0)) ** 0.8) * 0.5
-            left.append((x + ux * hw, y + uy * hw))
-            right.append((x - ux * hw, y - uy * hw))
-        return left + right[::-1]
+            fr = i / (n - 1.0)
+            hw = lerp(w0, w1, fr ** power) * 0.5
+            if i == 0:
+                ax, ay = pts[1][0] - x, pts[1][1] - y
+            elif i == n - 1:
+                ax, ay = x - pts[n - 2][0], y - pts[n - 2][1]
+            else:
+                ax, ay = pts[i + 1][0] - pts[i - 1][0], pts[i + 1][1] - pts[i - 1][1]
+            L = math.hypot(ax, ay) or 1.0
+            ux, uy = -ay / L, ax / L
+            cx, cy = x + ux * off, y + uy * off
+            left.append((cx + ux * hw, cy + uy * hw))
+            right.append((cx - ux * hw, cy - uy * hw))
+        right.reverse()
+        return left + right
 
+    # ---- çizim ----
     def draw(self, surf, t):
         k = clamp(self.life / self.LIFE, 0.0, 1.0)
         f = 1.0 - k
-        ev = self.evo
+        ev = min(3, evo_of(self))
+        # deri renkleri: evrimsiz kahverengi; I mavi parıltılı deri,
+        # II şimşek kamçısı (lacivert, elektrik), III ejder kamçısı (gece mavisi)
+        body, lite = ((WHIP_LEATHER, WHIP_LEATHER2), (WHIP_LEATHER, (190, 226, 255)),
+                      ((70, 92, 160), (255, 244, 150)), ((40, 60, 130), (150, 225, 255)))[ev]
+        dark = scale_col(body, 0.42)
+        mid = scale_col(body, 0.78)
+        w = self.width
         gl = gfx_level()
         PA = poly_aa if gl >= 2 else (lambda s_, p_, c_: pygame.draw.polygon(s_, c_, p_))
-        # renk: koyu kahve deri, uca doğru açılan; evrimde mavi-beyaz enerji
-        leather = ((96, 58, 34), (78, 92, 150), (66, 104, 200), (80, 140, 240))[min(ev, 3)]
-        shine = ((236, 196, 140), (190, 220, 255), (210, 236, 255), (240, 250, 255))[min(ev, 3)]
-        glow = ((255, 210, 140), (150, 200, 255), (140, 200, 255), (170, 220, 255))[min(ev, 3)]
-        w = self.width * 0.62
-        pts = self._rope(f)
-        # 1) savrulma izi: önceki iki anın soluk gövdesi (hareket bulanıklığı)
+
+        # 1) hareket izi: birkaç kare geriden gelen, sönen ince hayaletler
+        for gi in range(1, min(self.GHOSTS, gl) + 1):
+            gf = f - gi * 0.085
+            if gf <= 0.03:
+                continue
+            _, _, gpts = self._curve(gf, segs=14)
+            dim = (0.85 - 0.2 * gi) * (0.45 + 0.55 * k)
+            PA(surf, self._ribbon(gpts, w * 0.20, 0.4), scale_col(lite, dim))
+
+        grip, a_grip, pts = self._curve(f)
+
+        # 2) kamçı: ince kontur, deri ve sırtta parlak bir hat; uca doğru
+        #    kıl inceliğine kadar sivrilir
+        PA(surf, self._ribbon(pts, w + 2.0, 1.4, power=0.8), OUTLINE)
+        PA(surf, self._ribbon(pts, w, 0.7, power=0.8), mid)
         if gl:
-            for gi, df in ((2, 0.16), (1, 0.08)):
-                if f - df > 0.02:
-                    gp = self._rope(f - df, 18)
-                    PA(surf, self._taper(gp, w * 1.6, 1.0), scale_col(glow, 0.16 + 0.10 * (2 - gi)))
-        # 2) asıl kırbaç: kontur, deri, örgü, parlak sırt
-        PA(surf, self._taper(pts, w + 4.0, 2.4), OUTLINE)
-        PA(surf, self._taper(pts, w, 1.2), leather)
-        PA(surf, self._taper(pts, w * 0.45, 0.6), lighten(leather, 0.25))
+            PA(surf, self._ribbon(pts, w * 0.55, 0.5, power=0.8, off=w * 0.12), dark)
+        PA(surf, self._ribbon(pts, w * 0.26, 0.4, power=0.8, off=-w * 0.20),
+           scale_col(lite, 0.62 + 0.38 * f))
+        # örgü: gövde boyunca ince çapraz çentikler (yüksek grafikte)
         n_ = len(pts)
-        for i in range(2, n_ - 4, 2):
-            hw = (w + (1.2 - w) * (i / (n_ - 1.0)) ** 0.8) * 0.5
-            if hw < 1.2:
-                break
-            ax, ay = pts[i + 1][0] - pts[i - 1][0], pts[i + 1][1] - pts[i - 1][1]
-            L_ = math.hypot(ax, ay) or 1.0
-            ux, uy = ax / L_, ay / L_
-            px_, py_ = -uy, ux
-            cx_, cy_ = pts[i]
-            thick_line(surf, (cx_ + px_ * hw - ux * hw * 0.7, cy_ + py_ * hw - uy * hw * 0.7),
-                       (cx_ - px_ * hw + ux * hw * 0.7, cy_ - py_ * hw + uy * hw * 0.7),
-                       max(1.0, hw * 0.4), scale_col(leather, 0.55))
-        # sırttaki ışık çizgisi
-        hl = [(x, y - 1.2) for x, y in pts[1:-3]]
-        if len(hl) > 1:
-            pygame.draw.lines(surf, scale_col(shine, 0.5 + 0.5 * k), False, [(int(x), int(y)) for x, y in hl], 1)
-        # 3) sap: elde deri sargılı kısa kabza
-        hx, hy = pts[0]
-        bx_ = hx - math.cos(self.ang) * 14
-        by_ = hy - math.sin(self.ang) * 14
-        thick_line(surf, (bx_, by_), (hx, hy), 9, OUTLINE)
-        thick_line(surf, (bx_, by_), (hx, hy), 6, (70, 42, 26))
-        leather_wrap(surf, (bx_, by_), (hx, hy), 5.5, n=3, base=(110, 70, 44))
-        circle_aa(surf, bx_, by_, 4.2, OUTLINE)
-        circle_aa(surf, bx_, by_, 3.0, (210, 170, 90))
-        # 4) uç ve şaklama: dalga uca varınca parlak patlama + halka
-        tip = pts[-1]
-        crack = clamp((f - 0.45) / 0.25, 0.0, 1.0) * clamp((1.0 - f) / 0.35, 0.0, 1.0)
-        thick_line(surf, pts[-2], tip, 2.0, shine)
-        if crack > 0:
-            add_glow(surf, tip[0], tip[1], 20 + 34 * crack + 10 * ev, glow, 0.55 * crack + 0.1)
-            ring_aa(surf, tip[0], tip[1], 6 + 26 * (1 - crack) + 10 * f, scale_col(shine, 0.5 + 0.5 * crack), 2)
-            for i in range(6):
-                a = i * math.tau / 6 + self.seed
-                ln = (10 + 14 * crack) * (1.0 if i % 2 else 0.6)
-                thick_line(surf, (tip[0] + math.cos(a) * 4, tip[1] + math.sin(a) * 4),
-                           (tip[0] + math.cos(a) * ln, tip[1] + math.sin(a) * ln), 2.0, shine)
-        # 5) evrim: deri boyunca elektrik ve uçtan sıçrayan şimşekler
-        if ev >= 1:
-            step = 5 if ev == 1 else 3
+        if gl >= 2:
+            for i in range(1, n_ // 2, 2):
+                fr = i / (n_ - 1.0)
+                hw = lerp(w, 0.7, fr ** 0.8) * 0.5
+                if hw < 1.1:
+                    break
+                ax_, ay_ = pts[i + 1][0] - pts[i - 1][0], pts[i + 1][1] - pts[i - 1][1]
+                L_ = math.hypot(ax_, ay_) or 1.0
+                ux_, uy_ = ax_ / L_, ay_ / L_
+                px_, py_ = -uy_, ux_
+                cx_, cy_ = pts[i]
+                pygame.draw.aaline(surf, dark,
+                                   (cx_ + px_ * hw * 0.85 - ux_ * hw * 0.5, cy_ + py_ * hw * 0.85 - uy_ * hw * 0.5),
+                                   (cx_ - px_ * hw * 0.85 + ux_ * hw * 0.5, cy_ - py_ * hw * 0.85 + uy_ * hw * 0.5))
+        if ev >= 2:
+            # kamçı boyunca çatırdayan elektrik
+            step = (3 if evo_rich() else 6) if ev >= 3 else (4 if evo_rich() else 7)
             for i in range(0, n_ - step, step):
-                if ev == 1 and random.random() < 0.6:
-                    continue
                 evo_zap(surf, pts[i][0], pts[i][1], pts[i + step][0], pts[i + step][1],
-                        scale_col(glow, 0.7 + 0.3 * k), 3, 4 + 2 * ev, 1 if ev < 3 else 2)
-            if ev >= 2 and crack > 0:
-                for i in range(2 + ev):
-                    a = random.uniform(0, math.tau)
-                    ln = 22 + 12 * ev
-                    evo_zap(surf, tip[0], tip[1], tip[0] + math.cos(a) * ln, tip[1] + math.sin(a) * ln,
-                            shine, 3, 6, 1)
-            if ev >= 3:
-                add_glow(surf, pts[n_ // 2][0], pts[n_ // 2][1], 70, glow, 0.25 * k)
+                        scale_col(lite, 0.6 + 0.4 * k), 3, 4 + ev, 1)
+
+        # 3) kabza: elde duran kısa, deri sargılı ince sap
+        hw = max(4.0, w * 0.95)
+        hx = self.x - math.cos(a_grip) * WHIP_GRIP * 0.42
+        hy = self.y - math.sin(a_grip) * WHIP_GRIP * 0.42
+        thick_line(surf, (hx, hy), grip, hw + 2.2, OUTLINE)
+        thick_line(surf, (hx, hy), grip, hw, scale_col(body, 0.38))
+        leather_wrap(surf, (hx, hy), grip, hw * 0.9, n=3, base=scale_col(body, 0.55))
+        circle_aa(surf, hx, hy, hw * 0.50, OUTLINE)
+        circle_aa(surf, hx, hy, hw * 0.34, scale_col(lite, 0.55))
+
+        # 4) uç: ince kamçı ucu (fall) ve şaklama
+        ex, ey = pts[-1]
+        px, py = pts[-2]
+        dx, dy = ex - px, ey - py
+        L = math.hypot(dx, dy) or 1.0
+        ux, uy = dx / L, dy / L
+        fall = 14.0 * (0.35 + 0.65 * f)
+        tip = (ex + ux * fall, ey + uy * fall)
+        pygame.draw.aaline(surf, scale_col(lite, 0.9), (ex, ey), tip)
+        add_glow(surf, tip[0], tip[1], 8 + 14 * f + 8 * ev, lite, 0.22 + 0.30 * k)
+        circle_aa(surf, tip[0], tip[1], 1.4 + 1.0 * f + (1.0 if ev >= 2 else 0), lite)
+        if ev >= 2 and f > 0.5:
+            for i in range(ev):
+                a = random.uniform(0, math.tau)
+                ln = 22 + 10 * ev
+                evo_zap(surf, tip[0], tip[1], tip[0] + math.cos(a) * ln, tip[1] + math.sin(a) * ln,
+                        lite, 3, 6, 1)
+        # şaklama: yay tamamlanırken uçta parlama ve ince kıvılcımlar
+        if f > 0.58:
+            crack = clamp((f - 0.58) / 0.42, 0.0, 1.0)
+            add_glow(surf, tip[0], tip[1], 12 + 22 * crack, lite, 0.40 * crack)
+            base_a = math.atan2(uy, ux)
+            for i in range(5):
+                a = base_a + random.uniform(-1.0, 1.0)
+                ln = random.uniform(7, 22) * crack
+                pygame.draw.aaline(surf, lite, tip,
+                                   (tip[0] + math.cos(a) * ln, tip[1] + math.sin(a) * ln))
 
 
 class SwordSlash:
@@ -19432,9 +19464,9 @@ BOSS_WEAPONS = [
          cd=1.25, dmg=2.75, style=None, dpl=0.055, cdl=0.99075,     # 25. seviyede 1 sn
          up="erişimi uzar, yayı genişler ve daha sert savurur, birkaç "
             "seviyede bir yenisi eklenir",
-         desc="Baktığın yana yatay şaklar ve önündeki her şeye vurur. Seviyeyle "
-              "uzar; eklenen kırbaçlar yanına gelen yaratıklara saldırır (bir "
-              "yaratığa en çok 2 kırbaç).",
+         desc="Baktığın yöne savrulup şaklar, önündeki koniye vurur. Seviyeyle "
+              "uzar; eklenen kırbaçlar çevreye dağılır, sonunda sağa, üste, "
+              "sola ve aşağı ikişer kırbaç atar.",
          how="Kırbaç mesafe tanımaz, sen de tanıma. 40 kez dash at.",
          unlock=dict(text="Yakın dövüşe alış: toplam 40 dash at",
                      reqs=[rq_stat("total_dashes", 40, "Toplam 40 dash at")])),
@@ -33873,58 +33905,42 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMix
             sfx("shoot_c", 0.42, 0.0)
 
         elif key == "whip":
-            # kırbaç (klasik yatay şaklama): ilk kırbaç baktığın yana (sağ /
-            # sol) yatay şaklar. Seviyeyle eklenen kırbaçlar yanına gelen
-            # yaratıklara saldırır - bir yaratığa en çok 2 kırbaç. Her kırbaç
-            # uzandığı bant boyunca alana vurur.
+            # kırbaç: ilk kırbaç baktığın yöne savrulur; seviyeyle eklenen
+            # kırbaçlar çevreye eşit dağılır (2'de öne-arkaya). 4'ü geçince
+            # sağa 2, üste 2, sola 2, aşağı 2: aynı yöndeki iki kırbaç ters
+            # tarafa savrulup çapraz şaklar.
             adx, ady = p.aim_dir
-            face = 0.0 if adx >= 0 else math.pi
+            base_ang = math.atan2(ady, adx)
             n_whip = weapon_count(lvl, "whip")
             reach = whip_reach(lvl)
-            hw = whip_band(lvl)
+            half_arc = whip_arc(lvl)
             ev = evo_tier(p, "whip")
-            width = 14.0 + 0.6 * n_whip
+            width = 5.0 + 0.3 * n_whip        # ince, gerçek bir kamçı
             col = evo_color("whip", ev) if ev else w["color"]
-            dirs = [face]
-            if n_whip > 1:
-                near = []
-                for e in self._all_targets():
-                    if e.alive:
-                        d = dist(p.x, p.y, e.x, e.y)
-                        if d <= reach * 1.15 + getattr(e, "radius", 12):
-                            near.append((d, e))
-                near.sort(key=lambda q: q[0])
-                taken = {}
-                extra = n_whip - 1
-                # en yakından başlayarak her yaratığa en çok 2 kırbaç
-                for rnd_ in range(2):
-                    for d, e in near:
-                        if extra <= 0:
-                            break
-                        if taken.get(id(e), 0) > rnd_:
-                            continue
-                        taken[id(e)] = taken.get(id(e), 0) + 1
-                        dirs.append(math.atan2(e.y - p.y, e.x - p.x) + (0.12 if rnd_ else 0.0))
-                        extra -= 1
-                # yaratık yetmezse kalan kırbaçlar çevreye yayılır
-                for i in range(extra):
-                    dirs.append(face + math.pi + (i - (extra - 1) / 2.0) * 0.6)
+            if n_whip <= 4:
+                dirs = [(base_ang + i * math.tau / n_whip, 1 if i % 2 == 0 else -1)
+                        for i in range(n_whip)]
+            else:
+                # baktığın yöne en yakın ana yönden başla (sağ/üst/sol/alt)
+                card = round(base_ang / (math.pi / 2)) * (math.pi / 2)
+                dirs = [(card + (i % 4) * math.pi / 2, 1 if i < 4 else -1)
+                        for i in range(n_whip)]
+            face = dirs[0][0]
             total_hit = 0
             fx_left = 6
             hit_ids = {}
-            for i, a in enumerate(dirs):
+            cos_arc = math.cos(half_arc)
+            for i, (a, sp_) in enumerate(dirs):
                 ca, sa = math.cos(a), math.sin(a)
-                self.whip_lashes.append(WhipLash(p, a, reach, width, col,
-                                                 spin=1 if i % 2 == 0 else -1, hw=hw, ev=ev))
+                self.whip_lashes.append(WhipLash(p, a, reach, width, col, spin=sp_, ev=ev))
                 for e in self._all_targets():
                     if not e.alive:
                         continue
-                    rx, ry = e.x - p.x, e.y - p.y
-                    er = getattr(e, "radius", 12)
-                    along = rx * ca + ry * sa
-                    if along < -er or along > reach + er:
+                    d = dist(p.x, p.y, e.x, e.y)
+                    if d < 1 or d > reach + getattr(e, "radius", 12):
                         continue
-                    if abs(-rx * sa + ry * ca) > hw + er:
+                    # kırbacın taradığı koni: yaratık bu açının içinde mi?
+                    if ca * (e.x - p.x) / d + sa * (e.y - p.y) / d < cos_arc:
                         continue
                     # aynı şaklamada bir yaratığa en çok 2 kırbaç değer
                     c_ = hit_ids.get(id(e), 0)
@@ -33938,7 +33954,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMix
                                       n=5, speed=190, life=0.3, r=2.6)
                     total_hit += 1
             if ev >= 3:
-                self._whip_dragon_strike(p, face if not hit_ids else dirs[0], reach, dmg, lvl)
+                self._whip_dragon_strike(p, face, reach, dmg, lvl)
             if total_hit:
                 self.fx.shake(3.5 if ev < 2 else 2.0, 0.10)
             sfx("whip", 0.42 if ev < 2 else 0.26, 0.0 if ev < 2 else 0.04)
