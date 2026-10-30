@@ -1221,13 +1221,15 @@ def _clean_profile_style(st, owned):
 PAID_SKINS = {"web_master", "ash_warrior", "green_titan", "immortal_merc"}
 # yalnızca şans çarkından (sunucu) çıkan kozmetikler
 WHEEL_ONLY_COSMETICS = {"crown_god"}
+# yalnızca yöneticinin verebildiği kozmetikler (oyun kendi kendine ekleyemez)
+ADMIN_ONLY_COSMETICS = {"crown_50m"}
 
 
 def _is_paid(list_key, item):
     if list_key == "skins_owned":
         return item in PAID_SKINS
     if list_key == "cosmetics_owned":
-        return str(item).startswith("pet_") or item in WHEEL_ONLY_COSMETICS
+        return str(item).startswith("pet_") or item in WHEEL_ONLY_COSMETICS or item in ADMIN_ONLY_COSMETICS
     return False
 
 # ---- arena ustalığı (koşular arası kalıcı yükseltme) ----
@@ -4628,6 +4630,8 @@ SITE_WHEEL_MAX_WAIT = 30 * 60.0
 SITE_WHEEL_GAP = 8.0                 # iki çevirme arası en az
 SITE_AD_URL = "https://ardance.org/4/8eb87fad3ff308b09ec866979c2bcfe7"
 _site_codes = {}                     # kod özeti -> (hesap, bitiş)
+_site_acc_cache = {}                 # hesap id -> (zaman, satır)
+SITE_ACC_CACHE_T = 20.0
 _site_lock = threading.Lock()
 _site_rng = secrets.SystemRandom()
 
@@ -4681,26 +4685,37 @@ def _site_acc(data):
         return None
     if exp < time.time():
         return None
-    rows = db("accounts").select("*").eq("id", aid).execute()
-    if not rows.data:
-        return None
-    acc = rows.data[0]
+    # oyun masası saniyede bir sorulur: hesap satırı kısa süre önbellekte
+    now = time.time()
+    with _site_lock:
+        hit = _site_acc_cache.get(aid)
+    if hit and now - hit[0] < SITE_ACC_CACHE_T:
+        acc = hit[1]
+    else:
+        rows = db("accounts").select("*").eq("id", aid).execute()
+        if not rows.data:
+            return None
+        acc = rows.data[0]
+        with _site_lock:
+            if len(_site_acc_cache) > 5000:
+                _site_acc_cache.clear()
+            _site_acc_cache[aid] = (now, acc)
     if not hmac.compare_digest(_pw_tag(acc), parts[3]):
         return None
-    return acc
+    return dict(acc)
 
 
-def _site_ctx():
+def _site_ctx(poll=False):
     if not _accounts_enabled():
         return None, None, (jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503)
-    if not _rate_ok("site:ip:" + _client_ip(), 120, 60):
+    if not _rate_ok(("site:pip:" if poll else "site:ip:") + _client_ip(), 400 if poll else 120, 60):
         return None, None, (jsonify({"success": False, "error": "çok sık istek, biraz bekle"}), 429)
     data = _body()
     acc = _site_acc(data)
     if not acc:
         return None, None, (jsonify({"success": False, "error": "oturum süresi doldu, oyundan yeniden aç ya da giriş yap",
                                      "relogin": True}), 401)
-    if not _rate_ok("site:a:" + str(acc["id"]), 90, 60):
+    if not _rate_ok(("site:p:" if poll else "site:a:") + str(acc["id"]), 200 if poll else 90, 60):
         return None, None, (jsonify({"success": False, "error": "çok sık istek, biraz bekle"}), 429)
     return acc, data, None
 
@@ -4725,7 +4740,17 @@ def _site_state(acc, prog):
         "scratch": {"left": max(0, SCRATCH_DAILY - scr_used), "daily": SCRATCH_DAILY,
                     "tiers": {k: {"cost": c, "table": [[a, w] for a, w in t]} for k, (c, t) in SCRATCH_TIERS.items()}},
         "ad_url": SITE_AD_URL,
+        "room": _my_room_brief(acc.get("id")),
     }
+
+
+def _my_room_brief(aid):
+    try:
+        with _games_lock:
+            r = _room_of(aid)
+            return {"id": r["id"], "kind": r["kind"]} if r else None
+    except NameError:
+        return None
 
 
 @app.route("/site/link", methods=["POST"])
@@ -4809,6 +4834,11 @@ def site_me():
     acc, _data, err = _site_ctx()
     if err:
         return err
+    _game_reaper_start()
+    try:
+        _escrow_reconcile(acc["id"])
+    except Exception:
+        app.logger.exception("emanet denetlenemedi")
     prog = _stored_progress(_player_row(acc["id"]))
     return jsonify({"success": True, "state": _site_state(acc, prog)})
 
@@ -4947,6 +4977,701 @@ def site_scratch_buy():
                    ("kazı kazan %s: %d" % (tier, win))[:120])
     return jsonify({"success": True, "tier": tier, "cost": cost, "prize": win,
                     "cells": _scratch_cells(win, table), "state": _site_state(acc, merged)})
+
+
+# =====================================================================
+# ---- site oyun salonu: yazı tura, blackjack, pişti (oyuncular arası) + rulet ----
+# =====================================================================
+# Güvenlik ilkeleri:
+#  - Bütün kartlar, desteler ve sonuçlar YALNIZ sunucuda tutulur ve
+#    secrets.SystemRandom ile karılır. Tarayıcıya bir oyuncunun görmesi gereken
+#    dışında hiçbir şey gitmez (deste, rakibin kapalı kartı, masadaki kapalı
+#    kartlar asla gönderilmez). F12 ile bakan biri gelecek kartı göremez.
+#  - Yatırılan elmas odaya girerken hesaptan düşülür ve "emanet"e (rewards.
+#    escrow) yazılır. Oyun bitince kazanana pot - %5 kesinti ödenir; berabere
+#    kalınırsa herkesin yatırdığı aynen geri döner. Emanet ödemesi tek
+#    seferliktir (iki kez ödenemez). Sunucu yeniden başlarsa ya da oda
+#    kaybolursa emanetteki elmas oyuncuya kendiliğinden geri verilir.
+#  - Her hamle sunucuda doğrulanır (sıra, el, geçerli kart). Süresi dolan
+#    oyuncu adına sunucu oynar (blackjack: dur, pişti: rastgele kart).
+#  - Aynı IP'den iki hesap aynı masaya oturamaz (kendi kendine elmas aktarma).
+# Kilit sırası her zaman: _games_lock -> _acct_lock (kilitlenme olmasın).
+GAME_STAKES = (1000, 5000, 10000, 25000, 50000, 100000)
+GAME_RAKE = 0.05
+GAME_KINDS = {"coin": (2, 2), "bj": (2, 2), "pisti": (2, 4)}
+GAME_NAMES = {"coin": "yazı tura", "bj": "blackjack", "pisti": "pişti"}
+GAME_TURN_T = {"bj": 30.0, "pisti": 25.0}
+GAME_WAIT_T = 15 * 60.0          # dolmayan masa bu kadar sonra kapanır (iade)
+GAME_DONE_KEEP = 90.0            # biten masa sonucu bu kadar görünür
+GAME_LEFT_T = 1.5                # masadan kalkan oyuncunun sırası hemen oynanır
+ROULETTE_MAX = 100000            # tek çevirmede en çok toplam bahis
+ROULETTE_MIN = 100
+ROULETTE_DAILY = 400
+_games = {}
+_games_lock = threading.RLock()
+_game_rng = secrets.SystemRandom()
+SUITS = ("S", "H", "D", "C")      # maça, kupa, karo, sinek
+RANKS = ("A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K")
+ROUL_RED = frozenset((1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36))
+
+
+def _new_deck():
+    d = [r + s for s in SUITS for r in RANKS]
+    _game_rng.shuffle(d)
+    return d
+
+
+def _ip_tag():
+    return hashlib.sha256(("ip|" + _CONTACT_SALT + "|" + (_client_ip() or "")).encode()).hexdigest()[:16]
+
+
+# ---- emanet (escrow) ----
+def _escrow_take(aid, rid, amount, note):
+    """Bedeli hesaptan düşüp emanete yazar. Döner: None (tamam) ya da hata metni."""
+    with _acct_lock(aid):
+        row, before, rw = _reward_row(aid)
+        earned = max(0, _int(before.get("gems_earned"), 0))
+        spent = min(max(0, _int(before.get("gems_spent"), 0)), earned)
+        if earned - spent < amount:
+            return "yeterli elmasın yok"
+        esc = dict(rw.get("escrow") or {})
+        if rid in esc:
+            return "zaten bu masadasın"
+        esc[rid] = int(amount)
+        rw["escrow"] = esc
+        rw["srv_spent"] = _int(rw.get("srv_spent"), 0) + int(amount)
+        merged = dict(before)
+        merged["gems_spent"] = spent + int(amount)
+        merged["gems_earned"] = earned
+        merged["gems"] = max(0, earned - merged["gems_spent"])
+        merged["rewards"] = rw
+        if _store_progress(aid, row, before, merged) is not None:
+            return "elmas düşülemedi, tekrar dene"
+    _log_event(aid, "oyun", -int(amount), int(merged["gems"]), ("%s: masaya oturdu" % note)[:120])
+    return None
+
+
+def _escrow_pay(aid, rid, payout, note):
+    """Emaneti kapatır ve payout'u hesaba yazar (0 = kaybetti). Tek seferlik."""
+    with _acct_lock(aid):
+        row, before, rw = _reward_row(aid)
+        esc = dict(rw.get("escrow") or {})
+        if rid not in esc:
+            return False                 # zaten ödendi / iade edildi
+        esc.pop(rid, None)
+        rw["escrow"] = esc
+        payout = max(0, int(payout))
+        earned = max(0, _int(before.get("gems_earned"), 0))
+        spent = min(max(0, _int(before.get("gems_spent"), 0)), earned)
+        payout = min(payout, max(0, GEM_TOTAL_MAX - earned))
+        if payout:
+            rw["srv_earned"] = _int(rw.get("srv_earned"), 0) + payout
+        merged = dict(before)
+        merged["gems_earned"] = earned + payout
+        merged["gems_spent"] = spent
+        merged["gems"] = max(0, merged["gems_earned"] - spent)
+        merged["rewards"] = rw
+        if _store_progress(aid, row, before, merged) is not None:
+            return False
+    _log_event(aid, "oyun", payout, int(merged["gems"]), note[:120])
+    return True
+
+
+def _escrow_reconcile(aid):
+    """Sunucuda artık olmayan masaların emanetini iade eder (yeniden başlatma vb.)."""
+    with _games_lock:
+        row = _player_row(aid)
+        prog = _stored_progress(row)
+        esc = dict((prog.get("rewards") or {}).get("escrow") or {})
+        for rid, amt in esc.items():
+            room = _games.get(rid)
+            if room is None or aid not in [p_["aid"] for p_ in room["players"]]:
+                _escrow_pay(aid, rid, _int(amt, 0), "masa kapandı: elmas iade")
+
+
+# ---- masa yardımcıları ----
+def _room_of(aid):
+    for room in _games.values():
+        if room["state"] in ("wait", "play") and any(p_["aid"] == aid for p_ in room["players"]):
+            return room
+    return None
+
+
+def _room_public(room):
+    return {"id": room["id"], "kind": room["kind"], "stake": room["stake"], "cap": room["cap"],
+            "players": [p_["name"] for p_ in room["players"]], "state": room["state"],
+            "side": room.get("side"), "age": int(time.time() - room["created"])}
+
+
+def _settle(room, winners_idx, why):
+    """Masayı bitirir: kazanan(lar)a pot - %5, beraberlikte herkese iade."""
+    if room["state"] == "done":
+        return
+    room["state"] = "done"
+    room["done_at"] = time.time()
+    n = len(room["players"])
+    pot = room["stake"] * n
+    res = {"why": why, "winners": [room["players"][i]["name"] for i in winners_idx], "pot": pot}
+    if not winners_idx or len(winners_idx) == n:
+        res["refund"] = True
+        for p_ in room["players"]:
+            _escrow_pay(p_["aid"], room["id"], room["stake"],
+                        "%s: berabere, elmas iade" % GAME_NAMES[room["kind"]])
+        res["payout"] = room["stake"]
+    else:
+        share = int(pot * (1.0 - GAME_RAKE)) // len(winners_idx)
+        res["payout"] = share
+        res["rake"] = pot - share * len(winners_idx)
+        for i, p_ in enumerate(room["players"]):
+            win = i in winners_idx
+            _escrow_pay(p_["aid"], room["id"], share if win else 0,
+                        "%s %s: %s" % (GAME_NAMES[room["kind"]], "kazandı" if win else "kaybetti",
+                                       ("+%d" % share) if win else ("-%d" % room["stake"])))
+    room["result"] = res
+    room["seq"] += 1
+
+
+def _cancel(room, why):
+    if room["state"] == "done":
+        return
+    room["state"] = "done"
+    room["done_at"] = time.time()
+    for p_ in room["players"]:
+        _escrow_pay(p_["aid"], room["id"], room["stake"],
+                    "%s masası kapandı: elmas iade" % GAME_NAMES[room["kind"]])
+    room["result"] = {"why": why, "refund": True, "winners": [], "payout": room["stake"], "pot": 0}
+    room["seq"] += 1
+
+
+# ---- blackjack ----
+def _bj_value(cards):
+    v, aces = 0, 0
+    for c in cards:
+        r = c[:-1]
+        if r == "A":
+            v += 11
+            aces += 1
+        elif r in ("J", "Q", "K"):
+            v += 10
+        else:
+            v += int(r)
+    while v > 21 and aces:
+        v -= 10
+        aces -= 1
+    return v
+
+
+def _bj_start(room):
+    room["deck"] = _new_deck()
+    room["hands"] = [[room["deck"].pop(), room["deck"].pop()] for _ in room["players"]]
+    room["done"] = [False] * len(room["players"])
+    now = time.time()
+    room["deadline"] = [now + GAME_TURN_T["bj"]] * len(room["players"])
+    for i, h in enumerate(room["hands"]):
+        if _bj_value(h) == 21:
+            room["done"][i] = True       # blackjack: kendiliğinden durur
+
+
+def _bj_act(room, i, action):
+    if room["done"][i]:
+        return "elin bitti, rakibi bekle"
+    if action == "hit":
+        room["hands"][i].append(room["deck"].pop())
+        if _bj_value(room["hands"][i]) >= 21:
+            room["done"][i] = True
+    elif action == "stand":
+        room["done"][i] = True
+    else:
+        return "geçersiz hamle"
+    room["deadline"][i] = time.time() + GAME_TURN_T["bj"]
+    return None
+
+
+def _bj_finish_if_done(room):
+    if room["state"] != "play" or not all(room["done"]):
+        return
+    vals = [_bj_value(h) for h in room["hands"]]
+    nat = [len(h) == 2 and v == 21 for h, v in zip(room["hands"], vals)]
+    ok = [i for i, v in enumerate(vals) if v <= 21]
+    if not ok:
+        return _settle(room, [], "ikisi de battı")
+    best = max(vals[i] for i in ok)
+    top = [i for i in ok if vals[i] == best]
+    if len(top) > 1 and any(nat[i] for i in top) and not all(nat[i] for i in top):
+        top = [i for i in top if nat[i]]
+    _settle(room, top, "blackjack" if any(nat[i] for i in top) else "en yüksek el")
+
+
+# ---- pişti ----
+def _pisti_card_points(c):
+    r, s_ = c[:-1], c[-1]
+    if c == "10D":
+        return 3
+    if c == "2C":
+        return 2
+    return 1 if r in ("A", "J") else 0
+
+
+def _pisti_start(room):
+    deck = _new_deck()
+    table = [deck.pop() for _ in range(4)]
+    room["deck"] = deck
+    room["table"] = table                 # son eleman açık (üstteki)
+    room["hands"] = [[deck.pop() for _ in range(4)] for _ in room["players"]]
+    n = len(room["players"])
+    room["taken"] = [[] for _ in range(n)]
+    room["pisti"] = [0] * n
+    room["turn"] = 0
+    room["last_taker"] = None
+    room["last"] = None
+    room["deadline"] = time.time() + GAME_TURN_T["pisti"]
+
+
+def _pisti_play(room, i, card):
+    if room["turn"] != i:
+        return "sıra sende değil"
+    hand = room["hands"][i]
+    if card not in hand:
+        return "bu kart elinde yok"
+    hand.remove(card)
+    table = room["table"]
+    top = table[-1] if table else None
+    took = False
+    pis = 0
+    if top is not None and (card[:-1] == top[:-1] or card[:-1] == "J"):
+        if len(table) == 1 and card[:-1] == top[:-1]:
+            pis = 20 if card[:-1] == "J" else 10
+            room["pisti"][i] += pis
+        room["taken"][i].extend(table + [card])
+        room["table"] = []
+        room["last_taker"] = i
+        took = True
+    else:
+        table.append(card)
+    room["last"] = {"by": room["players"][i]["name"], "card": card, "took": took, "pisti": pis}
+    n = len(room["players"])
+    room["turn"] = (i + 1) % n
+    if all(not h for h in room["hands"]):
+        if len(room["deck"]) >= 4 * n:
+            room["hands"] = [[room["deck"].pop() for _ in range(4)] for _ in range(n)]
+        else:
+            if room["table"] and room["last_taker"] is not None:
+                room["taken"][room["last_taker"]].extend(room["table"])
+                room["table"] = []
+            _pisti_finish(room)
+            return None
+    room["deadline"] = time.time() + (GAME_LEFT_T if room["players"][room["turn"]].get("left")
+                                      else GAME_TURN_T["pisti"])
+    return None
+
+
+def _pisti_scores(room):
+    n = len(room["players"])
+    sc = [sum(_pisti_card_points(c) for c in room["taken"][i]) + room["pisti"][i] for i in range(n)]
+    counts = [len(t) for t in room["taken"]]
+    mx = max(counts) if counts else 0
+    if mx and counts.count(mx) == 1:
+        sc[counts.index(mx)] += 3
+    return sc
+
+
+def _pisti_finish(room):
+    sc = _pisti_scores(room)
+    room["final_scores"] = sc
+    best = max(sc)
+    _settle(room, [i for i, v in enumerate(sc) if v == best], "en çok puan")
+
+
+# ---- zaman aşımı / otomatik hamle ----
+def _game_tick(room):
+    now = time.time()
+    if room["state"] == "wait":
+        if now - room["created"] > GAME_WAIT_T:
+            _cancel(room, "masa dolmadı")
+        return
+    if room["state"] != "play":
+        return
+    if room["kind"] == "bj":
+        for i in range(len(room["players"])):
+            if not room["done"][i] and (now > room["deadline"][i] or room["players"][i].get("left")):
+                room["done"][i] = True
+                room["seq"] += 1
+        _bj_finish_if_done(room)
+    elif room["kind"] == "pisti":
+        guard = 0
+        while room["state"] == "play" and now > room["deadline"] and guard < 60:
+            guard += 1
+            i = room["turn"]
+            hand = room["hands"][i]
+            if not hand:
+                break
+            top = room["table"][-1] if room["table"] else None
+            pick = None
+            if top is not None:
+                same = [c for c in hand if c[:-1] == top[:-1]]
+                jack = [c for c in hand if c[:-1] == "J"]
+                pick = (same or jack or [None])[0]
+            _pisti_play(room, i, pick or _game_rng.choice(hand))
+            room["seq"] += 1
+
+
+def _game_reaper():
+    while True:
+        time.sleep(1.0)
+        try:
+            with _games_lock:
+                now = time.time()
+                for rid in list(_games):
+                    room = _games[rid]
+                    try:
+                        _game_tick(room)
+                    except Exception:
+                        app.logger.exception("masa işlenemedi")
+                    if room["state"] == "done" and now - room.get("done_at", now) > GAME_DONE_KEEP:
+                        _games.pop(rid, None)
+        except Exception:
+            app.logger.exception("oyun bekçisi")
+
+
+_game_reaper_started = [False]
+
+
+def _game_reaper_start():
+    if not _game_reaper_started[0]:
+        _game_reaper_started[0] = True
+        threading.Thread(target=_game_reaper, daemon=True).start()
+
+
+# ---- oyuncuya giden görünüm (yalnız görmesi gerekenler) ----
+def _room_view(room, aid):
+    me = next((i for i, p_ in enumerate(room["players"]) if p_["aid"] == aid), None)
+    out = _room_public(room)
+    out["seq"] = room["seq"]
+    out["me"] = me
+    out["result"] = room.get("result")
+    reveal = room["state"] == "done"
+    now = time.time()
+    if room["kind"] == "coin" and room.get("flip"):
+        out["flip"] = room["flip"]
+    if room["kind"] == "bj" and "hands" in room:
+        hands = []
+        for i, h in enumerate(room["hands"]):
+            if reveal or i == me:
+                hands.append({"cards": list(h), "value": _bj_value(h), "done": room["done"][i]})
+            else:
+                # rakip: yalnız ilk kart açık, gerisi kapalı (sayısı bilinir)
+                hands.append({"cards": [h[0]] + ["??"] * (len(h) - 1), "value": None, "done": room["done"][i]})
+        out["hands"] = hands
+        if me is not None and room["state"] == "play":
+            out["time_left"] = max(0, int(room["deadline"][me] - now))
+    if room["kind"] == "pisti" and "hands" in room:
+        out["hand"] = list(room["hands"][me]) if me is not None else []
+        out["counts"] = [len(h) for h in room["hands"]]
+        out["table_top"] = room["table"][-1] if room["table"] else None
+        out["table_n"] = len(room["table"])
+        out["deck_n"] = len(room["deck"])
+        out["taken_n"] = [len(t) for t in room["taken"]]
+        out["pisti"] = list(room["pisti"])
+        out["turn"] = room["turn"]
+        out["last"] = room.get("last")
+        out["time_left"] = max(0, int(room["deadline"] - now)) if room["state"] == "play" else 0
+        if reveal and "final_scores" in room:
+            out["scores"] = room["final_scores"]
+    return out
+
+
+def _game_resp(acc, extra=None):
+    prog = _stored_progress(_player_row(acc["id"]))
+    d = {"success": True, "state": _site_state(acc, prog)}
+    if extra:
+        d.update(extra)
+    return jsonify(d)
+
+
+@app.route("/site/games/list", methods=["POST"])
+def site_games_list():
+    acc, data, err = _site_ctx(poll=True)
+    if err:
+        return err
+    _game_reaper_start()
+    kind = str(data.get("kind") or "")
+    with _games_lock:
+        rooms = [_room_public(r) for r in _games.values()
+                 if r["state"] == "wait" and (not kind or r["kind"] == kind)]
+        mine = _room_of(acc["id"])
+    rooms.sort(key=lambda r: r["stake"])
+    return jsonify({"success": True, "rooms": rooms[:60], "mine": mine["id"] if mine else None,
+                    "mine_kind": mine["kind"] if mine else None, "stakes": list(GAME_STAKES)})
+
+
+@app.route("/site/games/create", methods=["POST"])
+def site_games_create():
+    acc, data, err = _site_ctx()
+    if err:
+        return err
+    _game_reaper_start()
+    kind = str(data.get("kind") or "")
+    stake = _int(data.get("stake"), 0)
+    if kind not in GAME_KINDS or stake not in GAME_STAKES:
+        return jsonify({"success": False, "error": "geçersiz masa"}), 400
+    lo, hi = GAME_KINDS[kind]
+    cap = max(lo, min(hi, _int(data.get("cap"), lo)))
+    side = str(data.get("side") or "yazi")
+    if side not in ("yazi", "tura"):
+        side = "yazi"
+    if not _rate_ok("game:new:" + str(acc["id"]), 12, 60):
+        return jsonify({"success": False, "error": "çok sık masa açıyorsun"}), 429
+    aid = acc["id"]
+    with _games_lock:
+        _escrow_reconcile(aid)
+        if _room_of(aid):
+            return jsonify({"success": False, "error": "zaten bir masadasın"}), 409
+        rid = secrets.token_hex(8)
+        e = _escrow_take(aid, rid, stake, GAME_NAMES[kind])
+        if e:
+            return jsonify({"success": False, "error": e}), 409
+        _games[rid] = {"id": rid, "kind": kind, "stake": stake, "cap": cap, "state": "wait",
+                       "created": time.time(), "seq": 1, "side": side if kind == "coin" else None,
+                       "players": [{"aid": aid, "name": _site_name(acc), "ip": _ip_tag()}]}
+        view = _room_view(_games[rid], aid)
+    return _game_resp(acc, {"room": view})
+
+
+@app.route("/site/games/join", methods=["POST"])
+def site_games_join():
+    acc, data, err = _site_ctx()
+    if err:
+        return err
+    rid = str(data.get("room") or "")[:32]
+    aid = acc["id"]
+    with _games_lock:
+        _escrow_reconcile(aid)
+        room = _games.get(rid)
+        if room is None or room["state"] != "wait":
+            return jsonify({"success": False, "error": "bu masa artık yok"}), 404
+        if _room_of(aid):
+            return jsonify({"success": False, "error": "zaten bir masadasın"}), 409
+        ip = _ip_tag()
+        if any(p_["ip"] == ip for p_ in room["players"]):
+            return jsonify({"success": False, "error": "aynı bağlantıdan iki hesap aynı masaya oturamaz"}), 403
+        e = _escrow_take(aid, rid, room["stake"], GAME_NAMES[room["kind"]])
+        if e:
+            return jsonify({"success": False, "error": e}), 409
+        room["players"].append({"aid": aid, "name": _site_name(acc), "ip": ip})
+        room["seq"] += 1
+        if len(room["players"]) >= room["cap"]:
+            room["state"] = "play"
+            if room["kind"] == "coin":
+                flip = _game_rng.choice(("yazi", "tura"))
+                room["flip"] = flip
+                _settle(room, [0 if flip == room["side"] else 1], "para: " + flip)
+            elif room["kind"] == "bj":
+                _bj_start(room)
+                _bj_finish_if_done(room)
+            else:
+                _pisti_start(room)
+        view = _room_view(room, aid)
+    return _game_resp(acc, {"room": view})
+
+
+@app.route("/site/games/state", methods=["POST"])
+def site_games_state():
+    acc, data, err = _site_ctx(poll=True)
+    if err:
+        return err
+    rid = str(data.get("room") or "")[:32]
+    with _games_lock:
+        room = _games.get(rid)
+        if room is None or not any(p_["aid"] == acc["id"] for p_ in room["players"]):
+            return jsonify({"success": False, "error": "masa kapandı", "gone": True}), 404
+        _game_tick(room)
+        if _int(data.get("seq"), -1) == room["seq"] and room["state"] != "play":
+            return jsonify({"success": True, "same": True})
+        view = _room_view(room, acc["id"])
+    return jsonify({"success": True, "room": view})
+
+
+@app.route("/site/games/act", methods=["POST"])
+def site_games_act():
+    acc, data, err = _site_ctx()
+    if err:
+        return err
+    rid = str(data.get("room") or "")[:32]
+    action = str(data.get("action") or "")
+    aid = acc["id"]
+    with _games_lock:
+        room = _games.get(rid)
+        if room is None:
+            return jsonify({"success": False, "error": "masa kapandı"}), 404
+        idx = next((i for i, p_ in enumerate(room["players"]) if p_["aid"] == aid), None)
+        if idx is None:
+            return jsonify({"success": False, "error": "bu masada değilsin"}), 403
+        _game_tick(room)
+        e = None
+        if action == "leave":
+            if room["state"] == "wait":
+                room["players"].pop(idx)
+                _escrow_pay(aid, rid, room["stake"], "%s: masadan kalktı, elmas iade" % GAME_NAMES[room["kind"]])
+                room["seq"] += 1
+                if not room["players"]:
+                    _games.pop(rid, None)
+                view = None
+            elif room["state"] == "play":
+                # oyun sürerken kalkan oyuncunun eli kendiliğinden oynanır (kaybeder)
+                room["players"][idx]["left"] = True
+                if room["kind"] == "bj":
+                    room["done"][idx] = True
+                    room["hands"][idx].extend([])
+                    _bj_finish_if_done(room)
+                elif room["kind"] == "pisti" and room["turn"] == idx:
+                    room["deadline"] = min(room["deadline"], time.time() + GAME_LEFT_T)
+                room["seq"] += 1
+                view = _room_view(room, aid)
+            else:
+                view = _room_view(room, aid)
+            return _game_resp(acc, {"room": view})
+        if room["state"] != "play":
+            return jsonify({"success": False, "error": "oyun başlamadı ya da bitti"}), 409
+        if room["kind"] == "bj":
+            e = _bj_act(room, idx, action)
+            if not e:
+                _bj_finish_if_done(room)
+        elif room["kind"] == "pisti" and action == "play":
+            e = _pisti_play(room, idx, str(data.get("card") or "")[:3])
+        else:
+            e = "geçersiz hamle"
+        if e:
+            return jsonify({"success": False, "error": e}), 409
+        room["seq"] += 1
+        view = _room_view(room, aid)
+        done = room["state"] == "done"
+    if done:
+        return _game_resp(acc, {"room": view})
+    return jsonify({"success": True, "room": view})
+
+
+# ---- rulet (kasaya karşı, Avrupa tipi tek sıfır) ----
+def _roul_win(bet, n):
+    t, v = bet["type"], bet.get("value")
+    if t == "num":
+        return 36 if n == v else 0
+    if n == 0:
+        return 0
+    if t == "red":
+        return 2 if n in ROUL_RED else 0
+    if t == "black":
+        return 2 if n not in ROUL_RED else 0
+    if t == "even":
+        return 2 if n % 2 == 0 else 0
+    if t == "odd":
+        return 2 if n % 2 == 1 else 0
+    if t == "low":
+        return 2 if n <= 18 else 0
+    if t == "high":
+        return 2 if n >= 19 else 0
+    if t == "dozen":
+        return 3 if (n - 1) // 12 + 1 == v else 0
+    if t == "col":
+        return 3 if (n - 1) % 3 + 1 == v else 0
+    return 0
+
+
+@app.route("/site/roulette/spin", methods=["POST"])
+def site_roulette_spin():
+    acc, data, err = _site_ctx()
+    if err:
+        return err
+    raw = data.get("bets")
+    if not isinstance(raw, list) or not raw or len(raw) > 40:
+        return jsonify({"success": False, "error": "bahis yok"}), 400
+    bets = []
+    for b in raw:
+        if not isinstance(b, dict):
+            return jsonify({"success": False, "error": "geçersiz bahis"}), 400
+        t = str(b.get("type") or "")
+        amt = _int(b.get("amount"), 0)
+        v = _int(b.get("value"), -1)
+        if t not in ("num", "red", "black", "even", "odd", "low", "high", "dozen", "col") or amt < ROULETTE_MIN:
+            return jsonify({"success": False, "error": "geçersiz bahis"}), 400
+        if t == "num" and not 0 <= v <= 36:
+            return jsonify({"success": False, "error": "geçersiz sayı"}), 400
+        if t in ("dozen", "col") and v not in (1, 2, 3):
+            return jsonify({"success": False, "error": "geçersiz bahis"}), 400
+        bets.append({"type": t, "value": v if t in ("num", "dozen", "col") else None, "amount": amt})
+    total = sum(b["amount"] for b in bets)
+    if total > ROULETTE_MAX:
+        return jsonify({"success": False, "error": "tek çevirmede en çok %d elmas" % ROULETTE_MAX}), 400
+    if not _rate_ok("roul:" + str(acc["id"]), 30, 60):
+        return jsonify({"success": False, "error": "çok hızlı, biraz yavaşla"}), 429
+    aid = acc["id"]
+    with _acct_lock(aid):
+        row, before, rw = _reward_row(aid)
+        today = _server_day()
+        used = _int(rw.get("roul_count"), 0) if rw.get("roul_day") == today else 0
+        if used >= ROULETTE_DAILY:
+            return jsonify({"success": False, "error": "bugünkü rulet sınırına ulaştın"}), 429
+        earned = max(0, _int(before.get("gems_earned"), 0))
+        spent = min(max(0, _int(before.get("gems_spent"), 0)), earned)
+        if earned - spent < total:
+            return jsonify({"success": False, "error": "yeterli elmasın yok"}), 409
+        n = _game_rng.randrange(37)
+        win = sum(b["amount"] * _roul_win(b, n) for b in bets)
+        win = min(win, max(0, GEM_TOTAL_MAX - earned))
+        merged = dict(before)
+        merged["gems_spent"] = spent + total
+        merged["gems_earned"] = earned + win
+        merged["gems"] = max(0, merged["gems_earned"] - merged["gems_spent"])
+        rw["roul_day"] = today
+        rw["roul_count"] = used + 1
+        rw["srv_spent"] = _int(rw.get("srv_spent"), 0) + total
+        rw["srv_earned"] = _int(rw.get("srv_earned"), 0) + win
+        merged["rewards"] = rw
+        e = _store_progress(aid, row, before, merged)
+        if e is not None:
+            return e
+        _log_event(aid, "rulet", win - total, int(merged["gems"]), ("rulet %d: bahis %d, kazanç %d" % (n, total, win))[:120])
+    return jsonify({"success": True, "number": n, "color": "green" if n == 0 else ("red" if n in ROUL_RED else "black"),
+                    "bet": total, "win": win, "state": _site_state(acc, merged)})
+
+
+@app.route("/admin/give_item", methods=["POST"])
+def admin_give_item():
+    """Yönetici: bir oyuncuya satılmayan kozmetik verir (50M Tacı)."""
+    if not _accounts_enabled():
+        return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
+    data = _body()
+    acc = _acct(data)
+    if not acc:
+        return jsonify({"success": False, "error": "oturum geçersiz"}), 401
+    if str(acc.get("username") or "").strip().lower() not in ADMIN_USERNAMES:
+        app.logger.warning("yetkisiz /admin/give_item denemesi: hesap %s", acc.get("id"))
+        return jsonify({"success": False, "error": "bu komut için yetkin yok"}), 403
+    if not _rate_ok("adm:" + str(acc.get("id")), 30, 60):
+        return jsonify({"success": False, "error": "çok sık istek"}), 429
+    item = str(data.get("item") or "")
+    if item not in ADMIN_ONLY_COSMETICS:
+        return jsonify({"success": False, "error": "bilinmeyen eşya"}), 400
+    tgt = _account_named(data.get("name"))
+    if not tgt:
+        return jsonify({"success": False, "error": "bu adda oyuncu yok"}), 404
+    tid = tgt.get("id")
+    try:
+        with _acct_lock(tid):
+            row = _player_row(tid)
+            before = _stored_progress(row)
+            merged = json.loads(json.dumps(before))
+            lst = list(merged.get("cosmetics_owned") or [])
+            had = item in lst
+            if not had:
+                lst.append(item)
+                merged["cosmetics_owned"] = lst
+                e = _store_progress(tid, row, before, merged)
+                if e is not None:
+                    return e
+        _log_event(tid, "kostum", 1, 0, ("yönetici verdi: %s (%s)" % (item, acc.get("username")))[:120])
+    except Exception as e:
+        return _oops(e, "eşya verilemedi")
+    return jsonify({"success": True, "name": tgt.get("username"), "item": item, "had": had})
 
 
 if __name__ == "__main__":
