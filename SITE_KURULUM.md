@@ -14,7 +14,7 @@
 Site artık çok sayfalı. `site/dist/` klasörünün **içindeki her şeyi** public_html'e yükle
 (eski `index.html`'in üzerine yazılır):
 - `index.html` (ana sayfa), `karakterler.html`, `silahlar.html`, `evrimler.html`, `kitaplar.html`,
-  `kostumler.html`, `rehber.html`, `kazi.html`, `magaza.html`
+  `kostumler.html`, `rehber.html`, `oyunlar.html` (Oyun Salonu), `kazi.html`, `magaza.html`
 - `assets/` klasörü (`site.css`, `site.js`, `data.js`)
 - `default.php` (indirme sayacı) ve `.htaccess` (gizli dosya: dosya yöneticisinde "gizli dosyaları göster")
 Kolaylık için aynı içerik `site_dist.zip` olarak da var: public_html'de zip'i yükleyip "Extract" de.
@@ -38,3 +38,18 @@ düzenleme; kaynağı düzenleyip derle.
   aynı anda hesaba yazılır. Sayfada gizli sonuç ya da kod yoktur.
 - Oyun açıkken sitede kazanılan/harcanan elmas, oyun eski bir kayıtla gelse bile kaybolmaz
   (`rewards.srv_earned / srv_spent` sayaçları).
+
+## Oyun Salonu (oyunlar.html)
+- Yazı tura (2 kişi), blackjack (2 kişi), pişti (2 ya da 4 kişi): oyuncular arası, bahis
+  1K / 5K / 10K / 25K / 50K / 100K. Kazanan pot − %5 alır; berabere kalınırsa herkesin elması
+  geri döner. Rulet kasaya karşı (tek sıfırlı Avrupa ruleti, çevirme başına en çok 100K).
+- Bütün kartlar ve sonuçlar sunucuda (server.py, `/site/games/*`, `/site/roulette/spin`).
+  Tarayıcıya deste, rakibin kapalı kartı ya da masadaki kapalı kartlar hiç gitmez.
+- Yatırılan elmas masaya oturunca emanete alınır (`rewards.escrow`). Sunucu yeniden başlarsa
+  kaybolan masaların emaneti oyuncunun bir sonraki site isteğinde kendiliğinden iade edilir.
+- Aynı IP'den iki hesap aynı masaya oturamaz. Süresi dolan oyuncu adına sunucu oynar.
+- Render'da tek süreç (gunicorn -w 1) şart: masalar bellekte tutuluyor.
+
+## 50M Tacı
+Yalnızca yönetici verir: oyunda sohbete `tac50m kullanıcıadı` yaz (yönetici hesabıyla girişliyken).
+Özelliği: elmas kazancı +%50.

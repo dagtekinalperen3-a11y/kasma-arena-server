@@ -2320,6 +2320,7 @@ STRINGS = {
     "ui.mute_note_w": _T("kapalı silah seviye atlarken çıkmaz", "muted weapons never appear on level up", "las armas silenciadas no aparecen al subir de nivel", "gesperrte Waffen erscheinen nie beim Aufstieg", "отключённое оружие не выпадает"),
     "ui.mute_book":   _T("BU KİTABI KAPAT", "MUTE THIS BOOK", "SILENCIAR ESTE LIBRO", "DIESES BUCH SPERREN", "ОТКЛЮЧИТЬ ЭТУ КНИГУ"),
     "ui.mute_note_b": _T("kapalı kitap seviye atlarken çıkmaz", "muted books never appear on level up", "los libros silenciados no aparecen al subir de nivel", "gesperrte Bücher erscheinen nie beim Aufstieg", "отключённая книга не выпадает"),
+    "ui.card_evo":    _T("Evrim: {0}", "Evolves into: {0}", "Evoluciona: {0}", "Entwicklung: {0}", "Эволюция: {0}"),
     "ui.click_read":  _T("OKUMAK İÇİN TIKLA  »", "CLICK TO READ  »", "CLIC PARA LEER  »", "ZUM LESEN KLICKEN  »", "НАЖМИ, ЧТОБЫ ЧИТАТЬ  »"),
     "ui.muted_count": _T("kapalı: {0}/{1}", "muted: {0}/{1}", "silenciados: {0}/{1}", "gesperrt: {0}/{1}", "отключено: {0}/{1}"),
     "ui.no_weapons":  _T("Bu listede silah yok.", "No weapons in this list.", "No hay armas en esta lista.", "Keine Waffen in dieser Liste.", "В этом списке нет оружия."),
@@ -6602,7 +6603,7 @@ def _is_paid_item(list_key, item):
     if list_key == "skins_owned":
         return bool(get_skin(item).get("premium")) and item in SKIN_BY_ID
     if list_key == "cosmetics_owned":
-        return str(item).startswith("pet_")
+        return str(item).startswith("pet_") or item == "crown_50m"
     return False
 
 
@@ -9159,6 +9160,11 @@ COSMETICS = [
          color=(255, 205, 60), accent=(255, 246, 200),
          desc="Şans Çarkı'nın en nadir tacı. Yalnızca tanrılar takar.",
          perk_text="Hasar +%12, Şans +%12", perk_add=dict()),
+    # yalnızca yöneticinin verdiği taç (satılmaz, çarktan çıkmaz)
+    dict(id="crown_50m", slot="hat", name="50M Tacı", cost=0, wheel_only=True, admin_only=True,
+         color=(110, 230, 255), accent=(235, 252, 255),
+         desc="Elmastan dövülmüş efsanevi taç. Yalnızca yönetici verir.",
+         perk_text="Elmas Kazancı +%50", perk_add=dict()),
 ]
 COSMETIC_BY_ID = {c["id"]: c for c in COSMETICS}
 
@@ -9195,6 +9201,8 @@ COS_STATS = {
              "BONK-Schaden +{v}%", "Урон БОНК +{v}%"),
     "bonkr": ("bonk_radius_mult", "pct", "BONK Alanı +%{v}", "BONK Area +{v}%", "Área de BONK +{v}%",
               "BONK-Fläche +{v}%", "Область БОНК +{v}%"),
+    "gem": ("gem_mult", "pct", "Elmas Kazancı +%{v}", "Gem Gain +{v}%", "Gemas +{v}%", "Edelsteine +{v}%",
+            "Кристаллы +{v}%"),
     "taken": ("dmg_taken_mult", "neg", "Hasar Alma -%{v}", "Damage Taken -{v}%", "Daño recibido -{v}%",
               "Erlittener Schaden -{v}%", "Получаемый урон -{v}%"),
 }
@@ -9224,6 +9232,7 @@ COS_PERKS = {
     "leaf_visor": (("regen", 0.4), ("pickup", 12)), "frost_lens": (("taken", 0.05), ("crit", 0.03)),
     "ember_shades": (("critd", 0.08), ("dmg", 0.04)), "cape_steel": (("armor", 0.06), ("hp", 20)),
     "crown_god": (("dmg", 0.12), ("luck", 0.12)),
+    "crown_50m": (("gem", 0.50),),
 }
 # takım: (ad 5 dil, renk, şapkalar, gözlükler, pelerinler, bonus)
 COS_SETS = {
@@ -11014,6 +11023,11 @@ def _draw_cosmetic_hat_raw(surf, p, px, py, t):
     elif item["id"] == "crown_god":
         # GOD tacı: ışınlı, taşlı, "GOD" yazılı büyük altın taç
         draw_god_crown(surf, px, py - r - 4, max(12.0, r * 0.62), t)
+
+    elif item["id"] == "crown_50m":
+        # 50M tacı: elmas mavisi, "50M" yazılı
+        draw_god_crown(surf, px, py - r - 4, max(12.0, r * 0.62), t, label="50M",
+                       cols=((120, 225, 255), (235, 252, 255), (30, 90, 140)))
 
     elif item["id"] == "halo_ring":
         # Çift halka + yumuşak nabız; hafifçe süzülür.
@@ -14650,7 +14664,7 @@ class Player:
             self.base_armor = min(0.55, self.base_armor
                                   + save.mastery_bonus("m_armor"))
             self.base_speed *= (1.0 + save.mastery_bonus("m_speed"))
-            self.gem_mult = 1.0 + save.mastery_bonus("m_gem")
+            self.gem_mult = float(getattr(self, "gem_mult", 1.0) or 1.0) * (1.0 + save.mastery_bonus("m_gem"))
             self.xp_mult *= (1.0 + save.mastery_bonus("m_xp"))
             self.luck += save.mastery_bonus("m_luck")
         except Exception:
@@ -16245,7 +16259,15 @@ HELL_BASE_WAVE = 25
 # 1.35 -> 1.65, zırh ve dalga eğrisi de sertleşti. Cehenneme evrimsiz girmek
 # artık zor; kapı da bunu söylüyor (HellPortal).
 HELL_HP_BOOST = 2.50        # cehennem canının taban çarpanı
-HELL_DMG_BOOST = 1.65       # cehennem yaratık hasarının taban çarpanı
+HELL_DMG_BOOST = 1.65 * 1.10  # cehennem yaratık hasarının taban çarpanı (+%10)
+# "cehennemde bir süre sonra düşmanlar ölmesin, dalga 33'te hâlâ tek atıyor":
+# doğan yaratık sayısı aynı kalır (kare hızı), yalnız canları dalga başına
+# büyür: cehennemin 2. dalgasından sonra her dalga +%12 (bileşik).
+HELL_HP_RAMP = 1.12
+HELL_HP_RAMP_FROM = 2
+# cehennem patronları +%20 can ve hasar
+HELL_BOSS_HP_K = 1.20
+HELL_BOSS_DMG_K = 1.20
 # cehennemin sonu: cehennem 40 dalgadır.
 HELL_FINAL_WAVE = None
 HELL_SPEED_BASE_WAVE = 12   # cehennem 1. dalgasının hız temposu (8 -> 12)
@@ -16292,7 +16314,8 @@ def hell_hp_mult(wave):
     w = max(1, int(wave))
     base = arena_hp_mult(HELL_BASE_WAVE) * HELL_HP_BOOST
     curve = 1.0 + (w - 1) * 0.38 + 0.010 * (w - 1) ** 2
-    return base * curve
+    ramp = HELL_HP_RAMP ** max(0, w - HELL_HP_RAMP_FROM)
+    return base * curve * ramp
 
 
 def hell_dmg_wave(wave):
@@ -25446,6 +25469,10 @@ class Boss(MapBossArt):
             self.dmg *= 1.0 + CHAMPION_DMG_PER * (self.champion - 1)
             self.radius = int(self.radius * CHAMPION_SIZE)
             self.hit_r = self.radius * 0.92
+        if self.hellish:
+            self.max_hp *= HELL_BOSS_HP_K
+            self.hp = self.max_hp
+            self.dmg *= HELL_BOSS_DMG_K
         self.alive = True
         self.spawn_t = 0.0
         self.hit_flash = 0.0
@@ -29917,9 +29944,9 @@ def draw_world_extras(world, run, cam, t):
 #   kalabalık) - kendine güvenen daha çok yaratık, daha çok skor/altın/tecrübe
 #   kazanır.
 # kürsü: 7. dalgada haritanın bir yerine gizlice gelir (haritada görünmez).
-#   2.000 altınla açılır; içinde açık olup oyuncunun o koşuda almadığı BÜTÜN
-#   (normal) kitaplar vardır, biri 10.000 altına alınır. 4 kitabı dolu olana
-#   hiç gelmez.
+#   2.000 altınla açılır; içinde açık olup oyuncunun o koşuda almadığı
+#   kitaplardan rastgele 3 tanesi vardır, biri 10.000 altına alınır. 4 kitabı
+#   dolu olana hiç gelmez.
 RALLY_COLOR = (230, 170, 80)
 RALLY_R = 110.0                 # [E] menzili
 ARMY_SIZE = 24
@@ -30329,7 +30356,9 @@ class RelicsMixin:
                 return
             self.gold_wallet -= LECTERN_OPEN_COST
             lc.opened = True
-            lc.offers = list(cands)
+            # 3 rastgele kitap (bütün kitapları sunmak fazla güçlüydü)
+            random.shuffle(cands)
+            lc.offers = cands[:3]
             sfx("buy", 0.8, 0.0)
         self.lectern_open = True
 
@@ -30443,11 +30472,11 @@ STRINGS.update({
     "rel.lect_full": _T("kitap yuvaların dolu", "your book slots are full", "tus huecos de libro están llenos",
                         "deine Buchplätze sind voll", "все ячейки книг заняты"),
     "rel.lect_title": _T("KÜRSÜ", "LECTERN", "ATRIL", "PULT", "КАФЕДРА"),
-    "rel.lect_sub": _T("Açtığın ve bu koşuda almadığın bütün kitaplar burada. Birini {0} altına alabilirsin.",
-                       "Every unlocked book you don't have this run. Take one for {0} gold.",
-                       "Todos los libros desbloqueados que no tienes. Toma uno por {0} oro.",
-                       "Alle freigeschalteten Bücher, die du nicht hast. Eines für {0} Gold.",
-                       "Все открытые книги, которых у тебя нет. Одна за {0} золота."),
+    "rel.lect_sub": _T("Sende olmayan 3 kitap. Birini {0} altına alabilirsin.",
+                       "3 books you don't have. Take one for {0} gold.",
+                       "3 libros que no tienes. Toma uno por {0} oro.",
+                       "3 Bücher, die du nicht hast. Eines für {0} Gold.",
+                       "3 книги, которых у тебя нет. Одна за {0} золота."),
     "rel.lect_buy": _T("{0} ALTIN", "{0} GOLD", "{0} ORO", "{0} GOLD", "{0} ЗОЛОТА"),
     "rel.lect_leave": _T("AYRIL", "LEAVE", "SALIR", "VERLASSEN", "УЙТИ"),
     "rel.lect_gold": _T("Altının: {0}", "Your gold: {0}", "Tu oro: {0}", "Dein Gold: {0}", "Твоё золото: {0}"),
@@ -30531,7 +30560,7 @@ def draw_extras_hud(surf, run, t):
         txt = L("rel.graves_hud", fmt_pct1(GRAVE_STEP * gn))
         w_ = text_width(txt, 12, True) + 36
         r_ = pygame.Rect(0, 0, w_, 22)
-        r_.topright = (VIRTUAL_W - 16, 226)
+        r_.topright = (VIRTUAL_W - 16, max(226, _BADGE_BOTTOM[0] + 6))
         pygame.draw.rect(surf, (28, 34, 24), r_, border_radius=11)
         ink_frame(surf, r_, GRAVE_COLOR, 11, 2)
         draw_icon(surf, r_.x + 13, r_.centery, "skull", GRAVE_COLOR, 6)
@@ -31038,11 +31067,11 @@ STRINGS.update({
                               "HIPOTERMIA: los de dentro reciben 20% más de daño",
                               "UNTERKÜHLUNG: Gegner im Feld nehmen 20% mehr Schaden",
                               "ГИПОТЕРМИЯ: враги внутри получают на 20% больше урона"),
-    "evo.perk.penta_frost": _T("mavi alevler: giren 1 sn donar, donan %23 fazla hasar alır",
-                               "blue flames: enemies freeze for 1s, frozen ones take 23% more damage",
-                               "llamas azules: se congelan 1 s y reciben 23% más de daño",
-                               "blaue Flammen: 1 s eingefroren, Gefrorene nehmen 23% mehr Schaden",
-                               "синее пламя: заморозка 1 с, замороженные получают +23% урона"),
+    "evo.perk.penta_frost": _T("mavi alevler: giren 0,7 sn donar, donan %18 fazla hasar alır",
+                               "blue flames: enemies freeze for 0.7s, frozen ones take 18% more damage",
+                               "llamas azules: se congelan 0,7 s y reciben 18% más de daño",
+                               "blaue Flammen: 0,7 s eingefroren, Gefrorene nehmen 18% mehr Schaden",
+                               "синее пламя: заморозка 0,7 с, замороженные получают +18% урона"),
     "evo.perk.whip_rapid": _T("seri saldırır; Tempo Kitabı yükseldikçe daha da hızlanır",
                               "lashes in rapid series; faster with every Tempo Book level",
                               "azota en serie; más rápido con cada nivel del Libro del Ritmo",
@@ -31105,16 +31134,16 @@ STRINGS.update({
                              "poisons; each kill heals you +1",
                              "envenena; cada muerte cura +1", "vergiftet; jeder Kill heilt +1",
                              "отравляет; каждое убийство лечит +1"),
-    "evo.perk.bat_vamp": _T("canın doluysa her öldürme +1 maks can; zehir güçlenir",
-                            "at full health each kill gives +1 max HP; stronger poison",
-                            "con la vida llena, +1 vida máx. por muerte; veneno más fuerte",
-                            "bei vollem Leben +1 max. LP pro Kill; stärkeres Gift",
-                            "при полном здоровье +1 к макс. за убийство; яд сильнее"),
-    "evo.perk.bat_dracula": _T("+2 maks can; her 100 maks canda hasar ve zehir büyür",
-                               "+2 max HP; every 100 max HP boosts damage and poison",
-                               "+2 vida máx.; cada 100 de vida máx. potencia daño y veneno",
-                               "+2 max. LP; je 100 max. LP mehr Schaden und Gift",
-                               "+2 к макс. здоровью; каждые 100 усиливают урон и яд"),
+    "evo.perk.bat_vamp": _T("canın doluysa her öldürme +0,5 maks can; zehir güçlenir",
+                            "at full health each kill gives +0.5 max HP; stronger poison",
+                            "con la vida llena, +0,5 vida máx. por muerte; veneno más fuerte",
+                            "bei vollem Leben +0,5 max. LP pro Kill; stärkeres Gift",
+                            "при полном здоровье +0,5 к макс. за убийство; яд сильнее"),
+    "evo.perk.bat_dracula": _T("+1 maks can; her 100 maks canda hasar ve zehir büyür",
+                               "+1 max HP; every 100 max HP boosts damage and poison",
+                               "+1 vida máx.; cada 100 de vida máx. potencia daño y veneno",
+                               "+1 max. LP; je 100 max. LP mehr Schaden und Gift",
+                               "+1 к макс. здоровью; каждые 100 усиливают урон и яд"),
     "evo.perk.zz_heal": _T("yeşil şifa aurası: içinde dururken saniyede +10 can",
                            "green healing aura: +10 HP per second while inside",
                            "aura curativa: +10 de vida por segundo dentro",
@@ -31388,8 +31417,15 @@ ICE_FREEZE_CD = 0.9
 ICE_FREEZE_MAX = 0.45
 ICE_RARITY_MULT = (1.0, 1.4, 1.9, 2.6, 3.6)     # efsanevi kart bile tek başına 0.2 sn'yi aşmaz
 PENTA_HYPO_MULT = 1.20          # pentagram II: alandaki her kaynaktan +%20
-PENTA_FROST_MULT = 1.23         # pentagram III: donan yaratık +%23
-PENTA_FROST_T = 1.0             # pentagram III: giren yaratığın donma süresi
+PENTA_FROST_MULT = 1.18         # pentagram III: donan yaratık +%18 (eskiden %23)
+PENTA_FROST_T = 0.7             # pentagram III: giren yaratığın donma süresi (eskiden 1 sn)
+PENTA_FROST_CD = 3.0            # aynı yaratık en erken bu kadar sonra yeniden donar (eskiden 2,2)
+# donma bağışıklığı: donması biten yaratık bu süre içinde yeniden donarsa süre
+# yalnız FREEZE_DR_K kadar işler. Pentagram + buz kitabı + ultiler üst üste
+# binince yaratıklar hiç kıpırdayamıyordu ("dona dona geliyor, vuramıyor").
+FREEZE_IMMUNE = 1.6
+FREEZE_IMMUNE_BOSS = 3.0
+FREEZE_DR_K = 0.25
 ZZ_FLOOD_MULT = 1.15            # zemzem II: sudaki yaratık +%15
 
 
@@ -31408,10 +31444,15 @@ def freeze_enemy(e, dur, run=None):
     if dur <= 0 or not getattr(e, "alive", False):
         return
     d = e.__dict__
+    run = run or EVO_CTX[0]
+    now = getattr(run, "run_time", None) if run is not None else None
+    if now is not None:
+        if d.get("_freeze_t", 0.0) <= 0 and d.get("_freeze_imm", -1.0) > now:
+            dur *= FREEZE_DR_K
+        d["_freeze_imm"] = now + dur + (FREEZE_IMMUNE_BOSS if getattr(e, "is_boss", False) else FREEZE_IMMUNE)
     d["_freeze_t"] = max(d.get("_freeze_t", 0.0), dur)
     if getattr(e, "is_boss", False) and hasattr(e, "apply_slow"):
         e.apply_slow(0.45, dur)
-    run = run or EVO_CTX[0]
     if run is not None and getattr(run, "_penta3", False):
         d["_frost_vuln"] = run.run_time + dur + 0.05
 
@@ -34209,7 +34250,7 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMix
             d_ = e.__dict__
             if ev >= 3:
                 if d_.get("_pf_cd", -1.0) <= now:
-                    d_["_pf_cd"] = now + 2.2
+                    d_["_pf_cd"] = now + PENTA_FROST_CD
                     freeze_enemy(e, PENTA_FROST_T * (0.5 if boss else 1.0), self)
                     self.fx.burst(e.x, e.y, (170, 220, 255), n=6, speed=90, life=0.35, r=2.6)
             elif ice_t > 0:
@@ -36139,14 +36180,15 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMix
         if ev == 1:
             p.heal(1.0)
             return
-        gain = 2 if ev >= 3 else 1
+        # "yarasa çok can veriyor": II öldürme başına +0,5, III +1 maks can
+        gain = 1.0 if ev >= 3 else 0.5
         if ev >= 3 or p.hp >= p.max_hp - 0.5:
             p.max_hp += gain
             p.hp = min(p.max_hp, p.hp + gain)
-            p.evo_maxhp = int(getattr(p, "evo_maxhp", 0) or 0) + gain
+            p.evo_maxhp = float(getattr(p, "evo_maxhp", 0) or 0) + gain
             if ev >= 3:
-                p.dracula_gain = int(getattr(p, "dracula_gain", 0)) + gain
-                steps = p.dracula_gain // 100
+                p.dracula_gain = float(getattr(p, "dracula_gain", 0)) + gain
+                steps = int(p.dracula_gain // 100)
                 done = int(getattr(p, "dracula_steps", 0))
                 if steps > done:
                     p.dracula_steps = steps
@@ -36156,8 +36198,8 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMix
                     self.fx.popup(p.x, p.y - 96, L("fx.dracula", steps), (190, 110, 255), 20, life=1.6)
                     self.fx.ring(p.x, p.y, (170, 70, 255), n=26, speed=280, life=0.5, r=3.4)
             if random.random() < 0.3:
-                self.fx.popup(p.x + random.uniform(-20, 20), p.y - 52, L("fx.maxhp", gain),
-                              (255, 90, 120), 13, life=0.6)
+                self.fx.popup(p.x + random.uniform(-20, 20), p.y - 52,
+                              L("fx.maxhp", ("%g" % gain).replace(".", ",")), (255, 90, 120), 13, life=0.6)
         else:
             p.heal(gain)
 
@@ -38084,9 +38126,9 @@ QUEST_DEFS = {
     "cave":   ("ghost", (190, 120, 255), (None, 1, 2)),
 }
 # "elmas çok kazanıyoruz, %50 azalt": 14/28/56 -> 7/14/28.
-QUEST_GEMS = (3, 6, 11)                          # kolay / orta / zor ödülü (-%50, sonra -%20)
+QUEST_GEMS = (2, 3, 6)                           # kolay / orta / zor ödülü (yine -%50)
 # Koşu sonunda toplanan altının elmasa dönüşme oranı (2 kişilik de bunu kullanır).
-RUN_GEM_RATE = 0.01344          # elmas yine -%50 (0.0336 -> 0.0168), sonra -%20
+RUN_GEM_RATE = 0.00672          # elmas yine -%50 (0.01344 -> 0.00672)
 QUEST_TIER_COLORS = ((110, 220, 140), (100, 160, 240), (170, 120, 230))
 
 BIOME_STYLE["frost"] = dict(BIOME_STYLE["arena"], **{
@@ -40993,6 +41035,10 @@ def _draw_hud_top(surf, run, t):
 
 
 
+# rozet panelinin alt kenarı (mezarlık etiketi altına yerleşsin, üstüne binmesin)
+_BADGE_BOTTOM = [0]
+
+
 def _draw_badges(surf, run, t):
     """Pazardan/kitaplardan gelen etkilerin rozetleri: küçük haritanın (ve
     anahtar sayacının) altında, koyu bir panelde 7'şerli ızgara. Eskiden skor
@@ -41022,6 +41068,7 @@ def _draw_badges(surf, run, t):
     if p.purgatory_level: badges.append(("shield", (255, 215, 120), p.purgatory_level))
     if p.execute_threshold > 0: badges.append(("sword", GOLD, round(p.execute_threshold * 100)))
     if not badges:
+        _BADGE_BOTTOM[0] = 0
         return
     badges = badges[:21]
     mr = minimap_rect(False)
@@ -41035,6 +41082,7 @@ def _draw_badges(surf, run, t):
     cols = min(per, len(badges))
     panel_r = pygame.Rect(0, 0, cols * cw + 8, rows * ch + 6)
     panel_r.topright = (mr.right, y0)
+    _BADGE_BOTTOM[0] = panel_r.bottom
     bg = pygame.Surface(panel_r.size, pygame.SRCALPHA)
     pygame.draw.rect(bg, (18, 13, 16, 190), bg.get_rect(), border_radius=8)
     surf.blit(bg, panel_r.topleft)
@@ -45670,6 +45718,15 @@ def parse_give_cmd(line):
         return ("", 0)
     n = int(raw) * mult
     return (parts[1].strip(), n) if n >= 1 else ("", 0)
+
+
+def parse_crown_cmd(line):
+    """'tac50m ad' / '/tac ad' -> ad; komut değilse None; ad yoksa ""."""
+    parts = str(line or "").split()
+    tr = str.maketrans("çğıöşüÇĞİÖŞÜ", "cgiosuCGIOSU")
+    if not parts or parts[0].translate(tr).lower().lstrip("/!") not in ("tac50m", "50mtac", "tacver"):
+        return None
+    return parts[1].strip() if len(parts) >= 2 else ""
 
 
 class ChatConsole:
@@ -55134,6 +55191,8 @@ STRINGS.update({
                        "нажми, чтобы закрыть"),
     "wh.wheel_only": _T("ŞANS ÇARKI'NDAN", "FROM THE WHEEL", "DE LA RUEDA", "AUS DEM RAD", "С КОЛЕСА"),
     "c.crown_god.name": _T("GOD Tacı", "GOD Crown", "Corona GOD", "GOD-Krone", "Корона GOD"),
+    "c.crown_50m.name": _T("50M Tacı", "50M Crown", "Corona 50M", "50M-Krone", "Корона 50M"),
+    "c.admin_only": _T("YALNIZ YÖNETİCİ VERİR", "ADMIN GIFT ONLY", "SOLO REGALO ADMIN", "NUR VOM ADMIN", "ТОЛЬКО ОТ АДМИНА"),
 })
 
 
@@ -55198,9 +55257,9 @@ def fmt_odds(p):
     return s + "%"
 
 
-def draw_god_crown(surf, cx, cy, s, t, glow=True):
+def draw_god_crown(surf, cx, cy, s, t, glow=True, label="GOD", cols=None):
     """GOD tacı: beş uçlu, taşlı, ışınlı altın taç (s: yarı genişlik)."""
-    gold, lite, dark = (255, 205, 60), (255, 246, 200), (170, 110, 20)
+    gold, lite, dark = cols or ((255, 205, 60), (255, 246, 200), (170, 110, 20))
     if glow:
         k = 0.5 + 0.5 * math.sin(t * 3.0)
         add_glow(surf, cx, cy - s * 0.2, s * 2.4, gold, 0.30 + 0.15 * k)
@@ -55221,7 +55280,7 @@ def draw_god_crown(surf, cx, cy, s, t, glow=True):
     pygame.draw.rect(surf, OUTLINE, band.inflate(2, 2), border_radius=max(2, int(s * 0.1)))
     pygame.draw.rect(surf, dark, band, border_radius=max(2, int(s * 0.1)))
     if s >= 10:
-        draw_text(surf, "GOD", band.center, max(7, int(s * 0.38)), lite, bold=True, center=True, shadow=False)
+        draw_text(surf, label, band.center, max(7, int(s * 0.38)), lite, bold=True, center=True, shadow=False)
     for gx, gy, gc in ((cx - s * 0.28, cy - s * 0.62, (230, 60, 90)), (cx + s * 0.28, cy - s * 0.62, (90, 190, 255)),
                        (cx - s, cy - s * 0.25, (120, 235, 150)), (cx + s, cy - s * 0.25, (200, 120, 255))):
         circle_aa(surf, gx, gy, max(1.6, s * 0.13), OUTLINE)
@@ -56966,6 +57025,13 @@ class App:
             elif self._chat_admin_gate():
                 self._admin_unban(target)
             return
+        crown_to = parse_crown_cmd(line)
+        if crown_to is not None:
+            if not crown_to:
+                self.chat.say("kullanım: tac50m kullanıcıadı", TEXT_DIM)
+            elif self._chat_admin_gate():
+                self._admin_give_item(crown_to, "crown_50m")
+            return
         give = parse_give_cmd(line)
         # "elmas ..." sıradan bir sohbet sözcüğü de olabilir: eksik/bozuk yazılmış
         # komut yalnızca yöneticiye cevap verir, başkasında normal mesaj kalır.
@@ -57019,6 +57085,32 @@ class App:
                 shown, fmt_num(int(res.get("added") or 0)), fmt_num(int(res.get("total") or 0))), GOLD)
             me = str((acc.account or {}).get("username") or "").lower()
             if shown.lower() == me:
+                await acc.pull_progress()
+        spawn(worker)
+
+    def _admin_give_item(self, name, item):
+        """Yönetici komutu: bir oyuncuya satılmayan bir eşya (50M tacı) verir."""
+        acc = self.account
+        name = "".join(c for c in str(name) if c.isalnum() or c == "_")[:USERNAME_MAX]
+        if not name:
+            return
+        tok = acc.token
+        self.chat.say("taç veriliyor: %s ..." % name, TEXT_DIM)
+
+        async def worker():
+            try:
+                res = await acc._post("/admin/give_item", {
+                    "token": tok, "device": device_id(), "device_legacy": device_id_legacy(),
+                    "name": name, "item": item}, timeout=30)
+            except Exception as e:
+                self.chat.say("verilemedi: %s" % acc._err_text(e), RED)
+                return
+            if not (isinstance(res, dict) and res.get("success")):
+                self.chat.say("verilemedi: %s" % ((res or {}).get("error") if isinstance(res, dict) else "?"), RED)
+                return
+            shown = str(res.get("name") or name)
+            self.chat.say("%s: 50M Tacı verildi%s" % (shown, " (zaten vardı)" if res.get("had") else ""), GOLD)
+            if shown.lower() == str((acc.account or {}).get("username") or "").lower():
                 await acc.pull_progress()
         spawn(worker)
 
@@ -58139,63 +58231,40 @@ class App:
         t = getattr(self, "t", 0.0)
         cx = VIRTUAL_W // 2
         col = LECTERN_COLOR
-        draw_text(canvas, L("rel.lect_title"), (cx, 34), 36, col, bold=True, center=True)
-        draw_text(canvas, L("rel.lect_sub", fmt_num(LECTERN_BOOK_COST)), (cx, 70), 15, TEXT, center=True)
+        draw_text(canvas, L("rel.lect_title"), (cx, 60), 42, col, bold=True, center=True)
+        draw_text(canvas, L("rel.lect_sub", fmt_num(LECTERN_BOOK_COST)), (cx, 104), 17, TEXT, center=True)
         gold = int(run.gold_wallet)
-        draw_coin_label(canvas, cx, 98, L("rel.lect_gold", fmt_num(gold)), GOLD, 16)
+        draw_coin_label(canvas, cx, 136, L("rel.lect_gold", fmt_num(gold)), GOLD, 17)
         p = run.player
         room = p.normal_book_count() < slot_max(p, "b")
         keys = [k for k in lc.offers if k in BOOK_BY_KEY]
-        # sık ızgara: ekranda aynı anda 15 kitap, fazlası tekerlekle kayar
-        cols = 5
-        cw, ch, gx, gy = 236, 128, 10, 10
-        x0 = cx - (cols * cw + (cols - 1) * gx) / 2
-        top, bottom = 124, 596
-        rows = max(1, int(math.ceil(len(keys) / float(cols))))
-        content_h = rows * ch + (rows - 1) * gy
-        max_sc = max(0, content_h - (bottom - top))
-        sc = float(getattr(self, "lectern_scroll", 0.0))
-        area = pygame.Rect(0, top, VIRTUAL_W, bottom - top)
-        if max_sc > 0 and area.collidepoint(mouse_pos):
-            sc -= wheel_y * 46
-        sc = clamp(sc, 0, max_sc)
-        self.lectern_scroll = sc
-        prev_clip = canvas.get_clip()
-        canvas.set_clip(area)
+        cw, ch, gap = 300, 330, 28
+        x0 = cx - (len(keys) * cw + (len(keys) - 1) * gap) / 2
         ok_all = room and gold >= LECTERN_BOOK_COST and not lc.used
         for i, k_ in enumerate(keys):
             bk = BOOK_BY_KEY[k_]
-            r_ = pygame.Rect(int(x0 + (i % cols) * (cw + gx)), int(top + (i // cols) * (ch + gy) - sc), cw, ch)
-            if r_.bottom < top or r_.y > bottom:
-                continue
-            hov = r_.collidepoint(mouse_pos) and area.collidepoint(mouse_pos)
+            r_ = pygame.Rect(int(x0 + i * (cw + gap)), 170, cw, ch)
+            hov = r_.collidepoint(mouse_pos)
             bcol = tuple(bk.get("color", col))
-            panel(canvas, r_, bg=(42, 32, 46) if hov else (30, 24, 34), edge=bcol if hov else scale_col(bcol, 0.55),
-                  alpha=245, radius=12, edge_w=2)
-            add_glow(canvas, r_.x + 40, r_.y + 50, 44, bcol, 0.16)
-            draw_book(canvas, r_.x + 40, r_.y + 50, 64 if hov else 60, bk, t)
-            tx = r_.x + 80
-            tw = r_.right - tx - 8
-            nm, nsz = ms_fit(bk_name(bk), 14, tw, True)
-            draw_text(canvas, nm, (tx, r_.y + 9), nsz, lighten(bcol, 0.3), bold=True, shadow=False)
-            for j, ln in enumerate(wrap_clip(bk_desc(bk), 10, tw, 3)):
-                draw_text(canvas, ln, (tx, r_.y + 30 + j * 14), 10, TEXT_DIM, shadow=False)
-            br = pygame.Rect(r_.x + 10, r_.bottom - 32, r_.w - 20, 24)
-            bh = br.collidepoint(mouse_pos) and area.collidepoint(mouse_pos)
+            panel(canvas, r_, bg=(40, 30, 44) if hov else (30, 24, 32), edge=bcol if hov else scale_col(bcol, 0.6),
+                  alpha=245, radius=16, edge_w=3 if hov else 2)
+            add_glow(canvas, r_.centerx, r_.y + 92, 80, bcol, 0.18)
+            draw_book(canvas, r_.centerx, r_.y + 92, 110 if hov else 104, bk, t)
+            nm, nsz = ms_fit(bk_name(bk), 20, cw - 24, True)
+            draw_text(canvas, nm, (r_.centerx, r_.y + 176), nsz, lighten(bcol, 0.25), bold=True, center=True)
+            for j, ln in enumerate(wrap_text(bk_desc(bk), 13, cw - 30)[:4]):
+                draw_text(canvas, ln, (r_.centerx, r_.y + 204 + j * 18), 13, TEXT_DIM, center=True, shadow=False)
+            br = pygame.Rect(r_.x + 24, r_.bottom - 58, cw - 48, 42)
+            bh = br.collidepoint(mouse_pos)
             self._mini_button(canvas, br, L("rel.lect_buy", fmt_num(LECTERN_BOOK_COST)), (60, 140, 80),
-                              bh and ok_all, icon="coin", size=12, enabled=ok_all)
+                              bh and ok_all, icon="coin", size=16, enabled=ok_all)
             if clicked and bh and ok_all:
                 if run.lectern_buy(k_):
-                    self.lectern_scroll = 0.0
                     self._close_lectern()
-                    canvas.set_clip(prev_clip)
                     return
-        canvas.set_clip(prev_clip)
-        if max_sc > 0:
-            draw_scrollbar(canvas, VIRTUAL_W - 16, top, bottom - top, content_h, sc)
         if not room:
-            draw_text(canvas, L("rel.lect_full"), (cx, 604), 15, (255, 150, 130), bold=True, center=True)
-        back = Button((cx - 100, 628, 200, 44), L("rel.lect_leave"), self._close_lectern)
+            draw_text(canvas, L("rel.lect_full"), (cx, 528), 16, (255, 150, 130), bold=True, center=True)
+        back = Button((cx - 100, 610, 200, 44), L("rel.lect_leave"), self._close_lectern)
         back.update(mouse_pos, dt)
         back.draw(canvas)
         if clicked:
@@ -64146,6 +64215,16 @@ class App:
                 draw_text(canvas, tag, (rect.right - 10, rect.y + 9), 9, tcol, bold=True, right=True, shadow=False)
             nm, nsz = ms_fit(w_name(w), 16, tw - tagw - 8, True)
             draw_text(canvas, nm, (tx, rect.y + 10), nsz, TEXT if owned else (140, 138, 160), bold=True)
+            # boşluk dolsun: evrim adı + "oku" ipucu
+            hy = rect.y + 36
+            if key in EVOLUTIONS:
+                ecol = evo_color(key, 1) if owned else (120, 112, 130)
+                draw_text(canvas, _fit_text(L("ui.card_evo", evo_name(key, 1)), 11, tw, bold=True), (tx, hy), 11,
+                          lighten(ecol, 0.15), bold=True, shadow=False)
+                hy += 16
+            if owned or key not in EVOLUTIONS:
+                draw_text(canvas, L("ui.click_read"), (tx, hy), 9, lighten(edge, 0.3) if hover else (120, 112, 128),
+                          bold=hover, shadow=False)
 
             if owned:
                 br = pygame.Rect(tx, rect.bottom - 36, tw, 26)
@@ -64663,6 +64742,9 @@ class App:
             draw_text(canvas, nm, (tx, rect.y + 10), nsz, TEXT if owned else (170, 160, 170), bold=True)
             ds = (wrap_clip(bk_desc(bk), 11, tw, 1) or [""])[0]
             draw_text(canvas, ds, (tx, rect.y + 34), 11, TEXT_DIM, shadow=False)
+            if owned:
+                draw_text(canvas, L("ui.click_read"), (tx, rect.y + 52), 9,
+                          lighten(edge, 0.3) if hover else (120, 112, 128), bold=hover, shadow=False)
 
             if owned:
                 br = pygame.Rect(tx, rect.bottom - 36, tw, 26)
@@ -65304,11 +65386,21 @@ class App:
         draw_text(canvas, L("ui.perks"), (panel_rect.centerx, y), 15, sk["color"], bold=True, center=True)
         y += 30
         perks = sk.get("perks") or []
+        btn_top = panel_rect.bottom - 66
         if perks:
-            for perk in perks:
-                draw_icon(canvas, panel_rect.x + 50, y + 7, "star", sk["color"], 8)
-                draw_text(canvas, perk_tr(perk), (panel_rect.x + 68, y), 14, TEXT, shadow=False)
-                y += 27
+            # özellikler düğmelerin üstüne taşmasın: uzun satır kırılır, yer
+            # yetmezse yazı küçülür
+            tw_ = panel_rect.w - 100
+            for fs, rh, lh in ((14, 27, 17), (13, 23, 15), (12, 20, 14), (11, 17, 13)):
+                rows = [wrap_text(perk_tr(pk), fs, tw_) or [""] for pk in perks]
+                need = sum(rh + (len(r_) - 1) * lh for r_ in rows)
+                if y + need <= btn_top - 8:
+                    break
+            for r_ in rows:
+                draw_icon(canvas, panel_rect.x + 50, y + fs * 0.5, "star", sk["color"], 7 if fs < 14 else 8)
+                for j, ln in enumerate(r_):
+                    draw_text(canvas, ln, (panel_rect.x + 68, y + j * lh), fs, TEXT, shadow=False)
+                y += rh + (len(r_) - 1) * lh
         else:
             draw_text(canvas, L("ui.no_ult"),
                       (panel_rect.centerx, y), 12, TEXT_DIM, center=True, shadow=False)
@@ -65404,6 +65496,9 @@ class App:
             self.store_tab = "pets"
             self.set_state(STATE_GEM_STORE)
             sfx("click", 0.6, 0.0)
+            return
+        if item.get("admin_only"):
+            sfx("error", 0.5, 0.0)          # satılmaz, yalnız yönetici verir
             return
         if item.get("wheel_only"):
             # satılmaz: şans çarkına götür
@@ -65514,6 +65609,8 @@ class App:
                 # pet'ler elmasla değil, mağaza'dan gerçek parayla alınır (tek satır, çakışma yok)
                 draw_text(canvas, _fit_text("%s  ·  %s" % (item.get("price_hint", ""), L("ui.store")), 14, tw,
                                             bold=True), (tx, by), 14, PURPLE, bold=True)
+            elif item.get("admin_only"):
+                draw_text(canvas, L("c.admin_only"), (tx, by + 1), 12, CYAN, bold=True)
             elif item.get("wheel_only"):
                 draw_text(canvas, L("wh.wheel_only"), (tx, by + 1), 12, GOLD, bold=True)
             else:
