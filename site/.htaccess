@@ -1,0 +1,29 @@
+# EvolveArena - Hostinger (public_html) güvenlik ayarları
+Options -Indexes
+ServerSignature Off
+
+# HTTPS'e zorla
+RewriteEngine On
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+<IfModule mod_headers.c>
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+  # sitenin kendisi başka sitelerin çerçevesine gömülemesin
+  Header always set Content-Security-Policy "frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
+  Header unset X-Powered-By
+</IfModule>
+
+# sayaç verisi, gizli dosyalar ve yedekler dışarıdan okunamasın
+<FilesMatch "^(counter\.txt|counter_ips\.json)$|^\.|\.(bak|old|sql|log|ini|py|sh)$">
+  Require all denied
+</FilesMatch>
+
+# index.html her zaman taze gelsin (yeni sürüm hemen görünsün)
+<FilesMatch "\.html$">
+  Header set Cache-Control "no-cache"
+</FilesMatch>

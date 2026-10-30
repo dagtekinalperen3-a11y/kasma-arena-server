@@ -30,6 +30,12 @@ PLAY_ORIGINS = [o.strip().rstrip("/").lower()
 CORS_PATHS = ("/auth/", "/player/", "/shop/", "/reward", "/rewards", "/ad/", "/gift",
               "/scores", "/submit", "/contact", "/snow", "/event")
 CORS_BLOCKED = ("/diag", "/get_player", "/update_player", "/admin")
+# Web sitesi (volvearena.shop): yalnızca /site/ uçlarına ve yalnızca bu
+# kökenlerden. Render > Environment: SITE_ORIGINS = https://alanadin.com
+# (virgülle birden fazla). Boşsa aşağıdaki varsayılanlar.
+SITE_ORIGINS = [o.strip().rstrip("/").lower()
+                for o in (os.environ.get("SITE_ORIGINS")
+                          or "https://volvearena.shop,https://www.volvearena.shop").split(",") if o.strip()]
 
 
 def _origin_ok(origin):
@@ -50,16 +56,34 @@ def _cors_path_ok(path):
     return any(p.startswith(a) for a in CORS_PATHS)
 
 
+def _site_origin_ok(origin):
+    return (origin or "").strip().rstrip("/").lower() in SITE_ORIGINS
+
+
 @app.after_request
 def _cors(resp):
     origin = request.headers.get("Origin")
-    if origin and _origin_ok(origin) and _cors_path_ok(request.path):
+    site = (request.path or "").startswith("/site/")
+    if origin and site and _site_origin_ok(origin):
+        resp.headers["Access-Control-Allow-Origin"] = origin.strip().rstrip("/")
+        resp.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        resp.headers["Access-Control-Max-Age"] = "600"
+    elif origin and not site and _origin_ok(origin) and _cors_path_ok(request.path):
         resp.headers["Access-Control-Allow-Origin"] = origin.strip().rstrip("/")
         resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
         resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
         resp.headers["Access-Control-Max-Age"] = "600"
     if origin:
         resp.headers["Vary"] = "Origin"
+    # güvenlik başlıkları (her yanıtta)
+    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+    resp.headers.setdefault("Referrer-Policy", "no-referrer")
+    resp.headers.setdefault("X-Frame-Options", "DENY")
+    resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    if site or (request.path or "").startswith(("/auth/", "/player/", "/rewards", "/admin")):
+        # hesap verisi önbelleğe, vekillere düşmesin
+        resp.headers["Cache-Control"] = "no-store"
     return resp
 
 # Oyunun en büyük isteği (/player/save, bütün ilerleme) birkaç on kilobayt; 256
@@ -1161,21 +1185,30 @@ PROGRESS_LISTS = ("skins_owned", "cosmetics_owned", "books_owned", "weapons_owne
 # profil kartı süsleri (oyundaki PROFILE_ITEMS ile aynı anahtarlar)
 PROFILE_ITEM_KIND = {
     **{k: "bg" for k in ("bg_skull", "bg_rainbow", "bg_galaxy", "bg_inferno", "bg_frost", "bg_neon",
-                         "bg_royal", "bg_matrix", "bg_sakura", "bg_storm")},
-    **{k: "frame" for k in ("fr_bronze", "fr_silver", "fr_gold", "fr_fire", "fr_diamond", "fr_rainbow")},
-    **{k: "glow" for k in ("gl_white", "gl_gold", "gl_red", "gl_cyan", "gl_purple", "gl_rainbow")},
+                         "bg_royal", "bg_matrix", "bg_sakura", "bg_storm",
+                         "bg_ocean", "bg_aurora", "bg_sunset", "bg_fireflies", "bg_hearts", "bg_lava",
+                         "bg_goldrain", "bg_void")},
+    **{k: "frame" for k in ("fr_bronze", "fr_silver", "fr_gold", "fr_fire", "fr_diamond", "fr_rainbow",
+                            "fr_emerald", "fr_ruby", "fr_amethyst", "fr_neon", "fr_electric", "fr_vine")},
+    **{k: "glow" for k in ("gl_white", "gl_gold", "gl_red", "gl_cyan", "gl_purple", "gl_rainbow",
+                           "gl_green", "gl_pink", "gl_orange", "gl_fire", "gl_shadow", "gl_ice")},
+    **{k: "badge" for k in ("bd_crown", "bd_skull", "bd_flame", "bd_star", "bd_heart", "bd_bolt",
+                            "bd_sword", "bd_gem", "bd_shield", "bd_clover", "bd_snow", "bd_ghost")},
+    **{k: "title" for k in ("tt_legend", "tt_bosshunter", "tt_hellord", "tt_shadow", "tt_king",
+                            "tt_immortal", "tt_lucky", "tt_sniper", "tt_champion", "tt_grinder")},
     "motto": "motto",
 }
+PROFILE_STYLE_SLOTS = ("bg", "frame", "glow", "badge", "title")
 PROFILE_MOTTO_MAX = 40
 
 
 def _clean_profile_style(st, owned):
     """Profil biçimi: yalnız sahip olunan süsler, söz kısa ve düz metin."""
-    out = {"bg": "", "frame": "", "glow": "", "motto": ""}
+    out = {"bg": "", "frame": "", "glow": "", "badge": "", "title": "", "motto": ""}
     if not isinstance(st, dict):
         return out
     own = set(owned or [])
-    for k in ("bg", "frame", "glow"):
+    for k in PROFILE_STYLE_SLOTS:
         v = str(st.get(k) or "")
         if v in own and PROFILE_ITEM_KIND.get(v) == k:
             out[k] = v
@@ -1402,6 +1435,17 @@ def _merge_progress(old, new, gem_cap=GEM_GAIN_CAP_PER_PUSH):
     spent_old = _int(old.get("gems_spent", 0))
     earned_new = max(0, _int(new.get("gems_earned", 0)))
     spent_new = max(0, _int(new.get("gems_spent", 0)))
+    # Sunucu tarafında (sitede: çark, kazı kazan; yönetici) işlenen elmas,
+    # oyun henüz görmeden eski bir kayıt gönderirse "büyük olan kazanır"
+    # birleştirmesinde kaybolmasın: oyunun gördüğü sayaçla (rewards.srv_*)
+    # aradaki fark oyunun değerine eklenir. Böylece ne sitede kazanılan silinir
+    # ne de sitede harcanan elmas oyunda ikinci kez harcanabilir.
+    rw_old = old.get("rewards") if isinstance(old.get("rewards"), dict) else {}
+    rw_new = new.get("rewards") if isinstance(new.get("rewards"), dict) else {}
+    if spent_new > 0:
+        spent_new += max(0, _int(rw_old.get("srv_spent"), 0) - max(0, _int(rw_new.get("srv_spent"), 0)))
+    if earned_new > 0:
+        earned_new += max(0, _int(rw_old.get("srv_earned"), 0) - max(0, _int(rw_new.get("srv_earned"), 0)))
     cap = int(max(0, min(GEM_GAIN_CAP_PER_PUSH, gem_cap)))
     earned = max(earned_old, min(earned_new, earned_old + cap))
     spent = max(spent_old, spent_new)
@@ -1463,6 +1507,8 @@ def _public_progress(prog):
     rw.pop("snow_started", None)
     rw.pop("wheel_nonce", None)         # çark bileti de
     rw.pop("wheel_started", None)
+    rw.pop("swheel_nonce", None)        # sitedeki çarkın bileti de
+    rw.pop("swheel_at", None)
     out["rewards"] = rw
     return out
 
@@ -1854,7 +1900,7 @@ def _ad_start_locked(acc):
 # çevirir: sonucu SUNUCU seçer (oyun yalnızca çarkı o dilime döndürür), ödül
 # hesaba burada yazılır. Günde WHEEL_DAILY hak. Oyundaki WHEEL_PRIZES ile aynı
 # olmalı (oyun oranları ekranda gösteriyor).
-WHEEL_DAILY = 3
+WHEEL_DAILY = 5
 WHEEL_COOLDOWN = 60.0
 WHEEL_MIN_AWAY = 30.0
 WHEEL_MAX_AWAY = 30 * 60.0
@@ -1875,6 +1921,33 @@ def _wheel_pick():
         if x <= 0:
             return prize
     return WHEEL_PRIZES[0][0]
+
+
+def _wheel_apply(before, prize, site=False):
+    """Çark ödülünü ilerlemeye işler: (yeni ilerleme, elmas, zaten vardı mı)."""
+    merged = json.loads(json.dumps(before))
+    gems = 0
+    dupe = False
+    if prize[:1] == "g" and prize[1:].isdigit():        # "g200" (green_titan değil)
+        gems = int(prize[1:])
+    elif prize in WHEEL_ONLY_COSMETICS:
+        lst = list(merged.get("cosmetics_owned") or [])
+        if prize in lst:
+            dupe, gems = True, WHEEL_DUPE_GEMS
+        else:
+            lst.append(prize)
+            merged["cosmetics_owned"] = lst
+    else:
+        lst = list(merged.get("skins_owned") or ["default"])
+        if prize in lst:
+            dupe, gems = True, WHEEL_DUPE_GEMS
+        else:
+            lst.append(prize)
+            merged["skins_owned"] = lst
+    if gems:
+        merged["gems_earned"] = min(GEM_TOTAL_MAX, int(before.get("gems_earned", 0) or 0) + gems)
+        merged["gems"] = max(0, merged["gems_earned"] - int(before.get("gems_spent", 0) or 0))
+    return merged, gems, dupe
 
 
 def _wheel_used_today(rw):
@@ -1927,28 +2000,7 @@ def rewards_wheel_spin():
         if _wheel_used_today(rw) >= WHEEL_DAILY:
             return jsonify({"success": False, "error": "bugünkü çark hakkın bitti"}), 429
         prize = _wheel_pick()
-        merged = json.loads(json.dumps(before))
-        gems = 0
-        dupe = False
-        if prize[:1] == "g" and prize[1:].isdigit():        # "g200" (green_titan değil)
-            gems = int(prize[1:])
-        elif prize in WHEEL_ONLY_COSMETICS:
-            lst = list(merged.get("cosmetics_owned") or [])
-            if prize in lst:
-                dupe, gems = True, WHEEL_DUPE_GEMS
-            else:
-                lst.append(prize)
-                merged["cosmetics_owned"] = lst
-        else:
-            lst = list(merged.get("skins_owned") or ["default"])
-            if prize in lst:
-                dupe, gems = True, WHEEL_DUPE_GEMS
-            else:
-                lst.append(prize)
-                merged["skins_owned"] = lst
-        if gems:
-            merged["gems_earned"] = int(before.get("gems_earned", 0) or 0) + gems
-            merged["gems"] = max(0, merged["gems_earned"] - int(before.get("gems_spent", 0) or 0))
+        merged, gems, dupe = _wheel_apply(before, prize)
         rw["wheel_count"] = _wheel_used_today(rw) + 1
         rw["wheel_day"] = _server_day()
         rw["wheel_last"] = time.time()
@@ -4524,6 +4576,9 @@ def admin_give_gems():
                 return jsonify({"success": False, "error": "bu oyuncunun elmas sınırı dolu"}), 409
             earned += add
             total = earned - spent
+            rw_ = dict(prog.get("rewards") or {})
+            rw_["srv_earned"] = _int(rw_.get("srv_earned"), 0) + add
+            prog["rewards"] = rw_
             payload = {
                 "account_id": tid,
                 "gems": total, "gems_earned": earned, "gems_spent": spent,
@@ -4539,6 +4594,359 @@ def admin_give_gems():
     except Exception as e:
         return _oops(e, "elmas verilemedi")
     return jsonify({"success": True, "name": tgt.get("username"), "added": add, "total": total})
+
+
+# =====================================================================
+# ---- web sitesi: şans çarkı + kazı kazan ----
+# =====================================================================
+# Akış:
+#   1) Oyun: /site/link (oyun oturumuyla) -> tek kullanımlık, 10 dakikalık kod.
+#      Oyun siteyi https://volvearena.shop/#k=KOD ile açar (# kısmı sunucuya,
+#      günlüklere ve reklam ağlarına gitmez).
+#   2) Site: /site/exchange {code} -> "site geçişi" (2 saatlik, imzalı jeton).
+#      Ya da /site/login {username, password} (oyundaki girişle aynı sınırlar).
+#      Site geçişi oyun oturumu DEĞİLDİR: oyunu oturumdan atmaz, şifre/e-posta
+#      değiştiremez; yalnızca /site/ uçlarında geçer. Şifre değişince geçersiz.
+#   3) Çark: /site/wheel/ad (sponsor bağlantısına tıklandı, sayaç başlar) ->
+#      en az SITE_WHEEL_WAIT saniye sonra /site/wheel/spin. Sonucu SUNUCU seçer
+#      ve hesaba burada yazar; site yalnızca çarkı o dilime döndürür.
+#   4) Kazı kazan: /site/scratch/buy {tier}. Bedel düşülür ve ödül AYNI ANDA,
+#      satın alırken sunucuda belirlenip hesaba yazılır. Kartın altında ne
+#      olduğu sayfaya ancak satın alma bittikten sonra gelir: sağ tık > incele
+#      ile bakan biri yalnızca zaten kesinleşmiş sonucu görür, değiştiremez.
+#      Kod yok, kodu tahmin etme / paylaşma / iki kez bozdurma derdi yok.
+# Sitede kazanılan / harcanan elmas rewards.srv_earned / srv_spent sayaçlarına
+# da yazılır (bkz. _merge_progress): oyun eski bir kayıtla gelse bile ne
+# kazanç silinir ne harcama geri gelir.
+SITE_SECRET = (os.environ.get("SITE_SECRET")
+               or hashlib.sha256(("evolve-site-v1|" + (SUPABASE_KEY or secrets.token_hex(32))
+                                  + "|" + (GOOGLE_CLIENT_SECRET or "")).encode()).hexdigest())
+SITE_PASS_TTL = 2 * 3600
+SITE_CODE_TTL = 10 * 60
+SITE_WHEEL_WAIT = 15.0
+SITE_WHEEL_MAX_WAIT = 30 * 60.0
+SITE_WHEEL_GAP = 8.0                 # iki çevirme arası en az
+SITE_AD_URL = "https://ardance.org/4/8eb87fad3ff308b09ec866979c2bcfe7"
+_site_codes = {}                     # kod özeti -> (hesap, bitiş)
+_site_lock = threading.Lock()
+_site_rng = secrets.SystemRandom()
+
+# kazı kazan: bedel -> (ödül, yüzde) tablosu. Beklenen getiri bedelin %75-80'i
+# (elmas ekonomisi şişmesin), 1 milyon "çok zor".
+SCRATCH_TIERS = {
+    "5k": (5000, ((0, 30.0), (250, 18.0), (1000, 13.0), (2500, 13.0), (5000, 12.5), (10000, 10.0),
+                  (25000, 2.6), (100000, 0.88), (1000000, 0.02))),
+    "10k": (10000, ((0, 30.3), (500, 17.0), (2500, 14.0), (5000, 13.0), (10000, 12.0), (20000, 9.0),
+                    (50000, 3.2), (100000, 1.1), (250000, 0.36), (1000000, 0.04))),
+    "50k": (50000, ((0, 30.0), (2500, 17.0), (10000, 14.0), (25000, 13.0), (50000, 12.5), (100000, 9.0),
+                    (250000, 3.0), (500000, 1.2), (1000000, 0.3))),
+}
+SCRATCH_DAILY = 150                  # hesap başına günde en çok kart
+SCRATCH_PER_MIN = 20
+
+
+def _b64u(b):
+    return base64.urlsafe_b64encode(b).decode().rstrip("=")
+
+
+def _pw_tag(acc):
+    """Şifre değişince eski site geçişleri düşsün diye şifre özetinden kısa iz."""
+    return hashlib.sha256(("pw|" + str((acc or {}).get("password_hash") or "")).encode()).hexdigest()[:10]
+
+
+def _site_sign(msg):
+    return _b64u(hmac.new(SITE_SECRET.encode(), msg.encode(), hashlib.sha256).digest())
+
+
+def _site_make_pass(acc):
+    exp = int(time.time() + SITE_PASS_TTL)
+    msg = "s1.%s.%d.%s.%s" % (int(acc["id"]), exp, _pw_tag(acc), secrets.token_hex(6))
+    return msg + "." + _site_sign(msg)
+
+
+def _site_acc(data):
+    """Site geçişinden hesabı çözer (yoksa None)."""
+    tok = str((data or {}).get("pass") or "")
+    if not tok or len(tok) > 200 or not supabase:
+        return None
+    parts = tok.split(".")
+    if len(parts) != 6 or parts[0] != "s1":
+        return None
+    msg = ".".join(parts[:5])
+    if not hmac.compare_digest(_site_sign(msg), parts[5]):
+        return None
+    try:
+        aid, exp = int(parts[1]), int(parts[2])
+    except ValueError:
+        return None
+    if exp < time.time():
+        return None
+    rows = db("accounts").select("*").eq("id", aid).execute()
+    if not rows.data:
+        return None
+    acc = rows.data[0]
+    if not hmac.compare_digest(_pw_tag(acc), parts[3]):
+        return None
+    return acc
+
+
+def _site_ctx():
+    if not _accounts_enabled():
+        return None, None, (jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503)
+    if not _rate_ok("site:ip:" + _client_ip(), 120, 60):
+        return None, None, (jsonify({"success": False, "error": "çok sık istek, biraz bekle"}), 429)
+    data = _body()
+    acc = _site_acc(data)
+    if not acc:
+        return None, None, (jsonify({"success": False, "error": "oturum süresi doldu, oyundan yeniden aç ya da giriş yap",
+                                     "relogin": True}), 401)
+    if not _rate_ok("site:a:" + str(acc["id"]), 90, 60):
+        return None, None, (jsonify({"success": False, "error": "çok sık istek, biraz bekle"}), 429)
+    return acc, data, None
+
+
+def _site_name(acc):
+    return str(acc.get("username") or acc.get("name") or "oyuncu")[:20]
+
+
+def _site_state(acc, prog):
+    rw = dict(prog.get("rewards") or {})
+    now = time.time()
+    used = _wheel_used_today(rw)
+    ad_at = _num(rw.get("swheel_at"), 0)
+    pending = bool(rw.get("swheel_nonce")) and 0 < now - ad_at < SITE_WHEEL_MAX_WAIT
+    scr_used = _int(rw.get("scr_count"), 0) if rw.get("scr_day") == _server_day() else 0
+    return {
+        "name": _site_name(acc),
+        "gems": int(prog.get("gems", 0) or 0),
+        "wheel": {"left": max(0, WHEEL_DAILY - used), "daily": WHEEL_DAILY, "wait": SITE_WHEEL_WAIT,
+                  "pending": pending, "rest": max(0.0, SITE_WHEEL_WAIT - (now - ad_at)) if pending else None,
+                  "prizes": [[p_, w_] for p_, w_ in WHEEL_PRIZES], "dupe_gems": WHEEL_DUPE_GEMS},
+        "scratch": {"left": max(0, SCRATCH_DAILY - scr_used), "daily": SCRATCH_DAILY,
+                    "tiers": {k: {"cost": c, "table": [[a, w] for a, w in t]} for k, (c, t) in SCRATCH_TIERS.items()}},
+        "ad_url": SITE_AD_URL,
+    }
+
+
+@app.route("/site/link", methods=["POST"])
+def site_link():
+    """Oyun: siteyi bu hesapla açmak için tek kullanımlık kod."""
+    ctx, err = _reward_ctx()
+    if err:
+        return err
+    acc, _data = ctx
+    code = secrets.token_urlsafe(18)
+    now = time.time()
+    with _site_lock:
+        if len(_site_codes) > 20000:
+            for k in [k for k, v in _site_codes.items() if v[1] < now]:
+                _site_codes.pop(k, None)
+            if len(_site_codes) > 20000:
+                _site_codes.clear()
+        _site_codes[_token_hash(code)] = (int(acc["id"]), now + SITE_CODE_TTL)
+    return jsonify({"success": True, "code": code, "ttl": SITE_CODE_TTL})
+
+
+@app.route("/site/exchange", methods=["POST"])
+def site_exchange():
+    if not _accounts_enabled():
+        return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
+    if not _rate_ok("site:x:" + _client_ip(), 20, 300):
+        return jsonify({"success": False, "error": "çok fazla deneme"}), 429
+    code = str(_body().get("code") or "")[:64]
+    if not code:
+        return jsonify({"success": False, "error": "kod yok"}), 400
+    with _site_lock:
+        hit = _site_codes.pop(_token_hash(code), None)      # tek kullanımlık
+    if not hit or hit[1] < time.time():
+        return jsonify({"success": False, "error": "bağlantının süresi dolmuş, oyundan yeniden aç"}), 401
+    rows = db("accounts").select("*").eq("id", hit[0]).execute()
+    if not rows.data:
+        return jsonify({"success": False, "error": "hesap bulunamadı"}), 404
+    acc = rows.data[0]
+    prog = _stored_progress(_player_row(acc["id"]))
+    return jsonify({"success": True, "pass": _site_make_pass(acc), "ttl": SITE_PASS_TTL,
+                    "state": _site_state(acc, prog)})
+
+
+@app.route("/site/login", methods=["POST"])
+def site_login():
+    """Sitede kullanıcı adı / e-posta + şifre ile giriş (oyun oturumunu kapatmaz)."""
+    if not _accounts_enabled():
+        return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
+    if not _rate_ok("auth:" + _client_ip()):
+        return jsonify({"success": False, "error": "çok fazla deneme"}), 429
+    data = _body()
+    who = str(data.get("username") or "").strip()[:254]
+    password = str(data.get("password", ""))[:256]
+    if _login_locked(who.lower()):
+        return jsonify({"success": False, "error": "çok fazla hatalı deneme, biraz bekle"}), 429
+    try:
+        if "@" in who:
+            rows = db("accounts").select("*").eq("email", who.lower()).execute()
+            acc = rows.data[0] if rows.data else None
+        else:
+            found = _accounts_by_username(who) if who else []
+            acc = found[0] if found else None
+        if not acc or not acc.get("password_hash"):
+            _verify_password(password, _DUMMY_HASH)
+            _login_failed(who.lower())
+            return jsonify({"success": False, "error": "kullanıcı adı ya da şifre hatalı "
+                            "(Google ile giriyorsan siteyi oyundan aç)"}), 401
+        if not _verify_password(password, acc["password_hash"]):
+            _login_failed(who.lower())
+            return jsonify({"success": False, "error": "kullanıcı adı ya da şifre hatalı"}), 401
+        _login_ok(who.lower())
+        prog = _stored_progress(_player_row(acc["id"]))
+        return jsonify({"success": True, "pass": _site_make_pass(acc), "ttl": SITE_PASS_TTL,
+                        "state": _site_state(acc, prog)})
+    except Exception as e:
+        return _oops(e)
+
+
+@app.route("/site/me", methods=["POST"])
+def site_me():
+    acc, _data, err = _site_ctx()
+    if err:
+        return err
+    prog = _stored_progress(_player_row(acc["id"]))
+    return jsonify({"success": True, "state": _site_state(acc, prog)})
+
+
+@app.route("/site/wheel/ad", methods=["POST"])
+def site_wheel_ad():
+    """Sponsor bağlantısına tıklandı: çark bileti + bekleme sayacı başlar."""
+    acc, _data, err = _site_ctx()
+    if err:
+        return err
+    with _acct_lock(acc["id"]):
+        row, before, rw = _reward_row(acc["id"])
+        if _wheel_used_today(rw) >= WHEEL_DAILY:
+            return jsonify({"success": False, "error": "bugünkü çark hakkın bitti, yarın yenilenir"}), 429
+        now = time.time()
+        if now - _num(rw.get("wheel_last"), 0) < SITE_WHEEL_GAP:
+            return jsonify({"success": False, "error": "biraz bekle"}), 429
+        nonce = secrets.token_hex(12)
+        rw["swheel_nonce"] = nonce
+        rw["swheel_at"] = now
+        merged = dict(before)
+        merged["rewards"] = rw
+        e = _store_progress(acc["id"], row, before, merged)
+        if e is not None:
+            return e
+    return jsonify({"success": True, "ticket": nonce, "wait": SITE_WHEEL_WAIT, "ad_url": SITE_AD_URL})
+
+
+@app.route("/site/wheel/spin", methods=["POST"])
+def site_wheel_spin():
+    acc, data, err = _site_ctx()
+    if err:
+        return err
+    with _acct_lock(acc["id"]):
+        row, before, rw = _reward_row(acc["id"])
+        ticket = str(data.get("ticket") or "")[:64]
+        if not ticket or not hmac.compare_digest(ticket, str(rw.get("swheel_nonce") or "")):
+            return jsonify({"success": False, "error": "önce sponsor bağlantısına tıkla"}), 403
+        el = time.time() - _num(rw.get("swheel_at"), 0)
+        if el < SITE_WHEEL_WAIT - 0.5:
+            return jsonify({"success": False, "error": "%d saniye daha bekle" % int(math.ceil(SITE_WHEEL_WAIT - el)),
+                            "rest": max(0.0, SITE_WHEEL_WAIT - el)}), 403
+        if el > SITE_WHEEL_MAX_WAIT:
+            rw.pop("swheel_nonce", None)
+            return jsonify({"success": False, "error": "süre doldu, sponsora yeniden tıkla"}), 403
+        if _wheel_used_today(rw) >= WHEEL_DAILY:
+            return jsonify({"success": False, "error": "bugünkü çark hakkın bitti"}), 429
+        prize = _wheel_pick()
+        merged, gems, dupe = _wheel_apply(before, prize)
+        rw["wheel_count"] = _wheel_used_today(rw) + 1
+        rw["wheel_day"] = _server_day()
+        rw["wheel_last"] = time.time()
+        rw["wheel_total"] = int(rw.get("wheel_total", 0) or 0) + 1
+        rw["wheel_site_last"] = prize
+        if gems:
+            rw["srv_earned"] = _int(rw.get("srv_earned"), 0) + gems
+        rw.pop("swheel_nonce", None)         # bilet bir kez kullanılır
+        rw.pop("swheel_at", None)
+        merged["rewards"] = rw
+        e = _store_progress(acc["id"], row, before, merged)
+        if e is not None:
+            return e
+        _log_event(acc["id"], "cark", gems, int(merged.get("gems", 0) or 0),
+                   ("site çarkı: " + prize + (" (zaten vardı)" if dupe else ""))[:120])
+    return jsonify({"success": True, "prize": prize, "gems": gems, "dupe": dupe,
+                    "state": _site_state(acc, merged)})
+
+
+def _scratch_pick(table):
+    total = sum(w for _a, w in table)
+    x = _site_rng.uniform(0.0, total)
+    for amt, w in table:
+        x -= w
+        if x <= 0:
+            return amt
+    return table[0][0]
+
+
+def _scratch_cells(prize, table):
+    """Kartın 9 hücresi (yalnız görüntü): kazanan miktar 3 kez, gerisi en çok
+    2'şer kez. Ödül yoksa hiçbir miktar 3 kez yazmaz."""
+    amounts = [a for a, _w in table if a > 0]
+    cells = []
+    if prize > 0:
+        cells = [prize] * 3
+        pool = [a for a in amounts if a != prize]
+    else:
+        pool = list(amounts)
+    while len(cells) < 9:
+        a = _site_rng.choice(pool)
+        if cells.count(a) < 2:
+            cells.append(a)
+    _site_rng.shuffle(cells)
+    return cells
+
+
+@app.route("/site/scratch/buy", methods=["POST"])
+def site_scratch_buy():
+    acc, data, err = _site_ctx()
+    if err:
+        return err
+    tier = str(data.get("tier") or "")
+    if tier not in SCRATCH_TIERS:
+        return jsonify({"success": False, "error": "bilinmeyen kart"}), 400
+    if not _rate_ok("scr:" + str(acc["id"]), SCRATCH_PER_MIN, 60):
+        return jsonify({"success": False, "error": "çok hızlı, biraz yavaşla"}), 429
+    cost, table = SCRATCH_TIERS[tier]
+    with _acct_lock(acc["id"]):
+        row, before, rw = _reward_row(acc["id"])
+        today = _server_day()
+        used = _int(rw.get("scr_count"), 0) if rw.get("scr_day") == today else 0
+        if used >= SCRATCH_DAILY:
+            return jsonify({"success": False, "error": "bugünkü kazı kazan sınırına ulaştın"}), 429
+        earned = max(0, _int(before.get("gems_earned"), 0))
+        spent = min(max(0, _int(before.get("gems_spent"), 0)), earned)
+        if earned - spent < cost:
+            return jsonify({"success": False, "error": "yeterli elmasın yok"}), 409
+        prize = _scratch_pick(table)
+        win = min(prize, max(0, GEM_TOTAL_MAX - earned))
+        merged = dict(before)
+        merged["gems_spent"] = spent + cost
+        merged["gems_earned"] = earned + win
+        merged["gems"] = max(0, merged["gems_earned"] - merged["gems_spent"])
+        rw["scr_day"] = today
+        rw["scr_count"] = used + 1
+        rw["scr_total"] = _int(rw.get("scr_total"), 0) + 1
+        rw["scr_won"] = _int(rw.get("scr_won"), 0) + win
+        rw["scr_best"] = max(_int(rw.get("scr_best"), 0), win)
+        rw["srv_spent"] = _int(rw.get("srv_spent"), 0) + cost
+        rw["srv_earned"] = _int(rw.get("srv_earned"), 0) + win
+        merged["rewards"] = rw
+        e = _store_progress(acc["id"], row, before, merged)
+        if e is not None:
+            return e
+        _log_event(acc["id"], "kazi", win - cost, int(merged["gems"]),
+                   ("kazı kazan %s: %d" % (tier, win))[:120])
+    return jsonify({"success": True, "tier": tier, "cost": cost, "prize": win,
+                    "cells": _scratch_cells(win, table), "state": _site_state(acc, merged)})
 
 
 if __name__ == "__main__":
