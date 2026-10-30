@@ -1977,6 +1977,20 @@ STRINGS = {
     "ui.gfx_mid":     _T("ORTA", "MEDIUM", "MEDIA", "MITTEL", "СРЕДНЕЕ"),
     "ui.gfx_high":    _T("YÜKSEK", "HIGH", "ALTA", "HOCH", "ВЫСОКОЕ"),
     "ui.fps_unlim":   _T("SINIRSIZ", "UNLIMITED", "ILIMITADO", "UNBEGRENZT", "БЕЗ ОГРАНИЧЕНИЙ"),
+    "ui.lb_your_rank": _T("SEN: #{0} · {1}", "YOU: #{0} · {1}", "TÚ: #{0} · {1}", "DU: #{0} · {1}", "ТЫ: #{0} · {1}"),
+    "ui.lb_tab_run":  _T("KOŞU KARTI", "RUN CARD", "PARTIDA", "LAUF", "ЗАБЕГ"),
+    "ui.lb_tab_pf":   _T("PROFİL", "PROFILE", "PERFIL", "PROFIL", "ПРОФИЛЬ"),
+    "ui.lb_pf_skins": _T("KARAKTERLERİ", "CHARACTERS", "PERSONAJES", "CHARAKTERE", "ПЕРСОНАЖИ"),
+    "ui.lb_pf_pets":  _T("PETLERİ VE TAÇLARI", "PETS & CROWNS", "MASCOTAS Y CORONAS", "HAUSTIERE & KRONEN", "ПИТОМЦЫ И КОРОНЫ"),
+    "ui.lb_pf_none":  _T("bu oyuncunun profil bilgisi yok", "no profile info for this player", "sin información de perfil",
+                         "keine Profildaten", "нет данных профиля"),
+    "ui.lb_pf_stats": _T("KARİYER", "CAREER", "CARRERA", "KARRIERE", "КАРЬЕРА"),
+    "ui.win_size":    _T("EKRAN BOYUTU", "WINDOW SIZE", "TAMAÑO DE VENTANA", "FENSTERGRÖSSE", "РАЗМЕР ОКНА"),
+    "ui.win_auto":    _T("OTOMATİK", "AUTO", "AUTO", "AUTO", "АВТО"),
+    "ui.scale_q":     _T("GÖRÜNTÜ KALİTESİ", "IMAGE QUALITY", "CALIDAD DE IMAGEN", "BILDQUALITÄT", "КАЧЕСТВО ИЗОБРАЖЕНИЯ"),
+    "ui.scale_auto":  _T("KESKİN (ÖNERİLEN)", "SHARP (BEST)", "NÍTIDA (MEJOR)", "SCHARF (BESTE)", "ЧЁТКО (ЛУЧШЕ)"),
+    "ui.scale_sharp": _T("PİKSEL", "PIXEL", "PÍXEL", "PIXEL", "ПИКСЕЛИ"),
+    "ui.scale_smooth": _T("YUMUŞAK", "SMOOTH", "SUAVE", "WEICH", "МЯГКО"),
     "ui.fps_cap":     _T("FPS SINIRI", "FPS LIMIT", "LÍMITE DE FPS", "FPS-GRENZE", "ОГРАНИЧЕНИЕ FPS"),
     "ui.pet_show":    _T("PET GÖRÜNÜMÜ", "SHOW PET", "MOSTRAR MASCOTA", "HAUSTIER ZEIGEN", "ПОКАЗЫВАТЬ ПИТОМЦА"),
     "ui.skill_size":  _T("YETENEK ÇUBUĞU BOYUTU", "SKILL BAR SIZE", "TAMAÑO DE LA BARRA", "GRÖSSE DER LEISTE", "РАЗМЕР ПАНЕЛИ"),
@@ -2147,6 +2161,9 @@ STRINGS = {
 
     # ---- oyun sonu ----
     "ui.go_player":   _T("Oyuncu", "Player", "Jugador", "Spieler", "Игрок"),
+    "ui.go_build_none": _T("Bu koşuda silah ya da kitap alınmadı.", "No weapon or book picked this run.",
+                           "Sin armas ni libros en esta partida.", "Keine Waffe oder Buch in diesem Lauf.",
+                           "В этом забеге нет оружия и книг."),
     "ui.go_build":    _T("BU KOŞUNUN TAKIMI", "THIS RUN'S BUILD", "BUILD DE LA PARTIDA", "BUILD DIESES LAUFS", "СБОРКА ЗАБЕГА"),
     "ui.lb_click":    _T("tıkla: koşu kartı", "click: run card", "clic: ficha", "Klick: Lauf-Karte", "клик: карточка"),
     "ui.lb_weapons":  _T("SİLAHLAR", "WEAPONS", "ARMAS", "WAFFEN", "ОРУЖИЕ"),
@@ -5389,6 +5406,8 @@ class SaveManager:
         "gems": 0,
         "skins_owned": ["default"],
         "equipped_skin": "default",
+        "skins_rebought": [],
+        "skin_reset": 1,
         "cosmetics_owned": [],
         "books_owned": [],          # görevi tamamlanıp kalıcı açılmış kitaplar
         "weapons_owned": [],        # görevi tamamlanıp kalıcı açılmış silahlar
@@ -5449,6 +5468,7 @@ class SaveManager:
         "board_banned", "ban_reasons",
         "rewards", "gem_pet_bought",
         "profile_owned", "profile_style",
+        "skins_rebought", "skin_reset",
     )
 
     def __init__(self):
@@ -5618,6 +5638,10 @@ class SaveManager:
                 data[lk] = [k for k in data[lk] if k not in REMOVED_BOOKS]
         # kaldırılmış skinler karşılığına çevrilir
         migrate_removed_skins(data)
+        # skin sıfırlaması (bütün profillerde)
+        apply_skin_reset(data)
+        for _pd in (data.get("profiles") or {}).values():
+            apply_skin_reset(_pd)
         return data
 
     # ---- profiller ----
@@ -5674,7 +5698,8 @@ class SaveManager:
                      # anahtarlar / efsanevi sandık
                      "total_keys", "legend_chests",
                      "total_chests", "total_cursed", "best_curse", "total_goblins")
-    MERGE_LISTS = ("skins_owned", "cosmetics_owned", "books_owned", "weapons_owned", "profile_owned")
+    MERGE_LISTS = ("skins_owned", "cosmetics_owned", "books_owned", "weapons_owned", "profile_owned",
+                   "skins_rebought")
 
     def import_progress(self, prog):
         """Sunucudan gelen ilerlemeyi uygular - üzerine yazmadan, birleştirerek."""
@@ -5799,6 +5824,9 @@ class SaveManager:
         self.data["ban_reasons"] = []
         if "default" not in self.data.get("skins_owned", []):
             self.data.setdefault("skins_owned", []).append("default")
+        # sunucudan eski (sıfırlanmamış) liste gelse bile sıfırlanan skinler geri gelmez
+        self.data["skin_reset"] = 0
+        apply_skin_reset(self.data)
         self.save()
 
     # Kaydı aynı anda birden fazla iş parçacığı yazabilir: ana döngü bir
@@ -5977,6 +6005,9 @@ class SaveManager:
             return False
         self.add_gems(-cost)
         self.data.setdefault("skins_owned", ["default"]).append(skin_id)
+        rb = self.data.setdefault("skins_rebought", [])
+        if skin_id not in rb:
+            rb.append(skin_id)
         self.data["equipped_skin"] = skin_id
         self.progress_changed()
         return True
@@ -8563,22 +8594,22 @@ SKINS = [
                 "Her seviye: Atış Hızı +%0.6 (en çok %30)"],
          perk_add=dict(base_pickup=20, base_speed=10, dash_cd_mult=-0.10),
          perk_level=dict(skin_aspd=(0.006, 0.30))),
-    dict(id="crimson", name="Kızıl Şahin",     color=(225, 70, 85),   accent=(255, 190, 160), cost=150,
-         weapon="crossbow", proj="feather",   aura="wings",   sfx="a", wlen=26,
+    dict(id="crimson", name="Kızıl Şahin",     color=(225, 70, 85),   accent=(255, 190, 160), cost=500,
+         weapon="crossbow", proj="feather",   aura="falcon",   sfx="a", wlen=26,
          desc="Kanatlarını çırpar, tüy gibi keskin oklar yağdırır.",
          perks=["Mermi Hızı +%12", "Kritik Şans +%5",
                 "Her seviye: Kritik Hasar +%1.2 (en çok %60), Hasar +%0.4 (en çok %24)"],
          perk_add=dict(proj_speed_mult=0.12, crit_chance=0.05),
          perk_level=dict(crit_dmg_mult=(0.012, 0.60), skin_power=(0.004, 0.24))),
-    dict(id="royal",   name="Kraliyet Moru",   color=(175, 120, 235), accent=(255, 220, 120), cost=320,
-         weapon="scepter",  proj="star",      aura="stars",   sfx="a", wlen=38,
+    dict(id="royal",   name="Kraliyet Moru",   color=(175, 120, 235), accent=(255, 220, 120), cost=1100,
+         weapon="scepter",  proj="star",      aura="royal",   sfx="a", wlen=38,
          desc="Tacını takar, asasıyla dönen yıldızlar fırlatır.",
          perks=["Deneyim Kazancı +%10", "Kritik Hasar +%10", "Şans +%5",
                 "Her seviye: Kritik Hasar +%1 (en çok %50)"],
          perk_add=dict(xp_mult=0.10, crit_dmg_mult=0.10, luck=0.05),
          perk_level=dict(crit_dmg_mult=(0.010, 0.50))),
-    dict(id="cyan",    name="Elektrik Cyan",   color=(100, 225, 225), accent=(230, 255, 255), cost=480,
-         weapon="tesla",    proj="lightning", aura="arcs",    sfx="c", wlen=30,
+    dict(id="cyan",    name="Elektrik Cyan",   color=(100, 225, 225), accent=(230, 255, 255), cost=1700,
+         weapon="tesla",    proj="lightning", aura="tesla",    sfx="c", wlen=30,
          desc="Tesla bobini. Bedeninde her an bir zincir yıldırım hazır bekler.",
          perks=["Zincir Yıldırım Lv.2 ile başlar", "Atış Hızı +%8",
                 "Her 15 seviyede Zincir Yıldırım +1 (en çok Lv.5)", "Her seviye: Hasar +%0.3"],
@@ -8586,29 +8617,29 @@ SKINS = [
          perk_add=dict(skin_aspd=0.08),
          perk_every=dict(chain_level=(15, 5)),
          perk_level=dict(skin_power=(0.003, 0.15))),
-    dict(id="shadow",  name="Gölge Suikastçı", color=(58, 52, 82),    accent=(175, 100, 255), cost=400,
-         weapon="scythe",   proj="blackfire", aura="shadow",  sfx="b", wlen=38,
+    dict(id="shadow",  name="Gölge Suikastçı", color=(58, 52, 82),    accent=(175, 100, 255), cost=1400,
+         weapon="scythe",   proj="blackfire", aura="hood",  sfx="b", wlen=38,
          desc="Elinde tırpan, ardında gölge izi. Siyah ateş fırlatır.",
          perks=["Dash Mesafesi +%20", "Mermi Delme +1",
                 "Her seviye: Kritik Şans +%0.2 (en çok %12)"],
          perk_add=dict(dash_dist_mult=0.20, pierce_bonus=1),
          perk_level=dict(crit_chance=(0.002, 0.12))),
-    dict(id="inferno", name="İnferno",         color=(245, 125, 40),  accent=(255, 225, 110), cost=480,
-         weapon="cannon",   proj="fireball",  aura="flames",  sfx="d", wlen=28,
+    dict(id="inferno", name="İnferno",         color=(245, 125, 40),  accent=(255, 225, 110), cost=1700,
+         weapon="cannon",   proj="fireball",  aura="inferno",  sfx="d", wlen=28,
          desc="Tepesinde alev, elinde alev topu atan top. Yaktıkça yanar.",
          perks=["BONK Yarıçapı +%15", "BONK Hasarı +%10", "Can +30",
                 "Her seviye: Hasar +%0.5 (en çok %30), BONK Hasarı +%1"],
          perk_add=dict(bonk_radius_mult=0.15, bonk_mult=0.10, base_max_hp=30),
          perk_level=dict(skin_power=(0.005, 0.30), bonk_mult=(0.01, 0.60))),
-    dict(id="gold",    name="Altın Efsane",    color=(232, 186, 90),  accent=(255, 245, 190), cost=700,
-         weapon="goldgun",  proj="gold",      aura="halo",    sfx="a", wlen=33,
+    dict(id="gold",    name="Altın Efsane",    color=(232, 186, 90),  accent=(255, 245, 190), cost=2500,
+         weapon="goldgun",  proj="gold",      aura="goldsun",    sfx="a", wlen=33,
          desc="Halesi ve işlemeli altın tüfeğiyle gerçek bir efsane.",
          perks=["Altın Kazancı +%20", "Toplama Menzili +20", "Hasar +%10",
                 "Her seviye: Hasar +%0.4, Şans +%0.2 (en çok %24 / %12)"],
          perk_add=dict(coin_mult=0.20, base_pickup=20, skin_power=0.10),
          perk_level=dict(skin_power=(0.004, 0.24), luck=(0.002, 0.12))),
-    dict(id="prism",   name="Prizma",          color=(255, 120, 200), accent=(255, 255, 255), cost=1000,
-         weapon="crystal",  proj="prism",     aura="prism",   sfx="c", wlen=30,
+    dict(id="prism",   name="Prizma",          color=(255, 120, 200), accent=(255, 255, 255), cost=3500,
+         weapon="crystal",  proj="prism",     aura="prism2",   sfx="c", wlen=30,
          desc="Sürekli renk değiştiren kristal silah ve mermiler.",
          perks=["Çoklu Atış Lv. +1", "Mermi Hızı +%10", "Mermi Delme +1", "Kritik Şans +%6",
                 "Her seviye: Hasar +%0.6 (en çok %36)"],
@@ -8616,15 +8647,15 @@ SKINS = [
          perk_level=dict(skin_power=(0.006, 0.36))),
 
     # ---- yeni: özel yetenekli skinler (elmasla alınan kalıcı avantajlar) ----
-    dict(id="shadow_hunter", name="Gölge Avcı", color=(52, 44, 78), accent=(200, 150, 255), cost=650,
-         weapon="crossbow", proj="blackfire", aura="shadow", sfx="b", wlen=27,
+    dict(id="shadow_hunter", name="Gölge Avcı", color=(52, 44, 78), accent=(200, 150, 255), cost=2300,
+         weapon="crossbow", proj="blackfire", aura="hunter", sfx="b", wlen=27,
          desc="Karanlıkta pusuya yatan bir avcı. Ayak sesi yok, ok sesi yok.",
          perks=["Hareket Hızı +30", "Dash Bekleme Süresi -%15",
                 "Her seviye: Kritik Şans +%0.2, Atış Hızı +%0.3"],
          perk_add=dict(base_speed=30, dash_cd_mult=-0.15),
          perk_level=dict(crit_chance=(0.002, 0.12), skin_aspd=(0.003, 0.18))),
-    dict(id="frost_witch", name="Buz Büyücüsü", color=(160, 225, 255), accent=(255, 255, 255), cost=850,
-         weapon="scepter", proj="star", aura="stars", sfx="a", wlen=36,
+    dict(id="frost_witch", name="Buz Büyücüsü", color=(160, 225, 255), accent=(255, 255, 255), cost=3000,
+         weapon="scepter", proj="star", aura="frost", sfx="a", wlen=36,
          desc="Asasının ucu buz gibi soğuk. Düşmanları donduran kristaller fırlatır.",
          perks=["Buz Lv.2 ile başlar (yavaşlatma)", "Kritik Vuruş Şansı +%8", "Hasar +%6",
                 "Her 15 seviyede Buz +1 (en çok Lv.5)", "Her seviye: Hasar +%0.3"],
@@ -8632,8 +8663,8 @@ SKINS = [
          perk_add=dict(crit_chance=0.08, skin_power=0.06),
          perk_every=dict(ice_level=(15, 5)),
          perk_level=dict(skin_power=(0.003, 0.18))),
-    dict(id="blood_countess", name="Kan Kontesi", color=(200, 30, 55), accent=(255, 120, 130), cost=850,
-         weapon="flask", proj="toxic", aura="bubbles", sfx="d", wlen=24,
+    dict(id="blood_countess", name="Kan Kontesi", color=(200, 30, 55), accent=(255, 120, 130), cost=3000,
+         weapon="flask", proj="toxic", aura="vampire", sfx="d", wlen=24,
          desc="Şişesinde kendi kanını taşır. Her vuruşta biraz can çalar.",
          perks=["Kan Emme Lv.2 ile başlar", "Can Yenilenmesi +0.8/sn", "Hasar +%6",
                 "Her 15 seviyede Kan Emme +1 (en çok Lv.5)",
@@ -8642,15 +8673,15 @@ SKINS = [
          perk_add=dict(base_regen=0.8, skin_power=0.06),
          perk_every=dict(vamp_level=(15, 5)),
          perk_level=dict(regen_pct=(0.00012, 0.006))),
-    dict(id="iron_sentinel", name="Zırhlı Devriye", color=(120, 128, 145), accent=(230, 235, 245), cost=750,
-         weapon="goldgun", proj="gold", aura="halo", sfx="a", wlen=30,
+    dict(id="iron_sentinel", name="Zırhlı Devriye", color=(120, 128, 145), accent=(230, 235, 245), cost=2600,
+         weapon="goldgun", proj="gold", aura="knight", sfx="a", wlen=30,
          desc="Ağır zırh giyer, yavaş ama sağlam. Bir tank gibi öne dalar.",
          perks=["Zırh +%8 (hasar azaltma)", "Can +40", "Hareket Hızı -15 (ağır zırh)",
                 "Her seviye: Can +6 (en çok +360), Hasar Alma -%0.3 (en çok %18)"],
          perk_add=dict(base_armor=0.08, base_max_hp=40, base_speed=-15),
          perk_level=dict(_hp=(6, 360), dmg_taken_mult=(-0.003, -0.18))),
-    dict(id="storm_bringer", name="Fırtına Getirici", color=(90, 150, 245), accent=(230, 245, 255), cost=1200,
-         weapon="cannon", proj="fireball", aura="flames", sfx="c", wlen=29,
+    dict(id="storm_bringer", name="Fırtına Getirici", color=(90, 150, 245), accent=(230, 245, 255), cost=4200,
+         weapon="cannon", proj="fireball", aura="storm", sfx="c", wlen=29,
          desc="Gökyüzünü kendine bağlamış. Etrafına düzenli yıldırım fırtınası çağırır.",
          perks=["Fırtına Lv.1 ile başlar (periyodik alan hasarı)", "Mermi Hızı +%18", "Atış Hızı +%8",
                 "Her 12 seviyede Fırtına +1 (en çok Lv.5)", "Her seviye: Hasar +%0.3"],
@@ -8660,8 +8691,8 @@ SKINS = [
          perk_level=dict(skin_power=(0.003, 0.18))),
 
     # ---- yeni +5 skin ----
-    dict(id="venom_striker", name="Zehir Vuruşçu", color=(90, 205, 115), accent=(220, 255, 210), cost=600,
-         weapon="flask", proj="toxic", aura="bubbles", sfx="d", wlen=25,
+    dict(id="venom_striker", name="Zehir Vuruşçu", color=(90, 205, 115), accent=(220, 255, 210), cost=2100,
+         weapon="flask", proj="toxic", aura="venom", sfx="d", wlen=25,
          desc="Zehirli şişesiyle yakın dövüşe girer, teması bile acıtır.",
          perks=["Dikenler Lv.1 ile başlar (temas hasarına karşılık verir)", "Can Yenilenmesi +0.5/sn", "Hasar +%8",
                 "Her 12 seviyede Dikenler +1 (en çok Lv.5)",
@@ -8670,8 +8701,8 @@ SKINS = [
          perk_add=dict(base_regen=0.5, skin_power=0.08),
          perk_every=dict(thorns_level=(12, 5)),
          perk_level=dict(regen_pct=(0.0001, 0.005))),
-    dict(id="homing_falcon", name="Yönelmeli Şahin", color=(90, 160, 245), accent=(220, 240, 255), cost=700,
-         weapon="crossbow", proj="feather", aura="wings", sfx="a", wlen=27,
+    dict(id="homing_falcon", name="Yönelmeli Şahin", color=(90, 160, 245), accent=(220, 240, 255), cost=2500,
+         weapon="crossbow", proj="feather", aura="jet", sfx="a", wlen=27,
          desc="Okları hedefi asla şaşırmaz; havada bile yön değiştirir.",
          perks=["Yönelme Lv.1 ile başlar (mermiler hedefe yönelir)", "Dash Bekleme Süresi -%10", "Hasar +%10",
                 "Her 15 seviyede Yönelme +1 (en çok Lv.4)", "Her seviye: Hasar +%0.4 (en çok %24)"],
@@ -8679,8 +8710,8 @@ SKINS = [
          perk_add=dict(dash_cd_mult=-0.10, skin_power=0.10),
          perk_every=dict(homing_level=(15, 4)),
          perk_level=dict(skin_power=(0.004, 0.24))),
-    dict(id="frenzy_beast", name="Çılgın Canavar", color=(220, 60, 40), accent=(255, 180, 90), cost=800,
-         weapon="cannon", proj="fireball", aura="flames", sfx="d", wlen=28,
+    dict(id="frenzy_beast", name="Çılgın Canavar", color=(220, 60, 40), accent=(255, 180, 90), cost=2800,
+         weapon="cannon", proj="fireball", aura="beast", sfx="d", wlen=28,
          desc="Ne kadar çok vurursa o kadar çılgınlaşır, durmak bilmez.",
          perks=["Çılgınlık Lv.2 ile başlar (ardışık vuruşta güçlenir)", "Can +40", "Hasar +%10",
                 "Her 15 seviyede Çılgınlık +1 (en çok Lv.4)",
@@ -8689,8 +8720,8 @@ SKINS = [
          perk_add=dict(base_max_hp=40, skin_power=0.10),
          perk_every=dict(frenzy_level=(15, 4)),
          perk_level=dict(_hp=(3, 180), skin_power=(0.004, 0.24))),
-    dict(id="orbit_guardian", name="Yörünge Bekçisi", color=(70, 200, 190), accent=(220, 255, 250), cost=900,
-         weapon="scepter", proj="star", aura="stars", sfx="a", wlen=37,
+    dict(id="orbit_guardian", name="Yörünge Bekçisi", color=(70, 200, 190), accent=(220, 255, 250), cost=3200,
+         weapon="scepter", proj="star", aura="guardian", sfx="a", wlen=37,
          desc="Etrafında dönen bir yıldız kalkanı ile korunur.",
          perks=["Yörünge Lv.1 ile başlar (etrafında dönen mermi)", "Zırh +%5", "Can +30",
                 "Her 12 seviyede Yörünge +1 (en çok Lv.5)", "Her seviye: Hasar Alma -%0.2 (en çok %12)"],
@@ -8735,7 +8766,7 @@ SKINS = [
                 "Kendi maskesi ve kostümüyle gelir"],
          perk_add=dict(second_wind_charges=1, run_dmg_mult=0.45)),
 
-    dict(id="pink_dream", name="Pembe Rüya", color=(255, 105, 190), accent=(255, 222, 236), cost=1100,
+    dict(id="pink_dream", name="Pembe Rüya", color=(255, 105, 190), accent=(255, 222, 236), cost=3900,
          weapon="scepter", proj="star", aura="halo", sfx="a", wlen=36,
          desc="Tepeden tırnağa pembe. Stiliyle olduğu kadar gücüyle de göz doldurur. "
               "Pembe şapka, gözlük ve pelerinle tamamla.",
@@ -8745,7 +8776,7 @@ SKINS = [
          perk_level=dict(regen_pct=(0.0001, 0.005), crit_chance=(0.001, 0.06))),
 
     # şans skini (Megabonk'taki Tilki gibi): şansı seviyeyle büyür.
-    dict(id="lucky_fox", name="Kurnaz Tilki", color=(240, 140, 60), accent=(255, 236, 214), cost=900,
+    dict(id="lucky_fox", name="Kurnaz Tilki", color=(240, 140, 60), accent=(255, 236, 214), cost=3200,
          weapon="crossbow", proj="feather", aura="stars", sfx="b", wlen=27,
          desc="Kuyruğunda uğur taşıyan kurnaz bir tilki: seviye atladıkça şansı da büyür.",
          perks=["Şans +%5 ile başlar", "Her seviye atladığında Şans +%1.5", "Hasar +%8",
@@ -8755,7 +8786,7 @@ SKINS = [
 
     # yeni skin: kozmik gezgin - çevresinde minik gezegenler döner, yeteneği
     # kara delik (düşmanları içine çekip patlar).
-    dict(id="cosmic", name="Kozmik Gezgin", color=(92, 74, 196), accent=(140, 232, 255), cost=1300,
+    dict(id="cosmic", name="Kozmik Gezgin", color=(92, 74, 196), accent=(140, 232, 255), cost=4500,
          weapon="scepter", proj="star", aura="cosmos", sfx="c", wlen=36,
          desc="Yıldızların arasından gelen bir gezgin. Çevresinde minik gezegenler döner; "
               "asasından kuyruklu yıldızlar fırlatır.",
@@ -8765,21 +8796,21 @@ SKINS = [
          perk_level=dict(skin_power=(0.007, 0.42))),
 
     # ---- yeni üçlü: her biri ayrı bir oyun tarzı (suikast / tank / tempo) ----
-    dict(id="shadow_warrior", name="Gölge Savaşçı", color=(78, 56, 132), accent=(196, 130, 255), cost=1400,
+    dict(id="shadow_warrior", name="Gölge Savaşçı", color=(78, 56, 132), accent=(196, 130, 255), cost=4900,
          weapon="katana", proj="blackfire", aura="shadowblade", sfx="b", wlen=44,
          desc="Gölgeden gölgeye atlayan bir savaşçı. Çevresinde iki hayalet bıçak döner; katanası nereye inse orada kritik vuruş biter.",
          perks=["Kritik Şans +%10", "Kritik Hasar +%25", "Dash Mesafesi +%15",
                 "Her seviye: Kritik Hasar +%1 (en çok %50), Kritik Şans +%0.15 (en çok %9)"],
          perk_add=dict(crit_chance=0.10, crit_dmg_mult=0.25, dash_dist_mult=0.15),
          perk_level=dict(crit_dmg_mult=(0.010, 0.50), crit_chance=(0.0015, 0.09))),
-    dict(id="dragon_soul", name="Ejder Ruhu", color=(200, 60, 40), accent=(255, 200, 90), cost=1400,
+    dict(id="dragon_soul", name="Ejder Ruhu", color=(200, 60, 40), accent=(255, 200, 90), cost=4900,
          weapon="dragonhead", proj="fireball", aura="dragon", sfx="d", wlen=34,
          desc="İçinde bir ejderin ruhunu taşıyan dev savaşçı. Kanatları, boynuzları ve ateş saçan ejder başlı topuyla hem dayanır hem yakar.",
          perks=["Can +60", "Zırh +%6 (hasar azaltma)", "Hasar +%10", "BONK Hasarı +%20",
                 "Her seviye: Can +4 (en çok +240), Hasar +%0.4 (en çok %24)"],
          perk_add=dict(base_max_hp=60, base_armor=0.06, skin_power=0.10, bonk_mult=0.20),
          perk_level=dict(_hp=(4, 240), skin_power=(0.004, 0.24))),
-    dict(id="chrono_sage", name="Zaman Bükücü", color=(70, 190, 210), accent=(255, 235, 150), cost=1400,
+    dict(id="chrono_sage", name="Zaman Bükücü", color=(70, 190, 210), accent=(255, 235, 150), cost=4900,
          weapon="clockstaff", proj="star", aura="chrono", sfx="c", wlen=42,
          desc="Arkasında dönen dev bir saat kadranı, başının üstünde kum saati: kendisi hızlanır, dünya yavaşlar.",
          perks=["Atış Hızı +%12", "Deneyim Kazancı +%12", "Dash Bekleme Süresi -%15", "Mermi Hızı +%15",
@@ -8787,6 +8818,34 @@ SKINS = [
          perk_add=dict(skin_aspd=0.12, xp_mult=0.12, dash_cd_mult=-0.15, proj_speed_mult=0.15),
          perk_level=dict(skin_aspd=(0.005, 0.30))),
 ]
+# ---- skin sıfırlaması (fiyatlar 3,5 katına çıktı) ----
+# Elmasla alınan bütün skinler herkesten geri alındı; yeniden (yeni fiyatla)
+# satın alınması gerekiyor. Sıfırlamadan sonra alınanlar "skins_rebought"
+# listesine yazılır ve korunur. Ücretsiz ve gerçek parayla alınan (premium)
+# skinlere dokunulmaz. Sunucu da aynı listeyi uygular (server.py REVOKED_SKINS).
+SKIN_RESET_V = 1
+
+
+def revoked_skin_ids():
+    return {sk["id"] for sk in SKINS if not sk.get("premium") and (sk.get("cost") or 0) > 0}
+
+
+def apply_skin_reset(data):
+    """Kayıttaki elmasla alınmış skinleri bir kez siler (sonradan alınanlar kalır)."""
+    if not isinstance(data, dict) or int(data.get("skin_reset", 0) or 0) >= SKIN_RESET_V:
+        return data
+    rev = revoked_skin_ids()
+    keep = set(data.get("skins_rebought") or [])
+    own = [x for x in (data.get("skins_owned") or ["default"]) if x not in rev or x in keep]
+    if "default" not in own:
+        own.insert(0, "default")
+    data["skins_owned"] = own
+    if data.get("equipped_skin") not in own:
+        data["equipped_skin"] = "default"
+    data["skin_reset"] = SKIN_RESET_V
+    return data
+
+
 # oyundan kaldırılan skinler -> sahiplerine verilen karşılık
 REMOVED_SKINS = {"toxic": "venom_striker"}
 
@@ -9155,6 +9214,39 @@ COSMETICS = [
          color=(120, 128, 145), accent=(235, 240, 250),
          desc="Dövülmüş çelik plakalardan örülmüş ağır bir pelerin.",
          perk_text="Zırh +%3", perk_add=dict(base_armor=0.03)),
+    # ---- skinlere uygun yeni parçalar ----
+    dict(id="samurai_helm", slot="hat", name="Samuray Kabutosu", cost=700,
+         color=(44, 38, 56), accent=(232, 186, 90),
+         desc="Altın hilal boynuzlu, lake kaplı bir samuray miğferi.",
+         perk_text="Kritik Şans +%6, Hasar +%6", perk_add=dict()),
+    dict(id="storm_crown", slot="hat", name="Fırtına Tacı", cost=650,
+         color=(70, 110, 220), accent=(200, 240, 255),
+         desc="Başının üstünde süzülen, çatırdayan şimşeklerden bir taç.",
+         perk_text="Atış Hızı +%6, Mermi Hızı +%8", perk_add=dict()),
+    dict(id="witch_hat", slot="hat", name="Cadı Şapkası", cost=480,
+         color=(34, 30, 44), accent=(150, 255, 120),
+         desc="Ucu bükük, zehir yeşili ışık saçan geniş kenarlı şapka.",
+         perk_text="Kritik Hasar +%10, Şans +%5", perk_add=dict()),
+    dict(id="falcon_helm", slot="hat", name="Şahin Miğferi", cost=560,
+         color=(200, 60, 50), accent=(255, 210, 120),
+         desc="İki yanında tüy kanatlar açılan parlak çelik miğfer.",
+         perk_text="Hareket Hızı +12, Mermi Hızı +%8", perk_add=dict()),
+    dict(id="ninja_mask", slot="eyewear", name="Gölge Maskesi", cost=520,
+         color=(34, 30, 44), accent=(190, 120, 255),
+         desc="Gözlerin yerinde mor yarıklar parlayan gölge maskesi.",
+         perk_text="Kritik Şans +%5, Dash Mesafesi +%10", perk_add=dict()),
+    dict(id="dragon_eye", slot="eyewear", name="Ejder Gözü", cost=560,
+         color=(150, 40, 30), accent=(255, 160, 50),
+         desc="Dikey göz bebekli, kor gibi yanan ejder gözleri.",
+         perk_text="Hasar +%5, Kritik Hasar +%8", perk_add=dict()),
+    dict(id="chrono_monocle", slot="eyewear", name="Zaman Monoklu", cost=500,
+         color=(200, 160, 80), accent=(120, 230, 220),
+         desc="Camında akrebi yelkovanı dönen dişlili bir monokl.",
+         perk_text="Deneyim +%10, Atış Hızı +%4", perk_add=dict()),
+    dict(id="cyber_shades", slot="eyewear", name="Neon Kesik Gözlük", cost=450,
+         color=(30, 30, 44), accent=(120, 240, 255),
+         desc="Kenarlarında renk akan, köşeli fütüristik gözlük.",
+         perk_text="Mermi Hızı +%8, Kritik Şans +%4", perk_add=dict()),
     # yalnızca şans çarkından (%2) çıkar, satılmaz
     dict(id="crown_god", slot="hat", name="GOD Tacı", cost=0, wheel_only=True,
          color=(255, 205, 60), accent=(255, 246, 200),
@@ -9233,19 +9325,23 @@ COS_PERKS = {
     "ember_shades": (("critd", 0.08), ("dmg", 0.04)), "cape_steel": (("armor", 0.06), ("hp", 20)),
     "crown_god": (("dmg", 0.12), ("luck", 0.12)),
     "crown_50m": (("gem", 0.50),),
+    "samurai_helm": (("crit", 0.06), ("dmg", 0.06)), "storm_crown": (("aspd", 0.06), ("pspeed", 0.08)),
+    "witch_hat": (("critd", 0.10), ("luck", 0.05)), "falcon_helm": (("speed", 12), ("pspeed", 0.08)),
+    "ninja_mask": (("crit", 0.05), ("dashd", 0.10)), "dragon_eye": (("dmg", 0.05), ("critd", 0.08)),
+    "chrono_monocle": (("xp", 0.10), ("aspd", 0.04)), "cyber_shades": (("pspeed", 0.08), ("crit", 0.04)),
 }
 # takım: (ad 5 dil, renk, şapkalar, gözlükler, pelerinler, bonus)
 COS_SETS = {
     "dragon": (("EJDER TAKIMI", "DRAGON SET", "SET DRAGÓN", "DRACHEN-SET", "НАБОР ДРАКОНА"), (255, 120, 50),
-               ("dragon_horns", "dragon_helm", "ember_horns"), ("ember_shades",), ("cape_flame",),
+               ("dragon_horns", "dragon_helm", "ember_horns"), ("ember_shades", "dragon_eye"), ("cape_flame",),
                (("dmg", 0.10), ("bonk", 0.15))),
     "frost": (("BUZ TAKIMI", "FROST SET", "SET ESCARCHA", "FROST-SET", "НАБОР ИНЕЯ"), (150, 220, 255),
               ("crystal_helm",), ("frost_lens",), ("cape_ice",), (("crit", 0.06), ("taken", 0.06))),
     "shadow": (("GÖLGE TAKIMI", "SHADOW SET", "SET SOMBRA", "SCHATTEN-SET", "НАБОР ТЕНИ"), (170, 120, 255),
-               ("ninja_hood",), ("blindfold",), ("cape_shadow", "cape_bat"),
+               ("ninja_hood", "samurai_helm"), ("blindfold", "ninja_mask"), ("cape_shadow", "cape_bat"),
                (("crit", 0.08), ("dashd", 0.20))),
     "royal": (("KRALİYET TAKIMI", "ROYAL SET", "SET REAL", "KÖNIGS-SET", "КОРОЛЕВСКИЙ НАБОР"), (255, 210, 100),
-              ("crown_gold", "top_hat"), ("monocle",), ("cape_royal", "cape_gold_trim"),
+              ("crown_gold", "top_hat"), ("monocle", "chrono_monocle"), ("cape_royal", "cape_gold_trim"),
               (("gold", 0.15), ("xp", 0.10))),
     "nature": (("DOĞA TAKIMI", "NATURE SET", "SET NATURALEZA", "NATUR-SET", "НАБОР ПРИРОДЫ"), (120, 220, 120),
                ("flower_crown", "leaf_crown"), ("leaf_visor",), ("cape_forest",), (("regen", 1.0), ("luck", 0.08))),
@@ -9255,7 +9351,8 @@ COS_SETS = {
              ("pink_bow",), ("pink_shades", "heart_glasses"), ("cape_pink",),
              (("crit", 0.07), ("luck", 0.08))),
     "tech": (("TEKNOLOJİ TAKIMI", "TECH SET", "SET TECNO", "TECH-SET", "ТЕХНО-НАБОР"), (120, 220, 255),
-             ("space_helmet", "neon_headband"), ("visor", "laser_visor", "steampunk_goggles"), ("cape_storm",),
+             ("space_helmet", "neon_headband", "storm_crown"), ("visor", "laser_visor", "steampunk_goggles", "cyber_shades"),
+             ("cape_storm",),
              (("aspd", 0.08), ("pspeed", 0.10))),
     "warrior": (("SAVAŞÇI TAKIMI", "WARRIOR SET", "SET GUERRERO", "KRIEGER-SET", "НАБОР ВОИНА"), (210, 180, 140),
                 ("viking_helm", "immortal_helm"), ("ski_mask", "goggles"), ("cape_red", "cape_steel"),
@@ -10912,7 +11009,7 @@ def eyes_hidden(p):
     item = _player_cosmetic(p, "eyewear")
     if not item:
         return ()
-    return (1,) if item["id"] == "monocle" else (-1, 1)
+    return (1,) if item["id"] in ("monocle", "chrono_monocle") else (-1, 1)
 
 
 def draw_cosmetic_hat(surf, p, px, py, t):
@@ -10923,562 +11020,524 @@ def draw_cosmetic_eyewear(surf, p, px, py, t):
     _cosmetic_inked(_draw_cosmetic_eyewear_raw, "eyewear", surf, p, px, py, t)
 
 
+class _HatPen:
+    """Kafa merkezli yerel çizim: (x, y) yarıçap birimindedir, y<0 yukarı.
+    Şapka nişan yönüne doğru hafifçe yatar."""
+
+    def __init__(self, surf, px, py, r, tilt=0.0):
+        self.s, self.px, self.py, self.r = surf, px, py, r
+        self.c, self.sn = math.cos(tilt), math.sin(tilt)
+
+    def P(self, x, y):
+        return (self.px + (x * self.c - y * self.sn) * self.r, self.py + (x * self.sn + y * self.c) * self.r)
+
+    def poly(self, pts, col):
+        poly_aa(self.s, [self.P(x, y) for x, y in pts], col)
+
+    def edge(self, pts, col, w=0.06, closed=True):
+        q = [self.P(x, y) for x, y in pts]
+        if closed:
+            q.append(q[0])
+        for a, b in zip(q, q[1:]):
+            thick_line(self.s, a, b, max(1.0, w * self.r), col)
+
+    def line(self, a, b, col, w=0.08):
+        thick_line(self.s, self.P(*a), self.P(*b), max(1.0, w * self.r), col)
+
+    def circ(self, x, y, rr, col):
+        cx, cy = self.P(x, y)
+        circle_aa(self.s, cx, cy, max(1.0, rr * self.r), col)
+
+    def glow(self, x, y, rr, col, k):
+        cx, cy = self.P(x, y)
+        add_glow(self.s, cx, cy, rr * self.r, col, k)
+
+    def spark(self, x, y, rr, col):
+        cx, cy = self.P(x, y)
+        _sparkle(self.s, cx, cy, rr * self.r, col)
+
+    @staticmethod
+    def arc(cx, cy, rx, ry, a0, a1, n=20):
+        return [(cx + math.cos(a0 + (a1 - a0) * k / n) * rx, cy + math.sin(a0 + (a1 - a0) * k / n) * ry)
+                for k in range(n + 1)]
+
+    def ell(self, cx, cy, rx, ry, col):
+        self.poly(self.arc(cx, cy, rx, ry, 0.0, math.tau, 28)[:-1], col)
+
+    def dome(self, cy, rx, ry, col, lip=0.12, cx=0.0):
+        """Kafaya oturan kubbe: üstü yarım elips, altı hafif kavisli."""
+        pts = self.arc(cx, cy, rx, ry, math.pi, math.tau, 22) + self.arc(cx, cy, rx, lip, 0.0, math.pi, 10)[1:-1]
+        self.poly(pts, col)
+        return pts
+
+    def ring(self, cx, cy, rx, ry, col, w, a0=0.0, a1=math.tau, n=26):
+        pts = self.arc(cx, cy, rx, ry, a0, a1, n)
+        for a, b in zip(pts, pts[1:]):
+            self.line(a, b, col, w)
+
+    def band(self, y0, y1, rx, col, sag=0.10):
+        """Kafayı saran kavisli şerit (y0 üst, y1 alt)."""
+        top = [(x, y0 + sag * (1 - (x / rx) ** 2)) for x in [rx * (k / 8.0 - 1.0) * 1.0 for k in range(17)]]
+        bot = [(x, y1 + sag * (1 - (x / rx) ** 2)) for x, _ in reversed(top)]
+        self.poly(top + bot, col)
+
+
+def _horn_pts(base, tip, ctrl, w0):
+    """İki ucu arasında kavisli, sivrilen boynuz/kanat çokgeni (yerel birim)."""
+    left, right = [], []
+    n = 10
+    for k in range(n + 1):
+        u = k / n
+        x = (1 - u) ** 2 * base[0] + 2 * (1 - u) * u * ctrl[0] + u * u * tip[0]
+        y = (1 - u) ** 2 * base[1] + 2 * (1 - u) * u * ctrl[1] + u * u * tip[1]
+        dx = 2 * (1 - u) * (ctrl[0] - base[0]) + 2 * u * (tip[0] - ctrl[0])
+        dy = 2 * (1 - u) * (ctrl[1] - base[1]) + 2 * u * (tip[1] - ctrl[1])
+        ln = math.hypot(dx, dy) or 1.0
+        nx, ny = -dy / ln, dx / ln
+        w = w0 * (1 - u) ** 0.9
+        left.append((x + nx * w, y + ny * w))
+        right.append((x - nx * w, y - ny * w))
+    return left + right[::-1], [(left[k], right[k]) for k in range(n + 1)]
+
+
+def _hat_tails(H, ox, oy, aim, t, col, n=2, ln=1.1, w=0.16):
+    """Arkaya uçuşan bant uçları (nişanın tersine dalgalanır)."""
+    bx, by = -aim[0] * 0.7 + (0.25 if ox >= 0 else -0.25), -aim[1] * 0.7 + 0.6
+    bl = math.hypot(bx, by) or 1.0
+    bx, by = bx / bl, by / bl
+    for j in range(n):
+        pts_l, pts_r = [], []
+        for k in range(7):
+            u = k / 6.0
+            wave = math.sin(t * 7.0 - u * 4.0 + j * 1.7) * 0.18 * u
+            x = ox + bx * ln * u * (1.0 - 0.15 * j) + (-by) * wave
+            y = oy + by * ln * u * (1.0 - 0.15 * j) + bx * wave + 0.25 * u * u + j * 0.12
+            ww = w * (1.0 - 0.55 * u)
+            pts_l.append((x, y - ww))
+            pts_r.append((x, y + ww))
+        H.poly(pts_l + pts_r[::-1], scale_col(col, 1.0 - 0.18 * j))
+
+
 def _draw_cosmetic_hat_raw(surf, p, px, py, t):
     """Şapka - kafanın üstünde, gövdeden sonra çizilir."""
     item = _player_cosmetic(p, "hat")
     if not item:
         return
     r = p.radius
+    iid = item["id"]
     col, acc = item["color"], item["accent"]
     dark = scale_col(col, 0.62)
-    lite = lighten(col, 0.34)
+    lite = lighten(col, 0.38)
+    aim = getattr(p, "aim_dir", (1.0, 0.0)) or (1.0, 0.0)
+    H = _HatPen(surf, px, py, r, clamp(aim[0], -1.0, 1.0) * 0.10)
 
-    if item["id"] == "cap_red":
-        # Klasik beyzbol şapkası: siperlik tacın ön kenarından çıkar ve nişan
-        # yönüne döner (kopuk bir yuvarlak değil, gerçek bir siperlik).
-        cy = py - r * 0.58
-        ax, ay = p.aim_dir
-        ang = math.atan2(ay, ax)
-        ca, sa = math.cos(ang), math.sin(ang)
-        visor_local = [(r * 0.05, -r * 0.52), (r * 0.78, -r * 0.42), (r * 1.20, -r * 0.15),
-                       (r * 1.20, r * 0.15), (r * 0.78, r * 0.42), (r * 0.05, r * 0.52)]
-        vpts = [(px + lx * ca - ly * sa, cy + r * 0.26 + lx * sa + ly * ca) for lx, ly in visor_local]
-        pygame.draw.polygon(surf, OUTLINE, [(x_, y_ + 2) for x_, y_ in vpts])
-        pygame.draw.polygon(surf, dark, vpts)
-        pygame.draw.line(surf, scale_col(col, 0.88), vpts[1], vpts[2], 2)
-        pygame.draw.circle(surf, OUTLINE, (int(px), int(cy)), int(r * 0.77))
-        pygame.draw.circle(surf, col, (int(px), int(cy)), int(r * 0.72))
-        seam = pygame.Rect(int(px - r * 0.72), int(cy - r * 0.72), int(r * 1.44), int(r * 1.44))
-        pygame.draw.arc(surf, dark, seam, 0.55, 2.60, 2)
-        pygame.draw.circle(surf, lite, (int(px - r * 0.26), int(cy - r * 0.32)), max(2, int(r * 0.22)))
-        pygame.draw.circle(surf, OUTLINE, (int(px), int(cy - r * 0.68)), max(3, int(r * 0.13)))
-        pygame.draw.circle(surf, acc, (int(px), int(cy - r * 0.68)), max(2, int(r * 0.10)))
-
-    elif item["id"] == "cap_blue":
-        # Düz siperlikli "snapback": kırmızı şapkadan belirgin biçimde farklı,
-        # köşeli bir taç ve geniş düz siperlik.
-        cy = py - r * 0.60
-        ax, ay = p.aim_dir
-        ang = math.atan2(ay, ax)
-        ca, sa = math.cos(ang), math.sin(ang)
-        # düz, geniş ve köşeli siperlik - tacın ön alt kenarına yapışık
-        visor_local = [(0.0, -r * 0.56), (r * 1.26, -r * 0.44), (r * 1.28, r * 0.44),
-                       (0.0, r * 0.56)]
-        vpts = [(px + lx * ca - ly * sa, cy + r * 0.40 + lx * sa + ly * ca) for lx, ly in visor_local]
-        pygame.draw.polygon(surf, OUTLINE, [(x_, y_ + 2) for x_, y_ in vpts])
-        pygame.draw.polygon(surf, dark, vpts)
-        pygame.draw.line(surf, lighten(col, 0.18), vpts[0], vpts[1], 2)
-        crown = pygame.Rect(int(px - r * 0.62), int(cy - r * 0.64), int(r * 1.24), int(r * 1.10))
-        pygame.draw.rect(surf, OUTLINE, crown.inflate(4, 4), border_radius=max(4, int(r * 0.34)))
-        pygame.draw.rect(surf, col, crown, border_radius=max(4, int(r * 0.34)))
-        pygame.draw.line(surf, dark, (int(px), crown.y + 4), (int(px), crown.bottom - 4), 2)
-        pygame.draw.rect(surf, lite, (crown.x + 4, crown.y + 4, max(3, int(r * 0.40)), max(3, int(r * 0.28))),
-                         border_radius=3)
-        pygame.draw.circle(surf, acc, (int(px), int(crown.y + 1)), max(2, int(r * 0.10)))
-
-    elif item["id"] == "wizard_hat":
-        # Ucu hafif kıvrık külah + yıldızlı bant.
-        by = py - r - 2
-        tip_sway = math.sin(t * 1.6) * 3.0
-        tip = (px + 4 + tip_sway, by - 32)
-        mid = (px + 1, by - 14)
-        left, right = (px - 15, by + 6), (px + 15, by + 6)
-        pts = [left, right, tip, mid]
-        pygame.draw.polygon(surf, OUTLINE, [(x_, y_ + 2) for x_, y_ in pts])
-        pygame.draw.polygon(surf, col, pts)
-        pygame.draw.polygon(surf, dark, [mid, tip, (tip[0] - 4, tip[1] + 4)])
-        pygame.draw.line(surf, lite, left, (tip[0] - 2, tip[1] + 3), 2)
-        band = pygame.Rect(int(px - 16), int(by - 2), 32, max(4, int(r * 0.22)))
-        pygame.draw.rect(surf, OUTLINE, band.inflate(2, 2), border_radius=3)
-        pygame.draw.rect(surf, dark, band, border_radius=3)
-        pygame.draw.ellipse(surf, OUTLINE, (int(px - 18), int(by + 1), 36, 10))
-        pygame.draw.ellipse(surf, col, (int(px - 17), int(by + 2), 34, 8))
-        pygame.draw.ellipse(surf, lite, (int(px - 15), int(by + 3), 30, 3))
-        add_glow(surf, tip[0], tip[1] + 2, 12, acc, .55 + .18 * math.sin(t * 5))
-        pygame.draw.circle(surf, acc, (int(tip[0]), int(tip[1] + 2)), 3)
-        for i in range(3):
-            sx = px - 10 + i * 10
-            sy = by - 1 + (i % 2) * 3
-            tw = 1 + max(0.0, math.sin(t * 4 + i * 2.1)) * 1.6
-            pygame.draw.circle(surf, acc, (int(sx), int(sy)), int(tw))
-
-    elif item["id"] == "crown_gold":
-        # Beş uçlu taç: uçlarda taşlar, altta kalın bant.
-        by = py - r - 3
-        pts = [(px - 13, by + 9), (px - 13, by - 1), (px - 6, by + 6), (px, by - 9),
-               (px + 6, by + 6), (px + 13, by - 1), (px + 13, by + 9)]
-        pygame.draw.polygon(surf, OUTLINE, [(x_, y_ + 2) for x_, y_ in pts])
-        pygame.draw.polygon(surf, col, pts)
-        pygame.draw.polygon(surf, acc, pts, 1)
-        band = pygame.Rect(int(px - 14), int(by + 7), 28, max(4, int(r * 0.24)))
-        pygame.draw.rect(surf, OUTLINE, band.inflate(2, 2), border_radius=2)
-        pygame.draw.rect(surf, dark, band, border_radius=2)
-        pygame.draw.line(surf, lite, (band.x + 2, band.y + 1), (band.right - 2, band.y + 1), 1)
-        gems = ((px, by - 6, (230, 60, 90)), (px - 13, by - 1, (90, 190, 255)), (px + 13, by - 1, (120, 235, 150)))
-        for gx, gy, gc in gems:
-            pygame.draw.circle(surf, OUTLINE, (int(gx), int(gy)), 3)
-            pygame.draw.circle(surf, gc, (int(gx), int(gy)), 2)
-        add_glow(surf, px, by, 18, col, .40 + .18 * math.sin(t * 3.4))
-
-    elif item["id"] == "crown_god":
-        # GOD tacı: ışınlı, taşlı, "GOD" yazılı büyük altın taç
+    if iid == "crown_god":
         draw_god_crown(surf, px, py - r - 4, max(12.0, r * 0.62), t)
-
-    elif item["id"] == "crown_50m":
-        # 50M tacı: elmas mavisi, "50M" yazılı
+        return
+    if iid == "crown_50m":
         draw_god_crown(surf, px, py - r - 4, max(12.0, r * 0.62), t, label="50M",
                        cols=((120, 225, 255), (235, 252, 255), (30, 90, 140)))
+        return
 
-    elif item["id"] == "halo_ring":
-        # Çift halka + yumuşak nabız; hafifçe süzülür.
-        bob = math.sin(t * 2.0) * 1.8
-        hy = py - r - 16 + bob
-        add_glow(surf, px, hy, 22, col, .5 + .14 * math.sin(t * 4))
-        pygame.draw.ellipse(surf, scale_col(acc, 0.55), (int(px - 18), int(hy - 5), 36, 11), 3)
-        pygame.draw.ellipse(surf, acc, (int(px - 16), int(hy - 4), 32, 9), 2)
-        pygame.draw.ellipse(surf, lighten(acc, 0.5), (int(px - 12), int(hy - 3), 24, 4), 1)
-        for i in range(3):
-            a = t * 1.4 + i * math.tau / 3
-            sx = px + math.cos(a) * 17
-            sy = hy + math.sin(a) * 4.5
-            pygame.draw.circle(surf, acc, (int(sx), int(sy)), 1 + int(max(0.0, math.sin(t * 5 + i)) * 1.5))
+    if iid in ("cap_red", "cap_blue"):
+        # siperlik nişan yönüne bakar; tepe kubbe + dikiş + düğme
+        fx, fy = aim
+        sx, sy = -fy, fx
+        if fy > 0:
+            fy *= 0.35          # bize doğru bakan siperlik kısalır (yüzü örtmesin)
+        bx0, by0 = H.P(0.0, -0.52)
+        flat = iid == "cap_blue"
+        loc = ([(0.2, -0.62), (1.25, -0.56), (1.32, 0.0), (1.25, 0.56), (0.2, 0.62)] if flat else
+               [(0.2, -0.6), (0.95, -0.5), (1.28, -0.18), (1.28, 0.18), (0.95, 0.5), (0.2, 0.6)])
+        bill = [(bx0 + (f * fx + l * sx) * r, by0 + (f * fy + l * sy) * r) for f, l in loc]
+        poly_aa(surf, bill, dark)
+        poly_aa(surf, [(bx0 + (f * 0.92 * fx + l * 0.8 * sx) * r, by0 + (f * 0.92 * fy + l * 0.8 * sy) * r)
+                       for f, l in loc], scale_col(col, 0.8))
+        if flat:
+            sx_, sy_ = bx0 + (1.0 * fx + 0.3 * sx) * r, by0 + (1.0 * fy + 0.3 * sy) * r
+            circle_aa(surf, sx_, sy_, max(2.0, r * 0.13), (255, 215, 90))
+            circle_aa(surf, sx_, sy_, max(1.0, r * 0.07), (255, 245, 200))
+        if flat:
+            H.dome(-0.44, 0.9, 0.7, dark, 0.13)
+            H.dome(-0.44, 0.52, 0.7, col, 0.13)
+            H.ell(-0.3, -0.9, 0.16, 0.09, lite)
+            H.poly([(-0.2, -0.6), (0.2, -0.6), (0.2, -0.9), (-0.2, -0.9)], acc)
+            H.poly([(-0.12, -0.68), (0.12, -0.68), (0.12, -0.82), (-0.12, -0.82)], col)
+            H.circ(0.0, -1.13, 0.1, acc)
+        else:
+            H.dome(-0.42, 0.88, 0.74, col, 0.13)
+            for sx_ in (-0.42, 0.42):
+                H.line((0.0, -1.14), (sx_, -0.36), dark, 0.06)
+            H.ell(-0.38, -0.86, 0.24, 0.12, lite)
+            H.band(-0.5, -0.36, 0.86, acc, 0.12)
+            H.circ(0.0, -1.14, 0.12, acc)
+            H.spark(0.0, -0.74, 0.17, (255, 245, 220))
 
-    elif item["id"] == "beanie_gray":
-        # Örgü bere: dokulu gövde, katlı bant ve ponpon.
-        cy = py - r * 0.64
-        pygame.draw.circle(surf, OUTLINE, (int(px), int(cy)), int(r * 0.74))
-        pygame.draw.circle(surf, col, (int(px), int(cy)), int(r * 0.69))
-        for i in range(-2, 3):
-            kx = px + i * r * 0.24
-            pygame.draw.line(surf, dark, (int(kx), int(cy - r * 0.55)), (int(kx), int(cy + r * 0.34)), 1)
-        pygame.draw.circle(surf, lite, (int(px - r * 0.26), int(cy - r * 0.30)), max(2, int(r * 0.20)))
-        band = pygame.Rect(0, 0, int(r * 1.48), int(r * 0.34))
-        band.center = (int(px), int(cy + r * 0.44))
-        pygame.draw.ellipse(surf, OUTLINE, band.inflate(3, 3))
-        pygame.draw.ellipse(surf, dark, band)
-        pygame.draw.ellipse(surf, lighten(col, 0.18), (band.x + 2, band.y + 1, band.w - 4, max(2, band.h // 2)))
-        pom = (int(px), int(cy - r * 0.78 + math.sin(t * 2.4) * 1.2))
-        pygame.draw.circle(surf, OUTLINE, pom, max(4, int(r * 0.20)))
-        pygame.draw.circle(surf, acc, pom, max(3, int(r * 0.17)))
-        pygame.draw.circle(surf, lighten(acc, 0.4), (pom[0] - 1, pom[1] - 1), max(1, int(r * 0.07)))
+    elif iid == "wizard_hat":
+        sw = math.sin(t * 1.6) * 0.12
+        H.ell(0.0, -0.64, 1.18, 0.27, dark)
+        H.ell(0.0, -0.68, 1.06, 0.2, col)
+        cone = [(-0.64, -0.7), (-0.36, -1.32), (-0.05, -1.86), (0.4 + sw, -2.28), (0.98 + sw * 1.5, -2.22),
+                (0.5 + sw, -1.96), (0.34, -1.42), (0.64, -0.7)]
+        H.poly(cone, col)
+        H.poly([(0.0, -0.7), (0.1, -1.4), (0.32, -1.92), (0.5 + sw, -1.96), (0.34, -1.42), (0.64, -0.7)], dark)
+        H.line((-0.5, -0.8), (-0.12, -1.7), lite, 0.07)
+        H.poly([(-0.6, -0.76), (0.6, -0.76), (0.52, -0.98), (-0.52, -0.98)], scale_col(acc, 0.55))
+        H.poly([(-0.14, -0.74), (0.14, -0.74), (0.14, -1.0), (-0.14, -1.0)], (255, 214, 110))
+        H.poly([(-0.07, -0.81), (0.07, -0.81), (0.07, -0.93), (-0.07, -0.93)], scale_col(acc, 0.55))
+        H.circ(-0.22, -1.38, 0.15, acc)
+        H.circ(-0.15, -1.43, 0.13, col)
+        H.spark(0.18, -1.2, 0.16, acc)
+        H.spark(0.06, -1.7, 0.11, acc)
+        tx, ty = 0.98 + sw * 1.5, -2.22
+        H.glow(tx, ty, 0.8, acc, 0.6 + 0.2 * math.sin(t * 5))
+        H.spark(tx, ty, 0.26 + 0.06 * math.sin(t * 6), (255, 255, 255))
 
-    elif item["id"] == "viking_helm":
-        # Miğfer + burun koruması + kıvrık boynuzlar + perçinler.
-        cy = py - r * 0.60
-        pygame.draw.circle(surf, OUTLINE, (int(px), int(cy)), int(r * 0.70))
-        pygame.draw.circle(surf, col, (int(px), int(cy)), int(r * 0.64))
-        pygame.draw.circle(surf, lite, (int(px - r * 0.24), int(cy - r * 0.28)), max(2, int(r * 0.18)))
-        rim = pygame.Rect(0, 0, int(r * 1.32), int(r * 0.26))
-        rim.center = (int(px), int(cy + r * 0.40))
-        pygame.draw.ellipse(surf, OUTLINE, rim.inflate(3, 3))
-        pygame.draw.ellipse(surf, dark, rim)
-        pygame.draw.rect(surf, OUTLINE, (int(px - 4), int(cy - r * 0.08), 8, int(r * 0.72)))
-        pygame.draw.rect(surf, dark, (int(px - 3), int(cy - r * 0.08), 6, int(r * 0.70)))
-        for s in (-1, 1):
-            pygame.draw.circle(surf, dark, (int(px + s * r * 0.40), int(cy + r * 0.20)), max(2, int(r * 0.08)))
-            hx0 = px + s * r * 0.52
-            hy0 = cy - r * 0.16
-            pts = [(hx0, hy0 + 4),
-                   (hx0 + s * 7, hy0 - 12),
-                   (hx0 + s * 19, hy0 - 19),
-                   (hx0 + s * 15, hy0 - 8),
-                   (hx0 + s * 17, hy0 + 2),
-                   (hx0 + s * 7, hy0 + 6)]
-            pygame.draw.polygon(surf, OUTLINE, [(x_ + s, y_ + 1) for x_, y_ in pts])
-            pygame.draw.polygon(surf, acc, pts)
-            pygame.draw.polygon(surf, scale_col(acc, 0.7), pts, 1)
-            pygame.draw.line(surf, scale_col(acc, 0.72), (hx0 + s * 8, hy0 - 10), (hx0 + s * 15, hy0 - 14), 1)
+    elif iid == "crown_gold":
+        H.glow(0.0, -1.1, 1.4, col, 0.25 + 0.12 * math.sin(t * 3.0))
+        pts = [(-0.84, -0.6), (-0.86, -1.32), (-0.58, -1.02), (-0.4, -1.5), (-0.18, -1.1), (0.0, -1.66),
+               (0.18, -1.1), (0.4, -1.5), (0.58, -1.02), (0.86, -1.32), (0.84, -0.6)]
+        H.poly(pts, col)
+        H.poly([(0.0, -1.66), (0.18, -1.1), (0.4, -1.5), (0.58, -1.02), (0.86, -1.32), (0.84, -0.6),
+                (0.0, -0.6)], scale_col(col, 0.85))
+        H.poly([(-0.86, -0.56), (0.86, -0.56), (0.86, -0.84), (-0.86, -0.84)], dark)
+        H.line((-0.8, -0.82), (0.8, -0.82), lite, 0.06)
+        for x, y in ((-0.86, -1.32), (-0.4, -1.5), (0.0, -1.66), (0.4, -1.5), (0.86, -1.32)):
+            H.circ(x, y, 0.1, acc)
+        for x, gc, rr in ((0.0, (230, 50, 90), 0.15), (-0.5, (80, 170, 255), 0.11), (0.5, (90, 220, 140), 0.11)):
+            H.circ(x, -0.7, rr, gc)
+            H.circ(x - rr * 0.35, -0.7 - rr * 0.35, rr * 0.35, (255, 255, 255))
+        H.line((-0.72, -0.94), (-0.62, -1.18), (255, 252, 230), 0.07)
+        ph = (t * 0.7) % 3.0
+        if ph < 1.0:
+            H.spark(-0.8 + ph * 1.6, -1.15, 0.22, (255, 255, 255))
 
-    elif item["id"] == "ninja_hood":
-        # Kukuleta + göz açıklığı bandı + arkada uçuşan kuşak.
-        cy = py - r * 0.55
-        tail = math.sin(t * 2.6) * r * 0.18
-        pts = [(px - r * 0.78, cy + r * 0.38), (px - r * 0.62, cy - r * 0.58),
-               (px, cy - r * 0.90), (px + r * 0.62, cy - r * 0.58), (px + r * 0.78, cy + r * 0.38)]
-        pygame.draw.polygon(surf, OUTLINE, [(x_, y_ + 2) for x_, y_ in pts])
-        pygame.draw.polygon(surf, col, pts)
-        pygame.draw.polygon(surf, lighten(col, 0.22),
-                            [(px - r * 0.52, cy - r * 0.40), (px, cy - r * 0.82), (px + r * 0.06, cy - r * 0.46)])
-        band = pygame.Rect(0, 0, int(r * 1.54), int(r * 0.30))
-        band.center = (int(px), int(cy + r * 0.16))
-        pygame.draw.ellipse(surf, OUTLINE, band.inflate(3, 3), 3)
-        pygame.draw.ellipse(surf, acc, band, 2)
-        kx, ky = px + r * 0.70, cy + r * 0.10
-        pygame.draw.lines(surf, OUTLINE, False,
-                          [(kx, ky), (kx + r * 0.30, ky + r * 0.22), (kx + r * 0.56, ky + r * 0.10 + tail)], 5)
-        pygame.draw.lines(surf, acc, False,
-                          [(kx, ky), (kx + r * 0.30, ky + r * 0.22), (kx + r * 0.56, ky + r * 0.10 + tail)], 2)
-
-    elif item["id"] == "flower_crown":
-        # Gerçek taç yapraklı çiçekler + aralarında küçük yeşil yapraklar.
-        ring_y = py - r * 0.38
-        rx, ry = r * 0.80, r * 0.38
-        n = 6
-        for i in range(n):
-            ang = i * math.tau / n - math.pi / 2
-            cxf = px + math.cos(ang) * rx
-            cyf = ring_y + math.sin(ang) * ry
-            if i % 2 == 1:
-                lp = [(cxf, cyf + 3), (cxf + 5, cyf - 3), (cxf, cyf - 8), (cxf - 5, cyf - 3)]
-                pygame.draw.polygon(surf, OUTLINE, [(x_, y_ + 1) for x_, y_ in lp])
-                pygame.draw.polygon(surf, (110, 180, 110), lp)
-                continue
-            fc = acc if (i // 2) % 2 == 0 else lighten(col, 0.28)
-            sway = math.sin(t * 2.2 + i) * 0.10
-            for k in range(5):
-                pa = k * math.tau / 5 + sway
-                pygame.draw.circle(surf, OUTLINE,
-                                   (int(cxf + math.cos(pa) * 4.2), int(cyf + math.sin(pa) * 4.2)), 4)
-            for k in range(5):
-                pa = k * math.tau / 5 + sway
-                pygame.draw.circle(surf, fc,
-                                   (int(cxf + math.cos(pa) * 4.2), int(cyf + math.sin(pa) * 4.2)), 3)
-            pygame.draw.circle(surf, (255, 235, 120), (int(cxf), int(cyf)), 2)
-
-    elif item["id"] == "top_hat":
-        # Silindir şapka: hafif konik gövde, saten bant ve parlama.
-        by = py - r - 4
-        brim = pygame.Rect(0, 0, int(r * 1.78), int(r * 0.28))
-        brim.center = (int(px), int(by))
-        pygame.draw.ellipse(surf, OUTLINE, brim.inflate(4, 4))
-        pygame.draw.ellipse(surf, col, brim)
-        pygame.draw.ellipse(surf, lighten(col, 0.20), (brim.x + 3, brim.y + 1, brim.w - 6, max(2, brim.h // 2)))
-        top_w, bot_w = r * 1.02, r * 0.94
-        top_y = by - r * 1.22
-        body = [(px - bot_w / 2, by), (px - top_w / 2, top_y),
-                (px + top_w / 2, top_y), (px + bot_w / 2, by)]
-        pygame.draw.polygon(surf, OUTLINE, [(x_, y_ + 1) for x_, y_ in body])
-        pygame.draw.polygon(surf, col, body)
-        pygame.draw.line(surf, lighten(col, 0.30), (px - bot_w / 2 + 3, by - 3), (px - top_w / 2 + 3, top_y + 3), 2)
-        pygame.draw.ellipse(surf, OUTLINE, (int(px - top_w / 2), int(top_y - r * 0.13), int(top_w), int(r * 0.26)))
-        pygame.draw.ellipse(surf, lighten(col, 0.12),
-                            (int(px - top_w / 2 + 1), int(top_y - r * 0.11), int(top_w - 2), int(r * 0.22)))
-        pygame.draw.rect(surf, acc, (int(px - bot_w / 2), int(by - r * 0.30), int(bot_w), max(3, int(r * 0.22))))
-        pygame.draw.rect(surf, scale_col(acc, 0.7), (int(px - bot_w / 2), int(by - r * 0.30), int(bot_w), 1))
-
-    elif item["id"] == "dragon_horns":
-        # Boğumlu, sivrilen ejderha boynuzları.
-        cy = py - r * 0.50
-        for s in (-1, 1):
-            hx0 = px + s * r * 0.36
-            pts = [(hx0, cy + 2), (hx0 + s * 8, cy - 22), (hx0 + s * 21, cy - 31),
-                   (hx0 + s * 14, cy - 15), (hx0 + s * 19, cy - 3)]
-            pygame.draw.polygon(surf, OUTLINE, [(x_ + s, y_ + 1) for x_, y_ in pts])
-            pygame.draw.polygon(surf, col, pts)
-            pygame.draw.polygon(surf, acc, pts, 1)
-            for k in range(3):
-                f = 0.22 + k * 0.22
-                rx0 = hx0 + s * (8 * f + 4)
-                ry0 = cy - 22 * f - 2
-                pygame.draw.line(surf, scale_col(col, 0.65),
-                                 (int(rx0), int(ry0)), (int(rx0 + s * 6), int(ry0 - 2)), 1)
-            pygame.draw.circle(surf, lighten(acc, 0.35), (int(hx0 + s * 20), int(cy - 30)), 2)
-
-    elif item["id"] == "ember_horns":
-        # Kor boynuz: koyu gövde, içinde yanan çatlaklar ve yükselen
-        # kıvılcımlar.
-        cy = py - r * 0.52
-        pulse = .42 + .20 * math.sin(t * 4.2)
-        for s in (-1, 1):
-            bx0 = px + s * r * 0.40
-            pts = [(bx0 - s * r * 0.16, cy + r * 0.12),
-                   (bx0 + s * r * 0.08, cy - r * 0.50),
-                   (bx0 + s * r * 0.46, cy - r * 0.94),
-                   (bx0 + s * r * 0.30, cy - r * 0.42),
-                   (bx0 + s * r * 0.24, cy + r * 0.08)]
-            pygame.draw.polygon(surf, OUTLINE, [(x_ + s, y_ + 1) for x_, y_ in pts])
-            pygame.draw.polygon(surf, col, pts)
-            pygame.draw.line(surf, acc, (int(bx0 + s * r * 0.02), int(cy - r * 0.08)),
-                             (int(bx0 + s * r * 0.26), int(cy - r * 0.58)), 2)
-            pygame.draw.line(surf, lighten(acc, 0.4), (int(bx0 + s * r * 0.14), int(cy - r * 0.34)),
-                             (int(bx0 + s * r * 0.30), int(cy - r * 0.52)), 1)
-            tipx, tipy = bx0 + s * r * 0.44, cy - r * 0.90
-            add_glow(surf, tipx, tipy, r * 0.44, acc, pulse)
-            pygame.draw.circle(surf, lighten(acc, 0.45), (int(tipx), int(tipy)), max(2, int(r * 0.09)))
-        for i in range(3):
-            exx = px + math.sin(t * 1.8 + i * 2.1) * r * 0.5
-            eyy = cy - r * 0.95 - ((t * 22 + i * 13) % 18) * 0.5
-            pygame.draw.circle(surf, acc, (int(exx), int(eyy)), 1)
-
-    elif item["id"] == "space_helmet":
-        # Cam küre + yansıma yayı + yanıp sönen anten.
-        cy = py - r * 0.15
-        pygame.draw.circle(surf, OUTLINE, (int(px), int(cy)), int(r * 1.06))
-        pygame.draw.circle(surf, (30, 34, 46), (int(px), int(cy)), int(r * 0.99))
-        glass = pygame.Rect(int(px - r * 0.99), int(cy - r * 0.99), int(r * 1.98), int(r * 1.98))
-        pygame.draw.arc(surf, lighten(acc, 0.2), glass, 0.9, 2.2, 3)
-        pygame.draw.circle(surf, col, (int(px), int(cy)), int(r * 0.99), 3)
-        pygame.draw.circle(surf, acc, (int(px - r * 0.32), int(cy - r * 0.36)), max(2, int(r * 0.26)))
-        pygame.draw.circle(surf, lighten(acc, 0.5), (int(px - r * 0.38), int(cy - r * 0.42)), max(1, int(r * 0.11)))
-        neck = pygame.Rect(0, 0, int(r * 1.10), int(r * 0.26))
-        neck.center = (int(px), int(cy + r * 0.96))
-        pygame.draw.ellipse(surf, OUTLINE, neck.inflate(3, 3))
-        pygame.draw.ellipse(surf, col, neck)
-        ax0, ay0 = px + r * 0.62, cy - r * 0.72
-        pygame.draw.line(surf, col, (int(ax0), int(ay0)), (int(ax0 + r * 0.22), int(ay0 - r * 0.40)), 2)
-        blink = .35 + .45 * (0.5 + 0.5 * math.sin(t * 6))
-        add_glow(surf, ax0 + r * 0.22, ay0 - r * 0.40, r * 0.30, (255, 90, 90), blink)
-        pygame.draw.circle(surf, (255, 120, 120), (int(ax0 + r * 0.22), int(ay0 - r * 0.40)), max(2, int(r * 0.08)))
-        add_glow(surf, px, cy, r * 1.32, acc, .16)
-
-    elif item["id"] == "pink_bow":
-        # Fiyonk: iki dolgun ilmek, ortada düğüm, aşağı sarkan iki kurdele.
-        cy = py - r - 6
-        sway = math.sin(t * 2.4) * 1.5
-        for s in (-1, 1):
-            loop = [(px + s * 3, cy),
-                    (px + s * 12, cy - 11),
-                    (px + s * 19, cy - 3),
-                    (px + s * 14, cy + 8),
-                    (px + s * 4, cy + 4)]
-            pygame.draw.polygon(surf, OUTLINE, [(x_ + s, y_ + 1) for x_, y_ in loop])
-            pygame.draw.polygon(surf, col, loop)
-            pygame.draw.polygon(surf, lighten(col, 0.28),
-                                [(px + s * 5, cy - 1), (px + s * 12, cy - 8), (px + s * 13, cy - 2)])
-            rib = [(px + s * 4, cy + 3),
-                   (px + s * 8, cy + 12 + sway * s),
-                   (px + s * 13, cy + 18 + sway * s)]
-            pygame.draw.lines(surf, OUTLINE, False, rib, 5)
-            pygame.draw.lines(surf, dark, False, rib, 3)
-        pygame.draw.circle(surf, OUTLINE, (int(px), int(cy)), 7)
-        pygame.draw.circle(surf, acc, (int(px), int(cy)), 5)
-        pygame.draw.circle(surf, lighten(acc, 0.45), (int(px - 2), int(cy - 2)), 2)
-
-    elif item["id"] == "leaf_crown":
-        # Sarmaşık tacı: halka boyunca dizilmiş, rüzgârda hafif sallanan
-        # yapraklar.
-        ring_y = py - r * 0.42
-        rx, ry = r * 0.86, r * 0.36
-        vine = pygame.Rect(int(px - rx), int(ring_y - ry), int(rx * 2), int(ry * 2))
-        pygame.draw.ellipse(surf, OUTLINE, vine.inflate(3, 3), 3)
-        pygame.draw.ellipse(surf, scale_col(col, 0.55), vine, 2)
-        n = 7
-        for i in range(n):
-            ang = i * math.tau / n - math.pi / 2
-            lx = px + math.cos(ang) * rx
-            ly = ring_y + math.sin(ang) * ry
-            lean = (-0.6 if math.cos(ang) < 0 else 0.6) + math.sin(t * 2.2 + i) * 0.12
-            ca, sa = math.cos(lean), math.sin(lean)
-            leaf = [(0, 2), (5, -6), (0, -15), (-5, -6)]
-            pts = [(lx + dx * ca - dy * sa, ly + dx * sa + dy * ca) for dx, dy in leaf]
-            pygame.draw.polygon(surf, OUTLINE, [(x_, y_ + 1) for x_, y_ in pts])
-            pygame.draw.polygon(surf, col if i % 2 == 0 else lighten(col, 0.26), pts)
-            pygame.draw.line(surf, scale_col(col, 0.58), pts[0], pts[2], 1)
-        for i in range(3):
-            a = i * math.tau / 3 - math.pi / 2
-            bxp = px + math.cos(a) * rx * 0.72
-            byp = ring_y + math.sin(a) * ry * 0.72
-            pygame.draw.circle(surf, OUTLINE, (int(bxp), int(byp)), 3)
-            pygame.draw.circle(surf, acc, (int(bxp), int(byp)), 2)
-
-    elif item["id"] == "neon_headband":
-        # Alın bandı: içinde akan neon şerit ve arkada uçuşan iki uç.
-        by = py - r * 0.52
-        pulse = .50 + .28 * math.sin(t * 5.0)
-        add_glow(surf, px, by, r * 0.98, acc, pulse * 0.55)
-        band = pygame.Rect(0, 0, int(r * 1.64), int(r * 0.36))
-        band.center = (int(px), int(by))
-        pygame.draw.rect(surf, OUTLINE, band.inflate(4, 4), border_radius=max(3, int(r * 0.18)))
-        pygame.draw.rect(surf, dark, band, border_radius=max(3, int(r * 0.18)))
-        sh = max(2, int(r * 0.12))
-        stripe = pygame.Rect(band.x + 3, band.centery - sh // 2, band.w - 6, sh)
-        pygame.draw.rect(surf, acc, stripe, border_radius=2)
-        pygame.draw.rect(surf, lighten(acc, 0.55), (stripe.x, stripe.y, stripe.w, 1))
-        for i in range(4):
-            nx = stripe.x + ((t * 28 + i * 16) % (stripe.w + 12)) - 6
-            if stripe.x <= nx <= stripe.right:
-                pygame.draw.circle(surf, lighten(acc, 0.6), (int(nx), int(stripe.centery)), 2)
-        kx, ky = px + r * 0.82, by + r * 0.04
-        pygame.draw.circle(surf, OUTLINE, (int(kx), int(ky)), max(3, int(r * 0.16)))
-        pygame.draw.circle(surf, col, (int(kx), int(ky)), max(2, int(r * 0.12)))
-        for k in (0.0, 0.55):
-            wob = math.sin(t * 3.0 + k * 5.0) * r * 0.13
-            mid = (kx + r * 0.26, ky + r * 0.12 + k * r * 0.16)
-            tip = (kx + r * 0.54, ky + r * 0.28 + k * r * 0.26 + wob)
-            pygame.draw.lines(surf, OUTLINE, False, [(kx, ky), mid, tip], 5)
-            pygame.draw.lines(surf, col, False, [(kx, ky), mid, tip], 2)
-
-    elif item["id"] == "dragon_helm":
-        # Ejderha kaskı: kafaya oturan kapalı miğfer, arkasında yanan alev
-        # yelesi, önünde iki kavisli boynuz ve kor gibi parlayan göz yarıkları.
-        cy = py - r * 0.34
-        # ---- alev yelesi (arkada, gövdeden önce) ----
-        for i in range(7):
-            f = i / 6.0
-            fl = math.sin(t * 6 + i * 0.9) * 0.5 + 0.5
-            hx = px - r * (0.10 + f * 0.30)
-            hy = cy - r * (0.55 + f * 0.62) - fl * r * 0.16
-            fr = max(2, int(r * (0.24 - f * 0.13) * (0.75 + fl * 0.5)))
-            fc = mix_col(acc, (255, 90, 40), f)
-            add_glow(surf, hx, hy, fr * 2.4, fc, .30 + .18 * fl)
-            pygame.draw.circle(surf, fc, (int(hx), int(hy)), fr)
-        # ---- boynuzlar ----
-        for s in (-1, 1):
-            hx0 = px + s * r * 0.54
-            hy0 = cy - r * 0.26
-            pts = [(hx0, hy0 + r * 0.16),
-                   (hx0 + s * r * 0.16, hy0 - r * 0.46),
-                   (hx0 + s * r * 0.62, hy0 - r * 0.74),
-                   (hx0 + s * r * 0.40, hy0 - r * 0.30),
-                   (hx0 + s * r * 0.34, hy0 + r * 0.10)]
-            pygame.draw.polygon(surf, OUTLINE, [(x_ + s, y_ + 1) for x_, y_ in pts])
-            pygame.draw.polygon(surf, acc, pts)
-            pygame.draw.polygon(surf, scale_col(acc, 0.65), pts, 1)
-        # ---- miğfer gövdesi ----
-        pygame.draw.circle(surf, OUTLINE, (int(px), int(cy)), int(r * 0.86))
-        pygame.draw.circle(surf, col, (int(px), int(cy)), int(r * 0.80))
-        pygame.draw.circle(surf, lighten(col, 0.30), (int(px - r * 0.28), int(cy - r * 0.32)),
-                           max(2, int(r * 0.24)))
-        # sırt kreti
-        crest = [(px, cy - r * 0.84), (px + r * 0.10, cy - r * 0.20),
-                 (px, cy + r * 0.30), (px - r * 0.10, cy - r * 0.20)]
-        pygame.draw.polygon(surf, scale_col(col, 0.72), crest)
-        # ---- göz yarıkları (nabız gibi parlar) ----
-        eg = .55 + .30 * math.sin(t * 3.6)
-        for s in (-1, 1):
-            exx, eyy = px + s * r * 0.30, cy + r * 0.20
-            add_glow(surf, exx, eyy, r * 0.40, acc, eg)
-            pygame.draw.polygon(surf, (255, 240, 190),
-                                [(exx - s * r * 0.16, eyy - r * 0.06),
-                                 (exx + s * r * 0.12, eyy - r * 0.12),
-                                 (exx + s * r * 0.14, eyy + r * 0.06),
-                                 (exx - s * r * 0.14, eyy + r * 0.08)])
-        # çene/ağız hattı
-        pygame.draw.arc(surf, scale_col(col, 0.5),
-                        pygame.Rect(int(px - r * 0.52), int(cy + r * 0.16), int(r * 1.04), int(r * 0.72)),
-                        3.5, 5.9, 2)
-
-    elif item["id"] == "immortal_helm":
-        # Ölümsüz miğfer: altın kapalı kask, çevresinde dönen runeler ve
-        # yukarıdan aşağı süzülen bir ışık parıltısı.
-        cy = py - r * 0.36
-        # dönen rune halkası (arkada)
-        for i in range(6):
-            a = t * 0.9 + i * math.tau / 6
-            rx = px + math.cos(a) * r * 1.12
-            ry = cy + math.sin(a) * r * 0.42 - r * 0.10
-            depth = 0.5 + 0.5 * math.sin(a)          # önde/arkada hissi
-            rr = max(2, int(r * (0.09 + depth * 0.07)))
-            rc = mix_col(scale_col(acc, 0.55), acc, depth)
-            add_glow(surf, rx, ry, rr * 3.0, acc, .16 + depth * 0.20)
-            pygame.draw.circle(surf, rc, (int(rx), int(ry)), rr)
-            pygame.draw.circle(surf, lighten(acc, 0.5), (int(rx), int(ry)), max(1, rr // 2))
-        # miğfer
-        pygame.draw.circle(surf, OUTLINE, (int(px), int(cy)), int(r * 0.84))
-        pygame.draw.circle(surf, col, (int(px), int(cy)), int(r * 0.78))
-        # kayan parıltı bandı
-        sh = (math.sin(t * 1.8) * 0.5 + 0.5)
-        band_y = cy - r * 0.70 + sh * r * 1.30
-        clip_prev = surf.get_clip()
-        surf.set_clip(pygame.Rect(int(px - r * 0.78), int(cy - r * 0.78), int(r * 1.56), int(r * 1.56)))
-        pygame.draw.line(surf, lighten(col, 0.55), (px - r * 0.80, band_y + r * 0.18),
-                         (px + r * 0.80, band_y - r * 0.18), max(2, int(r * 0.14)))
-        surf.set_clip(clip_prev)
-        pygame.draw.circle(surf, lighten(col, 0.34), (int(px - r * 0.26), int(cy - r * 0.30)),
-                           max(2, int(r * 0.22)))
-        # taç dişleri
-        for s in (-1, 0, 1):
-            tx = px + s * r * 0.40
-            pts = [(tx - r * 0.13, cy - r * 0.66), (tx, cy - r * 1.02), (tx + r * 0.13, cy - r * 0.66)]
-            pygame.draw.polygon(surf, OUTLINE, [(x_, y_ + 1) for x_, y_ in pts])
-            pygame.draw.polygon(surf, acc, pts)
-        # T biçimli vizör
-        pygame.draw.rect(surf, (36, 30, 18), (int(px - r * 0.09), int(cy - r * 0.30), int(r * 0.18), int(r * 0.92)))
-        pygame.draw.rect(surf, (36, 30, 18), (int(px - r * 0.52), int(cy - r * 0.02), int(r * 1.04), int(r * 0.26)))
-        pygame.draw.rect(surf, acc, (int(px - r * 0.52), int(cy - r * 0.02), int(r * 1.04), int(r * 0.26)), 1)
-        pygame.draw.circle(surf, OUTLINE, (int(px), int(cy + r * 0.82)), max(2, int(r * 0.10)))
-        pygame.draw.circle(surf, acc, (int(px), int(cy + r * 0.82)), max(2, int(r * 0.08)))
-
-    elif item["id"] == "nightmare_helm":
-        # Kâbus miğferi: mor alev saçan, ardında kaybolan ruhlar bırakan kask.
-        cy = py - r * 0.34
-        # uçuşan ruhlar
-        for i in range(4):
-            ph = (t * 0.7 + i * 0.25) % 1.0
-            sx_ = px + math.sin(t * 1.6 + i * 2.0) * r * 0.72
-            sy_ = cy - r * 0.55 - ph * r * 1.5
-            al = (1.0 - ph)
-            sr = max(1, int(r * 0.16 * al))
-            add_glow(surf, sx_, sy_, sr * 3.4, acc, 0.30 * al)
-            pygame.draw.circle(surf, mix_col(acc, (255, 255, 255), 0.3), (int(sx_), int(sy_)), sr)
-        # yan alevler
-        for s in (-1, 1):
-            for i in range(3):
-                fl = math.sin(t * 5 + i * 1.3 + s) * 0.5 + 0.5
-                fxp = px + s * r * (0.66 + i * 0.10)
-                fyp = cy - r * (0.20 + i * 0.34) - fl * r * 0.18
-                fr = max(2, int(r * (0.20 - i * 0.045) * (0.7 + fl * 0.6)))
-                add_glow(surf, fxp, fyp, fr * 2.6, acc, .26 + .16 * fl)
-                pygame.draw.circle(surf, mix_col(acc, (120, 60, 200), i / 2.0), (int(fxp), int(fyp)), fr)
-        # miğfer
-        pygame.draw.circle(surf, OUTLINE, (int(px), int(cy)), int(r * 0.84))
-        pygame.draw.circle(surf, col, (int(px), int(cy)), int(r * 0.78))
-        pygame.draw.circle(surf, lighten(col, 0.28), (int(px - r * 0.26), int(cy - r * 0.30)),
-                           max(2, int(r * 0.22)))
-        # sivri tepe
-        pts = [(px - r * 0.22, cy - r * 0.62), (px, cy - r * 1.14), (px + r * 0.22, cy - r * 0.62)]
-        pygame.draw.polygon(surf, OUTLINE, [(x_, y_ + 1) for x_, y_ in pts])
-        pygame.draw.polygon(surf, scale_col(col, 0.8), pts)
-        # yarık göz bandı
-        vis = pygame.Rect(int(px - r * 0.56), int(cy + r * 0.04), int(r * 1.12), int(r * 0.30))
-        pygame.draw.rect(surf, (18, 12, 26), vis, border_radius=3)
-        gl = .50 + .28 * math.sin(t * 4.2)
-        add_glow(surf, px, vis.centery, r * 0.80, acc, gl)
-        pygame.draw.line(surf, acc, (vis.x + 3, vis.centery), (vis.right - 3, vis.centery), 2)
-        pygame.draw.line(surf, lighten(acc, 0.5), (vis.x + 5, vis.centery), (vis.right - 5, vis.centery), 1)
-
-    elif item["id"] == "crystal_helm":
-        # Kristal kask: saydam, ışığı kırarak sürekli renk değiştiren yüzeyler.
-        cy = py - r * 0.34
-        hue = (t * 0.10) % 1.0
-        c1 = hue_col(hue)
-        c2 = hue_col((hue + 0.33) % 1.0)
-        c3 = hue_col((hue + 0.66) % 1.0)
-        add_glow(surf, px, cy, r * 1.30, c1, .30 + .10 * math.sin(t * 3))
-        pygame.draw.circle(surf, OUTLINE, (int(px), int(cy)), int(r * 0.84))
-        pygame.draw.circle(surf, mix_col(col, c1, 0.45), (int(px), int(cy)), int(r * 0.78))
-        # kristal yüzeyler (her biri farklı renkte kırılma)
-        facets = [
-            ([(px - r * 0.78, cy), (px - r * 0.22, cy - r * 0.74), (px - r * 0.06, cy + r * 0.10)], c2),
-            ([(px + r * 0.78, cy), (px + r * 0.24, cy - r * 0.72), (px + r * 0.06, cy + r * 0.14)], c3),
-            ([(px - r * 0.34, cy + r * 0.24), (px, cy - r * 0.10), (px + r * 0.34, cy + r * 0.26),
-              (px, cy + r * 0.78)], mix_col(c1, (255, 255, 255), 0.35)),
-        ]
-        for pts, fc in facets:
-            pygame.draw.polygon(surf, mix_col(fc, col, 0.45), pts)
-            pygame.draw.polygon(surf, lighten(fc, 0.35), pts, 1)
-        # tepe kristali
-        spire = [(px - r * 0.18, cy - r * 0.66), (px, cy - r * 1.18), (px + r * 0.18, cy - r * 0.66)]
-        pygame.draw.polygon(surf, OUTLINE, [(x_, y_ + 1) for x_, y_ in spire])
-        pygame.draw.polygon(surf, mix_col(c2, (255, 255, 255), 0.4), spire)
-        add_glow(surf, px, cy - r * 1.02, r * 0.46, c2, .42 + .18 * math.sin(t * 4.5))
-        pygame.draw.circle(surf, WHITE, (int(px), int(cy - r * 1.04)), max(1, int(r * 0.08)))
-        # kenar parlaması
-        pygame.draw.circle(surf, lighten(acc, 0.2), (int(px), int(cy)), int(r * 0.78), 2)
+    elif iid == "halo_ring":
+        bob = math.sin(t * 2.0) * 0.08
+        hy = -1.5 + bob
+        H.glow(0.0, hy, 1.4, col, 0.5 + 0.14 * math.sin(t * 4))
+        H.ring(0.0, hy, 0.82, 0.22, scale_col(acc, 0.75), 0.15, math.pi, math.tau)
+        H.ring(0.0, hy, 0.82, 0.22, acc, 0.15, 0.0, math.pi)
+        H.ring(0.0, hy - 0.02, 0.7, 0.15, (255, 255, 255), 0.05, 0.2, math.pi - 0.2, 14)
         for i in range(3):
             a = t * 1.6 + i * math.tau / 3
-            sxp = px + math.cos(a) * r * 0.60
-            syp = cy + math.sin(a) * r * 0.60
-            tw = 0.5 + 0.5 * math.sin(t * 6 + i * 2)
-            pygame.draw.circle(surf, WHITE, (int(sxp), int(syp)), max(1, int(1 + tw * 1.8)))
+            H.spark(math.cos(a) * 0.9, hy + math.sin(a) * 0.25, 0.14 + 0.06 * max(0.0, math.sin(t * 5 + i)),
+                    (255, 255, 240))
 
-    else:
-        # Güvenlik ağı: ileride tanımsız yeni bir şapka eklenirse yine de
-        # düzgün bir silueti olsun (kubbe + kenarlık + accent düğme).
-        top_y = py - r - 8
-        dome_r = max(6, int(r * 0.62))
-        dome_c = (int(px), int(top_y))
-        pygame.draw.circle(surf, OUTLINE, dome_c, dome_r + 3)
-        pygame.draw.circle(surf, col, dome_c, dome_r)
-        pygame.draw.circle(surf, lite, (int(px - dome_r * 0.32), int(top_y - dome_r * 0.32)),
-                           max(2, int(dome_r * 0.32)))
-        brim = pygame.Rect(0, 0, int(r * 1.52), int(r * 0.32))
-        brim.center = (int(px), int(top_y + dome_r * 0.72))
-        pygame.draw.ellipse(surf, OUTLINE, brim.inflate(4, 4))
-        pygame.draw.ellipse(surf, dark, brim)
-        pygame.draw.ellipse(surf, lighten(col, 0.18), (brim.x + 2, brim.y + 1, brim.w - 4, max(2, brim.h // 2)))
-        pygame.draw.circle(surf, acc, (int(px), int(top_y - dome_r * 0.44)), 3)
-        add_glow(surf, px, top_y, 13, acc, .40 + .12 * math.sin(t * 4))
+    elif iid == "beanie_gray":
+        H.dome(-0.42, 0.92, 0.78, col, 0.12)
+        for row in range(3):
+            y = -0.62 - row * 0.2
+            span = 0.82 - row * 0.16
+            for k in range(-3, 4):
+                x = k * span / 3.4
+                H.line((x - 0.07, y - 0.08), (x, y), dark, 0.045)
+                H.line((x, y), (x + 0.07, y - 0.08), dark, 0.045)
+        H.ell(-0.42, -0.95, 0.2, 0.1, lite)
+        H.band(-0.56, -0.28, 0.95, scale_col(col, 0.78), 0.1)
+        for k in range(-6, 7):
+            x = k * 0.135
+            yo = 0.1 * (1 - (x / 0.95) ** 2)
+            H.line((x, -0.52 + yo), (x, -0.32 + yo), dark, 0.045)
+        bob = math.sin(t * 2.4) * 0.03
+        for dx, dy, rr in ((0.0, 0.0, 0.26), (-0.14, 0.06, 0.16), (0.14, 0.06, 0.16), (0.0, -0.12, 0.16)):
+            H.circ(dx, -1.24 + dy + bob, rr, acc)
+        H.circ(-0.07, -1.32 + bob, 0.08, (255, 255, 255))
+
+    elif iid == "viking_helm":
+        ivory, ivd = (240, 228, 196), (190, 170, 130)
+        for sd in (-1, 1):
+            pts, ribs = _horn_pts((sd * 0.62, -0.72), (sd * 1.48, -1.62), (sd * 1.42, -0.86), 0.24)
+            H.poly(pts, ivory)
+            for k in (2, 4, 6):
+                H.line(ribs[k][0], ribs[k][1], ivd, 0.05)
+            H.poly(pts[:3] + pts[-3:], (160, 110, 60))
+        steel = (176, 182, 198)
+        H.dome(-0.4, 0.92, 0.8, steel, 0.12)
+        H.poly([(-0.14, -1.18), (0.14, -1.18), (0.16, -0.42), (-0.16, -0.42)], col)
+        H.band(-0.56, -0.34, 0.92, col, 0.12)
+        for k in range(-3, 4):
+            x = k * 0.25
+            H.circ(x, -0.45 + 0.12 * (1 - (x / 0.92) ** 2), 0.055, acc)
+        H.ell(-0.42, -0.9, 0.22, 0.11, (235, 240, 250))
+
+    elif iid == "ninja_hood":
+        _hat_tails(H, 0.8, -0.42, aim, t, scale_col(acc, 0.9))
+        H.dome(-0.3, 0.96, 0.9, col, 0.1)
+        H.ell(-0.42, -0.86, 0.22, 0.1, lighten(col, 0.18))
+        H.band(-0.6, -0.34, 0.96, acc, 0.1)
+        plate = [(-0.36, -0.36), (0.36, -0.36), (0.36, -0.66), (-0.36, -0.66)]
+        H.poly([(x, y + 0.08) for x, y in plate], (190, 196, 210))
+        H.poly([(-0.3, -0.42), (0.3, -0.42), (0.3, -0.62), (-0.3, -0.62)], (226, 230, 240))
+        H.edge([(-0.12, -0.46), (0.0, -0.58), (0.12, -0.46)], (70, 74, 90), 0.05, closed=False)
+        H.circ(-0.26, -0.48, 0.035, (120, 124, 140))
+        H.circ(0.26, -0.48, 0.035, (120, 124, 140))
+
+    elif iid == "flower_crown":
+        H.ring(0.0, -0.66, 0.98, 0.32, (70, 130, 70), 0.1)
+        flowers = ((255, 140, 180), (255, 225, 120), (190, 150, 255), (255, 170, 120), (140, 210, 255),
+                   (255, 140, 180), (255, 225, 120))
+        for k in range(10):
+            a = k * math.tau / 10 + 0.3
+            x, y = math.cos(a) * 0.98, -0.66 + math.sin(a) * 0.32
+            H.poly([(x, y), (x + 0.16, y - 0.12), (x + 0.26, y), (x + 0.12, y + 0.06)], (110, 190, 100))
+        order = sorted(range(7), key=lambda k: math.sin(k * math.tau / 7 + 1.2))
+        for k in order:
+            a = k * math.tau / 7 + 1.2
+            x, y = math.cos(a) * 0.98, -0.66 + math.sin(a) * 0.32
+            sc = 0.8 + 0.3 * (math.sin(a) + 1) / 2
+            fc = flowers[k]
+            for j in range(5):
+                b = j * math.tau / 5 + t * 0.4
+                H.circ(x + math.cos(b) * 0.12 * sc, y + math.sin(b) * 0.12 * sc, 0.1 * sc, fc)
+            H.circ(x, y, 0.08 * sc, (255, 240, 150))
+
+    elif iid == "top_hat":
+        H.ell(0.0, -0.7, 1.04, 0.24, dark)
+        H.ell(0.0, -0.74, 0.94, 0.17, col)
+        H.poly([(-0.6, -0.74), (0.6, -0.74), (0.68, -1.92), (-0.68, -1.92)], col)
+        H.poly([(0.2, -0.74), (0.6, -0.74), (0.68, -1.92), (0.28, -1.92)], scale_col(lite, 0.7))
+        H.poly([(-0.5, -0.78), (-0.36, -0.78), (-0.4, -1.86), (-0.56, -1.86)], lighten(col, 0.22))
+        H.ell(0.0, -1.92, 0.68, 0.15, lighten(col, 0.15))
+        H.poly([(-0.61, -0.78), (0.61, -0.78), (0.63, -1.02), (-0.63, -1.02)], acc)
+        H.line((-0.6, -0.8), (0.6, -0.8), lighten(acc, 0.4), 0.04)
+        card = [(0.32, -1.0), (0.62, -1.06), (0.66, -1.5), (0.36, -1.44)]
+        H.poly(card, (250, 248, 240))
+        H.poly([(0.49, -1.15), (0.56, -1.26), (0.5, -1.36), (0.43, -1.25)], (220, 40, 60))
+
+    elif iid == "dragon_horns":
+        for sd in (-1, 1):
+            pts, ribs = _horn_pts((sd * 0.42, -0.74), (sd * 1.2, -1.8), (sd * 1.15, -0.9), 0.24)
+            H.poly(pts, dark)
+            H.poly(pts[:11] + [ribs[10][1], ribs[0][1]], col)
+            for k in range(1, 9, 2):
+                H.line(ribs[k][0], ribs[k][1], acc, 0.05)
+            tip = ribs[10][0]
+            H.glow(tip[0], tip[1], 0.5, acc, 0.5)
+        for k, x in enumerate((-0.26, 0.0, 0.26)):
+            h = 0.26 if k == 1 else 0.18
+            H.poly([(x - 0.11, -0.78), (x, -0.78 - h), (x + 0.11, -0.78)], acc if k == 1 else col)
+
+    elif iid == "space_helmet":
+        R = 1.36
+        cx, cy = H.P(0.0, -0.08)
+        rr = int(R * r) + 2
+        g = pygame.Surface((rr * 2, rr * 2), pygame.SRCALPHA)
+        pygame.draw.circle(g, (*acc, 46), (rr, rr), int(R * r))
+        pygame.draw.circle(g, (255, 255, 255, 120), (rr - int(r * 0.45), rr - int(r * 0.55)), int(r * 0.3))
+        surf.blit(g, (int(cx - rr), int(cy - rr)))
+        H.ring(0.0, -0.08, R, R, col, 0.08)
+        H.ring(0.0, -0.08, R - 0.1, R - 0.1, (255, 255, 255), 0.05, math.pi * 1.1, math.pi * 1.45, 8)
+        H.ring(0.0, -0.08, R, R, scale_col(col, 0.7), 0.18, math.pi * 0.25, math.pi * 0.75, 12)
+        H.line((0.7, -1.1), (0.95, -1.78), (150, 156, 170), 0.07)
+        on = math.sin(t * 5) > 0
+        H.circ(0.95, -1.8, 0.13, (255, 90, 90) if on else (150, 40, 40))
+        if on:
+            H.glow(0.95, -1.8, 0.6, (255, 80, 80), 0.6)
+
+    elif iid == "pink_bow":
+        cx, cy = 0.36, -0.98
+        sw = math.sin(t * 3.0) * 0.04
+        for sd in (-1, 1):
+            loop = [(cx, cy), (cx + sd * 0.7, cy - 0.42 + sw), (cx + sd * 0.86, cy - 0.05),
+                    (cx + sd * 0.7, cy + 0.34 - sw), (cx, cy)]
+            H.poly(loop, col)
+            H.poly([(cx, cy), (cx + sd * 0.56, cy - 0.28 + sw), (cx + sd * 0.62, cy + 0.0), (cx, cy)], dark)
+            H.circ(cx + sd * 0.5, cy - 0.2, 0.06, acc)
+            H.circ(cx + sd * 0.66, cy + 0.08, 0.05, acc)
+            H.poly([(cx, cy + 0.06), (cx + sd * 0.26, cy + 0.56), (cx + sd * 0.12, cy + 0.5), (cx + sd * 0.04, cy + 0.6),
+                    (cx - sd * 0.02, cy + 0.08)], dark)
+        H.circ(cx, cy, 0.16, lite)
+        H.circ(cx - 0.04, cy - 0.04, 0.06, (255, 255, 255))
+
+    elif iid == "leaf_crown":
+        lv, lvd = (120, 200, 110), (60, 140, 70)
+        for sd in (-1, 1):
+            for k in range(7):
+                u = k / 6.0
+                a = math.pi / 2 + sd * (0.35 + u * 2.5)
+                x, y = math.cos(a) * 0.96, -0.66 + math.sin(a) * 0.34
+                d = (math.cos(a + sd * 0.4) * 0.3, math.sin(a + sd * 0.4) * 0.3 - 0.16)
+                c = lv if k % 2 else lvd
+                H.poly([(x, y), (x + d[0] * 0.5 - d[1] * 0.4, y + d[1] * 0.5 + d[0] * 0.4), (x + d[0], y + d[1]),
+                        (x + d[0] * 0.5 + d[1] * 0.4, y + d[1] * 0.5 - d[0] * 0.4)], c)
+        H.circ(0.0, -0.36, 0.12, (255, 210, 90))
+        for k in range(3):
+            a = math.pi / 2 + (k - 1) * 1.6
+            H.circ(math.cos(a) * 0.9, -0.66 + math.sin(a) * 0.34 - 0.08, 0.07, (230, 70, 80))
+
+    elif iid == "neon_headband":
+        _hat_tails(H, 0.92, -0.46, aim, t, scale_col(col, 0.85), n=2, ln=0.9, w=0.12)
+        H.band(-0.66, -0.36, 0.98, (28, 32, 44), 0.1)
+        pul = 0.6 + 0.3 * math.sin(t * 4)
+        pts = [(x, -0.51 + 0.1 * (1 - (x / 0.98) ** 2)) for x in [k * 0.14 - 0.98 for k in range(15)]]
+        for a, b in zip(pts, pts[1:]):
+            H.line(a, b, col, 0.14)
+        for a, b in zip(pts, pts[1:]):
+            H.line(a, b, acc, 0.05)
+        H.glow(0.0, -0.45, 1.3, col, 0.35 * pul)
+        H.poly([(-0.14, -0.38), (0.14, -0.38), (0.0, -0.62)], acc)
+
+    elif iid == "ember_horns":
+        char = (60, 40, 36)
+        for sd in (-1, 1):
+            pts, ribs = _horn_pts((sd * 0.44, -0.76), (sd * 0.78, -1.58), (sd * 0.82, -0.98), 0.2)
+            H.poly(pts, char)
+            for k in range(1, 9, 2):
+                a, b = ribs[k]
+                m = ((a[0] + b[0]) / 2 + sd * 0.03, (a[1] + b[1]) / 2)
+                H.line(a, m, col, 0.05)
+            H.poly(pts[7:11] + pts[-11:-7], col)
+            tip = ribs[10][0]
+            H.glow(tip[0], tip[1], 0.55, col, 0.55 + 0.2 * math.sin(t * 6 + sd))
+            H.circ(tip[0], tip[1], 0.06, acc)
+        for k in range(5):
+            ph = (t * 0.8 + k * 0.21) % 1.0
+            sd = 1 if k % 2 else -1
+            H.circ(sd * (0.7 + 0.15 * math.sin(k * 3 + t)), -1.5 - ph * 0.9, 0.06 * (1 - ph) + 0.02,
+                   mix_col(acc, col, ph))
+
+    elif iid == "dragon_helm":
+        for k in range(5):
+            fx_ = (k - 2) * 0.16
+            px_, py_ = H.P(fx_, -1.18 + abs(k - 2) * 0.1)
+            evo_flame(surf, px_, py_, r * (0.85 - abs(k - 2) * 0.14), r * 0.24, t, k * 1.7)
+        for sd in (-1, 1):
+            pts, _ = _horn_pts((sd * 0.62, -0.7), (sd * 1.42, -1.2), (sd * 1.15, -0.62), 0.16)
+            H.poly(pts, acc)
+        H.dome(-0.34, 0.96, 0.86, col, 0.12)
+        for row in range(3):
+            for k in range(-2, 3):
+                x = k * 0.3 + (row % 2) * 0.15
+                y = -0.66 - row * 0.2
+                if abs(x) < 0.85 - row * 0.15:
+                    H.edge(H.arc(x, y, 0.12, 0.08, 0.0, math.pi, 6), dark, 0.04, closed=False)
+        H.poly([(-0.96, -0.36), (-0.5, -0.62), (0.0, -0.46), (0.5, -0.62), (0.96, -0.36), (0.0, -0.32)], acc)
+        H.circ(0.0, -0.46, 0.1, (255, 90, 40))
+
+    elif iid == "immortal_helm":
+        crest = H.arc(0.0, -1.0, 0.3, 0.9, math.pi, math.tau, 14)
+        H.poly(crest + [(0.3, -0.7), (-0.3, -0.7)], (200, 40, 50))
+        for k in range(1, 14, 2):
+            H.line((0.0, -0.95), crest[k], (240, 90, 90), 0.04)
+        H.dome(-0.36, 0.96, 0.84, col, 0.12)
+        H.ell(-0.4, -0.9, 0.22, 0.11, acc)
+        H.band(-0.58, -0.36, 0.96, scale_col(col, 0.72), 0.12)
+        for k in range(-3, 4):
+            x = k * 0.25
+            H.poly([(x - 0.07, -0.46), (x, -0.56), (x + 0.07, -0.46), (x, -0.4)], acc)
+        for i in range(3):
+            a = t * 1.3 + i * math.tau / 3
+            x, y = math.cos(a) * 1.35, -0.6 + math.sin(a) * 0.35
+            H.glow(x, y, 0.4, acc, 0.5)
+            H.edge([(x - 0.08, y + 0.1), (x, y - 0.12), (x + 0.08, y + 0.1), (x - 0.08, y + 0.1)], acc, 0.05)
+
+    elif iid == "nightmare_helm":
+        pcols = ((90, 30, 140), (170, 90, 255), (235, 200, 255))
+        for k, (x, h) in enumerate(((-0.62, 0.5), (0.0, 0.8), (0.62, 0.5))):
+            px_, py_ = H.P(x, -1.0 - h * 0.9)
+            evo_flame(surf, px_, py_, r * 0.6, r * 0.2, t, k * 2.3, cols=pcols)
+        H.dome(-0.34, 0.96, 0.86, col, 0.12)
+        for x, h in ((-0.62, 0.5), (0.0, 0.8), (0.62, 0.5)):
+            H.poly([(x - 0.16, -0.95 + abs(x) * 0.2), (x, -1.0 - h), (x + 0.16, -0.95 + abs(x) * 0.2)], scale_col(col, 0.75))
+        H.band(-0.58, -0.36, 0.96, (30, 20, 44), 0.12)
+        for sd in (-1, 1):
+            H.poly([(sd * 0.12, -0.42), (sd * 0.52, -0.52), (sd * 0.5, -0.44), (sd * 0.14, -0.38)], acc)
+        H.glow(0.0, -0.46, 1.0, acc, 0.4 + 0.15 * math.sin(t * 5))
+        for k in range(3):
+            ph = (t * 0.5 + k / 3.0) % 1.0
+            x = (k - 1) * 0.9 + math.sin(t * 2 + k) * 0.15
+            H.circ(x, -0.9 - ph * 1.2, 0.1 * (1 - ph) + 0.03, lighten(acc, 0.3))
+
+    elif iid == "crystal_helm":
+        H.band(-0.62, -0.36, 0.96, (150, 190, 220), 0.12)
+        for k in range(5):
+            x = (k - 2) * 0.38
+            h = 1.05 - abs(k - 2) * 0.22
+            hc = hue_col(t * 0.25 + k * 0.17, 0.45)
+            y0 = -0.56 + 0.12 * (1 - (x / 0.96) ** 2)
+            pts = [(x - 0.16, y0), (x - 0.17, y0 - h * 0.7), (x, y0 - h), (x + 0.17, y0 - h * 0.7), (x + 0.16, y0)]
+            H.glow(x, y0 - h * 0.6, 0.45, hc, 0.4)
+            H.poly(pts, hc)
+            H.poly([(x, y0), (x, y0 - h), (x + 0.17, y0 - h * 0.7), (x + 0.16, y0)], scale_col(hc, 0.8))
+            H.line((x - 0.08, y0 - 0.1), (x - 0.08, y0 - h * 0.6), (255, 255, 255), 0.04)
+        ph = (t * 0.9) % 2.0
+        if ph < 1.0:
+            H.spark(-0.8 + ph * 1.6, -1.15, 0.2, (255, 255, 255))
+
+    elif iid == "samurai_helm":
+        lace = (200, 50, 60)
+        for k in range(3):
+            y = -0.52 + k * 0.17
+            w = 1.0 + k * 0.12
+            H.poly([(-w, y), (w, y), (w + 0.08, y + 0.18), (-w - 0.08, y + 0.18)], scale_col(col, 0.85 - k * 0.1))
+            H.line((-w, y + 0.09), (w, y + 0.09), lace, 0.04)
+        H.dome(-0.48, 0.92, 0.74, col, 0.12)
+        for k in range(-3, 4):
+            x = k * 0.22
+            H.line((x * 0.5, -1.18), (x, -0.5), lighten(col, 0.25), 0.04)
+        H.band(-0.6, -0.46, 0.92, acc, 0.1)
+        for sd in (-1, 1):
+            pts, _ = _horn_pts((sd * 0.08, -0.72), (sd * 0.92, -1.9), (sd * 0.62, -0.9), 0.13)
+            H.poly(pts, acc)
+            H.line((sd * 0.12, -0.78), (sd * 0.75, -1.65), lighten(acc, 0.45), 0.04)
+        H.circ(0.0, -0.76, 0.16, acc)
+        H.circ(0.0, -0.76, 0.1, lace)
+        H.glow(0.0, -1.2, 0.9, acc, 0.25 + 0.1 * math.sin(t * 3))
+
+    elif iid == "storm_crown":
+        hy = -1.18 + math.sin(t * 2.0) * 0.05
+        H.glow(0.0, hy, 1.4, col, 0.35 + 0.15 * math.sin(t * 6))
+        H.ring(0.0, hy + 0.14, 0.82, 0.2, scale_col(col, 0.9), 0.1)
+        for k in range(5):
+            x = (k - 2) * 0.36
+            h = 0.62 - abs(k - 2) * 0.12
+            y0 = hy + 0.1
+            bolt = [(x - 0.1, y0), (x + 0.04, y0 - h * 0.5), (x - 0.06, y0 - h * 0.5), (x + 0.08, y0 - h),
+                    (x + 0.0, y0 - h * 0.42), (x + 0.1, y0 - h * 0.42), (x + 0.08, y0)]
+            H.poly(bolt, acc)
+        rnd = random.Random(int(t * 12))
+        if rnd.random() < 0.6:
+            a = rnd.randint(0, 3)
+            x0, x1 = (a - 2) * 0.36 + 0.04, (a - 1) * 0.36 + 0.04
+            ym = hy - 0.45 + rnd.uniform(-0.1, 0.1)
+            H.edge([(x0, hy - 0.3), ((x0 + x1) / 2, ym), (x1, hy - 0.3)], (235, 250, 255), 0.04, closed=False)
+
+    elif iid == "witch_hat":
+        sw = math.sin(t * 1.4) * 0.1
+        H.ell(0.0, -0.62, 1.42, 0.3, scale_col(col, 0.75))
+        H.ell(0.0, -0.66, 1.3, 0.22, col)
+        cone = [(-0.6, -0.7), (-0.42, -1.2), (-0.2, -1.62), (0.0, -1.95), (-0.25 + sw, -2.3), (-0.62 + sw, -2.2),
+                (0.15, -2.06), (0.26, -1.62), (0.34, -1.2), (0.6, -0.7)]
+        H.poly(cone, col)
+        H.poly([(0.0, -0.7), (0.08, -1.3), (0.15, -2.06), (0.26, -1.62), (0.34, -1.2), (0.6, -0.7)],
+               scale_col(col, 0.75))
+        H.poly([(-0.6, -0.74), (0.6, -0.74), (0.52, -0.98), (-0.54, -0.98)], (110, 60, 160))
+        H.poly([(-0.14, -0.72), (0.14, -0.72), (0.14, -1.0), (-0.14, -1.0)], acc)
+        H.poly([(-0.07, -0.79), (0.07, -0.79), (0.07, -0.93), (-0.07, -0.93)], (110, 60, 160))
+        tx, ty = -0.62 + sw, -2.2
+        H.glow(tx, ty, 0.7, acc, 0.55 + 0.2 * math.sin(t * 4))
+        for k in range(3):
+            ph = (t * 0.6 + k / 3.0) % 1.0
+            H.circ(tx + math.sin(t * 2 + k) * 0.12, ty - 0.1 - ph * 0.7, 0.08 * (1 - ph) + 0.03, acc)
+
+    elif iid == "falcon_helm":
+        steel = (190, 196, 210)
+        for sd in (-1, 1):
+            for k in range(4):
+                a = -math.pi / 2 + sd * (0.55 + k * 0.32) + math.sin(t * 4) * 0.05 * sd
+                ln = 1.05 - k * 0.12
+                b = (sd * 0.78, -0.72)
+                d = (math.cos(a) * ln, math.sin(a) * ln)
+                nrm = (-d[1] * 0.18, d[0] * 0.18)
+                c = (255, 252, 240) if k % 2 == 0 else acc
+                H.poly([b, (b[0] + d[0] * 0.5 + nrm[0], b[1] + d[1] * 0.5 + nrm[1]), (b[0] + d[0], b[1] + d[1]),
+                        (b[0] + d[0] * 0.5 - nrm[0] * 0.5, b[1] + d[1] * 0.5 - nrm[1] * 0.5)], c)
+        H.dome(-0.4, 0.92, 0.8, steel, 0.12)
+        H.ell(-0.4, -0.9, 0.22, 0.11, (245, 248, 255))
+        H.poly([(-0.12, -1.2), (0.12, -1.2), (0.14, -0.44), (0.0, -0.3), (-0.14, -0.44)], col)
+        H.band(-0.58, -0.38, 0.92, col, 0.12)
+        H.circ(0.0, -0.5, 0.1, acc)
 
 
 def _face_frame(p, px, py):
@@ -11496,246 +11555,384 @@ def _fpts(px, py, fx, fy, sx, sy, local):
     return [(px + lf * fx + ls * sx, py + lf * fy + ls * sy) for lf, ls in local]
 
 
+# gözlerin yerel konumu (yarıçap birimi): ileri EYE_F, yana ±EYE_S
+EYE_F, EYE_S = 0.42, 0.34
+
+
+class _EyePen:
+    """Yüz çizimi: W(f, l) ileri/yan; E(s, x, y) s tarafındaki göze göre x dışa,
+    y yukarı (yüzün üstü)."""
+
+    def __init__(self, surf, p, px, py):
+        self.s, self.px, self.py, self.r = surf, px, py, p.radius
+        self.fx, self.fy, self.sx, self.sy = _face_frame(p, px, py)
+
+    def W(self, f, l):
+        r = self.r
+        return (self.px + (f * self.fx + l * self.sx) * r, self.py + (f * self.fy + l * self.sy) * r)
+
+    def E(self, s, x, y):
+        return self.W(EYE_F - y, s * (EYE_S + x))
+
+    def lens(self, s, local, col):
+        poly_aa(self.s, [self.E(s, x, y) for x, y in local], col)
+
+    def rim(self, s, local, col, w=0.07):
+        q = [self.E(s, x, y) for x, y in local]
+        q.append(q[0])
+        for a, b in zip(q, q[1:]):
+            thick_line(self.s, a, b, max(1.0, w * self.r), col)
+
+    def wpoly(self, local, col):
+        poly_aa(self.s, [self.W(f, l) for f, l in local], col)
+
+    def wline(self, a, b, col, w=0.07):
+        thick_line(self.s, self.W(*a), self.W(*b), max(1.0, w * self.r), col)
+
+    def eline(self, s, a, b, col, w=0.07):
+        thick_line(self.s, self.E(s, *a), self.E(s, *b), max(1.0, w * self.r), col)
+
+    def ecirc(self, s, x, y, rr, col):
+        cx, cy = self.E(s, x, y)
+        circle_aa(self.s, cx, cy, max(1.0, rr * self.r), col)
+
+    def eglow(self, s, x, y, rr, col, k):
+        cx, cy = self.E(s, x, y)
+        add_glow(self.s, cx, cy, rr * self.r, col, k)
+
+    def pupil(self, s, k=1.0):
+        """Şeffaf camın ardındaki göz bebeği."""
+        cx, cy = self.E(s, 0.0, 0.0)
+        r = self.r
+        circle_aa(self.s, cx, cy, max(1.5, r * 0.2 * k), (250, 250, 255))
+        circle_aa(self.s, cx + self.fx * r * 0.08, cy + self.fy * r * 0.08, max(1.0, r * 0.1 * k), (20, 24, 40))
+
+    def temples(self, col, w=0.07, y=0.06, x=0.3):
+        for s in (-1, 1):
+            a = self.E(s, x, y)
+            b = self.W(EYE_F - 0.5, s * 0.96)
+            thick_line(self.s, a, b, max(1.0, w * self.r), col)
+
+    def bridge(self, col, w=0.07, y=0.08, x=0.26):
+        thick_line(self.s, self.E(1, -x, y), self.E(-1, -x, y), max(1.0, w * self.r), col)
+
+
+def _shape_circle(rr, n=18):
+    return [(math.cos(k * math.tau / n) * rr, math.sin(k * math.tau / n) * rr) for k in range(n)]
+
+
+def _shape_heart(rr):
+    pts = []
+    for k in range(24):
+        a = k * math.tau / 24
+        x = 16 * math.sin(a) ** 3
+        y = 13 * math.cos(a) - 5 * math.cos(2 * a) - 2 * math.cos(3 * a) - math.cos(4 * a)
+        pts.append((x / 17.0 * rr, y / 17.0 * rr + rr * 0.1))
+    return pts
+
+
+def _shape_star(rr, n=5, k_in=0.48, rot=0.0):
+    return [(math.cos(rot - math.pi / 2 + j * math.pi / n) * rr * (1 if j % 2 == 0 else k_in),
+             -math.sin(rot - math.pi / 2 + j * math.pi / n) * rr * (1 if j % 2 == 0 else k_in)) for j in range(n * 2)]
+
+
 def _draw_cosmetic_eyewear_raw(surf, p, px, py, t):
     """Gözlük - gözlerin üstüne, gövdeden sonra çizilir."""
     item = _player_cosmetic(p, "eyewear")
     if not item:
         return
-    r = p.radius
+    iid = item["id"]
     col, acc = item["color"], item["accent"]
     dark = scale_col(col, 0.55)
-    fx_, fy_, sx_, sy_ = _face_frame(p, px, py)
-    iid = item["id"]
+    G = _EyePen(surf, p, px, py)
+    S = (-1, 1)
 
-    # gözlerin yerel konumu: biraz ileri, iki yana ayrık
-    EF, ES = r * 0.40, r * 0.34
+    def shine(s, x0, y0, x1, y1, w=0.08, c=(255, 255, 255)):
+        G.eline(s, (x0, y0), (x1, y1), c, w)
 
-    def W(lf, ls):
-        return (px + lf * fx_ + ls * sx_, py + lf * fy_ + ls * sy_)
+    def tails(s, colr, n=2):
+        """Arkada düğüm + uçuşan iki uç (yüz bize dönükken başın ardında kalır)."""
+        if G.fy > 0.55:
+            return
+        kx, ky = G.W(EYE_F - 0.62, s * 0.9)
+        r = G.r
+        bx, by = -G.fx * 0.6, -G.fy * 0.6 + 0.8
+        bl = math.hypot(bx, by) or 1.0
+        bx, by = bx / bl, by / bl
+        for j in range(n):
+            pts_a, pts_b = [], []
+            for k in range(6):
+                u = k / 5.0
+                wv = math.sin(t * 8.0 - u * 4.0 + j * 1.9) * r * 0.16 * u
+                x = kx + bx * r * 0.9 * u + G.sx * s * r * (0.2 + 0.25 * j) * u + (-by) * wv
+                y = ky + by * r * 0.9 * u + G.sy * s * r * (0.2 + 0.25 * j) * u + bx * wv
+                ww = r * 0.1 * (1 - 0.5 * u)
+                pts_a.append((x - G.sx * ww, y - G.sy * ww))
+                pts_b.append((x + G.sx * ww, y + G.sy * ww))
+            poly_aa(surf, pts_a + pts_b[::-1], scale_col(colr, 1.0 - 0.2 * j))
+        circle_aa(surf, kx, ky, max(2.0, r * 0.14), scale_col(colr, 0.8))
 
-    def poly(local, color, width=0):
-        pygame.draw.polygon(surf, color, _fpts(px, py, fx_, fy_, sx_, sy_, local), width)
+    if iid == "shades":
+        lens = [(-0.3, 0.2), (0.33, 0.22), (0.32, -0.04), (0.16, -0.26), (-0.14, -0.26), (-0.3, -0.08)]
+        G.temples((40, 42, 52))
+        for s in S:
+            G.lens(s, lens, col)
+            G.lens(s, [(-0.26, 0.17), (0.3, 0.19), (0.3, 0.04), (-0.27, 0.0)], (54, 64, 96))
+            shine(s, 0.06, 0.12, 0.2, -0.08, 0.07, lighten(acc, 0.5))
+            G.rim(s, lens, (52, 54, 66), 0.06)
+        G.bridge((52, 54, 66), 0.07, 0.17, 0.3)
 
-    def line(a, b, color, w=2):
-        pygame.draw.line(surf, color, W(*a), W(*b), w)
+    elif iid == "goggles":
+        for s in S:
+            G.wline((EYE_F, s * 0.6), (EYE_F - 0.32, s * 1.0), (80, 56, 36), 0.22)
+        for s in S:
+            G.lens(s, _shape_circle(0.34), (170, 130, 70))
+            G.lens(s, _shape_circle(0.25), (255, 190, 90))
+            G.lens(s, [(-0.2, 0.05), (0.15, 0.2), (0.22, 0.08), (-0.12, -0.08)], (255, 230, 160))
+            for k in range(6):
+                a = k * math.tau / 6 + 0.3
+                G.ecirc(s, math.cos(a) * 0.3, math.sin(a) * 0.3, 0.035, (90, 66, 36))
+        G.bridge((120, 90, 60), 0.1, 0.0, 0.3)
 
-    def lens_poly(side, hw, hh, tilt=0.0):
-        """Tek bir cam için dörtgen: hw=ileri yarıçap, hh=yan yarıçap."""
-        c = ES * side
-        return [(EF - hw, c - hh * (1 - tilt * side)),
-                (EF + hw, c - hh),
-                (EF + hw, c + hh),
-                (EF - hw, c + hh * (1 - tilt * side))]
+    elif iid in ("monocle", "chrono_monocle"):
+        s = 1
+        cx, cy = G.E(s, 0.0, 0.0)
+        r = G.r
+        ch = [G.E(s, 0.22, -0.24)]
+        for k in range(1, 8):
+            u = k / 7.0
+            bx_, by_ = G.W(EYE_F - 0.2 - 0.5 * u, s * (EYE_S + 0.25 + 0.4 * u))
+            ch.append((bx_, by_ + math.sin(u * math.pi) * r * 0.22))
+        for k, (x, y) in enumerate(ch):
+            circle_aa(surf, x, y, max(1.0, r * 0.045), col if k % 2 else acc)
+        if iid == "chrono_monocle":
+            G.lens(s, _shape_circle(0.36), col)
+            G.lens(s, _shape_circle(0.29), (250, 240, 214))
+            for k in range(12):
+                a = k * math.tau / 12
+                ln = 0.2 if k % 3 else 0.16
+                G.eline(s, (math.cos(a) * ln, math.sin(a) * ln), (math.cos(a) * 0.25, math.sin(a) * 0.25),
+                        (90, 70, 40), 0.03)
+            ah = t * 0.8
+            G.eline(s, (0, 0), (math.cos(ah) * 0.13, math.sin(ah) * 0.13), (40, 30, 20), 0.05)
+            G.eline(s, (0, 0), (math.cos(ah * 8) * 0.22, math.sin(ah * 8) * 0.22), (190, 60, 50), 0.03)
+            gx, gy = 0.42, 0.22
+            teeth = [(math.cos(k * math.pi / 8 + t) * (0.16 if k % 2 else 0.12),
+                      math.sin(k * math.pi / 8 + t) * (0.16 if k % 2 else 0.12)) for k in range(16)]
+            G.lens(s, [(gx + x, gy + y) for x, y in teeth], col)
+            G.ecirc(s, gx, gy, 0.05, (250, 240, 214))
+            G.eglow(s, 0.0, 0.0, 0.6, acc, 0.3)
+        else:
+            G.lens(s, _shape_circle(0.35), col)
+            G.lens(s, _shape_circle(0.28), (226, 236, 246))
+            G.pupil(s, 1.15)
+            shine(s, -0.16, 0.12, -0.04, 0.2, 0.06)
+        ph = (t * 0.6) % 3.0
+        if ph < 0.5:
+            _sparkle(surf, *G.E(s, 0.2, 0.2), r * 0.22 * (1 - abs(ph - 0.25) * 4), (255, 255, 255))
 
-    # ---- tek parça (wraparound) gözlükler ----
-    if iid == "visor":
-        band = [(EF - r * 0.20, -r * 0.62), (EF + r * 0.26, -r * 0.50),
-                (EF + r * 0.26, r * 0.50), (EF - r * 0.20, r * 0.62)]
-        poly([(a + 0.6, b) for a, b in band], OUTLINE)
-        poly(band, dark)
-        inner = [(EF - r * 0.10, -r * 0.52), (EF + r * 0.20, -r * 0.42),
-                 (EF + r * 0.20, r * 0.42), (EF - r * 0.10, r * 0.52)]
-        poly(inner, col)
-        # tarama çizgisi yukarı aşağı gezer
-        scan = math.sin(t * 2.6)
-        line((EF + r * 0.06, -r * 0.40 * scan), (EF + r * 0.18, -r * 0.40 * scan), lighten(acc, .5), 2)
-        line((EF - r * 0.16, -r * 0.55), (EF + r * 0.22, -r * 0.45), lighten(col, .45), 2)
-        add_glow(surf, *W(EF, 0), r * 0.85, acc, .45 + .14 * math.sin(t * 4))
+    elif iid == "visor" or iid == "cyber_shades":
+        cyber = iid == "cyber_shades"
 
-    elif iid == "laser_visor":
-        bar = [(EF - r * 0.10, -r * 0.66), (EF + r * 0.20, -r * 0.60),
-               (EF + r * 0.20, r * 0.60), (EF - r * 0.10, r * 0.66)]
-        poly([(a + 0.6, b) for a, b in bar], OUTLINE)
-        poly(bar, (24, 20, 28))
-        pulse = .55 + .30 * math.sin(t * 7)
-        add_glow(surf, *W(EF + r * 0.10, 0), r * 1.05, col, pulse)
-        line((EF + r * 0.10, -r * 0.52), (EF + r * 0.10, r * 0.52), col, 4)
-        line((EF + r * 0.10, -r * 0.52), (EF + r * 0.10, r * 0.52), lighten(acc, .6), 2)
-        for s in (-1, 1):
-            pygame.draw.circle(surf, acc, (int(W(EF + r * 0.10, s * r * 0.56)[0]),
-                                           int(W(EF + r * 0.10, s * r * 0.56)[1])), max(2, int(r * 0.09)))
+        def band(f0, f1, l_max, n=12, sag=0.18):
+            top, bot = [], []
+            for k in range(n + 1):
+                l = -l_max + 2 * l_max * k / n
+                d = sag * (l / l_max) ** 2
+                top.append((f1 - d, l))
+                bot.append((f0 - d, l))
+            return top + bot[::-1]
+        if cyber:
+            shape = [(EYE_F + 0.24, -0.72), (EYE_F + 0.2, -0.1), (EYE_F + 0.05, 0.0), (EYE_F + 0.2, 0.1),
+                     (EYE_F + 0.24, 0.72), (EYE_F - 0.12, 0.68), (EYE_F - 0.26, 0.4), (EYE_F - 0.2, 0.0),
+                     (EYE_F - 0.26, -0.4), (EYE_F - 0.12, -0.68)]
+            G.temples((30, 30, 40), 0.07, 0.1, 0.36)
+            G.wpoly(shape, (18, 18, 28))
+            G.wpoly([(EYE_F + 0.18, -0.64), (EYE_F + 0.15, -0.12), (EYE_F + 0.04, -0.04), (EYE_F + 0.04, -0.6)],
+                    (60, 50, 110))
+            G.wpoly([(EYE_F + 0.18, 0.64), (EYE_F + 0.15, 0.12), (EYE_F + 0.04, 0.04), (EYE_F + 0.04, 0.6)],
+                    (60, 50, 110))
+            q = shape + shape[:1]
+            for k, (a, b) in enumerate(zip(q, q[1:])):
+                G.wline(a, b, hue_col(t * 0.4 + k * 0.06, 0.8), 0.05)
+            add_glow(surf, *G.W(EYE_F, 0.0), G.r * 0.9, hue_col(t * 0.4), 0.35)
+        else:
+            G.wpoly(band(EYE_F - 0.22, EYE_F + 0.26, 0.76), dark)
+            G.wpoly(band(EYE_F - 0.14, EYE_F + 0.19, 0.66), col)
+            sc = math.sin(t * 2.6) * 0.6
+            G.wline((EYE_F + 0.17 - 0.18 * sc * sc, sc - 0.05), (EYE_F - 0.12 - 0.18 * sc * sc, sc + 0.05),
+                    lighten(acc, 0.5), 0.07)
+            G.wline((EYE_F + 0.15, -0.5), (EYE_F + 0.17, 0.5), lighten(col, 0.5), 0.05)
+            add_glow(surf, *G.W(EYE_F, 0.0), G.r * 0.95, acc, 0.4 + 0.14 * math.sin(t * 4))
+
+    elif iid == "round_glasses":
+        G.temples(col, 0.05)
+        for s in S:
+            G.lens(s, _shape_circle(0.3), (226, 238, 250))
+            G.pupil(s)
+            shine(s, -0.16, 0.14, -0.02, 0.22, 0.05)
+            G.rim(s, _shape_circle(0.3), col, 0.06)
+        G.bridge(col, 0.05, 0.12, 0.26)
+
+    elif iid == "heart_glasses":
+        k = 1.0 + 0.08 * max(0.0, math.sin(t * 6))
+        G.temples(dark, 0.06)
+        for s in S:
+            G.lens(s, _shape_heart(0.36 * k), col)
+            G.lens(s, _shape_heart(0.27 * k), lighten(col, 0.18))
+            shine(s, -0.14, 0.14, -0.05, 0.22, 0.07, acc)
+        G.bridge(dark, 0.07, 0.12, 0.28)
+        if math.sin(t * 6) > 0.9:
+            add_glow(surf, *G.W(EYE_F, 0.0), G.r, col, 0.4)
+
+    elif iid == "steampunk_goggles":
+        for s in S:
+            G.wline((EYE_F, s * 0.6), (EYE_F - 0.32, s * 1.0), (90, 60, 34), 0.2)
+        for s in S:
+            G.lens(s, _shape_circle(0.36), col)
+            G.lens(s, _shape_circle(0.3), scale_col(col, 0.7))
+            G.lens(s, _shape_circle(0.23), (90, 190, 120))
+            G.lens(s, [(-0.16, 0.06), (0.1, 0.18), (0.16, 0.08), (-0.1, -0.04)], (190, 255, 210))
+            for j in range(8):
+                a = j * math.tau / 8
+                G.ecirc(s, math.cos(a) * 0.33, math.sin(a) * 0.33, 0.03, acc)
+        gx, gy = 0.38, 0.26
+        teeth = [(math.cos(j * math.pi / 8 + t * 1.5) * (0.17 if j % 2 else 0.13),
+                  math.sin(j * math.pi / 8 + t * 1.5) * (0.17 if j % 2 else 0.13)) for j in range(16)]
+        G.lens(1, [(gx + x, gy + y) for x, y in teeth], acc)
+        G.ecirc(1, gx, gy, 0.06, col)
+        G.bridge(col, 0.1, 0.02, 0.3)
 
     elif iid == "ski_mask":
-        mask = [(EF - r * 0.26, -r * 0.74), (EF + r * 0.28, -r * 0.58),
-                (EF + r * 0.28, r * 0.58), (EF - r * 0.26, r * 0.74)]
-        poly([(a + 0.8, b) for a, b in mask], OUTLINE)
-        poly(mask, dark)
-        glass = [(EF - r * 0.12, -r * 0.62), (EF + r * 0.22, -r * 0.48),
-                 (EF + r * 0.22, r * 0.48), (EF - r * 0.12, r * 0.62)]
-        poly(glass, col)
-        poly([(EF + r * 0.02, -r * 0.54), (EF + r * 0.20, -r * 0.44),
-              (EF + r * 0.20, -r * 0.16), (EF + r * 0.02, -r * 0.26)], lighten(col, .42))
-        # kafa bandı
-        for s in (-1, 1):
-            line((EF - r * 0.26, s * r * 0.72), (EF - r * 0.95, s * r * 0.62), OUTLINE, 6)
-            line((EF - r * 0.26, s * r * 0.72), (EF - r * 0.95, s * r * 0.62), acc, 3)
+        shape = []
+        for k in range(13):
+            l = -0.78 + 1.56 * k / 12
+            shape.append((EYE_F + 0.3 - 0.16 * (l / 0.78) ** 2, l))
+        for k in range(13):
+            l = 0.78 - 1.56 * k / 12
+            dip = 0.1 if abs(l) < 0.16 else 0.0
+            shape.append((EYE_F - 0.28 - 0.12 * (l / 0.78) ** 2 + dip, l))
+        for s in S:
+            G.wline((EYE_F, s * 0.72), (EYE_F - 0.4, s * 1.0), acc, 0.18)
+        G.wpoly(shape, col)
+        inner = [(EYE_F + (f - EYE_F) * 0.78, l * 0.86) for f, l in shape]
+        top_e, bot_e = inner[:13], inner[13:][::-1]
+        mid = [((a[0] + b[0]) / 2, a[1]) for a, b in zip(top_e, bot_e)]
+        G.wpoly(top_e + mid[::-1], (255, 160, 60))
+        G.wpoly(mid + bot_e[::-1], (200, 80, 190))
+        G.wpoly([(EYE_F + 0.18, -0.5), (EYE_F + 0.22, -0.24), (EYE_F + 0.1, -0.2), (EYE_F + 0.06, -0.46)],
+                (255, 236, 210))
 
-    elif iid == "blindfold":
-        band = [(EF - r * 0.16, -r * 0.82), (EF + r * 0.22, -r * 0.66),
-                (EF + r * 0.22, r * 0.66), (EF - r * 0.16, r * 0.82)]
-        poly([(a + 0.8, b) for a, b in band], OUTLINE)
-        poly(band, col)
-        poly([(EF + r * 0.04, -r * 0.70), (EF + r * 0.18, -r * 0.62),
-              (EF + r * 0.18, -r * 0.24), (EF + r * 0.04, -r * 0.34)], lighten(col, .22))
-        # yan düğüm + uçuşan uçlar
-        kx, ky = EF - r * 0.30, r * 0.80
-        pygame.draw.circle(surf, OUTLINE, (int(W(kx, ky)[0]), int(W(kx, ky)[1])), max(3, int(r * 0.15)))
-        pygame.draw.circle(surf, acc, (int(W(kx, ky)[0]), int(W(kx, ky)[1])), max(2, int(r * 0.11)))
-        for k in (0.0, 0.5):
-            wob = math.sin(t * 3 + k * 5) * r * 0.16
-            pygame.draw.lines(surf, OUTLINE, False,
-                              [W(kx, ky), W(kx - r * 0.30, ky + r * 0.22 + k * r * 0.2),
-                               W(kx - r * 0.55, ky + r * 0.34 + k * r * 0.3 + wob)], 5)
-            pygame.draw.lines(surf, col, False,
-                              [W(kx, ky), W(kx - r * 0.30, ky + r * 0.22 + k * r * 0.2),
-                               W(kx - r * 0.55, ky + r * 0.34 + k * r * 0.3 + wob)], 2)
+    elif iid == "laser_visor":
+        G.wpoly([(EYE_F + 0.13, -0.72), (EYE_F + 0.13, 0.72), (EYE_F - 0.13, 0.72), (EYE_F - 0.13, -0.72)],
+                (26, 22, 30))
+        pulse = 0.55 + 0.3 * math.sin(t * 7)
+        add_glow(surf, *G.W(EYE_F, 0.0), G.r * 1.1, col, pulse)
+        G.wline((EYE_F, -0.58), (EYE_F, 0.58), col, 0.13)
+        G.wline((EYE_F, -0.58), (EYE_F, 0.58), lighten(acc, 0.6), 0.05)
+        for s in S:
+            G.wpoly([(EYE_F + 0.17, s * 0.72), (EYE_F + 0.17, s * 0.84), (EYE_F - 0.17, s * 0.84),
+                     (EYE_F - 0.17, s * 0.72)], (70, 70, 84))
 
-    else:
-        # ---- iki camlı gözlükler ----
-        # köprü (iki cam arası)
-        bridge_col = acc if iid not in ("shades", "round_glasses") else col
+    elif iid in ("blindfold", "ninja_mask"):
+        ninja = iid == "ninja_mask"
+        tails(1, col if not ninja else (34, 30, 44))
+        bandc = col if not ninja else (34, 30, 44)
+        G.wpoly([(EYE_F + 0.26, -0.82), (EYE_F + 0.3, 0.0), (EYE_F + 0.26, 0.82), (EYE_F - 0.24, 0.84),
+                 (EYE_F - 0.2, 0.0), (EYE_F - 0.24, -0.84)], bandc)
+        G.wline((EYE_F + 0.2, -0.7), (EYE_F + 0.24, 0.7), lighten(bandc, 0.2), 0.05)
+        G.wline((EYE_F - 0.12, -0.72), (EYE_F - 0.08, 0.72), scale_col(bandc, 0.7), 0.05)
+        if ninja:
+            for s in S:
+                slit = [(-0.22, 0.02), (0.18, 0.12), (0.24, 0.04), (-0.16, -0.06)]
+                G.eglow(s, 0.0, 0.03, 0.55, acc, 0.6 + 0.2 * math.sin(t * 5))
+                G.lens(s, slit, acc)
+                G.lens(s, [(x * 0.6, y * 0.5 + 0.02) for x, y in slit], (255, 235, 255))
+        else:
+            G.wpoly([(EYE_F + 0.06, -0.6), (EYE_F + 0.1, -0.1), (EYE_F - 0.02, -0.1), (EYE_F - 0.06, -0.6)],
+                    scale_col(acc, 0.9))
 
-        for s in (-1, 1):
-            if iid == "monocle" and s == -1:
-                continue
-            c = ES * s
-            ex, ey = W(EF, c)
+    elif iid == "star_glasses":
+        G.temples(col, 0.06)
+        for s in S:
+            rot = math.sin(t * 2 + s) * 0.15
+            G.lens(s, _shape_star(0.4, rot=rot), col)
+            G.lens(s, _shape_star(0.29, rot=rot), acc)
+            G.lens(s, _shape_star(0.14, rot=rot), lighten(acc, 0.6))
+        G.bridge(col, 0.07, 0.1, 0.28)
+        ph = (t * 1.2) % 2.0
+        if ph < 0.6:
+            _sparkle(surf, *G.E(1, 0.3, 0.32), G.r * 0.25 * (1 - abs(ph - 0.3) * 3), (255, 255, 255))
 
-            if iid == "shades":
-                lp = [(EF - r * 0.14, c - r * 0.30), (EF + r * 0.20, c - r * 0.30),
-                      (EF + r * 0.20, c + r * 0.30), (EF - r * 0.14, c + r * 0.30)]
-                poly([(a + 0.6, b) for a, b in lp], OUTLINE)
-                poly(lp, (20, 20, 28))
-                poly(lp, col, 1)
-                poly([(EF - r * 0.06, c - r * 0.24), (EF + r * 0.12, c - r * 0.24),
-                      (EF + r * 0.12, c - r * 0.06), (EF - r * 0.06, c - r * 0.06)], (118, 128, 155))
-                # sap: kafayı sıyırarak geriye gider, dışarı fırlamaz
-                line((EF - r * 0.12, c + r * 0.28 * s), (EF - r * 0.46, c + r * 0.40 * s), OUTLINE, 2)
+    elif iid == "pink_shades":
+        lens = [(-0.28, 0.14), (0.0, 0.18), (0.3, 0.3), (0.4, 0.34), (0.3, -0.02), (0.14, -0.24), (-0.16, -0.24),
+                (-0.3, -0.06)]
+        G.temples(col, 0.06)
+        for s in S:
+            G.lens(s, lens, col)
+            G.lens(s, [(x * 0.78, y * 0.78 - 0.02) for x, y in lens], (150, 40, 100))
+            G.lens(s, [(-0.2, 0.1), (0.2, 0.18), (0.18, 0.06), (-0.2, -0.02)], (220, 90, 160))
+            G.ecirc(s, 0.36, 0.3, 0.06, (255, 255, 255))
+            G.ecirc(s, 0.24, 0.22, 0.04, (255, 230, 245))
+        G.bridge(col, 0.07, 0.12, 0.28)
 
-            elif iid == "pink_shades":
-                # kedi gözü: dış köşesi yukarı kalkık oval
-                lp = [(EF - r * 0.16, c - r * 0.24), (EF + r * 0.10, c - r * 0.34),
-                      (EF + r * 0.22, c - r * 0.06), (EF + r * 0.14, c + r * 0.26),
-                      (EF - r * 0.12, c + r * 0.22)]
-                poly([(a + 0.6, b) for a, b in lp], OUTLINE)
-                poly(lp, col)
-                poly(lp, acc, 1)
-                poly([(EF - r * 0.04, c - r * 0.20), (EF + r * 0.10, c - r * 0.24),
-                      (EF + r * 0.14, c - r * 0.04), (EF - r * 0.02, c - r * 0.02)], lighten(col, .55))
-                line((EF - r * 0.14, c + r * 0.22 * s), (EF - r * 0.46, c + r * 0.36 * s), acc, 2)
+    elif iid == "leaf_visor":
+        leaf = [(-0.32, 0.0), (-0.12, 0.2), (0.16, 0.22), (0.38, 0.06), (0.16, -0.18), (-0.1, -0.2)]
+        G.temples((70, 120, 60), 0.05)
+        for s in S:
+            G.lens(s, leaf, col)
+            G.lens(s, [(x * 0.75, y * 0.7) for x, y in leaf], lighten(col, 0.25))
+            G.eline(s, (-0.28, 0.0), (0.34, 0.04), dark, 0.04)
+            for k in range(3):
+                x = -0.12 + k * 0.14
+                G.eline(s, (x, 0.01), (x + 0.07, 0.12), dark, 0.03)
+                G.eline(s, (x, 0.01), (x + 0.07, -0.1), dark, 0.03)
+        G.bridge((70, 120, 60), 0.06, 0.06, 0.3)
 
-            elif iid == "round_glasses":
-                pygame.draw.circle(surf, OUTLINE, (int(ex), int(ey)), max(4, int(r * 0.32)))
-                pygame.draw.circle(surf, (44, 48, 62), (int(ex), int(ey)), max(3, int(r * 0.29)))
-                pygame.draw.circle(surf, col, (int(ex), int(ey)), max(3, int(r * 0.30)), 2)
-                pygame.draw.circle(surf, lighten(acc, .45),
-                                   (int(ex - fx_ * r * 0.09 + sx_ * r * 0.09),
-                                    int(ey - fy_ * r * 0.09 + sy_ * r * 0.09)), max(1, int(r * 0.09)))
-                line((EF - r * 0.06, c + r * 0.30 * s), (EF - r * 0.44, c + r * 0.40 * s), col, 2)
+    elif iid == "frost_lens":
+        hexs = [(math.cos(k * math.pi / 3) * 0.31, math.sin(k * math.pi / 3) * 0.31) for k in range(6)]
+        G.temples((170, 210, 240), 0.05)
+        for s in S:
+            for k in range(3):
+                a = -0.6 + k * 0.6
+                G.lens(s, [(math.cos(a - 0.12) * 0.3, math.sin(a - 0.12) * 0.3),
+                           (math.cos(a) * 0.5, math.sin(a) * 0.5),
+                           (math.cos(a + 0.12) * 0.3, math.sin(a + 0.12) * 0.3)], (220, 245, 255))
+            G.lens(s, hexs, (200, 230, 250))
+            G.lens(s, [(x * 0.8, y * 0.8) for x, y in hexs], (236, 248, 255))
+            G.pupil(s)
+            G.rim(s, hexs, (150, 200, 240), 0.05)
+            shine(s, -0.14, 0.14, -0.02, 0.2, 0.05)
+        G.bridge((150, 200, 240), 0.06, 0.06, 0.28)
+        G.eglow(1, 0.0, 0.0, 0.5, (190, 235, 255), 0.25)
 
-            elif iid == "goggles":
-                pygame.draw.circle(surf, OUTLINE, (int(ex), int(ey)), max(4, int(r * 0.36)))
-                pygame.draw.circle(surf, dark, (int(ex), int(ey)), max(4, int(r * 0.34)))
-                pygame.draw.circle(surf, col, (int(ex), int(ey)), max(4, int(r * 0.34)), 3)
-                pygame.draw.circle(surf, acc, (int(ex), int(ey)), max(2, int(r * 0.18)))
-                pygame.draw.circle(surf, lighten(acc, .55),
-                                   (int(ex - fx_ * r * 0.08 + sx_ * r * 0.07),
-                                    int(ey - fy_ * r * 0.08 + sy_ * r * 0.07)), max(1, int(r * 0.07)))
+    elif iid == "ember_shades":
+        lens = [(-0.3, 0.18), (0.32, 0.18), (0.32, -0.14), (0.2, -0.24), (-0.3, -0.24)]
+        G.temples((40, 30, 30), 0.07)
+        for s in S:
+            G.lens(s, lens, (30, 20, 20))
+            G.lens(s, [(-0.28, -0.04), (0.3, -0.04), (0.3, -0.14), (0.19, -0.22), (-0.28, -0.22)], col)
+            G.lens(s, [(-0.28, -0.12), (0.3, -0.12), (0.19, -0.22), (-0.28, -0.22)], acc)
+            G.rim(s, lens, (60, 34, 30), 0.06)
+            for k in range(2):
+                fx_, fy_ = G.E(s, -0.12 + k * 0.26, 0.2)
+                evo_flame(surf, fx_, fy_, G.r * 0.3, G.r * 0.08, t, k * 2 + s)
+        G.bridge((60, 34, 30), 0.08, 0.1, 0.3)
 
-            elif iid == "steampunk_goggles":
-                pygame.draw.circle(surf, OUTLINE, (int(ex), int(ey)), max(4, int(r * 0.38)))
-                pygame.draw.circle(surf, (28, 24, 22), (int(ex), int(ey)), max(4, int(r * 0.34)))
-                pygame.draw.circle(surf, col, (int(ex), int(ey)), max(4, int(r * 0.34)), 3)
-                pygame.draw.circle(surf, acc, (int(ex), int(ey)), max(2, int(r * 0.14)))
-                for gi in range(8):
-                    ga = gi * math.tau / 8 + t * 0.4 * s
-                    gx = ex + math.cos(ga) * r * 0.40
-                    gy = ey + math.sin(ga) * r * 0.40
-                    pygame.draw.circle(surf, scale_col(col, .9), (int(gx), int(gy)), max(1, int(r * 0.05)))
-                if s == 1:   # yan boru
-                    line((EF - r * 0.10, c + r * 0.42), (EF - r * 0.60, c + r * 0.66), scale_col(col, .8), 4)
-
-            elif iid == "monocle":
-                pygame.draw.circle(surf, OUTLINE, (int(ex), int(ey)), max(4, int(r * 0.35)))
-                pygame.draw.circle(surf, (54, 52, 44), (int(ex), int(ey)), max(3, int(r * 0.31)))
-                pygame.draw.circle(surf, acc, (int(ex), int(ey)), max(4, int(r * 0.32)), 2)
-                pygame.draw.circle(surf, lighten(acc, .6),
-                                   (int(ex - fx_ * r * 0.10 + sx_ * r * 0.09),
-                                    int(ey - fy_ * r * 0.10 + sy_ * r * 0.09)), max(1, int(r * 0.09)))
-                # sarkan zincir: yüzün yanından geriye doğru iner
-                sw = math.sin(t * 2.2) * r * 0.08
-                pygame.draw.lines(surf, acc, False,
-                                  [W(EF - r * 0.06, c + r * 0.34),
-                                   W(EF - r * 0.34, c + r * 0.52 + sw),
-                                   W(EF - r * 0.62, c + r * 0.60 + sw)], 1)
-
-            elif iid == "heart_glasses":
-                hr = r * 0.30
-                hp = [(EF - hr * 0.9, c), (EF + hr * 0.2, c - hr * 1.0),
-                      (EF + hr * 0.9, c - hr * 0.35), (EF + hr * 0.35, c + hr * 0.15),
-                      (EF + hr * 0.9, c + hr * 0.35), (EF + hr * 0.2, c + hr * 1.0)]
-                poly([(a + 0.6, b) for a, b in hp], OUTLINE)
-                poly(hp, col)
-                poly(hp, acc, 1)
-                pygame.draw.circle(surf, lighten(acc, .6),
-                                   (int(ex + sx_ * r * 0.08), int(ey + sy_ * r * 0.08)), max(1, int(r * 0.07)))
-
-            elif iid == "star_glasses":
-                spts = []
-                for si in range(5):
-                    oa = -math.pi / 2 + si * math.tau / 5
-                    spts.append((EF + math.cos(oa) * r * 0.34, c + math.sin(oa) * r * 0.34))
-                    ia = oa + math.pi / 5
-                    spts.append((EF + math.cos(ia) * r * 0.15, c + math.sin(ia) * r * 0.15))
-                poly([(a + 0.6, b) for a, b in spts], OUTLINE)
-                poly(spts, col)
-                poly(spts, acc, 1)
-                tw = 0.5 + 0.5 * math.sin(t * 5 + s)
-                pygame.draw.circle(surf, lighten(acc, .6), (int(ex), int(ey)), max(1, int(1 + tw * r * 0.10)))
-
-            elif iid == "leaf_visor":
-                # yaprak biçimli camlar + orta damar
-                lp = [(EF - r * 0.22, c), (EF + r * 0.06, c - r * 0.34),
-                      (EF + r * 0.26, c), (EF + r * 0.06, c + r * 0.34)]
-                poly([(a + 0.6, b) for a, b in lp], OUTLINE)
-                poly(lp, col)
-                poly(lp, acc, 1)
-                line((EF - r * 0.20, c), (EF + r * 0.24, c), scale_col(col, .6), 1)
-                for k in (-1, 1):
-                    line((EF - r * 0.02, c), (EF + r * 0.10, c + k * r * 0.16), scale_col(col, .6), 1)
-
-            elif iid == "frost_lens":
-                pygame.draw.circle(surf, OUTLINE, (int(ex), int(ey)), max(4, int(r * 0.34)))
-                pygame.draw.circle(surf, col, (int(ex), int(ey)), max(3, int(r * 0.31)))
-                pygame.draw.circle(surf, lighten(col, .5), (int(ex), int(ey)), max(3, int(r * 0.31)), 1)
-                # buz kristali
-                for k in range(3):
-                    ka = k * math.pi / 3 + t * 0.6
-                    dx, dy = math.cos(ka) * r * 0.24, math.sin(ka) * r * 0.24
-                    pygame.draw.line(surf, lighten(acc, .4), (ex - dx, ey - dy), (ex + dx, ey + dy), 1)
-                add_glow(surf, ex, ey, r * 0.52, acc, .34 + .12 * math.sin(t * 3 + s))
-
-            elif iid == "ember_shades":
-                lp = [(EF - r * 0.16, c - r * 0.30 * s), (EF + r * 0.20, c - r * 0.32),
-                      (EF + r * 0.20, c + r * 0.28), (EF - r * 0.16, c + r * 0.24)]
-                poly([(a + 0.6, b) for a, b in lp], OUTLINE)
-                poly(lp, (26, 18, 16))
-                poly(lp, col, 1)
-                glow = .45 + .22 * math.sin(t * 4.5 + s * 1.2)
-                add_glow(surf, ex, ey, r * 0.50, acc, glow)
-                line((EF - r * 0.10, c - r * 0.18), (EF + r * 0.16, c + r * 0.10), acc, 2)
-                line((EF + r * 0.02, c - r * 0.24), (EF + r * 0.10, c + r * 0.04), lighten(acc, .4), 1)
-
-            else:
-                # Güvenlik ağı: tanımsız yeni bir gözlük eklenirse düzgün
-                # görünsün.
-                pygame.draw.circle(surf, OUTLINE, (int(ex), int(ey)), max(3, int(r * 0.31)))
-                pygame.draw.circle(surf, col, (int(ex), int(ey)), max(3, int(r * 0.28)))
-                pygame.draw.circle(surf, acc, (int(ex), int(ey)), max(3, int(r * 0.28)), 1)
-
-        # köprü: monocle dışındaki bütün iki camlı gözlüklerde
-        if iid != "monocle":
-            line((EF + r * 0.04, -ES * 0.42), (EF + r * 0.04, ES * 0.42), bridge_col, 2)
+    elif iid == "dragon_eye":
+        almond = [(-0.34, 0.0), (-0.14, 0.18), (0.16, 0.2), (0.38, 0.06), (0.16, -0.18), (-0.14, -0.16)]
+        G.temples(dark, 0.07)
+        for s in S:
+            for k in range(2):
+                a = 0.5 - k * 0.7
+                G.lens(s, [(0.3, a * 0.2), (0.62, a * 0.4 + 0.08), (0.36, a * 0.2 - 0.12)], col)
+            G.eglow(s, 0.0, 0.0, 0.55, acc, 0.45 + 0.2 * math.sin(t * 4))
+            G.lens(s, [(x * 1.12, y * 1.15) for x, y in almond], dark)
+            G.lens(s, almond, (255, 200, 60))
+            G.lens(s, [(x * 0.7, y * 0.7) for x, y in almond], (255, 140, 30))
+            sl = 0.03 + 0.02 * math.sin(t * 2)
+            G.lens(s, [(0.0, 0.17), (sl, 0.0), (0.0, -0.17), (-sl, 0.0)], (20, 10, 10))
+        G.bridge(dark, 0.08, 0.06, 0.3)
 
 
 AURA_INTERVAL = {"motes": .045, "wings": .08, "bubbles": .055, "stars": .09, "arcs": .07,
@@ -11751,7 +11948,7 @@ def skin_update_fx(p, dt, fx):
     if CFG.get("plain_skin") or gfx_level() == 0:
         return          # düşük grafikte aura parçacıkları yok
     sk = p.skin
-    a = sk["aura"]
+    a = AURA_FX_ALIAS.get(sk["aura"], sk["aura"])
     iv = AURA_INTERVAL.get(a, .2)
     p.aura_acc += dt
     n = int(p.aura_acc / iv)
@@ -12202,6 +12399,409 @@ def _chrono_layer(surf, p, px, py, r, col, acc, t, front):
 
 
 _NEW_AURA_LAYERS = {"shadowblade": _shadowblade_layer, "dragon": _dragon_layer, "chrono": _chrono_layer}
+
+
+# ---- 16 skinin yeni görünümleri (her biri kendi katmanı: arka + ön) ----
+def _pts_i(pts):
+    return [(int(x), int(y)) for x, y in pts]
+
+
+def _feather(cx, cy, ang, ln, wd):
+    dx, dy = math.cos(ang), math.sin(ang)
+    nx, ny = -dy, dx
+    return [(cx, cy), (cx + dx * ln * 0.45 + nx * wd, cy + dy * ln * 0.45 + ny * wd),
+            (cx + dx * ln, cy + dy * ln), (cx + dx * ln * 0.45 - nx * wd * 0.6, cy + dy * ln * 0.45 - ny * wd * 0.6)]
+
+
+def _wing_fan(surf, px, py, r, side, t, cols, n=5, span=1.0, flap_k=0.18, base=0.55):
+    flap = math.sin(t * 5.0) * flap_k
+    sx, sy = px + side * r * 0.55, py - r * 0.1
+    for i in range(n):
+        a = -math.pi / 2 + side * (base + i * 0.30 * span + flap)
+        ln = r * (2.3 - i * 0.18)
+        c = mix_col(cols[0], cols[1], i / max(1, n - 1))
+        pts = _feather(sx, sy, a, ln, r * 0.26)
+        poly_aa(surf, [(x + 1, y + 1) for x, y in pts], OUTLINE)
+        poly_aa(surf, pts, c)
+        pygame.draw.line(surf, lighten(c, 0.35), (sx, sy), (sx + math.cos(a) * ln * 0.9, sy + math.sin(a) * ln * 0.9), 1)
+
+
+def _falcon_layer(surf, p, px, py, r, col, acc, t, front):
+    """Kızıl Şahin: katmanlı tüy kanatlar + başta kızıl tepelik."""
+    if not front:
+        add_glow(surf, px, py, r * 2.4, col, 0.22)
+        for side in (-1, 1):
+            _wing_fan(surf, px, py, r, side, t, (scale_col(col, 0.7), (255, 190, 150)), n=6)
+        return
+    for k, (dx, h) in enumerate(((-0.28, 0.75), (0.0, 1.0), (0.28, 0.75))):
+        a = -math.pi / 2 + dx * 1.2 + 0.08 * math.sin(t * 4 + k)
+        pts = _feather(px + dx * r * 0.6, py - r * 0.78, a, r * 0.95 * h, r * 0.18)
+        poly_aa(surf, pts, (255, 90, 80) if k != 1 else (255, 200, 120))
+
+
+def _royal_layer(surf, p, px, py, r, col, acc, t, front):
+    """Kraliyet Moru: kakum kenarlı mor pelerin + havada süzülen taç."""
+    if not front:
+        _bx, _by, _sp, _ph = _cape_motion(p, t)
+        ang = math.atan2(_by, _bx)
+        dx, dy = math.cos(ang), math.sin(ang)
+        nx, ny = -dy, dx
+        w0, w1, ln = r * 0.75, r * 1.15, r * 1.75
+        wave = math.sin(_ph * 1.5) * r * 0.18
+        pts = [(px + nx * w0, py + ny * w0), (px + dx * ln + nx * w1 + nx * wave, py + dy * ln + ny * w1 + ny * wave),
+               (px + dx * ln * 1.05, py + dy * ln * 1.05), (px + dx * ln - nx * w1 + nx * wave, py + dy * ln - ny * w1 + ny * wave),
+               (px - nx * w0, py - ny * w0)]
+        poly_aa(surf, pts, (90, 40, 140))
+        pygame.draw.lines(surf, (150, 90, 210), False, _pts_i(pts), 2)
+        for k in range(7):
+            f = k / 6.0
+            x = pts[1][0] * (1 - f) + pts[3][0] * f
+            y = pts[1][1] * (1 - f) + pts[3][1] * f
+            circle_aa(surf, x, y, r * 0.13, (250, 248, 240))
+            circle_aa(surf, x, y, r * 0.05, (30, 30, 40))
+        return
+    bob = math.sin(t * 2.2) * r * 0.08
+    cy = py - r * 1.25 + bob
+    w = r * 0.62
+    pts = [(px - w, cy + r * 0.3), (px - w, cy - r * 0.15), (px - w * 0.5, cy + r * 0.08), (px, cy - r * 0.35),
+           (px + w * 0.5, cy + r * 0.08), (px + w, cy - r * 0.15), (px + w, cy + r * 0.3)]
+    add_glow(surf, px, cy, r * 0.9, (255, 210, 110), 0.3)
+    poly_aa(surf, [(x, y + 1.5) for x, y in pts], OUTLINE)
+    poly_aa(surf, pts, (245, 196, 80))
+    for gx, gc in ((-0.5, (255, 80, 120)), (0.0, (120, 200, 255)), (0.5, (120, 235, 150))):
+        circle_aa(surf, px + gx * w, cy + r * 0.16, r * 0.08, gc)
+    for k in range(3):
+        a = t * 1.8 + k * math.tau / 3
+        _sparkle(surf, px + math.cos(a) * r * 1.7, py + math.sin(a) * r * 1.3, r * 0.16, (255, 230, 150))
+
+
+def _tesla_layer(surf, p, px, py, r, col, acc, t, front):
+    """Elektrik Cyan: omuzlarda iki tesla bobini, arada çakan yıldırım."""
+    coils = [(px - r * 1.25, py - r * 0.55), (px + r * 1.25, py - r * 0.55)]
+    if not front:
+        pygame.draw.circle(surf, scale_col(col, 0.55), (int(px), int(py)), int(r * 1.75), 2)
+        for cx_, cy_ in coils:
+            body = pygame.Rect(int(cx_ - r * 0.24), int(cy_ - r * 0.1), int(r * 0.48), int(r * 0.85))
+            pygame.draw.rect(surf, (60, 70, 90), body, border_radius=3)
+            for k in range(3):
+                yy = body.y + 3 + k * body.h / 3.2
+                pygame.draw.line(surf, (200, 160, 80), (body.x - 2, yy), (body.right + 1, yy), 2)
+            circle_aa(surf, cx_, cy_ - r * 0.12, r * 0.3, (210, 250, 255))
+            add_glow(surf, cx_, cy_ - r * 0.12, r * 0.6, acc, 0.45 + 0.2 * math.sin(t * 9))
+        return
+    rnd = random.Random(int(t * 14))
+    a, b = (coils[0][0], coils[0][1] - r * 0.12), (coils[1][0], coils[1][1] - r * 0.12)
+    pts = [a]
+    for k in range(1, 7):
+        f = k / 7.0
+        pts.append((a[0] + (b[0] - a[0]) * f, a[1] - r * 0.55 * math.sin(f * math.pi) + rnd.uniform(-r * 0.2, r * 0.2)))
+    pts.append(b)
+    pygame.draw.lines(surf, (210, 250, 255), False, _pts_i(pts), 2)
+    pygame.draw.lines(surf, acc, False, _pts_i(pts), 1)
+
+
+def _hood_layer(surf, p, px, py, r, col, acc, t, front):
+    """Gölge Suikastçı: kukuleta + yerde sürünen gölge dokunaçları."""
+    if not front:
+        for k in range(6):
+            a = math.pi * 0.15 + k * math.pi * 0.14
+            pts = []
+            for j in range(7):
+                f = j / 6.0
+                pts.append((px + math.cos(a) * r * (0.8 + 1.4 * f) + math.sin(t * 3 + k + f * 4) * r * 0.15,
+                            py + math.sin(a) * r * (0.8 + 1.0 * f)))
+            pygame.draw.lines(surf, (40, 26, 60), False, _pts_i(pts), max(2, int(r * 0.22 * (1 - k % 2 * 0.3))))
+        blit_disc(surf, px, py - r * 0.25, r * 1.35, (26, 18, 40), 230)
+        return
+    hood = [(px - r * 1.12, py + r * 0.15)]
+    for k in range(13):
+        a = math.pi + k * math.pi / 12
+        hood.append((px + math.cos(a) * r * 1.12, py - r * 0.1 + math.sin(a) * r * 1.25))
+    hood.append((px + r * 1.12, py + r * 0.15))
+    inner = []
+    for k in range(13):
+        a = math.pi * 2 - k * math.pi / 12
+        inner.append((px + math.cos(a) * r * 0.86, py - r * 0.05 + math.sin(a) * r * 0.62))
+    poly_aa(surf, hood + inner, (34, 24, 52))
+    pygame.draw.lines(surf, scale_col(acc, 0.85), False, _pts_i(hood[1:-1]), 2)
+    tip = (px + r * 0.15, py - r * 1.45)
+    poly_aa(surf, [(px - r * 0.3, py - r * 1.2), tip, (px + r * 0.35, py - r * 1.18)], (34, 24, 52))
+
+
+def _inferno_layer(surf, p, px, py, r, col, acc, t, front):
+    """İnferno: yerde lav halkası + başta alev yelesi."""
+    if not front:
+        ring = pygame.Rect(0, 0, int(r * 3.4), int(r * 1.2))
+        ring.center = (int(px), int(py + r * 0.85))
+        pygame.draw.ellipse(surf, (90, 24, 10), ring)
+        pygame.draw.ellipse(surf, (255, 120, 40), ring, 2)
+        add_glow(surf, px, py + r * 0.8, r * 1.8, (255, 110, 30), 0.35 + 0.1 * math.sin(t * 5))
+        for k in range(5):
+            ang = -math.pi / 2 + (k - 2) * 0.42
+            evo_flame(surf, px + math.cos(ang) * r * 0.85, py + math.sin(ang) * r * 0.55 + r * 0.25,
+                      r * (1.15 - abs(k - 2) * 0.18), r * 0.42, t, k * 1.3)
+        return
+    for k in range(3):
+        evo_flame(surf, px + (k - 1) * r * 0.42, py - r * 0.72, r * 0.62, r * 0.24, t + 0.5, k * 2.1)
+
+
+def _goldsun_layer(surf, p, px, py, r, col, acc, t, front):
+    """Altın Efsane: dönen güneş ışınları + defne tacı + yörüngede altınlar."""
+    if not front:
+        add_glow(surf, px, py, r * 2.6, (255, 210, 90), 0.3)
+        for k in range(12):
+            a = t * 0.5 + k * math.tau / 12
+            ln = r * (1.9 if k % 2 else 1.55)
+            pts = [(px + math.cos(a - 0.12) * r * 1.15, py + math.sin(a - 0.12) * r * 1.15),
+                   (px + math.cos(a) * ln, py + math.sin(a) * ln),
+                   (px + math.cos(a + 0.12) * r * 1.15, py + math.sin(a + 0.12) * r * 1.15)]
+            poly_aa(surf, pts, (255, 214, 100) if k % 2 else (240, 170, 60))
+        return
+    for side in (-1, 1):
+        for k in range(5):
+            a = -math.pi / 2 + side * (0.35 + k * 0.28)
+            cx_, cy_ = px + math.cos(a) * r * 0.92, py - r * 0.05 + math.sin(a) * r * 0.92
+            pygame.draw.ellipse(surf, (110, 190, 80) if k % 2 else (80, 160, 60),
+                                (int(cx_ - r * 0.16), int(cy_ - r * 0.09), int(r * 0.32), int(r * 0.18)))
+    for k in range(3):
+        a = t * 1.4 + k * math.tau / 3
+        draw_icon(surf, px + math.cos(a) * r * 1.8, py + math.sin(a) * r * 0.9, "coin", (255, 215, 90), max(4, r * 0.24))
+
+
+def _prism_layer(surf, p, px, py, r, col, acc, t, front):
+    """Prizma: çevresinde dönen kristal parçaları (renk değiştirir)."""
+    for k in range(6):
+        a = t * 1.1 + k * math.tau / 6
+        z = math.sin(a)
+        if (z > 0) != front:
+            continue
+        cx_, cy_ = px + math.cos(a) * r * 1.7, py + z * r * 0.7 - r * 0.2
+        sz = r * (0.32 + 0.08 * z)
+        c = hue_col(t * 0.3 + k / 6.0)
+        pts = [(cx_, cy_ - sz * 1.4), (cx_ + sz * 0.7, cy_), (cx_, cy_ + sz * 1.4), (cx_ - sz * 0.7, cy_)]
+        add_glow(surf, cx_, cy_, sz * 2.4, c, 0.35)
+        poly_aa(surf, pts, c)
+        pygame.draw.line(surf, (255, 255, 255), (cx_, cy_ - sz * 1.3), (cx_, cy_ + sz * 1.3), 1)
+
+
+def _hunter_layer(surf, p, px, py, r, col, acc, t, front):
+    """Gölge Avcı: sırtta ok sadağı + tüylü avcı başlığı."""
+    if not front:
+        qx, qy = px + r * 0.75, py - r * 0.35
+        q = [(qx - r * 0.25, qy - r * 0.9), (qx + r * 0.25, qy - r * 1.0), (qx + r * 0.35, qy + r * 0.6), (qx - r * 0.15, qy + r * 0.7)]
+        for k in range(3):
+            ax = qx - r * 0.12 + k * r * 0.14
+            pygame.draw.line(surf, (200, 190, 170), (ax, qy - r * 0.9), (ax + r * 0.1, qy - r * 1.55), 2)
+            poly_aa(surf, [(ax + r * 0.1 - r * 0.1, qy - r * 1.45), (ax + r * 0.1, qy - r * 1.75), (ax + r * 0.1 + r * 0.1, qy - r * 1.45)],
+                    (200, 150, 255))
+        poly_aa(surf, q, (70, 46, 40))
+        pygame.draw.polygon(surf, (150, 110, 80), _pts_i(q), 2)
+        for k in range(4):
+            a = math.pi * 0.25 + k * 0.4
+            pts = [(px + math.cos(a) * r * 0.9, py + math.sin(a) * r * 0.9),
+                   (px + math.cos(a) * r * 1.7 + math.sin(t * 2 + k) * r * 0.1, py + math.sin(a) * r * 1.6),
+                   (px + math.cos(a + 0.25) * r * 0.9, py + math.sin(a + 0.25) * r * 0.9)]
+            poly_aa(surf, pts, (40, 30, 60))
+        return
+    brim = [(px - r * 1.05, py - r * 0.45), (px - r * 0.6, py - r * 0.95), (px + r * 0.6, py - r * 0.95), (px + r * 1.05, py - r * 0.45),
+            (px + r * 0.7, py - r * 0.6), (px - r * 0.7, py - r * 0.6)]
+    poly_aa(surf, [(x, y + 1.5) for x, y in brim], OUTLINE)
+    poly_aa(surf, brim, (96, 70, 130))
+    pygame.draw.line(surf, (200, 150, 255), (px - r * 0.68, py - r * 0.62), (px + r * 0.68, py - r * 0.62), 2)
+    fx_ = px + r * 0.55
+    poly_aa(surf, _feather(fx_, py - r * 0.85, -math.pi / 2 + 0.6 + 0.1 * math.sin(t * 3), r * 0.9, r * 0.16), (200, 150, 255))
+
+
+def _frost_layer(surf, p, px, py, r, col, acc, t, front):
+    """Buz Büyücüsü: arkada buz sarkıtı tacı + önde kristal taç, dönen kar."""
+    if not front:
+        add_glow(surf, px, py - r * 0.4, r * 2.2, (170, 230, 255), 0.3)
+        for k in range(7):
+            a = -math.pi / 2 + (k - 3) * 0.32
+            ln = r * (1.9 - abs(k - 3) * 0.22)
+            pts = [(px + math.cos(a - 0.1) * r * 0.8, py + math.sin(a - 0.1) * r * 0.8),
+                   (px + math.cos(a) * ln, py + math.sin(a) * ln),
+                   (px + math.cos(a + 0.1) * r * 0.8, py + math.sin(a + 0.1) * r * 0.8)]
+            poly_aa(surf, pts, (190, 235, 255) if k % 2 else (130, 200, 245))
+            pygame.draw.line(surf, (255, 255, 255), pts[0], pts[1], 1)
+        return
+    for k in range(5):
+        x = px + (k - 2) * r * 0.3
+        h = r * (0.55 if k == 2 else 0.35)
+        poly_aa(surf, [(x - r * 0.1, py - r * 0.8), (x, py - r * 0.8 - h), (x + r * 0.1, py - r * 0.8)], (220, 245, 255))
+    for k in range(4):
+        a = -t * 1.2 + k * math.tau / 4
+        draw_icon(surf, px + math.cos(a) * r * 1.6, py + math.sin(a) * r * 1.1, "snow", (230, 248, 255), max(4, r * 0.22))
+
+
+def _vampire_layer(surf, p, px, py, r, col, acc, t, front):
+    """Kan Kontesi: yüksek vampir yakası + küçük yarasa kanatları + kan damlaları."""
+    if not front:
+        for side in (-1, 1):
+            flap = math.sin(t * 7) * 0.15
+            sx, sy = px + side * r * 0.7, py
+            pts = [(sx, sy - r * 0.2), (sx + side * r * 1.5, sy - r * (0.9 + flap)), (sx + side * r * 1.25, sy - r * 0.2),
+                   (sx + side * r * 1.6, sy + r * 0.1), (sx + side * r * 1.0, sy + r * 0.15), (sx + side * r * 1.1, sy + r * 0.45),
+                   (sx, sy + r * 0.3)]
+            poly_aa(surf, pts, (60, 14, 26))
+            pygame.draw.lines(surf, (150, 30, 50), False, _pts_i(pts), 1)
+        for side in (-1, 1):
+            col_pts = [(px + side * r * 0.2, py - r * 0.6), (px + side * r * 1.25, py - r * 1.65),
+                       (px + side * r * 1.05, py - r * 0.35), (px + side * r * 0.5, py + r * 0.1)]
+            poly_aa(surf, col_pts, (110, 16, 36))
+            poly_aa(surf, [(x * 0.82 + px * 0.18, y * 0.86 + py * 0.14) for x, y in col_pts], (200, 40, 70))
+        return
+    for k in range(3):
+        a = t * 1.6 + k * math.tau / 3
+        dx_, dy_ = px + math.cos(a) * r * 1.55, py + math.sin(a) * r * 1.0
+        poly_aa(surf, [(dx_, dy_ - r * 0.22), (dx_ + r * 0.13, dy_), (dx_ - r * 0.13, dy_)], (220, 30, 60))
+        circle_aa(surf, dx_, dy_ + r * 0.02, r * 0.13, (220, 30, 60))
+
+
+def _knight_layer(surf, p, px, py, r, col, acc, t, front):
+    """Zırhlı Devriye: sırtta kule kalkanı + önde omuzluklar ve miğfer sorgucu."""
+    if not front:
+        sh = pygame.Rect(0, 0, int(r * 1.6), int(r * 2.1))
+        sh.center = (int(px - r * 0.2), int(py - r * 0.1))
+        pygame.draw.rect(surf, OUTLINE, sh.inflate(4, 4), border_radius=int(r * 0.5))
+        pygame.draw.rect(surf, (120, 128, 145), sh, border_radius=int(r * 0.5))
+        pygame.draw.rect(surf, (200, 206, 220), sh.inflate(-int(r * 0.3), -int(r * 0.3)), 2, border_radius=int(r * 0.4))
+        pygame.draw.line(surf, (190, 60, 60), (sh.centerx, sh.y + r * 0.3), (sh.centerx, sh.bottom - r * 0.3), 3)
+        pygame.draw.line(surf, (190, 60, 60), (sh.x + r * 0.3, sh.centery - r * 0.2), (sh.right - r * 0.3, sh.centery - r * 0.2), 3)
+        return
+    for side in (-1, 1):
+        cx_ = px + side * r * 0.95
+        pts = [(cx_ - r * 0.45, py - r * 0.05), (cx_ - r * 0.3, py - r * 0.5), (cx_ + r * 0.3, py - r * 0.5), (cx_ + r * 0.45, py - r * 0.05)]
+        poly_aa(surf, [(x, y + 1.5) for x, y in pts], OUTLINE)
+        poly_aa(surf, pts, (170, 178, 196))
+        pygame.draw.line(surf, (235, 240, 250), pts[1], pts[2], 2)
+    for k in range(5):
+        a = -math.pi / 2 - 0.5 + k * 0.12 + 0.05 * math.sin(t * 4 + k)
+        poly_aa(surf, _feather(px, py - r * 0.95, a, r * 0.9, r * 0.12), (220, 50, 60) if k % 2 else (250, 90, 90))
+
+
+def _storm_layer(surf, p, px, py, r, col, acc, t, front):
+    """Fırtına Getirici: başının üstünde fırtına bulutu, yağmur ve şimşek."""
+    if front:
+        cy = py - r * 1.75 + math.sin(t * 1.5) * r * 0.06
+        for k, (dx, rr) in enumerate(((-0.6, 0.45), (-0.15, 0.6), (0.4, 0.5), (0.8, 0.36))):
+            circle_aa(surf, px + dx * r, cy, r * rr + 1.5, (30, 34, 50))
+        for k, (dx, rr) in enumerate(((-0.6, 0.45), (-0.15, 0.6), (0.4, 0.5), (0.8, 0.36))):
+            circle_aa(surf, px + dx * r, cy, r * rr, (90, 100, 130))
+        if (t * 0.9) % 1.0 < 0.12:
+            bx = px + (int(t * 0.9) % 3 - 1) * r * 0.4
+            pts = [(bx, cy + r * 0.3), (bx - r * 0.2, cy + r * 0.7), (bx + r * 0.05, cy + r * 0.7), (bx - r * 0.15, cy + r * 1.1)]
+            pygame.draw.lines(surf, (255, 250, 180), False, _pts_i(pts), 2)
+            add_glow(surf, bx, cy + r * 0.6, r, (220, 230, 255), 0.5)
+        return
+    add_glow(surf, px, py - r * 1.2, r * 2.0, acc, 0.22)
+    for k in range(7):
+        ph = (t * 1.8 + k * 0.37) % 1.0
+        x = px + (k - 3) * r * 0.32
+        y = py - r * 1.4 + ph * r * 1.6
+        pygame.draw.line(surf, (150, 190, 255), (x, y), (x - r * 0.08, y + r * 0.22), 1)
+    for k in range(2):
+        a = t * 2.5 + k * math.pi
+        pygame.draw.arc(surf, scale_col(acc, 0.8), (int(px - r * 1.6), int(py - r * 1.3), int(r * 3.2), int(r * 2.6)), a, a + 1.6, 2)
+
+
+def _venom_layer(surf, p, px, py, r, col, acc, t, front):
+    """Zehir Vuruşçu: dikenli sarmaşık halkası + kaynayan zehir baloncukları."""
+    if not front:
+        add_glow(surf, px, py, r * 2.1, (110, 230, 120), 0.25)
+        n = 14
+        pts = []
+        for k in range(n * 2):
+            a = t * 0.4 + k * math.pi / n
+            rr = r * (1.75 if k % 2 == 0 else 1.35)
+            pts.append((px + math.cos(a) * rr, py + math.sin(a) * rr * 0.8))
+        poly_aa(surf, pts, (40, 90, 40))
+        pygame.draw.polygon(surf, (120, 220, 110), _pts_i(pts), 1)
+        blit_disc(surf, px, py, r * 1.32, (16, 26, 18), 255)
+        return
+    for k in range(5):
+        ph = (t * 0.6 + k * 0.2) % 1.0
+        x = px + (k - 2) * r * 0.45 + math.sin(t * 2 + k) * r * 0.1
+        y = py - r * 0.6 - ph * r * 1.4
+        circle_aa(surf, x, y, r * (0.08 + 0.12 * (1 - ph)), (160, 255, 140))
+        circle_aa(surf, x - r * 0.03, y - r * 0.03, r * 0.04 * (1 - ph) + 0.5, (230, 255, 220))
+
+
+def _jet_layer(surf, p, px, py, r, col, acc, t, front):
+    """Yönelmeli Şahin: mekanik jet kanatları + dönen hedef nişangâhı."""
+    if not front:
+        for side in (-1, 1):
+            for k in range(3):
+                y0 = py - r * 0.35 + k * r * 0.32
+                pts = [(px + side * r * 0.6, y0), (px + side * r * (2.0 - k * 0.25), y0 - r * 0.45),
+                       (px + side * r * (2.1 - k * 0.25), y0 - r * 0.25), (px + side * r * 0.65, y0 + r * 0.2)]
+                poly_aa(surf, [(x + 1, y + 1) for x, y in pts], OUTLINE)
+                poly_aa(surf, pts, mix_col((80, 110, 160), (180, 210, 240), k / 2.0))
+            tx_ = px + side * r * 1.9
+            add_glow(surf, tx_, py - r * 0.4, r * 0.5, (120, 200, 255), 0.6 + 0.3 * math.sin(t * 12))
+        return
+    ang = t * 1.6
+    R_ = r * 1.9
+    pygame.draw.circle(surf, scale_col(acc, 0.8), (int(px), int(py)), int(R_), 1)
+    for k in range(4):
+        a = ang + k * math.pi / 2
+        pygame.draw.line(surf, acc, (px + math.cos(a) * R_ * 0.85, py + math.sin(a) * R_ * 0.85),
+                         (px + math.cos(a) * R_ * 1.12, py + math.sin(a) * R_ * 1.12), 2)
+
+
+def _beast_layer(surf, p, px, py, r, col, acc, t, front):
+    """Çılgın Canavar: sivri yele + yana kıvrık boğa boynuzları + öfke halesi."""
+    if not front:
+        add_glow(surf, px, py, r * 2.3, (255, 70, 30), 0.25 + 0.12 * math.sin(t * 6))
+        n = 11
+        pts = []
+        for k in range(n * 2 + 1):
+            a = math.pi * 0.95 + k * math.pi * 1.1 / (n * 2)
+            rr = r * (1.75 + 0.15 * math.sin(t * 8 + k) if k % 2 == 0 else 1.1)
+            pts.append((px + math.cos(a) * rr, py + math.sin(a) * rr))
+        pts.append((px, py))
+        poly_aa(surf, pts, (120, 40, 20))
+        pygame.draw.lines(surf, (255, 150, 70), False, _pts_i(pts[:-1]), 2)
+        return
+    for side in (-1, 1):
+        bx, by = px + side * r * 0.55, py - r * 0.6
+        pts = [(bx - side * r * 0.1, by + r * 0.15), (bx + side * r * 0.65, by - r * 0.05), (bx + side * r * 1.0, by - r * 0.55),
+               (bx + side * r * 0.85, by - r * 0.85), (bx + side * r * 0.7, by - r * 0.4), (bx + side * r * 0.2, by - r * 0.2)]
+        poly_aa(surf, [(x, y + 1.5) for x, y in pts], OUTLINE)
+        poly_aa(surf, pts, (240, 225, 190))
+        pygame.draw.line(surf, (190, 160, 120), pts[1], pts[4], 1)
+
+
+def _guardian_layer(surf, p, px, py, r, col, acc, t, front):
+    """Yörünge Bekçisi: dönen altıgen kalkan panelleri + yörüngede yıldızlar."""
+    for k in range(6):
+        a = t * 0.8 + k * math.tau / 6
+        z = math.sin(a)
+        if (z > 0) != front:
+            continue
+        cx_, cy_ = px + math.cos(a) * r * 1.85, py + z * r * 0.55
+        w_ = r * (0.28 + 0.07 * z)
+        hexp = [(cx_ + math.cos(j * math.pi / 3) * w_, cy_ + math.sin(j * math.pi / 3) * w_) for j in range(6)]
+        poly_aa(surf, hexp, mix_col((40, 120, 120), acc, 0.25 + 0.25 * (z + 1) / 2))
+        pygame.draw.polygon(surf, lighten(acc, 0.3), _pts_i(hexp), 1)
+    if front:
+        for k in range(3):
+            a = -t * 2.0 + k * math.tau / 3
+            _sparkle(surf, px + math.cos(a) * r * 1.25, py - r * 0.2 + math.sin(a) * r * 0.5, r * 0.18, (220, 255, 250))
+
+
+_NEW_AURA_LAYERS.update({
+    "falcon": _falcon_layer, "royal": _royal_layer, "tesla": _tesla_layer, "hood": _hood_layer,
+    "inferno": _inferno_layer, "goldsun": _goldsun_layer, "prism2": _prism_layer, "hunter": _hunter_layer,
+    "frost": _frost_layer, "vampire": _vampire_layer, "knight": _knight_layer, "storm": _storm_layer,
+    "venom": _venom_layer, "jet": _jet_layer, "beast": _beast_layer, "guardian": _guardian_layer,
+})
+# parçacıklar: yeni görünümler eski auranın parçacıklarını kullanır
+AURA_FX_ALIAS = {"falcon": "wings", "royal": "stars", "tesla": "arcs", "hood": "shadow", "inferno": "flames",
+                 "goldsun": "halo", "prism2": "prism", "hunter": "shadow", "frost": "stars", "vampire": "bubbles",
+                 "knight": "halo", "storm": "arcs", "venom": "bubbles", "jet": "wings", "beast": "flames",
+                 "guardian": "stars"}
+
 
 
 def _cosmos_layer(surf, px, py, r, col, acc, t, front):
@@ -14116,6 +14716,9 @@ def legend_share_cap(luck):
     return RARITY_LEGEND_CAP
 
 
+# mağaza: silahına isim ver (server.py WEAPON_NAME_COST ile aynı)
+WEAPON_NAME_COST = 1_000_000
+
 # kart kısmeti (bkz. RunState._meta_weight / start_levelup_choice)
 OFFER_PITY_STEP = 0.30
 OFFER_PITY_MAX = 4.0
@@ -15259,7 +15862,7 @@ class Player:
             self.x += self.vx * dt
             self.y += self.vy * dt
             self.speed_now = math.hypot(self.vx, self.vy)
-            if self.skin["aura"] == "shadow" and self.speed_now > 60:
+            if AURA_FX_ALIAS.get(self.skin["aura"], self.skin["aura"]) == "shadow" and self.speed_now > 60:
                 self.ghost_t -= dt
                 if self.ghost_t <= 0:
                     self.ghost_t = 0.05
@@ -37273,6 +37876,25 @@ STRINGS.update({
     "ui.tab_free":    _T("ÜCRETSİZ", "FREE", "GRATIS", "GRATIS", "БЕСПЛАТНО"),
     "ui.tab_gems":    _T("ELMAS PAKETLERİ", "GEM PACKS", "PACKS DE GEMAS", "EDELSTEINPAKETE", "НАБОРЫ КРИСТАЛЛОВ"),
     "ui.tab_pets":    _T("PETLER", "PETS", "MASCOTAS", "HAUSTIERE", "ПИТОМЦЫ"),
+    "ui.tab_wname":   _T("SİLAH İSMİ", "NAME A WEAPON", "NOMBRA ARMA", "WAFFE BENENNEN", "ИМЯ ОРУЖИЯ"),
+    "wn.title":       _T("SİLAHINA KENDİ İSMİNİ VER", "NAME A WEAPON YOURSELF", "PONLE TU NOMBRE A UN ARMA",
+                         "GIB EINER WAFFE DEINEN NAMEN", "НАЗОВИ ОРУЖИЕ САМ"),
+    "wn.desc":        _T("{0} elmasa bir silah seç ve ona istediğin ismi yaz. İsteğin yöneticiye mesaj olarak gider; uygun bulunursa bir sonraki güncellemede o silah herkesin oyununda senin verdiğin isimle gelir.",
+                         "Pick a weapon and write the name you want for {0} gems. Your request goes to the admin as a message; if approved, the weapon carries your name for everyone in the next update.",
+                         "Elige un arma y escribe su nombre por {0} gemas. Tu petición llega al admin; si se aprueba, el arma llevará tu nombre en la próxima actualización.",
+                         "Wähle eine Waffe und schreib ihren Namen für {0} Edelsteine. Die Anfrage geht an den Admin; wird sie angenommen, trägt die Waffe im nächsten Update deinen Namen.",
+                         "Выбери оружие и напиши имя за {0} кристаллов. Запрос уйдёт админу; если его одобрят, в следующем обновлении оружие получит твоё имя."),
+    "wn.ph":          _T("yeni isim (3-24 harf)", "new name (3-24 letters)", "nuevo nombre (3-24)", "neuer Name (3-24)", "новое имя (3-24)"),
+    "wn.preview":     _T("İSMİNİ YAZ", "TYPE A NAME", "ESCRIBE UN NOMBRE", "NAMEN EINGEBEN", "ВВЕДИ ИМЯ"),
+    "wn.buy":         _T("{0} ELMASA İSTE", "REQUEST FOR {0}", "PEDIR POR {0}", "FÜR {0} ANFRAGEN", "ЗАПРОСИТЬ ЗА {0}"),
+    "wn.sent":        _T("İsteğin yöneticiye gönderildi, elmas düşüldü.", "Request sent to the admin; gems deducted.",
+                         "Petición enviada al admin; gemas descontadas.", "Anfrage an den Admin gesendet; Edelsteine abgezogen.",
+                         "Запрос отправлен админу, кристаллы списаны."),
+    "wn.need_login":  _T("Önce hesabınla giriş yap", "Sign in first", "Inicia sesión primero", "Zuerst anmelden", "Сначала войди"),
+    "wn.need_gems":   _T("1.000.000 elmasın olmalı", "You need 1,000,000 gems", "Necesitas 1.000.000 gemas",
+                         "Du brauchst 1.000.000 Edelsteine", "Нужно 1 000 000 кристаллов"),
+    "wn.bad":         _T("İsim 3-24 harf olmalı (harf, rakam, boşluk)", "Name must be 3-24 letters", "El nombre debe tener 3-24 letras",
+                         "Name muss 3-24 Zeichen haben", "Имя: 3-24 символа"),
     "ui.free_gems":   _T("ÜCRETSİZ ELMAS", "FREE GEMS", "GEMAS GRATIS", "GRATIS-EDELSTEINE", "БЕСПЛАТНЫЕ КРИСТАЛЛЫ"),
     "ui.watch_ad":    _T("REKLAM İZLE", "WATCH AN AD", "VER ANUNCIO", "WERBUNG ANSEHEN", "СМОТРЕТЬ РЕКЛАМУ"),
     "ui.watch_plus":  _T("İZLE  +{0}", "WATCH  +{0}", "VER  +{0}", "ANSEHEN  +{0}", "СМОТРЕТЬ  +{0}"),
@@ -37441,6 +38063,10 @@ def set_window_icon():
         pass
 
 
+# ayarlardaki EKRAN BOYUTU seçenekleri (pencere kipinde)
+WIN_SIZES = ((1280, 720), (1600, 900), (1920, 1080), (2560, 1440), (3200, 1800), (3840, 2160))
+
+
 class Display:
     """Oyun hep 1280x720'ye çizilir, sonra pencereye ölçeklenir."""
 
@@ -37492,6 +38118,9 @@ class Display:
                 sc = pygame.display.set_mode((VIRTUAL_W, VIRTUAL_H),
                                              flags | pygame.SCALED)
             self.scaled_mode = True
+            wi = int(self.save.data.get("settings", {}).get("win_size", 0) or 0)
+            if 0 < wi <= len(WIN_SIZES) and not self.fullscreen:
+                win_size = WIN_SIZES[wi - 1]
             if win_size is not None:
                 self._fit_window(win_size)
             return sc
@@ -37538,6 +38167,33 @@ class Display:
         _os_boot.environ["SDL_RENDER_SCALE_QUALITY"] = "0" if sharp else "1"
         self.scale_sharp = sharp
         return win
+
+    def next_window_size(self, cur):
+        """Ayarlardaki EKRAN BOYUTU: sıradaki seçeneğe geçer ve pencereyi o boya getirir.
+        0 = otomatik (ekrana göre). Ekrandan büyük seçenekler atlanır."""
+        try:
+            dw, dh = pygame.display.get_desktop_sizes()[0]
+        except Exception:
+            dw, dh = 99999, 99999
+        n = len(WIN_SIZES)
+        nxt = cur
+        for _ in range(n + 1):
+            nxt = (nxt + 1) % (n + 1)
+            if nxt == 0 or (WIN_SIZES[nxt - 1][0] <= dw and WIN_SIZES[nxt - 1][1] <= dh):
+                break
+        self.apply_window_size(nxt)
+        return nxt
+
+    def apply_window_size(self, idx):
+        if IS_WEB or MOBILE or self.fullscreen or not self.scaled_mode:
+            return
+        if idx and 0 < idx <= len(WIN_SIZES):
+            self._fit_window(WIN_SIZES[idx - 1])
+        else:
+            win = self._pick_scale_filter()
+            if win is not None:
+                self._fit_window(win)
+        self._sb = None
 
     def _fit_window(self, size):
         """SCALED pencereyi istenen boya getirip ortalar (SDL kendisi yalnız tam
@@ -37701,7 +38357,7 @@ class Display:
         if IS_WEB or MOBILE or not self.scaled_mode or getattr(self, "_sb_off", False):
             return None
         mode = str(self.save.data.get("settings", {}).get("scale_filter", "auto"))
-        if mode == "smooth":
+        if mode in ("smooth", "sharp"):
             return None
         try:
             win = pygame.Window.from_display_module()
@@ -38126,7 +38782,7 @@ QUEST_DEFS = {
     "cave":   ("ghost", (190, 120, 255), (None, 1, 2)),
 }
 # "elmas çok kazanıyoruz, %50 azalt": 14/28/56 -> 7/14/28.
-QUEST_GEMS = (2, 3, 6)                           # kolay / orta / zor ödülü (yine -%50)
+QUEST_GEMS = (200, 250, 300)                     # kolay / orta / zor ödülü ("görevlerden 200-300 elmas")
 # Koşu sonunda toplanan altının elmasa dönüşme oranı (2 kişilik de bunu kullanır).
 RUN_GEM_RATE = 0.00672          # elmas yine -%50 (0.01344 -> 0.00672)
 QUEST_TIER_COLORS = ((110, 220, 140), (100, 160, 240), (170, 120, 230))
@@ -41232,6 +41888,33 @@ def draw_invisible_player(world, p, t):
 DIFF_BADGE = {"nightmare": ((255, 120, 110), (62, 22, 26)),
               "hard": ((255, 186, 96), (56, 38, 18)),
               "normal": ((150, 190, 235), (22, 32, 50))}
+
+
+_LB_CARD = {}
+
+
+def _lb_card_grad(w, h, col):
+    key = ("g", w, h, col)
+    srf = _LB_CARD.get(key)
+    if srf is None:
+        srf = pygame.Surface((w, h))
+        for y in range(h):
+            k = y / max(1, h - 1)
+            srf.fill(mix_col(scale_col(col, 0.34), (16, 14, 26), k), (0, y, w, 1))
+        _LB_CARD[key] = srf
+    return srf
+
+
+def _lb_card_shade(w, h):
+    key = ("s", w, h)
+    srf = _LB_CARD.get(key)
+    if srf is None:
+        srf = pygame.Surface((w, h), pygame.SRCALPHA)
+        for y in range(h):
+            k = clamp((y / max(1, h - 1) - 0.35) / 0.65, 0.0, 1.0)
+            srf.fill((8, 6, 14, int(40 + 175 * k)), (0, y, w, 1))
+        _LB_CARD[key] = srf
+    return srf
 
 
 def _lb_diff_badge(surf, cx, y, diff):
@@ -45697,6 +46380,15 @@ def parse_unban_cmd(line):
     if len(low) >= 2 and low[0] == "ban" and low[1] in ("kaldir", "ac", "kaldirma"):
         return parts[2].strip() if len(parts) >= 3 else ""
     return None
+
+
+def parse_take_cmd(line):
+    """'elmasal ad 5000' / '/elmasal ad 10k' -> (ad, miktar); komut değilse None."""
+    parts = str(line or "").split()
+    tr = str.maketrans("çğıöşüÇĞİÖŞÜ", "cgiosuCGIOSU")
+    if not parts or parts[0].translate(tr).lower().lstrip("/!") not in ("elmasal", "takegems", "elmassil"):
+        return None
+    return parse_give_cmd("elmas " + " ".join(parts[1:]))
 
 
 def parse_give_cmd(line):
@@ -57004,6 +57696,8 @@ class App:
         """Sohbet kutusu bu ekranda açılabilir mi?"""
         if self.state == STATE_PET_DESIGNER and (getattr(self, "pd", None) or {}).get("name_focus"):
             return False
+        if self.state == STATE_GEM_STORE and getattr(self, "wn_focus", False):
+            return False
         return self.state not in (STATE_NAME_ENTRY, STATE_LOGIN, STATE_FRIENDS)
 
     def _chat_submit(self, line):
@@ -57031,6 +57725,13 @@ class App:
                 self.chat.say("kullanım: tac50m kullanıcıadı", TEXT_DIM)
             elif self._chat_admin_gate():
                 self._admin_give_item(crown_to, "crown_50m")
+            return
+        take = parse_take_cmd(line)
+        if take is not None:
+            if not take[0]:
+                self.chat.say("kullanım: elmasal kullanıcıadı miktar  (örn. elmasal Ali 5000 ya da 10k)", TEXT_DIM)
+            elif self._chat_admin_gate():
+                self._admin_take(take[0], take[1])
             return
         give = parse_give_cmd(line)
         # "elmas ..." sıradan bir sohbet sözcüğü de olabilir: eksik/bozuk yazılmış
@@ -57085,6 +57786,33 @@ class App:
                 shown, fmt_num(int(res.get("added") or 0)), fmt_num(int(res.get("total") or 0))), GOLD)
             me = str((acc.account or {}).get("username") or "").lower()
             if shown.lower() == me:
+                await acc.pull_progress()
+        spawn(worker)
+
+    def _admin_take(self, name, amount):
+        """Yönetici komutu: bir oyuncudan elmas alır."""
+        acc = self.account
+        name = "".join(c for c in str(name) if c.isalnum() or c == "_")[:USERNAME_MAX]
+        if not name:
+            return
+        tok = acc.token
+        self.chat.say("elmas alınıyor: %s -%s ..." % (name, fmt_num(amount)), TEXT_DIM)
+
+        async def worker():
+            try:
+                res = await acc._post("/admin/take_gems", {
+                    "token": tok, "device": device_id(), "device_legacy": device_id_legacy(),
+                    "name": name, "amount": int(amount)}, timeout=30)
+            except Exception as e:
+                self.chat.say("elmas alınamadı: %s" % acc._err_text(e), RED)
+                return
+            if not (isinstance(res, dict) and res.get("success")):
+                self.chat.say("elmas alınamadı: %s" % ((res or {}).get("error") if isinstance(res, dict) else "?"), RED)
+                return
+            shown = str(res.get("name") or name)
+            self.chat.say("%s: -%s elmas alındı (kalan %s)" % (
+                shown, fmt_num(int(res.get("taken") or 0)), fmt_num(int(res.get("total") or 0))), GOLD)
+            if shown.lower() == str((acc.account or {}).get("username") or "").lower():
                 await acc.pull_progress()
         spawn(worker)
 
@@ -57335,6 +58063,9 @@ class App:
                     self.handle_login_key(event)
                 elif self.state == STATE_FRIENDS:
                     self.handle_friends_key(event)
+                elif (self.state == STATE_GEM_STORE and getattr(self, "store_tab", "") == "name"
+                      and getattr(self, "wn_focus", False)):
+                    self.handle_wn_key(event)
                 elif self.state == STATE_PET_DESIGNER:
                     self.handle_pet_designer_key(event)
                 elif self.state == STATE_NAME_ENTRY:
@@ -58801,14 +59532,17 @@ class App:
         chips = [("LV %d" % r.player.level, PURPLE),
                  (L("ui.hell") if r.biome == "hell" else L("map.%s.short" % theme), hcol),
                  (LX("diff." + r.diff, DIFF_LABEL.get(r.diff, r.diff)), (200, 206, 230))]
+        # iki satır: (seviye + zorluk) ve harita - kartın alt kenarından taşmasın
         cy_ = hero.y + 232
-        for txt, ccol in chips:
-            cw_ = text_width(txt, 12, True) + 22
-            cr_ = pygame.Rect(0, 0, cw_, 22)
-            cr_.center = (hero.centerx, cy_ + 11)
-            tag_chip(canvas, cr_, ccol, 11, tint=0.24)
-            draw_text(canvas, txt, cr_.center, 12, lighten(ccol, 0.2), bold=True, center=True, shadow=False)
-            cy_ += 26
+        for line in ((chips[0], chips[2]), (chips[1],)):
+            ws_ = [text_width(txt, 12, True) + 22 for txt, _c in line]
+            x_ = hero.centerx - (sum(ws_) + 8 * (len(ws_) - 1)) / 2
+            for (txt, ccol), cw_ in zip(line, ws_):
+                cr_ = pygame.Rect(int(x_), cy_, int(cw_), 22)
+                tag_chip(canvas, cr_, ccol, 11, tint=0.24)
+                draw_text(canvas, txt, cr_.center, 12, lighten(ccol, 0.2), bold=True, center=True, shadow=False)
+                x_ += cw_ + 8
+            cy_ += 27
 
         # ---- istatistik karoları (sayarak dolar) ----
         def _count(v, i):
@@ -58941,6 +59675,8 @@ class App:
             draw_text(canvas, L("ui.go_build"), (lx_, team_y - 2), 11, (130, 136, 162), bold=True, shadow=False)
             xx = lx_
             pw_ = r.player.weapons
+            if not pw_ and not any(v > 0 for v in r.player.books.values()):
+                draw_text(canvas, L("ui.go_build_none"), (lx_, team_y + 26), 12, (110, 106, 128), shadow=False)
             for k, lv in sorted(pw_.items(), key=lambda kv: -kv[1]):
                 if k not in WEAPON_BY_KEY:
                     continue
@@ -58985,7 +59721,7 @@ class App:
                        lambda: self.set_state(STATE_MENU))]
         if rp_rect is not None:
             hov_rp = replay_button_draw(canvas, rp_rect, mouse_pos, self.t)
-            draw_text(canvas, _fit_text(L("rp.note"), 10, left.w - 40), (left.centerx, left.bottom - 8), 10,
+            draw_text(canvas, _fit_text(L("rp.note"), 10, bw + 60), (rp_rect.centerx, rp_rect.y - 12), 10,
                       (150, 130, 140), center=True, shadow=False)
             if clicked and hov_rp:
                 self.replay.start()
@@ -60308,8 +61044,9 @@ class App:
         tabs = [("free", L("ui.tab_free"), "star", (110, 220, 140)),
                 ("gems", L("ui.tab_gems"), "gem", GEM_COLOR),
                 ("skins", L("ui.premium_skins"), "shield", (200, 150, 255)),
-                ("pets", L("ui.tab_pets"), "heart", (255, 150, 190))]
-        tw, th, gap = 214, 40, 10
+                ("pets", L("ui.tab_pets"), "heart", (255, 150, 190)),
+                ("name", L("ui.tab_wname"), "sword", (255, 200, 90))]
+        tw, th, gap = 200, 40, 10
         total = len(tabs) * tw + (len(tabs) - 1) * gap
         x0 = (VIRTUAL_W - total) / 2
         bar = pygame.Rect(int(x0 - 8), 82, int(total + 16), th + 12)
@@ -60675,6 +61412,85 @@ class App:
             btn.draw(canvas)
             if clicked:
                 btn.click(mouse_pos)
+
+    # ---- mağaza: silahına isim ver (1.000.000 elmas) ----
+    def _draw_weapon_naming(self, canvas, dt, mouse_pos, clicked):
+        """Bir silah seç, ismini yaz, 1.000.000 elmasa iste: istek yöneticiye gider."""
+        t = self.t
+        key = getattr(self, "wn_weapon", None) or BOSS_WEAPONS[0]["key"]
+        self.wn_weapon = key
+        name = getattr(self, "wn_name", "")
+        box = pygame.Rect(60, 150, VIRTUAL_W - 120, 480)
+        panel(canvas, box, bg=(30, 22, 24), edge=(150, 120, 70), alpha=240, radius=18, edge_w=2)
+        draw_text(canvas, L("wn.title"), (box.x + 30, box.y + 20), 24, GOLD, bold=True)
+        for j, ln in enumerate(wrap_text(L("wn.desc", fmt_num(WEAPON_NAME_COST)), 12, 560)[:3]):
+            draw_text(canvas, ln, (box.x + 30, box.y + 56 + j * 17), 12, TEXT_DIM, shadow=False)
+        # silah seçimi: 5x4 arma
+        gx, gy, cs = box.x + 30, box.y + 118, 112
+        for i, w in enumerate(BOSS_WEAPONS[:20]):
+            r_ = pygame.Rect(gx + (i % 5) * (cs + 6), gy + (i // 5) * 82, cs, 76)
+            sel = w["key"] == key
+            hov = r_.collidepoint(mouse_pos)
+            pygame.draw.rect(canvas, (60, 46, 30) if sel else ((48, 36, 38) if hov else (38, 28, 30)), r_, border_radius=10)
+            ink_frame(canvas, r_, GOLD if sel else ((140, 120, 100) if hov else (80, 66, 60)), 10, 2 if sel else 1)
+            draw_weapon_emblem(canvas, r_.centerx, r_.y + 30, 42, w, t, locked=False, glow=sel)
+            draw_text(canvas, _fit_text(w_name(w), 10, cs - 8, bold=True), (r_.centerx, r_.bottom - 16), 10,
+                      TEXT if sel else TEXT_DIM, bold=True, center=True, shadow=False)
+            if clicked and hov:
+                self.wn_weapon = w["key"]
+                sfx("click", 0.5, 0.0)
+        # sağ: önizleme + isim kutusu + düğme
+        rx = box.x + 640
+        rw_ = box.right - rx - 30
+        w = WEAPON_BY_KEY.get(key, BOSS_WEAPONS[0])
+        add_glow(canvas, rx + rw_ / 2, box.y + 150, 90, tuple(w["color"]), 0.18)
+        draw_weapon_emblem(canvas, rx + rw_ / 2, box.y + 150, 96, w, t, locked=False, glow=True)
+        draw_text(canvas, w_name(w), (rx + rw_ / 2, box.y + 212), 16, TEXT_DIM, bold=True, center=True)
+        draw_text(canvas, "»", (rx + rw_ / 2, box.y + 234), 18, GOLD, bold=True, center=True)
+        shown = " ".join(name.split()) or L("wn.preview")
+        nm, nsz = ms_fit(shown.upper(), 26, rw_ - 10, True)
+        draw_text(canvas, nm, (rx + rw_ / 2, box.y + 262), nsz, GOLD if name.strip() else (110, 100, 90), bold=True, center=True)
+        ib = pygame.Rect(rx, box.y + 312, rw_, 46)
+        foc = bool(getattr(self, "wn_focus", False))
+        _fr_input_box(canvas, ib, name, L("wn.ph"), foc, t, "wn_name", L("wn.title"), mouse_pos, clicked)
+        if clicked:
+            self.wn_focus = ib.collidepoint(mouse_pos) or (foc and not clicked)
+        clean = " ".join(name.split())
+        valid = 3 <= len(clean) <= 24 and all(c.isalnum() or c in " '.-" for c in clean)
+        gems = self.save.get_gems()
+        logged = self.account.logged_in()
+        ok = valid and logged and gems >= WEAPON_NAME_COST and not getattr(self, "wn_busy", False)
+        br = pygame.Rect(rx, box.y + 374, rw_, 50)
+        bh = br.collidepoint(mouse_pos)
+        self._mini_button(canvas, br, L("wn.buy", fmt_num(WEAPON_NAME_COST)), (176, 128, 40), bh and ok,
+                          enabled=ok, icon="gem", size=16)
+        note = getattr(self, "wn_note", "")
+        if not note:
+            note = (L("wn.need_login") if not logged else (L("wn.need_gems") if gems < WEAPON_NAME_COST else
+                    ("" if valid or not clean else L("wn.bad"))))
+        if note:
+            draw_text(canvas, _fit_text(note, 12, rw_, bold=True), (rx + rw_ / 2, br.bottom + 14), 12,
+                      GREEN if getattr(self, "wn_ok", False) else (255, 170, 150), bold=True, center=True,
+                      shadow=False)
+        if clicked and bh and ok:
+            self.wn_busy = True
+            self.wn_note = ""
+
+            def done(ok_, err, res):
+                self.wn_busy = False
+                self.wn_ok = bool(ok_)
+                self.wn_note = L("wn.sent") if ok_ else (err or L("ui.op_fail"))
+                if ok_:
+                    self.wn_name = ""
+                    sfx("buy", 1.0, 0.0)
+            self.account.reward_call("/shop/name_weapon", {"weapon": key, "name": clean}, done)
+
+    def handle_wn_key(self, event):
+        if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_ESCAPE):
+            self.wn_focus = False
+            return
+        self.wn_name, _ = text_edit("wn_name", getattr(self, "wn_name", ""), event, None, 24)
+        self.wn_note = ""
 
     def _draw_store_pets(self, canvas, dt, mouse_pos, clicked, can_buy):
         """Mağaza > petler sekmesi."""
@@ -61476,6 +62292,8 @@ class App:
             self._draw_store_pets(canvas, dt, mouse_pos, ui_click, can_buy)
         elif self.store_tab == "free":
             self._draw_free_gems(canvas, dt, mouse_pos, ui_click)
+        elif self.store_tab == "name":
+            self._draw_weapon_naming(canvas, dt, mouse_pos, ui_click)
         else:
             self._draw_gem_packs(canvas, dt, mouse_pos, ui_click, can_buy)
 
@@ -61848,118 +62666,98 @@ class App:
         return True
 
     def update_mastery(self, dt, mouse_pos, clicked):
-        """Arena ustalığı ekranı: elmasla alınan kalıcı yükseltmeler."""
+        """Arena ustalığı: sade 3x3 ızgara (parıltı yok; simge kutusu, kademe
+        çizgileri, tam genişlikte satın alma düğmesi)."""
         canvas = self.display.canvas
-        self.bg.update(dt * 0.2)
         self.bg.draw(canvas)
-        # 7. kart (uğur) için panel 4 satıra büyüdü.
-        n_rows = (len(MASTERY) + 1) // 2
-        pr = pygame.Rect(0, 0, 940, 600 if n_rows <= 3 else (690 if n_rows == 4 else 708))
-        pr.center = (VIRTUAL_W / 2, VIRTUAL_H / 2 - (10 if n_rows <= 3 else 0))
-        panel(canvas, pr, alpha=246)
-        cx = pr.centerx
-        draw_text(canvas, L("ui.mastery"), (cx, pr.y + 22), 30, GOLD, bold=True,
-                  center=True)
-        for i, ln in enumerate(wrap_text(L("ui.mastery_sub"), 12, pr.w - 120)[:2]):
-            draw_text(canvas, ln, (cx, pr.y + 62 + i * 15), 12, TEXT_DIM,
-                      center=True, shadow=False)
-
-        # elmas kesesi ve ustalığa yatırılan toplam
+        sh = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+        sh.fill((10, 8, 14, 150))
+        canvas.blit(sh, (0, 0))
         gem = self.save.get_gems()
-        draw_icon(canvas, pr.right - 150, pr.y + 34, "gem", GEM_COLOR, 9)
-        draw_text(canvas, fmt_num(gem), (pr.right - 34, pr.y + 24), 20, GEM_COLOR,
-                  bold=True, right=True)
-        draw_text(canvas, L("ui.mastery_spent", fmt_num(self.save.mastery_spent())),
-                  (pr.x + 34, pr.y + 28), 11, (130, 136, 162), shadow=False)
-
-        kart_w, kart_h = 410, (112 if n_rows <= 4 else 92)
-        gx0 = cx - kart_w - 12
-        gy0 = pr.y + (102 if n_rows <= 3 else (96 if n_rows == 4 else 90))
-        gap_y = 14 if n_rows <= 3 else (8 if n_rows == 4 else 6)
+        # ---- başlık ----
+        draw_text(canvas, L("ui.mastery"), (54, 26), 30, GOLD, bold=True)
+        draw_text(canvas, L("ui.mastery_sub"), (56, 66), 12, TEXT_DIM, shadow=False)
+        draw_text(canvas, L("ui.mastery_spent", fmt_num(self.save.mastery_spent())), (56, 84), 11,
+                  (130, 128, 150), shadow=False)
+        gt = fmt_num(gem)
+        pw = int(coin_label_width(gt, 20, 10, gap=8) + 40)
+        pill = pygame.Rect(VIRTUAL_W - 54 - pw, 30, pw, 40)
+        pygame.draw.rect(canvas, (30, 34, 50), pill, border_radius=20)
+        ink_frame(canvas, pill, scale_col(GEM_COLOR, 0.7), 20, 2)
+        draw_coin_label(canvas, pill.centerx, pill.centery, gt, GEM_COLOR, 20, icon="gem", icon_r=10, gap=8)
+        # ---- kartlar ----
+        cols, cw, ch, gx, gy = 3, 380, 150, 16, 12
+        x0 = VIRTUAL_W / 2 - (cols * cw + (cols - 1) * gx) / 2
+        y0 = 116
         for i, m in enumerate(MASTERY):
-            col, row = i % 2, i // 2
-            r = pygame.Rect(gx0 + col * (kart_w + 24), gy0 + row * (kart_h + gap_y),
-                            kart_w, kart_h)
-            if len(MASTERY) % 2 and i == len(MASTERY) - 1:
-                r.centerx = cx                  # tek kalan kart ortada
+            r = pygame.Rect(int(x0 + (i % cols) * (cw + gx)), int(y0 + (i // cols) * (ch + gy)), cw, ch)
             lvl = self.save.mastery_level(m["key"])
             cost = self.save.mastery_next_cost(m["key"])
             maxed = self.save.mastery_maxed(m["key"])
-            alinabilir = gem >= cost and self.save.can_spend() and not maxed
+            ok = gem >= cost and self.save.can_spend() and not maxed
             hov = r.collidepoint(mouse_pos)
             renk = tuple(m["color"])
-            panel(canvas, r, bg=(59, 43, 45) if hov else (45, 32, 34),
-                  edge=renk if (hov and alinabilir) else (100, 72, 75),
-                  alpha=242, radius=12, edge_w=2)
-            add_glow(canvas, r.x + 42, r.centery, 34, renk, 0.16 if lvl else 0.07)
-            draw_icon(canvas, r.x + 42, r.centery - 8, m["icon"], renk, 17)
-
-            draw_text(canvas, mastery_name(m), (r.x + 78, r.y + 12), 18, renk,
-                      bold=True, shadow=False)
-            draw_text(canvas, mastery_desc(m), (r.x + 78, r.y + 36), 11, TEXT_DIM,
-                      shadow=False)
-
-            # kademe etiketi: 5'e kadar "Kademe N", sonrası "PRESTİJ N"
+            pygame.draw.rect(canvas, (40, 31, 36) if hov else (32, 25, 30), r, border_radius=14)
+            ink_frame(canvas, r, scale_col(renk, 0.75) if hov else (70, 56, 62), 14, 2 if hov else 1)
+            # simge kutusu
+            ib = pygame.Rect(r.x + 16, r.y + 16, 52, 52)
+            pygame.draw.rect(canvas, mix_col((32, 25, 30), renk, 0.22), ib, border_radius=12)
+            ink_frame(canvas, ib, scale_col(renk, 0.6), 12, 1)
+            draw_icon(canvas, ib.centerx, ib.centery, m["icon"], renk, 15)
+            # ad + açıklama
+            draw_text(canvas, mastery_name(m), (r.x + 82, r.y + 16), 17, renk, bold=True, shadow=False)
+            for j, ln in enumerate(wrap_clip(mastery_desc(m), 11, cw - 170, 2)):
+                draw_text(canvas, ln, (r.x + 82, r.y + 40 + j * 14), 11, TEXT_DIM, shadow=False)
+            # sağ üst: toplam bonus
+            bonus = mastery_bonus(m, lvl)
+            bt = ("+%d" % round(bonus)) if (m["key"] == "m_hp" or m.get("kind") == "count") else fmt_pct(bonus * 100)
+            draw_text(canvas, bt, (r.right - 16, r.y + 16), 20, renk if lvl else (110, 106, 128), bold=True,
+                      right=True, shadow=False)
+            # kademe: 5 çizgi (+ prestij çipi)
+            sx, sy = r.x + 16, r.y + 76
+            top = int(m["max"]) if m.get("max") else MASTERY_TIERS
+            segw = (cw - 32 - (top - 1) * 4 - (70 if lvl > MASTERY_TIERS else 0)) / float(top)
+            for k in range(top):
+                sr = pygame.Rect(int(sx + k * (segw + 4)), sy, int(segw), 6)
+                pygame.draw.rect(canvas, renk if k < min(lvl, top) else (58, 48, 56), sr, border_radius=3)
             if m.get("max"):
-                etiket = L("ui.mastery_tier", lvl) + " / %d" % int(m["max"])
-                et_col = TEXT if lvl else TEXT_DIM
+                lab = L("ui.mastery_tier", lvl) + " / %d" % top
             elif lvl > MASTERY_TIERS:
-                etiket = L("ui.mastery_prestige", lvl - MASTERY_TIERS)
-                et_col = (255, 196, 90)
-            else:
-                etiket = L("ui.mastery_tier", lvl)
-                et_col = TEXT if lvl else TEXT_DIM
-            draw_text(canvas, etiket, (r.x + 78, r.y + 56), 12, et_col, bold=True,
-                      shadow=False)
-
-            # şu anki toplam bonus
-            b = mastery_bonus(m, lvl)
-            if m["key"] == "m_hp" or m.get("kind") == "count":
-                b_txt = "+%d" % round(b)
-            else:
-                b_txt = fmt_pct(b * 100)
-            draw_text(canvas, b_txt, (r.right - 16, r.y + (52 if kart_h > 100 else 10)), 20,
-                      renk if lvl else (138, 144, 172), bold=True, right=True)
-
-            # kademe çubuğu (doğrusal kısım dolunca prestij rengine döner)
-            # Çubuk satın alma düğmesinin soluna sığsın (düğme r.right-150'de
-            # başlıyor): 150 piksel genişlik tam oturuyor.
-            bar = pygame.Rect(r.x + 78, r.y + 80, 150, 8)
-            if m.get("max"):
-                dolu = min(1.0, lvl / float(m["max"]))
-            else:
-                dolu = (min(lvl, MASTERY_TIERS) / float(MASTERY_TIERS)) if lvl <= MASTERY_TIERS else 1.0
-            draw_bar(canvas, bar, dolu, renk, radius=4)
-
-            # satın alma düğmesi
-            br = pygame.Rect(r.right - 150, r.bottom - 36, 134, 28)
-            bcol = (56, 112, 78) if alinabilir else (73, 55, 56)
-            pygame.draw.rect(canvas, bcol if not (hov and alinabilir) else (74, 148, 102),
-                             br, border_radius=7)
-            ink_frame(canvas, br, (90, 160, 115) if alinabilir else (102, 76, 78), 7, 1)
-            if maxed:
-                draw_text(canvas, L("ui.mastery_max"), br.center, 14, GOLD, bold=True,
-                          center=True, shadow=False)
-            else:
-                draw_icon(canvas, br.x + 18, br.centery, "gem",
-                          GEM_COLOR if alinabilir else (96, 104, 128), 6)
-                draw_text(canvas, fmt_num(cost), (br.x + 32, br.centery - 8), 14,
-                          WHITE if alinabilir else (110, 116, 142), bold=True,
+                pr_ = pygame.Rect(r.right - 16 - 62, sy - 6, 62, 18)
+                pygame.draw.rect(canvas, (70, 52, 24), pr_, border_radius=9)
+                draw_text(canvas, "P%d" % (lvl - MASTERY_TIERS), pr_.center, 11, GOLD, bold=True, center=True,
                           shadow=False)
-            if clicked and br.collidepoint(mouse_pos):
-                if self.save.buy_mastery(m["key"]):
-                    sfx("buy", 0.7, 0.0)
-                else:
-                    sfx("error", 0.5, 0.0)
-
-        draw_text(canvas, L("ui.mastery_hint"), (cx, pr.bottom - 92), 11,
-                  (124, 130, 156), center=True, shadow=False)
-        b = Button((cx - 150, pr.bottom - 66, 300, 46), L("ui.back_menu"),
-                   lambda: self.set_state(STATE_MENU), text_size=17)
-        b.update(mouse_pos, dt)
-        b.draw(canvas)
+                lab = L("ui.mastery_prestige", lvl - MASTERY_TIERS)
+            else:
+                lab = L("ui.mastery_tier", lvl)
+            draw_text(canvas, lab, (sx, sy + 12), 11, (255, 200, 110) if lvl > MASTERY_TIERS else TEXT_DIM, bold=True,
+                      shadow=False)
+            # satın alma düğmesi (tam genişlik)
+            br = pygame.Rect(r.x + 16, r.bottom - 40, cw - 32, 28)
+            bh = br.collidepoint(mouse_pos)
+            if maxed:
+                pygame.draw.rect(canvas, (44, 38, 30), br, border_radius=9)
+                draw_text(canvas, L("ui.mastery_max"), br.center, 13, GOLD, bold=True, center=True, shadow=False)
+            else:
+                pygame.draw.rect(canvas, ((70, 140, 96) if bh else (52, 110, 74)) if ok else (52, 44, 50), br,
+                                 border_radius=9)
+                lbl = fmt_num(cost)
+                lw = coin_label_width(lbl, 14, 7)
+                draw_coin_label(canvas, br.centerx, br.centery, lbl, WHITE if ok else (120, 116, 136), 14,
+                                icon="gem", icon_r=7)
+                if clicked and bh:
+                    if self.save.buy_mastery(m["key"]):
+                        sfx("buy", 0.7, 0.0)
+                    else:
+                        sfx("error", 0.5, 0.0)
+        draw_text(canvas, L("ui.mastery_hint"), (VIRTUAL_W / 2, VIRTUAL_H - 84), 11, (130, 126, 150), center=True,
+                  shadow=False)
+        btn = Button((VIRTUAL_W / 2 - 150, VIRTUAL_H - 62, 300, 46), L("ui.back_menu"),
+                     lambda: self.set_state(STATE_MENU), text_size=17)
+        btn.update(mouse_pos, dt)
+        btn.draw(canvas)
         if clicked:
-            b.click(mouse_pos)
+            btn.click(mouse_pos)
 
     def update_login(self, dt, mouse_pos, clicked):
         """Hesap ekranı + sağ üstte iletişim düğmesi."""
@@ -62615,7 +63413,7 @@ class App:
         """Ayarlar ekranı."""
         canvas = self.display.canvas
         self.bg.draw(canvas)
-        pr = pygame.Rect(0, 0, 940, 626)
+        pr = pygame.Rect(0, 0, 940, 684)
         pr.center = (VIRTUAL_W / 2, VIRTUAL_H / 2)
         panel(canvas, pr, alpha=245)
         draw_text(canvas, L("ui.settings"), (pr.centerx, pr.y + 26), 28, CYAN, bold=True, center=True)
@@ -62629,7 +63427,7 @@ class App:
         cw = 420
         lx = pr.centerx - cw - 16
         rx = pr.centerx + 16
-        ROW_H, ROW_STEP = 46, 52          # iki sütunda da aynı (7'şer satır)
+        ROW_H, ROW_STEP = 44, 50          # iki sütunda da aynı (8'er satır)
         draw_text(canvas, L("ui.audio_screen"), (lx, pr.y + 62), 15, GOLD, bold=True)
         draw_text(canvas, L("ui.look_perf"), (rx, pr.y + 62), 15, GOLD, bold=True)
 
@@ -62664,6 +63462,14 @@ class App:
                          L("ui.on") if full else L("ui.off"), GREEN if full else RED,
                          mouse_pos, clicked):
             self.display.toggle_fullscreen()
+        y += ROW_STEP
+        # ekran boyutu: büyük ekranlarda pencereyi istenen boya getirir
+        wi = int(st.get("win_size", 0) or 0)
+        wlab = L("ui.win_auto") if wi <= 0 else "%d × %d" % WIN_SIZES[min(wi, len(WIN_SIZES)) - 1]
+        if self._set_row(canvas, pygame.Rect(lx, y, cw, ROW_H), L("ui.win_size"), wlab + "  »", CYAN,
+                         mouse_pos, clicked):
+            st["win_size"] = self.display.next_window_size(wi)
+            save_cfg()
         y += ROW_STEP
         tog(pygame.Rect(lx, y, cw, ROW_H), L("ui.shake"), "shake")
         y += ROW_STEP
@@ -62716,7 +63522,16 @@ class App:
             CFG["skill_scale"] = cycle_skill_scale()
             st["skill_scale"] = CFG["skill_scale"]
             self.save.save()
-
+        y += ROW_STEP
+        # görüntü kalitesi: otomatik (keskin ölçekleme) / piksel / yumuşak
+        fm = str(st.get("scale_filter", "auto"))
+        fm = fm if fm in ("auto", "sharp", "smooth") else "auto"
+        if self._set_row(canvas, pygame.Rect(rx, y, cw, ROW_H), L("ui.scale_q"),
+                         L("ui.scale_" + fm) + "  »", (GREEN, CYAN, GOLD)[("auto", "sharp", "smooth").index(fm)],
+                         mouse_pos, clicked):
+            st["scale_filter"] = {"auto": "sharp", "sharp": "smooth", "smooth": "auto"}[fm]
+            save_cfg()
+            self.display.reopen()
         # ---- tam genişlikte: eşya efekti kaydırıcısı ----
         # Oyun içindeki (ESC) kaydırıcının aynısı: aynı yardımcıyı çağırıyor,
         # yani iki ekran birbiriyle her zaman aynı değeri gösteriyor.
@@ -62728,7 +63543,7 @@ class App:
 
         # ---- kısa notlar ----
         ny = ir.bottom + 12
-        notes = [L("ui.note_fx")] + wrap_text(L("ui.note_gfx"), 10, pr.w - 30)[:2]
+        notes = [L("ui.note_fx")] + wrap_text(L("ui.note_gfx"), 10, pr.w - 30)[:1]
         for ln in notes:
             draw_text(canvas, ln, (pr.centerx, ny), 10, TEXT_DIM, center=True, shadow=False)
             ny += 14
@@ -63599,6 +64414,125 @@ class App:
                   (row.right - 14, row.centery - 8), 13, TEXT_DIM, right=True,
                   shadow=False)
 
+    def _lb_champ_card(self, canvas, r, e, idx, my_name, t):
+        """İlk üçün kartı: oyuncunun profil arka planı, çerçevesi, rozeti, unvanı."""
+        col, _sh = self._rank_style(idx)
+        pst = clean_profile_style(e.get("style"))
+        nm = str(e.get("name", "?"))[:14]
+        is_me = bool(my_name) and nm.strip().lower() == my_name
+        clip = canvas.get_clip()
+        canvas.set_clip(r.clip(clip) if clip else r)
+        if pst["bg"]:
+            draw_profile_bg(canvas, r, pst["bg"], t)
+        else:
+            canvas.blit(_lb_card_grad(r.w, r.h, col), r.topleft)
+        sh = _lb_card_shade(r.w, r.h)
+        canvas.blit(sh, r.topleft)
+        canvas.set_clip(clip)
+        if pst["frame"]:
+            draw_profile_frame(canvas, r, pst["frame"], t, 18)
+        else:
+            ink_frame(canvas, r, col, 18, 3 if idx == 0 else 2)
+        # sıra rozeti + madalya
+        self._draw_medal(canvas, r.x + 32, r.y + 32, idx, 16 if idx == 0 else 14, t)
+        # skin (+ birinciye taç)
+        sy = r.y + (78 if idx == 0 else 70)
+        sk = get_skin(str(e.get("skin") or "default"))
+        add_glow(canvas, r.centerx, sy, 70, tuple(sk["color"]), 0.22)
+        try:
+            draw_skin_preview(canvas, sk, r.centerx, sy, t + idx, r=32 if idx == 0 else 27, weapon=True)
+        except Exception:
+            pass
+        if idx == 0:
+            self._lb_crown(canvas, r.centerx, sy - 52, 1.0, (255, 226, 130), t)
+        # ad + rozet
+        ny = r.y + (128 if idx == 0 else 112)
+        nsz = 20 if idx == 0 else 18
+        nm_fit = _fit_text(nm, nsz, r.w - 60, bold=True)
+        nw = text_width(nm_fit, nsz, True)
+        bw_ = 24 if pst.get("badge") else 0
+        x_ = r.centerx - (nw + bw_) / 2
+        if pst["glow"]:
+            draw_glow_name(canvas, nm_fit, (x_, ny), nsz, pst["glow"], t)
+        else:
+            draw_text(canvas, nm_fit, (x_, ny), nsz, GREEN if is_me else WHITE, bold=True)
+        if pst.get("badge"):
+            draw_profile_badge(canvas, x_ + nw + 14, ny + nsz * 0.6, pst["badge"], t, 10)
+        yy = ny + nsz + 8
+        if pst.get("title"):
+            tw0 = text_width(profile_title_text(pst["title"]), 11, True) + 18
+            draw_profile_title(canvas, r.centerx - tw0 / 2, yy, pst["title"], t, 11)
+            yy += 26
+        elif pst["motto"]:
+            draw_text(canvas, _fit_text("\u201c" + pst["motto"] + "\u201d", 12, r.w - 30), (r.centerx, yy + 8), 12,
+                      (255, 236, 200), center=True)
+            yy += 22
+        # skor
+        draw_coin_label(canvas, r.centerx, r.bottom - 52, fmt_num(e.get("score", 0)), col, 24 if idx == 0 else 21,
+                        icon="star", icon_r=10, gap=6)
+        wk = L("ui.lb_wave_k", e.get("wave", "-"), fmt_num(e.get("kills", 0)))
+        draw_text(canvas, _fit_text(wk, 11, r.w - 90), (r.centerx - 26, r.bottom - 26), 11, (210, 214, 236),
+                  center=True, shadow=False)
+        _lb_diff_badge(canvas, r.right - 52, r.bottom - 30, e.get("diff"))
+        if is_me:
+            yt = L("ui.you")
+            yr = pygame.Rect(0, 0, text_width(yt, 10, True) + 14, 16)
+            yr.midtop = (r.centerx, r.y - 8)
+            pygame.draw.rect(canvas, (24, 70, 44), yr, border_radius=8)
+            ink_frame(canvas, yr, GREEN, 8, 1)
+            draw_text(canvas, yt, yr.center, 10, GREEN, bold=True, center=True, shadow=False)
+        self._lb_hits.append((r, e, idx))
+
+    def _lb_strip(self, canvas, row, i, e, my_name, t, appear):
+        """4. sıradan itibaren: oyuncunun profil şeridi (arka plan, ad, rozet, unvan)."""
+        if appear <= 0.02:
+            return
+        row = row.move(int((1.0 - appear) * 40), 0)
+        pst = clean_profile_style(e.get("style"))
+        nm = str(e.get("name", "?"))[:14]
+        is_me = bool(my_name) and nm.strip().lower() == my_name
+        clip = canvas.get_clip()
+        canvas.set_clip(row.clip(clip) if clip else row)
+        if pst["bg"]:
+            draw_profile_bg(canvas, row, pst["bg"], t)
+            canvas.blit(_pf_shade(row.w, row.h), row.topleft)
+        else:
+            pygame.draw.rect(canvas, (30, 52, 40) if is_me else ((26, 24, 40) if i % 2 else (22, 20, 34)), row)
+        canvas.set_clip(clip)
+        if pst["frame"]:
+            draw_profile_frame(canvas, row, pst["frame"], t, 10)
+        else:
+            ink_frame(canvas, row, GREEN if is_me else (66, 70, 104), 10, 2 if is_me else 1)
+        draw_text(canvas, "#%d" % (i + 1), (row.x + 30, row.centery), 18, GREEN if is_me else (196, 206, 240),
+                  bold=True, center=True)
+        clip = canvas.get_clip()
+        sc_ = pygame.Rect(row.x + 52, row.y + 1, 52, row.h - 2)
+        canvas.set_clip(sc_.clip(clip) if clip else sc_)
+        try:
+            draw_skin_preview(canvas, get_skin(str(e.get("skin") or "default")), row.x + 78, row.centery, t + i,
+                              r=14, weapon=False)
+        except Exception:
+            pass
+        canvas.set_clip(clip)
+        x_ = row.x + 110
+        nm_fit = _fit_text(nm, 16, 180, bold=True)
+        ny = row.centery - (16 if pst.get("title") else 9)
+        if pst["glow"]:
+            draw_glow_name(canvas, nm_fit, (x_, ny), 16, pst["glow"], t)
+        else:
+            draw_text(canvas, nm_fit, (x_, ny), 16, GREEN if is_me else TEXT, bold=True)
+        ex = x_ + text_width(nm_fit, 16, True) + 8
+        if pst.get("badge"):
+            draw_profile_badge(canvas, ex + 9, ny + 10, pst["badge"], t, 8)
+        if pst.get("title"):
+            draw_profile_title(canvas, x_, ny + 22, pst["title"], t, 10)
+        draw_coin_label(canvas, row.right - 92, row.centery - 8, fmt_num(e.get("score", 0)), GOLD, 17, icon="star",
+                        icon_r=7, gap=5)
+        draw_text(canvas, L("ui.lb_wave_n", e.get("wave", "-")), (row.right - 92, row.centery + 8), 11,
+                  (160, 196, 240), center=True, shadow=False)
+        _lb_diff_badge(canvas, row.right - 24, row.centery - 7, e.get("diff"))
+        self._lb_hits.append((row, e, i))
+
     def _lb_empty_row(self, canvas, row, i, t, appear):
         """Henüz sahibi olmayan sıra: kesik çizgili, davet eden bir yuva."""
         if appear <= 0.02:
@@ -63647,205 +64581,94 @@ class App:
         # Ekrana her girişte liste sırayla belirsin diye küçük bir sayaç.
         self.world_lb_t = min(3.0, getattr(self, "world_lb_t", 0.0) + dt)
 
-        panel_rect = pygame.Rect(0, 0, 780, 618)
-        panel_rect.center = (VIRTUAL_W / 2, VIRTUAL_H / 2)
+        panel_rect = pygame.Rect(24, 12, VIRTUAL_W - 48, VIRTUAL_H - 24)
         self._wlb_back(canvas, panel_rect, t)
 
-        # ---- başlık şeridi ----
-        head = pygame.Rect(panel_rect.x + 3, panel_rect.y + 3, panel_rect.w - 6, 78)
-        head_band(canvas, head, (60, 40, 28, 200), (130, 92, 52), radius=14)
+        # ---- başlık ----
         title = L("ui.world_lb")
         if PLATFORM_TAG == "mobile":
             title += "  -  " + _tc("MOBİL", "MOBILE", "MÓVIL", "MOBIL", "МОБАЙЛ")
-        ty_ = panel_rect.y + 30
-        draw_text(canvas, title, (panel_rect.centerx, ty_), 31,
-                  (255, 214, 140), bold=True, center=True)
-        # başlığın iki yanında yıldız (başlıkla aynı hizada)
-        sx_off = text_width(title, 31, True) // 2 + 26
-        for sgn in (-1, 1):
-            draw_icon(canvas, panel_rect.centerx + sgn * sx_off, ty_, "star", (255, 222, 140),
-                      12 + 1.2 * math.sin(t * 2.4 + sgn))
-        draw_text(canvas, L("ui.lb_sub", WORLD_LB_SIZE),
-                  (panel_rect.centerx, panel_rect.y + 60), 12, TEXT_DIM,
-                  center=True, shadow=False)
+        draw_icon(canvas, panel_rect.x + 40, panel_rect.y + 36, "star", (255, 214, 120), 15)
+        draw_text(canvas, title, (panel_rect.x + 64, panel_rect.y + 16), 32, (255, 214, 140), bold=True)
+        draw_text(canvas, L("ui.lb_sub", WORLD_LB_SIZE), (panel_rect.x + 66, panel_rect.y + 56), 12, TEXT_DIM,
+                  shadow=False)
+        body_top = panel_rect.y + 86
+        board_all = (self.online.world_scores or [])[:WORLD_LB_SIZE]
+        mine_i = next((i for i, e in enumerate(board_all)
+                       if my_name and str(e.get("name", "")).strip().lower() == my_name), None)
+        if mine_i is not None:
+            yt = L("ui.lb_your_rank", mine_i + 1, fmt_num(board_all[mine_i].get("score", 0)))
+            yr = pygame.Rect(0, 0, text_width(yt, 14, True) + 34, 34)
+            yr.topright = (panel_rect.right - 24, panel_rect.y + 22)
+            pygame.draw.rect(canvas, (24, 60, 40), yr, border_radius=17)
+            ink_frame(canvas, yr, GREEN, 17, 2)
+            draw_text(canvas, yt, yr.center, 14, (190, 255, 200), bold=True, center=True, shadow=False)
 
-        body_top = panel_rect.y + 96
-
-        # ---- kalıcı sıralama yasağı ----
-        # Hileci bu ekranı açtığında kendi adını aramakla uğraşmasın: neden
-        # orada olmadığı en üstte, kırmızı kırmızı yazıyor.
         if self.save.is_board_banned():
-            bb = pygame.Rect(panel_rect.x + 24, body_top, panel_rect.w - 48, 86)
-            panel(canvas, bb, bg=(48, 18, 22), edge=(200, 74, 84), alpha=244,
-                  radius=10, edge_w=2)
-            draw_text(canvas, L("ui.banned_title"), (bb.centerx, bb.y + 12), 17,
-                      (255, 150, 150), bold=True, center=True, shadow=False)
-            yy = bb.y + 36
-            for ln in wrap_clip(L("ui.banned_body"), 11, bb.w - 36, 3):
-                draw_text(canvas, ln, (bb.centerx, yy), 11, (226, 176, 176),
-                          center=True, shadow=False)
-                yy += 15
-            body_top = bb.bottom + 10
+            bb = pygame.Rect(panel_rect.x + 24, body_top, panel_rect.w - 48, 70)
+            panel(canvas, bb, bg=(48, 18, 22), edge=(200, 74, 84), alpha=244, radius=10, edge_w=2)
+            draw_text(canvas, L("ui.banned_title"), (bb.centerx, bb.y + 10), 16, (255, 150, 150), bold=True,
+                      center=True, shadow=False)
+            for k_, ln in enumerate(wrap_clip(L("ui.banned_body"), 11, bb.w - 36, 2)):
+                draw_text(canvas, ln, (bb.centerx, bb.y + 34 + k_ * 15), 11, (226, 176, 176), center=True,
+                          shadow=False)
+            body_top = bb.bottom + 8
 
         if self.online.loading:
             for k in range(10):
                 a = t * 3.4 + k * math.tau / 10
                 al = 0.15 + 0.85 * ((k / 10.0 + t * 0.6) % 1.0)
-                blit_disc(canvas, panel_rect.centerx + math.cos(a) * 28,
-                          panel_rect.centery - 20 + math.sin(a) * 28,
+                blit_disc(canvas, panel_rect.centerx + math.cos(a) * 28, panel_rect.centery - 20 + math.sin(a) * 28,
                           1.5 + 2.2 * al, (120, 180, 255), int(230 * al))
-            draw_text(canvas, L("ui.lb_loading"), (panel_rect.centerx, panel_rect.centery + 22),
-                      18, TEXT_DIM, center=True)
-
+            draw_text(canvas, L("ui.lb_loading"), (panel_rect.centerx, panel_rect.centery + 22), 18, TEXT_DIM,
+                      center=True)
         elif self.online.world_error and not self.online.world_scores:
             draw_icon(canvas, panel_rect.centerx, panel_rect.centery - 56, "shield", (110, 118, 148), 26)
-            # hata sebebiyle geliyor (uzun) - satırlara bölünür.
-            wl = wrap_text(self.online.world_error, 15, panel_rect.w - 120)[:3]
+            wl = wrap_text(self.online.world_error, 15, panel_rect.w - 200)[:3]
             for i, ln in enumerate(wl):
-                draw_text(canvas, ln, (panel_rect.centerx,
-                                       panel_rect.centery - 16 + (i - (len(wl) - 1)) * 19),
+                draw_text(canvas, ln, (panel_rect.centerx, panel_rect.centery - 16 + (i - (len(wl) - 1)) * 19),
                           15, TEXT, center=True)
-            if not self.online.enabled:
-                draw_text(canvas, L("ui.dev_note1"),
-                          (panel_rect.centerx, panel_rect.centery + 14), 13, TEXT_DIM, center=True, shadow=False)
-                draw_text(canvas, L("ui.dev_note2"),
-                          (panel_rect.centerx, panel_rect.centery + 32), 13, TEXT_DIM, center=True, shadow=False)
-
+        elif not board_all:
+            draw_icon(canvas, panel_rect.centerx, panel_rect.centery - 40, "star", (110, 118, 148), 26)
+            draw_text(canvas, L("ui.lb_none"), (panel_rect.centerx, panel_rect.centery), 19, TEXT_DIM, center=True)
+            draw_text(canvas, L("ui.lb_be_first"), (panel_rect.centerx, panel_rect.centery + 26), 14, TEXT_DIM,
+                      center=True, shadow=False)
         else:
-            board = (self.online.world_scores or [])[:WORLD_LB_SIZE]
-            if not board:
-                draw_icon(canvas, panel_rect.centerx, panel_rect.centery - 40, "star", (110, 118, 148), 26)
-                draw_text(canvas, L("ui.lb_none"),
-                          (panel_rect.centerx, panel_rect.centery), 19, TEXT_DIM, center=True)
-                draw_text(canvas, L("ui.lb_be_first"), (panel_rect.centerx, panel_rect.centery + 26),
-                          14, TEXT_DIM, center=True, shadow=False)
-            else:
-                best = max(1, max(int(e.get("score", 0) or 0) for e in board))
-                # ---- podyum (ilk üç) ----
-                pod_h = 176
-                pod = pygame.Rect(panel_rect.x + 30, body_top, panel_rect.w - 60, pod_h)
-                order = [1, 0, 2]          # 2. - 1. - 3. sırayla yan yana
-                slot_w = pod.w / 3
-                # basamakların yükseklikleri: birinci en yüksekte durur
-                step_h = {0: pod_h - 54, 1: pod_h - 74, 2: pod_h - 88}
-                for slot, idx in enumerate(order):
-                    col, shine = self._rank_style(idx)
-                    ap = clamp((self.world_lb_t - idx * 0.10) / 0.35, 0.0, 1.0)
-                    ap = ease_out_cubic(ap)
-                    if ap <= 0.01:
-                        continue
-                    cx = pod.x + slot_w * slot + slot_w / 2
-                    if idx >= len(board):
-                        # Sahibi olmayan podyum basamağı: sönük, kesik çizgili
-                        # bir kaide olarak yine de durur - podyumun bir ayağı
-                        # eksik kalmasın.
-                        bh = step_h[idx] * ap
-                        st_r = pygame.Rect(int(cx - slot_w * 0.36),
-                                           int(pod.bottom - bh),
-                                           int(slot_w * 0.72), int(max(2, bh)))
-                        dim = scale_col(col, 0.34)
-                        for yy in range(0, st_r.h, 12):
-                            pygame.draw.line(canvas, scale_col(col, 0.16),
-                                             (st_r.x + 4, st_r.y + yy),
-                                             (st_r.right - 4, st_r.y + yy), 1)
-                        pygame.draw.rect(canvas, dim, st_r, width=1,
-                                         border_top_left_radius=10,
-                                         border_top_right_radius=10)
-                        self._draw_medal(canvas, cx, st_r.y - 22, idx, 18, t)
-                        draw_text(canvas, L("ui.empty"), (cx, st_r.y + 20), 15, dim,
-                                  bold=True, center=True, shadow=False)
-                        draw_text(canvas, L("ui.waiting_owner"), (cx, st_r.y + 42), 10,
-                                  scale_col(col, 0.30), center=True, shadow=False)
-                        continue
-                    e = board[idx]
-                    base_y = pod.bottom
-                    bh = step_h[idx] * ap
-                    step = pygame.Rect(int(cx - slot_w * 0.36), int(base_y - bh),
-                                       int(slot_w * 0.72), int(max(2, bh)))
-                    # basamak: üstü aydınlık, altı koyu bir blok
-                    ss = pygame.Surface(step.size, pygame.SRCALPHA)
-                    for yy in range(step.h):
-                        f = yy / max(1, step.h - 1)
-                        base = scale_col(col, 0.30 - 0.16 * f)
-                        pygame.draw.line(ss, (*base, 238), (0, yy), (step.w, yy))
-                    smask = pygame.Surface(step.size, pygame.SRCALPHA)
-                    pygame.draw.rect(smask, (255, 255, 255, 255), smask.get_rect(),
-                                     border_top_left_radius=10, border_top_right_radius=10)
-                    ss.blit(smask, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
-                    canvas.blit(ss, step.topleft)
-                    pygame.draw.rect(canvas, col, step, width=2,
-                                     border_top_left_radius=10, border_top_right_radius=10)
-                    # basamağın üst kenarında parlayan bir şerit
-                    pygame.draw.line(canvas, lighten(col, 0.45),
-                                     (step.x + 6, step.y + 2), (step.right - 6, step.y + 2), 2)
-
-                    nm = str(e.get("name", "?"))[:13]
-                    is_me = bool(my_name) and nm.strip().lower() == my_name
-                    bob = math.sin(t * 2 + idx) * 2.4
-                    my = step.y - 22 + bob
-                    if idx == 0:
-                        # birinciye taç + sürekli yükselen kıvılcımlar
-                        self._lb_crown(canvas, cx, my - 32, 1.0, (255, 226, 130), t)
-                        for sp in range(5):
-                            ph = (t * 0.55 + sp * 0.2) % 1.0
-                            blit_disc(canvas, cx + math.sin(t * 1.6 + sp * 2) * 26,
-                                      step.y - 6 - ph * 62, 2.2 * (1 - ph),
-                                      (255, 224, 140), int(200 * (1 - ph)))
-                    # skin avatarı (madalya yanında)
-                    try:
-                        draw_skin_preview(canvas, get_skin(str(e.get("skin") or "default")),
-                                          cx, my - 4, t + idx, r=17, weapon=False)
-                    except Exception:
-                        pass
-                    self._draw_medal(canvas, cx - 30, my + 8, idx, 11, t)
-                    self._lb_hits.append((pygame.Rect(int(cx - slot_w * 0.40), int(my - 34),
-                                                      int(slot_w * 0.80), int(pod.bottom - my + 34)), e, idx))
-                    _gl = clean_profile_style(e.get("style"))["glow"]
-                    nm_fit = _fit_text(nm, 16, step.w - 10, bold=True)
-                    if _gl and not is_me:
-                        draw_glow_name(canvas, nm_fit, (cx, step.y + 12), 16, _gl, t, center=True)
-                    else:
-                        draw_text(canvas, nm_fit, (cx, step.y + 20), 16,
-                                  GREEN if is_me else TEXT, bold=True, center=True)
-                    draw_coin_label(canvas, cx, step.y + 44, fmt_num(e.get("score", 0)),
-                                    col, 19, icon="star", icon_r=8, gap=5)
-                    _wk = L("ui.lb_wave_k", e.get("wave", "-"), fmt_num(e.get("kills", 0)))
-                    _ws = 10 if text_width(_wk, 10) <= step.w - 10 else 9
-                    draw_text(canvas, _fit_text(_wk, _ws, step.w - 8),
-                              (cx, step.y + 62), _ws, (176, 190, 220), center=True, shadow=False)
-                    _lb_diff_badge(canvas, cx, step.y + 76, e.get("diff"))
-                    if is_me:
-                        # "SEN": basamağın üst kenarında küçük bir sekme
-                        yt = L("ui.you")
-                        yr = pygame.Rect(0, 0, text_width(yt, 10, True) + 14, 15)
-                        yr.center = (cx, step.y)
-                        pygame.draw.rect(canvas, (24, 70, 44), yr, border_radius=7)
-                        ink_frame(canvas, yr, GREEN, 7, 1)
-                        draw_text(canvas, yt, yr.center, 10, GREEN, bold=True, center=True, shadow=False)
-                pygame.draw.line(canvas, (58, 82, 128), (pod.x, pod.bottom),
-                                 (pod.right, pod.bottom), 2)
-
-                # ---- 4. sıradan itibaren liste ----
-                # Liste her zaman 10 sıraya kadar çizilir: sahibi olmayan
-                # sıralar boş bırakılmaz, "bu sıra seni bekliyor" diyen kesik
-                # çizgili bir yuva olarak durur.
-                rest = board[3:WORLD_LB_SIZE]
-                n_slots = WORLD_LB_SIZE - 3
-                list_top = pod.bottom + 12
-                list_bottom = panel_rect.bottom - 70
-                row_h = (list_bottom - list_top) / n_slots
-                for j in range(n_slots):
-                    i = j + 3
-                    ap = ease_out_cubic(clamp((self.world_lb_t - 0.30 - j * 0.06) / 0.30,
-                                              0.0, 1.0))
-                    row = pygame.Rect(panel_rect.x + 34, int(list_top + j * row_h),
-                                      panel_rect.w - 68, int(row_h) - 5)
-                    if j < len(rest):
-                        e = rest[j]
-                        frac = clamp(int(e.get("score", 0) or 0) / best, 0.0, 1.0)
-                        self._lb_row(canvas, row, i, e, my_name, t, ap, frac * ap)
-                    else:
-                        self._lb_empty_row(canvas, row, i, t, ap)
+            board = board_all
+            # ---- şampiyonlar: ilk üç, profil arka planlı büyük kartlar ----
+            base_y = body_top + 262
+            sizes = {0: (330, 262), 1: (290, 228), 2: (290, 228)}
+            xs = {1: panel_rect.centerx - 330 / 2 - 14 - 290, 0: panel_rect.centerx - 330 / 2,
+                  2: panel_rect.centerx + 330 / 2 + 14}
+            for idx in (1, 2, 0):
+                cw_, ch_ = sizes[idx]
+                ap = ease_out_cubic(clamp((self.world_lb_t - idx * 0.10) / 0.35, 0.0, 1.0))
+                if ap <= 0.01:
+                    continue
+                r = pygame.Rect(int(xs[idx]), int(base_y - ch_ + (1 - ap) * 30), cw_, ch_)
+                if idx >= len(board):
+                    pygame.draw.rect(canvas, (26, 22, 34), r, border_radius=18)
+                    ink_frame(canvas, r, (60, 56, 80), 18, 1)
+                    self._draw_medal(canvas, r.centerx, r.y + 40, idx, 18, t)
+                    draw_text(canvas, L("ui.empty"), (r.centerx, r.centery + 10), 16, (90, 86, 110), bold=True,
+                              center=True, shadow=False)
+                    continue
+                self._lb_champ_card(canvas, r, board[idx], idx, my_name, t)
+            # ---- 4-10: profil şeritleri, iki sütun ----
+            lt = base_y + 14
+            lb = panel_rect.bottom - 66
+            n_left = 4
+            colw = (panel_rect.w - 48 - 16) / 2
+            rh = min(62, (lb - lt) / n_left)
+            for j in range(WORLD_LB_SIZE - 3):
+                i = j + 3
+                ci, ri = (0, j) if j < n_left else (1, j - n_left)
+                row = pygame.Rect(int(panel_rect.x + 24 + ci * (colw + 16)), int(lt + ri * rh), int(colw), int(rh - 6))
+                ap = ease_out_cubic(clamp((self.world_lb_t - 0.30 - j * 0.06) / 0.30, 0.0, 1.0))
+                if i < len(board):
+                    self._lb_strip(canvas, row, i, board[i], my_name, t, ap)
+                else:
+                    self._lb_empty_row(canvas, row, i, t, ap)
 
         # Girişsizken tek satırlık hatırlatma: adını hesapla sahiplenirsen
         # kimse o adla skor gönderemez (sunucu adı hesaptan alır).
@@ -63979,6 +64802,24 @@ class App:
         if clicked and (hov or not R.collidepoint(mouse_pos)):
             sfx("click", 0.6, 0.0)
             return True
+        # ---- sekmeler: koşu kartı / profil ----
+        tab = getattr(self, "_lb_tab", "run")
+        tx_ = R.right - 470
+        for k_, (key_, lab_) in enumerate((("run", L("ui.lb_tab_run")), ("pf", L("ui.lb_tab_pf")))):
+            tr_ = pygame.Rect(tx_ + k_ * 128, R.y + 88 - 30, 120, 26)
+            act_ = tab == key_
+            th_ = tr_.collidepoint(mouse_pos)
+            pygame.draw.rect(canvas, scale_col(col, 0.5) if act_ else ((60, 46, 50) if th_ else (40, 30, 34)), tr_,
+                             border_radius=13)
+            ink_frame(canvas, tr_, col if act_ else (90, 80, 100), 13, 1)
+            draw_text(canvas, lab_, tr_.center, 11, WHITE if act_ else TEXT_DIM, bold=True, center=True, shadow=False)
+            if clicked and th_ and not act_:
+                self._lb_tab = key_
+                sfx("click", 0.5, 0.0)
+                clicked = False
+        if tab == "pf":
+            self._lb_profile_body(canvas, R, e, col, t)
+            return False
         # ---- sol: skin + temel sayılar ----
         L_ = pygame.Rect(R.x + 20, R.y + 94, 260, R.h - 114)
         panel(canvas, L_, bg=scale_col(col, 0.14), edge=scale_col(col, 0.6), alpha=240, radius=14, edge_w=1)
@@ -64086,6 +64927,76 @@ class App:
             if yy > S.bottom - 18:
                 break
         return False
+
+    def _lb_profile_body(self, canvas, R, e, col, t):
+        """Sıralama kartının PROFİL sekmesi: koleksiyon ve kariyer."""
+        pf = e.get("pf") if isinstance(e.get("pf"), dict) else None
+        body = pygame.Rect(R.x + 20, R.y + 94, R.w - 40, R.h - 114)
+        if not pf:
+            draw_text(canvas, L("ui.lb_pf_none"), body.center, 15, TEXT_DIM, center=True)
+            return
+        # sol: karakter koleksiyonu
+        A = pygame.Rect(body.x, body.y, 640, body.h)
+        panel(canvas, A, bg=(30, 22, 26), edge=(80, 70, 100), alpha=240, radius=14, edge_w=1)
+        skins = [sid for sid in (pf.get("skins") or []) if sid in SKIN_BY_ID]
+        draw_text(canvas, "%s  ·  %d / %d" % (L("ui.lb_pf_skins"), len(skins), len(SKINS)), (A.x + 16, A.y + 12), 13,
+                  (190, 200, 240), bold=True, shadow=False)
+        cols, cs = 8, 76
+        for k_, sid in enumerate(skins[:24]):
+            cx_ = A.x + 16 + (k_ % cols) * cs + cs / 2
+            cy_ = A.y + 64 + (k_ // cols) * 80
+            sk = SKIN_BY_ID[sid]
+            if sk.get("premium"):
+                add_glow(canvas, cx_, cy_, 30, PURPLE, 0.25)
+            clip = canvas.get_clip()
+            cell = pygame.Rect(int(cx_ - cs / 2 + 2), int(cy_ - 34), cs - 4, 56)
+            canvas.set_clip(cell.clip(clip) if clip else cell)
+            try:
+                draw_skin_preview(canvas, sk, cx_, cy_, t + k_ * 0.3, r=15, weapon=False)
+            except Exception:
+                pass
+            canvas.set_clip(clip)
+            draw_text(canvas, _fit_text(skin_name(sk), 9, cs - 6), (cx_, cy_ + 26), 9,
+                      PURPLE if sk.get("premium") else TEXT_DIM, center=True, shadow=False)
+        # alt: petler ve taçlar
+        py_ = A.bottom - 104
+        draw_text(canvas, L("ui.lb_pf_pets"), (A.x + 16, py_), 13, (255, 170, 210), bold=True, shadow=False)
+        py_ += 16
+        xx = A.x + 40
+        for cid in (pf.get("crowns") or []) + (pf.get("pets") or []):
+            if cid in COSMETIC_BY_ID or cid.startswith("pet_"):
+                try:
+                    self._cosmetic_preview(canvas, xx, py_ + 46, 18, "pet" if cid.startswith("pet_") else "hat", cid, t)
+                except Exception:
+                    pass
+                xx += 62
+                if xx > A.right - 30:
+                    break
+        # sağ: kariyer sayıları
+        B = pygame.Rect(A.right + 16, body.y, body.right - A.right - 16, body.h)
+        panel(canvas, B, bg=(30, 22, 26), edge=(80, 70, 100), alpha=240, radius=14, edge_w=1)
+        draw_text(canvas, L("ui.lb_pf_stats"), (B.x + 16, B.y + 12), 13, GOLD, bold=True, shadow=False)
+        rows = [("skull", (255, 140, 130), L("ui.go_kills"), fmt_num(pf.get("kills", 0))),
+                ("target", CYAN, L("ui.go_wave"), str(pf.get("best_wave", 0))),
+                ("shield", (255, 120, 90), L("ui.lb_bosses"), fmt_num(pf.get("bosses", 0))),
+                ("orbit", (190, 200, 255), _tc("KOŞU", "RUNS", "PARTIDAS", "LÄUFE", "ЗАБЕГИ"), fmt_num(pf.get("runs", 0))),
+                ("star", GOLD, L("ui.achievements"), str(pf.get("ach_n", 0))),
+                ("sword", (240, 120, 90), _tc("USTALIK", "MASTERY", "MAESTRÍA", "MEISTERSCHAFT", "МАСТЕРСТВО"),
+                 str(pf.get("mastery", 0))),
+                ("book", (186, 150, 255), _tc("KİTAP / SİLAH", "BOOKS / WEAPONS", "LIBROS / ARMAS", "BÜCHER / WAFFEN",
+                                             "КНИГИ / ОРУЖИЕ"),
+                 "%d / %d" % (pf.get("books_n", 0), pf.get("weapons_n", 0))),
+                ("gem", GEM_COLOR, _tc("KOSTÜM · PROFİL", "COSMETICS · PROFILE", "TRAJES · PERFIL", "KOSTÜME · PROFIL",
+                                       "КОСТЮМЫ · ПРОФИЛЬ"), "%d · %d" % (pf.get("cos_n", 0), pf.get("pf_n", 0)))]
+        yy = B.y + 40
+        for ic, cc, lab, val in rows:
+            cr = pygame.Rect(B.x + 14, yy, B.w - 28, 46)
+            pygame.draw.rect(canvas, (40, 30, 34), cr, border_radius=10)
+            draw_icon(canvas, cr.x + 20, cr.centery, ic, cc, 8)
+            draw_text(canvas, _fit_text(lab, 12, cr.w - 130, bold=True), (cr.x + 38, cr.centery - 8), 12,
+                      (170, 176, 206), bold=True, shadow=False)
+            draw_text(canvas, val, (cr.right - 12, cr.centery - 11), 19, cc, bold=True, right=True)
+            yy += 52
 
     def _world_lb_refresh(self):
         """yenile: listeyi yeniden çeker ve beliriş animasyonunu başa sarar."""
