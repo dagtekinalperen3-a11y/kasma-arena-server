@@ -11,10 +11,13 @@
 3. Veritabanında yeni tablo/sütun gerekmez: sayaçlar `ilerleme.veri.rewards` içinde.
 
 ## Hostinger (volvearena.shop / public_html)
-Şu dosyaları yükle (eskilerin üzerine):
-- `index.html` (depo kökündeki, derlenmiş tek dosya)
-- `default.php` (indirme sayacı, artık aynı IP'den dakikada 1 sayım)
-- `site/.htaccess` -> public_html/`.htaccess` (HTTPS zorlama + güvenlik başlıkları)
+Site artık çok sayfalı. `site/dist/` klasörünün **içindeki her şeyi** public_html'e yükle
+(eski `index.html`'in üzerine yazılır):
+- `index.html` (ana sayfa), `karakterler.html`, `silahlar.html`, `evrimler.html`, `kitaplar.html`,
+  `kostumler.html`, `rehber.html`, `kazi.html`, `magaza.html`
+- `assets/` klasörü (`site.css`, `site.js`, `data.js`)
+- `default.php` (indirme sayacı) ve `.htaccess` (gizli dosya: dosya yöneticisinde "gizli dosyaları göster")
+Kolaylık için aynı içerik `site_dist.zip` olarak da var: public_html'de zip'i yükleyip "Extract" de.
 
 ## Siteyi yeniden derlemek
 Oyuna yeni skin/kitap/silah eklenince:
@@ -22,13 +25,14 @@ Oyuna yeni skin/kitap/silah eklenince:
     pip install pygame-ce pillow
     python tools/build_site.py
 
-`site/index.src.html` şablondur; `index.html`'i elle düzenleme, şablonu düzenleyip derle.
+Kaynaklar `site/src/` (iskelet, sayfalar, CSS, JS) ve `site/static/`. `site/dist/`'i elle
+düzenleme; kaynağı düzenleyip derle.
 
 ## Nasıl çalışıyor
 - Oyunda Mağaza > Şans Çarkı > ÇEVİR: sunucudan tek kullanımlık 10 dakikalık kod alınır,
   site `https://volvearena.shop/#k=KOD` ile açılır ve hesap otomatik bağlanır.
   (Sitede kullanıcı adı/şifre ile de girilebilir; Google hesapları oyundan açmalı.)
-- Çark: ÇEVİR -> sponsor bağlantısı yeni sekmede açılır -> 15 sn (sunucu sayar) -> ÇEVİR!
+- Çark her sayfada sağ alttaki yuvarlak düğmede. ÇEVİR -> sponsor bağlantısı yeni sekmede açılır -> 15 sn (sunucu sayar) -> ÇEVİR!
   Günde 5 hak. Sonucu sunucu seçer, ödül hesaba anında yazılır.
 - Kazı kazan: 5K / 10K / 50K. Bedel düşülür ve ödül satın alırken sunucuda belirlenip
   aynı anda hesaba yazılır. Sayfada gizli sonuç ya da kod yoktur.

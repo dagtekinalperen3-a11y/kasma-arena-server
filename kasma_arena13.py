@@ -3348,9 +3348,9 @@ STRINGS.update({
     # skin / kıyafet perk satırları (perk_tr)
     "perk.Şans +%5 ile başlar": _T("Şans +%5 ile başlar", "Starts with Luck +5%", "Empieza con Suerte +5%",
                                    "Startet mit Glück +5%", "Начинает с удачей +5%"),
-    "perk.Her seviye atladığında Şans +%1": _T("Her seviye atladığında Şans +%1", "Luck +1% every level up",
-                                               "Suerte +1% en cada subida de nivel", "Glück +1% bei jedem Stufenaufstieg",
-                                               "Удача +1% за каждый уровень"),
+    "perk.Her seviye atladığında Şans +%1.5": _T("Her seviye atladığında Şans +%1,5", "Luck +1.5% every level up",
+                                                  "Suerte +1,5% en cada nivel", "Glück +1,5% pro Stufenaufstieg",
+                                                  "Удача +1,5% за каждый уровень"),
     "perk.Can Yenilenmesi +0.2/sn, Şans +%5": _T("Can Yenilenmesi +0.2/sn, Şans +%5", "Health Regen +0.2/s, Luck +5%",
                                                  "Regeneración +0.2/s, Suerte +5%", "Regeneration +0.2/s, Glück +5%",
                                                  "Регенерация +0.2/с, удача +5%"),
@@ -3688,11 +3688,11 @@ STRINGS.update({
  "sk.immortal_merc.desc": _T("Ölmeyi beceremeyen, çenesi düşük bir kiralık katil. Öldüğü darbede ayağa kalkar ve dövüşe devam eder.","A loud-mouthed killer who simply can't die. He gets back up on the blow that should end him.","Un mercenario bocazas que no sabe morir. Se levanta justo con el golpe mortal.","Ein großmäuliger Söldner, der nicht sterben kann. Er steht beim tödlichen Schlag wieder auf.","Болтливый наёмник, который не умеет умирать. Встаёт после смертельного удара."),
  "sk.pink_dream.name": _T("Pembe Rüya","Pink Dream","Sueño Rosa","Rosa Traum","Розовая Мечта"),
  "sk.shadow_warrior.name": _T("Gölge Savaşçı","Shadow Warrior","Guerrero Sombrío","Schattenkrieger","Теневой Воин"),
- "sk.shadow_warrior.desc": _T("Gölgeden gölgeye atlayan bir savaşçı. Tırpanı nereye inse orada kritik vuruş biter.","A warrior leaping from shadow to shadow. Wherever the scythe falls, a critical hit lands.","Un guerrero que salta de sombra en sombra. Donde cae su guadaña, hay un crítico.","Ein Krieger, der von Schatten zu Schatten springt. Wo die Sense fällt, sitzt ein Krit.","Воин, прыгающий из тени в тень. Куда падает коса, там критический удар."),
+ "sk.shadow_warrior.desc": _T("Gölgeden gölgeye atlayan bir savaşçı. Çevresinde iki hayalet bıçak döner; katanası nereye inse orada kritik vuruş biter.","A warrior leaping from shadow to shadow. Two ghost blades orbit him; wherever his katana falls, a critical hit lands.","Un guerrero que salta de sombra en sombra. Donde cae su guadaña, hay un crítico.","Ein Krieger, der von Schatten zu Schatten springt. Wo die Sense fällt, sitzt ein Krit.","Воин, прыгающий из тени в тень. Куда падает коса, там критический удар."),
  "sk.dragon_soul.name": _T("Ejder Ruhu","Dragon Soul","Alma de Dragón","Drachenseele","Душа Дракона"),
- "sk.dragon_soul.desc": _T("İçinde bir ejderin ruhunu taşıyan dev savaşçı. Hem dayanır hem yakar.","A giant warrior carrying a dragon's soul. Tough as stone and burns everything.","Un guerrero gigante con el alma de un dragón. Aguanta y quema.","Ein riesiger Krieger mit der Seele eines Drachen. Hält aus und verbrennt.","Гигант с душой дракона. И держит удар, и сжигает."),
+ "sk.dragon_soul.desc": _T("İçinde bir ejderin ruhunu taşıyan dev savaşçı. Kanatları, boynuzları ve ateş saçan ejder başlı topuyla hem dayanır hem yakar.","A giant warrior with a dragon's soul. With wings, horns and a fire-breathing dragon-head cannon, he endures and burns.","Un guerrero gigante con el alma de un dragón. Aguanta y quema.","Ein riesiger Krieger mit der Seele eines Drachen. Hält aus und verbrennt.","Гигант с душой дракона. И держит удар, и сжигает."),
  "sk.chrono_sage.name": _T("Zaman Bükücü","Chrono Sage","Sabio del Tiempo","Zeitbieger","Повелитель Времени"),
- "sk.chrono_sage.desc": _T("Saatin akrebini avucunda tutar: kendisi hızlanır, dünya yavaşlar.","Holds the clock's hand in his palm: he speeds up, the world slows down.","Sostiene la aguja del reloj: él acelera, el mundo se frena.","Hält den Uhrzeiger in der Hand: er wird schneller, die Welt langsamer.","Держит стрелку часов в ладони: он ускоряется, мир замедляется."),
+ "sk.chrono_sage.desc": _T("Arkasında dönen dev bir saat kadranı, başının üstünde kum saati: kendisi hızlanır, dünya yavaşlar.","A giant clock face spins behind him, an hourglass floats overhead: he speeds up, the world slows down.","Sostiene la aguja del reloj: él acelera, el mundo se frena.","Hält den Uhrzeiger in der Hand: er wird schneller, die Welt langsamer.","Держит стрелку часов в ладони: он ускоряется, мир замедляется."),
  "sk.cosmic.name": _T("Kozmik Gezgin","Cosmic Wanderer","Viajero Cósmico","Kosmischer Wanderer","Космический Странник"),
  "sk.cosmic.desc": _T("Yıldızların arasından gelen bir gezgin. Çevresinde minik gezegenler döner; asasından kuyruklu yıldızlar fırlatır.","A wanderer from between the stars. Tiny planets orbit around it; its staff hurls comets.","Un viajero de entre las estrellas. Pequeños planetas lo orbitan; su bastón lanza cometas.","Ein Wanderer zwischen den Sternen. Winzige Planeten umkreisen ihn; sein Stab schleudert Kometen.","Странник из межзвёздья. Вокруг вращаются крошечные планеты, посох мечет кометы."),
  "sk.pink_dream.desc": _T("Tepeden tırnağa pembe. Stiliyle olduğu kadar gücüyle de göz doldurur. Pembe şapka, gözlük ve pelerinle tamamla.","Pink from head to toe - as strong as it is stylish. Finish the look with the pink hat, eyewear and cape.","Rosa de pies a cabeza - tan fuerte como elegante. Complétalo con sombrero, gafas y capa rosas.","Rosa von Kopf bis Fuß - so stark wie stilvoll. Vervollständige mit rosa Hut, Brille und Umhang.","Розовая с ног до головы — столь же сильна, сколь стильна. Дополни розовыми шляпой, очками и плащом."),
@@ -8747,9 +8747,9 @@ SKINS = [
     dict(id="lucky_fox", name="Kurnaz Tilki", color=(240, 140, 60), accent=(255, 236, 214), cost=900,
          weapon="crossbow", proj="feather", aura="stars", sfx="b", wlen=27,
          desc="Kuyruğunda uğur taşıyan kurnaz bir tilki: seviye atladıkça şansı da büyür.",
-         perks=["Şans +%5 ile başlar", "Her seviye atladığında Şans +%1", "Hasar +%8",
+         perks=["Şans +%5 ile başlar", "Her seviye atladığında Şans +%1.5", "Hasar +%8",
                 "Her seviye: Hasar +%0.2 (en çok %12)"],
-         perk_add=dict(luck=0.05, luck_per_level=0.01, skin_power=0.08),
+         perk_add=dict(luck=0.05, luck_per_level=0.015, skin_power=0.08),
          perk_level=dict(skin_power=(0.002, 0.12))),
 
     # yeni skin: kozmik gezgin - çevresinde minik gezegenler döner, yeteneği
@@ -8764,26 +8764,26 @@ SKINS = [
          perk_level=dict(skin_power=(0.007, 0.42))),
 
     # ---- yeni üçlü: her biri ayrı bir oyun tarzı (suikast / tank / tempo) ----
-    dict(id="shadow_warrior", name="Gölge Savaşçı", color=(44, 40, 66), accent=(150, 110, 255), cost=1400,
-         weapon="scythe", proj="blackfire", aura="shadow", sfx="b", wlen=38,
-         desc="Gölgeden gölgeye atlayan bir savaşçı. Tırpanı nereye inse orada kritik vuruş biter.",
+    dict(id="shadow_warrior", name="Gölge Savaşçı", color=(78, 56, 132), accent=(196, 130, 255), cost=1400,
+         weapon="katana", proj="blackfire", aura="shadowblade", sfx="b", wlen=44,
+         desc="Gölgeden gölgeye atlayan bir savaşçı. Çevresinde iki hayalet bıçak döner; katanası nereye inse orada kritik vuruş biter.",
          perks=["Kritik Şans +%10", "Kritik Hasar +%25", "Dash Mesafesi +%15",
-                "Her seviye: Kritik Hasar +%1 (en çok %50), Hasar +%0.3 (en çok %18)"],
+                "Her seviye: Kritik Hasar +%1 (en çok %50), Kritik Şans +%0.15 (en çok %9)"],
          perk_add=dict(crit_chance=0.10, crit_dmg_mult=0.25, dash_dist_mult=0.15),
-         perk_level=dict(crit_dmg_mult=(0.010, 0.50), skin_power=(0.003, 0.18))),
+         perk_level=dict(crit_dmg_mult=(0.010, 0.50), crit_chance=(0.0015, 0.09))),
     dict(id="dragon_soul", name="Ejder Ruhu", color=(200, 60, 40), accent=(255, 200, 90), cost=1400,
-         weapon="cannon", proj="fireball", aura="flames", sfx="d", wlen=29,
-         desc="İçinde bir ejderin ruhunu taşıyan dev savaşçı. Hem dayanır hem yakar.",
-         perks=["Can +60", "Zırh +%6 (hasar azaltma)", "Hasar +%10",
+         weapon="dragonhead", proj="fireball", aura="dragon", sfx="d", wlen=34,
+         desc="İçinde bir ejderin ruhunu taşıyan dev savaşçı. Kanatları, boynuzları ve ateş saçan ejder başlı topuyla hem dayanır hem yakar.",
+         perks=["Can +60", "Zırh +%6 (hasar azaltma)", "Hasar +%10", "BONK Hasarı +%20",
                 "Her seviye: Can +4 (en çok +240), Hasar +%0.4 (en çok %24)"],
-         perk_add=dict(base_max_hp=60, base_armor=0.06, skin_power=0.10),
+         perk_add=dict(base_max_hp=60, base_armor=0.06, skin_power=0.10, bonk_mult=0.20),
          perk_level=dict(_hp=(4, 240), skin_power=(0.004, 0.24))),
     dict(id="chrono_sage", name="Zaman Bükücü", color=(70, 190, 210), accent=(255, 235, 150), cost=1400,
-         weapon="crystal", proj="prism", aura="arcs", sfx="c", wlen=30,
-         desc="Saatin akrebini avucunda tutar: kendisi hızlanır, dünya yavaşlar.",
-         perks=["Atış Hızı +%12", "Deneyim Kazancı +%12", "Dash Bekleme Süresi -%15",
+         weapon="clockstaff", proj="star", aura="chrono", sfx="c", wlen=42,
+         desc="Arkasında dönen dev bir saat kadranı, başının üstünde kum saati: kendisi hızlanır, dünya yavaşlar.",
+         perks=["Atış Hızı +%12", "Deneyim Kazancı +%12", "Dash Bekleme Süresi -%15", "Mermi Hızı +%15",
                 "Her seviye: Atış Hızı +%0.5 (en çok %30)"],
-         perk_add=dict(skin_aspd=0.12, xp_mult=0.12, dash_cd_mult=-0.15),
+         perk_add=dict(skin_aspd=0.12, xp_mult=0.12, dash_cd_mult=-0.15, proj_speed_mult=0.15),
          perk_level=dict(skin_aspd=(0.005, 0.30))),
 ]
 # oyundan kaldırılan skinler -> sahiplerine verilen karşılık
@@ -8908,17 +8908,20 @@ SKIN_ULTS = {
                    desc="En kalabalık noktada bir kara delik açar: çevredeki düşmanları 3 saniye "
                         "içine çeker ve öğütür, sonra patlayarak büyük hasar verir."),
     "shadow_warrior": dict(name="GÖLGE ÇARPMASI", icon="skull", color=(170, 130, 255), cd=17.0,
-                           kind="shadow_strike", mode="auto", n=8, mult=2.2, duration=2.0,
-                           desc="Gölgeye dönüşüp en yakın 8 düşmanın arasından geçer: her birine "
-                                "kesin kritik vurur ve 2 saniye dokunulmaz kalırsın."),
+                           kind="shadow_strike", mode="auto", n=10, mult=2.4, duration=2.0,
+                           desc="Gölgeye dönüşüp en yakın 10 düşmanın arasından geçer: her birine kesin "
+                                "kritik vurur, her vuruşta canın %2 dolar; ardından 4 saniye hasarın %30 "
+                                "artar ve 2 saniye dokunulmaz kalırsın."),
     "dragon_soul": dict(name="EJDER NEFESİ", icon="flame", color=(255, 120, 50), cd=18.0,
-                        kind="dragon_breath", mode="auto", radius=460, mult=1.6, heal=0.08,
-                        desc="Baktığın yöne geniş bir ateş nefesi üfler: değdiği her düşman yanar "
-                             "ve savrulur, sen de maks canının %8'ini yenilersin."),
+                        kind="dragon_breath", mode="auto", radius=480, mult=1.7, heal=0.08,
+                        desc="Baktığın yöne geniş bir ateş nefesi üfler: değdiği her düşman yanar ve "
+                             "savrulur. Ejder pulları sana 2 kalkan yükü ve 5 saniye %30 hasar azaltma "
+                             "verir, maks canının %8'i dolar."),
     "chrono_sage": dict(name="ZAMAN BÜKÜLMESİ", icon="orbit", color=(120, 225, 240), cd=22.0,
-                        kind="time_warp", mode="auto", duration=6.0,
-                        desc="6 saniye bütün düşmanlar yarı hızda kalır, sen %35 hızlı ateş "
-                             "edersin; dash beklemen sıfırlanır ve maks canının %20'sini yenilersin."),
+                        kind="time_warp", mode="auto", duration=6.0, mult=0.8,
+                        desc="Zaman 1,5 saniye durur, sonra 6 saniye bütün düşmanlar yarı hızda kalır "
+                             "ve hepsi hasar alır. Sen %35 hızlı ateş edersin, dash beklemen sıfırlanır "
+                             "ve maks canının %20'si dolar."),
     "pink_dream": dict(name="RÜYA PATLAMASI", icon="heart", color=(255, 140, 210), cd=20.0,
                        kind="dream", mode="auto", radius=300, duration=6.0,
                        desc="Maks canının %25'ini yeniler, 6 saniye kritik şansın %25 artar ve "
@@ -11724,7 +11727,9 @@ def _draw_cosmetic_eyewear_raw(surf, p, px, py, t):
 AURA_INTERVAL = {"motes": .045, "wings": .08, "bubbles": .055, "stars": .09, "arcs": .07,
                  "shadow": .04, "flames": .022, "halo": .05, "prism": .04,
                  # premium skinler
-                 "web": .07, "ash": .035, "titan": .05, "merc": .06}
+                 "web": .07, "ash": .035, "titan": .05, "merc": .06,
+                 # yeni üçlü
+                 "shadowblade": .045, "dragon": .03, "chrono": .06}
 
 
 def skin_update_fx(p, dt, fx):
@@ -11744,6 +11749,26 @@ def skin_update_fx(p, dt, fx):
     x, y = p.x, p.y
     col, acc = sk["color"], sk["accent"]
     for _ in range(n):
+        if a == "shadowblade":
+            # kara duman + mor kıvılcım
+            fx.spark(x + random.uniform(-r, r), y + random.uniform(-r * .3, r),
+                     (34, 22, 52), random.uniform(-14, 14), -26, .9, 3.6, add=False, drag=1.6, grow=3)
+            if random.random() < .5:
+                fx.spark(x + random.uniform(-r * 1.4, r * 1.4), y + random.uniform(-r * 1.4, r * 1.4),
+                         acc, random.uniform(-20, 20), random.uniform(-20, 20), .45, 2.0)
+            continue
+        if a == "dragon":
+            # yükselen korlar
+            fx.spark(x + random.uniform(-r, r), y - r * .4 + random.uniform(-r * .3, r * .3),
+                     random.choice(((255, 150, 50), (255, 210, 90), (230, 70, 30))),
+                     random.uniform(-16, 16), random.uniform(-70, -40), .7, 2.4, gravity=-10)
+            continue
+        if a == "chrono":
+            # kadranın çevresinde dönen altın kum
+            ang = random.uniform(0, math.tau)
+            fx.spark(x + math.cos(ang) * r * 2.1, y + math.sin(ang) * r * 2.1, (255, 214, 110),
+                     -math.sin(ang) * 40, math.cos(ang) * 40, .6, 2.2)
+            continue
         if a == "motes":
             # Çekirdekten kopan enerji zerreleri: içeri doğru çekilen
             # kıvılcımlar
@@ -12012,6 +12037,9 @@ def skin_draw_back(surf, p, px, py, t):
     elif a == "cosmos":
         _cosmos_layer(surf, px, py, r, col, acc, t, front=False)
 
+    elif a in _NEW_AURA_LAYERS:
+        _NEW_AURA_LAYERS[a](surf, p, px, py, r, sk["color"], acc, t, front=False)
+
     elif a == "prism":
         # prizma halkası: gökkuşağı renklerinde dönen altıgen
         ang0 = t * 0.9
@@ -12028,6 +12056,138 @@ def skin_draw_back(surf, p, px, py, t):
 _COSMOS_PLANETS = ((2.35, 0.9, 0.34, (255, 196, 120), True),
                    (1.80, -1.35, 0.24, (140, 232, 255), False),
                    (2.80, 0.55, 0.20, (236, 130, 255), False))
+
+
+# ---- yeni üçlünün auraları ----
+def _blade_pts(cx, cy, ang, ln, wd):
+    dx, dy = math.cos(ang), math.sin(ang)
+    nx, ny = -dy, dx
+    return [(cx - dx * ln * 0.35, cy - dy * ln * 0.35), (cx + nx * wd, cy + ny * wd),
+            (cx + dx * ln, cy + dy * ln), (cx - nx * wd * 0.6, cy - ny * wd * 0.6)]
+
+
+def _shadowblade_layer(surf, p, px, py, r, col, acc, t, front):
+    """Gölge Savaşçı: arkada kara duman başlığı, çevresinde dönen iki hayalet bıçak."""
+    if not front:
+        add_glow(surf, px, py - r * 0.4, r * 2.6, (90, 40, 170), 0.32)
+        for i in range(7):
+            a = -math.pi / 2 + (i - 3) * 0.42 + 0.08 * math.sin(t * 2.2 + i)
+            rr = r * (1.25 + 0.18 * math.sin(t * 3 + i * 1.7))
+            blit_disc(surf, px + math.cos(a) * rr, py + math.sin(a) * rr * 1.1 - r * 0.2,
+                      r * (0.55 + 0.1 * math.sin(t * 2 + i)), (22, 14, 34), 170)
+        # gölge tacı: arkada sivri, mor kenarlı dişler
+        for i in range(5):
+            a = -math.pi / 2 + (i - 2) * 0.38
+            bx, by = px + math.cos(a) * r * 1.05, py + math.sin(a) * r * 1.05
+            tip = r * (0.85 + (0.35 if i == 2 else 0.0)) + 3 * math.sin(t * 4 + i)
+            pts = _blade_pts(bx, by, a, tip, r * 0.18)
+            poly_aa(surf, pts, (16, 10, 26))
+            pygame.draw.polygon(surf, scale_col(acc, 0.8), [(int(x), int(y)) for x, y in pts], 1)
+        return
+    for k in range(2):
+        a = t * 2.4 + k * math.pi
+        bx, by = px + math.cos(a) * r * 1.95, py + math.sin(a) * r * 1.55
+        ang = a + math.pi / 2
+        pts = _blade_pts(bx, by, ang, r * 1.05, r * 0.22)
+        add_glow(surf, bx, by, r * 0.9, acc, 0.35)
+        poly_aa(surf, pts, (20, 12, 34))
+        pygame.draw.polygon(surf, lighten(acc, 0.25), [(int(x), int(y)) for x, y in pts], 1)
+        # iz: bıçağın arkasında sönen hayaletler
+        for j in range(1, 4):
+            aj = a - j * 0.22
+            gx, gy = px + math.cos(aj) * r * 1.95, py + math.sin(aj) * r * 1.55
+            blit_disc(surf, gx, gy, r * 0.18 * (1 - j * 0.2), acc, int(110 - j * 30))
+
+
+def _dragon_layer(surf, p, px, py, r, col, acc, t, front):
+    """Ejder Ruhu: çırpan ejder kanatları, alev yelesi; önde iki boynuz."""
+    if not front:
+        add_glow(surf, px, py, r * 2.7, (255, 110, 40), 0.30)
+        flap = math.sin(t * 5.0) * 0.20
+        for side in (-1, 1):
+            sx, sy = px + side * r * 0.55, py - r * 0.15
+            bones = []
+            for i in range(4):
+                a = -math.pi / 2 + side * (0.75 + i * 0.36 + flap)
+                ln = r * (2.25 - i * 0.22)
+                bones.append((sx + math.cos(a) * ln, sy + math.sin(a) * ln))
+            poly_aa(surf, [(sx, sy)] + bones + [(sx + side * r * 0.9, sy + r * 0.55)], scale_col(col, 0.5))
+            for i in range(len(bones) - 1):
+                mx = (bones[i][0] + bones[i + 1][0]) / 2 * 0.78 + sx * 0.22
+                my = (bones[i][1] + bones[i + 1][1]) / 2 * 0.78 + sy * 0.22
+                pygame.draw.line(surf, scale_col(col, 0.3), bones[i], (mx, my), 1)
+                pygame.draw.line(surf, scale_col(col, 0.3), (mx, my), bones[i + 1], 1)
+            for bx, by in bones:
+                pygame.draw.line(surf, (60, 24, 16), (sx, sy), (bx, by), 3)
+                pygame.draw.line(surf, acc, (sx, sy), (bx, by), 1)
+                circle_aa(surf, bx, by, max(1.5, r * 0.09), (240, 220, 170))
+        for i in range(3):
+            evo_flame(surf, px + (i - 1) * r * 0.55, py - r * 0.75, r * (0.9 + 0.25 * (i == 1)), r * 0.45,
+                      t, i * 1.7)
+        return
+    for side in (-1, 1):
+        hx, hy = px + side * r * 0.45, py - r * 0.78
+        pts = [(hx - side * r * 0.16, hy + r * 0.12), (hx + side * r * 0.18, hy + r * 0.06),
+               (hx + side * r * 0.42, hy - r * 0.42), (hx + side * r * 0.30, hy - r * 0.70)]
+        poly_aa(surf, [(x + 1, y + 1) for x, y in pts], OUTLINE)
+        poly_aa(surf, pts, (245, 226, 180))
+        pygame.draw.line(surf, (200, 160, 110), pts[0], pts[3], 1)
+
+
+_CHRONO_TICKS = tuple((math.cos(i * math.tau / 12 - math.pi / 2), math.sin(i * math.tau / 12 - math.pi / 2), i % 3 == 0)
+                      for i in range(12))
+
+
+def _gear(surf, cx, cy, rr, ang, col):
+    pts = []
+    n = 8
+    for i in range(n * 2):
+        a = ang + i * math.pi / n
+        k = 1.0 if i % 2 == 0 else 0.72
+        pts.append((cx + math.cos(a) * rr * k, cy + math.sin(a) * rr * k))
+    poly_aa(surf, pts, col)
+    circle_aa(surf, cx, cy, rr * 0.32, (20, 34, 44))
+
+
+def _chrono_layer(surf, p, px, py, r, col, acc, t, front):
+    """Zaman Bükücü: arkada dönen saat kadranı, yörüngede altın dişliler; önde kum saati."""
+    if not front:
+        R = r * 2.15
+        add_glow(surf, px, py, R * 1.1, col, 0.26)
+        blit_disc(surf, px, py, R, (16, 40, 52), 120)
+        pygame.draw.circle(surf, scale_col(acc, 0.85), (int(px), int(py)), int(R), 2)
+        pygame.draw.circle(surf, scale_col(col, 0.6), (int(px), int(py)), int(R * 0.86), 1)
+        for cx_, cy_, big in _CHRONO_TICKS:
+            r0 = R * (0.74 if big else 0.8)
+            pygame.draw.line(surf, acc if big else scale_col(acc, 0.7),
+                             (px + cx_ * r0, py + cy_ * r0), (px + cx_ * R * 0.92, py + cy_ * R * 0.92),
+                             2 if big else 1)
+        for spd, ln, wd in ((0.35, 0.55, 3), (2.4, 0.82, 2)):
+            a = t * spd - math.pi / 2
+            pygame.draw.line(surf, (255, 236, 170), (px, py), (px + math.cos(a) * R * ln, py + math.sin(a) * R * ln), wd)
+        for k in range(2):
+            a = -t * 0.8 + k * math.pi
+            gx, gy = px + math.cos(a) * r * 2.75, py + math.sin(a) * r * 2.2
+            _gear(surf, gx, gy, r * (0.42 if k == 0 else 0.32), t * (2.0 if k == 0 else -2.6), (226, 186, 90))
+        return
+    hx, hy = px, py - r * 1.55 + 2 * math.sin(t * 2.4)
+    w_, h_ = r * 0.36, r * 0.42
+    top = [(hx - w_, hy - h_), (hx + w_, hy - h_), (hx, hy)]
+    bot = [(hx - w_, hy + h_), (hx + w_, hy + h_), (hx, hy)]
+    add_glow(surf, hx, hy, r * 0.8, col, 0.35)
+    poly_aa(surf, top, (180, 230, 240))
+    poly_aa(surf, bot, (180, 230, 240))
+    fill = (t * 0.25) % 1.0
+    poly_aa(surf, [(hx - w_ * (1 - fill), hy - h_ * (1 - fill)), (hx + w_ * (1 - fill), hy - h_ * (1 - fill)), (hx, hy)],
+            (240, 200, 110))
+    if fill > 0.05:
+        poly_aa(surf, [(hx - w_ * fill, hy + h_), (hx + w_ * fill, hy + h_), (hx, hy + h_ * (1 - fill))],
+                (240, 200, 110))
+    pygame.draw.line(surf, (255, 214, 110), (hx - w_ - 2, hy - h_), (hx + w_ + 2, hy - h_), 2)
+    pygame.draw.line(surf, (255, 214, 110), (hx - w_ - 2, hy + h_), (hx + w_ + 2, hy + h_), 2)
+
+
+_NEW_AURA_LAYERS = {"shadowblade": _shadowblade_layer, "dragon": _dragon_layer, "chrono": _chrono_layer}
 
 
 def _cosmos_layer(surf, px, py, r, col, acc, t, front):
@@ -12134,6 +12294,9 @@ def skin_draw_front(surf, p, px, py, t):
 
     if a == "cosmos":
         _cosmos_layer(surf, px, py, r, col, acc, t, front=True)
+        return
+    if a in _NEW_AURA_LAYERS:
+        _NEW_AURA_LAYERS[a](surf, p, px, py, r, col, acc, t, front=True)
         return
 
     if a == "stars":
@@ -12517,6 +12680,41 @@ def draw_weapon(surf, p, px, py, t):
             poly([(2, s * 2 + 2), (7, s * 2 + 2), (5, s * 2 + 9), (1, s * 2 + 9)], (34, 36, 46))
             circ(17, s * 2, 2, (200, 200, 210))
         glow(20, 0, 12, col, .45)
+    # ---- yeni üçlünün silahları ----
+    elif w == "katana":
+        # gölge savaşçı: hafif kavisli, mor kenarlı kara katana
+        poly([(-10, -2), (2, -2), (2, 2), (-10, 2)], (40, 30, 56), acc, 1)
+        poly([(2, -6), (4, -6), (4, 6), (2, 6)], (150, 120, 220))
+        blade = [(4, -2), (24, -3.5), (38, -5.5), (44, -8), (40, -3), (24, 1.5), (4, 2)]
+        poly(blade, (24, 18, 38), acc, 1)
+        line((6, -0.5), (38, -4.5), lighten(acc, 0.4), 1)
+        glow(40, -6, 14, acc, .45 + .2 * math.sin(t * 4))
+    elif w == "dragonhead":
+        # ejder ruhu: ejder başı biçimli top; ağzından alev
+        poly([(-2, -6), (14, -7), (22, -5), (28, -2), (28, 2), (22, 5), (14, 7), (-2, 6)],
+             scale_col(col, 0.8), (255, 200, 90), 2)
+        poly([(8, -7), (12, -13), (15, -7)], (240, 220, 170))
+        poly([(16, -6), (19, -11), (21, -5)], (240, 220, 170))
+        circ(18, -2, 2, (255, 230, 120))
+        for x in (4, 9):
+            line((x, -6), (x + 2, 6), scale_col(col, 0.55), 1)
+        jaw = 2 + 2 * abs(math.sin(t * 8))
+        fl = 7 + 5 * abs(math.sin(t * 17))
+        poly([(28, -jaw), (28 + fl, 0), (28, jaw)], (255, 140, 40))
+        poly([(28, -jaw * 0.5), (28 + fl * 0.6, 0), (28, jaw * 0.5)], (255, 235, 140))
+        glow(30, 0, 18, (255, 130, 40), .7)
+    elif w == "clockstaff":
+        # zaman bükücü: ucunda dönen kadranlı saat asası
+        line((-8, 0), (26, 0), (196, 160, 80), 3)
+        line((-8, 0), (26, 0), (255, 230, 150), 1)
+        circ(33, 0, 9, (24, 48, 64))
+        circ(33, 0, 9, (255, 214, 110), 2)
+        for k in range(4):
+            aa = k * math.pi / 2
+            line((33 + math.cos(aa) * 6, math.sin(aa) * 6), (33 + math.cos(aa) * 8, math.sin(aa) * 8), acc, 1)
+        line((33, 0), (33 + math.cos(t * 3) * 6, math.sin(t * 3) * 6), (255, 240, 200), 2)
+        line((33, 0), (33 + math.cos(t * 0.4) * 4, math.sin(t * 0.4) * 4), (255, 240, 200), 2)
+        glow(33, 0, 20, col, .55 + .15 * math.sin(t * 3))
     if p.flash_t > 0:
         gx, gy = P(sk["wlen"], 0)
         add_glow(surf, gx, gy, 24, acc, min(1.0, p.flash_t * 16))
@@ -28716,6 +28914,16 @@ def head_band(surf, rect, fill, line, radius=16):
     pygame.draw.line(surf, line, (rect.x + 2, rect.bottom - 1), (rect.right - 3, rect.bottom - 1), 2)
 
 
+def draw_card_task(surf, x, y_bottom, w, text, frac, cur, need):
+    """Sık kartın kilitli alt kısmı: tek satır görev + ince çubuk + 'x/y'."""
+    ln0 = (wrap_clip(text, 10, w, 1) or [""])[0]
+    draw_text(surf, ln0, (x, y_bottom - 44), 10, (205, 185, 125), shadow=False)
+    lab = "%s/%s" % (cur, need)
+    lw = text_width(lab, 10, True)
+    draw_bar(surf, pygame.Rect(x, y_bottom - 22, w - lw - 10, 7), frac, (215, 175, 90), radius=4)
+    draw_text(surf, lab, (x + w, y_bottom - 26), 10, TEXT_DIM, bold=True, right=True, shadow=False)
+
+
 def draw_scrollbar(surf, track_x, list_top, list_h, content_h, scroll):
     """Kaydırılabilir bir liste için sağ kenara ince bir scrollbar çizer."""
     track = pygame.Rect(track_x, list_top, 5, list_h)
@@ -35059,15 +35267,17 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMix
             dur = float(ult.get("duration", 2.0))
             targets = sorted(self._ult_targets(), key=lambda e: dist(p.x, p.y, e.x, e.y))
             px, py = p.x, p.y
-            for e in targets[:int(ult.get("n", 8))]:
-                self._ult_hit(e, self._ult_unit() * float(ult.get("mult", 2.2)) * p.eff_crit_dmg(),
+            for e in targets[:int(ult.get("n", 10))]:
+                self._ult_hit(e, self._ult_unit() * float(ult.get("mult", 2.4)) * p.eff_crit_dmg(),
                               crit=True, kb=120)
+                p.heal(p.max_hp * 0.02)
                 self.fx.bolt([(px, py), (e.x, e.y)], col, 0.25)
                 self.fx.burst(e.x, e.y, (60, 40, 110), n=8, speed=160, life=0.4, r=3)
                 p.ghosts.append([e.x, e.y, 0.45, (90, 60, 150)])
                 px, py = e.x, e.y
             p.invuln = max(p.invuln, dur)
             p.dash_cd_timer = 0.0
+            p.add_temp_buff(4.0, run_dmg_mult=0.30)
             self.fx.do_flash(col, 0.2)
             self._ult_banner(name, col)
             sfx("dash", 1.0, 0.0)
@@ -35090,6 +35300,9 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMix
                 self.fx.burst(p.x + math.cos(a2) * rad * k_, p.y + math.sin(a2) * rad * k_,
                               col if i % 2 else (255, 210, 90), n=6, speed=120, life=0.45, r=4)
             p.heal(p.max_hp * float(ult.get("heal", 0.08)))
+            p.shield_charges += 2
+            p.add_temp_buff(5.0, dmg_taken_mult=-0.30)
+            self.fx.shockwave(p.x, p.y, 90, (255, 200, 90), 0.35, 4)
             self.fx.shake(10, 0.3)
             self._ult_banner(name, col)
             sfx("explosion", 1.0, 0.0)
@@ -35097,10 +35310,12 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMix
         # ---- zaman bükücü: zaman bükülmesi ----
         elif kind == "time_warp":
             dur = float(ult.get("duration", 6.0))
+            self.freeze_enemies(1.5)
             for e in self._ult_targets():
+                self._ult_hit(e, self._ult_unit() * float(ult.get("mult", 0.8)))
                 if hasattr(e, "apply_slow"):
-                    e.apply_slow(0.5, dur)
-            p.add_temp_buff(dur, run_aspd_mult=0.35)
+                    e.apply_slow(0.5, dur + 1.5)
+            p.add_temp_buff(dur + 1.5, run_aspd_mult=0.35)
             p.dash_cd_timer = 0.0
             p.heal(p.max_hp * 0.20)
             self.fx.do_flash(col, 0.3)
@@ -53435,7 +53650,9 @@ TEXT_TR.update({
     # ---- yeni üç karakter ----
     'Kritik Hasar +%25': ('Crit Damage +25%', 'Daño crítico +25%', 'Krit-Schaden +25%', 'Крит. урон +25%'),
     'Dash Mesafesi +%15': ('Dash Distance +15%', 'Distancia de dash +15%', 'Dash-Weite +15%', 'Дальность рывка +15%'),
-    'Her seviye: Kritik Hasar +%1 (en çok %50), Hasar +%0.3 (en çok %18)': ('Per level: Crit Damage +1% (max 50%), Damage +0.3% (max 18%)', 'Por nivel: Daño crítico +1% (máx. 50%), Daño +0.3% (máx. 18%)', 'Pro Stufe: Krit-Schaden +1% (max. 50%), Schaden +0.3% (max. 18%)', 'За уровень: крит. урон +1% (макс. 50%), урон +0.3% (макс. 18%)'),
+    'Her seviye: Kritik Hasar +%1 (en çok %50), Kritik Şans +%0.15 (en çok %9)': ('Per level: Crit Damage +1% (max 50%), Crit Chance +0.15% (max 9%)', 'Por nivel: Daño crítico +1% (máx. 50%), Prob. crítico +0,15% (máx. 9%)', 'Pro Stufe: Krit-Schaden +1% (max. 50%), Krit-Chance +0,15% (max. 9%)', 'За уровень: крит. урон +1% (макс. 50%), шанс крита +0,15% (макс. 9%)'),
+    'BONK Hasarı +%20': ('BONK Damage +20%', 'Daño BONK +20%', 'BONK-Schaden +20%', 'Урон BONK +20%'),
+    'Mermi Hızı +%15': ('Projectile Speed +15%', 'Vel. de proyectil +15%', 'Geschosstempo +15%', 'Скорость снарядов +15%'),
     'Can +60': ('Health +60', 'Vida +60', 'Leben +60', 'Здоровье +60'),
     'Zırh +%6 (hasar azaltma)': ('Armor +6% (damage reduction)', 'Armadura +6% (reducción de daño)', 'Rüstung +6% (Schadensreduktion)', 'Броня +6% (снижение урона)'),
     'Her seviye: Can +4 (en çok +240), Hasar +%0.4 (en çok %24)': ('Per level: Health +4 (max +240), Damage +0.4% (max 24%)', 'Por nivel: Vida +4 (máx. +240), Daño +0.4% (máx. 24%)', 'Pro Stufe: Leben +4 (max. +240), Schaden +0.4% (max. 24%)', 'За уровень: здоровье +4 (макс. +240), урон +0.4% (макс. 24%)'),
@@ -53443,11 +53660,11 @@ TEXT_TR.update({
     'Deneyim Kazancı +%12': ('XP Gain +12%', 'Ganancia de XP +12%', 'XP-Gewinn +12%', 'Прирост опыта +12%'),
     'Her seviye: Atış Hızı +%0.5 (en çok %30)': ('Per level: Attack Speed +0.5% (max 30%)', 'Por nivel: Vel. de ataque +0.5% (máx. 30%)', 'Pro Stufe: Angriffstempo +0.5% (max. 30%)', 'За уровень: скорость атаки +0.5% (макс. 30%)'),
     'GÖLGE ÇARPMASI': ('SHADOW STRIKE', 'GOLPE SOMBRÍO', 'SCHATTENSCHLAG', 'ТЕНЕВОЙ УДАР'),
-    'Gölgeye dönüşüp en yakın 8 düşmanın arasından geçer: her birine kesin kritik vurur ve 2 saniye dokunulmaz kalırsın.': ('Turns into a shadow and cuts through the 8 nearest enemies: each takes a guaranteed crit and you are invulnerable for 2 seconds.', 'Se vuelve sombra y atraviesa a los 8 enemigos más cercanos: crítico seguro a cada uno y 2 segundos de invulnerabilidad.', 'Wird zum Schatten und schneidet durch die 8 nächsten Gegner: jeder bekommt einen sicheren Krit, du bist 2 Sekunden unverwundbar.', 'Становится тенью и проходит сквозь 8 ближайших врагов: каждому гарантированный крит, 2 секунды неуязвимости.'),
+    'Gölgeye dönüşüp en yakın 10 düşmanın arasından geçer: her birine kesin kritik vurur, her vuruşta canın %2 dolar; ardından 4 saniye hasarın %30 artar ve 2 saniye dokunulmaz kalırsın.': ('Becomes a shadow and cuts through the 10 nearest enemies: a guaranteed crit on each, every hit heals 2%; then +30% damage for 4 seconds and 2 seconds of invulnerability.', 'Se vuelve sombra y atraviesa a los 10 enemigos más cercanos: crítico seguro, cada golpe cura un 2%; luego +30% de daño 4 segundos y 2 segundos de invulnerabilidad.', 'Wird zum Schatten und schneidet durch die 10 nächsten Gegner: sicherer Krit, jeder Treffer heilt 2%; danach 4 Sekunden +30% Schaden und 2 Sekunden unverwundbar.', 'Становится тенью и проходит сквозь 10 ближайших врагов: гарантированный крит, каждый удар лечит 2%; затем 4 секунды +30% урона и 2 секунды неуязвимости.'),
     'EJDER NEFESİ': ('DRAGON BREATH', 'ALIENTO DE DRAGÓN', 'DRACHENATEM', 'ДЫХАНИЕ ДРАКОНА'),
-    "Baktığın yöne geniş bir ateş nefesi üfler: değdiği her düşman yanar ve savrulur, sen de maks canının %8'ini yenilersin.": ('Breathes a wide cone of fire where you aim: every enemy hit burns and is knocked back, and you heal 8% of max HP.', 'Lanza un amplio aliento de fuego hacia donde apuntas: cada enemigo arde y sale despedido, y curas el 8% de tu vida máx.', 'Speit einen breiten Feuerstrahl in Blickrichtung: jeder Gegner brennt und wird weggestoßen, du heilst 8% der max. LP.', 'Выдыхает широкий конус огня: каждый враг горит и отлетает, а ты лечишь 8% макс. здоровья.'),
+    "Baktığın yöne geniş bir ateş nefesi üfler: değdiği her düşman yanar ve savrulur. Ejder pulları sana 2 kalkan yükü ve 5 saniye %30 hasar azaltma verir, maks canının %8'i dolar.": ('Breathes a wide cone of fire where you aim: every enemy hit burns and is knocked back. Dragon scales give you 2 shield charges and 30% damage reduction for 5 seconds, and heal 8% of max HP.', 'Lanza un amplio aliento de fuego: cada enemigo arde y sale despedido. Las escamas te dan 2 cargas de escudo y 30% menos daño 5 segundos, y curan el 8% de tu vida máx.', 'Speit einen breiten Feuerstrahl: jeder Gegner brennt und wird weggestoßen. Drachenschuppen geben 2 Schildladungen und 5 Sekunden 30% Schadensreduktion und heilen 8% der max. LP.', 'Выдыхает широкий конус огня: враги горят и отлетают. Драконья чешуя даёт 2 заряда щита и 30% снижения урона на 5 секунд, лечит 8% макс. здоровья.'),
     'ZAMAN BÜKÜLMESİ': ('TIME WARP', 'DISTORSIÓN TEMPORAL', 'ZEITKRÜMMUNG', 'ИСКРИВЛЕНИЕ ВРЕМЕНИ'),
-    "6 saniye bütün düşmanlar yarı hızda kalır, sen %35 hızlı ateş edersin; dash beklemen sıfırlanır ve maks canının %20'sini yenilersin.": ('For 6 seconds all enemies move at half speed and you fire 35% faster; your dash resets and you heal 20% of max HP.', 'Durante 6 segundos todos los enemigos van a media velocidad y disparas un 35% más rápido; el dash se reinicia y curas el 20% de tu vida máx.', '6 Sekunden lang sind alle Gegner halb so schnell und du feuerst 35% schneller; Dash wird zurückgesetzt und du heilst 20% der max. LP.', '6 секунд все враги вдвое медленнее, а ты стреляешь на 35% быстрее; рывок перезаряжается, лечишь 20% макс. здоровья.'),
+    "Zaman 1,5 saniye durur, sonra 6 saniye bütün düşmanlar yarı hızda kalır ve hepsi hasar alır. Sen %35 hızlı ateş edersin, dash beklemen sıfırlanır ve maks canının %20'si dolar.": ('Time stops for 1.5 seconds, then all enemies move at half speed for 6 seconds and all take damage. You fire 35% faster, your dash resets and you heal 20% of max HP.', 'El tiempo se detiene 1,5 segundos; luego todos los enemigos van a media velocidad 6 segundos y reciben daño. Disparas un 35% más rápido, el dash se reinicia y curas el 20%.', 'Die Zeit steht 1,5 Sekunden still, dann sind alle Gegner 6 Sekunden halb so schnell und nehmen Schaden. Du feuerst 35% schneller, Dash wird zurückgesetzt, du heilst 20%.', 'Время замирает на 1,5 секунды, затем 6 секунд все враги вдвое медленнее и получают урон. Ты стреляешь на 35% быстрее, рывок перезаряжается, лечишь 20%.'),
     # az oynanan skinlere eklenen güçler
     'Kritik Şans +%5': ('Crit Chance +5%', 'Prob. crítica +5%', 'Krit. Chance +5%', 'Шанс крита +5%'),
     'Kritik Şans +%6': ('Crit Chance +6%', 'Prob. crítica +6%', 'Krit. Chance +6%', 'Шанс крита +6%'),
@@ -63927,13 +64144,11 @@ class App:
             tagw = text_width(tag, 9, True) if tag else 0
             if tag:
                 draw_text(canvas, tag, (rect.right - 10, rect.y + 9), 9, tcol, bold=True, right=True, shadow=False)
-            nm, nsz = ms_fit(w_name(w), 15, tw - tagw - 8, True)
-            draw_text(canvas, nm, (tx, rect.y + 7), nsz, TEXT if owned else (140, 138, 160), bold=True)
-            for j, ln in enumerate(wrap_clip(w_desc(w), 10, tw, 2)):
-                draw_text(canvas, ln, (tx, rect.y + 28 + j * 13), 10, TEXT_DIM, shadow=False)
+            nm, nsz = ms_fit(w_name(w), 16, tw - tagw - 8, True)
+            draw_text(canvas, nm, (tx, rect.y + 10), nsz, TEXT if owned else (140, 138, 160), bold=True)
 
             if owned:
-                br = pygame.Rect(tx, rect.bottom - 34, tw, 24)
+                br = pygame.Rect(tx, rect.bottom - 36, tw, 26)
                 bhov = br.collidepoint(mouse_pos) and hover
                 pygame.draw.rect(canvas, (44, 30, 32) if not is_muted else (28, 44, 34), br, border_radius=8)
                 ink_frame(canvas, br, (150, 120, 122) if bhov else (90, 70, 72), 8, 2 if bhov else 1)
@@ -63947,19 +64162,9 @@ class App:
                     muted = self.save.muted_weapons()
                     opened_now = True
             else:
-                unl = w.get("unlock") or {}
-                ln0 = (wrap_clip(unlock_text(unl), 9, tw, 1) or [""])[0]
-                draw_text(canvas, ln0, (tx, rect.bottom - 48), 9, (200, 180, 120), shadow=False)
-                reqs = weapon_reqs(w)
-                for j, rq in enumerate(reqs):
-                    _c, _n, rdone, _t = book_req_state(self.save, rq)
-                    pygame.draw.circle(canvas, GREEN if rdone else (120, 96, 98),
-                                       (int(rect.right - 14 - j * 11), rect.bottom - 43), 4)
                 cur, need, _ = weapon_progress(self.save, w)
-                frac = weapon_frac(self.save, w)
-                draw_bar(canvas, pygame.Rect(tx, rect.bottom - 30, tw, 8), frac, (215, 175, 90), radius=4)
-                draw_text(canvas, L("ui.task_prog", cur, need, fmt_pct(frac * 100)),
-                          (tx, rect.bottom - 19), 9, TEXT_DIM, shadow=False)
+                draw_card_task(canvas, tx, rect.bottom, tw, unlock_text(w.get("unlock") or {}),
+                               weapon_frac(self.save, w), cur, need)
 
             if list_click and hover and not opened_now:
                 self.weapon_detail = key
@@ -64454,13 +64659,13 @@ class App:
             tagw = text_width(tag, 9, True) if tag else 0
             if tag:
                 draw_text(canvas, tag, (rect.right - 10, rect.y + 9), 9, tcol, bold=True, right=True, shadow=False)
-            nm, nsz = ms_fit(bk_name(bk), 14, tw - tagw - 8, True)
-            draw_text(canvas, nm, (tx, rect.y + 7), nsz, TEXT if owned else (170, 160, 170), bold=True)
-            for j, ln in enumerate(wrap_clip(bk_desc(bk), 10, tw, 2)):
-                draw_text(canvas, ln, (tx, rect.y + 28 + j * 13), 10, TEXT_DIM, shadow=False)
+            nm, nsz = ms_fit(bk_name(bk), 16, tw - tagw - 8, True)
+            draw_text(canvas, nm, (tx, rect.y + 10), nsz, TEXT if owned else (170, 160, 170), bold=True)
+            ds = (wrap_clip(bk_desc(bk), 11, tw, 1) or [""])[0]
+            draw_text(canvas, ds, (tx, rect.y + 34), 11, TEXT_DIM, shadow=False)
 
             if owned:
-                br = pygame.Rect(tx, rect.bottom - 34, tw, 24)
+                br = pygame.Rect(tx, rect.bottom - 36, tw, 26)
                 bhov = br.collidepoint(mouse_pos) and hover
                 pygame.draw.rect(canvas, (44, 30, 32) if not is_bmuted else (28, 44, 34), br, border_radius=8)
                 ink_frame(canvas, br, (150, 120, 122) if bhov else (90, 70, 72), 8, 2 if bhov else 1)
@@ -64475,18 +64680,8 @@ class App:
                     opened_now = True
                     continue
             else:
-                unl = bk.get("unlock") or {}
-                ln0 = (wrap_clip(unlock_text(unl), 9, tw, 1) or [""])[0]
-                draw_text(canvas, ln0, (tx, rect.bottom - 48), 9, (200, 180, 120), shadow=False)
-                reqs = book_reqs(bk)
-                for j, rq in enumerate(reqs):
-                    _c, _n, rdone, _t = book_req_state(self.save, rq)
-                    pygame.draw.circle(canvas, GREEN if rdone else (120, 96, 98),
-                                       (int(rect.right - 14 - j * 11), rect.bottom - 43), 4)
-                frac = book_frac(self.save, bk)
-                draw_bar(canvas, pygame.Rect(tx, rect.bottom - 30, tw, 8), frac, (215, 175, 90), radius=4)
-                draw_text(canvas, L("ui.task_prog", cur, need, fmt_pct(frac * 100)),
-                          (tx, rect.bottom - 19), 9, TEXT_DIM, shadow=False)
+                draw_card_task(canvas, tx, rect.bottom, tw, unlock_text(bk.get("unlock") or {}),
+                               book_frac(self.save, bk), cur, need)
 
             if list_click and hover and not opened_now:
                 self.book_detail = bk["key"]
@@ -64957,34 +65152,32 @@ class App:
             pygame.draw.rect(canvas, PURPLE, br, border_radius=8)
             draw_text(canvas, L("ui.premium"), br.center, 9, WHITE, bold=True, center=True, shadow=False)
             tagw = bw + 4
-        nm, nsz = ms_fit(skin_name(sk), 15, tw - tagw - 4, True)
-        draw_text(canvas, nm, (tx, rect.y + 7), nsz, lighten(scol, 0.45) if owned else TEXT, bold=True)
-        for j, ln in enumerate(wrap_clip(skin_desc(sk), 10, tw, 2)):
-            draw_text(canvas, ln, (tx, rect.y + 28 + j * 13), 10, TEXT_DIM, shadow=False)
-        # ---- özel yetenek rozeti ----
+        nm, nsz = ms_fit(skin_name(sk), 16, tw - tagw - 4, True)
+        draw_text(canvas, nm, (tx, rect.y + 12), nsz, lighten(scol, 0.45) if owned else TEXT, bold=True)
+        # ---- özel yetenek: tek satır ----
         ult = get_skin_ult(sk["id"])
         if ult:
             ucol = tuple(ult.get("color", GOLD))
-            uy = rect.y + 58
-            draw_icon(canvas, tx + 5, uy + 6, ult.get("icon", "star"), ucol, 6)
-            un = _fit_text(TRX(ult["name"]), 10, tw - 50, bold=True)
-            draw_text(canvas, un, (tx + 16, uy), 10, ucol, bold=True, shadow=False)
-            draw_text(canvas, L("ui.sec_fmt", int(round(ult["cd"]))), (rect.right - 10, uy), 10,
+            uy = rect.y + 42
+            draw_icon(canvas, tx + 6, uy + 7, ult.get("icon", "star"), ucol, 7)
+            un = _fit_text(TRX(ult["name"]), 11, tw - 56, bold=True)
+            draw_text(canvas, un, (tx + 18, uy), 11, ucol, bold=True, shadow=False)
+            draw_text(canvas, L("ui.sec_fmt", int(round(ult["cd"]))), (rect.right - 10, uy), 11,
                       TEXT_DIM, bold=True, right=True, shadow=False)
-        by = rect.bottom - 22
+        by = rect.bottom - 30
         if is_equipped:
-            draw_text(canvas, L("ui.equipped"), (tx, by - 4), 13, GOLD, bold=True)
+            draw_text(canvas, L("ui.equipped"), (tx, by), 13, GOLD, bold=True)
         elif owned:
-            draw_text(canvas, L("ui.owned_click"), (tx, by), 10, TEXT_DIM, shadow=False)
+            draw_text(canvas, _fit_text(L("ui.owned_click"), 11, tw), (tx, by + 2), 11, TEXT_DIM, shadow=False)
         elif premium:
-            # Premium skin: elmasla değil, mağaza'dan gerçek parayla alınır.
-            draw_text(canvas, L("ui.premium_price", sk.get("price_hint", "")), (tx, by - 4), 14, PURPLE, bold=True)
-            draw_text(canvas, L("ui.from_store"), (rect.right - 10, by), 9, TEXT_DIM, right=True, shadow=False)
+            # Premium skin: elmasla değil, mağaza'dan gerçek parayla alınır (tek satır).
+            draw_text(canvas, _fit_text("%s  ·  %s" % (sk.get("price_hint", ""), L("ui.store")), 14, tw, bold=True),
+                      (tx, by), 14, PURPLE, bold=True)
         else:
             pcol = GEM_COLOR if affordable else (100, 105, 130)
             cost_txt = fmt_num(skin_gem_cost(sk))
-            cw_ = coin_label_width(cost_txt, 14, 7)
-            draw_coin_label(canvas, tx + cw_ / 2, by + 4, cost_txt, pcol, 14, icon="gem", icon_r=7)
+            cw_ = coin_label_width(cost_txt, 15, 8)
+            draw_coin_label(canvas, tx + cw_ / 2, by + 9, cost_txt, pcol, 15, icon="gem", icon_r=8)
 
     # ---- skin detay (özellikler) ----
     def _equip_detail_skin(self):
@@ -65302,33 +65495,32 @@ class App:
             self._cosmetic_preview(canvas, cc[0], cc[1], 23, item["slot"], item["id"], self.t)
             tx = rect.x + 96
             tw = rect.right - tx - 10
-            nm, nsz = ms_fit(cos_name(item), 15, tw, True)
-            draw_text(canvas, nm, (tx, rect.y + 7), nsz, TEXT, bold=True)
-            for j, ln in enumerate(wrap_clip(cos_desc(item), 10, tw, 2)):
-                draw_text(canvas, ln, (tx, rect.y + 28 + j * 13), 10, TEXT_DIM, shadow=False)
-            perk_txt = perk_tr(item.get("perk_text")) if item.get("perk_text") else ""
+            nm, nsz = ms_fit(cos_name(item), 16, tw, True)
+            draw_text(canvas, nm, (tx, rect.y + 12), nsz, TEXT, bold=True)
+            # tek satır bonus (petlerde yok: hepsi yalnız görünüş)
+            perk_txt = perk_tr(item.get("perk_text")) if (item.get("perk_text") and not is_pet) else ""
             if perk_txt:
                 pcol = lighten(item["color"], .55)
-                perk_txt = _fit_text(TRX(perk_txt), 10, tw - 16, bold=True)
-                draw_icon(canvas, tx + 5, rect.y + 64, "star", pcol, 5)
-                draw_text(canvas, perk_txt, (tx + 15, rect.y + 58), 10, pcol, bold=True, shadow=False)
-            by = rect.bottom - 22
+                perk_txt = _fit_text(TRX(perk_txt), 11, tw - 18, bold=True)
+                draw_icon(canvas, tx + 6, rect.y + 49, "star", pcol, 6)
+                draw_text(canvas, perk_txt, (tx + 17, rect.y + 42), 11, pcol, bold=True, shadow=False)
+            by = rect.bottom - 30
             if is_equipped:
-                draw_text(canvas, L("ui.equipped_off"), (tx, by), 10, CYAN, bold=True)
+                draw_text(canvas, _fit_text(L("ui.equipped_off"), 11, tw, bold=True), (tx, by + 2), 11, CYAN,
+                          bold=True)
             elif owned:
-                draw_text(canvas, L("ui.owned_equip"), (tx, by), 10, TEXT_DIM, shadow=False)
+                draw_text(canvas, _fit_text(L("ui.owned_equip"), 11, tw), (tx, by + 2), 11, TEXT_DIM, shadow=False)
             elif is_pet:
-                # pet'ler elmasla değil, mağaza'dan gerçek parayla alınır.
-                draw_text(canvas, item.get("price_hint", ""), (tx, by - 4), 14, PURPLE, bold=True)
-                draw_text(canvas, L("ui.from_store_click"), (rect.right - 10, by), 9, TEXT_DIM, right=True,
-                          shadow=False)
+                # pet'ler elmasla değil, mağaza'dan gerçek parayla alınır (tek satır, çakışma yok)
+                draw_text(canvas, _fit_text("%s  ·  %s" % (item.get("price_hint", ""), L("ui.store")), 14, tw,
+                                            bold=True), (tx, by), 14, PURPLE, bold=True)
             elif item.get("wheel_only"):
-                draw_text(canvas, L("wh.wheel_only"), (tx, by - 2), 12, GOLD, bold=True)
+                draw_text(canvas, L("wh.wheel_only"), (tx, by + 1), 12, GOLD, bold=True)
             else:
                 pcol = GEM_COLOR if affordable else (100, 105, 130)
                 cost_txt = fmt_num(item["cost"])
-                cw_ = coin_label_width(cost_txt, 14, 7)
-                draw_coin_label(canvas, tx + cw_ / 2, by + 4, cost_txt, pcol, 14, icon="gem", icon_r=7)
+                cw_ = coin_label_width(cost_txt, 15, 8)
+                draw_coin_label(canvas, tx + cw_ / 2, by + 9, cost_txt, pcol, 15, icon="gem", icon_r=8)
 
             if clicked and hover:
                 self._buy_or_equip_cosmetic(item)

@@ -1,0 +1,73 @@
+<!--meta title="Oyun Rehberi — EvolveArena" desc="EvolveArena rehberi: kontroller, kart ve nadirlik sistemi, 5 harita, 12 yemin, gizli sistemler ve Cehennem." page="rehber"-->
+<section class="phero"><div class="wrap">
+  <div class="crumbs"><a href="index.html">Ana Sayfa</a> › Rehber</div>
+  <h1>Oyun rehberi</h1>
+  <p class="lead">Kontrollerden kart sistemine, haritalardan yeminlere ve arenanın gizli katmanlarına kadar bilmen gereken her şey.</p>
+</div></section>
+
+<section class="section tight"><div class="wrap feat">
+  <div>
+    <span class="eyebrow">Kontroller</span><h2>Elinde olan az, ama hepsi önemli</h2>
+    <p style="margin-top:10px">Ateş çoğunlukla otomatik; sen pozisyon alırsın, BONK atarsın ve dash ile ölümden kaçarsın.</p>
+  </div>
+  <ul class="keys">
+    <li><kbd>WASD / OKLAR</kbd>Yürü ve kaç (mobilde sol yarı ekran)</li>
+    <li><kbd>FARE + SOL TIK</kbd>Nişan al, basılı tutunca ateş</li>
+    <li><kbd>SPACE</kbd>BONK: çevrendeki herkese vurur, kitaplarla büyür</li>
+    <li><kbd>SHIFT / SAĞ TIK</kbd>Dash: kısa bir an hasar almazsın</li>
+    <li><kbd>E</kbd>Portal, tüccar, sandık, kürsü</li>
+    <li><kbd>B · TAB · ESC</kbd>Market · istatistik · mola</li>
+  </ul>
+</div></section>
+
+<section class="section alt tight"><div class="wrap">
+  <span class="eyebrow">Kart sistemi</span><h2>Seviye atla, 3 karttan birini seç</h2>
+  <p style="margin:10px 0 20px;max-width:720px">Her seviyede 3 kart: yeni silah, kitap ya da yükseltme. Kartın nadirliği kazancı belirler; şans bu yüzden altın değerinde. Bir koşuda en fazla <b>4 silah</b>, <b>4 normal + 1 nadir kitap</b>. Uzun süre gelmeyen kitabın çıkma ihtimali giderek artar.</p>
+  <div class="rar">
+    <span style="color:#c8c8d2;border-color:#c8c8d255">YAYGIN</span><span style="color:#6ddc8e;border-color:#6ddc8e55">SIRADIŞI</span><span style="color:#6ec8ff;border-color:#6ec8ff55">NADİR</span><span style="color:#b795ff;border-color:#b795ff55">EPİK</span><span style="color:#f3c55e;border-color:#f3c55e55">EFSANEVİ</span>
+  </div>
+  <div class="cards3">
+    <div class="box"><div class="ic">🎴</div><h3>Nadirlik = güç</h3><p>Yaygın kart küçük, Efsanevi kart devasa kazanç verir. %500 şanstan sonra kartların çoğu Efsanevi gelir.</p></div>
+    <div class="box"><div class="ic">📕</div><h3>Tek nadir kitap</h3><p>Koşu başına yalnızca 1 nadir kitap. Her 5 seviyede bir nadir kart belirir; seçimini iyi yap.</p></div>
+    <div class="box"><div class="ic">🎲</div><h3>Yenile ve pas</h3><p>El beğenmedin mi? Altınla yenile (ücretsiz haklar da var) ya da pas geç.</p></div>
+  </div>
+</div></section>
+
+<section class="section tight"><div class="wrap">
+  <span class="eyebrow">Dünyalar</span><h2>5 harita, kendi yaratıkları ve patronlarıyla</h2>
+  <p style="margin:10px 0 20px">Hasar ve can her haritada aynı; değişen yaratıklar, patronlar ve harita kuralları. Bir harita seç:</p>
+  <div class="maps" id="mapGrid"></div>
+  <div class="mapd" id="mapDetail"></div>
+  <h3 style="font-size:1.4rem;margin:36px 0 14px">Zorluk: aynı dalgalar, üç tempo</h3>
+  <div class="diffs">
+    <div class="box"><h3 style="color:var(--green)">Normal</h3><p>25 dalga ≈ 70 dakika · skor ×1.0<br>Sakin tempo, öğrenmek için ideal.</p></div>
+    <div class="box"><h3 style="color:var(--gold)">Zor</h3><p>25 dalga ≈ 60 dakika · skor ×1.25<br>Yaratıklar daha sık, saha kalabalık.</p></div>
+    <div class="box"><h3 style="color:var(--rose)">Kabus</h3><p>25 dalga ≈ 40 dakika · skor ×1.5<br>Aynı sürü 40 dakikaya sıkışır.</p></div>
+  </div>
+</div></section>
+
+<section class="section alt tight"><div class="wrap">
+  <span class="eyebrow">Gezgin tüccar</span><h2>12 yemin: bir güç, bir bedel</h2>
+  <p style="margin:10px 0 20px">Haritada dolaşan tüccar 3 yemin sunar. Koşu başına tek yemin; altınla 3 kez yenileme hakkın var.</p>
+  <div class="oaths" id="oathGrid"></div>
+</div></section>
+
+<section class="section tight"><div class="wrap">
+  <span class="eyebrow">Derin sistemler</span><h2>Arenanın bilinmeyen katmanları</h2>
+  <div class="cards3" style="margin-top:22px">
+    <div class="box"><div class="ic">💀</div><h3>Lanetli mağara</h3><p>Büyük ödül + kalıcı lanet. Her lanet skor kazancını artırır: risk, puan demek.</p></div>
+    <div class="box"><div class="ic">👺</div><h3>Hazine goblini</h3><p>Kaçan altın goblini yakalarsan altın, mıknatıs, seviye taşı hatta patron sandığı bırakır.</p></div>
+    <div class="box"><div class="ic">🗝️</div><h3>Efsanevi sandık</h3><p>Haritadaki anahtarları topla: seçtiğin silah ya da kitap için büyük seviye patlaması.</p></div>
+    <div class="box"><div class="ic">📖</div><h3>Kürsü</h3><p>7. dalgada gizlice belirir. 2.000 altınla açılır; açık olup almadığın bütün kitaplar 10.000 altına.</p></div>
+    <div class="box"><div class="ic">🏅</div><h3>Arena ustalığı</h3><p>Elmasla kalıcı güç: hasar, can, zırh, hız, şans. 5. kademeden sonra prestij; 7. prestijden sonra bedel ikişer katına çıkar.</p></div>
+    <div class="box"><div class="ic">📜</div><h3>Koşu görevleri</h3><p>Her koşuda kolay / orta / zor 3 görev; koşu bitince elmasları tüccar öder.</p></div>
+  </div>
+</div></section>
+
+<section class="section tight"><div class="wrap">
+  <div class="hellband">
+    <h2>🔥 Cehennem kapısı</h2>
+    <p>25. dalga patronunu yen, mor portalda E'ye bas. 6 yeni patron, Cehennem Marketi ve zırh delen yaratıklar seni bekliyor. Evrilmeden girme!</p>
+    <div class="btns" style="justify-content:center"><a class="btn" href="evrimler.html">Evrimleri gör</a><a class="btn hell" href="index.html#indir">Oyunu indir</a></div>
+  </div>
+</div></section>

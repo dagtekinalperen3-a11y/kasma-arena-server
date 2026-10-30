@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Evrimler — EvolveArena</title>
+<meta name="description" content="EvolveArena'da her silah eş kitabıyla üç kademe evrilir. Bütün evrim zincirleri, şartları ve etkileri.">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="theme-color" content="#0c0a1d">
+<meta property="og:title" content="Evrimler — EvolveArena">
+<meta property="og:description" content="EvolveArena'da her silah eş kitabıyla üç kademe evrilir. Bütün evrim zincirleri, şartları ve etkileri.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=Russo+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css?v=847c1873">
+</head>
+<body data-page="evrimler">
+
+<header class="top"><div class="wrap">
+  <a class="logo" href="index.html">Evolve<span>Arena</span></a>
+  <nav class="nav" id="nav" aria-label="Ana menü">
+    <a href="index.html" data-nav="index">Ana Sayfa</a>
+    <a href="karakterler.html" data-nav="karakterler">Karakterler</a>
+    <a href="silahlar.html" data-nav="silahlar">Silahlar</a>
+    <a href="evrimler.html" data-nav="evrimler" aria-current="page">Evrimler</a>
+    <a href="kitaplar.html" data-nav="kitaplar">Kitaplar</a>
+    <a href="kostumler.html" data-nav="kostumler">Kostümler</a>
+    <a href="rehber.html" data-nav="rehber">Rehber</a>
+    <a href="kazi.html" data-nav="kazi">Kazı Kazan</a>
+    <a href="magaza.html" data-nav="magaza">Mağaza</a>
+  </nav>
+  <div class="top-right">
+    <div class="acct" id="acct"></div>
+    <a class="btn sm" href="index.html#indir">İndir</a>
+    <button class="burger" id="burger" aria-label="Menüyü aç" aria-controls="nav" aria-expanded="false"><span></span></button>
+  </div>
+</div></header>
+
+<main>
+<section class="phero"><div class="wrap">
+  <div class="crumbs"><a href="index.html">Ana Sayfa</a> › Evrimler</div>
+  <h1>Evrimler</h1>
+  <p class="lead">Silahını ve onun <b>eş kitabını</b> birlikte büyüt: şart tutunca seviye kartlarında bir <b>EVRİM</b> kartı çıkar. Her silah üç kademe evrilir; her kademe yeni bir etki ve daha fazla hasar getirir. Nadir kitaplar seviye atlamaz, elde olmaları yeter.</p>
+</div></section>
+<section class="section tight" style="padding-top:10px"><div class="wrap">
+  <div class="rules" id="rules"></div>
+  <div id="evoList"></div>
+</div></section>
+
+</main>
+
+<footer class="sitefoot"><div class="wrap">
+  <div>
+    <a class="logo" href="index.html" style="font-size:1.3rem">Evolve<span>Arena</span></a>
+    <p>Yukarıdan bakışlı hayatta kalma. Dalgalara dayan, silahlarını evrilt, patronları devir.</p>
+    <p style="color:var(--dim)">© <span id="yil"></span> EvolveArena · Geliştirici: Yapimc1903 · v3.49</p>
+  </div>
+  <div>
+    <h4>Oyun</h4>
+    <a href="karakterler.html">Karakterler</a><a href="silahlar.html">Silahlar</a><a href="evrimler.html">Evrimler</a>
+    <a href="kitaplar.html">Kitaplar</a><a href="kostumler.html">Kostümler</a><a href="rehber.html">Rehber</a>
+  </div>
+  <div>
+    <h4>Ödüller</h4>
+    <a href="#" data-open-wheel>Şans Çarkı</a><a href="kazi.html">Kazı Kazan</a><a href="magaza.html">Mağaza</a><a href="index.html#indir">Oyunu İndir</a>
+  </div>
+</div></footer>
+
+<!-- ŞANS ÇARKI: sağ altta yüzen düğme + panel -->
+<button class="fab" id="fab" aria-label="Şans Çarkı" aria-controls="drawer">
+  <span class="lbl">Şans Çarkı</span>
+  <span class="disc"><i></i><span class="cnt" id="fabCnt" hidden></span></span>
+</button>
+<div class="drawer" id="drawer" aria-hidden="true">
+  <div class="shade" data-close-drawer></div>
+  <aside class="panel" role="dialog" aria-modal="true" aria-labelledby="wTitle">
+    <button class="mclose" data-close-drawer aria-label="Kapat">×</button>
+    <span class="eyebrow">Günlük ödül</span>
+    <h2 id="wTitle">Şans Çarkı</h2>
+    <p class="sub">Oyundaki çarkın aynısı. Sonucu sunucu belirler, ödül anında hesabına yazılır.</p>
+    <div class="wheelbox"><canvas id="wheelCv" width="560" height="560" aria-label="Şans çarkı"></canvas></div>
+    <div class="wstatus"><span id="wWho">Giriş yapılmadı</span><span class="dots" id="wDots"></span></div>
+    <ol class="wsteps">
+      <li id="wS1">Giriş yap (ya da oyunda Mağaza › Şans Çarkı › ÇEVİR)</li>
+      <li id="wS2">ÇEVİR'e bas: sponsor sayfamız yeni sekmede açılır</li>
+      <li id="wS3">Burada 15 saniye bekle</li>
+      <li id="wS4">ÇEVİR! Ödül hesabına işlenir</li>
+    </ol>
+    <a class="wbtn" id="wBtn" href="#" role="button">GİRİŞ YAP</a>
+    <div class="wnote" id="wNote"></div>
+    <details class="odds"><summary>Çarkta neler var? (günde 5 hak)</summary><div class="ol" id="wOdds"></div></details>
+  </aside>
+</div>
+
+<div class="modal" id="mLogin" role="dialog" aria-modal="true" aria-labelledby="mLoginT"><div class="mbox sm">
+  <button class="mclose" data-close aria-label="Kapat">×</button>
+  <h3 id="mLoginT" style="font-size:1.5rem;margin-bottom:8px">Hesabına giriş yap</h3>
+  <p style="font-size:.92rem;margin-bottom:16px">En kolayı: oyunda <b>Mağaza › Şans Çarkı › ÇEVİR</b>. Site hesabınla otomatik açılır (Google ile girenler için tek yol bu).</p>
+  <form class="form" id="loginForm" autocomplete="on">
+    <input id="lgUser" name="username" placeholder="Kullanıcı adı ya da e-posta" autocomplete="username" maxlength="254" required>
+    <input id="lgPass" name="password" type="password" placeholder="Şifre" autocomplete="current-password" maxlength="256" required>
+    <div class="err" id="lgErr"></div>
+    <button class="btn block" type="submit" id="lgBtn">Giriş yap</button>
+  </form>
+  <p class="secnote">Şifren yalnızca oyunun kendi sunucusuna gider. Site girişi oyundaki oturumunu kapatmaz ve 2 saat sonra kendiliğinden düşer.</p>
+</div></div>
+<div class="modal" id="mInfo" role="dialog" aria-modal="true"><div class="mbox" id="mInfoBox"></div></div>
+
+<script src="assets/data.js?v=4317aa59" defer></script>
+<script src="assets/site.js?v=f69b8e27" defer></script>
+<script data-cfasync="false" src="https://accountut.com/1/32f0b894b7ce43f59b6d0269c3b8fdb5"></script>
+<script data-cfasync="false" src="https://bellnewyork.org/14/33a9dc2c48f6cb146f8c75aaf00ed1e3"></script>
+<script data-cfasync="false" src="https://asiafilm.org/4/f9722e614a9e1620cd5cfbfe58d6a684"></script>
+</body>
+</html>
