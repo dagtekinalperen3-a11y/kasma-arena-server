@@ -1395,11 +1395,21 @@ def _stored_progress(row):
     return _apply_skin_reset(out)
 
 
-# Dünya sıralaması yasakları kaldırıldı: hiçbir skor "imkânsız" diye
-# reddedilmez, hiçbir hesap sıralamadan atılmaz. Bu iki işlev eski çağrılar
-# kırılmasın diye duruyor.
+# ---- hile yasağı ----
+# Tahmine dayalı ("çok skor", "çok hasar") hiçbir yasak yok: dürüst ama güçlü
+# koşular asla cezalanmaz. Yasak yalnızca oyunun kesin kanıt bulduğu durumda
+# konur (/player/report_cheat): oyunun kendi kodundan geçmeden değişen değer
+# (bellek düzenleyici) ya da hız hilesi. Yasak sunucuda tutulur; oyun dosyası
+# temizlense de geri gelir, yalnızca yönetici kaldırır (/admin/unban).
+AC_BAN_REASONS = {"ac"}
+AC_KINDS = {"bellek", "hiz"}
+
+
 def _is_banned(account_id):
-    return False
+    try:
+        return bool(_stored_progress(_player_row(account_id)).get("board_banned"))
+    except Exception:
+        return False
 
 
 def _ban_account(account_id, reason):
@@ -1428,6 +1438,46 @@ def _gem_allowance(prog, now=None):
     if t <= 0 or not math.isfinite(t) or not math.isfinite(left):
         return float(GEM_BURST)
     return max(0.0, min(float(GEM_BURST), left + max(0.0, now - t) * GEM_RATE_PER_HOUR / 3600.0))
+
+
+ITEM_GEM_COST = {
+    "skins_owned": {'crimson': 500, 'royal': 1100, 'cyan': 1700, 'shadow': 1400, 'inferno': 1700, 'gold': 2500, 'prism': 3500, 'shadow_hunter': 2300, 'frost_witch': 3000, 'blood_countess': 3000, 'iron_sentinel': 2600, 'storm_bringer': 4200, 'venom_striker': 2100, 'homing_falcon': 2500, 'frenzy_beast': 2800, 'orbit_guardian': 3200, 'pink_dream': 3900, 'lucky_fox': 3200, 'cosmic': 4500, 'shadow_warrior': 4900, 'dragon_soul': 4900, 'chrono_sage': 4900},
+    "cosmetics_owned": {'cap_red': 80, 'wizard_hat': 260, 'crown_gold': 420, 'halo_ring': 520, 'beanie_gray': 70, 'viking_helm': 340, 'ninja_hood': 300, 'flower_crown': 260, 'top_hat': 380, 'dragon_horns': 560, 'space_helmet': 640, 'pink_bow': 300, 'shades': 90, 'goggles': 150, 'monocle': 220, 'visor': 340, 'round_glasses': 60, 'heart_glasses': 200, 'steampunk_goggles': 310, 'ski_mask': 250, 'laser_visor': 420, 'blindfold': 480, 'star_glasses': 360, 'pink_shades': 260, 'cape_red': 180, 'cape_royal': 460, 'cape_shadow': 520, 'wings_angelic': 900, 'cape_forest': 150, 'cape_ice': 300, 'cape_flame': 400, 'cape_storm': 520, 'cape_starlight': 600, 'cape_bat': 340, 'cape_gold_trim': 700, 'cape_pink': 320, 'cap_blue': 90, 'leaf_crown': 120, 'neon_headband': 220, 'ember_horns': 280, 'dragon_helm': 520, 'immortal_helm': 760, 'nightmare_helm': 620, 'crystal_helm': 680, 'leaf_visor': 140, 'frost_lens': 260, 'ember_shades': 230, 'cape_steel': 290, 'samurai_helm': 700, 'storm_crown': 650, 'witch_hat': 480, 'falcon_helm': 560, 'ninja_mask': 520, 'dragon_eye': 560, 'chrono_monocle': 500, 'cyber_shades': 450},
+}
+# Eski oyun sürümleri eski (3,5 kat ucuz) fiyatla satın almış olabilir: bedelin
+# dörtte biri harcanmışsa kabul (elmas harcamadan dosyaya yazılan eşya 0 harcar).
+ITEM_COST_SLACK = 0.25
+
+
+def _drop_unpaid_items(old, out, new=None):
+    """Bu gönderimde yeni gelen elmaslı skin / kıyafetin bedeli harcanmamışsa
+    eşyayı almaz (kayıt dosyası düzenlenerek eklenmiş). Döner: reddedilenler."""
+    spent_old = min(_int(old.get("gems_spent"), 0), _int(old.get("gems_earned"), 0))
+    # oyunun bildirdiği harcama (gönderim başına kazanç tavanı harcamayı kırpmasın),
+    # hesabın gerçekten sahip olduğu elmasla sınırlı
+    claimed = max(_int(out.get("gems_spent"), 0), _int((new or {}).get("gems_spent"), 0)) - spent_old
+    spent_delta = min(claimed, max(0, _int(out.get("gems_earned"), 0) - spent_old))
+    added = []
+    for k, table in ITEM_GEM_COST.items():
+        had = set(old.get(k) or [])
+        added += [(k, v, table[v]) for v in (out.get(k) or []) if v not in had and v in table]
+    if not added:
+        return []
+    need = sum(c for _k, _v, c in added) * ITEM_COST_SLACK
+    if spent_delta >= need:
+        return []
+    for k, v, _c in added:
+        out[k] = [x for x in (out.get(k) or []) if x != v]
+        if k == "skins_owned":
+            out["skins_rebought"] = [x for x in (out.get("skins_rebought") or []) if x != v]
+    if out.get("equipped_skin") not in (out.get("skins_owned") or ["default"]):
+        out["equipped_skin"] = "default"
+    rw = dict(out.get("rewards") or {})
+    log = list(rw.get("ac_items") or [])[-19:]
+    log.append({"t": int(time.time()), "items": [v for _k, v, _c in added][:10], "spent": int(spent_delta)})
+    rw["ac_items"] = log
+    out["rewards"] = rw
+    return [v for _k, v, _c in added]
 
 
 def _merge_progress(old, new, gem_cap=GEM_GAIN_CAP_PER_PUSH):
@@ -1476,8 +1526,10 @@ def _merge_progress(old, new, gem_cap=GEM_GAIN_CAP_PER_PUSH):
     # dönemez - ama yeni bir yasak yalnızca sunucunun kendi doğruladığı yoldan
     # gelir: /submit'teki imzalı skor-makullük denetimi ya da elle (admin)
     # müdahale.
-    out["board_banned"] = False         # yasak yok
-    out["ban_reasons"] = []
+    # yasak yalnızca sunucuda değişir (kesin kanıt / yönetici); oyunun gönderdiği
+    # bayrak dikkate alınmaz
+    out["board_banned"] = bool(old.get("board_banned"))
+    out["ban_reasons"] = [str(r)[:24] for r in (old.get("ban_reasons") or [])][:8]
     # ücretsiz elmas sayaçları: reklam ve günlük hediye hesaplarda yalnızca
     # sunucuda işler.
     out["rewards"] = dict(old.get("rewards") or {})
@@ -1522,6 +1574,7 @@ def _merge_progress(old, new, gem_cap=GEM_GAIN_CAP_PER_PUSH):
             out[k] = list(old[k])
     if isinstance(out.get("books_muted"), list):
         out["books_muted"] = [b for b in out["books_muted"] if b not in REMOVED_BOOKS]
+    _drop_unpaid_items(old, out, new)
     return out
 
 
@@ -1571,8 +1624,8 @@ def _public_progress(prog):
 
 def _store_progress(account_id, row, before, merged):
     """Birleştirilmiş ilerlemeyi yazar ve olay günlüğünü tutar."""
-    merged["board_banned"] = False
-    merged["ban_reasons"] = []
+    merged["board_banned"] = bool(merged.get("board_banned"))
+    merged["ban_reasons"] = [str(r)[:24] for r in (merged.get("ban_reasons") or [])][:8]
     st = merged.get("stats") or {}
     st_before = before.get("stats") or {}
     payload = {
@@ -1777,9 +1830,58 @@ def player_report_cheat():
     acc = _acct(data)
     if not acc:
         return jsonify({"success": False, "error": "oturum geçersiz"}), 401
-    # yasak yok: eski oyun sürümleri bu ucu çağırabilir, sessizce geçilir
-    prog = _stored_progress(_player_row(acc["id"]))
-    return jsonify({"success": True, "banned": False, "progress": _public_progress(prog)})
+    aid = acc["id"]
+    reason = str(data.get("reason") or "")[:24]
+    ev = data.get("evidence") if isinstance(data.get("evidence"), dict) else {}
+    kind = str(ev.get("kind") or "")[:16]
+    if reason not in AC_BAN_REASONS or kind not in AC_KINDS:
+        # eski sürümler (hile kodu vb.) bu ucu çağırabilir: yasak yok, sessizce geç
+        prog = _stored_progress(_player_row(aid))
+        return jsonify({"success": True, "banned": bool(prog.get("board_banned")),
+                        "progress": _public_progress(prog)})
+    if not _rate_ok("acr:" + str(aid), 5, 3600):
+        return jsonify({"success": False, "error": "çok sık"}), 429
+    clean_ev = {"kind": kind, "field": str(ev.get("field") or "")[:40], "value": str(ev.get("value") or "")[:40],
+                "run_time": _num(ev.get("run_time"), 0.0), "wave": _int(ev.get("wave"), 0),
+                "level": _int(ev.get("level"), 0), "ratio": _num(ev.get("ratio"), 0.0),
+                "ver": str(ev.get("ver") or "")[:12], "t": int(time.time())}
+    with _acct_lock(aid):
+        row = _player_row(aid)
+        before = _stored_progress(row)
+        merged = dict(before)
+        merged["board_banned"] = True
+        rs = [str(r)[:24] for r in (before.get("ban_reasons") or [])]
+        if "ac" not in rs:
+            rs.append("ac")
+        merged["ban_reasons"] = rs[:8]
+        rw = dict(merged.get("rewards") or {})
+        log = list(rw.get("ac_log") or [])[-9:]
+        log.append(clean_ev)
+        rw["ac_log"] = log
+        merged["rewards"] = rw
+        e = _store_progress(aid, row, before, merged)
+        if e is not None:
+            return e
+    # sıralamadaki eski skorları da çıkar (yönetici kaldırırsa yeni skorlar yine girer)
+    try:
+        db(WORLD_TABLE).update({"ranked": False}).eq("account_id", aid).execute()
+    except Exception:
+        app.logger.exception("yasaklı skorlar sıralamadan çıkarılamadı")
+    try:
+        db("feedback").insert({
+            "created_at": time.time(), "kind": "hile",
+            "message": ("HİLE TESPİTİ (%s): %s alan=%s değer=%s dalga=%s seviye=%s süre=%ss oran=%s sürüm=%s" % (
+                acc.get("username"), kind, clean_ev["field"], clean_ev["value"], clean_ev["wave"],
+                clean_ev["level"], int(clean_ev["run_time"]), clean_ev["ratio"], clean_ev["ver"]))[:900],
+            "email": acc.get("email") or "", "account_id": aid,
+            "username": str(acc.get("username") or "")[:32], "ip_hash": "",
+            "version": clean_ev["ver"], "status": "yeni",
+        }).execute()
+    except Exception:
+        app.logger.exception("hile kaydı yazılamadı")
+    _log_event(aid, "yasak", 0, 0, ("hile: %s %s" % (kind, clean_ev["field"]))[:120])
+    app.logger.warning("HİLE YASAĞI: hesap %s (%s) %s", aid, acc.get("username"), clean_ev)
+    return jsonify({"success": True, "banned": True, "progress": _public_progress(merged)})
 
 
 # ---- ücretsiz elmas: günlük hediye + reklam ----
@@ -2584,6 +2686,9 @@ def add_score():
             return jsonify({"success": False,
                             "error": "önce kullanıcı adı seçmelisin"}), 409
         account_id = acc.get("id")
+        if _is_banned(account_id):
+            return jsonify({"success": False, "banned": True,
+                            "error": "bu hesap hile nedeniyle dünya sıralamasından yasaklandı"}), 403
         _touch_play(acc, data)
 
         # aynı koşu ikinci kez geldiyse: zaten yazılı
@@ -4505,7 +4610,7 @@ def social_profile():
            "skins": _n(row.get("skin_count")) or len(prog.get("skins_owned") or []),
            "skin": str(prog.get("equipped_skin") or "default")[:40],
            "style": _clean_profile_style(prog.get("profile_style"), prog.get("profile_owned")),
-           "banned": False}
+           "banned": bool(prog.get("board_banned"))}
     on, stt = _presence(tid)
     out["online"], out["status"] = on, stt
     rel = "self" if tid == aid else "none"
