@@ -2653,6 +2653,16 @@ STRINGS = {
                           "сервер работает, но аккаунты выключены (на сервере нет настроек базы данных)."),
     "ui.net_other":    _T("bağlantı kurulamadı ({0}).", "could not connect ({0}).", "no se pudo conectar ({0}).",
                           "keine Verbindung ({0}).", "не удалось подключиться ({0})."),
+    "ui.ac_banned_sub": _T("Hile tespit edildi (oyun değerleri dışarıdan değiştirildi).",
+                           "Cheating detected (game values were changed from outside).",
+                           "Trampa detectada (valores del juego cambiados desde fuera).",
+                           "Cheat erkannt (Spielwerte wurden von außen geändert).",
+                           "Обнаружен чит (значения игры изменены извне)."),
+    "ui.ac_caught": _T("HİLE TESPİT EDİLDİ - koşu geçersiz, hesap sıralamadan yasaklandı",
+                       "CHEAT DETECTED - run invalid, account banned from the ranking",
+                       "TRAMPA DETECTADA - partida inválida, cuenta vetada del ranking",
+                       "CHEAT ERKANNT - Lauf ungültig, Konto aus der Rangliste verbannt",
+                       "ОБНАРУЖЕН ЧИТ - забег недействителен, аккаунт исключён из рейтинга"),
     "ui.banned_title": _T("DÜNYA SIRALAMASINDAN ÇIKARILDIN",
                           "REMOVED FROM THE WORLD RANKING",
                           "EXPULSADO DEL RANKING MUNDIAL",
@@ -5453,6 +5463,8 @@ class SaveManager:
         # Kapalı kitap seviye atlama ekranında çıkmaz.
         "books_muted": [],
         "save_version": 0,
+        "ban_pending": False,       # sunucuya henüz bildirilemeyen kesin hile kanıtı
+        "ac_evidence": {},
         # ---- hile koruması ----
         # tainted: kayıt bir kez şaibelendiyse bir daha temizlenmez
         # taint_reasons: hangi denetimin takıldığı (oyuncuya gösterilir)
@@ -5501,7 +5513,7 @@ class SaveManager:
         "books_owned", "weapons_owned", "weapons_muted", "books_muted",
         "achievements", "stats", "leaderboard",
         "tainted", "taint_reasons",
-        "board_banned", "ban_reasons",
+        "board_banned", "ban_reasons", "ban_pending", "ac_evidence",
         "rewards", "gem_pet_bought",
         "profile_owned", "profile_style",
         "skins_rebought", "skin_reset",
@@ -5583,8 +5595,9 @@ class SaveManager:
     #      düşürüyor.
     #   board_banned: "bu hesap bir daha ASLA dünya sıralamasına girmez"
     #      kalıcı. Yalnızca masum açıklaması olmayan
-    # Dünya sıralaması yasağı kaldırıldı: hiçbir sebep hesabı sıralamadan atmaz.
-    BAN_REASONS = ()
+    # Kalıcı sıralama yasağı yalnızca KESİN hile kanıtında: "ac" (mühür tutmadı /
+    # hız hilesi). Tahmine dayalı hiçbir şey (çok skor, çok hasar) yasak sebebi değil.
+    BAN_REASONS = ("ac",)
 
     @staticmethod
     def _mark_tainted_dict(data, reason):
@@ -5622,8 +5635,14 @@ class SaveManager:
         return self.is_tainted() and "cheat_code" in (self.data.get("taint_reasons") or [])
 
     def is_board_banned(self):
-        """Yasak yok (eski kayıtlarda kalan bayrak da sayılmaz)."""
-        return False
+        """Hesap dünya sıralamasından yasaklı mı? (Sunucu söyler; kesin hile kanıtı.)"""
+        return bool(self.data.get("board_banned"))
+
+    def ac_ban(self, evidence):
+        """Kesin hile kanıtı: kalıcı yasak + kanıt sunucuya gönderilmek üzere saklanır."""
+        self.data["ac_evidence"] = evidence if isinstance(evidence, dict) else {}
+        self.data["ban_pending"] = True
+        self.mark_tainted("ac")
 
     def clear_board_ban(self):
         """Yönetici komutu: yerel yasağı kaldırır. Şaibe damgası bilerek kalır;
@@ -5631,6 +5650,14 @@ class SaveManager:
         self.data["board_banned"] = False
         self.data["ban_reasons"] = []
         self.save()
+
+    def _take_server_ban(self, prog):
+        if self.data.get("ban_pending"):
+            self.data["board_banned"] = True
+            return
+        self.data["board_banned"] = bool((prog or {}).get("board_banned"))
+        rs = (prog or {}).get("ban_reasons")
+        self.data["ban_reasons"] = [str(r)[:24] for r in rs][:8] if isinstance(rs, list) else []
 
     @staticmethod
     def _merge_ban_reasons(local, remote):
@@ -5768,7 +5795,7 @@ class SaveManager:
             was_banned = bool(self.data.get("board_banned"))
             was_reasons = list(self.data.get("ban_reasons") or [])
             for k in self.PROFILE_KEYS:
-                if k in ("tainted", "taint_reasons", "board_banned", "ban_reasons"):
+                if k in ("tainted", "taint_reasons", "board_banned", "ban_reasons", "ban_pending", "ac_evidence"):
                     continue
                 src = prog[k] if prog.get(k) is not None else blank.get(k)
                 self.data[k] = json.loads(json.dumps(src))
@@ -5781,8 +5808,7 @@ class SaveManager:
             self.data["rewards"]["pid"] = self.profile_id()
             self.data["tainted"] = False
             self.data["taint_reasons"] = []
-            self.data["board_banned"] = False       # yasak yok
-            self.data["ban_reasons"] = []
+            self._take_server_ban(prog)
             if "default" not in self.data.get("skins_owned", []):
                 self.data.setdefault("skins_owned", []).append("default")
             self.save()
@@ -5790,7 +5816,7 @@ class SaveManager:
         for k in self.PROFILE_KEYS:
             if k not in prog or prog[k] is None:
                 continue
-            if k in ("tainted", "taint_reasons", "board_banned", "ban_reasons"):
+            if k in ("tainted", "taint_reasons", "board_banned", "ban_reasons", "ban_pending", "ac_evidence"):
                 continue        # aşağıda ayrıca, yalnızca sıkılaşacak yönde işlenir
             v = json.loads(json.dumps(prog[k]))
             if k in self.MERGE_LISTS and isinstance(v, list):
@@ -5854,10 +5880,9 @@ class SaveManager:
         # etmiyor.
         self.data["tainted"] = False
         self.data["taint_reasons"] = []
-        # yasak ayrı: sunucu da biz de bir kez "yasaklı" dediysek öyle kalır.
-        # İkisinden biri yeterli; hiçbir yerde False'a dönmez.
-        self.data["board_banned"] = False
-        self.data["ban_reasons"] = []
+        # yasak: sunucunun söylediği geçerli (yönetici kaldırınca burada da kalkar).
+        # Sunucuya henüz ulaşmamış yerel yasak (ban_pending) korunur.
+        self._take_server_ban(prog)
         if "default" not in self.data.get("skins_owned", []):
             self.data.setdefault("skins_owned", []).append("default")
         # sunucudan eski (sıfırlanmamış) liste gelse bile sıfırlanan skinler geri gelmez
@@ -7611,18 +7636,21 @@ class AccountClient:
             return
         tok = self.token
         acc_id = (self.account or {}).get("id")
-        reason = str(reason or (self.save.data.get("ban_reasons") or ["cheat_code"])[0])
+        reason = str(reason or (self.save.data.get("ban_reasons") or ["ac"])[0])
+        ev = self.save.data.get("ac_evidence")
 
         async def worker():
             try:
                 res = await self._post("/player/report_cheat", {
                     "token": tok, "device": device_id(),
                     "device_legacy": device_id_legacy(),
-                    "reason": reason}, timeout=15)
+                    "reason": reason, "evidence": ev if isinstance(ev, dict) else {}}, timeout=15)
             except Exception:
                 return
             if tok != self.token or (self.account or {}).get("id") != acc_id:
                 return          # arada hesap değişti
+            if res.get("success") and res.get("banned"):
+                self.save.data["ban_pending"] = False
             if res.get("success") and isinstance(res.get("progress"), dict):
                 self.save.import_progress(res["progress"])
         spawn(worker)
@@ -7630,8 +7658,8 @@ class AccountClient:
     def _sync_ban(self, prog):
         """Sunucudan gelen ilerleme yasaksız ama yerel profil yasaklıysa (örn. hile çevrimdışıyken kullanıldı) yasağı sunucuya taşı."""
         if (isinstance(prog, dict) and not prog.get("board_banned")
-                and self.save.is_board_banned() and self._profile_is_mine()):
-            self.report_ban()
+                and self.save.data.get("ban_pending") and self._profile_is_mine()):
+            self.report_ban("ac")
 
     async def pull_progress(self):
         """Hesabın sunucudaki ilerlemesini indirir ve uygular."""
@@ -14938,7 +14966,257 @@ def draw_grace_bubble(surf, x, y, r, left, t):
                         math.pi / 2, math.pi / 2 + math.tau * k, 3)
 
 
-class Player:
+# =====================================================================
+# ---- HİLE KORUMASI: mühürlü değerler + saat denetimi ----
+# =====================================================================
+# İlke: dürüst oyuncu ASLA yakalanmaz. Bu yüzden "çok hasar / çok can"
+# gibi tahmine dayalı eşikler yerine kesin kanıt aranır:
+#
+#   1) Mühür: Player, RunState ve ComboMeter'in her sayısal alanı oyunun
+#      KENDİ kodu yazdığı anda (__setattr__) yanına gizli bir mühür alır
+#      (değerin ikili gösterimi ^ oturuma özel rastgele anahtar). Silah,
+#      kitap gibi sözlükler de kendi mührünü taşır. Oyunda hasar, can, hız
+#      nereden artarsa artsın (kitap, silah, evrim, skin, yemin, sunak,
+#      mezarlık, cehennem...) hep bu yoldan yazılır; mühür tutar. Bellek
+#      düzenleyicisi (Cheat Engine vb.) değeri doğrudan bellekte değiştirirse
+#      oyunun kodu çalışmadığı için mühür eski değerde kalır: tutmaz = hile.
+#      Mezarlık gibi oyunu zorlaştıran şeyler hiç sayılmaz; ne kadar düşman
+#      gelirse gelsin bakılan şey yalnızca değerin oyunun kodundan geçip
+#      geçmediği.
+#   2) Saat: hız hilesi (speedhack) oyunun saatini (QueryPerformanceCounter)
+#      hızlandırır; duvar saati (time.time) hızlanmaz. Oyun saati, 5 sn'lik
+#      üç ardışık pencerede duvar saatinden %40 fazla akarsa = hız hilesi.
+#      Takılma / düşük FPS / pencere küçültme oyun saatini YAVAŞLATIR (asla
+#      hızlandırmaz), sistem saatinin tek seferlik ayarı da üç pencere
+#      boyunca sürmez.
+import struct as _ac_struct
+
+_AC_KEY = random.SystemRandom().getrandbits(61) | 1
+_AC_PACK = _ac_struct.Struct("<d").pack
+_AC_UNPACK = _ac_struct.Struct("<q").unpack
+_AC_MASK = (1 << 64) - 1
+_AC_SK = {}                    # alan adı -> mühür anahtarı (önbellek)
+_AC_DICTS = frozenset(("weapons", "books"))
+# konum / hız vektörü / kamera: her kare yazılır ve 2 kişilik eşitleme bunları
+# doğrudan kaydırır. Işınlanma hilesi zaten bunlarla yakalanamaz: mühürsüz.
+_AC_SKIP = frozenset(("x", "y", "vx", "vy", "kbx", "kby", "cam_x", "cam_y"))
+
+
+def _ac_seal(v):
+    """Sayının mührü (sayı değilse None)."""
+    t = type(v)
+    if t is float:
+        return ((_AC_UNPACK(_AC_PACK(v))[0] ^ _AC_KEY) * 5 + 1) & _AC_MASK
+    if t is int or t is bool:
+        return (((int(v) ^ _AC_KEY) * 5 + 2) ^ (int(v) >> 64)) & _AC_MASK
+    return None
+
+
+def _ac_key(k):
+    sk = _AC_SK.get(k)
+    if sk is None:
+        sk = _AC_SK[k] = "\x00" + k
+    return sk
+
+
+_AC_MISSING = object()
+_AC_TRIP = "\x00!"            # yazmadan önce bozuk bulunan alan: (ad, değer)
+
+
+class _AcDict(dict):
+    """Mühürlü sözlük (silah / kitap seviyeleri). Okuma hızı normal dict'le aynı.
+    Her yazmadan önce mevcut içerik mühürle karşılaştırılır: dışarıdan değişip
+    oyunun bir sonraki yazımıyla "aklanan" değer de yakalanır."""
+    __slots__ = ("_m", "_bad")
+
+    def __init__(self, *a, **kw):
+        dict.__init__(self, *a, **kw)
+        self._bad = False
+        self._m = self._calc()
+
+    def _pre(self):
+        if not self._bad and self._m != self._calc():
+            self._bad = True
+
+    def _calc(self):
+        h = _AC_KEY
+        for k, v in dict.items(self):
+            h = (h + hash((k, _ac_seal(v)))) & _AC_MASK
+        return h
+
+    def ok(self):
+        return not self._bad and self._m == self._calc()
+
+    def __setitem__(self, k, v):
+        self._pre()
+        dict.__setitem__(self, k, v)
+        self._m = self._calc()
+
+    def __delitem__(self, k):
+        self._pre()
+        dict.__delitem__(self, k)
+        self._m = self._calc()
+
+    def pop(self, *a):
+        self._pre()
+        r = dict.pop(self, *a)
+        self._m = self._calc()
+        return r
+
+    def popitem(self):
+        self._pre()
+        r = dict.popitem(self)
+        self._m = self._calc()
+        return r
+
+    def setdefault(self, k, d=None):
+        self._pre()
+        r = dict.setdefault(self, k, d)
+        self._m = self._calc()
+        return r
+
+    def update(self, *a, **kw):
+        self._pre()
+        dict.update(self, *a, **kw)
+        self._m = self._calc()
+
+    def clear(self):
+        self._pre()
+        dict.clear(self)
+        self._m = self._calc()
+
+    def __ior__(self, o):
+        self._pre()
+        dict.update(self, o)
+        self._m = self._calc()
+        return self
+
+    def __reduce__(self):
+        return (dict, (dict(self),))
+
+
+class _AcGuard:
+    """Sayısal alanları mühürleyen karışım sınıf. Okuma hızına dokunmaz
+    (alanlar normal __dict__ alanı); yalnızca yazma yolunda mühür tazelenir."""
+    __slots__ = ()
+
+    def __setattr__(self, k, v):
+        d = self.__dict__
+        s0 = d.get(_ac_key(k))
+        if s0 is not None and _AC_TRIP not in d:
+            # yazmadan önce: eski değer hâlâ mührüne uyuyor mu? (her kare artan
+            # alanlarda dışarıdan yapılan değişiklik bir sonraki yazımda aklanmasın)
+            cur = d.get(k, _AC_MISSING)
+            if cur is not _AC_MISSING and _ac_seal(cur) != s0:
+                d[_AC_TRIP] = (k, cur)
+        t = type(v)
+        if t is dict and k in _AC_DICTS:
+            v = _AcDict(v)
+            t = _AcDict
+        object.__setattr__(self, k, v)
+        if (t is float or t is int or t is bool) and k not in _AC_SKIP:
+            self.__dict__[_ac_key(k)] = _ac_seal(v)
+        else:
+            self.__dict__.pop(_ac_key(k), None)
+
+    def __delattr__(self, k):
+        object.__delattr__(self, k)
+        self.__dict__.pop(_ac_key(k), None)
+
+
+def ac_reseal(obj, keys=None):
+    """Oyunun kendi kodu bir alanı __dict__ üzerinden yazdıysa (2 kişilik bağlam
+    değişimi) mührü tazeler. keys None ise bütün sayısal alanlar."""
+    d = getattr(obj, "__dict__", None)
+    if not d:
+        return
+    for k in (list(d.keys()) if keys is None else keys):
+        if type(k) is not str or k[:1] == "\x00":
+            continue
+        v = d.get(k)
+        t = type(v)
+        if k in d and (t is float or t is int or t is bool) and k not in _AC_SKIP:
+            d[_ac_key(k)] = _ac_seal(v)
+        else:
+            d.pop(_ac_key(k), None)
+        if t is dict and k in _AC_DICTS:
+            d[k] = _AcDict(v)
+
+
+def ac_scan(obj):
+    """Mührü tutmayan ilk alanın adı; hepsi tutuyorsa None."""
+    d = getattr(obj, "__dict__", None)
+    if not d:
+        return None
+    tr = d.get(_AC_TRIP)
+    if tr:
+        return tr[0]
+    for k, v in list(d.items()):
+        if type(k) is str and k[:1] == "\x00":
+            name = k[1:]
+            if name in d and _ac_seal(d[name]) != v:
+                return name
+        elif type(v) is _AcDict and not v.ok():
+            return k
+    return None
+
+
+class AcClock:
+    """Hız hilesi denetimi: oyun saati duvar saatinden sürekli hızlı akıyor mu?"""
+    WINDOW = 5.0            # pencere (oyun saniyesi)
+    RATIO = 1.40            # bu oranın üstü şüpheli
+    NEED = 3                # art arda bu kadar şüpheli pencere = hile
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.g = 0.0
+        self.w0 = None
+        self.bad = 0
+        self.last_ratio = 1.0
+
+    def feed(self, raw_dt):
+        """raw_dt: oyunun saatinden ölçülen ham kare süresi (sn). Hile kesinleşince True."""
+        now = time.time()
+        if self.w0 is None:
+            self.w0 = now
+            self.g = 0.0
+            return False
+        self.g += max(0.0, raw_dt)
+        if self.g < self.WINDOW:
+            return False
+        w = now - self.w0
+        g = self.g
+        self.w0 = now
+        self.g = 0.0
+        if w <= 0.25 or w > 120.0:
+            self.bad = 0            # sistem saati ayarlandı / bilgisayar uyudu: sayma
+            return False
+        self.last_ratio = g / w
+        self.bad = self.bad + 1 if self.last_ratio > self.RATIO else 0
+        return self.bad >= self.NEED
+
+
+AC_CLOCK = AcClock()
+
+
+def ac_evidence(run, kind, field="", value=None):
+    """Sunucuya gidecek kısa kanıt."""
+    p = getattr(run, "player", None)
+    try:
+        val = repr(value)[:40] if value is not None else ""
+    except Exception:
+        val = "?"
+    return {"kind": str(kind)[:16], "field": str(field)[:40], "value": val,
+            "run_time": round(float(getattr(run, "run_time", 0.0) or 0.0), 1),
+            "wave": int(getattr(getattr(run, "waves", None), "wave", 0) or 0),
+            "level": int(getattr(p, "level", 0) or 0),
+            "ratio": round(AC_CLOCK.last_ratio, 2) if kind == "hiz" else None,
+            "ver": GAME_VERSION}
+
+
+class Player(_AcGuard):
     def __init__(self, skin_id="default"):
         self.skin = get_skin(skin_id)
         self.color = self.skin["color"]
@@ -28866,7 +29144,7 @@ def time_wave_reachable(total_wave, run_time, diff="normal"):
 WAVE_ACCEL_EXTRA_MAX = 2
 
 
-class WaveManager:
+class WaveManager(_AcGuard):
     def __init__(self, diff="normal", biome="arena"):
         # biome: "arena" (1. harita) | "hell" (cehennem)
         self.biome = biome
@@ -29250,7 +29528,7 @@ class WaveManager:
 
 # combo sayacı
 
-class ComboMeter:
+class ComboMeter(_AcGuard):
     def __init__(self):
         self.count = 0
         self.best = 0
@@ -33042,7 +33320,7 @@ def draw_evo_card(surf, r2, ch, run, t, hover):
                   bold=True, center=True, shadow=False)
 
 
-class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMixin):
+class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMixin):
     def __init__(self, save, skin_id, diff="normal", ach=None):
         self.save = save
         self.diff = diff
@@ -33097,6 +33375,8 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMix
         # hile koruması (3. katman): koşu denetimi. Bir kez bozulduysa düzelmez
         # - hile yapılıp geri alınan bir koşu da geçersizdir.
         self.cheat_flag = ""        # boş = temiz, dolu = takılan denetim
+        self.ac_flag = ""           # kesin hile kanıtı (mühür / saat); hiçbir yerde sıfırlanmaz
+        self.ac_banner_t = 0.0
         self.integrity_timer = 0.0
         # Cehenneme girerken arenada ulaşılan dalga.
         self.arena_waves = 0
@@ -36197,6 +36477,8 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMix
                 self.check_map_achs()
         if self.quest_flash > 0:
             self.quest_flash = max(0.0, self.quest_flash - dt)
+        if getattr(self, "ac_banner_t", 0.0) > 0:
+            self.ac_banner_t = max(0.0, self.ac_banner_t - dt)
         _qt = getattr(self, "quest_toast", None)
         if _qt:
             _qt[3] -= dt
@@ -36213,6 +36495,8 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMix
         self.integrity_timer -= dt
         if self.integrity_timer <= 0:
             self.integrity_timer = 0.5
+            if not getattr(self, "ac_flag", ""):
+                self.ac_check()
             if not self.cheat_flag:
                 bad = run_integrity_check(self)
                 if bad:
@@ -37510,7 +37794,33 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMix
 
     def run_is_clean(self):
         """Bu koşu sıralamalara yazılabilir mi?"""
-        return not self.cheat_flag
+        return not self.cheat_flag and not getattr(self, "ac_flag", "")
+
+    # ---- hile koruması: kesin kanıt ----
+    def ac_check(self):
+        """Mühürleri tara: oyunun kodundan geçmeden değişen bir değer var mı?"""
+        objs = [self, self.player, getattr(self, "combo", None), getattr(self, "waves", None)]
+        objs += [p_ for p_ in (getattr(self, "players", None) or []) if p_ is not self.player]
+        for obj in objs:
+            if obj is None:
+                continue
+            bad = ac_scan(obj)
+            if bad:
+                tr = obj.__dict__.get(_AC_TRIP)
+                self.ac_trip("bellek", bad, tr[1] if tr else obj.__dict__.get(bad))
+                return
+
+    def ac_trip(self, kind, field="", value=None):
+        """Hile kesinleşti: koşu geçersiz, hesap kalıcı yasaklı, kanıt sunucuya."""
+        if getattr(self, "ac_flag", ""):
+            return
+        self.ac_flag = "%s:%s" % (kind, field)
+        self.cheat_flag = "hile"
+        self.ac_banner_t = 10.0
+        try:
+            (getattr(self, "real_save", None) or self.save).ac_ban(ac_evidence(self, kind, field, value))
+        except Exception as e:
+            print("hile bildirimi:", repr(e))
 
     def _tick_boss_wound(self, players):
         """yara: sahada yaşayan patron varken oyuncuların şifası azalır."""
@@ -37535,6 +37845,11 @@ class RunState(EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMix
             "kills": int(_st0.get("best_run_kills", 0) or 0),
             "combo": int(_st0.get("best_combo", 0) or 0),
         }
+        # Koşu bitti: son bir mühür taraması (bitişe çok yakın yapılan düzenleme kaçmasın)
+        if not getattr(self, "ac_flag", ""):
+            self.ac_check()
+        if getattr(self, "ac_flag", "") and not self.cheat_flag:
+            self.cheat_flag = "hile"
         # Koşu bitti: skor; öldürme, dalga ve süreyle tutarlı mı?
         if not self.cheat_flag and not run_score_plausible(self):
             self.cheat_flag = "skor"
@@ -41448,6 +41763,18 @@ def draw_hud(surf, run, t):
     else:
         hud_layer(surf, "top", run, t, lambda b: _draw_hud_top(b, run, t), 0)
     _draw_hud_center(surf, run, t)
+    if getattr(run, "ac_flag", "") and getattr(run, "ac_banner_t", 0.0) > 0:
+        # hile tespit edildi: üstte kırmızı bant (koşu sürer ama geçersiz)
+        k = min(1.0, run.ac_banner_t)
+        msg = L("ui.ac_caught")
+        w = int(text_width(msg, 15, True)) + 40
+        r_ = pygame.Rect(0, 0, w, 36)
+        r_.center = (VIRTUAL_W // 2, HUD_TOP_H + 30)
+        sh_ = pygame.Surface(r_.size, pygame.SRCALPHA)
+        sh_.fill((120, 16, 26, int(225 * k)))
+        surf.blit(sh_, r_.topleft)
+        ink_frame(surf, r_, (255, 90, 100), 8, 2)
+        draw_text(surf, msg, r_.center, 15, (255, 230, 232), bold=True, center=True, alpha=int(255 * k))
     if getattr(run, "coop_others", None):
         draw_coop_hud(surf, run, t)       # 2 kişilik - arkadaşın kartı
 
@@ -52771,6 +53098,7 @@ class CoopRunState(RunState):
     def __init__(self, save, skins, diff, names=("", ""), cosmetics=(None, None), pools=None):
         sv = _AdSave(save.data)
         RunState.__init__(self, sv, skins[0], diff, _AdAch())
+        self.real_save = save           # hile yasağı gerçek kayda yazılır (koşu kopya kayıtla oynar)
         self.players = [self.player]
         self.names = [str(n or "")[:14] for n in names]
         self.cur = 0
@@ -52848,6 +53176,7 @@ class CoopRunState(RunState):
         other = self.ctx[i]
         for k in COOP_PERSONAL:
             d[k] = other.get(k)
+        ac_reseal(self, COOP_PERSONAL)      # bağlam değişimi oyunun kendi işi: mühür tazelenir
         self.ctx[self.cur] = mine
         self.ctx[i] = None
         self.cur = i
@@ -52862,6 +53191,7 @@ class CoopRunState(RunState):
     def ctx_set(self, i, name, value):
         if i == self.cur:
             self.__dict__[name] = value
+            ac_reseal(self, (name,))
         elif self.ctx[i] is not None:
             self.ctx[i][name] = value
 
@@ -53087,6 +53417,12 @@ class CoopRunState(RunState):
         RUN_EVENT[0] = getattr(self, "wave_event", None)
         ENEMY_HAZARDS[0] = self
         self.run_time += dt
+        # hile koruması: 2 kişilikte de yarım saniyede bir mühür taraması
+        self.integrity_timer -= dt
+        if self.integrity_timer <= 0:
+            self.integrity_timer = 0.5
+            if not getattr(self, "ac_flag", ""):
+                self.ac_check()
         if self.time_stop > 0:
             self.time_stop = max(0.0, self.time_stop - dt)
         alive = self.alive_players()
@@ -54114,6 +54450,11 @@ class GuestRun(CoopRunState):
     """Konuğun ekranındaki koşu: simülasyon yok, ev sahibinin anlık görüntüsüyle dolar."""
 
     is_guest = True
+
+    def ac_check(self):
+        """Konuğun bütün değerleri ev sahibinden gelir (eşitleme doğrudan yazar);
+        can/hasar/skor ev sahibinde hesaplanır ve orada denetlenir."""
+        return None
 
     def __init__(self, save, skins, diff, names=("", ""), cosmetics=(None, None)):
         CoopRunState.__init__(self, save, skins, diff, names, cosmetics)
@@ -58474,7 +58815,16 @@ class App:
         # Web'de kareyi tarayıcı (requestAnimationFrame) zamanlar; tick burada
         # bekletmesin, yalnızca geçen süreyi ölçsün.
         _pt0 = time.perf_counter()
-        dt = min(self.clock.tick(0 if IS_WEB else CFG.get("fps_cap", FPS)) / 1000.0, 1 / 20)
+        _tick_ms = self.clock.tick(0 if IS_WEB else CFG.get("fps_cap", FPS))
+        dt = min(_tick_ms / 1000.0, 1 / 20)
+        # hız hilesi denetimi: yalnız koşu sürerken (menü / duraklatma pencereyi sıfırlar)
+        _ac_run = getattr(self, "run", None)
+        if (not IS_WEB and self.state == STATE_PLAY and _ac_run is not None
+                and not getattr(_ac_run, "game_over", False) and hasattr(_ac_run, "ac_trip")):
+            if AC_CLOCK.feed(_tick_ms / 1000.0):
+                _ac_run.ac_trip("hiz", "saat", round(AC_CLOCK.last_ratio, 2))
+        else:
+            AC_CLOCK.reset()
         self._pt1 = time.perf_counter()
         self._pt_wait = (self._pt1 - _pt0) * 1000.0
         self.t += dt
@@ -59854,6 +60204,8 @@ class App:
             return L("ui.pick_name_why")
         if self.save.used_cheat_code():
             return L("ui.taint_prefix", self.save.taint_text())
+        if self.save.is_board_banned():
+            return L("ui.banned_title")
         if self.run is not None and not self.run.run_is_clean():
             return f"koşu doğrulanamadı ({self.run.cheat_flag})"
         # Öbür haritaların koşuları da gönderilir: sunucu onları dünya
@@ -60774,15 +61126,16 @@ class App:
         # ---- şaibeli kayıt uyarısı ----
         # Oyuncu neden sıralamaya giremediğini sonuç ekranında değil, burada
         # öğrensin; sessizce engellemek "oyun bozuk" hissi verirdi.
-        if self.save.used_cheat_code():
+        if self.save.used_cheat_code() or self.save.is_board_banned():
             wr = pygame.Rect(0, 0, 560, 46)
             wr.center = (VIRTUAL_W / 2, 300)
             panel(canvas, wr, bg=(44, 18, 22), edge=(92, 44, 48), alpha=238, radius=10, edge_w=2)
             draw_icon(canvas, wr.x + 24, wr.centery, "shield", RED, 9)
-            draw_text(canvas, L("ui.world_locked"), (wr.x + 40, wr.y + 7), 13, RED,
-                      bold=True, shadow=False)
-            draw_text(canvas, self.save.taint_text(), (wr.x + 40, wr.y + 25), 10,
-                      (212, 158, 158), shadow=False)
+            banned_ = self.save.is_board_banned()
+            draw_text(canvas, L("ui.banned_title") if banned_ else L("ui.world_locked"), (wr.x + 40, wr.y + 7), 13,
+                      RED, bold=True, shadow=False)
+            draw_text(canvas, L("ui.ac_banned_sub") if banned_ else self.save.taint_text(), (wr.x + 40, wr.y + 25),
+                      10, (212, 158, 158), shadow=False)
 
         # ---- sağ üst: hesap çipi ----
         self.draw_account_chip(canvas, dt, mouse_pos, clicked)
