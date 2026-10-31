@@ -1181,7 +1181,27 @@ GEM_GAIN_CAP_PER_PUSH = 5_000_000
 # sınır oyuncunun elmasını sunucuda eksik gösteriyordu)
 GEM_BURST = 5_000_000
 GEM_RATE_PER_HOUR = 5_000_000
-PROGRESS_LISTS = ("skins_owned", "cosmetics_owned", "books_owned", "weapons_owned", "profile_owned")
+PROGRESS_LISTS = ("skins_owned", "cosmetics_owned", "books_owned", "weapons_owned", "profile_owned",
+                  "skins_rebought")
+# ---- skin sıfırlaması: elmasla alınan skinler herkesten geri alındı (fiyatlar
+# 3,5 katı). Sıfırlamadan sonra yeniden alınanlar "skins_rebought" ile korunur.
+# Ücretsiz (default, ranger) ve gerçek parayla alınan skinlere dokunulmaz.
+REVOKED_SKINS = frozenset((
+    "crimson", "royal", "cyan", "shadow", "inferno", "gold", "prism", "shadow_hunter", "frost_witch",
+    "blood_countess", "iron_sentinel", "storm_bringer", "venom_striker", "homing_falcon", "frenzy_beast",
+    "orbit_guardian", "pink_dream", "lucky_fox", "cosmic", "shadow_warrior", "dragon_soul", "chrono_sage"))
+
+
+def _apply_skin_reset(prog):
+    keep = set(prog.get("skins_rebought") or [])
+    own = [x for x in (prog.get("skins_owned") or ["default"]) if x not in REVOKED_SKINS or x in keep]
+    if "default" not in own:
+        own.insert(0, "default")
+    prog["skins_owned"] = own
+    if prog.get("equipped_skin") and prog["equipped_skin"] not in own:
+        prog["equipped_skin"] = "default"
+    prog["skin_reset"] = 1
+    return prog
 # profil kartı süsleri (oyundaki PROFILE_ITEMS ile aynı anahtarlar)
 PROFILE_ITEM_KIND = {
     **{k: "bg" for k in ("bg_skull", "bg_rainbow", "bg_galaxy", "bg_inferno", "bg_frost", "bg_neon",
@@ -1341,7 +1361,7 @@ def _stored_progress(row):
     out["gems"] = int(row.get("gems", 0) or 0)
     out["gems_earned"] = int(row.get("gems_earned", 0) or 0)
     out["gems_spent"] = int(row.get("gems_spent", 0) or 0)
-    return out
+    return _apply_skin_reset(out)
 
 
 # Dünya sıralaması yasakları kaldırıldı: hiçbir skor "imkânsız" diye
@@ -1392,12 +1412,15 @@ def _merge_progress(old, new, gem_cap=GEM_GAIN_CAP_PER_PUSH):
             merged = [v for v in merged if v not in REMOVED_BOOKS]
         if k == "profile_owned":
             merged = [v for v in merged if v in PROFILE_ITEM_KIND]
+        if k == "skins_rebought":
+            merged = [v for v in merged if v in REVOKED_SKINS]
         out[k] = merged[:400]
     if isinstance(new.get("profile_style"), dict):
         out["profile_style"] = _clean_profile_style(new["profile_style"], out.get("profile_owned"))
     for k in ("equipped_skin",):
         if new.get(k):
             out[k] = str(new[k])[:40]
+    _apply_skin_reset(out)
     if isinstance(new.get("equipped_cosmetics"), dict):
         out["equipped_cosmetics"] = {str(a)[:20]: (str(b)[:40] if b else None)
                                      for a, b in list(new["equipped_cosmetics"].items())[:12]}
@@ -2303,7 +2326,7 @@ def _rate_ok(key, max_n=RATE_MAX, window=RATE_WINDOW):
 SUBMIT_SIG_FIELDS = ("name", "score", "kills", "wave", "run_time", "created_at", "diff")
 
 SCORE_PUBLIC_FIELDS = ("name", "score", "kills", "wave", "run_time", "diff",
-                       "created_at", "skin", "build", "style")
+                       "created_at", "skin", "build", "style", "pf")
 
 # ---- koşu kartı ----
 # Sıralamada bir skora tıklayınca açılan ayrıntı (skin, silahlar, kitaplar,
@@ -2427,6 +2450,7 @@ def get_scores():
                 .eq("platform", plat).eq("ranked", True)
                 .order("score", desc=True).limit(WORLD_LB_ROWS).execute().data or [])
         styles = {}
+        pfs = {}
         ids = sorted({str(r.get("account_id")) for r in rows if r.get("account_id") is not None})
         if ids:
             try:
@@ -2434,12 +2458,15 @@ def get_scores():
                     d = pr.get("data") if isinstance(pr.get("data"), dict) else {}
                     styles[str(pr.get("account_id"))] = _clean_profile_style(d.get("profile_style"),
                                                                              d.get("profile_owned"))
+                    pfs[str(pr.get("account_id"))] = _profile_summary(_apply_skin_reset(dict(d)))
             except Exception:
                 app.logger.exception("profil biçimleri okunamadı")
         out = []
         for r in rows:
             r = dict(r)
-            r["style"] = styles.get(str(r.pop("account_id", None)))
+            _aid = str(r.pop("account_id", None))
+            r["style"] = styles.get(_aid)
+            r["pf"] = pfs.get(_aid)
             row = dict(r)
             row["build"] = row.pop("details", None)
             row["skin"] = str(row.get("skin") or (row["build"] or {}).get("skin") or "default")[:40]
@@ -2447,6 +2474,26 @@ def get_scores():
         return jsonify(out)
     except Exception as e:
         return _oops(e)
+
+
+def _profile_summary(d):
+    """Sıralamada gösterilecek koleksiyon özeti (yalnız sayılar ve bilinen kimlikler)."""
+    st = d.get("stats") or {}
+    own = [str(x)[:40] for x in (d.get("skins_owned") or []) if isinstance(x, str)][:60]
+    cos = [str(x)[:40] for x in (d.get("cosmetics_owned") or []) if isinstance(x, str)]
+    mast = d.get("mastery") or {}
+    return {
+        "skins": own,
+        "pets": [c for c in cos if c.startswith("pet_")][:12],
+        "crowns": [c for c in cos if c in ("crown_god", "crown_50m")],
+        "cos_n": len([c for c in cos if not c.startswith("pet_")]),
+        "pf_n": len(d.get("profile_owned") or []),
+        "ach_n": len(d.get("achievements") or {}),
+        "mastery": sum(max(0, _int(v, 0)) for v in mast.values()) if isinstance(mast, dict) else 0,
+        "runs": _int(st.get("runs"), 0), "kills": _int(st.get("total_kills"), 0),
+        "best_wave": _int(st.get("best_wave"), 0), "bosses": _int(st.get("bosses"), 0),
+        "books_n": len(d.get("books_owned") or []), "weapons_n": len(d.get("weapons_owned") or []),
+    }
 
 
 def _is_duplicate_error(e):
@@ -5632,6 +5679,105 @@ def site_roulette_spin():
         _log_event(aid, "rulet", win - total, int(merged["gems"]), ("rulet %d: bahis %d, kazanç %d" % (n, total, win))[:120])
     return jsonify({"success": True, "number": n, "color": "green" if n == 0 else ("red" if n in ROUL_RED else "black"),
                     "bet": total, "win": win, "state": _site_state(acc, merged)})
+
+
+# ---- mağaza: silahına isim ver (1.000.000 elmas) ----
+# Oyuncu bir silah seçip isim yazar; elmas sunucuda düşülür ve istek yöneticiye
+# mesaj olarak (geri_bildirim tablosu, tür "isim") düşer. Uygun bulunursa bir
+# sonraki güncellemede silah o isimle gelir.
+WEAPON_NAME_COST = 1_000_000
+WEAPON_NAME_RE = _re.compile(r"^[A-Za-z0-9ÇĞİÖŞÜçğıöşü' .\-]{3,24}$")
+
+
+@app.route("/shop/name_weapon", methods=["POST"])
+def shop_name_weapon():
+    ctx, err = _reward_ctx()
+    if err:
+        return err
+    acc, data = ctx
+    weapon = str(data.get("weapon") or "")
+    name = " ".join(str(data.get("name") or "").split())[:24]
+    if weapon not in BUILD_WEAPONS:
+        return jsonify({"success": False, "error": "geçersiz silah"}), 400
+    if not WEAPON_NAME_RE.match(name):
+        return jsonify({"success": False, "error": "isim 3-24 harf olmalı (harf, rakam, boşluk)"}), 400
+    if not _rate_ok("wname:" + str(acc["id"]), 3, 3600):
+        return jsonify({"success": False, "error": "çok sık istek, biraz bekle"}), 429
+    aid = acc["id"]
+    with _acct_lock(aid):
+        row, before, rw = _reward_row(aid)
+        earned = max(0, _int(before.get("gems_earned"), 0))
+        spent = min(max(0, _int(before.get("gems_spent"), 0)), earned)
+        if earned - spent < WEAPON_NAME_COST:
+            return jsonify({"success": False, "error": "1.000.000 elmasın yok"}), 409
+        try:
+            db("feedback").insert({
+                "created_at": time.time(), "kind": "isim",
+                "message": "SİLAH İSMİ İSTEĞİ: %s -> \"%s\" (1.000.000 elmas ödendi)" % (weapon, name),
+                "email": acc.get("email") or "", "account_id": aid,
+                "username": str(acc.get("username") or "")[:32], "ip_hash": "", "version": "", "status": "yeni",
+            }).execute()
+        except Exception as e:
+            return _oops(e, "istek kaydedilemedi, elmas düşülmedi")
+        rw["srv_spent"] = _int(rw.get("srv_spent"), 0) + WEAPON_NAME_COST
+        reqs = list(rw.get("weapon_names") or [])[-9:]
+        reqs.append({"w": weapon, "n": name, "t": int(time.time())})
+        rw["weapon_names"] = reqs
+        merged = dict(before)
+        merged["gems_spent"] = spent + WEAPON_NAME_COST
+        merged["gems_earned"] = earned
+        merged["gems"] = earned - merged["gems_spent"]
+        merged["rewards"] = rw
+        e = _store_progress(aid, row, before, merged)
+        if e is not None:
+            return e
+    _log_event(aid, "isim", -WEAPON_NAME_COST, int(merged["gems"]), ("silah ismi: %s -> %s" % (weapon, name))[:120])
+    return jsonify({"success": True, "progress": _public_progress(merged)})
+
+
+@app.route("/admin/take_gems", methods=["POST"])
+def admin_take_gems():
+    """Yönetici: bir oyuncudan elmas alır (en çok elindeki kadar)."""
+    if not _accounts_enabled():
+        return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
+    data = _body()
+    acc = _acct(data)
+    if not acc:
+        return jsonify({"success": False, "error": "oturum geçersiz"}), 401
+    if str(acc.get("username") or "").strip().lower() not in ADMIN_USERNAMES:
+        app.logger.warning("yetkisiz /admin/take_gems denemesi: hesap %s", acc.get("id"))
+        return jsonify({"success": False, "error": "bu komut için yetkin yok"}), 403
+    if not _rate_ok("adm:" + str(acc.get("id")), 30, 60):
+        return jsonify({"success": False, "error": "çok sık istek"}), 429
+    amount = _int(data.get("amount"), 0)
+    if amount < 1:
+        return jsonify({"success": False, "error": "miktar 1 ya da daha büyük olmalı"}), 400
+    tgt = _account_named(data.get("name"))
+    if not tgt:
+        return jsonify({"success": False, "error": "bu adda oyuncu yok"}), 404
+    tid = tgt.get("id")
+    try:
+        with _acct_lock(tid):
+            row, before, rw = _reward_row(tid)
+            earned = max(0, _int(before.get("gems_earned"), 0))
+            spent = min(max(0, _int(before.get("gems_spent"), 0)), earned)
+            take = min(amount, earned - spent)
+            if take < 1:
+                return jsonify({"success": False, "error": "bu oyuncunun alınacak elması yok"}), 409
+            # harcanan sayacı büyür: oyunun eski kaydı bu elması geri getiremez
+            rw["srv_spent"] = _int(rw.get("srv_spent"), 0) + take
+            merged = dict(before)
+            merged["gems_spent"] = spent + take
+            merged["gems_earned"] = earned
+            merged["gems"] = earned - merged["gems_spent"]
+            merged["rewards"] = rw
+            e = _store_progress(tid, row, before, merged)
+            if e is not None:
+                return e
+        _log_event(tid, "gem", -take, int(merged["gems"]), ("yönetici aldı: " + str(acc.get("username")))[:120])
+    except Exception as e:
+        return _oops(e, "elmas alınamadı")
+    return jsonify({"success": True, "name": tgt.get("username"), "taken": take, "total": int(merged["gems"])})
 
 
 @app.route("/admin/give_item", methods=["POST"])
