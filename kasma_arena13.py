@@ -2658,6 +2658,11 @@ STRINGS = {
                            "Trampa detectada (el juego fue modificado desde fuera).",
                            "Cheat erkannt (das Spiel wurde von außen verändert).",
                            "Обнаружен чит (игра изменена извне)."),
+    "ui.ac_void": _T("Bu koşu doğrulanamadı: sıralamaya gönderilmez (hesabın yasaklı değil)",
+                     "This run could not be verified: it won't be ranked (your account is not banned)",
+                     "Esta partida no se pudo verificar: no entra al ranking (tu cuenta no está vetada)",
+                     "Dieser Lauf konnte nicht verifiziert werden: keine Rangliste (Konto nicht gesperrt)",
+                     "Этот забег не прошёл проверку: не попадёт в рейтинг (аккаунт не забанен)"),
     "ui.ac_tool": _T("Hile programı açık ({0}): bu koşu sıralamaya gönderilmez",
                      "Cheat tool running ({0}): this run won't be ranked",
                      "Programa de trampas abierto ({0}): esta partida no entra al ranking",
@@ -15263,10 +15268,14 @@ def ac_evidence(run, kind, field="", value=None):
 import _thread as _ac_thread
 import types as _ac_types
 
-# YANLIŞ BAN KORUMASI: yeni kod/DLL enjeksiyon katmanları gerçek Windows/exe
-# üzerinde doğrulanana kadar YALNIZCA TESPİT (ban/engel YOK). Kanıtlı iki denetim
-# (bellek mührü + hız) her zaman aktif. Doğrulanınca True yapılır.
-_AC_ENFORCE_INJECTION = False
+# İKİ KADEMELİ CEZA (yanlış ban olmaması için):
+#  - Kanıtlı denetimler (bellek mührü, hız hilesi) -> KALICI BAN.
+#  - Enjeksiyon / kod yaması / hile programı -> yalnız KOŞU GEÇERSİZ (sıralamaya
+#    gitmez), KALICI BAN YOK. Böyle bir katman gerçek bilgisayarda yanlışlıkla
+#    tetiklense bile hiçbir dürüst oyuncu kalıcı yasaklanmaz; en fazla o koşu
+#    sayılmaz. İmzasız-DLL sezgisi (yayın bindirmeleri yüzünden yanlış alarm
+#    riski) tamamen kaldırıldı; yalnız adıyla bilinen hile programları sayılır.
+_AC_ENFORCE_INJECTION = True
 _AC_MAIN_TID = _ac_thread.get_ident()
 _AC_TID = _ac_thread.get_ident
 _AC_GETFRAME = sys._getframe
@@ -15746,13 +15755,12 @@ def ac_scan_modules():
             p = os.path.normcase(os.path.abspath(path))
             if any(p.startswith(r) for r in st["sysroots"]) or any(p.startswith(r) for r in st["roots"]):
                 continue
-            base = os.path.basename(p)
-            if any(p.startswith(u) for u in st["user"]):
-                # PyInstaller'ın kendi açılış klasörü Temp\_MEIxxxx: güvenli kökte zaten
-                if os.sep + "_mei" in p:
-                    continue
-                if _ac_win_signed(path) is False:
-                    _ac_hit("dll", base, path[-60:])
+            # NOT: imzasız-DLL sezgisi kaldırıldı. Yayın bindirmeleri (Discord,
+            # GeForce, MSI Afterburner...) imzasız DLL yükleyebiliyor ve dürüst
+            # oyuncuda yanlış alarma yol açıyordu. Yalnız adıyla bilinen hile
+            # programları (yukarıda _ac_win_tools) sayılır; onlar da ban etmez,
+            # yalnız o koşuyu sıralama dışı bırakır.
+            _ = p
     except Exception:
         pass
 
@@ -33933,6 +33941,7 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
         self.cheat_flag = ""        # boş = temiz, dolu = takılan denetim
         self.ac_flag = ""           # kesin hile kanıtı (mühür / saat); hiçbir yerde sıfırlanmaz
         self.ac_tool = ""           # koşu sırasında açık görülen hile programı (koşu sıralamaya gitmez)
+        self.ac_void = ""           # enjeksiyon/kod yaması: koşu geçersiz (BAN YOK)
         self.ac_banner_t = 0.0
         self.integrity_timer = 0.0
         # Cehenneme girerken arenada ulaşılan dalga.
@@ -38351,7 +38360,8 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
 
     def run_is_clean(self):
         """Bu koşu sıralamalara yazılabilir mi?"""
-        if _AC_ENFORCE_INJECTION and (getattr(self, "ac_tool", "") or _AC_STATE.get("taint")):
+        if _AC_ENFORCE_INJECTION and (getattr(self, "ac_tool", "") or getattr(self, "ac_void", "")
+                                      or _AC_STATE.get("taint")):
             return False
         return not self.cheat_flag and not getattr(self, "ac_flag", "")
 
@@ -38382,24 +38392,30 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
                     return
 
     def ac_trip(self, kind, field="", value=None):
-        """Hile kesinleşti: koşu geçersiz, hesap kalıcı yasaklı, kanıt sunucuya.
-        Enjeksiyon (kod/dll) katmanları doğrulanana dek yalnız günlüğe yazılır:
-        DÜRÜST OYUNCU ASLA yanlışlıkla banlanmaz."""
-        if getattr(self, "ac_flag", ""):
-            return
-        if kind not in ("bellek", "hiz") and not _AC_ENFORCE_INJECTION:
+        """Kanıtlı hile (bellek mührü / hız) -> koşu geçersiz + hesap KALICI yasaklı.
+        Enjeksiyon / kod yaması (kod, dll) -> yalnız KOŞU GEÇERSİZ (sıralamaya
+        gitmez), BAN YOK. Dürüst oyuncu bu katmanlardan kalıcı ban yemez."""
+        if kind in ("bellek", "hiz"):
+            if getattr(self, "ac_flag", ""):
+                return
+            self.ac_flag = "%s:%s" % (kind, field)
+            self.cheat_flag = "hile"
+            self.ac_banner_t = 10.0
             try:
-                print("hile koruması (yalnız tespit):", kind, field, repr(value)[:40])
+                (getattr(self, "real_save", None) or self.save).ac_ban(ac_evidence(self, kind, field, value))
+            except Exception as e:
+                print("hile bildirimi:", repr(e))
+        else:
+            # enjeksiyon: koşuyu geçersiz kıl (sıralamaya gitmez) ama BAN YOK
+            if not getattr(self, "ac_void", ""):
+                self.ac_void = "%s:%s" % (kind, field)
+            if not _AC_STATE.get("taint"):
+                _AC_STATE["taint"] = "%s:%s" % (kind, field)
+            self.ac_banner_t = max(getattr(self, "ac_banner_t", 0.0), 6.0)
+            try:
+                print("hile koruması (koşu geçersiz, ban yok):", kind, field, repr(value)[:40])
             except Exception:
                 pass
-            return
-        self.ac_flag = "%s:%s" % (kind, field)
-        self.cheat_flag = "hile"
-        self.ac_banner_t = 10.0
-        try:
-            (getattr(self, "real_save", None) or self.save).ac_ban(ac_evidence(self, kind, field, value))
-        except Exception as e:
-            print("hile bildirimi:", repr(e))
 
     def _tick_boss_wound(self, players):
         """yara: sahada yaşayan patron varken oyuncuların şifası azalır."""
@@ -42360,9 +42376,9 @@ def draw_hud(surf, run, t):
         surf.blit(sh_, r_.topleft)
         ink_frame(surf, r_, (255, 90, 100), 8, 2)
         draw_text(surf, msg, r_.center, 15, (255, 230, 232), bold=True, center=True, alpha=int(255 * k))
-    elif getattr(run, "ac_tool", ""):
-        # hile programı açık: sarı bant (yasak değil, yalnızca sıralamaya gitmez)
-        msg = L("ui.ac_tool", run.ac_tool)
+    elif getattr(run, "ac_tool", "") or getattr(run, "ac_void", ""):
+        # hile programı / enjeksiyon: sarı bant (BAN YOK, yalnızca koşu sayılmaz)
+        msg = L("ui.ac_tool", run.ac_tool) if getattr(run, "ac_tool", "") else L("ui.ac_void")
         w = int(text_width(msg, 13, True)) + 32
         r_ = pygame.Rect(0, 0, w, 30)
         r_.center = (VIRTUAL_W // 2, HUD_TOP_H + 28)
