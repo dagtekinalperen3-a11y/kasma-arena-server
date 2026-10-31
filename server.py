@@ -370,6 +370,37 @@ STATIC_EXT = (".html", ".htm", ".css", ".js", ".png", ".jpg", ".jpeg", ".gif",
               ".svg", ".ico", ".webp", ".txt", ".woff", ".woff2")
 
 
+@app.route("/health")
+def health():
+    """Hafif canlılık yoklaması (veritabanına dokunmaz)."""
+    return "ok", 200, {"Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store"}
+
+
+# ---- uyanık tut: Render'ın ücretsiz planı 15 dk istek gelmeyince sunucuyu
+# uyutuyor; ilk giren 30-60 sn bekliyordu ("site açılmıyor"). Sunucu kendi
+# dış adresine 10 dakikada bir küçük bir istek atar ve uyumaz.
+_keepalive_started = [False]
+
+
+def _keepalive_start():
+    base = (os.environ.get("RENDER_EXTERNAL_URL") or os.environ.get("KEEPALIVE_URL") or "").rstrip("/")
+    if not base or _keepalive_started[0]:
+        return
+    _keepalive_started[0] = True
+
+    def loop():
+        while True:
+            time.sleep(600)
+            try:
+                urllib.request.urlopen(base + "/health", timeout=20).read(16)
+            except Exception:
+                pass
+    threading.Thread(target=loop, daemon=True).start()
+
+
+_keepalive_start()
+
+
 @app.route("/")
 def index():
     return send_from_directory(".", "index.html")
@@ -4656,7 +4687,7 @@ def admin_give_gems():
 #      Ya da /site/login {username, password} (oyundaki girişle aynı sınırlar).
 #      Site geçişi oyun oturumu DEĞİLDİR: oyunu oturumdan atmaz, şifre/e-posta
 #      değiştiremez; yalnızca /site/ uçlarında geçer. Şifre değişince geçersiz.
-#   3) Çark: /site/wheel/ad (sponsor bağlantısına tıklandı, sayaç başlar) ->
+#   3) Çark: /site/wheel/ad (ödüllü video başladı, sayaç başlar) ->
 #      en az SITE_WHEEL_WAIT saniye sonra /site/wheel/spin. Sonucu SUNUCU seçer
 #      ve hesaba burada yazar; site yalnızca çarkı o dilime döndürür.
 #   4) Kazı kazan: /site/scratch/buy {tier}. Bedel düşülür ve ödül AYNI ANDA,
@@ -4675,7 +4706,7 @@ SITE_CODE_TTL = 10 * 60
 SITE_WHEEL_WAIT = 15.0
 SITE_WHEEL_MAX_WAIT = 30 * 60.0
 SITE_WHEEL_GAP = 8.0                 # iki çevirme arası en az
-SITE_AD_URL = "https://ardance.org/4/8eb87fad3ff308b09ec866979c2bcfe7"
+SITE_AD_URL = ""                     # sponsor bağlantısı yok: sitede ödüllü video (AppLixir) oynar
 _site_codes = {}                     # kod özeti -> (hesap, bitiş)
 _site_acc_cache = {}                 # hesap id -> (zaman, satır)
 SITE_ACC_CACHE_T = 20.0
@@ -4691,6 +4722,9 @@ SCRATCH_TIERS = {
                     (50000, 3.2), (100000, 1.1), (250000, 0.36), (1000000, 0.04))),
     "50k": (50000, ((0, 30.0), (2500, 17.0), (10000, 14.0), (25000, 13.0), (50000, 12.5), (100000, 9.0),
                     (250000, 3.0), (500000, 1.2), (1000000, 0.3))),
+    # 100K'lık kart: beklenen getiri ~%79; en büyük ödül 5 milyon (çok zor)
+    "100k": (100000, ((0, 30.0), (5000, 17.0), (25000, 14.0), (50000, 13.0), (100000, 12.5), (200000, 9.0),
+                      (500000, 3.0), (1000000, 1.3), (5000000, 0.2))),
 }
 SCRATCH_DAILY = 150                  # hesap başına günde en çok kart
 SCRATCH_PER_MIN = 20
@@ -4788,6 +4822,8 @@ def _site_state(acc, prog):
                     "tiers": {k: {"cost": c, "table": [[a, w] for a, w in t]} for k, (c, t) in SCRATCH_TIERS.items()}},
         "ad_url": SITE_AD_URL,
         "room": _my_room_brief(acc.get("id")),
+        "stakes": list(GAME_STAKES), "roul_max": ROULETTE_MAX,
+        "gw": {"bets": list(GEMWHEEL_BETS), "segs": list(GEMWHEEL_SEGS), "odds": _gemwheel_odds()},
     }
 
 
@@ -4923,14 +4959,14 @@ def site_wheel_spin():
         row, before, rw = _reward_row(acc["id"])
         ticket = str(data.get("ticket") or "")[:64]
         if not ticket or not hmac.compare_digest(ticket, str(rw.get("swheel_nonce") or "")):
-            return jsonify({"success": False, "error": "önce sponsor bağlantısına tıkla"}), 403
+            return jsonify({"success": False, "error": "önce ÇEVİR'e basıp videoyu izle"}), 403
         el = time.time() - _num(rw.get("swheel_at"), 0)
         if el < SITE_WHEEL_WAIT - 0.5:
             return jsonify({"success": False, "error": "%d saniye daha bekle" % int(math.ceil(SITE_WHEEL_WAIT - el)),
                             "rest": max(0.0, SITE_WHEEL_WAIT - el)}), 403
         if el > SITE_WHEEL_MAX_WAIT:
             rw.pop("swheel_nonce", None)
-            return jsonify({"success": False, "error": "süre doldu, sponsora yeniden tıkla"}), 403
+            return jsonify({"success": False, "error": "süre doldu, ÇEVİR'e yeniden bas"}), 403
         if _wheel_used_today(rw) >= WHEEL_DAILY:
             return jsonify({"success": False, "error": "bugünkü çark hakkın bitti"}), 429
         prize = _wheel_pick()
@@ -5041,9 +5077,10 @@ def site_scratch_buy():
 #    kaybolursa emanetteki elmas oyuncuya kendiliğinden geri verilir.
 #  - Her hamle sunucuda doğrulanır (sıra, el, geçerli kart). Süresi dolan
 #    oyuncu adına sunucu oynar (blackjack: dur, pişti: rastgele kart).
-#  - Aynı IP'den iki hesap aynı masaya oturamaz (kendi kendine elmas aktarma).
+#  - Aynı ağdan (aynı IP) oturmak serbest (yönetici isteği); %5 kesinti her
+#    pottan alındığı için kendi kendine elmas aktarmak zararına olur.
 # Kilit sırası her zaman: _games_lock -> _acct_lock (kilitlenme olmasın).
-GAME_STAKES = (1000, 5000, 10000, 25000, 50000, 100000)
+GAME_STAKES = (1000, 5000, 10000, 25000, 50000, 100000, 150000, 200000, 300000, 500000, 1000000)
 GAME_RAKE = 0.05
 GAME_KINDS = {"coin": (2, 2), "bj": (2, 2), "pisti": (2, 4)}
 GAME_NAMES = {"coin": "yazı tura", "bj": "blackjack", "pisti": "pişti"}
@@ -5051,7 +5088,7 @@ GAME_TURN_T = {"bj": 30.0, "pisti": 25.0}
 GAME_WAIT_T = 15 * 60.0          # dolmayan masa bu kadar sonra kapanır (iade)
 GAME_DONE_KEEP = 90.0            # biten masa sonucu bu kadar görünür
 GAME_LEFT_T = 1.5                # masadan kalkan oyuncunun sırası hemen oynanır
-ROULETTE_MAX = 100000            # tek çevirmede en çok toplam bahis
+ROULETTE_MAX = 1000000           # tek çevirmede en çok toplam bahis
 ROULETTE_MIN = 100
 ROULETTE_DAILY = 400
 _games = {}
@@ -5498,9 +5535,7 @@ def site_games_join():
             return jsonify({"success": False, "error": "bu masa artık yok"}), 404
         if _room_of(aid):
             return jsonify({"success": False, "error": "zaten bir masadasın"}), 409
-        ip = _ip_tag()
-        if any(p_["ip"] == ip for p_ in room["players"]):
-            return jsonify({"success": False, "error": "aynı bağlantıdan iki hesap aynı masaya oturamaz"}), 403
+        ip = _ip_tag()          # yalnız kayıt için (aynı ağdan oturmak serbest)
         e = _escrow_take(aid, rid, room["stake"], GAME_NAMES[room["kind"]])
         if e:
             return jsonify({"success": False, "error": e}), 409
@@ -5679,6 +5714,72 @@ def site_roulette_spin():
         _log_event(aid, "rulet", win - total, int(merged["gems"]), ("rulet %d: bahis %d, kazanç %d" % (n, total, win))[:120])
     return jsonify({"success": True, "number": n, "color": "green" if n == 0 else ("red" if n in ROUL_RED else "black"),
                     "bet": total, "win": win, "state": _site_state(acc, merged)})
+
+
+# ---- elmaslı çark: kasaya karşı, bedeli seçilir, çarpanı SUNUCU seçer ----
+# 16 dilim; dilimlerin olasılıkları eşit değil (oranlar sayfada açıkça
+# yazar). Beklenen getiri ~%88. Sonuç ve ödeme tek kilit içinde yazılır.
+GEMWHEEL_BETS = (1000, 5000, 10000, 50000, 100000, 250000)
+GEMWHEEL_SEGS = (0, 0.5, 1.2, 0, 2, 0.5, 1.5, 0, 3, 0.5, 1.2, 0, 5, 0.5, 1.5, 10)
+GEMWHEEL_W = {0: 8.5, 0.5: 7.0, 1.2: 7.0, 1.5: 5.5, 2: 7.0, 3: 3.5, 5: 1.8, 10: 0.7}
+GEMWHEEL_DAILY = 300
+
+
+def _gemwheel_odds():
+    out = {}
+    for m in GEMWHEEL_SEGS:
+        out[m] = out.get(m, 0.0) + GEMWHEEL_W[m]
+    tot = sum(GEMWHEEL_W[m] for m in GEMWHEEL_SEGS)
+    return [[m, round(w * 100.0 / tot, 2)] for m, w in sorted(out.items())]
+
+
+@app.route("/site/gemwheel/spin", methods=["POST"])
+def site_gemwheel_spin():
+    acc, data, err = _site_ctx()
+    if err:
+        return err
+    bet = _int(data.get("bet"), 0)
+    if bet not in GEMWHEEL_BETS:
+        return jsonify({"success": False, "error": "geçersiz bahis"}), 400
+    if not _rate_ok("gwh:" + str(acc["id"]), 30, 60):
+        return jsonify({"success": False, "error": "çok hızlı, biraz yavaşla"}), 429
+    aid = acc["id"]
+    with _acct_lock(aid):
+        row, before, rw = _reward_row(aid)
+        today = _server_day()
+        used = _int(rw.get("gwh_count"), 0) if rw.get("gwh_day") == today else 0
+        if used >= GEMWHEEL_DAILY:
+            return jsonify({"success": False, "error": "bugünkü elmas çarkı sınırına ulaştın"}), 429
+        earned = max(0, _int(before.get("gems_earned"), 0))
+        spent = min(max(0, _int(before.get("gems_spent"), 0)), earned)
+        if earned - spent < bet:
+            return jsonify({"success": False, "error": "yeterli elmasın yok"}), 409
+        weights = [GEMWHEEL_W[m] for m in GEMWHEEL_SEGS]
+        r = _game_rng.random() * sum(weights)
+        seg = len(GEMWHEEL_SEGS) - 1
+        for i, w in enumerate(weights):
+            if r < w:
+                seg = i
+                break
+            r -= w
+        mult = GEMWHEEL_SEGS[seg]
+        win = int(round(bet * mult))
+        win = min(win, max(0, GEM_TOTAL_MAX - earned))
+        merged = dict(before)
+        merged["gems_spent"] = spent + bet
+        merged["gems_earned"] = earned + win
+        merged["gems"] = max(0, merged["gems_earned"] - merged["gems_spent"])
+        rw["gwh_day"] = today
+        rw["gwh_count"] = used + 1
+        rw["srv_spent"] = _int(rw.get("srv_spent"), 0) + bet
+        rw["srv_earned"] = _int(rw.get("srv_earned"), 0) + win
+        merged["rewards"] = rw
+        e = _store_progress(aid, row, before, merged)
+        if e is not None:
+            return e
+        _log_event(aid, "elmas_cark", win - bet, int(merged["gems"]), ("elmas çarkı x%s: bahis %d, kazanç %d" % (mult, bet, win))[:120])
+    return jsonify({"success": True, "seg": seg, "mult": mult, "bet": bet, "win": win,
+                    "state": _site_state(acc, merged)})
 
 
 # ---- mağaza: silahına isim ver (1.000.000 elmas) ----
