@@ -1402,7 +1402,7 @@ def _stored_progress(row):
 # (bellek düzenleyici) ya da hız hilesi. Yasak sunucuda tutulur; oyun dosyası
 # temizlense de geri gelir, yalnızca yönetici kaldırır (/admin/unban).
 AC_BAN_REASONS = {"ac"}
-AC_KINDS = {"bellek", "hiz"}
+AC_KINDS = {"bellek", "hiz", "kod", "dll"}   # kod: enjeksiyon/yama, dll: yüklenen hile DLL'i
 
 
 def _is_banned(account_id):
@@ -2367,6 +2367,33 @@ SUBMIT_SECRET = os.environ.get("KASMA_SUBMIT_SECRET",
 # İmza zorunlu mu? Eski istemcilerin bir süre çalışabilmesi için kapatılabilir.
 REQUIRE_SIGNATURE = os.environ.get("KASMA_REQUIRE_SIG", "1") == "1"
 
+# İmza sürümü 2 (oyun 3.50): anahtar gizli anahtardan türetilir, oyunun sürümü
+# imzaya girer. Hile korumasız eski sürümler (3.49 ve öncesi) skor gönderemez.
+SUBMIT_SIG_V = "v2"
+SUBMIT_KEY_V2 = hmac.new(SUBMIT_SECRET.encode("utf-8"), b"evolve-arena|submit|" + SUBMIT_SIG_V.encode(),
+                         hashlib.sha256).digest()
+# Skor gönderebilen en düşük oyun sürümü (Render'da KASMA_MIN_VERSION ile değişir).
+MIN_GAME_VERSION = os.environ.get("KASMA_MIN_VERSION", "3.50")
+OLD_VERSION_ERR = "oyun sürümün eski, oyunu güncelle"
+
+
+def _ver_tuple(v):
+    out = []
+    for part in str(v or "").strip().split(".")[:4]:
+        try:
+            out.append(int(part))
+        except ValueError:
+            return None
+    return tuple(out) if out else None
+
+
+def _version_ok(v):
+    """Gönderen oyun en düşük sürümde ya da üstünde mi?"""
+    have, need = _ver_tuple(v), _ver_tuple(MIN_GAME_VERSION)
+    if need is None:
+        return True
+    return have is not None and have >= need
+
 # ---- sınırlar ----
 # "İmkânsız skor" denetimi yok: dürüst ama çok güçlü koşular da reddediliyordu.
 # Yalnızca veritabanını bozacak uç değerler (negatif, taşan sayı) kırpılır.
@@ -2561,9 +2588,9 @@ def _expected_sig(payload):
     # süreli dalga kipi de imzalı (eski istemciler bu alanı göndermez)
     if payload.get("wmode"):
         fields = fields + ("wmode",)
-    msg = "|".join(str(payload.get(k, "")) for k in fields)
-    return hmac.new(SUBMIT_SECRET.encode("utf-8"), msg.encode("utf-8"),
-                    hashlib.sha256).hexdigest()
+    fields = fields + ("ver",)
+    msg = SUBMIT_SIG_V + "|" + "|".join(str(payload.get(k, "")) for k in fields)
+    return hmac.new(SUBMIT_KEY_V2, msg.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 # ---- skor tablosu ----
@@ -2657,6 +2684,11 @@ def add_score():
         if not _rate_ok("sub:" + _client_ip()):
             return jsonify({"success": False, "error": "çok sık gönderim, biraz bekle"}), 429
 
+        # ---- sürüm: hile korumasız eski oyunlar sıralamaya yazamaz ----
+        ver = str(data.get("ver") or "")[:16]
+        if not _version_ok(ver):
+            return jsonify({"success": False, "update": True, "error": OLD_VERSION_ERR}), 426
+
         # ---- imza: sıralamaya elle (curl ile) skor yazılamasın ----
         sig = str(data.get("sig") or "")[:128]
         if REQUIRE_SIGNATURE:
@@ -2670,10 +2702,10 @@ def add_score():
                 "diff": str(data.get("diff", "normal")), "build": build_h,
                 "platform": "mobile" if data.get("platform") == "mobile" else "",
                 "wmode": "time" if data.get("wmode") == "time" else "",
+                "ver": ver,
             })
             if not sig or not hmac.compare_digest(sig, want):
-                return jsonify({"success": False,
-                                "error": "oyun sürümün eski, oyunu güncelle"}), 403
+                return jsonify({"success": False, "update": True, "error": OLD_VERSION_ERR}), 403
 
         if str(data.get("mode") or "") == "coop":
             return jsonify({"success": False, "error": "2 kişilik koşular buradan gönderilmez"}), 422
@@ -4061,8 +4093,13 @@ def coop_submit():
         if not acc:
             return jsonify({"success": False, "error": "giriş gerekli"}), 401
         aid = str(acc.get("id"))
+        if not _version_ok(data.get("ver")):
+            return jsonify({"success": False, "update": True, "error": OLD_VERSION_ERR}), 426
         if not _rate_ok("coops:" + aid, 10, 600):
             return jsonify({"success": False, "error": "çok sık gönderim"}), 429
+        if _is_banned(acc.get("id")):
+            return jsonify({"success": False, "banned": True,
+                            "error": "bu hesap hile nedeniyle dünya sıralamasından yasaklandı"}), 403
         code = str(data.get("code") or "").strip().upper()[:12]
         key = str(data.get("key") or "")[:80]
         run_id = str(data.get("run_id") or "")[:40]
