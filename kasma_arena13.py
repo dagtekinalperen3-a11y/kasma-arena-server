@@ -855,7 +855,7 @@ WEAPON_FX_LEGACY = {"full": 100, "dim": 32, "off": 0}
 # oyunun adı EvolveArena (E ve A büyük). (Kayıt klasörü "KasmaArena" olarak
 # kalıyor: adı değiştirmek oyuncuların ilerlemesini kaybettirirdi)
 GAME_TITLE = "EvolveArena"
-GAME_VERSION = "3.49"
+GAME_VERSION = "3.50"
 
 
 # ---- dil sistemi ----
@@ -2653,11 +2653,16 @@ STRINGS = {
                           "сервер работает, но аккаунты выключены (на сервере нет настроек базы данных)."),
     "ui.net_other":    _T("bağlantı kurulamadı ({0}).", "could not connect ({0}).", "no se pudo conectar ({0}).",
                           "keine Verbindung ({0}).", "не удалось подключиться ({0})."),
-    "ui.ac_banned_sub": _T("Hile tespit edildi (oyun değerleri dışarıdan değiştirildi).",
-                           "Cheating detected (game values were changed from outside).",
-                           "Trampa detectada (valores del juego cambiados desde fuera).",
-                           "Cheat erkannt (Spielwerte wurden von außen geändert).",
-                           "Обнаружен чит (значения игры изменены извне)."),
+    "ui.ac_banned_sub": _T("Hile tespit edildi (oyun dışarıdan değiştirildi).",
+                           "Cheating detected (the game was modified from outside).",
+                           "Trampa detectada (el juego fue modificado desde fuera).",
+                           "Cheat erkannt (das Spiel wurde von außen verändert).",
+                           "Обнаружен чит (игра изменена извне)."),
+    "ui.ac_tool": _T("Hile programı açık ({0}): bu koşu sıralamaya gönderilmez",
+                     "Cheat tool running ({0}): this run won't be ranked",
+                     "Programa de trampas abierto ({0}): esta partida no entra al ranking",
+                     "Cheat-Programm offen ({0}): dieser Lauf kommt nicht in die Rangliste",
+                     "Открыта чит-программа ({0}): забег не попадёт в рейтинг"),
     "ui.ac_caught": _T("HİLE TESPİT EDİLDİ - koşu geçersiz, hesap sıralamadan yasaklandı",
                        "CHEAT DETECTED - run invalid, account banned from the ranking",
                        "TRAMPA DETECTADA - partida inválida, cuenta vetada del ranking",
@@ -5424,6 +5429,17 @@ def build_hash(details):
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32]
 
 
+# İmza sürümü 2 (3.50): anahtar gizli anahtardan türetilir ve oyunun sürümü
+# imzaya girer. Hile korumasız eski sürümlerin (3.49 ve öncesi) gönderisi
+# sunucuda tutmaz: "oyunu güncelle".
+SUBMIT_SIG_V = "v2"
+
+
+def _submit_key():
+    return hmac.new(SUBMIT_SECRET.encode("utf-8"), b"evolve-arena|submit|" + SUBMIT_SIG_V.encode(),
+                    hashlib.sha256).digest()
+
+
 def sign_submit(payload):
     """Skor gönderisinin imzası (sunucudaki doğrulamayla birebir aynı sıra). koşu kartı varsa özeti ("build") de imzaya girer."""
     fields = SUBMIT_SIG_FIELDS + (("build",) if payload.get("build") else ())
@@ -5432,9 +5448,9 @@ def sign_submit(payload):
     # dalga kipi (süreli dalgalar) imzalı - sunucu skoru buna göre denetler
     if payload.get("wmode"):
         fields = fields + ("wmode",)
-    msg = "|".join(str(payload.get(k, "")) for k in fields)
-    return hmac.new(SUBMIT_SECRET.encode("utf-8"), msg.encode("utf-8"),
-                    hashlib.sha256).hexdigest()
+    fields = fields + ("ver",)
+    msg = SUBMIT_SIG_V + "|" + "|".join(str(payload.get(k, "")) for k in fields)
+    return hmac.new(_submit_key(), msg.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 # Oyun içi hile kodu da bir hiledir: kullanıldığı anda kayıt şaibelenir ve
@@ -15101,6 +15117,14 @@ class _AcGuard:
     __slots__ = ()
 
     def __setattr__(self, k, v):
+        if _AC_ON[0]:
+            # yazan kim? oyunun kendi kodu ve ana iş parçacığı değilse = enjeksiyon
+            try:
+                f = _AC_GETFRAME(1)
+            except ValueError:
+                f = None
+            if f is None or f.f_code not in _AC_CODES or _AC_TID() != _AC_MAIN_TID:
+                _ac_foreign_write(self, k, f)
         d = self.__dict__
         s0 = d.get(_ac_key(k))
         if s0 is not None and _AC_TRIP not in d:
@@ -15163,6 +15187,7 @@ def ac_scan(obj):
 
 class AcClock:
     """Hız hilesi denetimi: oyun saati duvar saatinden sürekli hızlı akıyor mu?"""
+    __slots__ = ("g", "w0", "bad", "last_ratio")     # örnek üstüne metot yaması konamaz
     WINDOW = 5.0            # pencere (oyun saniyesi)
     RATIO = 1.40            # bu oranın üstü şüpheli
     NEED = 3                # art arda bu kadar şüpheli pencere = hile
@@ -15214,6 +15239,532 @@ def ac_evidence(run, kind, field="", value=None):
             "level": int(getattr(p, "level", 0) or 0),
             "ratio": round(AC_CLOCK.last_ratio, 2) if kind == "hiz" else None,
             "ver": GAME_VERSION}
+
+
+# ---- kod enjeksiyonu koruması (DLL / Python enjektörü / yama) ----
+# Bellek mühürleri dışarıdan yapılan bellek düzenlemesini yakalar. Ama oyunun
+# içine DLL sokup oyunun KENDİ Python yorumlayıcısında kod çalıştıran biri
+# (Extreme Injector + Python yükü) değerleri oyunun yazma yolundan değiştirir;
+# mühür de "oyun yazdı" sanır. Buna karşı:
+#   1) Kod kimliği: oyunun bütün kod nesneleri açılışta kaydedilir. Mühürlü bir
+#      alana oyunun kendi kodu dışında (enjekte edilen kod) ya da başka bir
+#      iş parçacığından yazılırsa = enjeksiyon.
+#   2) Denetim kancası (sys.addaudithook, kaldırılamaz): yerel koddan
+#      (Python çerçevesi olmadan, yani DLL'den) ya da oyunun kodu çalışırken
+#      araya girip kaynak derleyen/çalıştıran olursa (PyRun_SimpleString),
+#      nesne avlayan (gc.get_objects) ya da izleyici takan olursa = enjeksiyon.
+#      Oyun hiçbir yerde exec/eval/compile/gc.get_objects kullanmıyor.
+#   3) Bütünlük: oyunun fonksiyonları ve sınıf metotları açılışta kaydedilir;
+#      biri yerine başka fonksiyon konursa (koruma kapatma yaması) = yama.
+#   4) Windows'ta yüklü modüller taranır: İndirilenler / Masaüstü / Belgeler /
+#      Temp klasöründen yüklenmiş imzasız DLL = enjeksiyon. Hile programı
+#      (Cheat Engine, Extreme Injector...) açıkken koşu sıralamaya gitmez.
+# Hepsi kesin kanıt: dürüst oyunda hiçbiri olmaz.
+import _thread as _ac_thread
+import types as _ac_types
+
+_AC_MAIN_TID = _ac_thread.get_ident()
+_AC_TID = _ac_thread.get_ident
+_AC_GETFRAME = sys._getframe
+_AC_CODES = set()             # oyunun kendi kod nesneleri (modül sonunda dolar)
+_AC_HITS = []                 # [(tür, alan, değer)] - kanca / yazma denetimi bulguları
+_AC_ON = [False]              # modül tamamen yüklenince açılır
+_AC_STATE = {"taint": "", "tool": "", "snap": None, "mods": set(), "reported": False}
+
+
+def _ac_hit(kind, field, value=""):
+    if len(_AC_HITS) < 8:
+        _AC_HITS.append((kind, str(field)[:40], str(value)[:40]))
+    if not _AC_STATE.get("taint"):
+        _AC_STATE["taint"] = "%s:%s" % (kind, field)
+
+
+def _ac_foreign_write(obj, k, f):
+    """Mühürlü bir alana oyunun kodu dışından yazıldı mı? (yazma yolundan çağrılır)"""
+    if f is None:
+        _ac_hit("kod", "yerel:" + k, type(obj).__name__)      # DLL'den doğrudan C-API yazımı
+        return
+    if f.f_code in _AC_CODES:
+        # oyunun kendi kodu, başka bir iş parçacığında: oyunun iş parçacıkları
+        # (ağ, kayıt) mühürlü nesnelere yazmaz; yine de yalnızca yığının
+        # tamamı oyunun / Python'un koduysa izin ver.
+        g = f
+        n = 0
+        while g is not None and n < 64:
+            c = g.f_code
+            if c not in _AC_CODES:
+                fn = c.co_filename or ""
+                if fn[:1] == "<" and not fn.startswith("<frozen"):
+                    _ac_hit("kod", "is:" + k, fn[:30])
+                    return
+            g = g.f_back
+            n += 1
+        return
+    _ac_hit("kod", "yaz:" + k, (f.f_code.co_filename or "?")[-30:])
+
+
+def _ac_audit_factory():
+    """Kaldırılamayan denetim kancası ve onun gizli bulgu okuyucusu.
+    Bulgu üç yere birden yazılır (enjekte kodun ilk satırında listeyi
+    temizlemesi yetmesin): kancanın kendi gizli listesi, _AC_HITS, _AC_STATE."""
+    codes = _AC_CODES
+    pub = _AC_HITS
+    state = _AC_STATE
+    priv = []
+    getframe = sys._getframe
+    on = _AC_ON
+    src = frozenset(("compile", "exec"))
+    hunt = frozenset(("gc.get_objects", "gc.get_referrers", "gc.get_referents",
+                      "sys.settrace", "sys.setprofile", "sys.monitoring.register_callback"))
+    watch = src | hunt
+
+    class _Hits(list):
+        __slots__ = ()
+
+        def append(self, h):
+            if len(priv) < 8:
+                list.append(priv, h)
+            if len(pub) < 8:
+                list.append(pub, h)
+            if not state.get("taint"):
+                state["taint"] = "%s:%s" % (h[0], h[1])
+
+    hits = _Hits()
+
+    def _ac_audit(ev, args):
+        if ev not in watch or not on[0] or len(priv) >= 8:
+            return
+        try:
+            f = getframe(1)
+        except ValueError:
+            f = None
+        # çağıran çerçevenin dosyası "<...>" ise kaynak, bir dizgeden derlenmiş
+        # demektir (enjekte kod); gerçek .py / "<frozen ...>" (içe aktarma) değil.
+        fn0 = ""
+        if f is not None:
+            try:
+                fn0 = f.f_code.co_filename or ""
+            except Exception:
+                fn0 = ""
+        strframe = fn0[:1] == "<" and not fn0.startswith("<frozen")
+        if ev in src:
+            # Oyun hiçbir yerde exec/compile çağırmaz. Yerel koddan (DLL, çerçeve
+            # yok) ya da enjekte bir dizge çerçevesinden gelen derleme = enjeksiyon.
+            # İçe aktarmalar gerçek .py dosyasından geldiği için elenir (yanlış
+            # alarm olmaz: dürüst oyunda modül yükleme bu dala düşmez).
+            if f is None or strframe:
+                nm = ""
+                try:
+                    nm = str(args[1] if ev == "compile" else getattr(args[0], "co_filename", ""))
+                except Exception:
+                    pass
+                hits.append(("kod", ev, nm[:40]))
+        else:
+            # nesne avlama / izleyici: oyun bunları hiç çağırmaz. Yerel koddan,
+            # enjekte dizgeden ya da oyunun kendi çerçevesi üstünden (araya sokma)
+            # gelirse enjeksiyon. Üçüncü taraf bir .py bunu kendi çerçevesinden
+            # yaparsa dokunulmaz.
+            if f is None or strframe or f.f_code in codes:
+                hits.append(("kod", ev, (fn0[-30:] if f is not None else "yerel")))
+
+    def _ac_poll():
+        return priv[0] if priv else None
+    return _ac_audit, _ac_poll
+
+
+def _AC_POLL():
+    return None
+
+
+def _ac_collect_codes(co, out):
+    stack = [co]
+    while stack:
+        c = stack.pop()
+        if c in out:
+            continue
+        out.add(c)
+        for k in c.co_consts:
+            if type(k) is _ac_types.CodeType:
+                stack.append(k)
+
+
+_AC_FN_TYPES = (_ac_types.FunctionType, staticmethod, classmethod, property)
+
+
+def _ac_fn_parts(v):
+    """Bir sınıf girdisinin içindeki fonksiyonlar (kod kimliği için)."""
+    t = type(v)
+    if t is _ac_types.FunctionType:
+        return (v,)
+    if t is staticmethod or t is classmethod:
+        f = v.__func__
+        return (f,) if type(f) is _ac_types.FunctionType else ()
+    if t is property:
+        return tuple(f for f in (v.fget, v.fset, v.fdel) if type(f) is _ac_types.FunctionType)
+    return ()
+
+
+# Oyunun kendisinin çalışırken değiştirdiği adlar (bütünlükte sayılmaz).
+_AC_SNAP_SKIP = frozenset(("on_ban", "on_progress_change"))
+
+
+def _ac_build_snapshot(g):
+    """Oyunun fonksiyon / sınıf tablosunun kimlik fotoğrafı."""
+    ents = []      # (kap, ad, nesne)
+    fns = []       # (fonksiyon, kod, varsayılanlar)
+    mod = g.get("__name__")
+    for name, obj in list(g.items()):
+        if name in _AC_SNAP_SKIP:
+            continue
+        t = type(obj)
+        if t is _ac_types.FunctionType and obj.__code__ in _AC_CODES:
+            ents.append((g, name, obj))
+            fns.append((obj, obj.__code__, obj.__defaults__))
+        elif isinstance(obj, type) and getattr(obj, "__module__", None) == mod:
+            ents.append((g, name, obj))
+            cd = obj.__dict__
+            for k, v in list(cd.items()):
+                if k in _AC_SNAP_SKIP or type(v) not in _AC_FN_TYPES:
+                    continue
+                ents.append((cd, k, v))
+                for f in _ac_fn_parts(v):
+                    if f.__code__ in _AC_CODES:
+                        fns.append((f, f.__code__, f.__defaults__))
+    for name in ("AC_CLOCK", "_AC_CODES", "_AC_HITS", "_AC_ON", "_AC_STATE", "_AC_KEY",
+                 "_AC_MAIN_TID", "_AC_GETFRAME", "_AC_TID", "_AC_TRIP", "_AC_DICTS", "_AC_SKIP"):
+        if name in g:
+            ents.append((g, name, g[name]))
+    def _crit(n):
+        n = str(n)
+        return n.lower().startswith(("_ac", "ac_")) or n in ("run_is_clean", "finish_run",
+                                                              "sign_submit", "_submit_key")
+    crit = [e for e in ents if _crit(e[1]) or (e[0] is not g and _crit(getattr(e[2], "__name__", "")))]
+    critf = [e for e in fns if _crit(e[0].__name__)]
+    return {"ents": ents, "fns": fns, "crit": crit, "critf": critf,
+            "classes": frozenset(o for c, n, o in ents if c is g and isinstance(o, type))}
+
+
+_AC_SNAP_STEP = 6           # her denetimde fotoğrafın 1/6'sı (+ korumanın kendisi hep)
+
+
+def _ac_verify_snapshot(snap, part=None):
+    """Değişen ilk girdinin adı; hepsi yerindeyse None. part: (i, n) dilimi."""
+    miss = _AC_MISSING
+    ents, fns = snap["ents"], snap["fns"]
+    if part is not None:
+        i, n = part
+        ents = snap["crit"] + ents[i::n]
+        fns = snap["critf"] + fns[i::n]
+    for cont, name, obj in ents:
+        if cont.get(name, miss) is not obj:
+            return name
+    for f, co, df in fns:
+        if f.__code__ is not co or f.__defaults__ is not df:
+            return f.__qualname__
+    return None
+
+
+def ac_global_check(full=False):
+    """İşlem çapında kesin kanıt: (tür, alan, değer) ya da None. Ucuz; sık çağrılabilir.
+    full=False iken fonksiyon tablosunun bir dilimi denetlenir (sırayla hepsi)."""
+    snap = _AC_STATE.get("snap")
+    if snap is None:
+        return None                 # web / koruma açılmadı
+    if not _AC_ON[0]:
+        _ac_hit("kod", "yama:kapali")
+    if _AC_HITS:
+        return _AC_HITS[0]
+    h = _AC_POLL()
+    if h is not None:
+        _ac_hit(*h)                 # biri genel listeyi temizlemiş: gizli listede duruyor
+        return _AC_HITS[0]
+    if _AC_STATE.get("taint") and not _AC_HITS:
+        _ac_hit("kod", "iz:" + str(_AC_STATE["taint"])[:30])
+        return _AC_HITS[0]
+    if full:
+        bad = _ac_verify_snapshot(snap)
+    else:
+        snap["i"] = (snap.get("i", 0) + 1) % _AC_SNAP_STEP
+        bad = _ac_verify_snapshot(snap, (snap["i"], _AC_SNAP_STEP))
+    if bad:
+        _ac_hit("kod", "yama:" + bad)
+        return _AC_HITS[0]
+    if _AcGuard.__dict__.get("__setattr__") is not _AC_SETATTR:
+        _ac_hit("kod", "yama:koruma")
+        return _AC_HITS[0]
+    return None
+
+
+def ac_guarded_ok(obj):
+    """Mühürlü nesnenin sınıfı değiştirilmiş / metodu gölgelenmiş mi? (sorunlu alanın adı ya da None)"""
+    snap = _AC_STATE.get("snap")
+    t = type(obj)
+    if snap is not None and t not in snap["classes"]:
+        return "__class__"
+    if t.__setattr__ is not _AC_SETATTR:
+        return "__setattr__"
+    d = obj.__dict__
+    for k in d:
+        if type(k) is str and k[:1] != "\x00":
+            v = d[k]
+            if type(v) in (_ac_types.FunctionType, _ac_types.MethodType, _ac_types.BuiltinFunctionType) \
+                    and type(getattr(t, k, None)) is _ac_types.FunctionType:
+                return k
+    return None
+
+
+# ---- Windows: yüklü modüller ve açık hile programları ----
+_AC_TOOLS = ("cheatengine", "cheat engine", "extreme injector", "extremeinjector", "injector",
+             "xenos", "artmoney", "speedhack", "speed hack", "wemod", "gameguardian",
+             "processhacker", "process hacker", "systeminformer", "x64dbg", "x32dbg", "ollydbg",
+             "dnspy", "pyinjector")
+
+
+def _ac_win_paths():
+    """Hile DLL'lerinin geldiği kullanıcı klasörleri (küçük harf, sonda ayraçla)."""
+    out = []
+    env = os.environ
+    home = env.get("USERPROFILE") or ""
+    for sub in ("Downloads", "Desktop", "Documents", "OneDrive\\Desktop", "OneDrive\\Documents",
+                "OneDrive\\Masaüstü", "OneDrive\\Belgeler", "OneDrive\\Masaustu"):
+        if home:
+            out.append(os.path.join(home, sub))
+    try:
+        import ctypes
+        from ctypes import wintypes
+        # SHGetKnownFolderPath: İndirilenler / Masaüstü / Belgeler taşınmış olabilir
+        class _GUID(ctypes.Structure):
+            _fields_ = [("a", wintypes.DWORD), ("b", wintypes.WORD), ("c", wintypes.WORD),
+                        ("d", ctypes.c_ubyte * 8)]
+        def _g(s):
+            import uuid
+            u = uuid.UUID(s)
+            g_ = _GUID()
+            g_.a, g_.b, g_.c = u.fields[0], u.fields[1], u.fields[2]
+            g_.d[:] = list(u.bytes[8:])
+            return g_
+        sh = ctypes.windll.shell32
+        ole = ctypes.windll.ole32
+        for s in ("374DE290-123F-4565-9164-39C4925E467B", "B4BFCC3A-DB2C-424C-B029-7FE99A87C641",
+                  "FDD39AD0-238F-46AF-ADB4-6C85480369C7"):
+            p = ctypes.c_wchar_p()
+            if sh.SHGetKnownFolderPath(ctypes.byref(_g(s)), 0, None, ctypes.byref(p)) == 0 and p.value:
+                out.append(p.value)
+                ole.CoTaskMemFree(p)
+    except Exception:
+        pass
+    tmp = env.get("TEMP") or env.get("TMP") or ""
+    if tmp:
+        out.append(tmp)
+    res = []
+    for p in out:
+        try:
+            p = os.path.normcase(os.path.abspath(p)).rstrip("\\/") + os.sep
+        except Exception:
+            continue
+        if len(p) > 4 and p not in res:
+            res.append(p)
+    return res
+
+
+def _ac_win_safe_roots():
+    """Oyunun kendi klasörü, açılış klasörü (_MEI) ve Python: buradakiler oyunun parçası."""
+    roots = []
+    mei = getattr(sys, "_MEIPASS", None)
+    if getattr(sys, "frozen", False) and mei:
+        # exe'nin durduğu klasör (çoğu zaman İndirilenler) güvenli SAYILMAZ:
+        # oyunun DLL'leri yalnızca açılış klasöründe (_MEI / _internal) durur.
+        cands = (mei,)
+    else:
+        cands = (os.path.dirname(os.path.abspath(sys.executable)),
+                 os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else None,
+                 sys.base_prefix, sys.prefix)
+    for p in cands:
+        if p:
+            try:
+                roots.append(os.path.normcase(os.path.abspath(p)).rstrip("\\/") + os.sep)
+            except Exception:
+                pass
+    return roots
+
+
+def _ac_win_signed(path):
+    """Dosya geçerli bir dijital imza taşıyor mu? (WinVerifyTrust). Bilinemezse None."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class WINTRUST_FILE_INFO(ctypes.Structure):
+            _fields_ = [("cbStruct", wintypes.DWORD), ("pcwszFilePath", wintypes.LPCWSTR),
+                        ("hFile", wintypes.HANDLE), ("pgKnownSubject", ctypes.c_void_p)]
+
+        class WINTRUST_DATA(ctypes.Structure):
+            _fields_ = [("cbStruct", wintypes.DWORD), ("pPolicyCallbackData", ctypes.c_void_p),
+                        ("pSIPClientData", ctypes.c_void_p), ("dwUIChoice", wintypes.DWORD),
+                        ("fdwRevocationChecks", wintypes.DWORD), ("dwUnionChoice", wintypes.DWORD),
+                        ("pFile", ctypes.POINTER(WINTRUST_FILE_INFO)),
+                        ("dwStateAction", wintypes.DWORD), ("hWVTStateData", wintypes.HANDLE),
+                        ("pwszURLReference", wintypes.LPCWSTR), ("dwProvFlags", wintypes.DWORD),
+                        ("dwUIContext", wintypes.DWORD), ("pSignatureSettings", ctypes.c_void_p)]
+
+        class GUID(ctypes.Structure):
+            _fields_ = [("a", wintypes.DWORD), ("b", wintypes.WORD), ("c", wintypes.WORD),
+                        ("d", ctypes.c_ubyte * 8)]
+
+        act = GUID(0x00AAC56B, 0xCD44, 0x11D0, (ctypes.c_ubyte * 8)(0x8C, 0xC2, 0x00, 0xC0, 0x4F, 0xC2, 0x95, 0xEE))
+        fi = WINTRUST_FILE_INFO(ctypes.sizeof(WINTRUST_FILE_INFO), path, None, None)
+        wd = WINTRUST_DATA()
+        wd.cbStruct = ctypes.sizeof(WINTRUST_DATA)
+        wd.dwUIChoice = 2              # WTD_UI_NONE
+        wd.fdwRevocationChecks = 0     # WTD_REVOKE_NONE (ağ yok)
+        wd.dwUnionChoice = 1           # WTD_CHOICE_FILE
+        wd.pFile = ctypes.pointer(fi)
+        wd.dwStateAction = 0
+        wd.dwProvFlags = 0x1000        # WTD_CACHE_ONLY_URL_RETRIEVAL
+        wvt = ctypes.windll.wintrust.WinVerifyTrust
+        wvt.argtypes = (wintypes.HANDLE, ctypes.POINTER(GUID), ctypes.c_void_p)
+        wvt.restype = wintypes.LONG
+        r = wvt(wintypes.HANDLE(-1), ctypes.byref(act), ctypes.byref(wd))
+        if r == 0:
+            return True
+        # TRUST_E_NOSIGNATURE / TRUST_E_SUBJECT_FORM_UNKNOWN / TRUST_E_PROVIDER_UNKNOWN
+        if (r & 0xFFFFFFFF) in (0x800B0100, 0x800B0003, 0x800B0001):
+            return False
+        return None         # imza var ama doğrulanamadı (süresi geçmiş vb.): bilinmiyor say
+    except Exception:
+        return None
+
+
+def _ac_win_modules():
+    """Bu işleme yüklü DLL'lerin yolları (Windows dışı ya da hata: boş liste)."""
+    if os.name != "nt":
+        return []
+    try:
+        import ctypes
+        from ctypes import wintypes
+        k32 = ctypes.windll.kernel32
+        try:
+            enum = k32.K32EnumProcessModulesEx
+            getname = k32.K32GetModuleFileNameExW
+        except AttributeError:
+            ps = ctypes.windll.psapi
+            enum = ps.EnumProcessModulesEx
+            getname = ps.GetModuleFileNameExW
+        enum.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.HMODULE), wintypes.DWORD,
+                         ctypes.POINTER(wintypes.DWORD), wintypes.DWORD)
+        enum.restype = wintypes.BOOL
+        getname.argtypes = (wintypes.HANDLE, wintypes.HMODULE, wintypes.LPWSTR, wintypes.DWORD)
+        getname.restype = wintypes.DWORD
+        k32.GetCurrentProcess.restype = wintypes.HANDLE
+        hp = k32.GetCurrentProcess()
+        n = 1024
+        arr = (wintypes.HMODULE * n)()
+        need = wintypes.DWORD(0)
+        if not enum(hp, arr, ctypes.sizeof(arr), ctypes.byref(need), 3):
+            return []
+        cnt = min(n, need.value // ctypes.sizeof(wintypes.HMODULE))
+        buf = ctypes.create_unicode_buffer(1024)
+        out = []
+        for i in range(cnt):
+            if arr[i] and getname(hp, arr[i], buf, 1024):
+                out.append(buf.value)
+        return out
+    except Exception:
+        return []
+
+
+def _ac_win_tools():
+    """Açık hile programının adı ('' = yok)."""
+    if os.name != "nt":
+        return ""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class PROCESSENTRY32W(ctypes.Structure):
+            _fields_ = [("dwSize", wintypes.DWORD), ("cntUsage", wintypes.DWORD),
+                        ("th32ProcessID", wintypes.DWORD), ("th32DefaultHeapID", ctypes.c_size_t),
+                        ("th32ModuleID", wintypes.DWORD), ("cntThreads", wintypes.DWORD),
+                        ("th32ParentProcessID", wintypes.DWORD), ("pcPriClassBase", ctypes.c_long),
+                        ("dwFlags", wintypes.DWORD), ("szExeFile", ctypes.c_wchar * 260)]
+        k32 = ctypes.windll.kernel32
+        k32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+        k32.CreateToolhelp32Snapshot.argtypes = (wintypes.DWORD, wintypes.DWORD)
+        k32.Process32FirstW.argtypes = (wintypes.HANDLE, ctypes.POINTER(PROCESSENTRY32W))
+        k32.Process32NextW.argtypes = (wintypes.HANDLE, ctypes.POINTER(PROCESSENTRY32W))
+        k32.CloseHandle.argtypes = (wintypes.HANDLE,)
+        h = k32.CreateToolhelp32Snapshot(0x2, 0)
+        if not h or h == wintypes.HANDLE(-1).value:
+            return ""
+        found = ""
+        try:
+            e = PROCESSENTRY32W()
+            e.dwSize = ctypes.sizeof(PROCESSENTRY32W)
+            ok = k32.Process32FirstW(h, ctypes.byref(e))
+            while ok:
+                nm = (e.szExeFile or "").lower()
+                for t in _AC_TOOLS:
+                    if t in nm:
+                        found = e.szExeFile
+                        break
+                if found:
+                    break
+                ok = k32.Process32NextW(h, ctypes.byref(e))
+        finally:
+            k32.CloseHandle(h)
+        return found
+    except Exception:
+        return ""
+
+
+def ac_scan_modules():
+    """Yeni yüklenen DLL'leri denetle. Kesin kanıt bulunca _AC_HITS'e yazar.
+    Ayrıca açık hile programını _AC_STATE['tool']'a yazar (koşu sıralamaya gitmez)."""
+    if os.name != "nt" or IS_WEB:
+        return
+    st = _AC_STATE
+    try:
+        st["tool"] = _ac_win_tools()
+        if "roots" not in st:
+            st["roots"] = _ac_win_safe_roots()
+            st["user"] = _ac_win_paths()
+            st["sysroots"] = []
+            for v in ("SystemRoot", "windir", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432",
+                      "ProgramData", "CommonProgramFiles", "CommonProgramFiles(x86)"):
+                p = os.environ.get(v)
+                if p:
+                    st["sysroots"].append(os.path.normcase(os.path.abspath(p)).rstrip("\\/") + os.sep)
+        seen = st["mods"]
+        for path in _ac_win_modules():
+            if path in seen:
+                continue
+            seen.add(path)
+            p = os.path.normcase(os.path.abspath(path))
+            if any(p.startswith(r) for r in st["sysroots"]) or any(p.startswith(r) for r in st["roots"]):
+                continue
+            base = os.path.basename(p)
+            if any(p.startswith(u) for u in st["user"]):
+                # PyInstaller'ın kendi açılış klasörü Temp\_MEIxxxx: güvenli kökte zaten
+                if os.sep + "_mei" in p:
+                    continue
+                if _ac_win_signed(path) is False:
+                    _ac_hit("dll", base, path[-60:])
+    except Exception:
+        pass
+
+
+def _ac_mod_loop():
+    """Arka planda: 4 sn'de bir modül ve hile programı taraması (yalnız Windows)."""
+    while True:
+        ac_scan_modules()
+        time.sleep(4.0)
+
+
+def ac_note_hit(hit):
+    """Kesin bulgu: bu işlemde artık hiçbir koşu sıralamaya gitmez."""
+    if not _AC_STATE.get("taint"):
+        _AC_STATE["taint"] = "%s:%s" % (hit[0], hit[1])
+    _AC_STATE["reported"] = True
 
 
 class Player(_AcGuard):
@@ -33376,6 +33927,7 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
         # - hile yapılıp geri alınan bir koşu da geçersizdir.
         self.cheat_flag = ""        # boş = temiz, dolu = takılan denetim
         self.ac_flag = ""           # kesin hile kanıtı (mühür / saat); hiçbir yerde sıfırlanmaz
+        self.ac_tool = ""           # koşu sırasında açık görülen hile programı (koşu sıralamaya gitmez)
         self.ac_banner_t = 0.0
         self.integrity_timer = 0.0
         # Cehenneme girerken arenada ulaşılan dalga.
@@ -37794,13 +38346,19 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
 
     def run_is_clean(self):
         """Bu koşu sıralamalara yazılabilir mi?"""
-        return not self.cheat_flag and not getattr(self, "ac_flag", "")
+        return (not self.cheat_flag and not getattr(self, "ac_flag", "")
+                and not getattr(self, "ac_tool", "") and not _AC_STATE.get("taint"))
 
     # ---- hile koruması: kesin kanıt ----
     def ac_check(self):
         """Mühürleri tara: oyunun kodundan geçmeden değişen bir değer var mı?"""
         objs = [self, self.player, getattr(self, "combo", None), getattr(self, "waves", None)]
         objs += [p_ for p_ in (getattr(self, "players", None) or []) if p_ is not self.player]
+        hit = ac_global_check()
+        if hit:
+            ac_note_hit(hit)
+            self.ac_trip(*hit)
+            return
         for obj in objs:
             if obj is None:
                 continue
@@ -37808,6 +38366,11 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
             if bad:
                 tr = obj.__dict__.get(_AC_TRIP)
                 self.ac_trip("bellek", bad, tr[1] if tr else obj.__dict__.get(bad))
+                return
+            bad = ac_guarded_ok(obj)
+            if bad:
+                ac_note_hit(("kod", "nesne:" + bad, type(obj).__name__))
+                self.ac_trip("kod", "nesne:" + bad, type(obj).__name__)
                 return
 
     def ac_trip(self, kind, field="", value=None):
@@ -37847,7 +38410,12 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
         }
         # Koşu bitti: son bir mühür taraması (bitişe çok yakın yapılan düzenleme kaçmasın)
         if not getattr(self, "ac_flag", ""):
-            self.ac_check()
+            hit = ac_global_check(full=True)
+            if hit:
+                ac_note_hit(hit)
+                self.ac_trip(*hit)
+            else:
+                self.ac_check()
         if getattr(self, "ac_flag", "") and not self.cheat_flag:
             self.cheat_flag = "hile"
         # Koşu bitti: skor; öldürme, dalga ve süreyle tutarlı mı?
@@ -41775,6 +42343,17 @@ def draw_hud(surf, run, t):
         surf.blit(sh_, r_.topleft)
         ink_frame(surf, r_, (255, 90, 100), 8, 2)
         draw_text(surf, msg, r_.center, 15, (255, 230, 232), bold=True, center=True, alpha=int(255 * k))
+    elif getattr(run, "ac_tool", ""):
+        # hile programı açık: sarı bant (yasak değil, yalnızca sıralamaya gitmez)
+        msg = L("ui.ac_tool", run.ac_tool)
+        w = int(text_width(msg, 13, True)) + 32
+        r_ = pygame.Rect(0, 0, w, 30)
+        r_.center = (VIRTUAL_W // 2, HUD_TOP_H + 28)
+        sh_ = pygame.Surface(r_.size, pygame.SRCALPHA)
+        sh_.fill((92, 70, 10, 215))
+        surf.blit(sh_, r_.topleft)
+        ink_frame(surf, r_, (255, 210, 90), 8, 2)
+        draw_text(surf, msg, r_.center, 13, (255, 240, 200), bold=True, center=True)
     if getattr(run, "coop_others", None):
         draw_coop_hud(surf, run, t)       # 2 kişilik - arkadaşın kartı
 
@@ -58810,6 +59389,38 @@ class App:
             await asyncio.sleep(0)
         self.save.save()
 
+    def _ac_frame_check(self, run):
+        """Yarım saniyede bir: enjeksiyon / yama bulgusu var mı, hile programı açık mı?"""
+        self._ac_n = getattr(self, "_ac_n", 0) + 1
+        if self._ac_n % 30:
+            return
+        if os.name == "nt" and not getattr(self, "_ac_mod_th", False):
+            self._ac_mod_th = True
+            threading.Thread(target=_ac_mod_loop, daemon=True).start()
+        if (run is not None and self.state == STATE_PLAY and _AC_STATE.get("tool")
+                and not getattr(run, "game_over", False) and not getattr(run, "ac_tool", "")):
+            run.ac_tool = str(_AC_STATE["tool"])[:40]
+        hit = ac_global_check()
+        if not hit and run is not None and hasattr(run, "ac_trip") and not isinstance(run, GuestRun):
+            # koşunun kendi denetimi (ac_check) gölgelenmiş olabilir: nesneleri buradan da bak
+            for obj in (run, getattr(run, "player", None)):
+                if obj is not None and isinstance(obj, _AcGuard):
+                    bad = ac_guarded_ok(obj)
+                    if bad:
+                        hit = ("kod", "nesne:" + bad, type(obj).__name__)
+                        break
+        if not hit or _AC_STATE.get("reported"):
+            return
+        ac_note_hit(hit)
+        try:
+            if (run is not None and hasattr(run, "ac_trip") and not getattr(run, "game_over", False)
+                    and not getattr(run, "ac_flag", "")):
+                RunState.ac_trip(run, *hit)     # sınıftan: örnek üstündeki yama atlanır
+            else:
+                self.save.ac_ban(ac_evidence(run, *hit))
+        except Exception as e:
+            print("hile bildirimi:", repr(e))
+
     def frame(self):
         """Tek bir kare: girdi, güncelleme, çizim, ekrana basma."""
         # Web'de kareyi tarayıcı (requestAnimationFrame) zamanlar; tick burada
@@ -58825,6 +59436,9 @@ class App:
                 _ac_run.ac_trip("hiz", "saat", round(AC_CLOCK.last_ratio, 2))
         else:
             AC_CLOCK.reset()
+        # kod enjeksiyonu / yama / DLL: işlem çapında, menüde de
+        if not IS_WEB:
+            self._ac_frame_check(_ac_run)
         self._pt1 = time.perf_counter()
         self._pt_wait = (self._pt1 - _pt0) * 1000.0
         self.t += dt
@@ -60206,6 +60820,10 @@ class App:
             return L("ui.taint_prefix", self.save.taint_text())
         if self.save.is_board_banned():
             return L("ui.banned_title")
+        if _AC_STATE.get("taint"):
+            return L("ui.ac_banned_sub")
+        if self.run is not None and getattr(self.run, "ac_tool", ""):
+            return L("ui.ac_tool", self.run.ac_tool)
         if self.run is not None and not self.run.run_is_clean():
             return f"koşu doğrulanamadı ({self.run.cheat_flag})"
         # Öbür haritaların koşuları da gönderilir: sunucu onları dünya
@@ -60260,6 +60878,8 @@ class App:
             payload["platform"] = PLATFORM_TAG
         # dalgalar süreyle ilerliyor; sunucu dalga/süre uyumuna bakar.
         payload["wmode"] = "time"
+        # oyunun sürümü (imzalı): sunucu en düşük sürümün altını kabul etmez
+        payload["ver"] = GAME_VERSION
         # Gönderiye imza eklenir: sunucu imzasız/yanlış imzalı istekleri
         # reddeder, böylece sıralamaya elle curl atılamaz. koşu kartı: dünya
         # sıralamasında bu skora tıklayınca açılan ayrıntı (silahlar, kitaplar,
@@ -68245,7 +68865,8 @@ class CoopSession:
         so = getattr(self.app, "social", None)
         self.lb = None
         if (so is None or not so.base or not self.link.code or not self.link.key or run.run_time < 30
-                or self.app.save.is_board_banned() or getattr(run, "cheat_flag", "")):
+                or self.app.save.is_board_banned() or getattr(run, "cheat_flag", "")
+                or not run.run_is_clean()):
             return
         try:
             pls = [_coop_player_build(run, 0), _coop_player_build(run, 1)]
@@ -69620,7 +70241,7 @@ class SocialClient:
         spawn(self._coop_submit, payload, on_done)
 
     async def _coop_submit(self, payload, on_done):
-        res = await self._call("/coop/submit", dict(self._payload(), **payload), 25)
+        res = await self._call("/coop/submit", dict(self._payload(), ver=GAME_VERSION, **payload), 25)
         on_done(bool(res.get("success")), str(res.get("error") or ""), res.get("rank"))
         if res.get("success"):
             self.fetch_coop_scores()
@@ -73141,6 +73762,29 @@ def _index_strings_for_trx():
 
 
 _index_strings_for_trx()
+
+
+# ---- kod enjeksiyonu koruması: açılış ----
+# Modül tamamen yüklendi: oyunun bütün kod nesneleri ve fonksiyon tablosu
+# kaydedilir, kaldırılamayan denetim kancası takılır.
+_AC_SETATTR = _AcGuard.__dict__["__setattr__"]
+
+
+def _ac_boot(modcode):
+    if IS_WEB or _AC_ON[0]:
+        return
+    global _AC_POLL
+    try:
+        _ac_collect_codes(modcode, _AC_CODES)
+        hook, _AC_POLL = _ac_audit_factory()
+        _AC_STATE["snap"] = _ac_build_snapshot(globals())
+        sys.addaudithook(hook)
+        _AC_ON[0] = True
+    except Exception as e:
+        print("koruma açılamadı:", repr(e))
+
+
+_ac_boot(sys._getframe().f_code)
 
 
 def main():
