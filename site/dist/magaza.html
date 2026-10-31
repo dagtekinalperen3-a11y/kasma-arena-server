@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=Russo+One&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=36ff41aa">
+<link rel="stylesheet" href="assets/site.css?v=4e7498d5">
 </head>
 <body data-page="magaza">
 
@@ -80,11 +80,12 @@
     <h2 id="wTitle">Şans Çarkı</h2>
     <p class="sub">Oyundaki çarkın aynısı. Sonucu sunucu belirler, ödül anında hesabına yazılır.</p>
     <div class="wheelbox"><canvas id="wheelCv" width="560" height="560" aria-label="Şans çarkı"></canvas></div>
+    <div id="applixir-ad" class="adbox" aria-live="polite"></div>
     <div class="wstatus"><span id="wWho">Giriş yapılmadı</span><span class="dots" id="wDots"></span></div>
     <ol class="wsteps">
       <li id="wS1">Giriş yap (ya da oyunda Mağaza › Şans Çarkı › ÇEVİR)</li>
-      <li id="wS2">ÇEVİR'e bas: sponsor sayfamız yeni sekmede açılır</li>
-      <li id="wS3">Burada 15 saniye bekle</li>
+      <li id="wS2">ÇEVİR'e bas: kısa bir ödüllü video oynar</li>
+      <li id="wS3">Videoyu sonuna kadar izle (en az 15 sn)</li>
       <li id="wS4">ÇEVİR! Ödül hesabına işlenir</li>
     </ol>
     <a class="wbtn" id="wBtn" href="#" role="button">GİRİŞ YAP</a>
@@ -107,10 +108,10 @@
 </div></div>
 <div class="modal" id="mInfo" role="dialog" aria-modal="true"><div class="mbox" id="mInfoBox"></div></div>
 
-<script src="assets/data.js?v=4513c979" defer></script>
-<script src="assets/site.js?v=542ef656" defer></script>
-<script data-cfasync="false" src="https://accountut.com/1/32f0b894b7ce43f59b6d0269c3b8fdb5"></script>
-<script data-cfasync="false" src="https://bellnewyork.org/14/33a9dc2c48f6cb146f8c75aaf00ed1e3"></script>
-<script data-cfasync="false" src="https://asiafilm.org/4/f9722e614a9e1620cd5cfbfe58d6a684"></script>
+<script src="assets/data.js?v=218f624d" defer></script>
+<script src="assets/site.js?v=47a09c72" defer></script>
+<!-- AppLixir ödüllü video: API anahtarı assets/config.js içinde -->
+<script src="assets/config.js?v=c7677b29" defer></script>
+<script src="https://cdn.applixir.com/applixir.app.v6.1.0.js" defer></script>
 </body>
 </html>

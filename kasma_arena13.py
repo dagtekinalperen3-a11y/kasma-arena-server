@@ -56326,11 +56326,11 @@ def replay_button_draw(canvas, rect, mouse_pos, t):
 
 STRINGS.update({
     "wh.title": _T("ŞANS ÇARKI", "LUCKY WHEEL", "RUEDA DE LA SUERTE", "GLÜCKSRAD", "КОЛЕСО УДАЧИ"),
-    "wh.card_desc": _T("Çark sitede döner: sponsora tıkla, {0} sn bekle, ÇEVİR!",
-                       "The wheel spins on the website: click a sponsor, wait {0}s, SPIN!",
-                       "La rueda gira en la web: pulsa un patrocinador, espera {0}s y ¡GIRA!",
-                       "Das Rad dreht sich auf der Website: Sponsor klicken, {0}s warten, DREHEN!",
-                       "Колесо крутится на сайте: нажми спонсора, подожди {0}с и КРУТИ!"),
+    "wh.card_desc": _T("Çark sitede döner: kısa bir video izle ({0} sn), ÇEVİR!",
+                       "The wheel spins on the website: watch a short video ({0}s), SPIN!",
+                       "La rueda gira en la web: mira un vídeo corto ({0}s) y ¡GIRA!",
+                       "Das Rad dreht sich auf der Website: kurzes Video ({0}s), DREHEN!",
+                       "Колесо крутится на сайте: посмотри короткое видео ({0}с) и КРУТИ!"),
     "wh.on_site": _T("Çark sitede açıldı. Bitince oyuna dön, ödüller hesabına işlenir.",
                      "The wheel opened on the website. Come back when done; prizes go to your account.",
                      "La rueda se abrió en la web. Vuelve al terminar; los premios van a tu cuenta.",

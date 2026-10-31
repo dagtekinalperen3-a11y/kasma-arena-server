@@ -70,11 +70,12 @@
     <h2 id="wTitle">Şans Çarkı</h2>
     <p class="sub">Oyundaki çarkın aynısı. Sonucu sunucu belirler, ödül anında hesabına yazılır.</p>
     <div class="wheelbox"><canvas id="wheelCv" width="560" height="560" aria-label="Şans çarkı"></canvas></div>
+    <div id="applixir-ad" class="adbox" aria-live="polite"></div>
     <div class="wstatus"><span id="wWho">Giriş yapılmadı</span><span class="dots" id="wDots"></span></div>
     <ol class="wsteps">
       <li id="wS1">Giriş yap (ya da oyunda Mağaza › Şans Çarkı › ÇEVİR)</li>
-      <li id="wS2">ÇEVİR'e bas: sponsor sayfamız yeni sekmede açılır</li>
-      <li id="wS3">Burada {{wheelwait}} saniye bekle</li>
+      <li id="wS2">ÇEVİR'e bas: kısa bir ödüllü video oynar</li>
+      <li id="wS3">Videoyu sonuna kadar izle (en az {{wheelwait}} sn)</li>
       <li id="wS4">ÇEVİR! Ödül hesabına işlenir</li>
     </ol>
     <a class="wbtn" id="wBtn" href="#" role="button">GİRİŞ YAP</a>
@@ -99,8 +100,8 @@
 
 <script src="assets/data.js?v={{v_data}}" defer></script>
 <script src="assets/site.js?v={{v_js}}" defer></script>
-<script data-cfasync="false" src="https://accountut.com/1/32f0b894b7ce43f59b6d0269c3b8fdb5"></script>
-<script data-cfasync="false" src="https://bellnewyork.org/14/33a9dc2c48f6cb146f8c75aaf00ed1e3"></script>
-<script data-cfasync="false" src="https://asiafilm.org/4/f9722e614a9e1620cd5cfbfe58d6a684"></script>
+<!-- AppLixir ödüllü video: API anahtarı assets/config.js içinde -->
+<script src="assets/config.js?v={{v_cfg}}" defer></script>
+<script src="https://cdn.applixir.com/applixir.app.v6.1.0.js" defer></script>
 </body>
 </html>

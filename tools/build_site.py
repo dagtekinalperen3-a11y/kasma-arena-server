@@ -62,6 +62,7 @@ def png(surf, pad=2):
     raw = io.BytesIO()
     pygame.image.save(sub, raw, "x.png")
     data = raw.getvalue()
+    kind = "png"
     if Image is not None:
         im = Image.open(io.BytesIO(data)).convert("RGBA")
         q = im.quantize(colors=160, method=Image.Quantize.FASTOCTREE)
@@ -69,7 +70,15 @@ def png(surf, pad=2):
         q.save(out, "PNG", optimize=True)
         if len(out.getvalue()) < len(data):
             data = out.getvalue()
-    return "data:image/png;base64," + base64.b64encode(data).decode()
+        # WebP çok daha küçük: site daha hızlı açılır (bütün güncel tarayıcılar okur)
+        try:
+            out = io.BytesIO()
+            Image.open(io.BytesIO(data)).convert("RGBA").save(out, "WEBP", lossless=True, method=6)
+            if len(out.getvalue()) < len(data):
+                data, kind = out.getvalue(), "webp"
+        except Exception:
+            pass
+    return "data:image/%s;base64," % kind + base64.b64encode(data).decode()
 
 
 def canvas(w, h):
@@ -219,6 +228,18 @@ for name in ("site.css", "site.js"):
     txt = open(os.path.join(SRC, name), encoding="utf-8").read()
     ver[name.split(".")[1]] = hashlib.sha1(write("assets/" + name, txt).encode()).hexdigest()[:8]
 
+# AppLixir API anahtarı: site/config.json {"applixir_api_key": "..."} ya da
+# APPLIXIR_API_KEY ortam değişkeni. Sunucuda assets/config.js düzenlenerek de
+# değiştirilebilir (yeniden derleme gerekmez).
+_cfg = {}
+try:
+    _cfg = json.load(open(os.path.join(ROOT, "site", "config.json"), encoding="utf-8"))
+except Exception:
+    _cfg = {}
+_ak = str(_cfg.get("applixir_api_key") or os.environ.get("APPLIXIR_API_KEY") or "")
+ver["cfg"] = hashlib.sha1(write("assets/config.js", "/* AppLixir ödüllü video ayarı. API anahtarını tırnakların arasına yaz. */\n"
+                                "window.EA_CFG={applixirKey:%s};\n" % json.dumps(_ak)).encode()).hexdigest()[:8]
+
 layout = open(os.path.join(SRC, "_layout.html"), encoding="utf-8").read()
 META_RE = re.compile(r"^<!--meta\s+(.*?)-->\s*", re.S)
 ATTR_RE = re.compile(r'(\w+)="([^"]*)"')
@@ -233,7 +254,8 @@ for fn in pages:
            .replace("{{title}}", meta.get("title", "EvolveArena"))
            .replace("{{desc}}", meta.get("desc", ""))
            .replace("{{page}}", page)
-           .replace("{{v_css}}", ver["css"]).replace("{{v_js}}", ver["js"]).replace("{{v_data}}", ver["data"]))
+           .replace("{{v_css}}", ver["css"]).replace("{{v_js}}", ver["js"]).replace("{{v_data}}", ver["data"])
+           .replace("{{v_cfg}}", ver["cfg"]))
     out = re.sub(r'data-nav="%s"' % re.escape(page), 'data-nav="%s" aria-current="page"' % page, out)
     for k, v in VARS.items():
         out = out.replace("{{%s}}" % k, v)
