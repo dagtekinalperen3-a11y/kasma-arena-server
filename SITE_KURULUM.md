@@ -44,6 +44,18 @@ basınca AppLixir ödüllü videosunu oynatır; video bitince çark açılır.
   bekliyordu). Sunucu artık 10 dakikada bir kendi `/health` adresini yokluyor ve uyumuyor
   (Render `RENDER_EXTERNAL_URL` değişkenini kendisi verir). Site de açılır açılmaz sunucuyu dürter.
 
+## Giriş / oturum
+- Site oturumu tarayıcıda 7 gün kalır (sayfa yenilense, yeni sekme açılsa da). Site açıkken
+  her `/site/me` isteğinde oturum tazelenir. Şifre değişince bütün site oturumları düşer.
+- Sayfa açılır açılmaz son bilinen ad ve elmas gösterilir, sunucu cevap verince güncellenir.
+  Sunucu uyanırken altta "Sunucuya bağlanılıyor…" bandı çıkar; ağ hatası yüzünden çıkış yapılmaz,
+  yalnız sunucu "oturum geçersiz" derse çıkış yapılır.
+- `server.py` mutlaka yeni sürümüyle yüklenmeli (yeni uçlar: `/health`, `/site/gemwheel/spin`,
+  `/site/me` oturum tazeleme). Render'da `SITE_ORIGINS` boşsa `https://volvearena.shop` ve
+  `https://www.volvearena.shop` kabul edilir; başka bir adres kullanıyorsan onu da ekle.
+- Mağaza sayfasındaki "Satın al" düğmeleri `odeme.php`'ye gider. Bu dosya sunucunda yoksa
+  düğmeler ölü bağlantı yerine "satın alma oyunun içinden" penceresini açar.
+
 ## Siteyi yeniden derlemek
 Oyuna yeni skin/kitap/silah eklenince:
 

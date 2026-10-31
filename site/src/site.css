@@ -335,11 +335,16 @@ b,strong{color:var(--text);font-weight:700}
 @media(max-width:1440px){.nav{margin-left:4px}.nav a{padding:8px 8px;font-size:.88rem}.top .wrap{gap:12px}}
 @media(max-width:1240px){.top-right>.btn.sm{display:none}}
 @media(max-width:1100px){.nav a{padding:8px 7px;font-size:.85rem}.statstrip .wrap{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:980px){
+@media(max-width:1360px){.acct .who{display:none}}
+@media(max-width:1180px){
   .burger{display:block}
-  .nav{position:fixed;left:0;right:0;top:66px;flex-direction:column;gap:0;margin:0;background:rgba(12,10,29,.97);border-bottom:1px solid var(--line);padding:8px 14px 14px;display:none}
+  .nav{position:fixed;left:0;right:0;top:66px;flex-direction:column;gap:0;margin:0;background:rgba(12,10,29,.97);border-bottom:1px solid var(--line);padding:8px 14px 14px;display:none;max-height:calc(100vh - 66px);overflow:auto}
   .nav.open{display:flex}
   .nav a{padding:12px;font-size:1rem}
+  .top-right>.btn.sm{display:inline-flex}
+}
+@media(max-width:640px){.top-right>.btn.sm{display:none}}
+@media(max-width:980px){
   .hero .wrap,.feat{grid-template-columns:1fr}
   .newgrid,.explore,.cards3,.rewards,.stiers{grid-template-columns:1fr 1fr}
   .steps4,.oaths,.packs{grid-template-columns:1fr 1fr}
@@ -420,7 +425,7 @@ b,strong{color:var(--text);font-weight:700}
 .seat.turn{box-shadow:0 0 0 3px var(--cyan) inset,0 0 26px rgba(80,220,255,.25)}
 .seat .nm{display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:.95rem;margin-bottom:10px;gap:8px;color:#eafff2;flex-wrap:wrap}
 .seat .nm em{font-style:normal;color:var(--gold)}
-.who{display:inline-flex;align-items:center}
+.swho{display:inline-flex;align-items:center;min-width:0}
 .hv{font-family:var(--display);font-size:1.3rem;background:rgba(0,0,0,.35);border-radius:10px;padding:2px 12px}
 .hv.bust{color:#ff6b7a}.hv.bj{color:var(--gold)}
 .gold{color:var(--gold)}
@@ -526,3 +531,83 @@ b,strong{color:var(--text);font-weight:700}
 /* AppLixir ödüllü video alanı (çark panelinde) */
 .adbox{display:none;position:relative;width:100%;min-height:0;margin:8px 0}
 .adbox.on{display:block;min-height:250px}
+
+/* bağlantı bandı + bildirim */
+#netBar{position:fixed;left:50%;bottom:18px;transform:translate(-50%,140%);z-index:300;display:flex;align-items:center;gap:12px;max-width:calc(100% - 32px);
+  background:#1c1640;border:1px solid var(--line2);color:var(--text);border-radius:14px;padding:10px 14px;box-shadow:0 12px 40px rgba(0,0,0,.5);font-weight:700;font-size:.9rem;transition:transform .25s}
+#netBar.on{transform:translate(-50%,0)}
+#netBar.bad{border-color:#ff6b7a}
+#netBar .sp{width:16px;height:16px;flex:none;border-radius:50%;border:3px solid rgba(255,255,255,.2);border-top-color:var(--gold);animation:spin .8s linear infinite}
+#netBar.bad .sp{animation:none;border-color:#ff6b7a}
+#netBar button{display:none;font:inherit;font-size:.82rem;border:1px solid var(--line2);background:#110e28;color:var(--text);border-radius:10px;padding:6px 10px;cursor:pointer}
+#netBar.bad button{display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+#toast{position:fixed;left:50%;top:84px;transform:translate(-50%,-20px);opacity:0;pointer-events:none;z-index:310;background:#1c1640;border:1px solid var(--gold);
+  color:var(--text);border-radius:14px;padding:10px 18px;font-weight:800;box-shadow:0 12px 40px rgba(0,0,0,.5);transition:all .25s;max-width:calc(100% - 32px);text-align:center}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+.acct .gems.stale{opacity:.6}
+.note.err{border-color:#ff6b7a;color:#ffc2c9}
+
+/* ---------- oyun salonu: seçici + efektler ---------- */
+.gpick{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:22px}
+.gpick button{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;padding:12px 10px 14px;border-radius:18px;cursor:pointer;color:var(--text);
+  background:linear-gradient(170deg,#1c1640,#110d28);border:1px solid var(--line2);font:inherit;transition:transform .15s,border-color .15s,box-shadow .15s;overflow:hidden}
+.gpick button::before{content:"";position:absolute;inset:0;background:radial-gradient(80% 60% at 50% 20%,rgba(243,197,94,.16),transparent 70%);opacity:0;transition:opacity .2s}
+.gpick button:hover{transform:translateY(-4px);border-color:rgba(243,197,94,.6)}
+.gpick button:hover::before,.gpick button[aria-selected=true]::before{opacity:1}
+.gpick button[aria-selected=true]{border-color:var(--gold);box-shadow:0 10px 30px rgba(226,169,34,.22),inset 0 0 0 1px var(--gold)}
+.gpick .art{display:block;width:100%;max-width:130px;height:84px;position:relative}
+.gpick .art svg,.mkart svg,.rart svg,.hart svg{width:100%;height:100%;display:block}
+.gpick button:hover .art svg{animation:wob .6s ease}
+@keyframes wob{30%{transform:rotate(-4deg) scale(1.05)}70%{transform:rotate(3deg)}}
+.gpick b{font-family:var(--display);font-weight:400;font-size:1.05rem;position:relative}
+.gpick small{color:var(--muted);font-size:.76rem;font-weight:700;position:relative}
+.mkart{flex:none;width:86px;height:64px}
+.room{position:relative;overflow:hidden}
+.rart{position:absolute;right:-8px;bottom:-6px;width:96px;height:72px;opacity:.18;pointer-events:none}
+.hart{display:inline-block;width:46px;height:34px;vertical-align:middle;margin-right:8px}
+.felt .hdr b{display:flex;align-items:center}
+.hr{display:flex;align-items:center;gap:10px}
+.sndb{width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.3);cursor:pointer;font-size:1rem;line-height:1}
+.cstack{display:inline-flex;flex-direction:column-reverse;margin-right:8px;vertical-align:middle;height:22px;justify-content:flex-start}
+.cstack i{display:block;width:20px;height:5px;border-radius:50%;margin-top:-1px;background:linear-gradient(90deg,#e2a922,#fff3b0 50%,#e2a922);box-shadow:0 1px 0 #7a4e10}
+.felt::after{content:"EVOLVE ARENA";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-8deg);font-family:var(--display);font-size:clamp(2.4rem,7vw,5.5rem);
+  color:rgba(255,255,255,.035);letter-spacing:.08em;white-space:nowrap;pointer-events:none}
+.felt>*{position:relative;z-index:1}
+.cards{position:relative}
+.stamp{position:absolute;left:12px;top:24px;transform:rotate(-14deg);font-family:var(--display);font-size:1.6rem;color:#ff4d5e;border:4px solid #ff4d5e;border-radius:10px;
+  padding:2px 14px;background:rgba(40,0,6,.35);letter-spacing:.1em;animation:stampIn .35s cubic-bezier(.2,1.6,.4,1) both;pointer-events:none}
+.stamp.gold{color:var(--gold);border-color:var(--gold);background:rgba(40,28,0,.35);left:auto;right:12px}
+@keyframes stampIn{from{transform:rotate(-14deg) scale(2.2);opacity:0}}
+.coin3d span{display:flex;flex-direction:column;align-items:center;gap:2px}
+.coin3d .cf{font-style:normal;font-size:2rem;line-height:1}
+.board .c.hit,.outs .c.hit{animation:hit 1s ease 3;box-shadow:0 0 0 3px #fff,0 0 22px #fff6c8;z-index:3}
+@keyframes hit{50%{transform:scale(1.15)}}
+.burst{position:fixed;left:50%;top:46%;z-index:250;transform:translate(-50%,-50%);pointer-events:none;display:flex;align-items:center;justify-content:center;width:520px;height:520px;max-width:96vw}
+.burst .rays{position:absolute;inset:0;border-radius:50%;background:repeating-conic-gradient(rgba(255,214,107,.32) 0 8deg,transparent 8deg 22deg);
+  -webkit-mask:radial-gradient(circle,#000 25%,transparent 70%);mask:radial-gradient(circle,#000 25%,transparent 70%);animation:rays 2.2s linear both}
+.burst .bt{position:relative;font-family:var(--display);font-size:clamp(2.6rem,9vw,5rem);color:#fff6c8;text-align:center;line-height:1;
+  text-shadow:0 4px 0 #a8701e,0 0 30px rgba(255,200,80,.8),0 10px 30px rgba(0,0,0,.6);animation:pop2 2.2s cubic-bezier(.2,1.4,.4,1) both}
+.burst .bt small{display:block;font-family:var(--body);font-weight:800;font-size:1.05rem;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.7);margin-top:10px}
+.burst.win .bt{color:#d9ffe4;text-shadow:0 4px 0 #1f7a46,0 0 30px rgba(110,240,160,.8),0 10px 30px rgba(0,0,0,.6)}
+.burst.win .rays{background:repeating-conic-gradient(rgba(110,240,160,.28) 0 8deg,transparent 8deg 22deg)}
+@keyframes rays{0%{transform:scale(.3) rotate(0);opacity:0}15%{opacity:1}80%{opacity:1}100%{transform:scale(1.1) rotate(60deg);opacity:0}}
+@keyframes pop2{0%{transform:scale(.2);opacity:0}18%{transform:scale(1.15);opacity:1}30%{transform:scale(1)}82%{opacity:1}100%{transform:scale(1.05) translateY(-20px);opacity:0}}
+.gemrain{position:fixed;inset:0;pointer-events:none;z-index:240;overflow:hidden}
+.gemrain span{position:absolute;top:-40px;animation:fall 2.4s cubic-bezier(.3,.1,.6,1) both;filter:drop-shadow(0 4px 6px rgba(0,0,0,.4))}
+@keyframes fall{to{transform:translateY(110vh) rotate(260deg)}}
+@media(max-width:980px){.gpick{grid-template-columns:repeat(3,1fr)}.gpick .art{height:64px}.burst{width:340px;height:340px}}
+@media(max-width:560px){.gpick{grid-template-columns:repeat(2,1fr)}.gpick button:last-child{grid-column:1/-1}.mkart{width:64px;height:48px}.hart{display:none}}
+@media(prefers-reduced-motion:reduce){.burst,.gemrain{display:none}}
+
+/* mobil başlık: girişliyken logo + elmas + çıkış + menü 360 px'e sığsın */
+.top .wrap{min-width:0}
+@media(max-width:640px){
+  .top .wrap{gap:10px}
+  .top-right{gap:4px}
+  .acct{gap:2px;font-size:.8rem}
+  .acct .gems{padding:5px 9px;gap:4px;font-size:.8rem}
+  .acct button{padding:6px 5px;font-size:.8rem}
+  .top .logo{font-size:1.2rem}
+}
+@media(max-width:370px){.top .logo{font-size:1.05rem}.acct .gems{padding:4px 7px}}

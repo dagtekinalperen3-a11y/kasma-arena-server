@@ -154,7 +154,7 @@ const pages={
     r('hat');tabs('#cosTabs',r);
   },
   rehber(){renderMaps('plaza');renderOaths();},
-  magaza(){renderStore('gems');tabs('#storeTabs',renderStore);},
+  magaza(){renderStore('gems');tabs('#storeTabs',renderStore);checkPay();},
   kazi(){renderTiers();initScratch();},
   oyunlar(){initGames();}
 };
@@ -162,6 +162,16 @@ const pages={
 /* ---------- mağaza ---------- */
 const GEMS=[{g:100,old:null,p:'29,90'},{g:550,old:'74,90',p:'59,90'},{g:1200,old:'149,90',p:'119,90',best:true},{g:2600,old:null,p:'229,90'}];
 function odeme(u){return 'odeme.php?urun='+encodeURIComponent(u);}
+// ödeme sayfası sunucuda yoksa "Satın al" ölü bağlantıya gitmesin: oyundaki mağazaya yönlendir
+let PAY_OK=null;
+function checkPay(){
+  fetch('odeme.php',{method:'HEAD',cache:'no-store'}).then(r=>{PAY_OK=r.ok||r.status===405||r.status===302;}).catch(()=>{PAY_OK=false;});
+}
+document.addEventListener('click',e=>{
+  const a=e.target.closest('a[href^="odeme.php"]');if(!a||PAY_OK!==false)return;
+  e.preventDefault();e.stopPropagation();
+  info('<h3 style="margin-bottom:10px">Satın alma oyunun içinden</h3><p>Oyunu aç: <b>Mağaza › Elmas Paketleri</b> (ya da Premium Skinler / Petler). Ödeme güvenli ödeme sayfasında yapılır, elmasın hesabına kendiliğinden işlenir.</p><p style="margin-top:12px"><a class="btn sm" href="index.html#indir">Oyunu indir</a></p>');
+},true);
 function renderStore(c){
   const b=$('#storeBody');if(!b)return;
   if(c==='gems'){b.innerHTML='<div class="packs">'+GEMS.map(p=>'<div class="pack'+(p.best?' best':'')+'">'+(p.best?'<span class="tag rare flag">En popüler</span>':'')+
@@ -254,45 +264,140 @@ function demo(cid,hpId,wvId,lvId,klId,notId){
 }
 
 /* =================== HESAP (site geçişi) =================== */
-const ST={pass:null,state:null};
-function sset(k,v){try{v==null?sessionStorage.removeItem(k):sessionStorage.setItem(k,v);}catch(e){}}
-function sget(k){try{return sessionStorage.getItem(k);}catch(e){return null;}}
-async function api(path,body){
-  let r;
-  try{r=await fetch(API+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{}),credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer',mode:'cors'});}
-  catch(e){return {success:false,error:'sunucuya ulaşılamadı (sunucu uyanıyor olabilir, 30 sn sonra tekrar dene)'};}
-  let j={};try{j=await r.json();}catch(e){}
-  if(!j||typeof j!=='object')j={};
-  if(r.status===401&&j.relogin)logout(true);
-  if(!r.ok&&j.success===undefined)j.success=false;
-  return j;
+// Oturum tarayıcıda kalıcı (localStorage): sayfa yenilense, yeni sekme açılsa da
+// girişli kalır. Son bilinen durum (ad, elmas) da saklanır; sayfa açılır açılmaz
+// girişli görünür, sunucu cevap verince tazelenir. Yalnızca sunucu "oturum
+// geçersiz" (401) derse çıkış yapılır; ağ hatası / sunucu uyanıyor çıkış yaptırmaz.
+const ST={pass:null,state:null,stale:false};
+const LS_P='ea_pass',LS_S='ea_state';
+function lset(k,v){
+  try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v);}catch(e){}
+  try{v==null?sessionStorage.removeItem(k):sessionStorage.setItem(k,v);}catch(e){}
 }
-function setState(s){if(s&&typeof s==='object'){ST.state=s;renderAcct();renderWheelUi();if(PAGE==='kazi')renderTiers();if(PAGE==='oyunlar'){gameNeedLogin();if(!G.room&&G.tab!=='roul'&&G.tab!=='gw'&&!G.busy)renderGames();}}}
-function setPass(p,s){ST.pass=p;sset('ea_pass',p);setState(s);}
-function logout(expired){ST.pass=null;ST.state=null;sset('ea_pass',null);sset('ea_wt',null);renderAcct();renderWheelUi();if(PAGE==='kazi')renderTiers();
-  if(expired)wNote('Oturumun süresi doldu: yeniden giriş yap ya da oyundan aç.',true);}
+function lget(k){let v=null;try{v=localStorage.getItem(k);}catch(e){}if(v==null){try{v=sessionStorage.getItem(k);}catch(e){}}return v;}
+const sset=lset,sget=lget;
+function passExp(p){const a=String(p||'').split('.');const e=+a[2];return (a.length===6&&a[0]==='s1'&&e>0)?e*1000:0;}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function safe(f){try{return f&&f();}catch(e){console.error('[EvolveArena]',e);}}
+
+/* ---------- bağlantı durumu bandı ---------- */
+const NET={pending:0,fails:0,slowT:0};
+function netBar(){
+  let b=$('#netBar');
+  if(!b){b=document.createElement('div');b.id='netBar';b.setAttribute('role','status');b.innerHTML='<span class="sp"></span><span class="tx"></span><button type="button">Tekrar dene</button>';
+    document.body.appendChild(b);b.querySelector('button').onclick=()=>{NET.fails=0;netShow();if(ST.pass)refreshMe(true);else location.reload();};}
+  return b;
+}
+function netShow(){
+  const slow=NET.pending>0&&NET.slowT&&Date.now()-NET.slowT>3500,bad=NET.fails>=2;
+  const b=$('#netBar');
+  if(!slow&&!bad){if(b)b.classList.remove('on');return;}
+  const bb=netBar();bb.classList.add('on');bb.classList.toggle('bad',bad&&!slow);
+  bb.querySelector('.tx').textContent=bad&&!slow?'Sunucuya ulaşılamadı. İnternetini kontrol et ya da biraz sonra tekrar dene.':'Sunucuya bağlanılıyor… (ilk açılış 30 sn kadar sürebilir)';
+}
+setInterval(netShow,800);
+
+async function api(path,body,opt){
+  opt=opt||{};
+  const tries=opt.retry?7:1;
+  let last={success:false,error:'sunucuya ulaşılamadı (internetini kontrol et ya da biraz sonra dene)',net:true};
+  // yeniden denemeler boyunca da "bekleniyor" sayılır: 3,5 sn'yi geçerse bant görünür
+  NET.pending++;if(NET.pending===1)NET.slowT=Date.now();
+  try{
+  for(let i=0;i<tries;i++){
+    const ctl=typeof AbortController==='function'?new AbortController():null;
+    const to=setTimeout(()=>{try{ctl&&ctl.abort();}catch(e){}},opt.timeout||45000);
+    let r=null;
+    try{r=await fetch(API+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{}),
+      credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer',mode:'cors',signal:ctl?ctl.signal:undefined});}
+    catch(e){r=null;}
+    clearTimeout(to);
+    if(r){
+      let j=null;try{j=await r.json();}catch(e){j=null;}
+      if(j&&typeof j==='object'){
+        if(r.status===401&&j.relogin){NET.fails=0;netShow();logout(true);j.success=false;return j;}
+        if(!r.ok&&j.success===undefined)j.success=false;
+        const transient=r.status===429||r.status>=500;
+        if(!transient){NET.fails=0;netShow();return j;}
+        last=j;
+      }else{
+        last={success:false,error:r.status===429?'çok sık istek, biraz bekle':'sunucu şu an yanıt vermiyor ('+r.status+'), biraz sonra dene'};
+        if(r.status<500&&r.status!==429){NET.fails=0;return last;}
+      }
+    }
+    if(i<tries-1)await sleep(Math.min(9000,1200*(i+1)));
+  }
+  NET.fails++;
+  return last;
+  }finally{NET.pending=Math.max(0,NET.pending-1);if(!NET.pending)NET.slowT=0;netShow();}
+}
+
+function setState(s){
+  if(!s||typeof s!=='object')return;
+  ST.state=s;ST.stale=false;
+  try{lset(LS_S,JSON.stringify({t:Date.now(),s:s}));}catch(e){}
+  renderAll();
+}
+function renderAll(){
+  safe(renderAcct);safe(renderWheelUi);
+  if(PAGE==='kazi')safe(renderTiers);
+  if(PAGE==='oyunlar'){safe(gameNeedLogin);if(!G.room&&G.tab!=='roul'&&G.tab!=='gw'&&!G.busy)safe(renderGames);else if(G.tab==='gw')safe(gwBtnLabel);}
+}
+function setPass(p,s){ST.pass=p;lset(LS_P,p);setState(s);}
+function logout(expired){
+  ST.pass=null;ST.state=null;ST.stale=false;lset(LS_P,null);lset(LS_S,null);lset('ea_wt',null);
+  safe(()=>{W.ticket=null;});
+  renderAll();
+  if(PAGE==='oyunlar')safe(()=>{G.room=null;G.seq=-1;renderGames();});
+  if(expired){wNote('Oturumun süresi doldu: yeniden giriş yap ya da oyundan aç.',true);toast('Oturumun süresi doldu, yeniden giriş yap.');}
+}
+async function refreshMe(force){
+  if(!ST.pass)return false;
+  const j=await api('/site/me',{pass:ST.pass},{retry:true,timeout:60000});
+  if(j.success){if(j.pass){ST.pass=j.pass;lset(LS_P,j.pass);}setState(j.state);return true;}
+  return false;
+}
+function toast(t){
+  let el=$('#toast');if(!el){el=document.createElement('div');el.id='toast';el.setAttribute('role','status');document.body.appendChild(el);}
+  el.textContent=t;el.classList.add('on');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),4200);
+}
 function renderAcct(){
   const a=$('#acct');if(!a)return;a.textContent='';
   if(ST.state){
     const w=document.createElement('span');w.className='who';w.textContent=ST.state.name;
-    const g=document.createElement('span');g.className='gems';g.textContent='💎 '+num(ST.state.gems);
-    const b=document.createElement('button');b.textContent='Çıkış';b.onclick=()=>logout(false);
+    const g=document.createElement('span');g.className='gems'+(ST.stale?' stale':'');g.textContent='💎 '+num(ST.state.gems);
+    const b=document.createElement('button');b.type='button';b.textContent='Çıkış';b.onclick=()=>{if(confirm('Siteden çıkış yapılsın mı?'))logout(false);};
     a.append(w,g,b);
-  }else{const b=document.createElement('button');b.textContent='Giriş yap';b.onclick=()=>openModal('#mLogin');a.append(b);}
+  }else{const b=document.createElement('button');b.type='button';b.className='signin';b.textContent='Giriş yap';b.onclick=()=>openModal('#mLogin');a.append(b);}
   const fc=$('#fabCnt');
-  if(fc){const l=ST.state?ST.state.wheel.left:null;fc.hidden=!(l>0);fc.textContent=l||'';$('#fab').classList.toggle('hot',!!(ST.state&&ST.state.wheel.left>0));}
+  if(fc){const l=ST.state&&ST.state.wheel?ST.state.wheel.left:null;fc.hidden=!(l>0);fc.textContent=l||'';const fb=$('#fab');if(fb)fb.classList.toggle('hot',!!(l>0));}
 }
 const lf=$('#loginForm');
 if(lf)lf.addEventListener('submit',async e=>{
-  e.preventDefault();const btn=$('#lgBtn');btn.disabled=true;$('#lgErr').textContent='';
-  const j=await api('/site/login',{username:$('#lgUser').value.trim(),password:$('#lgPass').value});
-  btn.disabled=false;$('#lgPass').value='';
-  if(j.success){setPass(j.pass,j.state);closeAll();}else $('#lgErr').textContent=j.error||'giriş yapılamadı';
+  e.preventDefault();const btn=$('#lgBtn'),err=$('#lgErr');
+  const u=$('#lgUser').value.trim(),pw=$('#lgPass').value;
+  if(!u||!pw){err.textContent='Kullanıcı adı ve şifreyi yaz.';return;}
+  btn.disabled=true;err.textContent='';const old=btn.textContent;btn.textContent='Giriş yapılıyor…';
+  const slow=setTimeout(()=>{err.textContent='Sunucu uyanıyor, birkaç saniye daha…';},4000);
+  const j=await api('/site/login',{username:u,password:pw},{timeout:60000});
+  clearTimeout(slow);btn.disabled=false;btn.textContent=old;$('#lgPass').value='';
+  if(j.success){err.textContent='';setPass(j.pass,j.state);closeAll();toast('Hoş geldin '+j.state.name+'!');}
+  else err.textContent=j.error||'giriş yapılamadı';
 });
+// başka sekmede giriş / çıkış yapılınca bu sekme de uyar
+window.addEventListener('storage',e=>{
+  if(e.key!==LS_P)return;
+  if(!e.newValue&&ST.pass){ST.pass=null;ST.state=null;renderAll();}
+  else if(e.newValue&&e.newValue!==ST.pass){ST.pass=e.newValue;try{const o=JSON.parse(lget(LS_S)||'null');if(o&&o.s){ST.state=o.s;}}catch(x){}renderAll();refreshMe();}
+});
+// açık kalan sayfada elmas güncel kalsın
+setInterval(()=>{if(ST.pass&&!document.hidden&&PAGE!=='oyunlar')refreshMe();},90000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&ST.pass&&ST.state&&Date.now()-(ST.lastMe||0)>30000){ST.lastMe=Date.now();refreshMe();}});
 
 /* =================== ŞANS ÇARKI (panel) =================== */
 const W={angle:0,spin:null,ticket:sget('ea_wt'),readyAt:0,timer:null,imgs:{},open:false,raf:0};
-function openDrawer(){const d=$('#drawer');if(!d)return;d.classList.add('on');d.setAttribute('aria-hidden','false');W.open=true;if(!W.raf)W.raf=requestAnimationFrame(wheelLoop);}
+function openDrawer(){const d=$('#drawer');if(!d)return;d.classList.add('on');d.setAttribute('aria-hidden','false');W.open=true;if(!W.raf)W.raf=requestAnimationFrame(wheelLoop);axLoad();
+  if(!GD)wNote('Çark verisi yüklenemedi: sayfayı yenile (Ctrl+F5).',true);}
 function closeDrawer(){const d=$('#drawer');if(!d)return;d.classList.remove('on');d.setAttribute('aria-hidden','true');W.open=false;}
 $('#fab')&&($('#fab').onclick=openDrawer);
 document.addEventListener('click',e=>{if(e.target.closest('[data-open-wheel]')){e.preventDefault();openDrawer();}if(e.target.closest('[data-close-drawer]'))closeDrawer();});
@@ -355,7 +460,15 @@ function setBtn(text,mode){
    (status.type === "complete") çark açılır. Reklam yüklenemezse (reklam
    engelleyici vb.) aynı süre beklenir: çark yine çalışır. Asıl güvenlik
    sunucuda: çevirme ancak sunucunun başlattığı sürenin sonunda kabul edilir. */
-const ADX={handle:null,last:0,busy:false,cb:null,to:0};
+const ADX={handle:null,last:0,busy:false,cb:null,to:0,loading:false};
+// SDK yalnızca çark paneli açılınca yüklenir: dış betik başka sayfaları hiç etkilemez
+function axLoad(){
+  if(ADX.loading||typeof preloadAd==='function'||!axKey())return;
+  ADX.loading=true;
+  const s=document.createElement('script');s.src='https://cdn.applixir.com/applixir.app.v6.1.0.js';s.async=true;
+  s.onload=()=>setTimeout(axPreload,300);s.onerror=()=>{ADX.loading=false;};
+  document.head.appendChild(s);
+}
 function axKey(){return (window.EA_CFG&&window.EA_CFG.applixirKey)||'';}
 function axFire(ok){const f=ADX.cb;ADX.cb=null;if(ADX.to){clearTimeout(ADX.to);ADX.to=0;}if(f)f(ok);}
 function axOptions(){
@@ -408,7 +521,9 @@ if(wb)wb.addEventListener('click',async e=>{
   if(mode==='go'){
     e.preventDefault();
     // önce sunucu bekleme sayacını başlatır, sonra ödüllü video oynar
-    const j=await api('/site/wheel/ad',{pass:ST.pass});
+    setBtn('BAŞLATILIYOR…','off');
+    const j=await api('/site/wheel/ad',{pass:ST.pass},{retry:true});
+    if(!j.success){renderWheelUi();}
     if(!j.success){wNote(j.error||'başlatılamadı',true);return;}
     W.ticket=j.ticket;sset('ea_wt',j.ticket);ST.state.wheel.pending=true;ST.state.wheel.rest=j.wait;
     renderWheelUi();setBtn('🎬 VİDEO OYNUYOR…','off');wNote('Videoyu sonuna kadar izle, çark açılsın.');
@@ -503,6 +618,56 @@ function reveal(){
   setState(SC.res.state);
 }
 
+/* ---------- oyun salonu: çizimler, efektler, sesler ---------- */
+const ART={
+  coin:'<svg viewBox="0 0 120 90" aria-hidden="true"><defs><radialGradient id="gc1" cx="35%" cy="30%"><stop offset="0" stop-color="#fff6c4"/><stop offset=".55" stop-color="#f0bb3c"/><stop offset="1" stop-color="#9a6514"/></radialGradient></defs>'+
+    '<ellipse cx="60" cy="80" rx="30" ry="6" fill="rgba(0,0,0,.35)"/><circle cx="60" cy="44" r="34" fill="url(#gc1)" stroke="#7a4e10" stroke-width="3"/><circle cx="60" cy="44" r="26" fill="none" stroke="#fff3b0" stroke-opacity=".6" stroke-width="2" stroke-dasharray="3 4"/>'+
+    '<path d="M60 26l11 8-4 16H53l-4-16z" fill="#7fe3ff" stroke="#16485e" stroke-width="2.5" stroke-linejoin="round"/><path d="M49 34h22M60 26l-3 24M60 26l3 24" stroke="#16485e" stroke-width="1.6"/><path d="M38 24q8-10 20-12" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".7" fill="none"/></svg>',
+  bj:'<svg viewBox="0 0 120 90" aria-hidden="true"><g transform="rotate(-14 46 50)"><rect x="24" y="16" width="44" height="62" rx="6" fill="#fffdf6" stroke="#cfc6ae" stroke-width="2"/><text x="31" y="32" font-family="Russo One,sans-serif" font-size="13" fill="#1b1b28">A</text><text x="46" y="57" font-size="22" text-anchor="middle" fill="#1b1b28">♠</text></g>'+
+    '<g transform="rotate(12 76 48)"><rect x="54" y="14" width="44" height="62" rx="6" fill="#fffdf6" stroke="#cfc6ae" stroke-width="2"/><text x="61" y="30" font-family="Russo One,sans-serif" font-size="13" fill="#c8283a">K</text><text x="76" y="55" font-size="22" text-anchor="middle" fill="#c8283a">♥</text></g>'+
+    '<circle cx="96" cy="70" r="15" fill="#e2a922" stroke="#fff" stroke-width="3" stroke-dasharray="4 3"/><text x="96" y="75" text-anchor="middle" font-family="Russo One,sans-serif" font-size="13" fill="#1a1206">21</text></svg>',
+  pisti:'<svg viewBox="0 0 120 90" aria-hidden="true"><g transform="rotate(-18 50 46)"><rect x="30" y="14" width="40" height="58" rx="6" fill="#3b2a8a" stroke="#fff" stroke-width="3"/><circle cx="50" cy="43" r="8" fill="#6a4ad0"/></g>'+
+    '<g transform="rotate(10 70 46)"><rect x="50" y="14" width="40" height="58" rx="6" fill="#fffdf6" stroke="#cfc6ae" stroke-width="2"/><text x="57" y="30" font-family="Russo One,sans-serif" font-size="13" fill="#1b1b28">J</text><text x="70" y="54" font-size="22" text-anchor="middle" fill="#1b1b28">♣</text></g>'+
+    '<g transform="rotate(-6 60 70)"><path d="M14 62h92l-6 9 6 9H14l6-9z" fill="#e2a922" stroke="#7a4e10" stroke-width="2"/><text x="60" y="76" text-anchor="middle" font-family="Russo One,sans-serif" font-size="13" fill="#3a2406">PİŞTİ!</text></g></svg>',
+  roul:'<svg viewBox="0 0 120 90" aria-hidden="true"><ellipse cx="60" cy="82" rx="34" ry="6" fill="rgba(0,0,0,.35)"/><circle cx="60" cy="44" r="36" fill="#5a3418" stroke="#2a160a" stroke-width="3"/>'+
+    Array.from({length:16},(_,i)=>{const a0=i/16*6.283,a1=(i+1)/16*6.283;return '<path d="M60 44L'+(60+31*Math.cos(a0)).toFixed(1)+' '+(44+31*Math.sin(a0)).toFixed(1)+'A31 31 0 0 1 '+(60+31*Math.cos(a1)).toFixed(1)+' '+(44+31*Math.sin(a1)).toFixed(1)+'z" fill="'+(i===0?'#1f8a4e':(i%2?'#c0202f':'#16161f'))+'" stroke="#d9b45a" stroke-width=".8"/>';}).join('')+
+    '<circle cx="60" cy="44" r="15" fill="#6a4220" stroke="#d9b45a" stroke-width="2.5"/><path d="M60 32v24M48 44h24" stroke="#e8c46a" stroke-width="3" stroke-linecap="round"/><circle cx="82" cy="24" r="4.5" fill="#fff"/></svg>',
+  gw:'<svg viewBox="0 0 120 90" aria-hidden="true"><circle cx="60" cy="46" r="38" fill="#0d1830"/><circle cx="60" cy="46" r="34" fill="#2a6c9a"/>'+
+    Array.from({length:8},(_,i)=>{const c=['#e2a922','#6a3fb0','#1f7a86','#c23a7a','#2f8a4a','#3c4a6a','#c46a1c','#2a2638'][i],a0=i/8*6.283,a1=(i+1)/8*6.283;return '<path d="M60 46L'+(60+30*Math.cos(a0)).toFixed(1)+' '+(46+30*Math.sin(a0)).toFixed(1)+'A30 30 0 0 1 '+(60+30*Math.cos(a1)).toFixed(1)+' '+(46+30*Math.sin(a1)).toFixed(1)+'z" fill="'+c+'" stroke="#0d1830" stroke-width="1.5"/>';}).join('')+
+    '<circle cx="60" cy="46" r="10" fill="#bfefff" stroke="#0d1830" stroke-width="2"/><path d="M60 40l5 4-2 7h-6l-2-7z" fill="#7fe3ff" stroke="#16485e" stroke-width="1.4"/><path d="M52 4h16l-8 12z" fill="#ffd86b" stroke="#3a2a08" stroke-width="2"/></svg>'
+};
+const SND={on:lget('ea_snd')!=='0',ctx:null};
+function snd(kind){
+  if(!SND.on)return;
+  try{
+    if(!SND.ctx){const C=window.AudioContext||window.webkitAudioContext;if(!C)return;SND.ctx=new C();}
+    const c=SND.ctx;if(c.state==='suspended')c.resume();
+    const t=c.currentTime;
+    const tone=(f,d,type,v,at)=>{const o=c.createOscillator(),g=c.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,t+(at||0));
+      g.gain.setValueAtTime(0,t+(at||0));g.gain.linearRampToValueAtTime(v||.08,t+(at||0)+.01);g.gain.exponentialRampToValueAtTime(.0001,t+(at||0)+d);
+      o.connect(g);g.connect(c.destination);o.start(t+(at||0));o.stop(t+(at||0)+d+.02);};
+    if(kind==='card'){tone(900,.05,'triangle',.05);tone(420,.06,'square',.02,.01);}
+    else if(kind==='chip'){tone(1800,.04,'triangle',.05);tone(2400,.05,'triangle',.03,.03);}
+    else if(kind==='win'){[523,659,784,1047].forEach((f,i)=>tone(f,.22,'triangle',.07,i*.09));}
+    else if(kind==='big'){[523,659,784,1047,1319,1568].forEach((f,i)=>tone(f,.28,'triangle',.08,i*.08));}
+    else if(kind==='lose'){tone(220,.35,'sawtooth',.04);tone(165,.45,'sawtooth',.04,.15);}
+    else if(kind==='tick'){tone(1400,.02,'square',.025);}
+  }catch(e){}
+}
+function sndBtn(){return '<button type="button" class="sndb" title="Ses" aria-pressed="'+SND.on+'">'+(SND.on?'🔊':'🔇')+'</button>';}
+document.addEventListener('click',e=>{const b=e.target.closest('.sndb');if(!b)return;SND.on=!SND.on;lset('ea_snd',SND.on?'1':'0');$$('.sndb').forEach(x=>{x.textContent=SND.on?'🔊':'🔇';x.setAttribute('aria-pressed',SND.on);});if(SND.on)snd('chip');});
+function burst(host,html,cls){
+  // masanın üstünde büyük patlama yazısı (PİŞTİ!, BLACKJACK!, KAZANDIN!)
+  if(!host)return;const d=document.createElement('div');d.className='burst '+(cls||'');d.innerHTML='<div class="rays"></div><div class="bt">'+html+'</div>';
+  host.appendChild(d);setTimeout(()=>d.remove(),2300);
+}
+function gemRain(n){
+  const box=document.createElement('div');box.className='gemrain';
+  for(let i=0;i<(n||26);i++){const s=document.createElement('span');s.textContent='💎';s.style.left=(Math.random()*100)+'%';s.style.animationDelay=(Math.random()*.9)+'s';s.style.fontSize=(16+Math.random()*20)+'px';box.appendChild(s);}
+  document.body.appendChild(box);setTimeout(()=>box.remove(),3200);
+}
+function chipStack(v){const n=Math.max(1,Math.min(6,Math.ceil(Math.log10(Math.max(10,v))-2)));let h='<span class="cstack">';for(let i=0;i<n;i++)h+='<i style="--i:'+i+'"></i>';return h+'</span>';}
+
 /* =================== OYUN SALONU =================== */
 // Bütün kartlar ve sonuçlar sunucuda. Burada yalnızca sunucunun bu oyuncuya
 // gösterdiği görüntü çizilir; hamleler sunucuya gider ve orada doğrulanır.
@@ -520,7 +685,8 @@ function pcard(c,cls,attr){
 }
 function gameNeedLogin(){const n=$('#gameNeedLogin');if(n)n.style.display=ST.state?'none':'block';}
 function initGames(){
-  tabs('#gameTabs',t=>{G.tab=t;G.room=null;renderGames();});
+  $$('#gameTabs [data-art]').forEach(a=>{a.innerHTML=ART[a.dataset.art]||'';});
+  tabs('#gameTabs',t=>{G.tab=t;G.room=null;snd('chip');renderGames();});
   renderGames();
   setInterval(()=>{if(document.hidden)return;if(G.room)pollRoom();else if(G.tab!=='roul'&&G.tab!=='gw')pollLobby();},1100);
 }
@@ -544,13 +710,13 @@ function renderLobby(rooms){
   const extra=k==='coin'?'<div class="lbl2">Senin tarafın</div><div class="opts seg"><button data-side="yazi" aria-pressed="'+(G.side==='yazi')+'">YAZI</button><button data-side="tura" aria-pressed="'+(G.side==='tura')+'">TURA</button></div>'
     :(k==='pisti'?'<div class="lbl2">Oyuncu sayısı</div><div class="opts seg"><button data-cap="2" aria-pressed="'+(G.cap===2)+'">2 kişi</button><button data-cap="4" aria-pressed="'+(G.cap===4)+'">4 kişi</button></div>':'');
   const players=k==='pisti'?G.cap:2,net=Math.round(G.stake*players*0.95);
-  box.innerHTML='<div class="lob"><div class="box mk"><div class="mkh"><span class="gico g-'+k+'"></span><div><h3>'+esc(RULES[k][0])+'</h3><p>'+esc(RULES[k][1])+'</p></div></div>'+
+  box.innerHTML='<div class="lob"><div class="box mk"><div class="mkh"><span class="mkart">'+ART[k]+'</span><div><h3>'+esc(RULES[k][0])+'</h3><p>'+esc(RULES[k][1])+'</p></div></div>'+
     '<div class="lbl2">Bahis</div><div class="chips">'+stakeBtns+'</div>'+extra+
     '<div class="potline"><span>Kazanırsan</span><b>💎 '+num(net)+'</b></div>'+
     '<button class="btn block big" id="gCreate">'+(ST.state?'Masa aç · 💎 '+num(G.stake):'Giriş yap')+'</button>'+
     '<p class="secnote">Kazanan potun %95\'ini alır, berabere kalınırsa herkesin elması geri döner.</p></div>'+
     '<div><div class="lhead"><h3>Açık masalar</h3><span class="live"><i></i>canlı</span></div><div id="roomList">'+roomsHtml(rooms)+'</div></div></div>';
-  box.querySelectorAll('[data-stake]').forEach(b=>b.onclick=()=>{G.stake=+b.dataset.stake;renderLobby(G.lastRooms||[]);});
+  box.querySelectorAll('[data-stake]').forEach(b=>b.onclick=()=>{G.stake=+b.dataset.stake;snd('chip');renderLobby(G.lastRooms||[]);});
   box.querySelectorAll('[data-side]').forEach(b=>b.onclick=()=>{G.side=b.dataset.side;renderLobby(G.lastRooms||[]);});
   box.querySelectorAll('[data-cap]').forEach(b=>b.onclick=()=>{G.cap=+b.dataset.cap;renderLobby(G.lastRooms||[]);});
   $('#gCreate').onclick=()=>createRoom();
@@ -560,7 +726,7 @@ function avatars(names,cap){let h='';for(let i=0;i<cap;i++){const n=names[i];h+=
 function roomsHtml(rooms){
   const L=rooms.filter(r=>r.kind===G.tab);
   if(!L.length)return '<div class="empty">Şu an açık masa yok.<br><b>İlk masayı sen aç, rakibin gelsin!</b></div>';
-  return '<div class="rooms">'+L.map(r=>'<div class="room"><div class="rtop"><span class="st">💎 '+num(r.stake)+'</span><span class="cnt">'+r.players.length+'/'+r.cap+'</span></div>'+
+  return '<div class="rooms">'+L.map(r=>'<div class="room"><span class="rart">'+ART[r.kind]+'</span><div class="rtop"><span class="st">💎 '+num(r.stake)+'</span><span class="cnt">'+r.players.length+'/'+r.cap+'</span></div>'+
     '<div class="avs">'+avatars(r.players,r.cap)+'</div>'+
     '<div class="pl">'+esc(r.players.join(', '))+(r.side?' · masa '+(r.side==='yazi'?'YAZI':'TURA')+' seçti':'')+'</div>'+
     '<button class="btn sm" data-join="'+esc(r.id)+'">Otur · 💎 '+num(r.stake)+'</button></div>').join('')+'</div>';
@@ -613,26 +779,28 @@ function resultHtml(r,room){
   return '<div class="resbox '+cls+'"><b>'+esc(head)+'</b><div class="rsub">'+esc(sub)+'</div><span class="muted">'+esc(r.why||'')+(r.rake?' · site kesintisi 💎 '+num(r.rake):'')+'</span>'+
     '<div class="acts"><button class="btn big" id="gReplay">↻ Tekrar oyna · 💎 '+num(room.stake)+'</button><button class="btn ghost" id="gAgain">Lobiye dön</button></div></div>';
 }
-function seatHead(name,mine,extra){return '<div class="nm"><span class="who"><span class="av sm">'+esc((name||'?').slice(0,1).toUpperCase())+'</span>'+esc(name)+(mine?' <em>(sen)</em>':'')+'</span><span>'+extra+'</span></div>';}
+function seatHead(name,mine,extra){return '<div class="nm"><span class="swho"><span class="av sm">'+esc((name||'?').slice(0,1).toUpperCase())+'</span>'+esc(name)+(mine?' <em>(sen)</em>':'')+'</span><span>'+extra+'</span></div>';}
 function renderTable(room){
   G.seq=room.seq;const box=$('#table');if(!box)return;
   if(room.state==='done'&&G.doneFor!==room.id){G.doneFor=room.id;api('/site/me',{pass:ST.pass}).then(j=>{if(j.success){ST.state=j.state;renderAcct();renderWheelUi();}});}
   const pot=room.stake*(room.state==='wait'?room.cap:room.players.length);
-  let h='<div class="felt k-'+room.kind+'"><div class="hdr"><b>'+({coin:'Yazı Tura',bj:'Blackjack',pisti:'Pişti'}[room.kind])+'</b><span class="pot">POT 💎 '+num(pot)+'</span></div>';
+  let h='<div class="felt k-'+room.kind+'"><div class="hdr"><b><span class="hart">'+ART[room.kind]+'</span>'+({coin:'Yazı Tura',bj:'Blackjack',pisti:'Pişti'}[room.kind])+'</b><span class="hr">'+sndBtn()+'<span class="pot">'+chipStack(pot)+'POT 💎 '+num(pot)+'</span></span></div>';
   if(room.state==='wait'){
     h+='<div class="waiting">'+(room.kind==='coin'?'<div class="coin3d spin"><span>?</span></div>':'<div class="dots3"><i></i><i></i><i></i></div>')+
       '<p class="big">Rakip bekleniyor</p><div class="avs lg">'+avatars(room.players,room.cap)+'</div><p class="muted">Masa açık: biri oturunca oyun kendiliğinden başlar.</p></div>'+
       '<div class="acts"><button class="btn sm ghost" id="gLeave">Masadan kalk (elmas iade)</button></div>';
   }else if(room.kind==='coin'){
     const f=room.flip,fresh=G.coinFor!==room.id;G.coinFor=room.id;
-    h+='<div class="waiting"><div class="coin3d '+(fresh?'land ':'')+(f==='yazi'?'yazi':'tura')+'"><span>'+(f==='yazi'?'YAZI':'TURA')+'</span></div>'+
+    if(fresh)setTimeout(()=>snd('chip'),1300);
+    h+='<div class="waiting"><div class="coin3d '+(fresh?'land ':'')+(f==='yazi'?'yazi':'tura')+'"><span>'+(f==='yazi'?'<i class="cf">💎</i>YAZI':'<i class="cf">👑</i>TURA')+'</span></div>'+
       '<div class="vs"><div><b>'+esc(room.players[0])+'</b><span>'+(room.side==='yazi'?'YAZI':'TURA')+'</span></div><i>VS</i><div><b>'+esc(room.players[1]||'')+'</b><span>'+(room.side==='yazi'?'TURA':'YAZI')+'</span></div></div></div>';
   }else if(room.kind==='bj'){
     const order=room.hands.map((_,i)=>i).sort((a,b)=>(a===room.me)-(b===room.me));
     order.forEach(i=>{
-      const hd=room.hands[i],mine=i===room.me,bust=hd.value>21;
-      const val=hd.value!=null?'<span class="hv'+(bust?' bust':(hd.value===21?' bj':''))+'">'+hd.value+(bust?' · BATTI':'')+'</span>':'<span class="muted">'+(hd.done?'durdu':'düşünüyor…')+'</span>';
-      h+='<div class="seat'+(mine?' me':' opp')+'">'+seatHead(room.players[i],mine,val)+'<div class="cards fan">'+hd.cards.map((c,j)=>pcard(c,'lg','style="--i:'+j+'"')).join('')+'</div></div>';
+      const hd=room.hands[i],mine=i===room.me,bust=hd.value>21,bj21=hd.value===21&&hd.cards.length===2;
+      const val=hd.value!=null?'<span class="hv'+(bust?' bust':(hd.value===21?' bj':''))+'">'+(bj21?'BLACKJACK! ':'')+hd.value+'</span>':'<span class="muted">'+(hd.done?'durdu':'düşünüyor…')+'</span>';
+      h+='<div class="seat'+(mine?' me':' opp')+'">'+seatHead(room.players[i],mine,val)+'<div class="cards fan">'+hd.cards.map((c,j)=>pcard(c,'lg','style="--i:'+j+'"')).join('')+
+        (bust?'<span class="stamp">BATTI</span>':'')+(bj21?'<span class="stamp gold">21</span>':'')+'</div></div>';
     });
     if(room.state==='play'&&room.me!=null&&!room.hands[room.me].done)
       h+='<div class="acts"><button class="btn big" id="bjHit">KART ÇEK</button><button class="btn big violet" id="bjStand">DUR</button><span class="timer">⏱ '+(room.time_left||0)+' sn</span></div>';
@@ -665,7 +833,36 @@ function renderTable(room){
   on('gAgain',async()=>{G.room=null;G.seq=-1;const me=await api('/site/me',{pass:ST.pass});if(me.success)setState(me.state);renderGames();});
   on('gReplay',async()=>{const o={kind:room.kind,stake:room.stake,cap:room.cap,side:room.side||G.side};G.room=null;G.seq=-1;await createRoom(o);if(!G.room)renderGames();});
   box.querySelectorAll('.pc.play[data-card]').forEach(c=>c.onclick=()=>act('play',{card:c.dataset.card}));
-  if(room.state==='done'&&room.result&&!room.result.refund&&room.result.winners.includes(room.players[room.me])&&G.cfFor!==room.id){G.cfFor=room.id;confetti();}
+  tableFx(room);
+}
+
+function tableFx(room){
+  // yeni olayları bir kez oynat: kart sesi, PİŞTİ! patlaması, kazanma/kaybetme
+  const fx=G.fx&&G.fx.id===room.id?G.fx:(G.fx={id:room.id,last:'',cards:-1,done:false,bj:{}});
+  if(room.kind==='pisti'&&room.last){
+    const k=room.last.by+'|'+room.last.card+'|'+room.table_n+'|'+room.deck_n;
+    if(k!==fx.last){
+      if(fx.last){
+        if(room.last.pisti){burst(document.body,'PİŞTİ!<small>'+esc(room.last.by)+' · +'+room.last.pisti+' puan</small>','gold');snd('big');}
+        else if(room.last.took)snd('chip');else snd('card');
+      }
+      fx.last=k;
+    }
+  }
+  if(room.kind==='bj'&&room.hands){
+    const n=room.hands.reduce((a,h)=>a+h.cards.length,0);
+    if(fx.cards>=0&&n>fx.cards)snd('card');fx.cards=n;
+    room.hands.forEach((h,i)=>{if(h.value===21&&h.cards.length===2&&!fx.bj[i]){fx.bj[i]=1;burst(document.body,'BLACKJACK!<small>'+esc(room.players[i])+'</small>','gold');snd('big');}});
+  }
+  if(room.state==='done'&&room.result&&!fx.done){
+    fx.done=true;
+    const me=room.players[room.me],r=room.result,delay=room.kind==='coin'?1500:350;
+    setTimeout(()=>{
+      if(r.refund){snd('chip');return;}
+      if(r.winners.includes(me)){burst(document.body,'KAZANDIN!<small>+💎 '+num(r.payout)+'</small>','win');snd('win');gemRain(30);confetti();}
+      else snd('lose');
+    },delay);
+  }
 }
 
 /* ---------- rulet ---------- */
@@ -692,7 +889,7 @@ function renderRoulette(){
       '<p class="secnote">Sayı 35:1 · düzine ve sütun 2:1 · kırmızı/siyah, tek/çift, 1-18/19-36 1:1. Tek sıfırlı Avrupa ruleti; 0 gelirse dış bahisler kaybeder. Sonucu sunucu seçer.</p></div></div>';
     box.querySelectorAll('[data-chip]').forEach(b=>b.onclick=()=>{R.chip=+b.dataset.chip;box.querySelectorAll('[data-chip]').forEach(x=>x.setAttribute('aria-pressed',x===b));});
     box.querySelectorAll('.board .c,.outs .c').forEach(c=>{
-      c.onclick=()=>{if(R.spinning)return;const k=rkey(c.dataset.t,c.dataset.v);if(rTotal()+R.chip>rMax()){$('#rRes').textContent='Tek çevirmede en çok 💎 '+num(rMax());return;}R.bets[k]=(R.bets[k]||0)+R.chip;drawBets();};
+      c.onclick=()=>{if(R.spinning)return;const k=rkey(c.dataset.t,c.dataset.v);if(rTotal()+R.chip>rMax()){$('#rRes').textContent='Tek çevirmede en çok 💎 '+num(rMax());return;}R.bets[k]=(R.bets[k]||0)+R.chip;snd('chip');drawBets();};
       c.oncontextmenu=e=>{e.preventDefault();const k=rkey(c.dataset.t,c.dataset.v);delete R.bets[k];drawBets();};
     });
     $('#rClear').onclick=()=>{if(!R.spinning){R.bets={};drawBets();}};
@@ -733,7 +930,7 @@ async function spinRoulette(){
   if(!ST.state){openModal('#mLogin');return;}
   const bets=Object.entries(R.bets).map(([k,a])=>{const [t,v]=k.split(':');return {type:t,value:v!=null?+v:undefined,amount:a};});
   if(!bets.length){$('#rRes').textContent='Önce bahis koy: tahtaya tıkla.';return;}
-  R.spinning=true;$('#rRes').textContent='Dönüyor…';$('#rSpin').classList.add('off');
+  R.spinning=true;$('#rRes').textContent='Dönüyor…';$('#rSpin').classList.add('off');$$('#roul .board .c.hit').forEach(c=>c.classList.remove('hit'));
   const j=await api('/site/roulette/spin',{pass:ST.pass,bets});
   if(!j.success){R.spinning=false;$('#rSpin').classList.remove('off');$('#rRes').textContent=j.error||'çevrilemedi';return;}
   const i=RW.indexOf(j.number),seg=Math.PI*2/RW.length,a0=R.angle,target=-i*seg;
@@ -745,7 +942,8 @@ async function spinRoulette(){
       const col={red:'KIRMIZI',black:'SİYAH',green:'YEŞİL'}[j.color];
       $('#rRes').innerHTML='<span class="rn '+j.color+'">'+j.number+'</span> '+col+' · '+(j.win?'<span class="gold">+💎 '+num(j.win)+'</span>':'<span class="muted">kazanç yok</span>');
       R.hist.unshift(j);R.hist=R.hist.slice(0,12);$('#rHist').innerHTML=R.hist.map(h=>'<span class="rn '+h.color+'">'+h.number+'</span>').join('');
-      if(j.win>=j.bet*3&&j.win>0)confetti();
+      $$('#roul .board .c.hit').forEach(c=>c.classList.remove('hit'));const wc=document.querySelector('#roul .board .c[data-v="'+j.number+'"][data-t="num"]');if(wc)wc.classList.add('hit');
+      if(j.win>0){snd(j.win>=j.bet*3?'big':'win');if(j.win>=j.bet*3){confetti();gemRain(24);burst(document.body,'+💎 '+num(j.win),'win');}}else snd('lose');
     }})(t0);
 }
 
@@ -763,11 +961,12 @@ function renderGemWheel(){
     '<div class="rres" id="gwRes"></div><div class="hist" id="gwHist">'+GW.hist.map(gwHistChip).join('')+'</div>'+
     (cfg.odds.length?'<details class="odds2"><summary>Oranlar</summary><table>'+cfg.odds.slice().reverse().map(o=>'<tr><td><span class="sw" style="background:'+(GW_COL[o[0]]||'#555')+'"></span>x'+String(o[0]).replace('.',',')+'</td><td>'+pct(o[1])+'</td></tr>').join('')+'</table></details>':'')+
     '</div></div>';
-  box.querySelectorAll('[data-gb]').forEach(b=>b.onclick=()=>{if(GW.spinning)return;GW.bet=+b.dataset.gb;renderGemWheel();});
+  box.querySelectorAll('[data-gb]').forEach(b=>b.onclick=()=>{if(GW.spinning)return;GW.bet=+b.dataset.gb;snd('chip');renderGemWheel();});
   $('#gwSpin').onclick=spinGemWheel;
   drawGemWheel();
   if(!GW.raf)GW.raf=requestAnimationFrame(gwLoop);
 }
+function gwBtnLabel(){const b=$('#gwSpin');if(b&&!GW.spinning)b.textContent=ST.state?'ÇEVİR · 💎 '+num(GW.bet):'Giriş yap';}
 function gwHistChip(h){return '<span class="gwh" style="background:'+(GW_COL[h.mult]||'#555')+'">x'+String(h.mult).replace('.',',')+'</span>';}
 function drawGemWheel(){
   const cv=$('#gwCv');if(!cv)return;const x=cv.getContext('2d'),S=cv.width,c=S/2,R2=S/2-30,segs=gwCfg().segs,n=segs.length,seg=Math.PI*2/n,rot=GW.angle,tt=performance.now()/1000;
@@ -799,13 +998,16 @@ async function spinGemWheel(){
   if(!j.success){GW.spinning=false;$('#gwSpin').classList.remove('off');$('#gwRes').textContent=j.error||'çevrilemedi';return;}
   const n=gwCfg().segs.length,seg=Math.PI*2/n,a0=GW.angle,target=-j.seg*seg+(Math.random()*.6-.3)*seg;
   const delta=((target-a0)%(Math.PI*2)+Math.PI*2)%(Math.PI*2),a1=a0+delta+Math.PI*2*6,t0=performance.now(),dur=5000;
+  let lastSeg=-1;
   (function an(ts){const k=Math.min(1,(ts-t0)/dur),e=1-Math.pow(1-k,3.6);GW.angle=a0+(a1-a0)*e;drawGemWheel();
+    const sg=Math.floor((GW.angle/seg)+.5);if(sg!==lastSeg){lastSeg=sg;snd('tick');}
     if(k<1)requestAnimationFrame(an);else{
       GW.spinning=false;$('#gwSpin').classList.remove('off');setState(j.state);
       const m=String(j.mult).replace('.',',');
       $('#gwRes').innerHTML=j.win>0?'<span class="gold">x'+m+' · +💎 '+num(j.win)+'</span>':'<span class="muted">x0 · bu sefer olmadı</span>';
       GW.hist.unshift(j);GW.hist=GW.hist.slice(0,10);const hh=$('#gwHist');if(hh)hh.innerHTML=GW.hist.map(gwHistChip).join('');
-      if(j.mult>=3)confetti();
+      if(j.mult>=3){confetti();gemRain(30);burst(document.body,'x'+m+'!<small>+💎 '+num(j.win)+'</small>','gold');snd('big');}
+      else if(j.win>j.bet)snd('win');else if(!j.win)snd('lose');else snd('chip');
     }})(t0);
 }
 
@@ -814,22 +1016,31 @@ async function spinGemWheel(){
 document.addEventListener('contextmenu',e=>{if(e.target.closest('#drawer,#scratch,#tiers,#table,#roul,#gw'))e.preventDefault();});
 document.addEventListener('keydown',e=>{const k=(e.key||'').toUpperCase();if(k==='F12'||(e.ctrlKey&&e.shiftKey&&['I','J','C'].includes(k))||(e.ctrlKey&&k==='U'))e.preventDefault();});
 
+const NOGD=['kazi','oyunlar'];      // veri dosyası olmadan da çalışan sayfalar
 (async function boot(){
-  if(GD&&pages[PAGE])pages[PAGE]();
-  // sunucuyu erkenden uyandır (ilk istek beklemesin) + ödüllü videoyu önceden yükle
+  // sunucuyu erkenden uyandır (ilk istek beklemesin)
   try{fetch(API+'/health',{mode:'no-cors',cache:'no-store',credentials:'omit'}).catch(()=>{});}catch(e){}
-  setTimeout(axPreload,2500);
-  renderAcct();renderOdds();wheelImgs();renderWheelUi();
+  // 1) kayıtlı oturum: anında girişli görün, arkadan tazele
+  const p=lget(LS_P);
+  if(p&&passExp(p)>Date.now()+20000){
+    ST.pass=p;
+    try{const o=JSON.parse(lget(LS_S)||'null');if(o&&o.s&&typeof o.s==='object'){ST.state=o.s;ST.stale=true;}}catch(e){}
+  }else if(p){lset(LS_P,null);lset(LS_S,null);}
+  // 2) sayfa içeriği (biri hata verse bile diğerleri çalışır)
+  if(pages[PAGE]){
+    if(GD||NOGD.includes(PAGE))safe(pages[PAGE]);
+    else{const m=document.querySelector('main');if(m)m.insertAdjacentHTML('afterbegin','<div class="wrap"><div class="note err" style="margin-top:24px">Sayfa verileri yüklenemedi. Sayfayı yenile (Ctrl+F5).</div></div>');}
+  }
+  safe(renderAcct);safe(renderOdds);safe(wheelImgs);safe(renderWheelUi);
+  // 3) oyundan gelen tek kullanımlık kod
   const h=location.hash||'',m=h.match(/[#&]k=([A-Za-z0-9_-]{8,64})/);
   if(m){
     history.replaceState(null,'',location.pathname+location.search);   // kod adres çubuğunda kalmasın
-    openDrawer();
-    const j=await api('/site/exchange',{code:m[1]});
-    if(j.success){setPass(j.pass,j.state);wNote('Hoş geldin '+j.state.name+'! Çark hazır.');}else wNote(j.error||'bağlantı geçersiz',true);
-    return;
-  }
-  if(/^#cark/.test(h))openDrawer();
-  const p=sget('ea_pass');
-  if(p){ST.pass=p;const j=await api('/site/me',{pass:p});if(j.success)setState(j.state);}
+    openDrawer();wNote('Hesabın bağlanıyor…');
+    const j=await api('/site/exchange',{code:m[1]},{timeout:60000});
+    if(j.success){setPass(j.pass,j.state);wNote('Hoş geldin '+j.state.name+'! Çark hazır.');return;}
+    wNote((j.error||'bağlantı geçersiz')+(ST.pass?' (kayıtlı oturumunla devam ediyorsun)':''),true);
+  }else if(/^#cark/.test(h))openDrawer();
+  if(ST.pass){ST.lastMe=Date.now();await refreshMe();}
 })();
 })();

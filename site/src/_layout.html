@@ -94,14 +94,13 @@
     <div class="err" id="lgErr"></div>
     <button class="btn block" type="submit" id="lgBtn">Giriş yap</button>
   </form>
-  <p class="secnote">Şifren yalnızca oyunun kendi sunucusuna gider. Site girişi oyundaki oturumunu kapatmaz ve 2 saat sonra kendiliğinden düşer.</p>
+  <p class="secnote">Şifren yalnızca oyunun kendi sunucusuna gider. Site girişi oyundaki oturumunu kapatmaz; bu tarayıcıda 7 gün açık kalır (Çıkış ile kapatabilirsin).</p>
 </div></div>
 <div class="modal" id="mInfo" role="dialog" aria-modal="true"><div class="mbox" id="mInfoBox"></div></div>
 
+<!-- AppLixir ödüllü video: API anahtarı assets/config.js içinde (SDK çark açılınca yüklenir) -->
+<script src="assets/config.js?v={{v_cfg}}" defer></script>
 <script src="assets/data.js?v={{v_data}}" defer></script>
 <script src="assets/site.js?v={{v_js}}" defer></script>
-<!-- AppLixir ödüllü video: API anahtarı assets/config.js içinde -->
-<script src="assets/config.js?v={{v_cfg}}" defer></script>
-<script src="https://cdn.applixir.com/applixir.app.v6.1.0.js" defer></script>
 </body>
 </html>

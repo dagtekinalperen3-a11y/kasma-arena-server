@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=Russo+One&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=4e7498d5">
+<link rel="stylesheet" href="assets/site.css?v=83d74db4">
 </head>
 <body data-page="oyunlar">
 
@@ -44,12 +44,12 @@
   <div class="stats-inline"><span class="chip">🔒 Kartlar ve sonuçlar yalnız sunucuda</span><span class="chip">💎 1.000'den 1.000.000'a masa</span><span class="chip">%5 kesinti · beraberlikte tam iade</span></div>
 </div></section>
 <section class="section tight" style="padding-top:16px"><div class="wrap">
-  <div class="tabs gtabs" id="gameTabs">
-    <button aria-selected="true" data-c="coin"><span class="gico g-coin"></span>Yazı Tura</button>
-    <button data-c="bj"><span class="gico g-bj"></span>Blackjack</button>
-    <button data-c="pisti"><span class="gico g-pisti"></span>Pişti</button>
-    <button data-c="roul"><span class="gico g-roul"></span>Rulet</button>
-    <button data-c="gw"><span class="gico g-gw"></span>Elmas Çarkı</button>
+  <div class="gpick" id="gameTabs" role="tablist">
+    <button aria-selected="true" data-c="coin"><span class="art" data-art="coin"></span><b>Yazı Tura</b><small>2 kişi · şansına güven</small></button>
+    <button data-c="bj"><span class="art" data-art="bj"></span><b>Blackjack</b><small>2 kişi · 21'e en yakın</small></button>
+    <button data-c="pisti"><span class="art" data-art="pisti"></span><b>Pişti</b><small>2 ya da 4 kişi</small></button>
+    <button data-c="roul"><span class="art" data-art="roul"></span><b>Rulet</b><small>kasaya karşı · 35'e 1</small></button>
+    <button data-c="gw"><span class="art" data-art="gw"></span><b>Elmas Çarkı</b><small>kasaya karşı · x10'a kadar</small></button>
   </div>
   <div id="gameNeedLogin" class="note" style="display:none">Oynamak için giriş yap: üstteki <b>Giriş yap</b> ya da oyunda Mağaza › Şans Çarkı › ÇEVİR.</div>
   <div id="lobby"></div>
@@ -115,14 +115,13 @@
     <div class="err" id="lgErr"></div>
     <button class="btn block" type="submit" id="lgBtn">Giriş yap</button>
   </form>
-  <p class="secnote">Şifren yalnızca oyunun kendi sunucusuna gider. Site girişi oyundaki oturumunu kapatmaz ve 2 saat sonra kendiliğinden düşer.</p>
+  <p class="secnote">Şifren yalnızca oyunun kendi sunucusuna gider. Site girişi oyundaki oturumunu kapatmaz; bu tarayıcıda 7 gün açık kalır (Çıkış ile kapatabilirsin).</p>
 </div></div>
 <div class="modal" id="mInfo" role="dialog" aria-modal="true"><div class="mbox" id="mInfoBox"></div></div>
 
-<script src="assets/data.js?v=218f624d" defer></script>
-<script src="assets/site.js?v=47a09c72" defer></script>
-<!-- AppLixir ödüllü video: API anahtarı assets/config.js içinde -->
+<!-- AppLixir ödüllü video: API anahtarı assets/config.js içinde (SDK çark açılınca yüklenir) -->
 <script src="assets/config.js?v=c7677b29" defer></script>
-<script src="https://cdn.applixir.com/applixir.app.v6.1.0.js" defer></script>
+<script src="assets/data.js?v=b764b1ec" defer></script>
+<script src="assets/site.js?v=9e5a0e13" defer></script>
 </body>
 </html>
