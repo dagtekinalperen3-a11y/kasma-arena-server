@@ -47,8 +47,14 @@ karşı dört katman daha var:
    Extreme Injector, Xenos, WeMod, x64dbg...) görülürse o koşu sıralamaya **gönderilmez**
    (sarı uyarı bandı; yasak değil, sadece geçersiz).
 
-Enjeksiyon bulgusu *kalıcıdır*: o oyun açık olduğu sürece hiçbir koşu sıralamaya gitmez
-(enjekte kod ilk satırda bulgu listesini silse bile gizli kopya kancada durur).
+**İki kademeli ceza (yanlış ban olmasın diye):**
+- **Bellek mührü** ve **hız hilesi** → KALICI BAN (kanıtlı, ağır test edildi, yanlış alarm yok).
+- **Enjeksiyon / kod yaması / açık hile programı** → yalnız **KOŞU GEÇERSİZ** (sıralamaya
+  gitmez), **KALICI BAN YOK**. Bu katmanlar gerçek bilgisayarda bir gün yanlış tetiklense
+  bile hiçbir dürüst oyuncu kalıcı yasaklanmaz; en fazla o tek koşu sayılmaz. İmzasız-DLL
+  sezgisi (Discord/GeForce gibi yayın bindirmeleri yüzünden yanlış alarm riski) tamamen
+  kaldırıldı; yalnız adıyla bilinen hile programları (Cheat Engine, Extreme Injector...)
+  sayılır, onlar da ban etmez.
 
 ### 4. Eski/değiştirilmiş exe (sürüm kapısı)
 Skor imzası **v2**: anahtar gizli anahtardan türetilir ve oyunun sürümü imzaya girer.
