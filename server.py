@@ -4701,7 +4701,8 @@ def admin_give_gems():
 SITE_SECRET = (os.environ.get("SITE_SECRET")
                or hashlib.sha256(("evolve-site-v1|" + (SUPABASE_KEY or secrets.token_hex(32))
                                   + "|" + (GOOGLE_CLIENT_SECRET or "")).encode()).hexdigest())
-SITE_PASS_TTL = 2 * 3600
+SITE_PASS_TTL = 7 * 24 * 3600        # site oturumu 7 gün; her girişte (/site/me) tazelenir
+SITE_PASS_REFRESH = 12 * 3600        # bundan eski geçiş /site/me'de yenisiyle değişir
 SITE_CODE_TTL = 10 * 60
 SITE_WHEEL_WAIT = 15.0
 SITE_WHEEL_MAX_WAIT = 30 * 60.0
@@ -4789,14 +4790,15 @@ def _site_acc(data):
 def _site_ctx(poll=False):
     if not _accounts_enabled():
         return None, None, (jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503)
-    if not _rate_ok(("site:pip:" if poll else "site:ip:") + _client_ip(), 400 if poll else 120, 60):
+    # aynı evden / okuldan (aynı IP) birkaç arkadaş birlikte oynayabilsin diye geniş
+    if not _rate_ok(("site:pip:" if poll else "site:ip:") + _client_ip(), 1200 if poll else 400, 60):
         return None, None, (jsonify({"success": False, "error": "çok sık istek, biraz bekle"}), 429)
     data = _body()
     acc = _site_acc(data)
     if not acc:
         return None, None, (jsonify({"success": False, "error": "oturum süresi doldu, oyundan yeniden aç ya da giriş yap",
                                      "relogin": True}), 401)
-    if not _rate_ok(("site:p:" if poll else "site:a:") + str(acc["id"]), 200 if poll else 90, 60):
+    if not _rate_ok(("site:p:" if poll else "site:a:") + str(acc["id"]), 240 if poll else 150, 60):
         return None, None, (jsonify({"success": False, "error": "çok sık istek, biraz bekle"}), 429)
     return acc, data, None
 
@@ -4923,7 +4925,16 @@ def site_me():
     except Exception:
         app.logger.exception("emanet denetlenemedi")
     prog = _stored_progress(_player_row(acc["id"]))
-    return jsonify({"success": True, "state": _site_state(acc, prog)})
+    out = {"success": True, "state": _site_state(acc, prog)}
+    # kayan oturum: eski geçiş tazesiyle değişir (site açık kaldıkça düşmez)
+    try:
+        exp = int(str(_data.get("pass") or "").split(".")[2])
+        if exp - time.time() < SITE_PASS_TTL - SITE_PASS_REFRESH:
+            out["pass"] = _site_make_pass(acc)
+            out["ttl"] = SITE_PASS_TTL
+    except (ValueError, IndexError):
+        pass
+    return jsonify(out)
 
 
 @app.route("/site/wheel/ad", methods=["POST"])
