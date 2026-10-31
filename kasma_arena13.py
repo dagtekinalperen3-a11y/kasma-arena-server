@@ -15263,6 +15263,10 @@ def ac_evidence(run, kind, field="", value=None):
 import _thread as _ac_thread
 import types as _ac_types
 
+# YANLIŞ BAN KORUMASI: yeni kod/DLL enjeksiyon katmanları gerçek Windows/exe
+# üzerinde doğrulanana kadar YALNIZCA TESPİT (ban/engel YOK). Kanıtlı iki denetim
+# (bellek mührü + hız) her zaman aktif. Doğrulanınca True yapılır.
+_AC_ENFORCE_INJECTION = False
 _AC_MAIN_TID = _ac_thread.get_ident()
 _AC_TID = _ac_thread.get_ident
 _AC_GETFRAME = sys._getframe
@@ -15275,7 +15279,7 @@ _AC_STATE = {"taint": "", "tool": "", "snap": None, "mods": set(), "reported": F
 def _ac_hit(kind, field, value=""):
     if len(_AC_HITS) < 8:
         _AC_HITS.append((kind, str(field)[:40], str(value)[:40]))
-    if not _AC_STATE.get("taint"):
+    if _AC_ENFORCE_INJECTION and not _AC_STATE.get("taint"):
         _AC_STATE["taint"] = "%s:%s" % (kind, field)
 
 
@@ -15326,7 +15330,7 @@ def _ac_audit_factory():
                 list.append(priv, h)
             if len(pub) < 8:
                 list.append(pub, h)
-            if not state.get("taint"):
+            if _AC_ENFORCE_INJECTION and not state.get("taint"):
                 state["taint"] = "%s:%s" % (h[0], h[1])
 
     hits = _Hits()
@@ -15761,8 +15765,9 @@ def _ac_mod_loop():
 
 
 def ac_note_hit(hit):
-    """Kesin bulgu: bu işlemde artık hiçbir koşu sıralamaya gitmez."""
-    if not _AC_STATE.get("taint"):
+    """Kesin bulgu kaydı. Enjeksiyon katmanları tespit modundayken yalnızca
+    günlüğe yazar (ban/engel yok)."""
+    if _AC_ENFORCE_INJECTION and not _AC_STATE.get("taint"):
         _AC_STATE["taint"] = "%s:%s" % (hit[0], hit[1])
     _AC_STATE["reported"] = True
 
@@ -38346,19 +38351,21 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
 
     def run_is_clean(self):
         """Bu koşu sıralamalara yazılabilir mi?"""
-        return (not self.cheat_flag and not getattr(self, "ac_flag", "")
-                and not getattr(self, "ac_tool", "") and not _AC_STATE.get("taint"))
+        if _AC_ENFORCE_INJECTION and (getattr(self, "ac_tool", "") or _AC_STATE.get("taint")):
+            return False
+        return not self.cheat_flag and not getattr(self, "ac_flag", "")
 
     # ---- hile koruması: kesin kanıt ----
     def ac_check(self):
         """Mühürleri tara: oyunun kodundan geçmeden değişen bir değer var mı?"""
         objs = [self, self.player, getattr(self, "combo", None), getattr(self, "waves", None)]
         objs += [p_ for p_ in (getattr(self, "players", None) or []) if p_ is not self.player]
-        hit = ac_global_check()
-        if hit:
-            ac_note_hit(hit)
-            self.ac_trip(*hit)
-            return
+        if _AC_ENFORCE_INJECTION:
+            hit = ac_global_check()
+            if hit:
+                ac_note_hit(hit)
+                self.ac_trip(*hit)
+                return
         for obj in objs:
             if obj is None:
                 continue
@@ -38367,15 +38374,24 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
                 tr = obj.__dict__.get(_AC_TRIP)
                 self.ac_trip("bellek", bad, tr[1] if tr else obj.__dict__.get(bad))
                 return
-            bad = ac_guarded_ok(obj)
-            if bad:
-                ac_note_hit(("kod", "nesne:" + bad, type(obj).__name__))
-                self.ac_trip("kod", "nesne:" + bad, type(obj).__name__)
-                return
+            if _AC_ENFORCE_INJECTION:
+                bad = ac_guarded_ok(obj)
+                if bad:
+                    ac_note_hit(("kod", "nesne:" + bad, type(obj).__name__))
+                    self.ac_trip("kod", "nesne:" + bad, type(obj).__name__)
+                    return
 
     def ac_trip(self, kind, field="", value=None):
-        """Hile kesinleşti: koşu geçersiz, hesap kalıcı yasaklı, kanıt sunucuya."""
+        """Hile kesinleşti: koşu geçersiz, hesap kalıcı yasaklı, kanıt sunucuya.
+        Enjeksiyon (kod/dll) katmanları doğrulanana dek yalnız günlüğe yazılır:
+        DÜRÜST OYUNCU ASLA yanlışlıkla banlanmaz."""
         if getattr(self, "ac_flag", ""):
+            return
+        if kind not in ("bellek", "hiz") and not _AC_ENFORCE_INJECTION:
+            try:
+                print("hile koruması (yalnız tespit):", kind, field, repr(value)[:40])
+            except Exception:
+                pass
             return
         self.ac_flag = "%s:%s" % (kind, field)
         self.cheat_flag = "hile"
@@ -38410,12 +38426,13 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
         }
         # Koşu bitti: son bir mühür taraması (bitişe çok yakın yapılan düzenleme kaçmasın)
         if not getattr(self, "ac_flag", ""):
-            hit = ac_global_check(full=True)
-            if hit:
-                ac_note_hit(hit)
-                self.ac_trip(*hit)
-            else:
-                self.ac_check()
+            if _AC_ENFORCE_INJECTION:
+                hit = ac_global_check(full=True)
+                if hit:
+                    ac_note_hit(hit)
+                    self.ac_trip(*hit)
+                    return
+            self.ac_check()
         if getattr(self, "ac_flag", "") and not self.cheat_flag:
             self.cheat_flag = "hile"
         # Koşu bitti: skor; öldürme, dalga ve süreyle tutarlı mı?
@@ -59390,7 +59407,10 @@ class App:
         self.save.save()
 
     def _ac_frame_check(self, run):
-        """Yarım saniyede bir: enjeksiyon / yama bulgusu var mı, hile programı açık mı?"""
+        """Yarım saniyede bir: enjeksiyon / yama bulgusu var mı, hile programı açık mı?
+        Enjeksiyon katmanları doğrulanana dek tamamen pasif (yanlış ban olmasın)."""
+        if not _AC_ENFORCE_INJECTION:
+            return
         self._ac_n = getattr(self, "_ac_n", 0) + 1
         if self._ac_n % 30:
             return
@@ -60820,9 +60840,9 @@ class App:
             return L("ui.taint_prefix", self.save.taint_text())
         if self.save.is_board_banned():
             return L("ui.banned_title")
-        if _AC_STATE.get("taint"):
+        if _AC_ENFORCE_INJECTION and _AC_STATE.get("taint"):
             return L("ui.ac_banned_sub")
-        if self.run is not None and getattr(self.run, "ac_tool", ""):
+        if _AC_ENFORCE_INJECTION and self.run is not None and getattr(self.run, "ac_tool", ""):
             return L("ui.ac_tool", self.run.ac_tool)
         if self.run is not None and not self.run.run_is_clean():
             return f"koşu doğrulanamadı ({self.run.cheat_flag})"
