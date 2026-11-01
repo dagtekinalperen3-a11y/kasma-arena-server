@@ -8970,7 +8970,9 @@ SKIN_RESET_V = 1
 
 
 def revoked_skin_ids():
-    return {sk["id"] for sk in SKINS if not sk.get("premium") and (sk.get("cost") or 0) > 0}
+    # sıfırlamadan sonra eklenen skinler (5. paket) sıfırlamaya hiç girmez
+    return {sk["id"] for sk in SKINS if not sk.get("premium") and (sk.get("cost") or 0) > 0
+            and sk["id"] not in _NEW_SKIN_IDS}
 
 
 def apply_skin_reset(data):
@@ -9010,6 +9012,82 @@ def migrate_removed_skins(data):
     if data.get("equipped_skin") in REMOVED_SKINS:
         data["equipped_skin"] = REMOVED_SKINS[data["equipped_skin"]]
     return data
+
+# ---- 5. paket: 10 yeni skin ----
+NEW_SKINS = [
+    dict(id="sakura_ninja", name="Sakura Ninjası", color=(255, 150, 190), accent=(255, 240, 246), cost=4200,
+         weapon="katana", proj="feather", aura="sakura", sfx="b", wlen=44,
+         desc="Kiraz çiçekleri arasında süzülen bir ninja. Çevresinde yapraklar döner, katanası pembe bir iz bırakır.",
+         perks=["Kritik Şans +%8", "Dash Mesafesi +%15",
+                "Her seviye: Kritik Hasar +%1 (en çok %50)", "Yetenek: Kiraz Fırtınası"],
+         perk_add=dict(crit_chance=0.08, dash_dist_mult=0.15),
+         perk_level=dict(crit_dmg_mult=(0.010, 0.50))),
+    dict(id="thunder_god", name="Gök Tanrısı", color=(90, 140, 255), accent=(255, 240, 120), cost=5200,
+         weapon="tesla", proj="lightning", aura="thundergod", sfx="c", wlen=30,
+         desc="Başında şimşek tacı, sırtında çakan bir hale. Her atışında gök gürler.",
+         perks=["Zincir Yıldırım Lv.2 ile başlar", "Atış Hızı +%10",
+                "Her seviye: Hasar +%0.5 (en çok %30)", "Yetenek: Gök Öfkesi (8 yıldırım)"],
+         perk_set=dict(chain_level=2), perk_add=dict(skin_aspd=0.10),
+         perk_level=dict(skin_power=(0.005, 0.30))),
+    dict(id="pirate_king", name="Korsan Kral", color=(180, 40, 50), accent=(240, 200, 90), cost=3900,
+         weapon="pistols", proj="bullet", aura="pirate", sfx="a", wlen=30,
+         desc="Yedi denizin hükümdarı. Çevresinde altınları döner, iki tabancayla ateş eder.",
+         perks=["Altın Kazancı +%20", "Kritik Şans +%5",
+                "Her seviye: Hasar +%0.5 (en çok %30)", "Yetenek: Top Ateşi (12 güdümlü gülle)"],
+         perk_add=dict(coin_mult=0.20, crit_chance=0.05),
+         perk_level=dict(skin_power=(0.005, 0.30))),
+    dict(id="lava_golem", name="Lav Golemi", color=(96, 64, 54), accent=(255, 130, 40), cost=4600,
+         weapon="cannon", proj="fireball", aura="lava", sfx="d", wlen=30,
+         desc="Damarlarında lav akan kaya dev. Ayak bastığı yer kızarır, közler yükselir.",
+         perks=["Can +80", "Zırh +%5 (hasar azaltma)", "BONK Hasarı +%15",
+                "Her seviye: Can +5 (en çok +300)", "Yetenek: Lav Halkası"],
+         perk_add=dict(base_max_hp=80, base_armor=0.05, bonk_mult=0.15),
+         perk_level=dict(_hp=(5, 300))),
+    dict(id="neon_rider", name="Neon Sürücü", color=(44, 34, 80), accent=(60, 255, 230), cost=4400,
+         weapon="blaster", proj="bolt", aura="neon", sfx="a", wlen=28,
+         desc="Siberpunk sokaklarından gelen hız tutkunu. Neon ızgara halkası ve parlayan vizörüyle iz bırakır.",
+         perks=["Hareket Hızı +15", "Atış Hızı +%10", "Dash Bekleme Süresi -%10",
+                "Her seviye: Atış Hızı +%0.5 (en çok %30)", "Yetenek: Nitro"],
+         perk_add=dict(base_speed=15, skin_aspd=0.10, dash_cd_mult=-0.10),
+         perk_level=dict(skin_aspd=(0.005, 0.30))),
+    dict(id="forest_spirit", name="Orman Ruhu", color=(110, 186, 96), accent=(236, 255, 190), cost=3800,
+         weapon="crossbow", proj="feather", aura="forest", sfx="a", wlen=27,
+         desc="Kadim ormanın koruyucusu. Yapraktan bir taç taşır, çevresinde ateş böcekleri dans eder.",
+         perks=["Can Yenilenmesi +1.0/sn", "Toplama Menzili +30", "Şans +%5",
+                "Her seviye: Hasar +%0.4 (en çok %24)", "Yetenek: Diken Tarlası"],
+         perk_add=dict(base_regen=1.0, base_pickup=30, luck=0.05),
+         perk_level=dict(skin_power=(0.004, 0.24))),
+    dict(id="sand_pharaoh", name="Kum Firavunu", color=(222, 182, 92), accent=(60, 110, 220), cost=4800,
+         weapon="scepter", proj="star", aura="pharaoh", sfx="c", wlen=38,
+         desc="Güneşin oğlu. Ardında Ra'nın altın diski parlar, asasından yıldızlar saçar.",
+         perks=["Altın Kazancı +%25", "Deneyim Kazancı +%10",
+                "Her seviye: Hasar +%0.5 (en çok %30)", "Yetenek: Firavunun Hazinesi"],
+         perk_add=dict(coin_mult=0.25, xp_mult=0.10),
+         perk_level=dict(skin_power=(0.005, 0.30))),
+    dict(id="void_walker", name="Boşluk Gezgini", color=(34, 22, 56), accent=(186, 96, 255), cost=5200,
+         weapon="scythe", proj="blackfire", aura="void", sfx="b", wlen=38,
+         desc="Gerçekliğin yırtığından çıkan gezgin. Sırtında dönen bir boşluk kapısı, çevresinde kırık evren parçaları.",
+         perks=["Hasar +%12", "Kritik Hasar +%20",
+                "Her seviye: Hasar +%0.6 (en çok %36)", "Yetenek: Boşluk Kapısı"],
+         perk_add=dict(skin_power=0.12, crit_dmg_mult=0.20),
+         perk_level=dict(skin_power=(0.006, 0.36))),
+    dict(id="candy_pop", name="Şeker Patlaması", color=(255, 140, 200), accent=(140, 230, 255), cost=3800,
+         weapon="crystal", proj="prism", aura="candy", sfx="c", wlen=30,
+         desc="Şeker fabrikasından kaçan tatlı bela. Çevresinde lolipop halkası ve uçuşan şekerler.",
+         perks=["Şans +%10", "Toplama Menzili +25", "Deneyim Kazancı +%8",
+                "Her seviye: Hasar +%0.4 (en çok %24)", "Yetenek: Şeker Rüyası"],
+         perk_add=dict(luck=0.10, base_pickup=25, xp_mult=0.08),
+         perk_level=dict(skin_power=(0.004, 0.24))),
+    dict(id="steam_knight", name="Buhar Şövalyesi", color=(150, 118, 80), accent=(255, 200, 120), cost=4500,
+         weapon="cannon", proj="rock", aura="steam", sfx="d", wlen=30,
+         desc="Dişlilerle işleyen pirinç zırhlı şövalye. Sırtında çarklar döner, bacasından buhar tüter.",
+         perks=["Zırh +%8 (hasar azaltma)", "Can +50", "BONK Yarıçapı +%15",
+                "Her seviye: Can +4 (en çok +240)", "Yetenek: Zırh Kilidi"],
+         perk_add=dict(base_armor=0.08, base_max_hp=50, bonk_radius_mult=0.15),
+         perk_level=dict(_hp=(4, 240))),
+]
+SKINS.extend(NEW_SKINS)
+_NEW_SKIN_IDS = frozenset(s_["id"] for s_ in NEW_SKINS)
 SKIN_BY_ID = {s["id"]: s for s in SKINS}
 
 
@@ -9130,6 +9208,44 @@ SKIN_ULTS = {
                        desc="Maks canının %25'ini yeniler, 6 saniye kritik şansın %25 artar ve "
                             "çevredeki düşmanlar korkup kaçar."),
 }
+
+
+# 5. paket skinlerinin yetenekleri (mevcut yetenek türlerini kullanır)
+SKIN_ULTS.update({
+    "sakura_ninja": dict(name="KİRAZ FIRTINASI", icon="skull", color=(255, 170, 210), cd=17.0,
+                         kind="shadow_strike", mode="auto", n=8, mult=2.1, duration=1.6,
+                         desc="Yaprak fırtınasına dönüşüp en yakın 8 düşmanın arasından geçer: her birine kesin "
+                              "kritik vurur; ardından kısa süre hasarın artar ve dokunulmaz kalırsın."),
+    "thunder_god": dict(name="GÖK ÖFKESİ", icon="bolt", color=(150, 190, 255), cd=17.0,
+                        kind="thunder", mode="auto", n=8, mult=1.8,
+                        desc="Arka arkaya 8 yıldırım rastgele düşmanların tepesine iner."),
+    "pirate_king": dict(name="TOP ATEŞİ", icon="target", color=(240, 200, 90), cd=16.0,
+                        kind="salvo", mode="auto", n=12, mult=1.0,
+                        desc="Hedefi şaşmayan 12 güdümlü gülle fırlatır."),
+    "lava_golem": dict(name="LAV HALKASI", icon="flame", color=(255, 130, 40), cd=18.0,
+                       kind="fire_ring", mode="auto", radius=380,
+                       desc="Çevrene genişleyen bir lav halkası salar; değdiği düşman yanar."),
+    "neon_rider": dict(name="NİTRO", icon="boot", color=(60, 255, 230), cd=20.0,
+                       kind="sprint", mode="auto",
+                       desc="6 saniye boyunca %35 daha hızlı koşar, %25 daha hızlı ateş edersin."),
+    "forest_spirit": dict(name="DİKEN TARLASI", icon="drop", color=(150, 230, 120), cd=18.0,
+                          kind="thorn_field", mode="auto", duration=6.0, radius=260,
+                          desc="6 saniye boyunca çevrendeki düşmanlar sürekli zehir hasarı alır."),
+    "sand_pharaoh": dict(name="FİRAVUNUN HAZİNESİ", icon="coin", color=(255, 210, 100), cd=22.0,
+                         kind="midas", mode="auto", radius=360,
+                         desc="Çevredeki düşmanlara hasar verir ve her birinden fazladan altın düşürür."),
+    "void_walker": dict(name="BOŞLUK KAPISI", icon="orbit", color=(186, 96, 255), cd=20.0,
+                        kind="black_hole", mode="auto", radius=440, duration=3.0, mult=2.8,
+                        desc="En kalabalık noktada bir boşluk kapısı açar: düşmanları 3 saniye içine çeker ve "
+                             "öğütür, sonra patlayarak büyük hasar verir."),
+    "candy_pop": dict(name="ŞEKER RÜYASI", icon="heart", color=(255, 160, 220), cd=20.0,
+                      kind="dream", mode="auto", radius=300, duration=6.0,
+                      desc="Maks canının %25'ini yeniler, 6 saniye kritik şansın %25 artar ve çevredeki "
+                           "düşmanlar korkup kaçar."),
+    "steam_knight": dict(name="ZIRH KİLİDİ", icon="shield", color=(255, 200, 120), cd=24.0,
+                         kind="bulwark", mode="auto", duration=6.0,
+                         desc="6 saniye aldığın hasar %55 azalır ve çevrendeki düşmanları savurursun."),
+})
 
 # yetenek hasarı = (bu kadar saniyelik tam atış) x yeteneğin çarpanı
 ULT_DPS_K = 0.55
@@ -9408,6 +9524,154 @@ COSMETICS = [
               "yıldız tozu ve başının üstünde I'M GOD yazısı.",
          perk_text="Hasar +%10, Deneyim +%10, Şans +%10", perk_add=dict()),
 ]
+
+
+# =====================================================================
+# ---- 5. paket kozmetikler: 10 şapka, 10 gözlük, 10 pelerin ----
+# =====================================================================
+NEW_COSMETICS = [
+    # ---- şapkalar ----
+    dict(id="pirate_hat", slot="hat", name="Korsan Şapkası", cost=480,
+         color=(40, 34, 40), accent=(232, 190, 90),
+         desc="Altın işlemeli, kurukafalı üç köşeli korsan şapkası.",
+         perk_text="Altın Kazancı +%10, Kritik Şans +%3", perk_add=dict()),
+    dict(id="chef_hat", slot="hat", name="Aşçı Kepi", cost=220,
+         color=(246, 246, 240), accent=(220, 220, 214),
+         desc="Kabarık, bembeyaz bir şef kepi. Arena senin mutfağın.",
+         perk_text="Can +20, Can Yenilenmesi +0.3/sn", perk_add=dict()),
+    dict(id="cowboy_hat", slot="hat", name="Kovboy Şapkası", cost=360,
+         color=(150, 98, 56), accent=(230, 196, 120),
+         desc="Geniş kenarlı, deri bantlı tozlu bir kovboy şapkası.",
+         perk_text="Mermi Hızı +%8, Kritik Hasar +%6", perk_add=dict()),
+    dict(id="jester_hat", slot="hat", name="Soytarı Külahı", cost=300,
+         color=(200, 50, 80), accent=(120, 70, 210),
+         desc="İki sallanan uçlu, çıngıraklı rengârenk soytarı külahı.",
+         perk_text="Şans +%10, Hareket Hızı +8", perk_add=dict()),
+    dict(id="mushroom_cap", slot="hat", name="Mantar Şapka", cost=260,
+         color=(220, 60, 60), accent=(255, 250, 240),
+         desc="Benekli kocaman bir orman mantarı. Sevimli ve dayanıklı.",
+         perk_text="Can Yenilenmesi +0.6/sn, Toplama Menzili +12", perk_add=dict()),
+    dict(id="pharaoh_nemes", slot="hat", name="Firavun Başlığı", cost=720,
+         color=(52, 90, 190), accent=(240, 196, 80),
+         desc="Mavi-altın çizgili, alnında kobra olan firavun başlığı.",
+         perk_text="Altın Kazancı +%12, Deneyim +%8", perk_add=dict()),
+    dict(id="bunny_ears", slot="hat", name="Tavşan Kulakları", cost=240,
+         color=(250, 250, 255), accent=(255, 170, 200),
+         desc="Zıplarken sallanan pofuduk tavşan kulakları.",
+         perk_text="Dash Mesafesi +%12, Hareket Hızı +6", perk_add=dict()),
+    dict(id="propeller_cap", slot="hat", name="Pervaneli Kep", cost=200,
+         color=(60, 150, 240), accent=(255, 220, 60),
+         desc="Tepesinde fırıl fırıl dönen pervanesiyle çocukluk anısı.",
+         perk_text="Hareket Hızı +12, Dash Bekleme -%5", perk_add=dict()),
+    dict(id="flame_crown", slot="hat", name="Alev Tacı", cost=800,
+         color=(255, 120, 40), accent=(255, 230, 120),
+         desc="Başının üstünde dans eden canlı bir ateş halkası.",
+         perk_text="Hasar +%8, BONK Hasarı +%10", perk_add=dict()),
+    dict(id="headphones", slot="hat", name="Neon Kulaklık", cost=420,
+         color=(40, 40, 56), accent=(80, 240, 230),
+         desc="Ritimle yanıp sönen neon ışıklı oyuncu kulaklığı.",
+         perk_text="Atış Hızı +%6, Mermi Hızı +%6", perk_add=dict()),
+    # ---- gözlükler ----
+    dict(id="aviator", slot="eyewear", name="Pilot Gözlüğü", cost=380,
+         color=(230, 186, 90), accent=(120, 70, 30),
+         desc="Altın çerçeveli, damla camlı klasik pilot gözlüğü.",
+         perk_text="Mermi Hızı +%10, Kritik Şans +%3", perk_add=dict()),
+    dict(id="nerd_glasses", slot="eyewear", name="İnek Gözlüğü", cost=120,
+         color=(30, 30, 36), accent=(240, 240, 230),
+         desc="Kalın siyah çerçeve, ortası bantlı. Zekâ seviyesi: arena.",
+         perk_text="Deneyim Kazancı +%10", perk_add=dict()),
+    dict(id="vr_visor", slot="eyewear", name="VR Gözlüğü", cost=540,
+         color=(60, 64, 80), accent=(120, 255, 200),
+         desc="Önünde akan neon şeritli sanal gerçeklik başlığı.",
+         perk_text="Atış Hızı +%5, Kritik Hasar +%8", perk_add=dict()),
+    dict(id="glasses_3d", slot="eyewear", name="3D Gözlük", cost=160,
+         color=(245, 245, 245), accent=(230, 60, 60),
+         desc="Bir camı kırmızı, bir camı mavi eski sinema gözlüğü.",
+         perk_text="Şans +%8, Toplama Menzili +10", perk_add=dict()),
+    dict(id="eyepatch", slot="eyewear", name="Korsan Göz Bandı", cost=180,
+         color=(26, 22, 26), accent=(200, 160, 90),
+         desc="Tek gözü kapatan deri korsan bandı. Tek göz, tam isabet.",
+         perk_text="Kritik Şans +%6", perk_add=dict()),
+    dict(id="sunset_shades", slot="eyewear", name="Gün Batımı Gözlüğü", cost=320,
+         color=(255, 140, 60), accent=(160, 60, 200),
+         desc="Turuncudan mora akan renkli camlı plaj gözlüğü.",
+         perk_text="Hareket Hızı +10, Altın Kazancı +%6", perk_add=dict()),
+    dict(id="diamond_shades", slot="eyewear", name="Elmas Gözlük", cost=900,
+         color=(150, 230, 255), accent=(255, 255, 255),
+         desc="Elmas biçimli, durmadan parıldayan kristal camlar.",
+         perk_text="Kritik Hasar +%12, Şans +%6", perk_add=dict()),
+    dict(id="snow_goggles", slot="eyewear", name="Kar Gözlüğü", cost=280,
+         color=(240, 120, 60), accent=(255, 255, 255),
+         desc="Tek parça aynalı camlı kayak gözlüğü.",
+         perk_text="Aldığın Hasar -%4, Can +15", perk_add=dict()),
+    dict(id="cat_eye", slot="eyewear", name="Kedi Gözlüğü", cost=260,
+         color=(240, 90, 160), accent=(255, 220, 240),
+         desc="Uçları sivri, taşlı retro kedi gözlüğü.",
+         perk_text="Kritik Şans +%4, Dash Bekleme -%6", perk_add=dict()),
+    dict(id="matrix_shades", slot="eyewear", name="Kod Gözlüğü", cost=600,
+         color=(16, 18, 20), accent=(90, 255, 120),
+         desc="İnce siyah camlarında yeşil kodlar akan gözlük.",
+         perk_text="Atış Hızı +%6, Kritik Şans +%4", perk_add=dict()),
+    # ---- pelerinler ----
+    dict(id="cape_ocean", slot="cape", name="Okyanus Pelerini", cost=420,
+         color=(30, 110, 190), accent=(170, 240, 255),
+         desc="Dalga dalga etekli, içinden kabarcıklar yükselen deniz pelerini.",
+         perk_text="Can Yenilenmesi +0.5/sn, Dash Bekleme -%6", perk_add=dict()),
+    dict(id="cape_galaxy", slot="cape", name="Galaksi Pelerini", cost=880,
+         color=(46, 24, 92), accent=(200, 150, 255),
+         desc="İçinde dönen bir nebula ve kayan yıldızlar taşıyan pelerin.",
+         perk_text="Deneyim +%12, Kritik Hasar +%8", perk_add=dict()),
+    dict(id="cape_phoenix", slot="cape", name="Anka Pelerini", cost=950,
+         color=(230, 80, 30), accent=(255, 220, 90),
+         desc="Tüy tüy alev eteği ve yükselen közleriyle anka kanadı.",
+         perk_text="Hasar +%8, Can Yenilenmesi +0.5/sn", perk_add=dict()),
+    dict(id="cape_sakura", slot="cape", name="Sakura Pelerini", cost=460,
+         color=(255, 170, 200), accent=(255, 240, 246),
+         desc="Kenarlarından kiraz çiçeği yaprakları uçuşan pembe pelerin.",
+         perk_text="Şans +%8, Kritik Şans +%3", perk_add=dict()),
+    dict(id="cape_toxic", slot="cape", name="Zehir Pelerini", cost=380,
+         color=(70, 150, 50), accent=(190, 255, 90),
+         desc="Eteğinden yeşil zehir damlayan, kabarcıklı pelerin.",
+         perk_text="Hasar +%5, Toplama Menzili +15", perk_add=dict()),
+    dict(id="cape_rainbow", slot="cape", name="Gökkuşağı Pelerini", cost=700,
+         color=(230, 80, 90), accent=(255, 255, 255),
+         desc="Yedi rengin dalgalandığı, ışıl ışıl bir gökkuşağı pelerini.",
+         perk_text="Şans +%10, Altın Kazancı +%8", perk_add=dict()),
+    dict(id="cape_vampire", slot="cape", name="Vampir Pelerini", cost=640,
+         color=(20, 14, 22), accent=(200, 30, 50),
+         desc="Kan kırmızısı astarlı, dik yakalı kont pelerini.",
+         perk_text="Can +25, Kritik Hasar +%8", perk_add=dict()),
+    dict(id="cape_desert", slot="cape", name="Çöl Pelerini", cost=300,
+         color=(214, 170, 110), accent=(150, 60, 40),
+         desc="Püsküllü, kum savuran bir çöl gezgini pelerini.",
+         perk_text="Hareket Hızı +10, Altın Kazancı +%6", perk_add=dict()),
+    dict(id="cape_emerald", slot="cape", name="Zümrüt Pelerin", cost=560,
+         color=(30, 140, 90), accent=(240, 200, 90),
+         desc="Altın yaprak işlemeli derin yeşil bir asil pelerin.",
+         perk_text="Can +20, Şans +%6", perk_add=dict()),
+    dict(id="cape_void", slot="cape", name="Boşluk Pelerini", cost=1000,
+         color=(14, 10, 22), accent=(170, 90, 255),
+         desc="Kenarları dijital parçalara ayrılan, içinde boşluk kıpırdayan pelerin.",
+         perk_text="Hasar +%8, Dash Mesafesi +%12", perk_add=dict()),
+]
+NEW_COS_PERKS = {
+    "pirate_hat": (("gold", 0.10), ("crit", 0.03)), "chef_hat": (("hp", 20), ("regen", 0.3)),
+    "cowboy_hat": (("pspeed", 0.08), ("critd", 0.06)), "jester_hat": (("luck", 0.10), ("speed", 8)),
+    "mushroom_cap": (("regen", 0.6), ("pickup", 12)), "pharaoh_nemes": (("gold", 0.12), ("xp", 0.08)),
+    "bunny_ears": (("dashd", 0.12), ("speed", 6)), "propeller_cap": (("speed", 12), ("dashcd", 0.05)),
+    "flame_crown": (("dmg", 0.08), ("bonk", 0.10)), "headphones": (("aspd", 0.06), ("pspeed", 0.06)),
+    "aviator": (("pspeed", 0.10), ("crit", 0.03)), "nerd_glasses": (("xp", 0.10),),
+    "vr_visor": (("aspd", 0.05), ("critd", 0.08)), "glasses_3d": (("luck", 0.08), ("pickup", 10)),
+    "eyepatch": (("crit", 0.06),), "sunset_shades": (("speed", 10), ("gold", 0.06)),
+    "diamond_shades": (("critd", 0.12), ("luck", 0.06)), "snow_goggles": (("taken", 0.04), ("hp", 15)),
+    "cat_eye": (("crit", 0.04), ("dashcd", 0.06)), "matrix_shades": (("aspd", 0.06), ("crit", 0.04)),
+    "cape_ocean": (("regen", 0.5), ("dashcd", 0.06)), "cape_galaxy": (("xp", 0.12), ("critd", 0.08)),
+    "cape_phoenix": (("dmg", 0.08), ("regen", 0.5)), "cape_sakura": (("luck", 0.08), ("crit", 0.03)),
+    "cape_toxic": (("dmg", 0.05), ("pickup", 15)), "cape_rainbow": (("luck", 0.10), ("gold", 0.08)),
+    "cape_vampire": (("hp", 25), ("critd", 0.08)), "cape_desert": (("speed", 10), ("gold", 0.06)),
+    "cape_emerald": (("hp", 20), ("luck", 0.06)), "cape_void": (("dmg", 0.08), ("dashd", 0.12)),
+}
+COSMETICS.extend(NEW_COSMETICS)
 COSMETIC_BY_ID = {c["id"]: c for c in COSMETICS}
 
 # ---- kıyafet güçleri + takımlar ----
@@ -9553,6 +9817,7 @@ def cos_set_name(sid):
     return COS_SETS[sid][0][min(4, _LANG_IDX.get(lang(), 0))]
 
 
+COS_PERKS.update(NEW_COS_PERKS)
 for _c in COSMETICS:
     _st = COS_PERKS.get(_c["id"])
     if _st:
@@ -10934,6 +11199,389 @@ def _god_cape(surf, p, item, px, py, t, r, bx, by, nx, ny, col, acc, sp, ph):
 NEW_CAPE_DRAW = {"cape_imgod": _god_cape}
 
 
+# ---- şapka çizimleri (H: _HatPen, yerel birim = kafa yarıçapı, y<0 yukarı) ----
+def _hat_pirate(H, col, acc, t, r):
+    dark, lite = scale_col(col, 0.6), lighten(col, 0.3)
+    H.poly([(-1.25, -0.62), (-0.9, -1.05), (-0.4, -1.34), (0.0, -1.42), (0.4, -1.34), (0.9, -1.05),
+            (1.25, -0.62), (0.7, -0.78), (0.0, -0.7), (-0.7, -0.78)], col)
+    H.edge([(-1.25, -0.62), (-0.7, -0.78), (0.0, -0.7), (0.7, -0.78), (1.25, -0.62)], acc, 0.07, closed=False)
+    H.poly([(-0.55, -0.82), (0.55, -0.82), (0.45, -1.2), (-0.45, -1.2)], dark)
+    # kurukafa
+    H.circ(0.0, -1.02, 0.17, (240, 236, 220))
+    H.circ(-0.06, -1.04, 0.045, OUTLINE)
+    H.circ(0.06, -1.04, 0.045, OUTLINE)
+    H.line((-0.16, -0.82), (0.16, -0.72), (240, 236, 220), 0.06)
+    H.line((0.16, -0.82), (-0.16, -0.72), (240, 236, 220), 0.06)
+    H.line((-0.9, -1.05), (-0.4, -1.34), lite, 0.05)
+
+
+def _hat_chef(H, col, acc, t, r):
+    H.band(-0.82, -0.52, 0.72, acc, 0.08)
+    for x, y, rr in ((-0.42, -1.18, 0.36), (0.42, -1.18, 0.36), (0.0, -1.36, 0.42), (-0.18, -1.02, 0.34),
+                     (0.2, -1.02, 0.34)):
+        H.circ(x, y, rr + 0.04, scale_col(col, 0.8))
+    for x, y, rr in ((-0.42, -1.18, 0.36), (0.42, -1.18, 0.36), (0.0, -1.36, 0.42), (-0.18, -1.02, 0.34),
+                     (0.2, -1.02, 0.34)):
+        H.circ(x, y, rr, col)
+    H.circ(-0.12, -1.48, 0.12, WHITE)
+
+
+def _hat_cowboy(H, col, acc, t, r):
+    dark, lite = scale_col(col, 0.62), lighten(col, 0.3)
+    H.ell(0.0, -0.66, 1.42, 0.30, dark)
+    H.ell(0.0, -0.70, 1.30, 0.22, col)
+    H.poly([(-0.66, -0.72), (-0.6, -1.32), (-0.2, -1.42), (0.0, -1.3), (0.2, -1.42), (0.6, -1.32), (0.66, -0.72)], col)
+    H.poly([(0.0, -1.3), (0.2, -1.42), (0.6, -1.32), (0.66, -0.72), (0.2, -0.72)], dark)
+    H.poly([(-0.66, -0.74), (0.66, -0.74), (0.64, -0.92), (-0.64, -0.92)], (70, 44, 26))
+    H.circ(0.42, -0.83, 0.08, acc)
+    H.line((-1.2, -0.62), (-0.7, -0.6), lite, 0.05)
+
+
+def _hat_jester(H, col, acc, t, r):
+    sw = math.sin(t * 3.0)
+    H.band(-0.78, -0.52, 0.86, (240, 200, 80), 0.10)
+    for s, c in ((-1, col), (1, acc)):
+        tip = (s * (1.15 + 0.08 * sw), -1.55 + 0.1 * s * sw)
+        H.poly([(s * 0.05, -0.78), (s * 0.82, -0.8), (tip[0] * 1.02, tip[1] + 0.25), tip,
+                (s * 0.55, -1.25), (s * 0.05, -1.25)], c)
+        H.circ(tip[0], tip[1], 0.13, (255, 220, 80))
+        H.circ(tip[0] - 0.04, tip[1] - 0.04, 0.05, (255, 250, 220))
+    H.poly([(-0.1, -0.78), (0.1, -0.78), (0.12, -1.3), (-0.12, -1.3)], (240, 200, 80))
+    H.circ(0.0, -1.38, 0.12, (255, 220, 80))
+
+
+def _hat_mushroom(H, col, acc, t, r):
+    H.dome(-0.62, 1.22, 0.86, scale_col(col, 0.7), 0.16)
+    H.dome(-0.66, 1.15, 0.80, col, 0.14)
+    for x, y, rr in ((-0.55, -1.0, 0.16), (0.1, -1.28, 0.2), (0.62, -0.96, 0.14), (-0.15, -0.86, 0.11),
+                     (0.38, -1.12, 0.09)):
+        H.circ(x, y, rr, acc)
+    H.ell(-0.4, -1.18, 0.2, 0.08, lighten(col, 0.35))
+
+
+def _hat_pharaoh(H, col, acc, t, r):
+    # nemes: başı saran çizgili kumaş + iki yana inen yakalık + alında kobra
+    pts = [(-1.0, -0.3), (-0.95, -0.9), (-0.55, -1.25), (0.0, -1.32), (0.55, -1.25), (0.95, -0.9), (1.0, -0.3),
+           (1.2, 0.35), (0.8, 0.35), (0.72, -0.45), (-0.72, -0.45), (-0.8, 0.35), (-1.2, 0.35)]
+    H.poly(pts, col)
+    for k in range(5):
+        y = -1.15 + k * 0.17
+        w = 0.8 + 0.15 * k * 0.5
+        H.line((-w, y), (w, y), acc, 0.06)
+    for s in (-1, 1):
+        for k in range(3):
+            H.line((s * 0.86, -0.25 + k * 0.2), (s * 1.12, -0.18 + k * 0.2), acc, 0.06)
+    H.band(-0.62, -0.46, 0.76, acc, 0.06)
+    H.circ(0.0, -0.66, 0.13, (60, 150, 90))
+    H.poly([(-0.05, -0.62), (0.05, -0.62), (0.03, -0.9), (-0.03, -0.9)], (60, 150, 90))
+    H.circ(0.0, -0.94, 0.07, (255, 80, 60))
+
+
+def _hat_bunny(H, col, acc, t, r):
+    H.band(-0.86, -0.7, 0.9, scale_col(col, 0.85), 0.12)
+    for s in (-1, 1):
+        sw = math.sin(t * 4.0 + s) * 0.10
+        base = s * 0.42
+        tip = (s * 0.62 + sw, -2.15)
+        H.poly([(base - 0.22, -0.82), (s * 0.58 + sw - 0.25, -1.6), (tip[0], tip[1]),
+                (s * 0.58 + sw + 0.25, -1.6), (base + 0.22, -0.82)], col)
+        H.poly([(base - 0.1, -0.9), (s * 0.58 + sw - 0.11, -1.55), (tip[0], tip[1] + 0.2),
+                (s * 0.58 + sw + 0.11, -1.55), (base + 0.1, -0.9)], acc)
+
+
+def _hat_propeller(H, col, acc, t, r):
+    H.dome(-0.48, 0.9, 0.72, col, 0.13)
+    for k, c in enumerate((col, (230, 60, 60), (255, 220, 60), (80, 200, 90))):
+        a0, a1 = math.pi + k * math.pi / 4, math.pi + (k + 1) * math.pi / 4
+        H.poly([(0.0, -0.48)] + H.arc(0.0, -0.48, 0.9, 0.72, a0, a1, 6), c)
+    H.poly([(-0.05, -1.18), (0.05, -1.18), (0.05, -1.42), (-0.05, -1.42)], (90, 90, 100))
+    ang = t * 22.0
+    w = abs(math.cos(ang))
+    H.poly([(-0.95 * w, -1.44), (0.0, -1.38), (0.95 * w, -1.44), (0.0, -1.50)], acc)
+    H.circ(0.0, -1.44, 0.08, scale_col(acc, 0.7))
+
+
+def _hat_flame_crown(H, col, acc, t, r):
+    H.band(-0.86, -0.66, 0.86, (90, 40, 20), 0.12)
+    H.glow(0.0, -1.2, 1.4, col, 0.35 + 0.15 * math.sin(t * 6))
+    for k in range(7):
+        x = -0.75 + k * 0.25
+        h = 0.55 + 0.25 * abs(math.sin(t * 5.0 + k * 1.3)) + (0.2 if k == 3 else 0.0)
+        sw = math.sin(t * 7 + k) * 0.06
+        H.poly([(x - 0.14, -0.82), (x + sw, -0.82 - h), (x + 0.14, -0.82)], col)
+        H.poly([(x - 0.07, -0.82), (x + sw * 0.7, -0.82 - h * 0.6), (x + 0.07, -0.82)], acc)
+    for k in range(3):
+        H.spark(math.sin(t * 2 + k * 2.1) * 0.6, -1.6 - ((t * 0.8 + k * 0.33) % 1.0) * 0.6, 0.08, acc)
+
+
+def _hat_headphones(H, col, acc, t, r):
+    H.ring(0.0, -0.4, 0.98, 0.98, col, 0.16, math.pi * 1.05, math.pi * 1.95, 22)
+    H.ring(0.0, -0.4, 0.98, 0.98, lighten(col, 0.4), 0.05, math.pi * 1.15, math.pi * 1.85, 18)
+    beat = 0.5 + 0.5 * math.sin(t * 9.0)
+    for s in (-1, 1):
+        H.ell(s * 0.98, -0.32, 0.26, 0.36, OUTLINE)
+        H.ell(s * 0.98, -0.32, 0.22, 0.32, col)
+        H.ell(s * 0.98, -0.32, 0.12, 0.20, acc)
+        H.glow(s * 0.98, -0.32, 0.6, acc, 0.25 + 0.35 * beat)
+
+
+NEW_HAT_DRAW = {"pirate_hat": _hat_pirate, "chef_hat": _hat_chef, "cowboy_hat": _hat_cowboy,
+                "jester_hat": _hat_jester, "mushroom_cap": _hat_mushroom, "pharaoh_nemes": _hat_pharaoh,
+                "bunny_ears": _hat_bunny, "propeller_cap": _hat_propeller, "flame_crown": _hat_flame_crown,
+                "headphones": _hat_headphones}
+
+
+# ---- gözlük çizimleri (G: _EyePen) ----
+def _eye_aviator(G, col, acc, t, r):
+    lens = [(-0.3, 0.2), (0.32, 0.2), (0.3, -0.08), (0.12, -0.32), (-0.14, -0.3), (-0.3, -0.06)]
+    G.temples(col, 0.05)
+    for s in (-1, 1):
+        G.lens(s, lens, scale_col(acc, 0.9))
+        G.lens(s, [(-0.26, 0.16), (0.28, 0.16), (0.27, 0.0), (-0.27, -0.02)], scale_col(acc, 0.6))
+        G.eline(s, (0.05, 0.1), (0.2, -0.1), (255, 240, 200), 0.06)
+        G.rim(s, lens, col, 0.05)
+    G.bridge(col, 0.05, 0.18, 0.3)
+    G.bridge(col, 0.04, 0.10, 0.3)
+
+
+def _eye_nerd(G, col, acc, t, r):
+    lens = [(-0.3, 0.24), (0.3, 0.24), (0.3, -0.24), (-0.3, -0.24)]
+    G.temples(col, 0.08)
+    for s in (-1, 1):
+        G.lens(s, lens, (210, 230, 250))
+        G.pupil(s, 1.15)
+        G.eline(s, (0.1, 0.16), (0.22, 0.02), WHITE, 0.05)
+        G.rim(s, lens, col, 0.11)
+    G.bridge(col, 0.1, 0.06, 0.3)
+    cx, cy = G.E(1, -0.36, 0.06)
+    circle_aa(G.s, cx, cy, max(2.0, r * 0.12), acc)
+
+
+def _eye_vr(G, col, acc, t, r):
+    G.wline((EYE_F, -0.7), (EYE_F - 0.5, -1.0), (40, 40, 50), 0.16)
+    G.wline((EYE_F, 0.7), (EYE_F - 0.5, 1.0), (40, 40, 50), 0.16)
+    box = [(EYE_F + 0.28, -0.82), (EYE_F + 0.28, 0.82), (EYE_F - 0.22, 0.86), (EYE_F - 0.22, -0.86)]
+    G.wpoly(box, col)
+    G.wpoly([(EYE_F + 0.18, -0.72), (EYE_F + 0.18, 0.72), (EYE_F - 0.06, 0.74), (EYE_F - 0.06, -0.74)],
+            scale_col(col, 0.55))
+    ph = (t * 1.5) % 1.0
+    l0 = -0.7 + ph * 1.2
+    G.wline((EYE_F + 0.06, l0), (EYE_F + 0.06, min(0.7, l0 + 0.3)), acc, 0.1)
+    cx, cy = G.W(EYE_F + 0.06, l0 + 0.15)
+    add_glow(G.s, cx, cy, r * 0.6, acc, 0.5)
+
+
+def _eye_3d(G, col, acc, t, r):
+    lens = [(-0.3, 0.2), (0.3, 0.2), (0.3, -0.2), (-0.3, -0.2)]
+    G.temples(col, 0.07)
+    for s, c in ((-1, (230, 50, 60)), (1, (60, 150, 255))):
+        G.lens(s, lens, c)
+        G.eline(s, (-0.15, 0.12), (0.0, -0.1), (255, 255, 255), 0.05)
+        G.rim(s, lens, col, 0.09)
+    G.bridge(col, 0.09, 0.05, 0.3)
+
+
+def _eye_patch(G, col, acc, t, r):
+    s = 1
+    G.wline((EYE_F + 0.1, -1.0), (EYE_F + 0.2, 1.0), (40, 34, 30), 0.07)
+    patch = [(-0.3, 0.22), (0.3, 0.26), (0.34, -0.1), (0.0, -0.34), (-0.3, -0.12)]
+    G.lens(s, patch, col)
+    G.rim(s, patch, acc, 0.05)
+    G.ecirc(s, 0.0, 0.0, 0.05, acc)
+    G.pupil(-1, 1.0)
+
+
+def _eye_sunset(G, col, acc, t, r):
+    lens = [(-0.32, 0.18), (0.32, 0.18), (0.28, -0.14), (0.0, -0.26), (-0.28, -0.14)]
+    G.temples((50, 40, 60), 0.06)
+    for s in (-1, 1):
+        G.lens(s, lens, acc)
+        G.lens(s, [(-0.3, 0.17), (0.3, 0.17), (0.29, 0.0), (-0.29, 0.0)], col)
+        G.lens(s, [(-0.3, 0.17), (0.3, 0.17), (0.3, 0.1), (-0.3, 0.1)], (255, 220, 100))
+        G.rim(s, lens, (50, 40, 60), 0.06)
+    G.bridge((50, 40, 60), 0.06, 0.1, 0.3)
+
+
+def _eye_diamond(G, col, acc, t, r):
+    lens = [(0.0, 0.32), (0.32, 0.0), (0.0, -0.32), (-0.32, 0.0)]
+    G.temples((200, 220, 240), 0.05)
+    for s in (-1, 1):
+        G.eglow(s, 0.0, 0.0, 0.7, col, 0.3 + 0.2 * math.sin(t * 5 + s))
+        G.lens(s, lens, col)
+        G.lens(s, [(0.0, 0.32), (0.32, 0.0), (0.0, 0.0)], lighten(col, 0.4))
+        G.lens(s, [(0.0, -0.32), (-0.32, 0.0), (0.0, 0.0)], scale_col(col, 0.7))
+        G.rim(s, lens, acc, 0.05)
+        k = (t * 1.3 + s * 0.4) % 1.0
+        cx, cy = G.E(s, -0.15 + 0.3 * k, 0.15 - 0.3 * k)
+        _sparkle(G.s, cx, cy, r * 0.22, WHITE)
+    G.bridge((200, 220, 240), 0.05, 0.0, 0.32)
+
+
+def _eye_snow(G, col, acc, t, r):
+    G.wline((EYE_F - 0.05, -0.95), (EYE_F - 0.45, -1.02), (40, 40, 50), 0.2)
+    G.wline((EYE_F - 0.05, 0.95), (EYE_F - 0.45, 1.02), (40, 40, 50), 0.2)
+    lens = [(EYE_F + 0.28, -0.78), (EYE_F + 0.32, 0.0), (EYE_F + 0.28, 0.78), (EYE_F - 0.2, 0.8),
+            (EYE_F - 0.12, 0.0), (EYE_F - 0.2, -0.8)]
+    G.wpoly(lens, (30, 30, 36))
+    G.wpoly([(EYE_F + 0.22, -0.7), (EYE_F + 0.26, 0.0), (EYE_F + 0.22, 0.7), (EYE_F - 0.14, 0.72),
+             (EYE_F - 0.06, 0.0), (EYE_F - 0.14, -0.72)], col)
+    G.wpoly([(EYE_F + 0.22, -0.7), (EYE_F + 0.26, -0.2), (EYE_F - 0.08, -0.25), (EYE_F - 0.14, -0.72)],
+            lighten(col, 0.35))
+    G.wline((EYE_F + 0.16, 0.2), (EYE_F - 0.02, 0.5), acc, 0.06)
+
+
+def _eye_cat(G, col, acc, t, r):
+    lens = [(-0.28, 0.12), (0.18, 0.2), (0.42, 0.36), (0.3, -0.1), (0.05, -0.26), (-0.22, -0.2)]
+    G.temples(col, 0.06)
+    for s in (-1, 1):
+        G.lens(s, lens, (60, 30, 50))
+        G.pupil(s, 0.9)
+        G.rim(s, lens, col, 0.08)
+        G.ecirc(s, 0.38, 0.3, 0.06, acc)
+    G.bridge(col, 0.07, 0.1, 0.28)
+
+
+def _eye_matrix(G, col, acc, t, r):
+    lens = [(-0.34, 0.12), (0.34, 0.12), (0.3, -0.12), (-0.3, -0.12)]
+    G.temples((30, 30, 34), 0.05)
+    for s in (-1, 1):
+        G.lens(s, lens, col)
+        for k in range(3):
+            ph = (t * 1.6 + k * 0.33 + s * 0.17) % 1.0
+            x = -0.22 + k * 0.22
+            G.eline(s, (x, 0.1 - ph * 0.2), (x, 0.06 - ph * 0.2), acc, 0.05)
+        G.rim(s, lens, (40, 44, 48), 0.04)
+    G.bridge((40, 44, 48), 0.05, 0.02, 0.34)
+
+
+NEW_EYE_DRAW = {"aviator": _eye_aviator, "nerd_glasses": _eye_nerd, "vr_visor": _eye_vr, "glasses_3d": _eye_3d,
+                "eyepatch": _eye_patch, "sunset_shades": _eye_sunset, "diamond_shades": _eye_diamond,
+                "snow_goggles": _eye_snow, "cat_eye": _eye_cat, "matrix_shades": _eye_matrix}
+# tek gözü kapatan gözlükler (öbür göz görünür kalır)
+NEW_EYE_ONE_SIDE = {"eyepatch": (1,)}
+
+
+# ---- pelerinler: kumaş motoru (_draw_cloth_cape) + kendi etek biçimi + efekt ----
+def _nc_hem(kind, u, t, r):
+    if kind == "cape_ocean":
+        return r * (0.25 + 0.22 * math.sin(u * math.pi * 5 + t * 3.0))
+    if kind == "cape_phoenix":
+        k = (u * 7.0) % 1.0
+        return r * (0.15 + 0.75 * (1.0 - abs(k - 0.5) * 2.0) ** 1.5 * (0.85 + 0.15 * math.sin(t * 5 + u * 9)))
+    if kind == "cape_sakura":
+        return r * (0.20 + 0.25 * abs(math.sin(u * math.pi * 3)))
+    if kind == "cape_toxic":
+        k = (u * 5.0) % 1.0
+        drip = max(0.0, 1.0 - abs(k - 0.5) * 6.0)
+        return r * (0.18 + 0.7 * drip * (0.7 + 0.3 * math.sin(t * 2 + u * 7)))
+    if kind == "cape_vampire":
+        return r * (0.45 - 0.40 * abs(math.sin(u * math.pi * 3)))
+    if kind == "cape_desert":
+        return r * (0.22 + 0.18 * (int(u * 10) % 2))
+    if kind == "cape_void":
+        return r * (0.2 + 0.5 * ((int(u * 12 + t * 6) * 7919) % 10) / 10.0)
+    return r * 0.30 * math.sin(math.pi * u)
+
+
+def _nc_cape(surf, p, item, px, py, t, r, bx, by, nx, ny, col, acc, sp, ph):
+    kind = item["id"]
+    if kind == "cape_vampire":
+        # dik yaka: omuzların arkasında kırmızı astarlı iki kanat
+        for s in (-1, 1):
+            base = (px + bx * r * 0.1 + nx * s * r * 0.7, py + by * r * 0.1 + ny * s * r * 0.7)
+            tip = (px - bx * r * 0.5 + nx * s * r * 1.2, py - by * r * 0.5 + ny * s * r * 1.2 - r * 0.6)
+            poly_aa(surf, [base, tip, (px + nx * s * r * 0.3, py + ny * s * r * 0.3)], acc)
+    if kind == "cape_galaxy" or kind == "cape_void":
+        add_glow(surf, px + bx * r * 1.2, py + by * r * 1.2, r * 2.4, acc, 0.22)
+    if kind == "cape_phoenix":
+        add_glow(surf, px + bx * r * 1.2, py + by * r * 1.2, r * 2.6, (255, 140, 40), 0.28)
+    if kind == "cape_rainbow":
+        col = hue_col((t * 0.08) % 1.0)
+    _draw_cloth_cape(surf, p, item, px, py, t, r, bx, by, nx, ny, col, acc, sp, ph)
+    length = r * (1.95 + 0.50 * sp)
+
+    def cloth(u, s):
+        return (px + bx * (r * 0.22 + length * s) + nx * (u - 0.5) * r * (1.6 + 1.04 * s),
+                py + by * (r * 0.22 + length * s) + ny * (u - 0.5) * r * (1.6 + 1.04 * s))
+    if kind == "cape_ocean":
+        for j in range(5):
+            s = 1.0 - ((t * 0.4 + j * 0.2) % 1.0)
+            qx, qy = cloth(0.2 + 0.15 * j, s)
+            ring_aa(surf, qx + math.sin(t * 3 + j) * 3, qy, max(1.5, r * 0.12 * (1.2 - s)), acc, 1)
+    elif kind == "cape_galaxy":
+        cx, cy = cloth(0.5, 0.5)
+        for k in range(14):
+            a = t * 0.9 + k * 0.45
+            rr = r * (0.15 + 0.06 * k)
+            circle_aa(surf, cx + math.cos(a) * rr, cy + math.sin(a) * rr * 0.7, max(1.0, 1.8 - k * 0.08),
+                      mix_col(acc, (255, 255, 255), (k % 3) / 3.0))
+        rnd = random.Random(11)
+        for j in range(7):
+            qx, qy = cloth(rnd.uniform(0.15, 0.85), rnd.uniform(0.15, 0.95))
+            tw = 0.5 + 0.5 * math.sin(t * 3 + j * 2.1)
+            _cape_spark(surf, qx, qy, 1 + 2 * tw, (255, 255, 230))
+    elif kind == "cape_phoenix":
+        for j in range(6):
+            s = (t * 0.7 + j / 6.0) % 1.0
+            qx, qy = cloth(0.1 + 0.16 * j, 0.9 + 0.3 * s)
+            k = math.sin(math.pi * s)
+            circle_aa(surf, qx, qy - s * r * 0.8, max(1.0, r * 0.12 * k), (255, 200, 80))
+            add_glow(surf, qx, qy - s * r * 0.8, r * 0.4, (255, 140, 40), 0.3 * k)
+    elif kind == "cape_sakura":
+        for j in range(5):
+            s = (t * 0.35 + j * 0.2) % 1.0
+            qx, qy = cloth(0.1 + 0.2 * j + math.sin(t * 2 + j) * 0.1, 0.3 + s * 1.1)
+            a = t * 3 + j
+            pts = [(qx + math.cos(a) * 4, qy + math.sin(a) * 2), (qx + math.cos(a + 1.6) * 2, qy + math.sin(a + 1.6) * 3),
+                   (qx - math.cos(a) * 4, qy - math.sin(a) * 2), (qx - math.cos(a + 1.6) * 2, qy - math.sin(a + 1.6) * 3)]
+            poly_aa(surf, pts, (255, 200, 220) if j % 2 else acc)
+    elif kind == "cape_toxic":
+        for j in range(4):
+            s = (t * 0.8 + j * 0.25) % 1.0
+            qx, qy = cloth(0.15 + 0.23 * j, 1.05 + s * 0.5)
+            circle_aa(surf, qx, qy, max(1.0, r * 0.11 * (1 - s)), acc)
+        for j in range(3):
+            s = (t * 0.5 + j * 0.33) % 1.0
+            qx, qy = cloth(0.3 + 0.2 * j, 0.8 - s * 0.6)
+            ring_aa(surf, qx, qy, max(1.5, r * 0.10), lighten(acc, 0.3), 1)
+    elif kind == "cape_rainbow":
+        for k in range(6):
+            u = (k + 0.5) / 6.0
+            a_, b_ = cloth(u, 0.12), cloth(u, 1.0)
+            thick_line(surf, a_, b_, max(1.5, r * 0.20), hue_col((u + t * 0.15) % 1.0))
+        _cape_spark(surf, *cloth(0.5 + 0.3 * math.sin(t * 2), 0.5), 3, WHITE)
+    elif kind == "cape_desert":
+        for j in range(6):
+            s = (t * 0.9 + j / 6.0) % 1.0
+            qx, qy = cloth(0.05 + 0.18 * j, 1.0 + s * 0.4)
+            circle_aa(surf, qx + s * 10 * nx, qy + s * 10 * ny, max(1.0, 2.2 * (1 - s)), (230, 200, 150))
+        for u in (0.1, 0.3, 0.5, 0.7, 0.9):
+            qx, qy = cloth(u, 1.08)
+            circle_aa(surf, qx, qy, max(1.5, r * 0.10), acc)
+    elif kind == "cape_emerald":
+        for j in range(3):
+            qx, qy = cloth(0.5, 0.3 + 0.25 * j)
+            a = math.atan2(by, bx)
+            leaf = [(qx - nx * r * 0.25, qy - ny * r * 0.25), (qx + bx * r * 0.18, qy + by * r * 0.18),
+                    (qx + nx * r * 0.25, qy + ny * r * 0.25), (qx - bx * r * 0.18, qy - by * r * 0.18)]
+            poly_aa(surf, leaf, acc)
+        _cape_spark(surf, *cloth(0.3 + 0.4 * ((t * 0.3) % 1.0), 0.7), 2.5, (255, 240, 180))
+    elif kind == "cape_void":
+        rnd = random.Random(int(t * 8))
+        for j in range(6):
+            qx, qy = cloth(rnd.uniform(0.0, 1.0), rnd.uniform(0.6, 1.2))
+            sz = rnd.uniform(2.0, 5.0)
+            pygame.draw.rect(surf, acc if j % 2 else (60, 230, 255), (int(qx), int(qy), int(sz), int(sz)))
+        cx, cy = cloth(0.5, 0.55)
+        circle_aa(surf, cx, cy, r * 0.32, (4, 2, 8))
+        ring_aa(surf, cx, cy, r * (0.34 + 0.04 * math.sin(t * 5)), acc, 1)
+
+
+for _cid in ("cape_ocean", "cape_galaxy", "cape_phoenix", "cape_sakura", "cape_toxic", "cape_rainbow",
+             "cape_vampire", "cape_desert", "cape_emerald", "cape_void"):
+    NEW_CAPE_DRAW[_cid] = _nc_cape
+
+
 # ---- kumaş pelerin ----
 # Pelerin omuzdan eteğe dilimlenmiş bir kumaş:
 # * her dilim kendi fazıyla dalgalanır (dalga omuzdan eteğe akar), koşarken
@@ -10949,6 +11597,8 @@ CAPE_HEM_PTS = 14         # etek çizgisinin nokta sayısı
 
 def _cape_hem_offset(kind, u, t, r):
     """Etek çizgisinin (soldan sağa u = 0..1) pelerin yönünde ne kadar uzadığı/kısaldığı."""
+    if kind in NEW_CAPE_DRAW:
+        return _nc_hem(kind, u, t, r)
     if kind == "cape_bat":
         # yarasa kanadı: dört kemik ucu arasında içe oyulmuş yaylar
         return r * 0.30 - r * 0.62 * abs(math.sin(u * math.pi * 4))
@@ -11291,6 +11941,8 @@ def eyes_hidden(p):
     item = _player_cosmetic(p, "eyewear")
     if not item:
         return ()
+    if item["id"] in NEW_EYE_ONE_SIDE:
+        return NEW_EYE_ONE_SIDE[item["id"]]
     return (1,) if item["id"] in ("monocle", "chrono_monocle") else (-1, 1)
 
 
@@ -11413,6 +12065,9 @@ def _draw_cosmetic_hat_raw(surf, p, px, py, t):
     aim = getattr(p, "aim_dir", (1.0, 0.0)) or (1.0, 0.0)
     H = _HatPen(surf, px, py, r, clamp(aim[0], -1.0, 1.0) * 0.10)
 
+    if iid in NEW_HAT_DRAW:
+        NEW_HAT_DRAW[iid](H, col, acc, t, r)
+        return
     if iid == "crown_god":
         draw_god_crown(surf, px, py - r - 4, max(12.0, r * 0.62), t)
         return
@@ -11928,6 +12583,9 @@ def _draw_cosmetic_eyewear_raw(surf, p, px, py, t):
     dark = scale_col(col, 0.55)
     G = _EyePen(surf, p, px, py)
     S = (-1, 1)
+    if iid in NEW_EYE_DRAW:
+        NEW_EYE_DRAW[iid](G, col, acc, t, G.r)
+        return
 
     def shine(s, x0, y0, x1, y1, w=0.08, c=(255, 255, 255)):
         G.eline(s, (x0, y0), (x1, y1), c, w)
@@ -13083,6 +13741,226 @@ AURA_FX_ALIAS = {"falcon": "wings", "royal": "stars", "tesla": "arcs", "hood": "
                  "goldsun": "halo", "prism2": "prism", "hunter": "shadow", "frost": "stars", "vampire": "bubbles",
                  "knight": "halo", "storm": "arcs", "venom": "bubbles", "jet": "wings", "beast": "flames",
                  "guardian": "stars"}
+
+
+
+# ---- 5. paket skin auraları (arka: front=False, ön: front=True) ----
+def _petal(surf, x, y, a, s, col):
+    pts = [(x + math.cos(a) * s, y + math.sin(a) * s * 0.6), (x + math.cos(a + 1.7) * s * 0.45, y + math.sin(a + 1.7) * s * 0.45),
+           (x - math.cos(a) * s * 0.7, y - math.sin(a) * s * 0.5), (x + math.cos(a - 1.7) * s * 0.45, y + math.sin(a - 1.7) * s * 0.45)]
+    poly_aa(surf, pts, col)
+
+
+def _sakura_layer(surf, p, px, py, r, col, acc, t, front):
+    if not front:
+        add_glow(surf, px, py, r * 2.3, (255, 170, 210), 0.22)
+        for i in range(10):
+            a = t * 0.8 + i * math.tau / 10
+            _petal(surf, px + math.cos(a) * r * 1.8, py + math.sin(a) * r * 1.4, a * 2, r * 0.32,
+                   (255, 190, 215) if i % 2 else acc)
+        return
+    for i in range(5):
+        ph = (t * 0.45 + i * 0.2) % 1.0
+        x = px + (i - 2) * r * 0.55 + math.sin(t * 2 + i) * r * 0.3
+        y = py - r * 1.6 + ph * r * 3.0
+        _petal(surf, x, y, t * 3 + i, r * 0.22 * (1 - ph * 0.4), (255, 200, 222))
+
+
+def _thundergod_layer(surf, p, px, py, r, col, acc, t, front):
+    if not front:
+        pulse = 0.5 + 0.5 * math.sin(t * 6)
+        add_glow(surf, px, py, r * 2.6, (120, 170, 255), 0.25 + 0.15 * pulse)
+        ring_aa(surf, px, py, r * 1.75, (150, 190, 255), 2)
+        for i in range(6):
+            a = t * 1.4 + i * math.tau / 6
+            x0, y0 = px + math.cos(a) * r * 1.75, py + math.sin(a) * r * 1.75
+            x1, y1 = px + math.cos(a + 0.25) * r * 2.25, py + math.sin(a + 0.25) * r * 2.25
+            xm = (x0 + x1) / 2 + math.sin(t * 30 + i) * r * 0.15
+            ym = (y0 + y1) / 2 + math.cos(t * 30 + i) * r * 0.15
+            pygame.draw.lines(surf, acc, False, _pts_i([(x0, y0), (xm, ym), (x1, y1)]), 2)
+        return
+    cy = py - r * 1.25
+    pts = [(px - r * 0.7, cy + r * 0.25), (px - r * 0.5, cy - r * 0.35), (px - r * 0.2, cy + r * 0.05),
+           (px, cy - r * 0.55), (px + r * 0.2, cy + r * 0.05), (px + r * 0.5, cy - r * 0.35), (px + r * 0.7, cy + r * 0.25)]
+    poly_aa(surf, pts, acc)
+    pygame.draw.lines(surf, (255, 255, 230), False, _pts_i(pts[1:-1]), 1)
+    if (t * 2.3) % 1.0 < 0.15:
+        add_glow(surf, px, cy - r * 0.5, r * 1.2, (220, 230, 255), 0.6)
+
+
+def _pirate_layer(surf, p, px, py, r, col, acc, t, front):
+    if not front:
+        for s in (-1, 1):
+            a = -math.pi / 2 + s * 0.65
+            hx, hy = px - math.cos(a) * r * 1.2, py - math.sin(a) * r * 1.2 + r * 0.4
+            tx, ty = px + math.cos(a) * r * 2.1, py + math.sin(a) * r * 2.1
+            thick_line(surf, (hx, hy), (tx, ty), max(2.0, r * 0.16), (210, 214, 226))
+            thick_line(surf, (hx, hy), (hx - math.cos(a) * r * 0.4, hy - math.sin(a) * r * 0.4), max(3.0, r * 0.22), acc)
+        return
+    for i in range(4):
+        a = t * 2.0 + i * math.tau / 4
+        x, y = px + math.cos(a) * r * 1.7, py + math.sin(a) * r * 0.9 - r * 0.2
+        w = abs(math.cos(t * 5 + i)) * r * 0.26 + 1
+        pygame.draw.ellipse(surf, (150, 110, 30), (int(x - w), int(y - r * 0.26), int(w * 2), int(r * 0.52)))
+        pygame.draw.ellipse(surf, acc, (int(x - w * 0.8), int(y - r * 0.22), int(w * 1.6), int(r * 0.44)))
+
+
+def _lava_layer(surf, p, px, py, r, col, acc, t, front):
+    if not front:
+        add_glow(surf, px, py + r * 0.6, r * 2.6, (255, 100, 30), 0.30 + 0.1 * math.sin(t * 3))
+        pygame.draw.ellipse(surf, (120, 30, 10), (int(px - r * 1.7), int(py + r * 0.4), int(r * 3.4), int(r * 1.1)))
+        pygame.draw.ellipse(surf, (255, 110, 30), (int(px - r * 1.4), int(py + r * 0.5), int(r * 2.8), int(r * 0.85)))
+        for i in range(4):
+            ph = (t * 0.9 + i * 0.25) % 1.0
+            bx = px + (i - 1.5) * r * 0.6
+            circle_aa(surf, bx, py + r * 0.9, max(1.0, r * 0.18 * math.sin(math.pi * ph)), (255, 210, 120))
+        return
+    # gövdede lav damarları + yükselen közler
+    for k, (a0, a1) in enumerate(((-0.6, 0.3), (1.9, 2.9), (3.5, 4.4))):
+        x0, y0 = px + math.cos(a0) * r * 0.35, py + math.sin(a0) * r * 0.35
+        x1, y1 = px + math.cos(a1) * r * 0.8, py + math.sin(a1) * r * 0.8
+        thick_line(surf, (x0, y0), (x1, y1), max(1.5, r * 0.09), (255, 120 + int(60 * math.sin(t * 4 + k)), 40))
+    for i in range(4):
+        ph = (t * 0.7 + i * 0.25) % 1.0
+        x = px + (i - 1.5) * r * 0.5 + math.sin(t * 3 + i) * r * 0.2
+        circle_aa(surf, x, py - r * 0.8 - ph * r * 1.4, max(1.0, r * 0.1 * (1 - ph)), (255, 180, 80))
+
+
+def _neon_layer(surf, p, px, py, r, col, acc, t, front):
+    if not front:
+        add_glow(surf, px, py, r * 2.4, acc, 0.20)
+        n = 6
+        rot = t * 0.9
+        pts = [(px + math.cos(rot + i * math.tau / n) * r * 1.8, py + math.sin(rot + i * math.tau / n) * r * 1.45)
+               for i in range(n)]
+        for a_, b_ in zip(pts, pts[1:] + pts[:1]):
+            thick_line(surf, a_, b_, 2.0, acc)
+        pts2 = [(px + math.cos(-rot + i * math.tau / n) * r * 1.45, py + math.sin(-rot + i * math.tau / n) * r * 1.15)
+                for i in range(n)]
+        for a_, b_ in zip(pts2, pts2[1:] + pts2[:1]):
+            thick_line(surf, a_, b_, 1.4, (255, 80, 200))
+        return
+    y = py - r * 0.15
+    thick_line(surf, (px - r * 0.75, y), (px + r * 0.75, y), max(2.0, r * 0.18), (20, 18, 30))
+    k = (t * 1.2) % 1.0
+    x = px - r * 0.7 + r * 1.4 * k
+    thick_line(surf, (px - r * 0.7, y), (px + r * 0.7, y), max(1.0, r * 0.07), acc)
+    add_glow(surf, x, y, r * 0.5, acc, 0.7)
+
+
+def _forest_layer(surf, p, px, py, r, col, acc, t, front):
+    if not front:
+        add_glow(surf, px, py, r * 2.2, (150, 230, 120), 0.18)
+        for i in range(12):
+            a = i * math.tau / 12 + math.sin(t * 0.8) * 0.05
+            x, y = px + math.cos(a) * r * 1.55, py + math.sin(a) * r * 1.25
+            _petal(surf, x, y, a + math.pi / 2, r * 0.36, (90, 170, 80) if i % 2 else (130, 210, 100))
+        return
+    for i in range(5):
+        a = t * (0.6 + i * 0.13) + i * 1.3
+        x = px + math.cos(a) * r * (1.2 + 0.5 * math.sin(t + i))
+        y = py - r * 0.4 + math.sin(a * 1.3) * r * 1.1
+        k = 0.5 + 0.5 * math.sin(t * 6 + i * 2)
+        add_glow(surf, x, y, r * 0.5, (230, 255, 140), 0.5 * k)
+        circle_aa(surf, x, y, max(1.0, r * 0.07), (250, 255, 200))
+    # yaprak tacı
+    for s in (-1, 1):
+        for j in range(3):
+            a = -math.pi / 2 + s * (0.5 + j * 0.35)
+            _petal(surf, px + math.cos(a) * r * 0.95, py + math.sin(a) * r * 0.95, a, r * 0.3, (110, 200, 90))
+
+
+def _pharaoh_layer(surf, p, px, py, r, col, acc, t, front):
+    if not front:
+        cx, cy = px, py - r * 0.5
+        add_glow(surf, cx, cy, r * 3.0, (255, 210, 90), 0.28)
+        for i in range(16):
+            a = t * 0.3 + i * math.tau / 16
+            ln = r * (2.1 + 0.25 * math.sin(t * 2 + i))
+            poly_alpha(surf, [(cx, cy), (cx + math.cos(a - 0.06) * ln, cy + math.sin(a - 0.06) * ln),
+                              (cx + math.cos(a + 0.06) * ln, cy + math.sin(a + 0.06) * ln)], (255, 220, 120), 60)
+        circle_aa(surf, cx, cy, r * 1.35, (200, 150, 40))
+        circle_aa(surf, cx, cy, r * 1.22, (255, 214, 90))
+        ring_aa(surf, cx, cy, r * 1.0, acc, 2)
+        return
+    # yüzen ankh
+    ax, ay = px + r * 1.5, py - r * 1.2 + math.sin(t * 2.2) * r * 0.15
+    ring_aa(surf, ax, ay - r * 0.25, r * 0.2, (255, 214, 90), 2)
+    thick_line(surf, (ax, ay - r * 0.05), (ax, ay + r * 0.55), max(2.0, r * 0.1), (255, 214, 90))
+    thick_line(surf, (ax - r * 0.25, ay + r * 0.08), (ax + r * 0.25, ay + r * 0.08), max(2.0, r * 0.1), (255, 214, 90))
+    for i in range(4):
+        ph = (t * 0.8 + i * 0.25) % 1.0
+        circle_aa(surf, px + (i - 1.5) * r * 0.7 + ph * r * 0.6, py + r * 1.0 - ph * r * 0.3,
+                  max(1.0, r * 0.06), (240, 210, 150))
+
+
+def _void_layer(surf, p, px, py, r, col, acc, t, front):
+    if not front:
+        add_glow(surf, px, py, r * 2.8, acc, 0.25)
+        for k in range(3):
+            rr = r * (1.6 + 0.25 * k)
+            a0 = t * (1.2 - 0.3 * k) + k
+            pygame.draw.arc(surf, scale_col(acc, 1.0 - 0.25 * k), (int(px - rr), int(py - rr * 0.85), int(rr * 2), int(rr * 1.7)),
+                            a0, a0 + 2.2, 2)
+        circle_aa(surf, px, py - r * 0.1, r * 1.32, (6, 3, 12))
+        ring_aa(surf, px, py - r * 0.1, r * 1.32, acc, 2)
+        return
+    for i in range(5):
+        a = -t * 1.6 + i * math.tau / 5
+        x, y = px + math.cos(a) * r * 1.6, py + math.sin(a) * r * 1.1
+        rot = t * 3 + i
+        pts = [(x + math.cos(rot + j * math.tau / 3) * r * 0.18, y + math.sin(rot + j * math.tau / 3) * r * 0.18)
+               for j in range(3)]
+        poly_aa(surf, pts, acc if i % 2 else (90, 230, 255))
+
+
+def _candy_layer(surf, p, px, py, r, col, acc, t, front):
+    if not front:
+        n = 16
+        for i in range(n):
+            a0 = t * 0.7 + i * math.tau / n
+            a1 = a0 + math.tau / n
+            c = (255, 120, 190) if i % 2 else (255, 250, 250)
+            pts = [(px + math.cos(a0) * r * 1.45, py + math.sin(a0) * r * 1.2), (px + math.cos(a0) * r * 1.85, py + math.sin(a0) * r * 1.55),
+                   (px + math.cos(a1) * r * 1.85, py + math.sin(a1) * r * 1.55), (px + math.cos(a1) * r * 1.45, py + math.sin(a1) * r * 1.2)]
+            poly_aa(surf, pts, c)
+        return
+    cols = ((255, 120, 190), (140, 230, 255), (255, 230, 100), (150, 240, 140))
+    for i in range(4):
+        a = t * 1.8 + i * math.tau / 4
+        x, y = px + math.cos(a) * r * 1.9, py + math.sin(a) * r * 1.2 - r * 0.3
+        c = cols[i]
+        circle_aa(surf, x, y, r * 0.22, c)
+        for s in (-1, 1):
+            poly_aa(surf, [(x + s * r * 0.18, y), (x + s * r * 0.42, y - r * 0.14), (x + s * r * 0.42, y + r * 0.14)], lighten(c, 0.3))
+        circle_aa(surf, x - r * 0.06, y - r * 0.06, r * 0.07, WHITE)
+
+
+def _steam_layer(surf, p, px, py, r, col, acc, t, front):
+    if not front:
+        _gear(surf, px - r * 1.2, py - r * 0.6, r * 0.8, t * 1.2, (150, 120, 70))
+        _gear(surf, px + r * 1.25, py - r * 0.4, r * 0.6, -t * 1.6, (190, 150, 80))
+        _gear(surf, px + r * 0.2, py - r * 1.35, r * 0.45, t * 2.1, (120, 96, 60))
+        return
+    cx, cy = px + r * 0.55, py - r * 0.95
+    pygame.draw.rect(surf, (60, 48, 36), (int(cx - r * 0.14), int(cy - r * 0.35), int(r * 0.28), int(r * 0.4)))
+    pygame.draw.rect(surf, acc, (int(cx - r * 0.18), int(cy - r * 0.4), int(r * 0.36), int(r * 0.1)))
+    for i in range(4):
+        ph = (t * 0.6 + i * 0.25) % 1.0
+        rr = r * (0.12 + 0.3 * ph)
+        blit_disc(surf, cx + ph * r * 0.6 + math.sin(t * 2 + i) * r * 0.1, cy - r * 0.5 - ph * r * 1.3, rr,
+                  (230, 230, 236), int(170 * (1 - ph)))
+
+
+_NEW_AURA_LAYERS.update({
+    "sakura": _sakura_layer, "thundergod": _thundergod_layer, "pirate": _pirate_layer, "lava": _lava_layer,
+    "neon": _neon_layer, "forest": _forest_layer, "pharaoh": _pharaoh_layer, "void": _void_layer,
+    "candy": _candy_layer, "steam": _steam_layer,
+})
+AURA_FX_ALIAS.update({
+    "sakura": "stars", "thundergod": "arcs", "pirate": "halo", "lava": "flames", "neon": "arcs",
+    "forest": "bubbles", "pharaoh": "halo", "void": "shadow", "candy": "stars", "steam": "bubbles",
+})
 
 
 
