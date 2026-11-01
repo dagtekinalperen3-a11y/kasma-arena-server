@@ -2117,6 +2117,8 @@ STRINGS = {
                           "ПРОКЛЯТИЕ УГЛА! НИ ЛЕЧЕНИЯ, НИ ОЧКОВ - ВЫХОДИ!"),
     "fx.corner_warn":  _T("KÖŞEDEN ÇIK: {0}", "LEAVE THE CORNER: {0}", "SAL DE LA ESQUINA: {0}",
                           "RAUS AUS DER ECKE: {0}", "УЙДИ ИЗ УГЛА: {0}"),
+    "ui.legend_key": _T("EFSANEVİ ANAHTAR", "LEGENDARY KEY", "LLAVE LEGENDARIA", "LEGENDÄRER SCHLÜSSEL",
+                        "ЛЕГЕНДАРНЫЙ КЛЮЧ"),
     "fx.keys_new":    _T("HARİTADA BİR ANAHTAR BELİRDİ", "A KEY APPEARED ON THE MAP", "APARECIÓ UNA LLAVE", "EIN SCHLÜSSEL ERSCHEINT", "ПОЯВИЛСЯ КЛЮЧ"),
     "fx.legend_open": _T("EFSANEVİ ÖDÜL!  +{0} SEVİYE", "LEGENDARY REWARD!  +{0} LEVELS", "¡RECOMPENSA LEGENDARIA!  +{0} NIVELES",
                          "LEGENDÄRE BELOHNUNG!  +{0} STUFEN", "ЛЕГЕНДАРНАЯ НАГРАДА!  +{0} УР."),
@@ -22259,10 +22261,29 @@ class MapKey:
             add_glow(surf, x, y - 30 * k, 60 * (1 - k) + 10, KEY_COLOR, 0.6 * (1 - k))
             draw_key_icon(surf, x, y - 40 * k, 16 * (1 + k), KEY_COLOR2)
             return
-        # parlamaz - yerde duran sade bir anahtar (gezerek bulunur)
-        bob = math.sin(self.t * 2.0) * 2
-        surf.blit(shadow_sprite(30), (int(x - 15), int(y + 8)))
-        draw_key_icon(surf, x, y + bob - 4, 15, (214, 176, 84))
+        # efsanevi anahtar: uzaktan görülsün diye ışık sütunu, nabız gibi
+        # atan altın parıltı, yerde dalga halkaları ve dönen kıvılcımlar.
+        tt = self.t
+        pulse = 0.5 + 0.5 * math.sin(tt * 4.0)
+        bob = math.sin(tt * 2.0) * 4
+        beam = _key_beam()
+        surf.blit(beam, (int(x - beam.get_width() / 2), int(y - beam.get_height() + 10)))
+        for j in range(3):
+            ph = (tt * 0.7 + j / 3.0) % 1.0
+            rr = 18 + 70 * ph
+            a = int(200 * (1.0 - ph))
+            if a > 8:
+                ring_aa(surf, x, y + 10, rr, scale_col(KEY_COLOR, 1.0 - ph * 0.7),
+                        max(1, int(3 * (1.0 - ph))))
+        add_glow(surf, x, y - 4, 70 + 18 * pulse, KEY_COLOR, 0.45 + 0.25 * pulse)
+        add_glow(surf, x, y - 4, 30, KEY_COLOR2, 0.55)
+        for i in range(6):
+            a = tt * 1.6 + i * math.tau / 6
+            sx_, sy_ = x + math.cos(a) * 34, y - 6 + math.sin(a) * 20
+            circle_aa(surf, sx_, sy_ + bob * 0.5, 2.4 + 1.2 * math.sin(tt * 5 + i), KEY_COLOR2)
+        surf.blit(shadow_sprite(36), (int(x - 18), int(y + 10)))
+        draw_key_icon(surf, x, y + bob - 6, 22 + 2 * pulse, KEY_COLOR)
+        draw_text(surf, L("ui.legend_key"), (x, y - 52 + bob), 13, KEY_COLOR2, bold=True, center=True)
 
 
 _KEY_BEAM = None
@@ -41502,6 +41523,16 @@ def draw_minimap(surf, run, t, big=False):
         pygame.draw.circle(surf, CURSE_COLOR2, (int(px), int(py)), max(1, int(k * 2)))
 
     # anahtarlar (altın) ve efsanevi sandık (büyük, nabız gibi)
+    for _mk in getattr(run, "map_keys", ()):
+        if _mk.taken:
+            continue
+        px, py = mp(_mk.x, _mk.y)
+        pulse = 0.5 + 0.5 * math.sin(t * 6)
+        add_glow(surf, px, py, (18 + pulse * 10) * k, KEY_COLOR, 0.55 + pulse * 0.35)
+        ph = (t * 0.9) % 1.0
+        pygame.draw.circle(surf, scale_col(KEY_COLOR, 1.0 - ph), (int(px), int(py)),
+                           max(3, int(k * (5 + 12 * ph))), 1)
+        draw_key_icon(surf, px, py, max(4, int(5 * k)), KEY_COLOR2)
     _lc = getattr(run, "legend_chest", None)
     if _lc is not None and not _lc.opened:
         px, py = mp(_lc.x, _lc.y)
@@ -41625,6 +41656,9 @@ def draw_offscreen_markers(surf, run, cam, t):
     _lc = getattr(run, "legend_chest", None)
     if _lc is not None and not _lc.opened:
         marks.append((_lc.x, _lc.y, LEGEND_COLOR, "gem"))
+    for _mk in getattr(run, "map_keys", ()):
+        if not _mk.taken:
+            marks.append((_mk.x, _mk.y, KEY_COLOR, "key"))
     _rt = getattr(run, "roulette", None)
     if _rt is not None and not _rt.used:
         marks.append((_rt.x, _rt.y, _rt.color, "star"))
