@@ -4099,11 +4099,44 @@ def gfx_fx_mult():
 
 def gfx_particle_cap():
     base = 220 if MOBILE else 420
-    return int(base * (0.30, 0.60, 1.0)[gfx_level()])
+    return min(int(base * (0.30, 0.60, 1.0)[gfx_level()]), _DYNQ_PCAP[_DYNQ[0]])
 
 
 def gfx_glow_min_r():
-    return _GFX_GLOW_R[0]
+    return max(_GFX_GLOW_R[0], _DYNQ_GLOW[_DYNQ[0]])
+
+
+# ---- otomatik performans (dinamik kalite) ----
+# Kalabalık geç dalgalarda kare işleme süresi bütçeyi aşınca süsler kademeli
+# kısılır (küçük parlamalar, parçacık sayısı, evrim alevleri, kırbaç
+# hayaletleri, kenar yumuşatma); rahatlayınca geri açılır. Oyun mekaniği ve
+# hasar hiç değişmez. Ayarlardaki grafik kalitesi üst sınırdır.
+_DYNQ = [0]                         # 0 = tam süs .. 3 = en sade
+_DYNQ_PCAP = (9999, 260, 160, 90)   # en çok parçacık
+_DYNQ_GLOW = (0, 26, 44, 70)        # bundan küçük parlamalar çizilmez
+DYNQ_BUDGET_MS = 9.0                # kare işleme bütçesi (~110 FPS)
+DYNQ_RELAX_MS = 5.0                 # bunun altına inince bir kademe geri
+
+
+def dynq_feed(work_ms, dt):
+    """Her karede çağrılır: ortalama işleme süresine göre süs kademesini ayarlar."""
+    if not CFG.get("auto_perf", True):
+        _DYNQ[0] = 0
+        return
+    st = _DYNQ_ST
+    st["avg"] += (work_ms - st["avg"]) * min(1.0, dt * 4.0)
+    st["hold"] = max(0.0, st["hold"] - dt)
+    if st["hold"] > 0:
+        return
+    if st["avg"] > DYNQ_BUDGET_MS and _DYNQ[0] < 3:
+        _DYNQ[0] += 1
+        st["hold"] = 1.5
+    elif st["avg"] < DYNQ_RELAX_MS and _DYNQ[0] > 0:
+        _DYNQ[0] -= 1
+        st["hold"] = 4.0
+
+
+_DYNQ_ST = {"avg": 0.0, "hold": 0.0}
 
 
 # ---- tuş atama ----
@@ -4661,8 +4694,8 @@ def add_glow(surf, x, y, r, color, k=1.0):
         return
     if MOBILE and r < 40 and not _GLOW_ON_ALPHA:
         return          # telefon: küçük parlamalar (mermi, kıvılcım) atlanır
-    if r < _GFX_GLOW_R[0] and not _GLOW_ON_ALPHA:
-        return          # düşük/orta grafik: küçük parlamalar atlanır
+    if not _GLOW_ON_ALPHA and r < (_GFX_GLOW_R[0] if _DYNQ[0] == 0 else gfx_glow_min_r()):
+        return          # düşük/orta grafik ya da yoğun sahne: küçük parlamalar atlanır
     r = max(2, int(r) // 2 * 2)
     c = (int(color[0]), int(color[1]), int(color[2]))
     pos = (int(x - r), int(y - r))
@@ -4742,7 +4775,8 @@ _SR = 22050
 
 
 def _ipts(pts):
-    return [(int(round(x)), int(round(y))) for x, y in pts]
+    # int(x + 0.5): round()'dan ~2,5 kat hızlı (kare başına yüzlerce çokgen)
+    return [(int(x + 0.5), int(y + 0.5)) for x, y in pts]
 
 
 def poly_aa(surf, pts, col):
@@ -4753,7 +4787,8 @@ def poly_aa(surf, pts, col):
     if _gfx is not None:
         try:
             _gfx.filled_polygon(surf, ip, col)
-            _gfx.aapolygon(surf, ip, col)
+            if _DYNQ[0] < 3:
+                _gfx.aapolygon(surf, ip, col)
             return
         except Exception:
             pass
@@ -19343,8 +19378,8 @@ def evo_of(ob):
 
 
 def evo_rich():
-    """Ağır evrim süsleri çizilsin mi (düşük grafikte hayır)."""
-    return gfx_level() > 0
+    """Ağır evrim süsleri çizilsin mi (düşük grafikte ya da çok yoğun sahnede hayır)."""
+    return gfx_level() > 0 and _DYNQ[0] < 2
 
 
 def evo_flame(surf, x, y, h, w, t, seed=0.0, cols=FIRE_COLS):
@@ -20025,6 +20060,39 @@ def draw_axe_shape(surf, x, y, spin, k=1.0, color=AXE_COLOR, glow=0.6):
     circle_aa(surf, *P(11.5, 0), 1.3 * k, color)
 
 
+# ---- dönen silah şekilleri için açı önbelleği (FPS) ----
+# Balta / tırpan şekli yalnız açıya, boyuta ve renge bağlı: her biri bir kez
+# 64 açıdan birinde saydam bir yüzeye çizilir, sonra yalnız basılır. III. kademe
+# baltada kare süresinin yarıdan fazlası bu şekillerin her karede yeniden
+# çizilmesine gidiyordu.
+_ROT_CACHE = {}
+_ROT_STEPS = 64
+
+
+def cached_spin_shape(surf, x, y, spin, k, color, tag, draw_fn, **kw):
+    q = int((spin % math.tau) / math.tau * _ROT_STEPS + 0.5) % _ROT_STEPS
+    kq = int(k * 20 + 0.5)
+    col = (int(color[0]), int(color[1]), int(color[2]))
+    key = (tag, q, kq, col)
+    spr = _ROT_CACHE.get(key)
+    if spr is None:
+        if len(_ROT_CACHE) > 2500:
+            _ROT_CACHE.clear()
+        kk = kq / 20.0
+        size = int(80 * kk) + 10
+        spr = pygame.Surface((size, size), pygame.SRCALPHA)
+        global _GLOW_ON_ALPHA
+        old = _GLOW_ON_ALPHA
+        _GLOW_ON_ALPHA = True
+        try:
+            draw_fn(spr, size / 2.0, size / 2.0, q * math.tau / _ROT_STEPS, kk, col, glow=0, **kw)
+        finally:
+            _GLOW_ON_ALPHA = old
+        _ROT_CACHE[key] = spr
+    w = spr.get_width()
+    surf.blit(spr, (int(x - w / 2), int(y - w / 2)))
+
+
 def draw_scythe_shape(surf, x, y, spin, k=1.0, color=AXE_COLOR, glow=0.6, chain=False):
     """Ölüm tırpanı (balta II) / zincirli orak (balta III): uzun sap, hilal ağız."""
     hx, hy = math.cos(spin), math.sin(spin)
@@ -20120,6 +20188,39 @@ def axe_bonus_roll(p, levels=1):
             p.axe_bonus = int(getattr(p, "axe_bonus", 0) or 0) + 1
             got += 1
     return got
+
+
+_AXE_TRAIL = {}
+
+
+def _axe_trail_sprite(spin, k, color):
+    """Baltanın arkasındaki dönüş izi (açıya göre önbellekli; her karede yeni yüzey açılıyordu)."""
+    q = int((spin % math.tau) / math.tau * _ROT_STEPS + 0.5) % _ROT_STEPS
+    kq = int(k * 20 + 0.5)
+    key = (q, kq, (int(color[0]), int(color[1]), int(color[2])))
+    sw = _AXE_TRAIL.get(key)
+    if sw is not None:
+        return sw
+    if len(_AXE_TRAIL) > 1500:
+        _AXE_TRAIL.clear()
+    kk = kq / 20.0
+    R0, R1 = 13.0 * kk, 25.0 * kk
+    a1 = q * math.tau / _ROT_STEPS + 1.04
+    a0 = a1 - 2.3
+    n = 12
+    size = int(R1 * 2 + 8)
+    sw = pygame.Surface((size, size), pygame.SRCALPHA)
+    c0 = size / 2.0
+    outer = [(c0 + math.cos(a0 + (a1 - a0) * i / n) * R1,
+              c0 + math.sin(a0 + (a1 - a0) * i / n) * R1) for i in range(n + 1)]
+    inner = [(c0 + math.cos(a1 - (a1 - a0) * i / n) * R0,
+              c0 + math.sin(a1 - (a1 - a0) * i / n) * R0) for i in range(n + 1)]
+    pygame.draw.polygon(sw, (*lighten(color, 0.35), 70), outer + inner)
+    for i in range(n):
+        qq = i / float(n)
+        pygame.draw.line(sw, (255, 250, 236, int(40 + 150 * qq)), outer[i], outer[i + 1], 2)
+    _AXE_TRAIL[key] = sw
+    return sw
 
 
 class FlyingAxe:
@@ -20220,20 +20321,8 @@ class FlyingAxe:
         k = self.k
         evo = getattr(self, "evo", 0)
         R0, R1 = 13.0 * k, 25.0 * k
-        a1 = self.spin + 1.04                  # ağzın ucunun açısı
-        a0 = a1 - 2.3
-        n = 12
-        size = int(R1 * 2 + 8)
-        sw = pygame.Surface((size, size), pygame.SRCALPHA)
-        c0 = size / 2.0
-        outer = [(c0 + math.cos(a0 + (a1 - a0) * i / n) * R1,
-                  c0 + math.sin(a0 + (a1 - a0) * i / n) * R1) for i in range(n + 1)]
-        inner = [(c0 + math.cos(a1 - (a1 - a0) * i / n) * R0,
-                  c0 + math.sin(a1 - (a1 - a0) * i / n) * R0) for i in range(n + 1)]
-        pygame.draw.polygon(sw, (*lighten(self.color, 0.35), 70), outer + inner)
-        for i in range(n):
-            q = i / float(n)
-            pygame.draw.line(sw, (255, 250, 236, int(40 + 150 * q)), outer[i], outer[i + 1], 2)
+        sw = _axe_trail_sprite(self.spin, k, self.color)
+        c0 = sw.get_width() / 2.0
         surf.blit(sw, (self.x - c0, self.y - c0))
         if evo >= 1:
             # kızıl aura: baltanın çevresinde nabız gibi atan kan kırmızısı hâle
@@ -20248,11 +20337,16 @@ class FlyingAxe:
         # asıl balta (I: kızıl auralı balta, II: tırpan, III: zincirli tırpan)
         if evo >= 3:
             draw_chain_links(surf, self.px, self.py, self.x, self.y, t, self.color, k)
-            draw_scythe_shape(surf, self.x, self.y, self.spin, k * 1.08, self.color, glow=0.6, chain=True)
+            add_glow(surf, self.x, self.y, 30 * k * 1.08, self.color, 0.45)
+            cached_spin_shape(surf, self.x, self.y, self.spin, k * 1.08, self.color, "scy3",
+                              draw_scythe_shape, chain=True)
         elif evo == 2:
-            draw_scythe_shape(surf, self.x, self.y, self.spin, k * 1.08, self.color, glow=0.55)
+            add_glow(surf, self.x, self.y, 30 * k * 1.08, self.color, 0.41)
+            cached_spin_shape(surf, self.x, self.y, self.spin, k * 1.08, self.color, "scy2", draw_scythe_shape)
         else:
-            draw_axe_shape(surf, self.x, self.y, self.spin, k, self.color, glow=0.5)
+            hx_, hy_ = math.cos(self.spin), math.sin(self.spin)
+            add_glow(surf, self.x - hy_ * 8 * k, self.y + hx_ * 8 * k, 26 * k, self.color, 0.35)
+            cached_spin_shape(surf, self.x, self.y, self.spin, k, self.color, "axe", draw_axe_shape)
         if evo >= 2 and evo_rich():
             # tırpan yanar: dönen ağızdan alev
             a_ = self.spin + 1.2
@@ -20363,7 +20457,7 @@ class WhipLash:
         PA = poly_aa if gl >= 2 else (lambda s_, p_, c_: pygame.draw.polygon(s_, c_, p_))
 
         # 1) hareket izi: birkaç kare geriden gelen, sönen ince hayaletler
-        for gi in range(1, min(self.GHOSTS, gl) + 1):
+        for gi in range(1, min(self.GHOSTS, gl, 2 - min(2, _DYNQ[0])) + 1):
             gf = f - gi * 0.085
             if gf <= 0.03:
                 continue
@@ -43187,7 +43281,10 @@ def _draw_arena_air(world, cam, t):
     span = 340.0
     # Telefonda süzülen ışık zerreleri çizilmez (her karede ~60 küçük çizim).
     motes = () if MOBILE else _motes_in(cam)
-    for (ex, ey, spd, sz, ph) in motes:
+    _skip = (1, 2, 3, 99)[_DYNQ[0]]         # yoğun sahnede zerrelerin bir kısmı atlanır
+    for _mi, (ex, ey, spd, sz, ph) in enumerate(motes):
+        if _mi % _skip:
+            continue
         yy = ey - (t * spd) % span
         if yy < cam.top - 16 or yy > cam.bottom + 16:
             continue
@@ -62207,6 +62304,8 @@ class App:
         _pt3 = time.perf_counter()
         _ft = getattr(self, "_ft", None)
         _cur = (self._pt_wait, (_pt2 - self._pt1) * 1000.0, (_pt3 - _pt2) * 1000.0)
+        if self.state == STATE_PLAY:
+            dynq_feed(_cur[1], dt)
         if _ft is None:
             self._ft = list(_cur)
         else:
