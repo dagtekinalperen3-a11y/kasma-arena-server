@@ -2796,8 +2796,11 @@ def add_score():
         # dünya sıralaması yalnızca Taş Meydan'da (öbür haritaların kuralları
         # skoru kolaylaştırıyor); öbür koşular oyuncunun geçmişinde durur
         payload["ranked"] = (mp == "stone")
-        if rid or flags:
+        acn = _clean_text(data.get("acn"), 60) if data.get("acn") else ""
+        if rid or flags or acn:
             det = dict(payload.get("details") or {"v": 1})
+            if acn:
+                det["acn"] = acn          # oyunun yerel sezgi notu (sıralamayı etkilemez)
             if rid:
                 det["rid"] = rid
             if flags:
@@ -3144,6 +3147,9 @@ def admin_review_ok():
 # isteği dünün şampiyonunu bulur ve ödülü bir kez yazar (aynı gün iki kez
 # yazılmaz: oyuncunun kaydında god_days listesi tutulur).
 GOD_DAYS = 7
+# ödül yalnız bu günden itibaren dağıtılır (özellik yokken oynanmış eski
+# günlerin 1.'si ödül almaz). Türkiye günü, YYYY-AA-GG.
+GOD_FIRST_DAY = os.environ.get("KASMA_GOD_FIRST_DAY", "2026-11-01")
 GOD_COSMETIC = "cape_imgod"
 GOD_ONLY_COSMETICS = {GOD_COSMETIC}
 _champ_cache = {}            # gün -> {"name", "score", "aid"} ya da {}
@@ -3191,6 +3197,8 @@ def _award_champion(day):
     with _champ_lock:
         if day in _champ_cache:
             return _champ_cache[day]
+    if day < GOD_FIRST_DAY:
+        return {}
     champ = {}
     try:
         top = _day_top(day, 1)
@@ -5137,6 +5145,7 @@ def social_profile():
            "skins": _n(row.get("skin_count")) or len(prog.get("skins_owned") or []),
            "skin": str(prog.get("equipped_skin") or "default")[:40],
            "style": _clean_profile_style(prog.get("profile_style"), prog.get("profile_owned")),
+           "god": _num(prog.get("god_until"), 0.0) > time.time(),
            "banned": bool(prog.get("board_banned"))}
     on, stt = _presence(tid)
     out["online"], out["status"] = on, stt
