@@ -2021,7 +2021,7 @@ STRINGS = {
                           "Войди, чтобы попасть в рейтинг"),
     "ui.lb_you_best": _T("En iyin: {0}", "Best: {0}", "Mejor: {0}", "Bestwert: {0}", "Рекорд: {0}"),
     "ui.win_full":    _T('Tam ekran', 'Fullscreen', 'Pantalla completa', 'Vollbild', 'Полный экран'),
-    "ui.win_size":    _T("EKRAN BOYUTU", "WINDOW SIZE", "TAMAÑO DE VENTANA", "FENSTERGRÖSSE", "РАЗМЕР ОКНА"),
+    "ui.win_size":    _T("ÇÖZÜNÜRLÜK", "RESOLUTION", "RESOLUCIÓN", "AUFLÖSUNG", "РАЗРЕШЕНИЕ"),
     "ui.win_auto":    _T("OTOMATİK", "AUTO", "AUTO", "AUTO", "АВТО"),
     "ui.scale_q":     _T("GÖRÜNTÜ KALİTESİ", "IMAGE QUALITY", "CALIDAD DE IMAGEN", "BILDQUALITÄT", "КАЧЕСТВО ИЗОБРАЖЕНИЯ"),
     "ui.scale_auto":  _T("KESKİN (ÖNERİLEN)", "SHARP (BEST)", "NÍTIDA (MEJOR)", "SCHARF (BESTE)", "ЧЁТКО (ЛУЧШЕ)"),
@@ -41208,7 +41208,10 @@ def set_window_icon():
 
 
 # ayarlardaki EKRAN BOYUTU seçenekleri (pencere kipinde)
-WIN_SIZES = ((1280, 720), (1600, 900), (1920, 1080), (2560, 1440), (3200, 1800), (3840, 2160))
+WIN_SIZES = ((1280, 720), (1600, 900), (1920, 1080), (2560, 1440), (3200, 1800), (3840, 2160),
+             # 3.51: büyük / ara ekranlar için ek çözünürlükler (kayıtlı sıra numaraları
+             # bozulmasın diye sona eklendi; listede genişliğe göre sıralı görünür)
+             (1366, 768), (1760, 990), (2048, 1152), (2304, 1296), (2880, 1620), (5120, 2880))
 
 
 class Display:
@@ -41320,6 +41323,7 @@ class Display:
         """Seçilebilir pencere boyları: monitöre (başlık çubuğuyla) sığanlar."""
         dw, dh = self._desktop()
         out = [i + 1 for i, (w, h) in enumerate(WIN_SIZES) if w <= dw * 0.98 and h <= dh * 0.93]
+        out.sort(key=lambda i: WIN_SIZES[i - 1][0])
         return out or [1]            # küçük ekranda da en az 1280x720 pencere seçilebilsin
 
     def _cur_window(self):
