@@ -41509,6 +41509,10 @@ class Background:
         for s in self.snow:
             tw = 0.75 + 0.25 * math.sin(self.t * 3 + s["phase"])
             blit_disc(surf, s["x"], s["y"], s["r"], (255, 255, 255), int(s["a"] * tw))
+        try:
+            draw_sky_passes(surf, self, self.t, alpha=150, shadow=False)
+        except Exception as e:
+            print("gökyüzü:", repr(e))
         surf.blit(self._vignette(), (0, 0), special_flags=pygame.BLEND_RGBA_SUB)
 
     # ---- performans ----
@@ -45345,6 +45349,154 @@ def _hud_plate(w, h, edge, hellish=False):
 _HUD_TOP_MOB = {}
 
 
+# =====================================================================
+# ---- gökyüzü geçişleri: arenanın üstünden süzülen dev siluetler ----
+# =====================================================================
+# Arkaplan canlı olsun: arada bir arenanın üstünden dev bir ejderha, bir wyvern
+# sürüsü ya da alevli bir anka kuşu geçer. Zeminde gölgesi kayar, kanatları
+# çırpar. Kareler önbellekli (her tür için 12 kanat karesi) -> kare başına
+# en çok 2 blit; FPS'e yükü yok denecek kadar az. Oyunu etkilemez (yalnız görsel).
+SKY_GAP = (16.0, 28.0)         # iki geçiş arası (sn)
+SKY_KINDS = {
+    # tür: (kanat açıklığı, gövde rengi, kenar rengi, hız px/sn, geçişte kaç tane)
+    "dragon":  (560, (52, 22, 48), (150, 60, 90), 210.0, 1),
+    "wyvern":  (240, (30, 34, 58), (90, 110, 170), 300.0, 3),
+    "phoenix": (330, (150, 50, 20), (255, 190, 80), 260.0, 1),
+}
+_SKY_FRAMES = {}
+_SKY_STATE = {}
+
+
+def _sky_sprite(kind, frame):
+    key = (kind, frame)
+    s = _SKY_FRAMES.get(key)
+    if s is not None:
+        return s
+    span, body, edge, _spd, _n = SKY_KINDS[kind]
+    W = span + 40
+    H = int(span * 0.75)
+    s = pygame.Surface((W, H), pygame.SRCALPHA)
+    cx, cy = W / 2.0, H / 2.0
+    flap = math.sin(frame / 12.0 * math.tau)        # -1..1
+    L = span * 0.48
+    bodyc = (*body, 255)
+    edgec = (*edge, 255)
+    # kanatlar (yarasa kanadı: 3 kemik, aralarında oyuk zar)
+    for side in (-1, 1):
+        root = (cx + side * span * 0.04, cy - span * 0.02)
+        tip_y = cy - L * (0.35 + 0.45 * flap)
+        bones = []
+        for k_, (fx_, fy_) in enumerate(((1.0, 0.0), (0.82, 0.38), (0.55, 0.62))):
+            bones.append((cx + side * L * fx_, tip_y + (cy - tip_y) * fy_ + L * 0.18 * k_))
+        mem = [root, (cx + side * L * 0.45, tip_y + (cy - tip_y) * 0.1)] + bones + \
+              [(cx + side * span * 0.10, cy + span * 0.12)]
+        pygame.draw.polygon(s, bodyc, [(int(x), int(y)) for x, y in mem])
+        for b in bones:
+            pygame.draw.line(s, edgec, (int(root[0]), int(root[1])), (int(b[0]), int(b[1])), 3)
+        pygame.draw.lines(s, edgec, False, [(int(x), int(y)) for x, y in [mem[1]] + bones], 2)
+    # gövde, boyun-baş (yukarı), kuyruk (aşağı)
+    pygame.draw.ellipse(s, bodyc, (int(cx - span * 0.06), int(cy - span * 0.13), int(span * 0.12), int(span * 0.30)))
+    neck = [(cx, cy - span * 0.10), (cx + span * 0.015, cy - span * 0.22), (cx, cy - span * 0.30)]
+    pygame.draw.lines(s, bodyc, False, [(int(x), int(y)) for x, y in neck], max(3, int(span * 0.035)))
+    hd = (cx, cy - span * 0.32)
+    pygame.draw.polygon(s, bodyc, [(int(hd[0] - span * 0.035), int(hd[1] + span * 0.02)),
+                                   (int(hd[0]), int(hd[1] - span * 0.06)),
+                                   (int(hd[0] + span * 0.035), int(hd[1] + span * 0.02))])
+    for side in (-1, 1):
+        pygame.draw.line(s, edgec, (int(hd[0] + side * span * 0.02), int(hd[1] - span * 0.01)),
+                         (int(hd[0] + side * span * 0.05), int(hd[1] - span * 0.07)), 2)
+    tail = []
+    for i in range(9):
+        f = i / 8.0
+        tail.append((cx + math.sin(f * 3.0 + frame * 0.5) * span * 0.04 * f, cy + span * (0.15 + 0.30 * f)))
+    pygame.draw.lines(s, bodyc, False, [(int(x), int(y)) for x, y in tail], max(2, int(span * 0.025)))
+    pygame.draw.polygon(s, bodyc, [(int(tail[-1][0] - span * 0.03), int(tail[-1][1])),
+                                   (int(tail[-1][0]), int(tail[-1][1] + span * 0.05)),
+                                   (int(tail[-1][0] + span * 0.03), int(tail[-1][1]))])
+    if len(_SKY_FRAMES) > 120:
+        _SKY_FRAMES.clear()
+    _SKY_FRAMES[key] = s
+    return s
+
+
+def _sky_shadow(kind, frame):
+    key = (kind, frame, "sh")
+    s = _SKY_FRAMES.get(key)
+    if s is None:
+        src = _sky_sprite(kind, frame)
+        s = pygame.transform.smoothscale(src, (int(src.get_width() * 0.8), int(src.get_height() * 0.8)))
+        s.fill((0, 0, 0, 255), special_flags=pygame.BLEND_RGBA_MIN)
+        _SKY_FRAMES[key] = s
+    return s
+
+
+def draw_sky_passes(surf, owner, t, alpha=120, shadow=True):
+    """owner: geçişlerin durumunu taşıyan nesne (koşu ya da menü arka planı)."""
+    if gfx_level() == 0 or CFG.get("sky_fx", True) is False:
+        return
+    st = _SKY_STATE.get("owner")
+    if st is not owner:
+        _SKY_STATE.clear()
+        _SKY_STATE["owner"] = owner
+        _SKY_STATE["next"] = t + random.uniform(4.0, 9.0)
+        _SKY_STATE["list"] = []
+    lst = _SKY_STATE["list"]
+    if t >= _SKY_STATE["next"] and not lst:
+        _SKY_STATE["next"] = t + random.uniform(*SKY_GAP)
+        kind = random.choices(("dragon", "wyvern", "phoenix"), weights=(5, 3, 2))[0]
+        span, _b, _e, spd, n = SKY_KINDS[kind]
+        a = random.uniform(0, math.tau)
+        dx, dy = math.cos(a), math.sin(a)
+        W, H = surf.get_size()
+        cx0, cy0 = W / 2 - dx * (W * 0.5 + span), H / 2 - dy * (H * 0.5 + span)
+        off = random.uniform(-H * 0.25, H * 0.25)
+        for i in range(n):
+            lat = (i - (n - 1) / 2.0) * span * 0.9
+            back = abs(i - (n - 1) / 2.0) * span * 0.6
+            lst.append({"kind": kind, "x": cx0 - dy * (lat + off) - dx * back, "y": cy0 + dx * (lat + off) - dy * back,
+                        "vx": dx * spd, "vy": dy * spd, "ang": math.degrees(math.atan2(dy, dx)), "ph": random.uniform(0, 12),
+                        "life": (max(W, H) + span * 3) / spd})
+        if kind == "dragon":
+            sfx("roar", 0.18, 0.1)
+    dt = 1.0 / 60.0 if "_lt" not in _SKY_STATE else max(0.0, min(0.1, t - _SKY_STATE["_lt"]))
+    _SKY_STATE["_lt"] = t
+    keep = []
+    for sp in lst:
+        sp["x"] += sp["vx"] * dt
+        sp["y"] += sp["vy"] * dt
+        sp["life"] -= dt
+        if sp["life"] <= 0:
+            continue
+        keep.append(sp)
+        fr = int((t * 9.0 + sp["ph"]) % 12)
+        rot = -sp["ang"] - 90           # kafa gidiş yönüne baksın
+        if shadow:
+            sh = _sky_rot(_sky_shadow(sp["kind"], fr), rot, ("sh", sp["kind"], fr))
+            sh.set_alpha(55)
+            surf.blit(sh, (int(sp["x"] + 140 - sh.get_width() / 2), int(sp["y"] + 170 - sh.get_height() / 2)))
+        img = _sky_rot(_sky_sprite(sp["kind"], fr), rot, ("im", sp["kind"], fr))
+        img.set_alpha(alpha)
+        if sp["kind"] == "phoenix":
+            add_glow(surf, sp["x"], sp["y"], 200, (255, 140, 40), 0.25)
+        surf.blit(img, (int(sp["x"] - img.get_width() / 2), int(sp["y"] - img.get_height() / 2)))
+    _SKY_STATE["list"] = keep
+
+
+_SKY_ROT = {}
+
+
+def _sky_rot(src, rot, key):
+    q = int(rot // 6) * 6
+    k = key + (q,)
+    r = _SKY_ROT.get(k)
+    if r is None:
+        if len(_SKY_ROT) > 200:
+            _SKY_ROT.clear()
+        r = pygame.transform.rotate(src, q)
+        _SKY_ROT[k] = r
+    return r
+
+
 _CURSE_VIG = {}
 
 
@@ -45367,6 +45519,11 @@ def _draw_corner_curse(surf, t):
 
 def draw_hud(surf, run, t):
     """Üst bilgi şeridi + ekranın ortasındaki duyurular."""
+    if not MOBILE:
+        try:
+            draw_sky_passes(surf, run, t)        # arenanın üstünden geçen dev siluetler
+        except Exception as e:
+            print("gökyüzü:", repr(e))
     if MOBILE:
         # Üst bilgi ile küçük harita + anahtar sayacı iki ayrı hazır görüntü; 8
         # karede bir, farklı karelerde tazelenir.
