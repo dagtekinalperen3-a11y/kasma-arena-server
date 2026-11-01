@@ -2142,6 +2142,10 @@ STRINGS = {
                   "ТЫ ЧЕМПИОН! Плащ GOD твой ещё {0} дн."),
     "lu.loadout_hide": _T("TAB: gizle", "TAB: hide", "TAB: ocultar", "TAB: ausblenden", "TAB: скрыть"),
     "lu.loadout_show": _T("TAB: SİLAHLIK", "TAB: LOADOUT", "TAB: EQUIPO", "TAB: AUSRÜSTUNG", "TAB: СНАРЯЖЕНИЕ"),
+    "sp.pirate_volley": _T("TOP ATEŞİ!", "CANNON VOLLEY!", "¡ANDANADA!", "KANONENSALVE!", "ЗАЛП!"),
+    "sp.candy_shield": _T("ŞEKER KALKANI", "CANDY SHIELD", "ESCUDO DULCE", "ZUCKERSCHILD", "ЛЕДЕНЦОВЫЙ ЩИТ"),
+    "sp.steam_blast": _T("BUHAR PATLAMASI!", "STEAM BLAST!", "¡EXPLOSIÓN DE VAPOR!", "DAMPFSTOSS!", "ВЫБРОС ПАРА!"),
+    "sp.void_escape": _T("BOŞLUĞA KAÇIŞ!", "VOID ESCAPE!", "¡ESCAPE AL VACÍO!", "LEERENFLUCHT!", "ПОБЕГ В ПУСТОТУ!"),
     "fx.keys_new":    _T("HARİTADA BİR ANAHTAR BELİRDİ", "A KEY APPEARED ON THE MAP", "APARECIÓ UNA LLAVE", "EIN SCHLÜSSEL ERSCHEINT", "ПОЯВИЛСЯ КЛЮЧ"),
     "fx.legend_open": _T("EFSANEVİ ÖDÜL!  +{0} SEVİYE", "LEGENDARY REWARD!  +{0} LEVELS", "¡RECOMPENSA LEGENDARIA!  +{0} NIVELES",
                          "LEGENDÄRE BELOHNUNG!  +{0} STUFEN", "ЛЕГЕНДАРНАЯ НАГРАДА!  +{0} УР."),
@@ -8984,7 +8988,7 @@ SKINS = [
          perk_add=dict(crit_chance=0.10, crit_dmg_mult=0.25, dash_dist_mult=0.15),
          perk_level=dict(crit_dmg_mult=(0.010, 0.50), crit_chance=(0.0015, 0.09))),
     dict(id="dragon_soul", name="Ejder Ruhu", color=(200, 60, 40), accent=(255, 200, 90), cost=4900,
-         weapon="dragonhead", proj="fireball", aura="dragon", sfx="d", wlen=34,
+         weapon="dragonhead", proj="fireball", aura="dragon", sfx="d", wlen=22,
          desc="İçinde bir ejderin ruhunu taşıyan dev savaşçı. Kanatları, boynuzları ve ateş saçan ejder başlı topuyla hem dayanır hem yakar.",
          perks=["Can +60", "Zırh +%6 (hasar azaltma)", "Hasar +%10", "BONK Hasarı +%20",
                 "Her seviye: Can +4 (en çok +240), Hasar +%0.4 (en çok %24)"],
@@ -9055,71 +9059,61 @@ NEW_SKINS = [
     dict(id="sakura_ninja", name="Sakura Ninjası", color=(255, 150, 190), accent=(255, 240, 246), cost=4200,
          weapon="katana", proj="feather", aura="sakura", sfx="b", wlen=44,
          desc="Kiraz çiçekleri arasında süzülen bir ninja. Çevresinde yapraklar döner, katanası pembe bir iz bırakır.",
-         perks=["Kritik Şans +%8", "Dash Mesafesi +%15",
-                "Her seviye: Kritik Hasar +%1 (en çok %50)", "Yetenek: Kiraz Fırtınası"],
+         perks=["İMZA: Kiraz Dansı - dash attığın yoldaki her yaratığı kesersin; dash öldürürse dash beklemen yarıya iner", "İMZA: Her 8 öldürmede 4 sn yaprak fırtınası (çevrende 6 kiraz bıçağı döner)", "Kritik Şans +%8, Dash Mesafesi +%15", "Her seviye: Kritik Hasar +%1 (en çok %50)", "Yetenek: Kiraz Fırtınası (12 kesin kritik)"],
          perk_add=dict(crit_chance=0.08, dash_dist_mult=0.15),
          perk_level=dict(crit_dmg_mult=(0.010, 0.50))),
     dict(id="thunder_god", name="Gök Tanrısı", color=(90, 140, 255), accent=(255, 240, 120), cost=5200,
          weapon="tesla", proj="lightning", aura="thundergod", sfx="c", wlen=30,
          desc="Başında şimşek tacı, sırtında çakan bir hale. Her atışında gök gürler.",
-         perks=["Zincir Yıldırım Lv.2 ile başlar", "Atış Hızı +%10",
-                "Her seviye: Hasar +%0.5 (en çok %30)", "Yetenek: Gök Öfkesi (8 yıldırım)"],
+         perks=["İMZA: Her 6. atışında gökten yıldırım iner ve 3 yaratığa zincirlenir (sersemletir)", "Zincir Yıldırım Lv.2 ile başlar, Atış Hızı +%10", "Her seviye: Hasar +%0.5 (en çok %30)", "Yetenek: Gök Öfkesi (8 yıldırım)"],
          perk_set=dict(chain_level=2), perk_add=dict(skin_aspd=0.10),
          perk_level=dict(skin_power=(0.005, 0.30))),
     dict(id="pirate_king", name="Korsan Kral", color=(180, 40, 50), accent=(240, 200, 90), cost=3900,
          weapon="pistols", proj="bullet", aura="pirate", sfx="a", wlen=30,
          desc="Yedi denizin hükümdarı. Çevresinde altınları döner, iki tabancayla ateş eder.",
-         perks=["Altın Kazancı +%20", "Kritik Şans +%5",
-                "Her seviye: Hasar +%0.5 (en çok %30)", "Yetenek: Top Ateşi (12 güdümlü gülle)"],
+         perks=["İMZA: Kara Bayrak - çevrendeki (280 px) yaratıklar %15 fazla hasar alır", "İMZA: 22 sn'de bir 6 gülle yağar; öldürdüğün yaratıkların %15'i iki kat altın düşürür", "Altın Kazancı +%20, Kritik Şans +%5", "Yetenek: Top Ateşi (12 güdümlü gülle)"],
          perk_add=dict(coin_mult=0.20, crit_chance=0.05),
          perk_level=dict(skin_power=(0.005, 0.30))),
     dict(id="lava_golem", name="Lav Golemi", color=(96, 64, 54), accent=(255, 130, 40), cost=4600,
          weapon="cannon", proj="fireball", aura="lava", sfx="d", wlen=30,
          desc="Damarlarında lav akan kaya dev. Ayak bastığı yer kızarır, közler yükselir.",
-         perks=["Can +80", "Zırh +%5 (hasar azaltma)", "BONK Hasarı +%15",
-                "Her seviye: Can +5 (en çok +300)", "Yetenek: Lav Halkası"],
+         perks=["İMZA: Lav İzi - yürüdüğün yer 3 sn lav olur, üstündekileri yakar", "İMZA: Magma Kalbi - canın yarının altındayken %20 daha az hasar alırsın", "Can +80, Zırh +%5, BONK Hasarı +%15", "Her seviye: Can +5 (en çok +300)", "Yetenek: Lav Halkası"],
          perk_add=dict(base_max_hp=80, base_armor=0.05, bonk_mult=0.15),
          perk_level=dict(_hp=(5, 300))),
     dict(id="neon_rider", name="Neon Sürücü", color=(44, 34, 80), accent=(60, 255, 230), cost=4400,
          weapon="blaster", proj="bolt", aura="neon", sfx="a", wlen=28,
          desc="Siberpunk sokaklarından gelen hız tutkunu. Neon ızgara halkası ve parlayan vizörüyle iz bırakır.",
-         perks=["Hareket Hızı +15", "Atış Hızı +%10", "Dash Bekleme Süresi -%10",
-                "Her seviye: Atış Hızı +%0.5 (en çok %30)", "Yetenek: Nitro"],
+         perks=["İMZA: Hız Aşırtma - hareket ettikçe atış hızın birikir (en çok +%35)", "İMZA: Neon İz - arkanda yaratıkları çarpan ve yavaşlatan neon şerit kalır", "Hareket Hızı +15, Dash Bekleme -%10", "Her seviye: Atış Hızı +%0.5 (en çok %30)", "Yetenek: Nitro"],
          perk_add=dict(base_speed=15, skin_aspd=0.10, dash_cd_mult=-0.10),
          perk_level=dict(skin_aspd=(0.005, 0.30))),
     dict(id="forest_spirit", name="Orman Ruhu", color=(110, 186, 96), accent=(236, 255, 190), cost=3800,
          weapon="crossbow", proj="feather", aura="forest", sfx="a", wlen=27,
          desc="Kadim ormanın koruyucusu. Yapraktan bir taç taşır, çevresinde ateş böcekleri dans eder.",
-         perks=["Can Yenilenmesi +1.0/sn", "Toplama Menzili +30", "Şans +%5",
-                "Her seviye: Hasar +%0.4 (en çok %24)", "Yetenek: Diken Tarlası"],
+         perks=["İMZA: Doğanın Lütfu - 3 sn hasar almazsan saniyede maks canının %1,2'sini yenilersin", "İMZA: Sana vuranları kökler sarar (yakındakiler 0,9 sn kıpırdayamaz)", "Can Yenilenmesi +1.0/sn, Toplama Menzili +30, Şans +%5", "Yetenek: Diken Tarlası"],
          perk_add=dict(base_regen=1.0, base_pickup=30, luck=0.05),
          perk_level=dict(skin_power=(0.004, 0.24))),
     dict(id="sand_pharaoh", name="Kum Firavunu", color=(222, 182, 92), accent=(60, 110, 220), cost=4800,
          weapon="scepter", proj="star", aura="pharaoh", sfx="c", wlen=38,
          desc="Güneşin oğlu. Ardında Ra'nın altın diski parlar, asasından yıldızlar saçar.",
-         perks=["Altın Kazancı +%25", "Deneyim Kazancı +%10",
-                "Her seviye: Hasar +%0.5 (en çok %30)", "Yetenek: Firavunun Hazinesi"],
+         perks=["İMZA: Firavunun Laneti - 9 sn'de bir en yakın 5 yaratık lanetlenir: %35 fazla hasar alır", "İMZA: Lanetli yaratık ölünce altın tozuyla patlar (çevreye hasar + fazladan altın)", "Altın Kazancı +%25, Deneyim +%10", "Yetenek: Firavunun Hazinesi"],
          perk_add=dict(coin_mult=0.25, xp_mult=0.10),
          perk_level=dict(skin_power=(0.005, 0.30))),
     dict(id="void_walker", name="Boşluk Gezgini", color=(34, 22, 56), accent=(186, 96, 255), cost=5200,
          weapon="scythe", proj="blackfire", aura="void", sfx="b", wlen=38,
          desc="Gerçekliğin yırtığından çıkan gezgin. Sırtında dönen bir boşluk kapısı, çevresinde kırık evren parçaları.",
-         perks=["Hasar +%12", "Kritik Hasar +%20",
-                "Her seviye: Hasar +%0.6 (en çok %36)", "Yetenek: Boşluk Kapısı"],
+         perks=["İMZA: Boşluğa Kaçış - 70 sn'de bir ölümcül darbede ölmezsin: patlayıp uzakta %35 canla belirirsin", "İMZA: Her dash arkasında yaratıkları içine çeken bir boşluk yarığı bırakır", "Hasar +%12, Kritik Hasar +%20", "Her seviye: Hasar +%0.6 (en çok %36)", "Yetenek: Boşluk Kapısı"],
          perk_add=dict(skin_power=0.12, crit_dmg_mult=0.20),
          perk_level=dict(skin_power=(0.006, 0.36))),
     dict(id="candy_pop", name="Şeker Patlaması", color=(255, 140, 200), accent=(140, 230, 255), cost=3800,
          weapon="crystal", proj="prism", aura="candy", sfx="c", wlen=30,
          desc="Şeker fabrikasından kaçan tatlı bela. Çevresinde lolipop halkası ve uçuşan şekerler.",
-         perks=["Şans +%10", "Toplama Menzili +25", "Deneyim Kazancı +%8",
-                "Her seviye: Hasar +%0.4 (en çok %24)", "Yetenek: Şeker Rüyası"],
+         perks=["İMZA: Şeker Yağmuru - öldürmelerin %12'si şeker düşürür: %4 can + 3 sn %20 hız", "İMZA: 20 sn'de bir kalkan yükü (en çok 3)", "Şans +%10, Toplama Menzili +25, Deneyim +%8", "Yetenek: Şeker Rüyası"],
          perk_add=dict(luck=0.10, base_pickup=25, xp_mult=0.08),
          perk_level=dict(skin_power=(0.004, 0.24))),
     dict(id="steam_knight", name="Buhar Şövalyesi", color=(150, 118, 80), accent=(255, 200, 120), cost=4500,
          weapon="cannon", proj="rock", aura="steam", sfx="d", wlen=30,
          desc="Dişlilerle işleyen pirinç zırhlı şövalye. Sırtında çarklar döner, bacasından buhar tüter.",
-         perks=["Zırh +%8 (hasar azaltma)", "Can +50", "BONK Yarıçapı +%15",
-                "Her seviye: Can +4 (en çok +240)", "Yetenek: Zırh Kilidi"],
+         perks=["İMZA: Buhar Basıncı - zamanla ve aldığın hasarla dolar; dolunca çevreni savuran buhar patlaması + %5 can", "Zırh +%8, Can +50, BONK Yarıçapı +%15", "Her seviye: Can +4 (en çok +240)", "Yetenek: Zırh Kilidi"],
          perk_add=dict(base_armor=0.08, base_max_hp=50, bonk_radius_mult=0.15),
          perk_level=dict(_hp=(4, 240))),
 ]
@@ -9249,9 +9243,9 @@ SKIN_ULTS = {
 
 # 5. paket skinlerinin yetenekleri (mevcut yetenek türlerini kullanır)
 SKIN_ULTS.update({
-    "sakura_ninja": dict(name="KİRAZ FIRTINASI", icon="skull", color=(255, 170, 210), cd=17.0,
-                         kind="shadow_strike", mode="auto", n=8, mult=2.1, duration=1.6,
-                         desc="Yaprak fırtınasına dönüşüp en yakın 8 düşmanın arasından geçer: her birine kesin "
+    "sakura_ninja": dict(name="KİRAZ FIRTINASI", icon="skull", color=(255, 170, 210), cd=15.0,
+                         kind="shadow_strike", mode="auto", n=12, mult=2.6, duration=2.0,
+                         desc="Yaprak fırtınasına dönüşüp en yakın 12 düşmanın arasından geçer: her birine kesin "
                               "kritik vurur; ardından kısa süre hasarın artar ve dokunulmaz kalırsın."),
     "thunder_god": dict(name="GÖK ÖFKESİ", icon="bolt", color=(150, 190, 255), cd=17.0,
                         kind="thunder", mode="auto", n=8, mult=1.8,
@@ -14496,19 +14490,21 @@ def draw_weapon(surf, p, px, py, t):
         line((6, -0.5), (38, -4.5), lighten(acc, 0.4), 1)
         glow(40, -6, 14, acc, .45 + .2 * math.sin(t * 4))
     elif w == "dragonhead":
-        # ejder ruhu: ejder başı biçimli top; ağzından alev
-        poly([(-2, -6), (14, -7), (22, -5), (28, -2), (28, 2), (22, 5), (14, 7), (-2, 6)],
-             scale_col(col, 0.8), (255, 200, 90), 2)
-        poly([(8, -7), (12, -13), (15, -7)], (240, 220, 170))
-        poly([(16, -6), (19, -11), (21, -5)], (240, 220, 170))
-        circ(18, -2, 2, (255, 230, 120))
-        for x in (4, 9):
-            line((x, -6), (x + 2, 6), scale_col(col, 0.55), 1)
-        jaw = 2 + 2 * abs(math.sin(t * 8))
-        fl = 7 + 5 * abs(math.sin(t * 17))
-        poly([(28, -jaw), (28 + fl, 0), (28, jaw)], (255, 140, 40))
-        poly([(28, -jaw * 0.5), (28 + fl * 0.6, 0), (28, jaw * 0.5)], (255, 235, 140))
-        glow(30, 0, 18, (255, 130, 40), .7)
+        # ejder ruhu: ejder başı biçimli küçük top (eskiden çok iriydi); ağzından alev
+        S = 0.62
+
+        def Q(pts):
+            return [(x * S, y * S) for x, y in pts]
+        poly(Q([(-2, -6), (14, -7), (22, -5), (28, -2), (28, 2), (22, 5), (14, 7), (-2, 6)]),
+             scale_col(col, 0.8), (255, 200, 90), 1)
+        poly(Q([(8, -7), (12, -13), (15, -7)]), (240, 220, 170))
+        poly(Q([(16, -6), (19, -11), (21, -5)]), (240, 220, 170))
+        circ(18 * S, -2 * S, 1, (255, 230, 120))
+        jaw = (2 + 2 * abs(math.sin(t * 8))) * S
+        fl = (7 + 5 * abs(math.sin(t * 17))) * S
+        poly([(28 * S, -jaw), (28 * S + fl, 0), (28 * S, jaw)], (255, 140, 40))
+        poly([(28 * S, -jaw * 0.5), (28 * S + fl * 0.6, 0), (28 * S, jaw * 0.5)], (255, 235, 140))
+        glow(30 * S, 0, 11, (255, 130, 40), .55)
     elif w == "clockstaff":
         # zaman bükücü: ucunda dönen kadranlı saat asası
         line((-8, 0), (26, 0), (196, 160, 80), 3)
@@ -17738,7 +17734,10 @@ class Player(_AcGuard):
         # zırh delme: geç dalgalarda zırhın bir payı yok sayılır.
         arm = self.eff_armor() * (1.0 - clamp(self.armor_pierce, 0.0, 1.0))
         dmg = amount * (1 - arm) * self.dmg_taken_mult * self.lowhp_factor()
+        if self.skin.get("id") == "lava_golem" and self.hp < self.max_hp * 0.5:
+            dmg *= 1.0 - SP_LAVA_DR              # magma kalbi
         self.hp -= dmg
+        self.sp_hurt = float(getattr(self, "sp_hurt", 0.0) or 0.0) + dmg
         if dmg >= 1.0 and getattr(self, "focus_hurt_cd", 0.0) <= 0:
             self.focus_hurt_cd = 0.6
             self.add_focus(-FOCUS_HURT)
@@ -17761,6 +17760,13 @@ class Player(_AcGuard):
     def _resolve_lethal(self, fx):
         """Can sıfırın altına düştüyse ölümü engelleyen güçleri sırayla dener."""
         if self.hp > 0 or not self.alive:
+            return
+        if self.skin.get("id") == "void_walker" and float(getattr(self, "sp_void_cd", 0.0) or 0.0) <= 0:
+            # boşluğa kaçış: ölümcül darbede boşluğa düşüp uzakta yeniden belirir
+            self.hp = self.max_hp * 0.35
+            self.sp_void_cd = SP_VOID_CD
+            self.invuln = max(self.invuln, 2.5)
+            self.sp_void_now = True
             return
         if self.ult and self.ult.get("kind") == "death_defy" and self.ult_ready():
             # gölge duruşu: ölümcül darbede can 1'e sabitlenir ve zaman durur.
@@ -35001,6 +35007,8 @@ def evo_mark_mult(e):
         m *= PENTA_FROST_MULT
     if d.get("_zz_until", -1.0) > now:
         m *= ZZ_FLOOD_MULT
+    if "_pk_mark" in d or "_ph_mark" in d:
+        m *= sp_mark_mult(e, now)
     return m
 
 
@@ -35998,7 +36006,353 @@ def draw_evo_card(surf, r2, ch, run, t, hover):
                   bold=True, center=True, shadow=False)
 
 
-class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMixin):
+# =====================================================================
+# ---- 5. paket skinlerinin imza pasifleri ----
+# =====================================================================
+# Her yeni skinin yeteneğinin (ult) yanında, oyun tarzını değiştiren bir imza
+# gücü var. Durum düz bir sözlükte (RunState.sp) tutulur; tetikleyiciler:
+#   sp_tick (her kare), sp_on_kill (öldürme), sp_on_dash (dash başı),
+#   sp_on_shot (elle atış), oyuncunun aldığı hasar (Player.sp_hurt birikimi),
+#   ölümcül darbe (Player._resolve_lethal -> boşluk gezgini).
+# Hasarın birimi yetenek birimi (_ult_unit): oyuncunun gerçek ateş gücüyle büyür.
+SP_SAKURA_DASH_R = 54.0
+SP_SAKURA_BLOOM_KILLS = 8
+SP_THUNDER_EVERY = 6
+SP_PIRATE_AURA_R = 280.0
+SP_PIRATE_MARK = 1.15
+SP_PIRATE_VOLLEY_T = 22.0
+SP_LAVA_DR = 0.20
+SP_NEON_MAX = 0.35
+SP_FOREST_CALM_T = 3.0
+SP_FOREST_HEAL = 0.012
+SP_PHARAOH_T = 9.0
+SP_PHARAOH_MARK = 1.35
+SP_VOID_CD = 70.0
+SP_CANDY_CHANCE = 0.12
+SP_CANDY_SHIELD_T = 20.0
+SP_STEAM_MAX = 100.0
+
+
+def sp_mark_mult(e, now):
+    """Pasiflerin işaretlediği yaratığın aldığı fazladan hasar."""
+    d = e.__dict__
+    m = 1.0
+    if d.get("_pk_mark", -1.0) > now:
+        m *= SP_PIRATE_MARK
+    if d.get("_ph_mark", -1.0) > now:
+        m *= SP_PHARAOH_MARK
+    return m
+
+
+class SkinPassiveMixin:
+    def sp_init(self):
+        self.sp = {"kills": 0, "shots": 0, "lava": [], "trail": [], "candies": [], "rifts": [],
+                   "bloom_t": 0.0, "volley": SP_PIRATE_VOLLEY_T, "curse": SP_PHARAOH_T, "calm": 0.0,
+                   "neon": 0.0, "steam": 0.0, "shield": SP_CANDY_SHIELD_T, "drop": 0.0,
+                   "dash_hit": set(), "petal_t": 0.0}
+
+    def sp_id(self):
+        sk = getattr(self.player, "skin", None) or {}
+        return sk.get("id", "")
+
+    # ---- her kare ----
+    def sp_tick(self, dt):
+        sp = getattr(self, "sp", None)
+        if sp is None or getattr(self, "is_coop", False):
+            return
+        p = self.player
+        if not p.alive:
+            return
+        sid = self.sp_id()
+        hurt = float(getattr(p, "sp_hurt", 0.0) or 0.0)
+        if hurt > 0:
+            p.sp_hurt = 0.0
+        now = self.run_time
+        if sid == "sakura_ninja":
+            if p.dash_time > 0:
+                # dash yolundaki her yaratık bir kez kiraz kılıcıyla kesilir
+                for e in self._ult_targets(SP_SAKURA_DASH_R):
+                    if id(e) in sp["dash_hit"]:
+                        continue
+                    sp["dash_hit"].add(id(e))
+                    died = self._ult_hit(e, self._ult_unit() * 0.9, crit=random.random() < 0.5, kb=60)
+                    self.fx.burst(e.x, e.y, (255, 190, 215), n=6, speed=160, life=0.4, r=2.6)
+                    if died:
+                        p.dash_cd_timer *= 0.5
+            if sp["bloom_t"] > 0:
+                # yaprak fırtınası: 6 kiraz bıçağı oyuncunun çevresinde döner
+                sp["bloom_t"] -= dt
+                sp["petal_t"] -= dt
+                if sp["petal_t"] <= 0:
+                    sp["petal_t"] = 0.3
+                    for i in range(6):
+                        a = now * 4.0 + i * math.tau / 6
+                        bx, by = p.x + math.cos(a) * 92, p.y + math.sin(a) * 92
+                        for e in self._all_targets():
+                            if e.alive and dist(e.x, e.y, bx, by) < 34 + getattr(e, "radius", 12):
+                                self._ult_hit(e, self._ult_unit() * 0.45, kb=40)
+        elif sid == "pirate_king":
+            for e in self._ult_targets(SP_PIRATE_AURA_R):
+                e.__dict__["_pk_mark"] = now + 0.3
+            sp["volley"] -= dt
+            if sp["volley"] <= 0:
+                sp["volley"] = SP_PIRATE_VOLLEY_T
+                tg = self._ult_targets(700)
+                random.shuffle(tg)
+                for e in tg[:6]:
+                    self._ult_lightning_fx(e.x, e.y, (255, 200, 120))
+                    for o in self._all_targets():
+                        if o.alive and dist(o.x, o.y, e.x, e.y) < 90:
+                            self._ult_hit(o, self._ult_unit() * 1.1, kb=160)
+                    self.fx.burst(e.x, e.y, (90, 80, 70), n=12, speed=200, life=0.5, r=4)
+                if tg:
+                    self.fx.popup(p.x, p.y - 70, L("sp.pirate_volley"), (255, 210, 120), 18, life=1.0)
+                    sfx("explosion", 0.5, 0.05)
+        elif sid == "lava_golem":
+            sp["drop"] -= dt
+            if p.speed_now > 40 and sp["drop"] <= 0:
+                sp["drop"] = 0.32
+                sp["lava"].append([p.x, p.y, 3.0, 0.0])
+            for lv in sp["lava"]:
+                lv[2] -= dt
+                lv[3] -= dt
+                if lv[3] <= 0:
+                    lv[3] = 0.5
+                    for e in self._all_targets():
+                        if e.alive and dist(e.x, e.y, lv[0], lv[1]) < 40 + getattr(e, "radius", 12):
+                            self._ult_hit(e, self._ult_unit() * 0.22)
+                            if hasattr(e, "apply_burn"):
+                                e.apply_burn(self._ult_unit() * 0.05, 2.0)
+            sp["lava"] = [lv for lv in sp["lava"] if lv[2] > 0][-24:]
+        elif sid == "neon_rider":
+            moving = p.speed_now > 60
+            tgt = SP_NEON_MAX if moving else 0.0
+            nb = sp["neon"] + clamp(tgt - sp["neon"], -dt * 0.4, dt * 0.06)
+            if abs(nb - sp["neon"]) > 1e-6:
+                p.run_aspd_mult += nb - sp["neon"]          # hareket ettikçe atış hızı birikir
+                sp["neon"] = nb
+            if p.dash_time > 0 or (moving and int(now * 20) % 2 == 0):
+                sp["trail"].append([p.x, p.y, 1.2])
+            for tr in sp["trail"]:
+                tr[2] -= dt
+            sp["trail"] = [tr for tr in sp["trail"] if tr[2] > 0][-60:]
+            sp["drop"] -= dt
+            if sp["drop"] <= 0 and sp["trail"]:
+                sp["drop"] = 0.25
+                for e in self._all_targets():
+                    if not e.alive:
+                        continue
+                    for tr in sp["trail"][::3]:
+                        if dist(e.x, e.y, tr[0], tr[1]) < 26 + getattr(e, "radius", 12):
+                            self._ult_hit(e, self._ult_unit() * 0.18)
+                            if hasattr(e, "apply_slow"):
+                                e.apply_slow(0.6, 0.6)
+                            break
+        elif sid == "forest_spirit":
+            sp["calm"] = 0.0 if hurt > 0 else sp["calm"] + dt
+            if sp["calm"] >= SP_FOREST_CALM_T and p.hp < p.max_hp:
+                p.heal(p.max_hp * SP_FOREST_HEAL * dt)
+            if hurt > 0:
+                # sana vuran yaratıkları kökler sarar
+                for e in self._ult_targets(130):
+                    stun_enemy(e, 0.9)
+                    self.fx.burst(e.x, e.y + 6, (110, 190, 80), n=6, speed=90, life=0.4, r=2.6)
+        elif sid == "sand_pharaoh":
+            sp["curse"] -= dt
+            if sp["curse"] <= 0:
+                sp["curse"] = SP_PHARAOH_T
+                tg = sorted(self._ult_targets(520), key=lambda e: dist(p.x, p.y, e.x, e.y))[:5]
+                for e in tg:
+                    e.__dict__["_ph_mark"] = now + 6.0
+                    self.fx.bolt([(p.x, p.y - 20), (e.x, e.y)], (255, 210, 100), 0.3)
+                    self.fx.ring(e.x, e.y, (255, 200, 90), n=10, speed=120, life=0.4, r=2.6)
+                if tg:
+                    sfx("lightning", 0.4, 0.05)
+        elif sid == "void_walker":
+            p.sp_void_cd = max(0.0, float(getattr(p, "sp_void_cd", 0.0) or 0.0) - dt)
+            if getattr(p, "sp_void_now", False):
+                p.sp_void_now = False
+                self._sp_void_escape()
+            for rf in sp["rifts"]:
+                rf[2] -= dt
+                rf[3] -= dt
+                if rf[3] <= 0:
+                    rf[3] = 0.4
+                    for e in self._all_targets():
+                        if not e.alive:
+                            continue
+                        d = dist(e.x, e.y, rf[0], rf[1])
+                        if d < 110:
+                            self._ult_hit(e, self._ult_unit() * 0.3)
+                            if not getattr(e, "is_boss", False) and d > 8:
+                                e.x += (rf[0] - e.x) / d * 14
+                                e.y += (rf[1] - e.y) / d * 14
+            sp["rifts"] = [rf for rf in sp["rifts"] if rf[2] > 0]
+        elif sid == "candy_pop":
+            sp["shield"] -= dt
+            if sp["shield"] <= 0:
+                sp["shield"] = SP_CANDY_SHIELD_T
+                if p.shield_charges < 3:
+                    p.shield_charges += 1
+                    self.fx.popup(p.x, p.y - 50, L("sp.candy_shield"), (255, 170, 220), 16, life=0.9)
+            for cd in sp["candies"]:
+                cd[2] -= dt
+                if dist(cd[0], cd[1], p.x, p.y) < 44 + p.eff_pickup() * 0.15:
+                    cd[2] = -1
+                    p.heal(p.max_hp * 0.04)
+                    p.add_temp_buff(3.0, run_spd_mult=0.20)
+                    self.fx.burst(cd[0], cd[1], cd[3], n=12, speed=170, life=0.45, r=3)
+                    sfx("coin", 0.6, 0.1)
+            sp["candies"] = [cd for cd in sp["candies"] if cd[2] > 0]
+        elif sid == "steam_knight":
+            sp["steam"] = min(SP_STEAM_MAX, sp["steam"] + dt * 2.0 + hurt * 0.8)
+            if sp["steam"] >= SP_STEAM_MAX:
+                sp["steam"] = 0.0
+                rr = 230.0
+                for e in self._ult_targets(rr):
+                    self._ult_hit(e, self._ult_unit() * 1.5, kb=320)
+                    stun_enemy(e, 0.6)
+                p.heal(p.max_hp * 0.05)
+                self.fx.shockwave(p.x, p.y, rr, (235, 235, 240), 0.45, 8)
+                self.fx.burst(p.x, p.y, (220, 220, 228), n=26, speed=260, life=0.6, r=5)
+                self.fx.popup(p.x, p.y - 64, L("sp.steam_blast"), (255, 210, 150), 20, life=1.0)
+                sfx("explosion", 0.7, 0.0)
+
+    # ---- tetikleyiciler ----
+    def sp_on_kill(self, e):
+        sp = getattr(self, "sp", None)
+        if sp is None:
+            return
+        sid = self.sp_id()
+        sp["kills"] += 1
+        if sid == "sakura_ninja" and sp["kills"] % SP_SAKURA_BLOOM_KILLS == 0:
+            sp["bloom_t"] = 4.0
+        elif sid == "pirate_king" and random.random() < 0.15:
+            self.drop_pickup(e.x, e.y, "coin", max(1.0, getattr(e, "coin", 1.0)))
+        elif sid == "sand_pharaoh" and e.__dict__.get("_ph_mark", -1.0) > self.run_time:
+            # lanetli yaratık altın tozuna dönüşüp patlar
+            self.fx.shockwave(e.x, e.y, 110, (255, 210, 100), 0.35, 4)
+            for o in self._all_targets():
+                if o.alive and o is not e and dist(o.x, o.y, e.x, e.y) < 110:
+                    self._ult_hit(o, self._ult_unit() * 0.8, kb=120)
+            self.drop_pickup(e.x, e.y, "coin", max(1.0, getattr(e, "coin", 1.0)))
+        elif sid == "candy_pop" and random.random() < SP_CANDY_CHANCE:
+            sp["candies"].append([e.x, e.y, 8.0, random.choice(((255, 120, 190), (140, 230, 255),
+                                                                 (255, 230, 100), (150, 240, 140)))])
+
+    def sp_on_dash(self):
+        sp = getattr(self, "sp", None)
+        if sp is None:
+            return
+        sid = self.sp_id()
+        p = self.player
+        if sid == "sakura_ninja":
+            sp["dash_hit"] = set()
+            self.fx.burst(p.x, p.y, (255, 190, 215), n=14, speed=200, life=0.5, r=3)
+        elif sid == "void_walker":
+            sp["rifts"].append([p.x, p.y, 1.6, 0.0])
+
+    def sp_on_shot(self):
+        sp = getattr(self, "sp", None)
+        if sp is None or self.sp_id() != "thunder_god":
+            return
+        sp["shots"] += 1
+        if sp["shots"] % SP_THUNDER_EVERY:
+            return
+        p = self.player
+        tg = sorted(self._ult_targets(560), key=lambda e: dist(p.x, p.y, e.x, e.y))
+        if not tg:
+            return
+        e0 = tg[0]
+        chain = [e0] + [o for o in tg[1:] if dist(o.x, o.y, e0.x, e0.y) < 220][:3]
+        prev = None
+        for i, e in enumerate(chain):
+            self._ult_hit(e, self._ult_unit() * (1.3 if i == 0 else 0.6), kb=60)
+            stun_enemy(e, 0.3)
+            if prev is None:
+                self._ult_lightning_fx(e.x, e.y, (255, 240, 140))
+            else:
+                self.fx.bolt(zigzag(prev.x, prev.y, e.x, e.y, 5, 14), (190, 215, 255), 0.25)
+            prev = e
+        sfx("lightning", 0.35, 0.1)
+
+    def _sp_void_escape(self):
+        p = self.player
+        ox, oy = p.x, p.y
+        rr = 190.0
+        for e in self._ult_targets(rr):
+            self._ult_hit(e, self._ult_unit() * 2.0, kb=280)
+        self.fx.shockwave(ox, oy, rr, (186, 96, 255), 0.5, 7)
+        self.fx.do_flash((150, 80, 255), 0.4)
+        # en tenha yöne ışınlan
+        best, bscore = (ox, oy), -1.0
+        for i in range(12):
+            a = i * math.tau / 12
+            x = clamp(ox + math.cos(a) * 240, ARENA_RECT.left + 40, ARENA_RECT.right - 40)
+            y = clamp(oy + math.sin(a) * 240, ARENA_RECT.top + 40, ARENA_RECT.bottom - 40)
+            near = min([dist(x, y, e.x, e.y) for e in self.enemies if e.alive] or [999.0])
+            if near > bscore:
+                best, bscore = (x, y), near
+        p.x, p.y = best
+        self.fx.ring(p.x, p.y, (186, 96, 255), n=24, speed=240, life=0.5, r=3.5)
+        self.fx.popup(p.x, p.y - 70, L("sp.void_escape"), (210, 160, 255), 22, life=1.4)
+        sfx("second", 1.0, 0.0)
+
+
+def draw_skin_passives(world, run, t, vis):
+    """Pasiflerin dünyadaki izleri (lav, neon iz, şeker, boşluk yarığı, yaprak fırtınası)."""
+    sp = getattr(run, "sp", None)
+    if not sp:
+        return
+    p = run.player
+    for lv in sp.get("lava", ()):
+        if not vis.collidepoint(lv[0], lv[1]):
+            continue
+        k = clamp(lv[2] / 3.0, 0.0, 1.0)
+        blit_disc(world, lv[0], lv[1] + 6, 30 * (0.6 + 0.4 * k), (255, 100, 30), int(150 * k))
+        blit_disc(world, lv[0], lv[1] + 6, 16 * (0.6 + 0.4 * k), (255, 210, 110), int(170 * k))
+    tr = sp.get("trail", ())
+    if len(tr) > 1:
+        for a_, b_ in zip(tr, tr[1:]):
+            if dist(a_[0], a_[1], b_[0], b_[1]) > 80:
+                continue
+            k = clamp(b_[2] / 1.2, 0.0, 1.0)
+            thick_line(world, (a_[0], a_[1]), (b_[0], b_[1]), 5 * k + 1, scale_col((60, 255, 230), 0.4 + 0.6 * k))
+            thick_line(world, (a_[0], a_[1]), (b_[0], b_[1]), 2 * k + 1, (255, 120, 230))
+    for cd in sp.get("candies", ()):
+        bob = math.sin(t * 5 + cd[0]) * 3
+        add_glow(world, cd[0], cd[1], 22, cd[3], 0.4)
+        circle_aa(world, cd[0], cd[1] + bob, 7, cd[3])
+        for s in (-1, 1):
+            poly_aa(world, [(cd[0] + s * 6, cd[1] + bob), (cd[0] + s * 13, cd[1] + bob - 5),
+                            (cd[0] + s * 13, cd[1] + bob + 5)], lighten(cd[3], 0.3))
+        circle_aa(world, cd[0] - 2, cd[1] + bob - 2, 2, WHITE)
+    for rf in sp.get("rifts", ()):
+        k = clamp(rf[2] / 1.6, 0.0, 1.0)
+        add_glow(world, rf[0], rf[1], 80, (170, 90, 255), 0.4 * k)
+        circle_aa(world, rf[0], rf[1], 26 * k + 4, (8, 4, 16))
+        ring_aa(world, rf[0], rf[1], 30 * k + 6, (190, 110, 255), 2)
+    if sp.get("bloom_t", 0) > 0:
+        for i in range(6):
+            a = run.run_time * 4.0 + i * math.tau / 6
+            bx, by = p.x + math.cos(a) * 92, p.y + math.sin(a) * 92
+            _petal(world, bx, by, a + math.pi / 2, 14, (255, 190, 215))
+            add_glow(world, bx, by, 26, (255, 170, 210), 0.35)
+    sid = run.sp_id()
+    if sid == "steam_knight":
+        k = sp.get("steam", 0.0) / SP_STEAM_MAX
+        if k > 0.02:
+            r_ = pygame.Rect(int(p.x - 22), int(p.y + p.radius + 20), 44, 5)
+            pygame.draw.rect(world, (30, 26, 24), r_.inflate(2, 2), border_radius=3)
+            pygame.draw.rect(world, (240, 240, 245) if k < 0.85 else (255, 200, 120),
+                             (r_.x, r_.y, int(r_.w * k), r_.h), border_radius=3)
+    elif sid == "pirate_king":
+        ring_aa(world, p.x, p.y, SP_PIRATE_AURA_R, (120, 40, 50), 1)
+    elif sid == "void_walker" and getattr(p, "sp_void_cd", 0.0) <= 0:
+        ring_aa(world, p.x, p.y, p.radius + 12 + 2 * math.sin(t * 4), (186, 96, 255), 1)
+
+
+class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin, RelicsMixin, SkinPassiveMixin):
     def __init__(self, save, skin_id, diff="normal", ach=None):
         self.save = save
         self.diff = diff
@@ -36016,6 +36370,7 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
         self.dmg_log = {}           # kaynak -> verilen toplam hasar
         self.fx = EffectSystem()
         self.evo_init()
+        self.sp_init()
         self.extras_init()
         self.relics_init()
         self.events_init()
@@ -37109,6 +37464,8 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
 
     def do_player_attack(self, aim_dx, aim_dy):
         p = self.player
+        if not getattr(self, "is_coop", False):
+            self.sp_on_shot()
         # ---- kitap çarpanları (atış anında hesaplanır) ----
         atk_mult = 1.0
         echo_shot = False
@@ -39121,6 +39478,8 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
         if getattr(e, "variant", None) == "j_snake":
             self.snakes_killed += 1
         self.combo.add_kill()
+        if not getattr(self, "is_coop", False):
+            self.sp_on_kill(e)
         # kan kitabı: her öldürmede bir miktar can geri kazanılır. Sabit pay
         # (perk/eşya kaynaklı) ve oransal pay (kitap) birlikte işler.
         heal = p.kill_heal + p.kill_heal_amount()
@@ -39278,6 +39637,7 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
         # Skin yeteneği: süresi dolduysa kendiliğinden çalışır (ve zamanı
         # durdurabilir).
         self.update_skin_ult(dt)
+        self.sp_tick(dt)
         # dikkat: 'frozen' yetenek çalıştıktan sonra hesaplanır; yoksa
         # yeteneğin başlattığı donma bir kare geç işlerdi.
         frozen = self.time_stop > 0
@@ -39298,7 +39658,10 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
         if input_state.get("bonk_pressed") and p.try_bonk():
             self.do_bonk()
         if input_state.get("dash_pressed"):
-            if p.try_dash(self.fx) and p.dash_slow_level > 0:
+            _dashed = p.try_dash(self.fx)
+            if _dashed and not getattr(self, "is_coop", False):
+                self.sp_on_dash()
+            if _dashed and p.dash_slow_level > 0:
                 # zaman kitabı: dash çevredeki düşmanları kısa süre yavaşlatır.
                 # güçlendi: 180 px / 2,0 sn / %25 -> 230 px / 2,8 sn / %45
                 rad = 200 + 30 * p.dash_slow_level
@@ -45806,6 +46169,7 @@ def draw_run(surf, run, t, aim_pos=None, shake=(0, 0), world_only=False):
         for kn in run.knives:
             if vis_near.collidepoint(kn.x, kn.y):
                 kn.draw(world, t)
+        draw_skin_passives(world, run, t, vis_far)
         for nw in getattr(run, "nw_objs", ()):
             if vis_far.collidepoint(nw.x, nw.y):
                 nw.draw(world, t)
