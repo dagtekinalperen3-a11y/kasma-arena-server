@@ -1,0 +1,176 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scenes/main_menu/main_menu.gd" id="1_menu"]
+[ext_resource type="Script" path="res://scenes/main_menu/menu_background.gd" id="2_bg"]
+[ext_resource type="Script" path="res://scenes/player/player_visual.gd" id="3_visual"]
+
+[node name="MainMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_menu")
+
+[node name="Background" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("2_bg")
+
+[node name="Parade" type="Node2D" parent="."]
+
+[node name="Preview" type="Node2D" parent="."]
+scale = Vector2(4.5, 4.5)
+script = ExtResource("3_visual")
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 72
+theme_override_constants/margin_top = 28
+theme_override_constants/margin_right = 48
+theme_override_constants/margin_bottom = 100
+
+[node name="HBox" type="HBoxContainer" parent="Margin"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Left" type="VBoxContainer" parent="Margin/HBox"]
+layout_mode = 2
+mouse_filter = 2
+alignment = 1
+theme_override_constants/separation = 6
+
+[node name="Logo" type="Control" parent="Margin/HBox/Left"]
+custom_minimum_size = Vector2(460, 150)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Kaos" type="Label" parent="Margin/HBox/Left/Logo"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = -16.0
+offset_right = 460.0
+offset_bottom = 104.0
+theme_type_variation = &"TitleLabel"
+theme_override_colors/font_color = Color(1, 0.773, 0.192, 1)
+theme_override_colors/font_shadow_color = Color(0.114, 0.082, 0.188, 1)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 9
+theme_override_constants/outline_size = 18
+theme_override_font_sizes/font_size = 106
+text = "KAOS"
+
+[node name="Takimi" type="Label" parent="Margin/HBox/Left/Logo"]
+layout_mode = 0
+offset_left = 66.0
+offset_top = 68.0
+offset_right = 460.0
+offset_bottom = 160.0
+rotation = -0.04
+theme_type_variation = &"TitleLabel"
+theme_override_colors/font_color = Color(1, 0.365, 0.451, 1)
+theme_override_colors/font_shadow_color = Color(0.114, 0.082, 0.188, 1)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 7
+theme_override_constants/outline_size = 16
+theme_override_font_sizes/font_size = 78
+text = "TAKIMI"
+
+[node name="Subtitle" type="Label" parent="Margin/HBox/Left"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.83, 1, 1)
+theme_override_font_sizes/font_size = 22
+text = "Birlikte çalış, kaosa dayan!"
+
+[node name="Spacer" type="Control" parent="Margin/HBox/Left"]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Buttons" type="VBoxContainer" parent="Margin/HBox/Left"]
+custom_minimum_size = Vector2(380, 0)
+layout_mode = 2
+size_flags_horizontal = 0
+theme_override_constants/separation = 10
+
+[node name="PlayButton" type="Button" parent="Margin/HBox/Left/Buttons"]
+layout_mode = 2
+theme_type_variation = &"PrimaryButton"
+text = "OYNA"
+
+[node name="CreateRoomButton" type="Button" parent="Margin/HBox/Left/Buttons"]
+layout_mode = 2
+text = "ODA OLUŞTUR"
+
+[node name="JoinRoomButton" type="Button" parent="Margin/HBox/Left/Buttons"]
+layout_mode = 2
+text = "ODAYA KATIL"
+
+[node name="CharacterButton" type="Button" parent="Margin/HBox/Left/Buttons"]
+layout_mode = 2
+text = "KARAKTERİM"
+
+[node name="SettingsButton" type="Button" parent="Margin/HBox/Left/Buttons"]
+layout_mode = 2
+text = "AYARLAR"
+
+[node name="PreviewArea" type="Control" parent="Margin/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="Version" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -360.0
+offset_top = -40.0
+offset_right = -16.0
+offset_bottom = -10.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_colors/font_color = Color(1, 1, 1, 0.55)
+theme_override_font_sizes/font_size = 16
+text = "v0.1.0  •  Aşama 1 prototipi"
+horizontal_alignment = 2
+
+[node name="QuitButton" type="Button" parent="."]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -140.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = 64.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 18
+text = "ÇIKIŞ"
+
+[node name="Toast" type="PanelContainer" parent="."]
+layout_mode = 0
+offset_right = 300.0
+offset_bottom = 50.0
+mouse_filter = 2
+theme_type_variation = &"ToastPanel"
+
+[node name="Label" type="Label" parent="Toast"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Yakında!"
+horizontal_alignment = 1

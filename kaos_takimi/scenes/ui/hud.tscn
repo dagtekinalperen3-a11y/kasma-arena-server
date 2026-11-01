@@ -1,0 +1,64 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scenes/ui/hud.gd" id="1_hud"]
+
+[node name="HUD" type="CanvasLayer"]
+layer = 5
+script = ExtResource("1_hud")
+
+[node name="Root" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="RoomPanel" type="PanelContainer" parent="Root"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 280.0
+offset_bottom = 90.0
+mouse_filter = 2
+theme_type_variation = &"HUDPanel"
+
+[node name="VBox" type="VBoxContainer" parent="Root/RoomPanel"]
+layout_mode = 2
+theme_override_constants/separation = -6
+
+[node name="MapLabel" type="Label" parent="Root/RoomPanel/VBox"]
+layout_mode = 2
+theme_type_variation = &"TitleLabel"
+theme_override_colors/font_color = Color(1, 0.773, 0.192, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 24
+text = "KAOS FABRİKASI"
+
+[node name="RoomLabel" type="Label" parent="Root/RoomPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "..."
+
+[node name="KeysPanel" type="PanelContainer" parent="Root"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -330.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 60.0
+grow_horizontal = 0
+mouse_filter = 2
+theme_type_variation = &"HUDPanel"
+
+[node name="KeysLabel" type="Label" parent="Root/KeysPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.83, 1, 1)
+theme_override_font_sizes/font_size = 17
+text = "WASD: Yürü    ESC: Menü    F11: Tam ekran"
+horizontal_alignment = 1

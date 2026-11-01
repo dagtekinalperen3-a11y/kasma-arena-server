@@ -1,0 +1,695 @@
+[gd_scene load_steps=16 format=3]
+
+[ext_resource type="Script" path="res://scenes/maps/kaos_fabrikasi/kaos_fabrikasi.gd" id="0_map"]
+[ext_resource type="PackedScene" path="res://scenes/objects/floor_zone.tscn" id="1_floor_zone"]
+[ext_resource type="PackedScene" path="res://scenes/objects/floor_decal.tscn" id="2_floor_decal"]
+[ext_resource type="PackedScene" path="res://scenes/objects/conveyor.tscn" id="3_conveyor"]
+[ext_resource type="PackedScene" path="res://scenes/objects/wall.tscn" id="4_wall"]
+[ext_resource type="PackedScene" path="res://scenes/objects/door.tscn" id="5_door"]
+[ext_resource type="PackedScene" path="res://scenes/objects/shelf.tscn" id="6_shelf"]
+[ext_resource type="PackedScene" path="res://scenes/objects/crate.tscn" id="7_crate"]
+[ext_resource type="PackedScene" path="res://scenes/objects/barrel.tscn" id="8_barrel"]
+[ext_resource type="PackedScene" path="res://scenes/objects/task_point.tscn" id="9_task_point"]
+[ext_resource type="PackedScene" path="res://scenes/objects/machine.tscn" id="10_machine"]
+[ext_resource type="PackedScene" path="res://scenes/objects/table.tscn" id="11_table"]
+[ext_resource type="PackedScene" path="res://scenes/objects/plant.tscn" id="12_plant"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="13_hud"]
+[ext_resource type="PackedScene" path="res://scenes/ui/pause_menu.tscn" id="14_pause_menu"]
+
+[node name="KaosFabrikasi" type="Node2D"]
+script = ExtResource("0_map")
+
+[node name="Floors" type="Node2D" parent="."]
+
+[node name="Depo" parent="Floors" instance=ExtResource("1_floor_zone")]
+position = Vector2(28, 44)
+size = Vector2(818, 596)
+base_color = Color(0.702, 0.6431, 0.5608, 1)
+pattern = 3
+room_name = "DEPO"
+variation_seed = 3
+
+[node name="MontajHatti" parent="Floors" instance=ExtResource("1_floor_zone")]
+position = Vector2(874, 44)
+size = Vector2(832, 596)
+base_color = Color(0.5765, 0.6549, 0.7412, 1)
+pattern = 0
+room_name = "MONTAJ HATTI"
+label_position = Vector2(416, 320)
+label_font_size = 56
+
+[node name="MakineDairesi" parent="Floors" instance=ExtResource("1_floor_zone")]
+position = Vector2(1734, 44)
+size = Vector2(798, 596)
+base_color = Color(0.4902, 0.5412, 0.6275, 1)
+pattern = 2
+room_name = "MAKİNE DAİRESİ"
+label_position = Vector2(399, 330)
+label_font_size = 56
+
+[node name="AnaKoridor" parent="Floors" instance=ExtResource("1_floor_zone")]
+position = Vector2(28, 684)
+size = Vector2(2504, 276)
+base_color = Color(0.6588, 0.6314, 0.7255, 1)
+pattern = 3
+room_name = "ANA KORİDOR"
+label_position = Vector2(1252, 150)
+label_font_size = 48
+variation_seed = 9
+
+[node name="KontrolOdasi" parent="Floors" instance=ExtResource("1_floor_zone")]
+position = Vector2(28, 1004)
+size = Vector2(718, 616)
+base_color = Color(0.4353, 0.6902, 0.7216, 1)
+pattern = 0
+room_name = "KONTROL ODASI"
+tile_size = 48.0
+label_position = Vector2(359, 140)
+label_font_size = 52
+
+[node name="DinlenmeAlani" parent="Floors" instance=ExtResource("1_floor_zone")]
+position = Vector2(774, 1004)
+size = Vector2(812, 616)
+base_color = Color(0.7882, 0.5608, 0.3686, 1)
+pattern = 1
+room_name = "DİNLENME ALANI"
+label_position = Vector2(420, 112)
+label_font_size = 52
+
+[node name="YuklemeAlani" parent="Floors" instance=ExtResource("1_floor_zone")]
+position = Vector2(1614, 1004)
+size = Vector2(918, 616)
+base_color = Color(0.6039, 0.6392, 0.6784, 1)
+pattern = 3
+room_name = "YÜKLEME ALANI"
+label_position = Vector2(459, 190)
+label_font_size = 56
+variation_seed = 5
+
+[node name="FloorDecals" type="Node2D" parent="."]
+
+[node name="KoridorCizgi1" parent="FloorDecals" instance=ExtResource("2_floor_decal")]
+position = Vector2(28, 700)
+kind = 1
+size = Vector2(2504, 6)
+
+[node name="KoridorCizgi2" parent="FloorDecals" instance=ExtResource("2_floor_decal")]
+position = Vector2(28, 938)
+kind = 1
+size = Vector2(2504, 6)
+
+[node name="Ok1" parent="FloorDecals" instance=ExtResource("2_floor_decal")]
+position = Vector2(520, 795)
+kind = 2
+size = Vector2(90, 50)
+paint_color = Color(1, 1, 1, 1)
+
+[node name="Ok2" parent="FloorDecals" instance=ExtResource("2_floor_decal")]
+position = Vector2(1700, 795)
+kind = 2
+size = Vector2(90, 50)
+paint_color = Color(1, 1, 1, 1)
+
+[node name="Ok3" parent="FloorDecals" instance=ExtResource("2_floor_decal")]
+position = Vector2(2300, 795)
+kind = 2
+size = Vector2(90, 50)
+paint_color = Color(1, 1, 1, 1)
+
+[node name="DepoIkaz" parent="FloorDecals" instance=ExtResource("2_floor_decal")]
+position = Vector2(545, 455)
+kind = 0
+size = Vector2(200, 110)
+
+[node name="MakineIkaz" parent="FloorDecals" instance=ExtResource("2_floor_decal")]
+position = Vector2(1770, 112)
+kind = 0
+size = Vector2(730, 112)
+
+[node name="YuklemeIkaz" parent="FloorDecals" instance=ExtResource("2_floor_decal")]
+position = Vector2(2120, 1410)
+kind = 0
+size = Vector2(380, 190)
+
+[node name="Leke1" parent="FloorDecals" instance=ExtResource("2_floor_decal")]
+position = Vector2(420, 420)
+kind = 3
+size = Vector2(70, 36)
+
+[node name="Leke2" parent="FloorDecals" instance=ExtResource("2_floor_decal")]
+position = Vector2(930, 880)
+kind = 3
+size = Vector2(90, 40)
+
+[node name="Leke3" parent="FloorDecals" instance=ExtResource("2_floor_decal")]
+position = Vector2(2260, 520)
+kind = 3
+size = Vector2(60, 30)
+
+[node name="Gider1" parent="FloorDecals" instance=ExtResource("2_floor_decal")]
+position = Vector2(2300, 420)
+kind = 4
+size = Vector2(40, 40)
+
+[node name="Gider2" parent="FloorDecals" instance=ExtResource("2_floor_decal")]
+position = Vector2(2000, 1560)
+kind = 4
+size = Vector2(40, 40)
+
+[node name="Gider3" parent="FloorDecals" instance=ExtResource("2_floor_decal")]
+position = Vector2(1180, 1560)
+kind = 4
+size = Vector2(36, 36)
+
+[node name="Conveyors" type="Node2D" parent="."]
+
+[node name="Bant1" parent="Conveyors" instance=ExtResource("3_conveyor")]
+position = Vector2(940, 200)
+length = 640.0
+speed = 55.0
+
+[node name="Bant2" parent="Conveyors" instance=ExtResource("3_conveyor")]
+position = Vector2(1640, 440)
+length = 600.0
+speed = 55.0
+rotation = 3.14159
+
+[node name="Bant3" parent="Conveyors" instance=ExtResource("3_conveyor")]
+position = Vector2(2420, 1060)
+length = 300.0
+speed = 55.0
+rotation = 1.5708
+
+[node name="Walls" type="Node2D" parent="."]
+
+[node name="DisUst" parent="Walls" instance=ExtResource("4_wall")]
+position = Vector2(0, 0)
+size = Vector2(2560, 44)
+
+[node name="DisAlt" parent="Walls" instance=ExtResource("4_wall")]
+position = Vector2(0, 1620)
+size = Vector2(2560, 44)
+
+[node name="DisSol" parent="Walls" instance=ExtResource("4_wall")]
+position = Vector2(0, 44)
+size = Vector2(28, 1576)
+
+[node name="DisSag" parent="Walls" instance=ExtResource("4_wall")]
+position = Vector2(2532, 44)
+size = Vector2(28, 1576)
+
+[node name="UstAyirici1" parent="Walls" instance=ExtResource("4_wall")]
+position = Vector2(28, 640)
+size = Vector2(332, 44)
+
+[node name="UstAyirici2" parent="Walls" instance=ExtResource("4_wall")]
+position = Vector2(520, 640)
+size = Vector2(690, 44)
+
+[node name="UstAyirici3" parent="Walls" instance=ExtResource("4_wall")]
+position = Vector2(1370, 640)
+size = Vector2(670, 44)
+
+[node name="UstAyirici4" parent="Walls" instance=ExtResource("4_wall")]
+position = Vector2(2200, 640)
+size = Vector2(332, 44)
+
+[node name="AltAyirici1" parent="Walls" instance=ExtResource("4_wall")]
+position = Vector2(28, 960)
+size = Vector2(272, 44)
+
+[node name="AltAyirici2" parent="Walls" instance=ExtResource("4_wall")]
+position = Vector2(460, 960)
+size = Vector2(640, 44)
+
+[node name="AltAyirici3" parent="Walls" instance=ExtResource("4_wall")]
+position = Vector2(1260, 960)
+size = Vector2(700, 44)
+
+[node name="AltAyirici4" parent="Walls" instance=ExtResource("4_wall")]
+position = Vector2(2200, 960)
+size = Vector2(332, 44)
+
+[node name="DepoMontajA" parent="Walls" instance=ExtResource("4_wall")]
+position = Vector2(846, 44)
+size = Vector2(28, 206)
+
+[node name="DepoMontajB" parent="Walls" instance=ExtResource("4_wall")]
+position = Vector2(846, 400)
+size = Vector2(28, 240)
+
+[node name="MontajMakineA" parent="Walls" instance=ExtResource("4_wall")]
+position = Vector2(1706, 44)
+size = Vector2(28, 206)
+
+[node name="MontajMakineB" parent="Walls" instance=ExtResource("4_wall")]
+position = Vector2(1706, 400)
+size = Vector2(28, 240)
+
+[node name="KontrolDinlenmeA" parent="Walls" instance=ExtResource("4_wall")]
+position = Vector2(746, 1004)
+size = Vector2(28, 216)
+
+[node name="KontrolDinlenmeB" parent="Walls" instance=ExtResource("4_wall")]
+position = Vector2(746, 1370)
+size = Vector2(28, 250)
+
+[node name="DinlenmeYuklemeA" parent="Walls" instance=ExtResource("4_wall")]
+position = Vector2(1586, 1004)
+size = Vector2(28, 216)
+
+[node name="DinlenmeYuklemeB" parent="Walls" instance=ExtResource("4_wall")]
+position = Vector2(1586, 1370)
+size = Vector2(28, 250)
+
+[node name="Doors" type="Node2D" parent="."]
+
+[node name="UstKapi1" parent="Doors" instance=ExtResource("5_door")]
+position = Vector2(440.0, 662.0)
+width = 160.0
+thickness = 44.0
+
+[node name="UstKapi2" parent="Doors" instance=ExtResource("5_door")]
+position = Vector2(1290.0, 662.0)
+width = 160.0
+thickness = 44.0
+
+[node name="UstKapi3" parent="Doors" instance=ExtResource("5_door")]
+position = Vector2(2120.0, 662.0)
+width = 160.0
+thickness = 44.0
+
+[node name="AltKapi1" parent="Doors" instance=ExtResource("5_door")]
+position = Vector2(380.0, 982.0)
+width = 160.0
+thickness = 44.0
+
+[node name="AltKapi2" parent="Doors" instance=ExtResource("5_door")]
+position = Vector2(1180.0, 982.0)
+width = 160.0
+thickness = 44.0
+
+[node name="AltKapi3" parent="Doors" instance=ExtResource("5_door")]
+position = Vector2(2080.0, 982.0)
+width = 240.0
+thickness = 44.0
+
+[node name="DepoMontajKapi" parent="Doors" instance=ExtResource("5_door")]
+position = Vector2(860.0, 325)
+width = 150.0
+thickness = 28.0
+rotation = 1.5708
+
+[node name="MontajMakineKapi" parent="Doors" instance=ExtResource("5_door")]
+position = Vector2(1720.0, 325)
+width = 150.0
+thickness = 28.0
+rotation = 1.5708
+
+[node name="KontrolDinlenmeKapi" parent="Doors" instance=ExtResource("5_door")]
+position = Vector2(760.0, 1295)
+width = 150.0
+thickness = 28.0
+rotation = 1.5708
+
+[node name="DinlenmeYuklemeKapi" parent="Doors" instance=ExtResource("5_door")]
+position = Vector2(1600.0, 1295)
+width = 150.0
+thickness = 28.0
+rotation = 1.5708
+
+[node name="World" type="Node2D" parent="."]
+y_sort_enabled = true
+
+[node name="Raf1" parent="World" instance=ExtResource("6_shelf")]
+position = Vector2(180, 150)
+width = 260.0
+variation_seed = 1
+
+[node name="Raf2" parent="World" instance=ExtResource("6_shelf")]
+position = Vector2(520, 150)
+width = 260.0
+variation_seed = 2
+
+[node name="Raf3" parent="World" instance=ExtResource("6_shelf")]
+position = Vector2(760, 150)
+width = 140.0
+levels = 2
+variation_seed = 4
+
+[node name="Kutu1" parent="World" instance=ExtResource("7_crate")]
+position = Vector2(700, 280)
+stack = 2
+
+[node name="Kutu2" parent="World" instance=ExtResource("7_crate")]
+position = Vector2(756, 300)
+
+[node name="Kutu3" parent="World" instance=ExtResource("7_crate")]
+position = Vector2(690, 330)
+style = 1
+
+[node name="Kutu4" parent="World" instance=ExtResource("7_crate")]
+position = Vector2(90, 560)
+style = 2
+stack = 2
+
+[node name="Kutu5" parent="World" instance=ExtResource("7_crate")]
+position = Vector2(150, 590)
+
+[node name="Kutu6" parent="World" instance=ExtResource("7_crate")]
+position = Vector2(85, 620)
+style = 1
+
+[node name="Kutu7" parent="World" instance=ExtResource("7_crate")]
+position = Vector2(610, 525)
+style = 1
+stack = 3
+
+[node name="Kutu8" parent="World" instance=ExtResource("7_crate")]
+position = Vector2(668, 540)
+style = 1
+stack = 2
+
+[node name="Kutu9" parent="World" instance=ExtResource("7_crate")]
+position = Vector2(640, 575)
+style = 1
+
+[node name="Varil1" parent="World" instance=ExtResource("8_barrel")]
+position = Vector2(790, 560)
+barrel_color = Color(0.2392, 0.5451, 0.851, 1)
+
+[node name="Varil2" parent="World" instance=ExtResource("8_barrel")]
+position = Vector2(805, 605)
+barrel_color = Color(1, 0.3647, 0.451, 1)
+hazard_sign = true
+
+[node name="GorevNoktasi1" parent="World" instance=ExtResource("9_task_point")]
+position = Vector2(300, 470)
+task_id = "depo_teslimat"
+title = "TESLİMAT"
+point_color = Color(1, 0.7725, 0.1922, 1)
+
+[node name="Makine1" parent="World" instance=ExtResource("10_machine")]
+position = Vector2(1642, 236)
+kind = 0
+width = 104.0
+main_color = Color(0.8784, 0.451, 0.2902, 1)
+
+[node name="Makine2" parent="World" instance=ExtResource("10_machine")]
+position = Vector2(975, 478)
+kind = 1
+width = 100.0
+height = 60.0
+main_color = Color(0.349, 0.6392, 0.4784, 1)
+
+[node name="Masa1" parent="World" instance=ExtResource("11_table")]
+position = Vector2(1020, 612)
+width = 110.0
+items = 1
+
+[node name="Masa2" parent="World" instance=ExtResource("11_table")]
+position = Vector2(1580, 612)
+width = 110.0
+items = 3
+
+[node name="Kutu10" parent="World" instance=ExtResource("7_crate")]
+position = Vector2(1560, 335)
+style = 1
+stack = 2
+
+[node name="Kutu11" parent="World" instance=ExtResource("7_crate")]
+position = Vector2(1614, 350)
+style = 1
+
+[node name="Varil3" parent="World" instance=ExtResource("8_barrel")]
+position = Vector2(1440, 600)
+barrel_color = Color(1, 0.7725, 0.1922, 1)
+hazard_sign = true
+
+[node name="GorevNoktasi2" parent="World" instance=ExtResource("9_task_point")]
+position = Vector2(1300, 545)
+task_id = "montaj_tamir"
+title = "TAMİR ET"
+point_color = Color(1, 0.5412, 0.2392, 1)
+
+[node name="Makine3" parent="World" instance=ExtResource("10_machine")]
+position = Vector2(1880, 196)
+kind = 1
+width = 150.0
+main_color = Color(0.3098, 0.5255, 0.7765, 1)
+
+[node name="Makine4" parent="World" instance=ExtResource("10_machine")]
+position = Vector2(2130, 196)
+kind = 1
+width = 150.0
+main_color = Color(0.349, 0.6392, 0.4784, 1)
+
+[node name="Makine5" parent="World" instance=ExtResource("10_machine")]
+position = Vector2(2385, 196)
+kind = 2
+width = 150.0
+height = 60.0
+main_color = Color(0.4157, 0.3529, 0.8039, 1)
+
+[node name="Makine6" parent="World" instance=ExtResource("10_machine")]
+position = Vector2(1880, 520)
+kind = 2
+width = 130.0
+height = 56.0
+main_color = Color(0.2392, 0.4353, 0.851, 1)
+
+[node name="Varil4" parent="World" instance=ExtResource("8_barrel")]
+position = Vector2(2450, 455)
+barrel_color = Color(1, 0.7725, 0.1922, 1)
+hazard_sign = true
+
+[node name="Varil5" parent="World" instance=ExtResource("8_barrel")]
+position = Vector2(2484, 500)
+barrel_color = Color(1, 0.7725, 0.1922, 1)
+hazard_sign = true
+
+[node name="Varil6" parent="World" instance=ExtResource("8_barrel")]
+position = Vector2(2420, 510)
+barrel_color = Color(0.349, 0.7647, 0.6275, 1)
+
+[node name="Kutu12" parent="World" instance=ExtResource("7_crate")]
+position = Vector2(2300, 600)
+style = 2
+
+[node name="GorevNoktasi3" parent="World" instance=ExtResource("9_task_point")]
+position = Vector2(2130, 475)
+task_id = "makine_enerji"
+title = "ENERJİ"
+point_color = Color(0.3098, 0.8196, 1, 1)
+
+[node name="Bitki1" parent="World" instance=ExtResource("12_plant")]
+position = Vector2(70, 745)
+
+[node name="Bitki2" parent="World" instance=ExtResource("12_plant")]
+position = Vector2(2490, 745)
+
+[node name="Bitki3" parent="World" instance=ExtResource("12_plant")]
+position = Vector2(1000, 745)
+
+[node name="Kutu13" parent="World" instance=ExtResource("7_crate")]
+position = Vector2(1900, 745)
+style = 2
+stack = 2
+
+[node name="Kutu14" parent="World" instance=ExtResource("7_crate")]
+position = Vector2(1955, 760)
+
+[node name="Varil7" parent="World" instance=ExtResource("8_barrel")]
+position = Vector2(2480, 920)
+barrel_color = Color(0.2392, 0.5451, 0.851, 1)
+
+[node name="Varil8" parent="World" instance=ExtResource("8_barrel")]
+position = Vector2(75, 925)
+barrel_color = Color(0.8784, 0.451, 0.2902, 1)
+
+[node name="Makine7" parent="World" instance=ExtResource("10_machine")]
+position = Vector2(150, 1112)
+kind = 2
+width = 160.0
+height = 50.0
+main_color = Color(0.2392, 0.4353, 0.851, 1)
+
+[node name="Makine8" parent="World" instance=ExtResource("10_machine")]
+position = Vector2(600, 1112)
+kind = 2
+width = 200.0
+height = 50.0
+main_color = Color(0.2392, 0.4353, 0.851, 1)
+
+[node name="Masa3" parent="World" instance=ExtResource("11_table")]
+position = Vector2(200, 1350)
+width = 120.0
+items = 3
+top_color = Color(0.549, 0.5765, 0.7216, 1)
+
+[node name="Masa4" parent="World" instance=ExtResource("11_table")]
+position = Vector2(450, 1350)
+width = 120.0
+items = 2
+top_color = Color(0.549, 0.5765, 0.7216, 1)
+
+[node name="Bitki4" parent="World" instance=ExtResource("12_plant")]
+position = Vector2(70, 1590)
+
+[node name="Bitki5" parent="World" instance=ExtResource("12_plant")]
+position = Vector2(700, 1590)
+
+[node name="GorevNoktasi4" parent="World" instance=ExtResource("9_task_point")]
+position = Vector2(380, 1500)
+task_id = "kontrol_dugmeler"
+title = "DÜĞMELER"
+point_color = Color(0.7098, 0.4863, 1, 1)
+
+[node name="Makine9" parent="World" instance=ExtResource("10_machine")]
+position = Vector2(840, 1112)
+kind = 2
+width = 70.0
+depth = 34.0
+height = 80.0
+main_color = Color(1, 0.3647, 0.451, 1)
+
+[node name="Makine10" parent="World" instance=ExtResource("10_machine")]
+position = Vector2(925, 1112)
+kind = 2
+width = 70.0
+depth = 34.0
+height = 80.0
+main_color = Color(0.3098, 0.8196, 1, 1)
+
+[node name="Masa5" parent="World" instance=ExtResource("11_table")]
+position = Vector2(940, 1240)
+width = 130.0
+items = 4
+
+[node name="Masa6" parent="World" instance=ExtResource("11_table")]
+position = Vector2(1420, 1240)
+width = 130.0
+items = 4
+
+[node name="Masa7" parent="World" instance=ExtResource("11_table")]
+position = Vector2(1180, 1440)
+width = 150.0
+items = 4
+
+[node name="Masa8" parent="World" instance=ExtResource("11_table")]
+position = Vector2(940, 1520)
+width = 130.0
+items = 2
+
+[node name="Masa9" parent="World" instance=ExtResource("11_table")]
+position = Vector2(1420, 1520)
+width = 130.0
+items = 0
+
+[node name="Bitki6" parent="World" instance=ExtResource("12_plant")]
+position = Vector2(1545, 1085)
+
+[node name="Bitki7" parent="World" instance=ExtResource("12_plant")]
+position = Vector2(815, 1595)
+
+[node name="Bitki8" parent="World" instance=ExtResource("12_plant")]
+position = Vector2(1545, 1595)
+
+[node name="GorevNoktasi5" parent="World" instance=ExtResource("9_task_point")]
+position = Vector2(1180, 1310)
+task_id = "dinlenme_topla"
+title = "TOPLAMA"
+point_color = Color(0.349, 0.9412, 0.651, 1)
+
+[node name="Kutu15" parent="World" instance=ExtResource("7_crate")]
+position = Vector2(1750, 1150)
+stack = 3
+
+[node name="Kutu16" parent="World" instance=ExtResource("7_crate")]
+position = Vector2(1810, 1170)
+stack = 2
+
+[node name="Kutu17" parent="World" instance=ExtResource("7_crate")]
+position = Vector2(1765, 1200)
+style = 2
+
+[node name="Raf4" parent="World" instance=ExtResource("6_shelf")]
+position = Vector2(1850, 1600)
+width = 220.0
+levels = 2
+variation_seed = 7
+
+[node name="Varil9" parent="World" instance=ExtResource("8_barrel")]
+position = Vector2(1680, 1560)
+barrel_color = Color(1, 0.3647, 0.451, 1)
+
+[node name="Varil10" parent="World" instance=ExtResource("8_barrel")]
+position = Vector2(1716, 1592)
+barrel_color = Color(1, 0.3647, 0.451, 1)
+hazard_sign = true
+
+[node name="Kutu18" parent="World" instance=ExtResource("7_crate")]
+position = Vector2(2240, 1530)
+style = 1
+stack = 2
+
+[node name="Kutu19" parent="World" instance=ExtResource("7_crate")]
+position = Vector2(2300, 1550)
+style = 1
+
+[node name="Kutu20" parent="World" instance=ExtResource("7_crate")]
+position = Vector2(2365, 1525)
+style = 1
+stack = 3
+
+[node name="Kutu21" parent="World" instance=ExtResource("7_crate")]
+position = Vector2(2425, 1555)
+style = 2
+
+[node name="Makine11" parent="World" instance=ExtResource("10_machine")]
+position = Vector2(2420, 1420)
+kind = 0
+width = 96.0
+main_color = Color(0.7098, 0.4863, 1, 1)
+
+[node name="GorevNoktasi6" parent="World" instance=ExtResource("9_task_point")]
+position = Vector2(1960, 1340)
+task_id = "yukleme_tasima"
+title = "TAŞIMA"
+point_color = Color(1, 0.7725, 0.1922, 1)
+
+[node name="SpawnPoints" type="Node2D" parent="."]
+
+[node name="Spawn1" type="Marker2D" parent="SpawnPoints"]
+position = Vector2(1120, 800)
+
+[node name="Spawn2" type="Marker2D" parent="SpawnPoints"]
+position = Vector2(1200, 800)
+
+[node name="Spawn3" type="Marker2D" parent="SpawnPoints"]
+position = Vector2(1280, 800)
+
+[node name="Spawn4" type="Marker2D" parent="SpawnPoints"]
+position = Vector2(1360, 800)
+
+[node name="Spawn5" type="Marker2D" parent="SpawnPoints"]
+position = Vector2(1440, 800)
+
+[node name="Spawn6" type="Marker2D" parent="SpawnPoints"]
+position = Vector2(1120, 880)
+
+[node name="Spawn7" type="Marker2D" parent="SpawnPoints"]
+position = Vector2(1200, 880)
+
+[node name="Spawn8" type="Marker2D" parent="SpawnPoints"]
+position = Vector2(1280, 880)
+
+[node name="Spawn9" type="Marker2D" parent="SpawnPoints"]
+position = Vector2(1360, 880)
+
+[node name="Spawn10" type="Marker2D" parent="SpawnPoints"]
+position = Vector2(1440, 880)
+
+[node name="HUD" parent="." instance=ExtResource("13_hud")]
+
+[node name="PauseMenu" parent="." instance=ExtResource("14_pause_menu")]

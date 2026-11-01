@@ -1,0 +1,6 @@
+# Satir sonlarini tum bilgisayarlarda ayni tut (Windows/Mac/Linux)
+* text=auto eol=lf
+*.ttf binary
+*.png binary
+*.ogg binary
+*.wav binary
