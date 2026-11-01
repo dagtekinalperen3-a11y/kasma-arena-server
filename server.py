@@ -2851,11 +2851,11 @@ def add_score():
 #      - dalga, süreyle ulaşılabilecek dalgayı aşıyor mu.
 #    Son gönderi son nabızla tutarlı olmalı: koşu bitince skoru şişirmek
 #    zincirden anlaşılır.
-# 3) İNCELEME: şüpheli koşu reddedilmez (dürüst ama çok güçlü koşu yanlışlıkla
-#    yanmasın); dünya sıralamasına girmez, "incelemede" olarak yazılır.
-#    Yönetici /admin/review ile görür, /admin/review_ok ile onaylar.
-#    Kesin kanıt (bilet sahteciliği, hız hilesi, imkânsız dalga) ise direkt
-#    reddedilir.
+# 3) İNCELEME: şüpheli koşu (hız hilesi, imkânsız dalga, şişkin skor, nabızsız
+#    uzun koşu...) dünya sıralamasına girmez, "incelemede" olarak yazılır:
+#    dürüst ama çok güçlü bir koşu yanlışlıkla silinmesin. Yönetici
+#    /admin/review ile görür, /admin/review_ok ile onaylar. Sahte ya da başka
+#    hesabın bileti ve aynı biletin ikinci kez kullanılması doğrudan reddedilir.
 RUN_SECRET = (os.environ.get("KASMA_RUN_SECRET")
               or hashlib.sha256(("evolve-run-v1|" + (SUPABASE_KEY or SUBMIT_SECRET or "dev")).encode()).hexdigest())
 _RUN_KEY = hashlib.sha256(("run-ticket|" + RUN_SECRET).encode()).digest()
@@ -2874,8 +2874,6 @@ SCORE_RATE_BASE = float(os.environ.get("KASMA_SCORE_RATE_BASE", "4000"))
 SCORE_RATE_PER_WAVE = float(os.environ.get("KASMA_SCORE_RATE_WAVE", "1.16"))
 SCORE_RATE_MAX = float(os.environ.get("KASMA_SCORE_RATE_MAX", "600000"))
 KILL_RATE_MAX = float(os.environ.get("KASMA_KILL_RATE_MAX", "60"))
-# bu bayraklar kesin kanıt sayılır: gönderi reddedilir
-HARD_FLAGS = frozenset(("forge", "speed", "time", "mono", "wave"))
 
 # ---- dalga takvimi (oyundaki WAVE_PLAN_* ile birebir aynı) ----
 WAVE_PLAN_COUNT = 25
