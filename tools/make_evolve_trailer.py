@@ -1,35 +1,43 @@
 #!/usr/bin/env python3
 """
-EVOLVE ARENA — 90 SANİYELİK TANITIM FRAGMANI (1920x1080, 30 fps, MP4)
-=====================================================================
+EVOLVE ARENA — TANITIM FRAGMANI (1920x1080, 30 fps, ~1:52, MP4)
+==============================================================
 
-Her oyun karesi oyunun GERÇEK motorudur: kasma_arena13.py içe aktarılır,
-oyunun kendi "gölge oyun" altyapısı (GameTour / App(shadow_of=...)) ekransız
-çalıştırılır ve savaşları insan gibi nişan alan otomatik pilot oynar.
-Bunun üstüne fragman katmanı eklenir (oyunda olmayan ama senaryonun
-istediği her şey):
+Her oyun karesi oyunun GERÇEK motoru ve GERÇEK ekranlarıdır: oyun dosyası
+(kasma_arena13.py) içe aktarılır, oyunun kendi "gölge oyun" altyapısı
+(GameTour / App(shadow_of=...)) ekransız çalıştırılır; menülerde sanal bir
+imleç gezer, savaşları insan gibi nişan alan otomatik pilot oynar.
 
-  * flaş / glitch / zoom-punch / ekran sarsıntısı / hız çizgileri,
-    renk ayrışması (chromatic aberration), hareket bulanıklığı,
-  * dünyaya göre renk paleti (buzul mavi, orman yeşil, çöl turuncu,
-    cehennem kızıl) + kar / yaprak / kum / kor parçacıkları,
-  * 1080p'de keskin, büyük trailer yazıları (Inter Black Italic),
-  * EVRİM sahnesi, dünya sıralaması tırmanışı, highlight reel, logo,
-  * tools/trailer_audio.py ile sentezlenen müzik + SFX (telifsiz),
-    120 BPM ızgarasına oturtulmuş kesimlerle senkron.
+Akış:
+  karanlık kanca -> yaratık dalgası -> KAYIT OL -> ANA MENÜ -> HARİTA SEÇ ->
+  normal oynanış (koş / dash / BONK) -> B MARKET (bir kez) -> SİLAHLIK ->
+  silah detayı + EVRİM YOLU -> EVRİMİ İZLE (I / II / III canlı) -> 8 silahın
+  oyunda evrimleşmesi -> KİTAP + SİLAH = EVRİM mantığı -> seviye atlayınca
+  EVRİM KARTI -> evrimleşmiş güç -> Buzul / Orman / Çöl (patronlar) ->
+  cehennem kapısı -> Cehennem Lordu -> Kor Ejderha -> KRİTİK -> gerçek
+  DÜNYA SIRALAMASI -> highlight reel -> logo + ŞİMDİ İNDİR
+
+Oyun normal görüş açısıyla izlenir; kamera yalnızca patron gelişlerinde
+yaklaşır. Fragman katmanı (oyunda olmayan): flaş, zoom-punch, sarsıntı, hız
+çizgileri, dünyaya göre renk paleti, parçacıklar, 1080p trailer yazıları.
+Müzik ve SFX tools/trailer_audio.py ile sentezlenir (telifsiz), 120 BPM
+ızgarasına oturan kesimlerle senkron.
 
 Gerçek oyuncu kaydına dokunmaz (ARENA_SAVE_DIR geçici klasöre yönlenir),
 ağa bağlanmaz, pencere açmaz.
 
 Kullanım:
-    python3 tools/make_evolve_trailer.py                       # tam film
-    python3 tools/make_evolve_trailer.py -o fragman.mp4
-    python3 tools/make_evolve_trailer.py --stills 4.6,21,46    # yalnız PNG kareler
-    python3 tools/make_evolve_trailer.py --from 52 --to 65 -o dunyalar.mp4
+    python3 tools/make_evolve_trailer.py --game yol/kasma_arena13.py -o fragman.mp4
+    python3 tools/make_evolve_trailer.py --stills 10,40,66                # yalnız PNG
+    python3 tools/make_evolve_trailer.py --from 72 --to 86 -o dunyalar.mp4
+
+--game verilmezse depodaki kasma_arena13.py kullanılır. Oyun dosyası EVRİM
+sistemini (EVOLUTIONS) içermelidir (EvolveArena sürümü).
 
 Gerekenler: pygame, numpy, scipy ve PATH'te ffmpeg.
 """
 import argparse
+import importlib.util
 import math
 import os
 import random
@@ -44,82 +52,111 @@ _TMP = tempfile.mkdtemp(prefix="evolve_trailer_")
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 os.environ["ARENA_SAVE_DIR"] = os.path.join(_TMP, "save")   # gerçek kayda dokunma
-sys.path.insert(0, ROOT)
 sys.path.insert(0, HERE)
+
+
+def _game_path():
+    for i, a in enumerate(sys.argv):
+        if a == "--game" and i + 1 < len(sys.argv):
+            return sys.argv[i + 1]
+        if a.startswith("--game="):
+            return a.split("=", 1)[1]
+    return os.path.join(ROOT, "kasma_arena13.py")
+
+
+GAME = os.path.abspath(_game_path())
+sys.path.insert(0, os.path.dirname(GAME))
 
 import numpy as np          # noqa: E402
 import pygame               # noqa: E402
 
-import kasma_arena13 as K   # noqa: E402
+_spec = importlib.util.spec_from_file_location("kasma_arena13", GAME)
+K = importlib.util.module_from_spec(_spec)
+sys.modules["kasma_arena13"] = K
+_spec.loader.exec_module(K)
+if not hasattr(K, "EVOLUTIONS"):
+    sys.exit("Bu oyun dosyasında EVRİM sistemi yok (EVOLUTIONS). EvolveArena sürümünü "
+             "--game ile verin.")
+
 import trailer_audio as A   # noqa: E402
 
 W, H = 1920, 1080
 VW, VH = K.VIRTUAL_W, K.VIRTUAL_H
 S = W / VW                   # kanvas -> 1080p ölçeği (1.5)
 FPS = 30
-LENGTH = 90.0
+LENGTH = 112.0
 GOLD = (255, 204, 92)
 WHITE = (255, 255, 255)
-RED = (255, 60, 50)
+PLAYER = "Kanka"
 
 # (başlangıç, bitiş, sahne) — kesimler 120 BPM vuruş ızgarasında (0,5 sn)
 SCENES = (
-    (0.0, 3.5, "dark"),       # KANCA: kapkaranlık + "CEHENNEM KAPISI AÇILIYOR..."
-    (3.5, 8.0, "hook"),       # flaş — oyuncu yaratık dalgasının ortasında
-    (8.0, 11.0, "dash"),      # MEKANİK: koş + DASH
-    (11.0, 14.5, "bonk"),     # BONK + sarsıntı
-    (14.5, 17.0, "market"),   # market yanıp sönerek açılır
-    (17.0, 20.0, "gold"),     # altın yağmuru + KOŞ. VUR. HAYATTA KAL.
-    (20.0, 36.5, "weapons"),  # 11 silah × 1,5 sn
-    (36.5, 38.0, "combo"),    # SONSUZ KOMBİNASYON
-    (38.0, 42.5, "books"),    # kitaplar parlıyor
-    (42.5, 45.0, "charge"),   # silah 10, kitap 3 — yavaş çekim yükseliş
-    (45.0, 47.0, "evolve"),   # BEYAZ PATLAMA — EVRİM
-    (47.0, 52.0, "power"),    # evrimleşmiş güçle savaş
-    (52.0, 56.5, "frost"),    # Buzul Vadisi
-    (56.5, 61.0, "jungle"),   # Zümrüt Orman
-    (61.0, 65.0, "desert"),   # Kızıl Çöl
-    (65.0, 67.5, "gate"),     # cehennem kapısı açılır — gerilim nefesi
-    (67.5, 71.5, "hellord"),  # CEHENNEM LORDU
-    (71.5, 75.0, "dragon"),   # KOR EJDERHA
-    (75.0, 78.5, "crit"),     # KRİTİK! + şans simgeleri
-    (78.5, 82.5, "ranking"),  # dünya sıralaması tırmanışı
-    (82.5, 84.0, "badges"),   # başarımlar
-    (84.0, 86.5, "reel"),     # 0,2 sn'lik highlight reel
-    (86.5, 90.0, "logo"),     # EVOLVE ARENA + ŞİMDİ İNDİR
+    (0.0, 3.5, "dark"),        # kapkaranlık + "CEHENNEM KAPISI AÇILIYOR..."
+    (3.5, 8.0, "hook"),        # flaş — yaratık dalgasının ortasında
+    (8.0, 14.0, "register"),   # KAYIT OL
+    (14.0, 18.0, "menu"),      # ANA MENÜ -> OYNA
+    (18.0, 21.5, "mapsel"),    # HARİTA SEÇ -> BAŞLA
+    (21.5, 30.0, "play"),      # normal oynanış: koş, dash, BONK
+    (30.0, 31.5, "market"),    # B — market bir kez
+    (31.5, 34.0, "survive"),   # KOŞ. VUR. HAYATTA KAL.
+    (34.0, 39.0, "codex"),     # SİLAHLIK
+    (39.0, 42.5, "wdetail"),   # silah detayı: evrim yolu
+    (42.5, 49.0, "evopv"),     # EVRİMİ İZLE: I / II / III
+    (49.0, 61.0, "arsenal"),   # 8 silah oyunda evrimleşir
+    (61.0, 64.5, "evologic"),  # SİLAH + EŞ KİTAP = EVRİM
+    (64.5, 67.5, "evocard"),   # seviye atla: EVRİM KARTI
+    (67.5, 72.0, "power"),     # evrimleşmiş güç
+    (72.0, 76.5, "frost"),     # Buzul Vadisi
+    (76.5, 81.0, "jungle"),    # Zümrüt Orman
+    (81.0, 85.5, "desert"),    # Kızıl Çöl
+    (85.5, 88.0, "gate"),      # cehennem kapısı — gerilim nefesi
+    (88.0, 92.0, "hellord"),   # CEHENNEM LORDU
+    (92.0, 96.0, "dragon"),    # KOR EJDERHA
+    (96.0, 99.0, "crit"),      # KRİTİK! + şans
+    (99.0, 104.5, "ranking"),  # gerçek DÜNYA SIRALAMASI
+    (104.5, 107.0, "reel"),    # highlight reel
+    (107.0, 112.0, "logo"),    # logo + ŞİMDİ İNDİR
 )
-# highlight reel için yakalanacak anlar
-SNAP_TIMES = (4.7, 9.6, 12.6, 21.2, 27.4, 33.8, 45.6, 49.6, 54.2, 58.8, 63.0, 69.2, 73.2,
-              76.6, 81.6)
+EVO_HIT = 67.0                 # EVRİM kartına tıklama anı (müzikte BRAAAM)
+FINAL_HIT = 110.0
 
-# market eşyaları (senaryodaki "silahlar") — (anahtar, ekstra market, başlık, ek ayar)
-ARMORY = (
-    ("fire", {"fire": 5, "haste": 5, "multishot": 1}, None, {}),
-    ("ice", {"ice": 5, "haste": 5, "multishot": 1}, None, {}),
-    ("multishot", {"multishot": 5, "haste": 3}, None, {}),
-    ("pierce", {"pierce": 5, "multishot": 2, "haste": 3}, None, {}),
-    ("shield", {"shield": 8}, None, {"hurt": True, "rmin": 50, "rmax": 160}),
-    ("explosive", {"explosive": 5, "haste": 5, "multishot": 2}, None, {}),
-    ("chain", {"chain": 4, "storm": 5, "haste": 3}, "ZİNCİR ŞOK + FIRTINA", {"bonk": 0.35}),
-    ("vampiric", {"vampiric": 5, "haste": 4, "multishot": 2}, None, {"lowhp": True}),
-    ("overcharge", {"overcharge": 4}, None, {"bonk": 0.3, "rmin": 70, "rmax": 220}),
-    ("execute_edge", {"execute_edge": 3, "multishot": 2, "haste": 3}, None, {}),
-    ("titan_shield", {"titan_shield": 4, "shield": 3, "multishot": 1}, None,
-     {"hurt": True, "rmin": 60, "rmax": 200}),
+# müzik planı (tools/trailer_audio.py) — sahnelerle aynı zaman çizelgesi
+AUDIO_PLAN = dict(
+    sections=((0.0, "tense"), (8.0, "lite"), (21.5, "drive"), (61.0, "books"),
+              (EVO_HIT, "drive"), (85.5, "breath"), (88.0, "hell"), (96.0, "win"),
+              (107.0, "final"), (FINAL_HIT, "end")),
+    braams=((21.5, 26, 1.0, 0.9), (EVO_HIT, 26, 1.3, 1.0), (88.0, 25, 1.1, 1.0),
+            (92.0, 25, 1.2, 0.95), (FINAL_HIT, 26, 1.4, 1.0)),
+    impacts=((8.0, 0.45), (21.5, 0.9), (EVO_HIT, 1.0), (88.0, 1.0), (96.0, 0.6),
+             (FINAL_HIT, 1.0)),
+    risers=((5.0, 3.0, 0.55), (18.5, 3.0, 0.5), (64.5, 2.5, 0.75), (82.5, 3.0, 0.45),
+            (107.5, 2.5, 0.6)),
+    heart_fast=85.5, heart_slow=88.0,
 )
-ITEM_DUR = 1.5
+SNAP_TIMES = (4.7, 10.6, 15.6, 25.2, 33.0, 45.6, 50.0, 54.6, 59.6, 67.4, 70.2, 74.6,
+              79.2, 83.8, 89.6, 93.6, 97.6, 102.9)
+
+# oyunda evrimleşen silahlar: (silah, kademe)
+ARSENAL = (("whip", 1), ("tornado", 2), ("ghost_swords", 3), ("wolves", 1), ("tesla", 2),
+           ("meteor", 3), ("beam", 2), ("bats", 3))
+ARSENAL_DUR = 1.5
+EVO_KEY = "axe"                # evrim mantığı / EVRİM kartı / önizleme bu silahla
 
 WORLDS = {
-    "frost": dict(name="BUZUL VADİSİ", col=(150, 210, 255), bosses=("warlord", "witch"),
+    "frost": dict(col=(150, 210, 255), bosses=("warlord", "witch"),
                   mobs="YETİLER · KURTLAR · BUZ GOLEMLERİ",
-                  grade=((196, 222, 255), (12, 24, 44))),
-    "jungle": dict(name="ZÜMRÜT ORMAN", col=(120, 235, 130), bosses=("witch", "colossus"),
+                  grade=((205, 226, 255), (8, 18, 34))),
+    "jungle": dict(col=(120, 235, 130), bosses=("witch", "colossus"),
                    mobs="YILANLAR · GORİLLER · PANTERLER",
-                   grade=((200, 238, 190), (2, 20, 8))),
-    "desert": dict(name="KIZIL ÇÖL", col=(255, 176, 80), bosses=("warlord", "colossus"),
+                   grade=((210, 240, 200), (0, 14, 4))),
+    "desert": dict(col=(255, 176, 80), bosses=("warlord", "colossus"),
                    mobs="AKREPLER · MUMYALAR · ÇAKALLAR",
-                   grade=((255, 222, 176), (34, 14, 0))),
+                   grade=((255, 228, 190), (24, 10, 0))),
 }
+RIVALS = (("ZeyNo", 148200, 41, 4770), ("BonkUstası", 103499, 35, 4340),
+          ("Ayaz_41", 89009, 32, 3920), ("KralMert", 76547, 29, 3410),
+          ("Efe_TR", 65830, 26, 3020), ("Duru", 56613, 23, 2700),
+          ("Selin07", 48687, 20, 2310), ("Ozi", 41870, 17, 1960), ("Kuzey", 36008, 14, 1640))
 
 
 # =====================================================================
@@ -135,8 +172,15 @@ def ease_in_out(x):
     return x * x * (3 - 2 * x)
 
 
-def fmt_int(n):
-    return f"{int(n):,}".replace(",", ".")
+def lerp_path(keys, t):
+    """[(t, (x, y)), ...] üzerinde yumuşak yol."""
+    if t <= keys[0][0]:
+        return keys[0][1]
+    for (t0, p0), (t1, p1) in zip(keys, keys[1:]):
+        if t0 <= t <= t1:
+            k = ease_in_out((t - t0) / max(1e-6, t1 - t0))
+            return (p0[0] + (p1[0] - p0[0]) * k, p0[1] + (p1[1] - p0[1]) * k)
+    return keys[-1][1]
 
 
 def _find_font(names):
@@ -148,7 +192,7 @@ def _find_font(names):
             p = os.path.join(d, nm)
             if os.path.isfile(p):
                 return p
-    for d in dirs:                       # alt klasörlerde ara
+    for d in dirs:
         if not os.path.isdir(d):
             continue
         for r, _ds, fs in os.walk(d):
@@ -159,7 +203,7 @@ def _find_font(names):
 
 
 class Type:
-    """1080p trailer yazıları: kontur, gölge, parıltı, altın gradyan."""
+    """1080p trailer yazıları: kontur, gölge, parıltı, gradyan."""
 
     def __init__(self):
         self.paths = {
@@ -260,6 +304,7 @@ class Pilot(K._TourPilot):
 
     def step(self, dt):
         run = self.run
+        run.find_note = None                # "gezgin tüccar / buluntu" notları filmde çıkmasın
         orig = run.update
 
         def upd(dt_, inp):
@@ -297,16 +342,26 @@ class Trailer(K.GameTour):
         self.last_pre = None
         self.overlays = []
         self.item_i = -1
-        self.rank_y = {}
         self.vignette = self._make_vignette()
         self.layer = pygame.Surface((W, H), pygame.SRCALPHA)
-        self.skin = next((s for s in K.SKINS if s.get("id") == self.sh.selected_skin), K.SKINS[0])
         self.rng = random.Random(11)
+        self._vitrin_save()
         for theme in ("frost", "jungle", "desert"):          # zeminleri önceden çiz
             try:
                 K.floor_surface(theme)
             except Exception:
                 pass
+
+    def _vitrin_save(self):
+        """Fragman kaydı: bütün haritalar ve silahlar açık, hesap kapalı."""
+        d = self.sh.save.data
+        st = d.setdefault("stats", {})
+        st["stone_cleared"] = 1
+        for th in ("frost", "jungle", "desert"):
+            st[th + "_kills"] = max(int(st.get(th + "_kills", 0) or 0), 120)
+        d["weapons_owned"] = list(K.WEAPON_BY_KEY)
+        d["weapons_muted"] = []
+        self.sh.account.account = None
 
     # ------------------------------------------------------------------
     # efekt kayıtları
@@ -331,9 +386,14 @@ class Trailer(K.GameTour):
     def ov(self, fn):
         self.overlays.append(fn)
 
+    def tap(self, pos, gain=0.6):
+        """Sanal imleç tıklaması: halka + ses (oyunun düğmesine basmaz)."""
+        self.clicks.append((pos, self.t))
+        self.sfx("click", gain)
+
     # ------------------------------------------------------------------
     def make_run(self, wave=8, weapons=None, level=20, crowd=30, books=None, theme="stone",
-                 hell=False, shop=None, ring=0, rmin=140, rmax=380, prewarm=0.0, hurt=False):
+                 hell=False, ring=0, rmin=140, rmax=380, prewarm=0.0, announce=False):
         sh = self.sh
         sh.start_run()
         run = sh.run
@@ -342,10 +402,10 @@ class Trailer(K.GameTour):
         run.quests = []
         run.ach = None
         run.cursed_next_wave = 999          # filmde lanetli mağara bildirimi çıkmasın
+        run.lectern_done = True             # "gizemli KÜRSÜ belirdi" bildirimi de
         p = run.player
         p.no_stats = True
-        if not hurt:
-            p.take_damage = lambda *a, **k: 0
+        p.take_damage = lambda *a, **k: 0
         p.weapons = dict(weapons or {})
         for k in p.weapons:
             p.weapon_timers[k] = 0.0
@@ -353,16 +413,13 @@ class Trailer(K.GameTour):
             for _ in range(lv):
                 p.take_book(bk, tier)
         p.level = level
-        for key, lv in (shop or {}).items():
-            for _ in range(lv):
-                p.shop_levels[key] = p.shop_levels.get(key, 0) + 1
-                K.apply_shop_item(p, key)
         if hell:
             run.waves.wave = K.HELL_PORTAL_WAVE
             run.enter_hell()
         if wave > 1:
             run.waves._begin_wave(wave, run.score)
-        run.waves.announce_timer = 0.0
+        if not announce:
+            run.waves.announce_timer = 0.0
         self.pilot = Pilot(run, crowd=crowd)
         sh.state = K.STATE_PLAY
         if ring:
@@ -404,11 +461,16 @@ class Trailer(K.GameTour):
             run.do_bonk()
         except Exception:
             pass
-        run.fx.shake(12, 0.35)
-        self.shake(16 * power, 0.4)
-        self.punch(0.10 * power)
-        self.glitch(0.12)
+        run.fx.shake(10, 0.3)
+        self.shake(10 * power, 0.3)
         self.sfx("bonk", 0.9)
+
+    def evolve(self, run, key, tier):
+        """Silahı istenen kademeye taşır; son adım ekranda (flaş + afiş)."""
+        p = run.player
+        while K.evo_tier(p, key) < tier - 1:
+            run.evolve_weapon(key)
+        run.evolve_weapon(key)
 
     def play(self, dt):
         self._play(dt)
@@ -418,6 +480,26 @@ class Trailer(K.GameTour):
         if run is None:
             return VW / 2, VH / 2
         return run.world_to_screen(run.player.x, run.player.y)
+
+    def boss_zoom(self, run, lt, t_in=0.0, hold=1.2, z=1.45):
+        """Patron gelişi: kamera patrona yaklaşır, sonra normal görüşe döner."""
+        bs = [b for b in run.bosses if b.alive]
+        if not bs or lt < t_in:
+            return
+        q = lt - t_in
+        if q < 0.35:
+            k = ease_out(q / 0.35)
+        elif q < 0.35 + hold:
+            k = 1.0
+        else:
+            k = 1.0 - ease_in_out((q - 0.35 - hold) / 0.5)
+        if k <= 0:
+            return
+        bx = sum(b.x for b in bs) / len(bs)
+        by = sum(b.y for b in bs) / len(bs)
+        qx, qy = run.world_to_screen(bx, by)
+        self.zoom = 1.0 + (z - 1.0) * k
+        self.focus = (VW / 2 + (qx - VW / 2) * k, VH / 2 + (qy - VH / 2) * k)
 
     def bg(self, c, top=(54, 30, 80), bot=(10, 6, 20), key="g"):
         cache = getattr(self, "_bgs", None)
@@ -440,6 +522,14 @@ class Trailer(K.GameTour):
                                  (cx + math.cos(a + .05) * 1100, cy + math.sin(a + .05) * 1100)])
         c.blit(lay, (0, 0))
 
+    def ui_cursor(self, pos):
+        self.cursor(pos)
+        c = self.sh.display.canvas
+        for (p, t0) in self.clicks:
+            k = (self.t - t0) / 0.45
+            if 0 <= k <= 1:
+                K.ring_aa(c, p[0], p[1], 8 + 34 * k, (255, 236, 170), max(1, int(5 * (1 - k))))
+
     # ------------------------------------------------------------------
     # 1080p yazı
     def title(self, out, text, cx, cy, size, t0, t1=None, color=WHITE, grad=None, stroke=7,
@@ -453,7 +543,7 @@ class Trailer(K.GameTour):
         sc = 1.0 + slam * (1 - k)
         a = min(1.0, lt / 0.07)
         if t1 is not None:
-            a = min(a, max(0.0, (t1 - self.t) / 0.12))
+            a = min(a, max(0.0, (t1 - self.t) / 0.15))
         if flicker:
             a *= 0.35 + 0.65 * (self.rng.random() > 0.25)
         if sc != 1.0:
@@ -462,24 +552,43 @@ class Trailer(K.GameTour):
         iw, ih = img.get_size()
         x = cx - iw / 2 if align == "center" else (cx if align == "left" else cx - iw)
         y = cy - ih / 2
-        if chroma or lt < 0.12:
-            d = 10 if chroma else int(14 * (1 - lt / 0.12))
+        if chroma or lt < 0.1:
+            d = 9 if chroma else int(10 * (1 - lt / 0.1))
             if d > 0:
                 for tint, dx in (((255, 40, 60), -d), ((40, 220, 255), d)):
                     g = img.copy()
                     g.fill(tint + (255,), special_flags=pygame.BLEND_RGBA_MULT)
-                    g.set_alpha(int(150 * a))
+                    g.set_alpha(int(130 * a))
                     out.blit(g, (x + dx, y), special_flags=pygame.BLEND_ADD)
         if a < 1.0:
             img = img.copy()
             img.set_alpha(int(255 * a))
         out.blit(img, (x, y))
 
+    def band(self, out, text, t0, t1, col=GOLD, sub=None, y=985, size=66):
+        """UI ekranlarında alt yazı şeridi: ekranın altını hafifçe karartır."""
+        lt = self.t - t0
+        if lt < 0 or self.t >= t1:
+            return
+        a = min(1.0, lt / 0.15, (t1 - self.t) / 0.15)
+        hh = 150 if sub else 118
+        strip = pygame.Surface((W, hh), pygame.SRCALPHA)
+        for i in range(hh):
+            al = int(215 * a * min(1.0, i / 30.0))
+            pygame.draw.line(strip, (6, 4, 12, al), (0, i), (W, i))
+        out.blit(strip, (0, H - hh))
+        self.title(out, text, W / 2, y if not sub else y - 22, size, t0, t1,
+                   grad=(WHITE, col), stroke=6, slam=0.25)
+        if sub:
+            self.title(out, sub, W / 2, y + 40, 34, t0 + 0.1, t1, color=(236, 232, 244),
+                       stroke=4, slam=0.1, style="heavy")
+
     def keycap(self, out, label, sub, x, y, t0, t1, col=(255, 214, 120)):
         lt = self.t - t0
         if lt < 0 or self.t >= t1:
             return
         k = ease_out(lt / 0.25)
+        a = min(1.0, (t1 - self.t) / 0.2)
         f = self.T.render(label, 40, WHITE, "heavy", 0, shadow=False)
         w = f.get_width() + 44
         r = pygame.Rect(0, 0, w, 74)
@@ -489,10 +598,11 @@ class Trailer(K.GameTour):
         pygame.draw.rect(box, col + (255,), box.get_rect(), width=4, border_radius=14)
         pygame.draw.rect(box, col + (255,), pygame.Rect(0, r.h - 10, r.w, 10),
                          border_bottom_left_radius=14, border_bottom_right_radius=14)
-        box.set_alpha(int(255 * k))
+        box.blit(f, (22, 9))
+        box.set_alpha(int(255 * k * a))
         out.blit(box, r.topleft)
-        out.blit(f, (r.x + 22, r.y + 9))
-        s = self.T.render(sub, 34, col, "black", 4)
+        s = self.T.render(sub, 34, col, "black", 4).copy()
+        s.set_alpha(int(255 * a))
         out.blit(s, (r.right + 10, r.y + 37 - s.get_height() / 2))
 
     # ------------------------------------------------------------------
@@ -502,7 +612,7 @@ class Trailer(K.GameTour):
         rnd = random.Random(99)
         if kind == "snow":
             for i in range(n):
-                x0, y0, sp, r = rnd.uniform(0, W), rnd.uniform(0, H), rnd.uniform(140, 420), rnd.choice((2, 3, 3, 4, 6))
+                x0, y0, sp, r = rnd.uniform(0, W), rnd.uniform(0, H), rnd.uniform(140, 420), rnd.choice((2, 3, 3, 4, 5))
                 x = (x0 - t * sp * 0.55 + math.sin(t * 2 + i) * 20) % W
                 y = (y0 + t * sp) % H
                 pygame.draw.circle(out, (235, 245, 255), (int(x), int(y)), r)
@@ -529,7 +639,7 @@ class Trailer(K.GameTour):
                 x0, y0, sp, ln = rnd.uniform(0, W), rnd.uniform(0, H), rnd.uniform(500, 1100), rnd.uniform(40, 160)
                 x = (x0 + t * sp) % (W + 200) - 100
                 y = y0 + math.sin(t * 2 + i) * 10
-                pygame.draw.line(lay, (255, 214, 150, int(90 * alpha)), (x, y), (x + ln, y + 4), 2)
+                pygame.draw.line(lay, (255, 214, 150, int(80 * alpha)), (x, y), (x + ln, y + 4), 2)
             out.blit(lay, (0, 0))
         elif kind == "embers":
             for i in range(n):
@@ -540,12 +650,11 @@ class Trailer(K.GameTour):
                 if alpha >= 1 or rnd.random() < alpha:
                     pygame.draw.circle(out, col, (int(x), int(y)), r)
 
-    # ------------------------------------------------------------------
     @staticmethod
     def _make_vignette():
         yy, xx = np.mgrid[0:H, 0:W]
         d = np.sqrt(((xx - W / 2) / (W / 2)) ** 2 + ((yy - H / 2) / (H / 2)) ** 2)
-        a = np.clip((d - 0.62) / 0.75, 0, 1) ** 1.6 * 215
+        a = np.clip((d - 0.7) / 0.75, 0, 1) ** 1.6 * 190
         surf = pygame.Surface((W, H), pygame.SRCALPHA)
         px = pygame.surfarray.pixels_alpha(surf)
         px[:, :] = a.T.astype(np.uint8)
@@ -571,9 +680,9 @@ class Trailer(K.GameTour):
             self.wipe_from = self.last_pre
             self.cur_scene = name
             self.prev = -1.0
-        # sahne başına varsayılanlar
-        self.zoom, self.focus, self.grade = 1.06, "player", None
-        self.blur, self.vig = 0.0, 1.0
+        # sahne başına varsayılanlar: NORMAL GÖRÜŞ (yakınlaştırma yok)
+        self.zoom, self.focus, self.grade = 1.0, None, None
+        self.blur, self.vig = 0.0, 0.6
         self.wipe = None
         self.overlays = []
         canvas_scene = getattr(self, "_s_" + name)(st, dt, first, en - st0)
@@ -584,7 +693,6 @@ class Trailer(K.GameTour):
         for fn in self.overlays:
             fn(out)
         self.after(out)
-        # highlight reel ve geçişler için
         for sn in SNAP_TIMES:
             if abs(t - sn) < 0.5 / FPS:
                 self.snaps.append(pre)
@@ -601,36 +709,40 @@ class Trailer(K.GameTour):
         for t0, s in self.punches:
             if t >= t0:
                 z += s * math.exp(-(t - t0) * 9.0)
-        z = max(1.0, z)
-        if self.focus == "player":
-            fx, fy = self.player_screen()
-        elif self.focus is None:
-            fx, fy = VW / 2, VH / 2
-        else:
-            fx, fy = self.focus
-        w, h = VW / z, VH / z
         sx = sy = 0.0
+        amp_now = 0.0
         for t0, amp, dur in self.shakes:
             if t0 <= t < t0 + dur:
                 k = 1 - (t - t0) / dur
+                amp_now += amp * k
                 sx += self.rng.uniform(-1, 1) * amp * k / S
                 sy += self.rng.uniform(-1, 1) * amp * k / S
+        z = max(1.0 + amp_now * 0.0016, z)      # sarsıntıya pay bırak
+        if self.focus is None:
+            fx, fy = VW / 2, VH / 2
+        elif self.focus == "player":
+            fx, fy = self.player_screen()
+        else:
+            fx, fy = self.focus
+        w, h = VW / z, VH / z
         x = K.clamp(fx - w / 2 + sx, 0, VW - w)
         y = K.clamp(fy - h / 2 + sy, 0, VH - h)
+        if z <= 1.0001:
+            pygame.transform.smoothscale(c, (W, H), out)
+            return
         sub = c.subsurface(pygame.Rect(int(x), int(y), int(w), int(h)))
         pygame.transform.smoothscale(sub, (W, H), out)
 
     def post(self, out):
         t = self.t
-        if self.blur > 0 and self.last_pre is not None:          # hareket bulanıklığı
+        if self.blur > 0 and self.last_pre is not None:
             g = self.last_pre.copy()
-            g.set_alpha(int(170 * self.blur))
+            g.set_alpha(int(150 * self.blur))
             out.blit(g, (0, 0))
         if self.grade:
             mul, add = self.grade
             out.fill(mul, special_flags=pygame.BLEND_MULT)
             out.fill(add, special_flags=pygame.BLEND_ADD)
-        # hız çizgileri
         pw = 0.0
         for t0, dur, power in self.speeds:
             if t0 <= t < t0 + dur:
@@ -639,24 +751,22 @@ class Trailer(K.GameTour):
             lay = self.layer
             lay.fill((0, 0, 0, 0))
             cx, cy = W / 2, H / 2
-            for i in range(90):
+            for i in range(80):
                 a = self.rng.uniform(0, math.tau)
-                r0 = self.rng.uniform(330, 700)
+                r0 = self.rng.uniform(380, 720)
                 r1 = r0 + self.rng.uniform(250, 900)
-                wd = self.rng.uniform(0.004, 0.012)
-                pygame.draw.polygon(lay, (255, 255, 255, int(150 * pw)),
+                wd = self.rng.uniform(0.004, 0.011)
+                pygame.draw.polygon(lay, (255, 255, 255, int(130 * pw)),
                                     [(cx + math.cos(a) * r0, cy + math.sin(a) * r0),
                                      (cx + math.cos(a - wd) * r1, cy + math.sin(a - wd) * r1),
                                      (cx + math.cos(a + wd) * r1, cy + math.sin(a + wd) * r1)])
             out.blit(lay, (0, 0))
         if self.vig > 0:
-            if self.vig >= 1.0:
-                out.blit(self.vignette, (0, 0))
-            else:
-                v = self.vignette.copy()
+            v = self.vignette
+            if self.vig < 1.0:
+                v = v.copy()
                 v.set_alpha(int(255 * self.vig))
-                out.blit(v, (0, 0))
-        # sahne geçişi: eğik wipe (önceki sahne sağdan kayarak açılır)
+            out.blit(v, (0, 0))
         if self.wipe and self.wipe_from is not None:
             k, col = self.wipe
             if k < 1.0:
@@ -678,14 +788,14 @@ class Trailer(K.GameTour):
                 gl = max(gl, 1 - (t - t0) / dur)
         ca = 0
         for t0, s in self.punches:
-            if t0 <= t < t0 + 0.2:
-                ca = max(ca, int(s * 60 * (1 - (t - t0) / 0.2)))
+            if t0 <= t < t0 + 0.15 and s >= 0.1:
+                ca = max(ca, int(s * 40 * (1 - (t - t0) / 0.15)))
         if gl > 0:
-            ca = max(ca, int(12 * gl))
-            for _ in range(int(3 + 6 * gl)):
+            ca = max(ca, int(10 * gl))
+            for _ in range(int(2 + 5 * gl)):
                 y = self.rng.randrange(0, H - 40)
-                hh = min(self.rng.randrange(8, 70), H - y)
-                dx = self.rng.randrange(-60, 60)
+                hh = min(self.rng.randrange(8, 60), H - y)
+                dx = self.rng.randrange(-50, 50)
                 band = out.subsurface(pygame.Rect(0, y, W, hh)).copy()
                 out.blit(band, (dx, y))
         if ca > 0:
@@ -702,11 +812,10 @@ class Trailer(K.GameTour):
                 out.blit(fl, (0, 0))
 
     # ==================================================================
-    # SAHNELER — kanvasa (1280x720) oyun çizer; 1080p katmanı self.ov ile
+    # SAHNELER
     # ==================================================================
     def _s_dark(self, st, dt, first, dur):
-        c = self.sh.display.canvas
-        c.fill((0, 0, 0))
+        self.sh.display.canvas.fill((0, 0, 0))
         self.vig = 0.0
         if first:
             self.sfx("growl", 0.9, 0.2)
@@ -718,7 +827,6 @@ class Trailer(K.GameTour):
 
         def draw(out):
             t = self.t
-            # aşağıdan gelen kızıl kapı ışığı
             k = 0.25 + 0.75 * ease_in_out(st / dur)
             pul = 0.7 + 0.3 * math.sin(t * 9) * math.sin(t * 2.3)
             glow = pygame.Surface((W // 8, H // 8), pygame.SRCALPHA)
@@ -728,15 +836,11 @@ class Trailer(K.GameTour):
                                     pygame.Rect(W // 16 - r * 2, H // 8 - r, r * 4, r * 2))
             out.blit(pygame.transform.smoothscale(glow, (W, H)), (0, 0))
             self.particles(out, "embers", n=int(30 + 70 * k), alpha=k)
-            # karanlıkta beliren göz çiftleri
             rnd = random.Random(5)
             for i in range(14):
                 t_on = 0.3 + i * 0.2
                 ex, ey = rnd.uniform(160, W - 160), rnd.uniform(140, H - 260)
-                if t < t_on:
-                    continue
-                blink = (math.sin((t - t_on) * 3 + i) > -0.85)
-                if not blink:
+                if t < t_on or math.sin((t - t_on) * 3 + i) <= -0.85:
                     continue
                 a = min(1.0, (t - t_on) / 0.25)
                 sz = rnd.uniform(5, 11)
@@ -759,18 +863,17 @@ class Trailer(K.GameTour):
                           books={"r_dmg": (8, 3), "r_aspd": (6, 2)}, ring=60, rmin=110, rmax=420,
                           prewarm=0.25)
             self.flash(0.45, power=1.0)
-            self.punch(0.25)
-            self.speed(0.5, 1.0)
+            self.punch(0.18)
+            self.speed(0.4, 0.8)
             self.pilot.force_dash = True
             self.sfx("impact_big", 0.9)
             self.sfx("whoosh", 0.7)
         if self.at(st, 1.0):
-            self.bonk(1.3)
+            self.bonk(1.2)
         if self.at(st, 2.5):
             self.bonk(1.0)
         self.play(dt)
-        self.zoom = 1.06 + 0.5 * (1 - ease_out(st / 0.5)) + 0.08 * (st / dur)
-        self.grade = ((215, 190, 190), (14, 0, 0))
+        self.grade = ((225, 200, 200), (10, 0, 0))
 
         def draw(out):
             self.title(out, "HAYATTA KALABİLECEK", W / 2, H / 2 - 70, 118, self.t - st + 1.0, None,
@@ -779,107 +882,165 @@ class Trailer(K.GameTour):
                        grad=((255, 120, 90), (220, 20, 20)), stroke=8, glow=(200, 20, 10))
         self.ov(draw)
         if self.at(st, 1.5):
-            self.punch(0.08)
+            self.punch(0.05)
             self.sfx("impact", 0.5)
 
-    def _s_dash(self, st, dt, first, dur):
-        if first:
-            self.make_run(6, {}, 8, 46, shop={"haste": 3, "multishot": 1}, ring=34, rmin=120,
-                          rmax=360, prewarm=0.4)
-            self.sfx("whoosh", 0.5)
-        for x in (0.45, 1.45, 2.45):
-            if self.at(st, x):
-                self.pilot.force_dash = True
-                self.speed(0.45, 1.0)
-                self.punch(0.07)
-                self.sfx("whoosh", 0.8)
-        self.play(dt)
-        self.zoom = 1.12
-        for x in (0.45, 1.45, 2.45):
-            if x <= st < x + 0.35:
-                self.blur = 0.75
-        self.ov(lambda out: (self.keycap(out, "W A S D", "KOŞ", 80, 880, self.t - st + 0.1, self.t + 1),
-                             self.keycap(out, "SHIFT", "DASH", 80, 970, self.t - st + 0.45, self.t + 1)))
+    # ------------------------------------------------------------------
+    # KAYIT OL -> ANA MENÜ -> HARİTA SEÇ
+    REG_FIELDS = (("user", PLAYER, (640, 284), 0.6, 1.5),
+                  ("password", "evolve2026", (640, 334), 1.9, 2.8),
+                  ("email", "kanka@evolvearena.com", (640, 390), 3.1, 4.2))
+    REG_BTN = (640, 450)
 
-    def _s_bonk(self, st, dt, first, dur):
+    def _s_register(self, st, dt, first, dur):
+        sh = self.sh
         if first:
-            self.make_run(9, {"pentagram": 4}, 14, 64, shop={"overcharge": 1, "haste": 2},
-                          ring=50, rmin=70, rmax=300, prewarm=0.3)
-            self.flash(0.15, power=0.6)
-            self.sfx("whoosh", 0.6)
-        for x in (0.5, 1.5, 2.5):
+            sh.account.account = None
+            sh.state = K.STATE_LOGIN
+            try:
+                sh._login_set_mode("up")
+            except Exception:
+                sh.login_mode = "up"
+            for k in sh.login_fields:
+                sh.login_fields[k] = ""
+            self.flash(0.3, power=0.8)
+            self.sfx("whoosh_down", 0.6)
+        keys = [(0.0, (900, 620))]
+        for _f, _txt, pos, a, b in self.REG_FIELDS:
+            keys += [(a - 0.35, pos), (b, pos)]
+        keys += [(4.6, self.REG_BTN), (5.2, self.REG_BTN), (6.0, (980, 300))]
+        m = lerp_path(keys, st)
+        for fld, txt, pos, a, b in self.REG_FIELDS:
+            if self.at(st, a - 0.2):
+                self.tap(pos, 0.4)
+            if a <= st:
+                sh.login_focus = fld if st < b + 0.2 else sh.login_focus
+                n = int(len(txt) * min(1.0, (st - a) / (b - a)))
+                if len(sh.login_fields[fld]) != n:
+                    sh.login_fields[fld] = txt[:n]
+                    self.sfx("click", 0.18)
+        if self.at(st, 4.7):
+            self.tap(self.REG_BTN, 0.8)
+        if self.at(st, 5.0):
+            sh.account.sign_in(PLAYER, self.REG_FIELDS[2][1])
+            sh.state = K.STATE_MENU
+            self.flash(0.2, col=(170, 255, 190), power=0.7)
+            self.sfx("levelup", 0.6)
+            self.sfx("shing", 0.5)
+        if sh.state == K.STATE_LOGIN:
+            sh.update_login(dt, m, False)
+        else:
+            sh.update_menu(dt, m, False)
+        self.ui_cursor(m)
+
+        def draw(out):
+            self.title(out, "HESABINI AÇ.", W / 2, 62, 76, self.t - st + 0.2, self.t - st + 5.0,
+                       grad=(WHITE, (150, 230, 255)), stroke=6, glow=(40, 120, 255), slam=0.3)
+            if st >= 5.0:
+                self.title(out, "HESAP AÇILDI!", W / 2, H / 2, 110, self.t - st + 5.0, None,
+                           grad=((220, 255, 220), (90, 220, 120)), stroke=8, glow=(40, 180, 80),
+                           slam=0.8)
+        self.ov(draw)
+
+    MENU_PLAY = (640, 334)
+
+    def _s_menu(self, st, dt, first, dur):
+        sh = self.sh
+        if first:
+            sh.state = K.STATE_MENU
+        m = lerp_path([(0.0, (980, 300)), (0.8, (810, 402)), (1.5, (810, 402)), (2.1, (1108, 402)),
+                       (2.6, (1108, 402)), (3.2, self.MENU_PLAY), (4.0, self.MENU_PLAY)], st)
+        if self.at(st, 3.45):
+            self.tap(self.MENU_PLAY, 0.8)
+            self.punch(0.03)
+        sh.update_menu(dt, m, False)
+        self.ui_cursor(m)
+        self.ov(lambda out: self.band(out, "HOŞ GELDİN, KANKA.", self.t - st + 0.2, self.t - st + 3.4,
+                                      col=(255, 214, 120)))
+
+    MAP_CARDS = {"stone": (180, 470), "frost": (490, 470), "jungle": (795, 470), "desert": (1105, 470)}
+    MAP_START = (820, 660)
+
+    def _s_mapsel(self, st, dt, first, dur):
+        sh = self.sh
+        if first:
+            sh.state = K.STATE_MAP_SELECT
+            self.flash(0.12, power=0.5)
+            self.sfx("whoosh", 0.5)
+        mc = self.MAP_CARDS
+        m = lerp_path([(0.0, self.MENU_PLAY), (0.5, mc["stone"]), (0.9, mc["frost"]), (1.3, mc["jungle"]),
+                       (1.7, mc["desert"]), (2.2, self.MAP_START), (3.5, self.MAP_START)], st)
+        for x in (0.5, 0.9, 1.3, 1.7):
             if self.at(st, x):
-                self.bonk(1.4)
-                self.ring(self.sh.run, 18, 80, 260)
+                self.sfx("click", 0.25)
+        if self.at(st, 2.9):
+            self.tap(self.MAP_START, 0.8)
+        sh.update_map_select(dt, m, False)
+        self.ui_cursor(m)
+        self.ov(lambda out: self.title(out, "4 DÜNYA", 1700, 120, 64, self.t - st + 0.5, None,
+                                       grad=(WHITE, GOLD), stroke=6, slam=0.3))
+
+    # ------------------------------------------------------------------
+    # NORMAL OYNANIŞ
+    def _s_play(self, st, dt, first, dur):
+        if first:
+            self.make_run(3, {"axe": 4, "whip": 3}, 7, 18, ring=14, rmin=200, rmax=420,
+                          prewarm=0.1, announce=True)
+            self.flash(0.3, power=0.8)
+            self.sfx("impact", 0.6)
+        self.pilot.crowd = int(18 + st * 4)
+        if self.at(st, 3.0):
+            self.pilot.force_dash = True
+            self.speed(0.3, 0.7)
+            self.sfx("whoosh", 0.8)
+        for x in (5.0, 7.0):
+            if self.at(st, x):
+                self.ring(self.sh.run, 10, 90, 200)
+                self.bonk(1.0)
         self.play(dt)
-        self.zoom = 1.14
-        self.ov(lambda out: self.keycap(out, "SPACE", "BONK!", 80, 970, self.t - st + 0.5,
-                                        self.t + 1, col=(255, 150, 90)))
+        self.ov(lambda out: (
+            self.keycap(out, "W A S D", "KOŞ", 70, 760, self.t - st + 0.4, self.t - st + dur),
+            self.keycap(out, "SHIFT", "DASH", 70, 850, self.t - st + 2.8, self.t - st + dur),
+            self.keycap(out, "SPACE", "BONK!", 70, 940, self.t - st + 4.8, self.t - st + dur,
+                        col=(255, 150, 90))))
 
     def _s_market(self, st, dt, first, dur):
         sh = self.sh
         if first:
-            run = self.make_run(8, {"tesla": 6, "tornado": 4, "beam": 6, "pentagram": 6}, 16, 12)
-            run.gold_wallet = max(run.gold_wallet, 1600)
+            run = sh.run
+            run.gold_wallet = max(run.gold_wallet, 900)
             run.open_shop()
             sh.state = K.STATE_RUN_SHOP
-            self.flash(0.18, col=(255, 220, 140), power=0.9)
-            self.glitch(0.3)
-            self.sfx("glitch", 0.5)
-            self.sfx("shing", 0.6)
-        m = self.path([(0.0, (640, 600)), (0.5, (183, 250)), (1.1, (183, 250)), (1.5, (420, 250)),
-                       (2.5, (420, 250))], st)
-        clicked = False
-        for x in (0.6, 1.0, 1.6, 2.0):
-            if self.at(st, x):
-                clicked = True
-                self.clicks.append((m, self.t))
-                self.punch(0.04)
-                self.sfx("coin", 0.9)
+            self.flash(0.15, col=(255, 220, 140), power=0.7)
+            self.sfx("shing", 0.5)
+        m = lerp_path([(0.0, (640, 600)), (0.8, (420, 250)), (1.5, (420, 250))], st)
         if sh.state == K.STATE_RUN_SHOP:
-            sh.update_run_shop(dt, m, clicked)
+            sh.update_run_shop(dt, m, False)
             self.cursor(m)
         else:
             self.play(dt)
-        self.zoom, self.focus = 1.0, None
-        on = st > 0.28 or int(st * 30) % 3 != 1          # açılışta yanıp sönme
-        if not on:
-            sh.display.canvas.fill((255, 236, 180))
-        self.ov(lambda out: self.keycap(out, "B", "MARKET", 80, 970, self.t - st + 0.3,
-                                        self.t + 1, col=GOLD))
+        self.ov(lambda out: self.keycap(out, "B", "MARKET", 70, 940, self.t - st, self.t - st + dur,
+                                        col=GOLD))
 
-    def _s_gold(self, st, dt, first, dur):
+    def _s_survive(self, st, dt, first, dur):
         if first:
-            self.make_run(10, {"tesla": 6, "pentagram": 6, "beam": 6}, 20, 34,
-                          shop={"haste": 3, "multishot": 2}, ring=26, prewarm=0.3)
-            self.flash(0.12, power=0.6)
+            self.make_run(10, {"axe": 8, "whip": 8, "tornado": 6, "pentagram": 6}, 22, 46,
+                          books={"r_dmg": (4, 2)}, ring=30, prewarm=0.3)
+            self.flash(0.15, power=0.6)
             self.sfx("whoosh", 0.6)
-        run = self.sh.run
-        p = run.player
-        if int(st * 30) % 4 == 0:                          # altın yağmuru
-            for _ in range(7):
-                a = random.uniform(0, math.tau)
-                d = random.uniform(160, 420)
-                pk = K.Pickup(p.x + math.cos(a) * d, p.y + math.sin(a) * d * 0.7, "coin",
-                              random.choice((3, 5, 8)))
-                pk.magnet = True
-                run.pickups.append(pk)
-        if int(st * 30) % 3 == 0:
-            self.sfx("coin", 0.35)
         self.play(dt)
-        self.zoom = 1.1
-        self.grade = ((255, 240, 205), (14, 8, 0))
         words = (("KOŞ.", 0.0, -230, (WHITE, (200, 230, 255))), ("VUR.", 0.5, -40, (WHITE, (255, 190, 150))),
                  ("HAYATTA KAL.", 1.0, 170, ((255, 240, 180), (255, 160, 40))))
         for _w, x, _y, _g in words:
             if self.at(st, x):
-                self.punch(0.09)
+                self.punch(0.05)
                 self.sfx("impact", 0.55)
-                self.glitch(0.1)
+        if self.at(st, 1.0):
+            self.bonk(1.0)
 
         def draw(out):
             dim = pygame.Surface((W, H), pygame.SRCALPHA)
-            dim.fill((0, 0, 0, int(110 * min(1.0, st / 0.2))))
+            dim.fill((0, 0, 0, int(95 * min(1.0, st / 0.2))))
             out.blit(dim, (0, 0))
             for wd, x, y, g in words:
                 self.title(out, wd, W / 2, H / 2 + y, 190 if wd != "HAYATTA KAL." else 170,
@@ -887,320 +1048,326 @@ class Trailer(K.GameTour):
         self.ov(draw)
 
     # ------------------------------------------------------------------
-    def _s_weapons(self, st, dt, first, dur):
-        i = min(len(ARMORY) - 1, int(st / ITEM_DUR))
-        lt = st - i * ITEM_DUR
-        key, shop, label, extra = ARMORY[i]
-        item = K.SHOP_BY_KEY[key]
-        legendary = bool(item.get("legendary"))
+    # SİLAHLIK -> DETAY -> EVRİMİ İZLE
+    CODEX_AXE = (170, 200)
+    EVO_WATCH = (620, 616)
+    TIER_CARDS = {1: (1043, 263), 2: (1043, 375), 3: (1043, 487)}
+
+    def _s_codex(self, st, dt, first, dur):
+        sh = self.sh
+        if first:
+            sh.state = K.STATE_WEAPON_CODEX
+            sh.weapon_detail = None
+            sh.weapon_filter = "all"
+            sh.weapon_scroll = 0.0
+            self.flash(0.25, col=(255, 230, 190), power=0.8)
+            self.sfx("whoosh_down", 0.7)
+            self.sfx("impact", 0.4)
+        # liste aşağı kayıp geri gelir (20 silahın hepsi görünsün)
+        if st < 1.2:
+            sc = 0.0
+        elif st < 2.6:
+            sc = 420 * ease_in_out((st - 1.2) / 1.4)
+        elif st < 3.6:
+            sc = 420 * (1 - ease_in_out((st - 2.6) / 1.0))
+        else:
+            sc = 0.0
+        sh.weapon_scroll = sc
+        if hasattr(sh, "weapon_scroll_target"):
+            sh.weapon_scroll_target = sc
+        m = lerp_path([(0.0, (900, 600)), (1.0, (760, 330)), (2.6, (1060, 480)), (3.6, (560, 230)),
+                       (4.4, self.CODEX_AXE), (5.0, self.CODEX_AXE)], st)
+        if self.at(st, 4.6):
+            self.tap(self.CODEX_AXE, 0.8)
+            sh.weapon_detail = EVO_KEY
+            sh.weapon_detail_t = 0.0
+        sh.update_weapon_codex(dt, m, False, 0)
+        self.ui_cursor(m)
+        n = len(K.WEAPON_BY_KEY)
+        self.ov(lambda out: self.band(out, f"{n} SİLAH. HER BİRİNİN 3 EVRİMİ VAR.",
+                                      self.t - st + 0.3, self.t - st + 4.5, col=(255, 190, 120)))
+
+    def _s_wdetail(self, st, dt, first, dur):
+        sh = self.sh
+        if first:
+            sh.weapon_detail = EVO_KEY
+        m = lerp_path([(0.0, self.CODEX_AXE), (0.7, (820, 560)), (1.4, (900, 600)), (2.0, (840, 640)),
+                       (2.8, self.EVO_WATCH), (3.5, self.EVO_WATCH)], st)
+        if self.at(st, 3.1):
+            self.tap(self.EVO_WATCH, 0.8)
+        sh.update_weapon_codex(dt, m, False, 0)
+        self.ui_cursor(m)
+        bk = K.BOOK_BY_KEY[K.EVOLUTIONS[EVO_KEY][0]]
+        self.ov(lambda out: self.band(out, "SİLAH LV.10 + EŞ KİTAP LV.3 = EVRİM",
+                                      self.t - st + 0.3, self.t - st + dur, col=(255, 150, 120),
+                                      sub=f"{K.w_name(K.WEAPON_BY_KEY[EVO_KEY])} + {K.bk_name(bk).upper()}"))
+
+    def _s_evopv(self, st, dt, first, dur):
+        sh = self.sh
+        if first:
+            sh.evo_pv = K.EvoPreview(sh, EVO_KEY)
+            sh.evo_pv.select(1)
+            self.flash(0.2, col=(255, 200, 180), power=0.6)
+            self.sfx("shing", 0.7)
+        pv = sh.evo_pv
+        tiers = ((0.0, 1), (2.1, 2), (4.2, 3))
+        m = lerp_path([(0.0, self.EVO_WATCH), (0.4, self.TIER_CARDS[1]), (1.6, self.TIER_CARDS[1]),
+                       (2.0, self.TIER_CARDS[2]), (3.7, self.TIER_CARDS[2]), (4.1, self.TIER_CARDS[3]),
+                       (6.5, self.TIER_CARDS[3])], st)
+        for x, tier in tiers[1:]:
+            if self.at(st, x):
+                self.tap(self.TIER_CARDS[tier], 0.7)
+                pv.select(tier)
+                self.punch(0.03)
+                self.sfx("levelup", 0.5)
+        sh.update_weapon_codex(dt, m, False, 0)
+        self.ui_cursor(m)
+        cur = pv.tier
+
+        def draw(out):
+            roman = K.EVO_ROMAN[cur]
+            nm = K.evo_name(EVO_KEY, cur)
+            col = tuple(K.evo_color(EVO_KEY, cur))
+            t0 = self.t - st + [x for x, tr in tiers if tr == cur][0] + 0.1
+            self.band(out, f"EVRİM {roman}: {nm}", t0, self.t - st + dur, col=col,
+                      sub=f"SİLAH LV.{K.evo_level_need(EVO_KEY, cur)}  +  KİTAP LV.{K.evo_book_need(EVO_KEY, cur)}")
+        self.ov(draw)
+        if st > dur - 1.5 / FPS:
+            sh.close_evo_viewer()
+            sh.weapon_detail = None
+
+    # ------------------------------------------------------------------
+    # OYUNDA EVRİMLEŞEN SİLAHLAR
+    def _s_arsenal(self, st, dt, first, dur):
+        i = min(len(ARSENAL) - 1, int(st / ARSENAL_DUR))
+        lt = st - i * ARSENAL_DUR
+        key, tier = ARSENAL[i]
+        w = K.WEAPON_BY_KEY[key]
+        book = K.EVOLUTIONS[key][0]
         if i != self.item_i:
             self.item_i = i
-            run = self.make_run(11, {}, 24, 44, shop=shop, ring=36, rmin=extra.get("rmin", 120),
-                                rmax=extra.get("rmax", 330), prewarm=0.45, hurt=extra.get("hurt", False))
-            if extra.get("lowhp"):
-                self.pilot.keep_hp = False
-                run.player.hp = run.player.max_hp * 0.3
-            if extra.get("hurt"):
-                self.pilot.target = (run.player.x, run.player.y)
-            self.flash(0.16, col=(255, 236, 190) if legendary else (255, 250, 245), power=0.85)
-            self.punch(0.1)
+            lvl = K.evo_level_need(key, tier)
+            run = self.make_run(12, {key: lvl}, 26, 44, books={book: (K.evo_book_need(key, tier), 1)},
+                                ring=34, rmin=110, rmax=340, prewarm=0.3)
+            p = run.player
+            while K.evo_tier(p, key) < tier - 1:
+                run.evolve_weapon(key)
+            run.evo_banner = None
+            run.fx.texts.clear()
+            self.flash(0.12, power=0.6)
             self.sfx("whoosh", 0.7)
-            if legendary:
-                self.sfx("shing", 0.7)
-            if i == 0:
-                self.sfx("impact", 0.7)
-        if extra.get("bonk") and self.at(st, i * ITEM_DUR + extra["bonk"]):
-            self.bonk(1.3 if key == "overcharge" else 0.9)
+        run = self.sh.run
+        if self.at(st, i * ARSENAL_DUR + 0.3):
+            run.evolve_weapon(key)
+            self.punch(0.04)
+            self.sfx("shing", 0.6)
         self.play(dt)
-        self.zoom = 1.16 - 0.06 * (lt / ITEM_DUR)
-        if legendary:
-            self.grade = ((255, 238, 200), (22, 14, 0))
-        name = label or item["name"].upper()
-        col = tuple(item.get("color", GOLD))
+        evolved = lt >= 0.3
+        col = tuple(K.evo_color(key, tier)) if evolved else tuple(w["color"])
 
         def draw(out):
             k = ease_out(lt / 0.2)
-            x0 = int(-760 + 820 * k)
-            y0 = 800
-            box = pygame.Surface((900, 190), pygame.SRCALPHA)
+            x0 = int(-860 + 900 * k)
+            y0 = 790
+            box = pygame.Surface((960, 170), pygame.SRCALPHA)
             box.fill((10, 8, 18, 215))
-            pygame.draw.rect(box, (GOLD if legendary else col) + (255,), pygame.Rect(0, 0, 12, 190))
+            pygame.draw.rect(box, col + (255,), pygame.Rect(0, 0, 12, 170))
             out.blit(box, (x0, y0))
-            cxi, cyi = x0 + 110, y0 + 95
-            pygame.draw.circle(out, (24, 18, 36), (cxi, cyi), 70)
-            pygame.draw.circle(out, GOLD if legendary else col, (cxi, cyi), 70, 6)
-            K.draw_icon(out, cxi, cyi, item.get("icon", "star"), col if not legendary else GOLD, r=42)
-            if legendary:
-                tag = self.T.render("★ EFSANEVİ ★", 34, GOLD, "black", 4)
-                out.blit(tag, (x0 + 200, y0 + 6))
-                img = self.T.render(name, 80, GOLD, "black", 6, grad=((255, 250, 210), (255, 170, 40)),
-                                    glow=(255, 170, 40))
-                out.blit(img, (x0 + 190 - 40, y0 + 30 - 40))
+            K.draw_weapon_emblem(out, x0 + 100, y0 + 85, 130, w, self.t, locked=False, glow=True)
+            if not evolved:
+                img = self.T.render(K.w_name(w), 72, col, "black", 6, grad=(WHITE, col))
+                out.blit(img, (x0 + 190, y0 + 30))
             else:
-                img = self.T.render(name, 80, col, "black", 6, grad=(WHITE, col))
-                out.blit(img, (x0 + 190, y0 + 22))
-            d = self.T.render(item["desc"], 30, (236, 232, 244), "bold", 3)
-            out.blit(d, (x0 + 196, y0 + 128))
-            # sayaç
-            ctr = self.T.render(f"{i + 1:02d}/{len(ARMORY):02d}", 36, (200, 190, 220), "heavy", 3)
-            out.blit(ctr, (W - ctr.get_width() - 60, 50))
-            if legendary:                     # altın parıltı süpürmesi
-                sx = int(-300 + (W + 600) * (lt / ITEM_DUR))
-                lay = self.layer
-                lay.fill((0, 0, 0, 0))
-                pygame.draw.polygon(lay, (255, 220, 120, 46), [(sx, 0), (sx + 140, 0), (sx - 160, H), (sx - 300, H)])
-                out.blit(lay, (0, 0))
-            if st < 1.4:
-                self.title(out, "ONLARCA SİLAH.", W / 2, 230, 150, self.t - st + 0.05, self.t - st + 1.45,
-                           grad=(WHITE, (255, 190, 120)), stroke=9, glow=(255, 120, 40))
-        self.ov(draw)
-
-    def _s_combo(self, st, dt, first, dur):
-        c = self.sh.display.canvas
-        self.bg(c, (40, 22, 60), (8, 4, 16))
-        self.rays(c, VW / 2, VH / 2, self.t, alpha=26)
-        K.add_glow(c, VW / 2, VH / 2, 460, (210, 150, 60), 0.3)
-        self.zoom, self.focus = 1.0 + 0.04 * st, None
-        if first:
-            self.flash(0.2, power=0.9)
-            self.sfx("impact", 0.7)
-            self.punch(0.1)
-
-        def draw(out):
-            n = len(ARMORY)
-            for j, (key, _s, _l, _e) in enumerate(ARMORY):
-                it = K.SHOP_BY_KEY[key]
-                a = j * math.tau / n + self.t * 0.6
-                k = ease_out((st - j * 0.04) / 0.35)
-                rr = 420 * k + 900 * (1 - k)
-                x, y = W / 2 + math.cos(a) * rr * 1.25, H / 2 + math.sin(a) * rr * 0.78
-                leg = it.get("legendary")
-                pygame.draw.circle(out, (24, 18, 36), (int(x), int(y)), 58)
-                pygame.draw.circle(out, GOLD if leg else tuple(it["color"]), (int(x), int(y)), 58, 5)
-                K.draw_icon(out, x, y, it.get("icon", "star"), GOLD if leg else tuple(it["color"]), r=34)
-            self.title(out, "SONSUZ", W / 2, H / 2 - 70, 150, self.t - st + 0.1, None,
-                       grad=(WHITE, (255, 200, 120)), stroke=9, glow=(255, 140, 40))
-            self.title(out, "KOMBİNASYON.", W / 2, H / 2 + 80, 150, self.t - st + 0.45, None,
-                       grad=((255, 236, 170), (255, 150, 40)), stroke=9, glow=(255, 140, 40))
-        if self.at(st, 0.45):
-            self.punch(0.08)
-            self.sfx("impact", 0.5)
+                a = self.T.render(K.w_name(w) + "  →", 34, (220, 214, 232), "heavy", 3)
+                out.blit(a, (x0 + 196, y0 + 14))
+                img = self.T.render(K.evo_name(key, tier), 70, col, "black", 6,
+                                    grad=((255, 255, 240), col), glow=col)
+                out.blit(img, (x0 + 150, y0 + 6))
+                tag = self.T.render(f"EVRİM {K.EVO_ROMAN[tier]}", 34, col, "black", 4)
+                out.blit(tag, (x0 + 196, y0 + 120))
+            ctr = self.T.render(f"{i + 1:02d}/{len(ARSENAL):02d}", 36, (200, 190, 220), "heavy", 3)
+            out.blit(ctr, (W - ctr.get_width() - 60, H - 90))
+            if st < 1.45:
+                self.title(out, "EVRİMLER OYUNDA", W / 2, 620, 110, self.t - st + 0.05,
+                           self.t - st + 1.45, grad=(WHITE, (255, 190, 120)), stroke=8,
+                           glow=(255, 120, 40))
         self.ov(draw)
 
     # ------------------------------------------------------------------
-    BOOK_KEYS = (("r_dmg", (255, 110, 90)), ("r_luck", (120, 235, 130)), ("r_crit", (255, 214, 90)))
-
-    def _s_books(self, st, dt, first, dur):
+    # KİTAP + SİLAH = EVRİM
+    def _s_evologic(self, st, dt, first, dur):
         c = self.sh.display.canvas
-        self.bg(c, (44, 28, 22), (12, 8, 10), "books")
-        self.zoom, self.focus = 1.0 + 0.05 * st / dur, None
-        if first:
-            self.flash(0.2, col=(200, 160, 255), power=0.7)
-            self.sfx("whoosh_down", 0.6)
-        # arkada raf
-        for sy in (210, 560):
-            pygame.draw.rect(c, (92, 60, 36), pygame.Rect(0, sy, VW, 18))
-            pygame.draw.rect(c, (128, 86, 52), pygame.Rect(0, sy, VW, 4))
-        others = [b for b in K.BOOKS if b["key"] not in dict(self.BOOK_KEYS)][:24]
-        for j, bk in enumerate(others):
-            row, col = divmod(j, 12)
-            x = 60 + col * 105 + (st * 30 if row == 0 else -st * 30)
-            y = 150 if row == 0 else 500
-            K.draw_book(c, x, y, 90, bk, self.t, locked=False, glow=False)
-        dim = pygame.Surface((VW, VH), pygame.SRCALPHA)
-        dim.fill((6, 4, 10, 150))
-        c.blit(dim, (0, 0))
-        for j, (key, colr) in enumerate(self.BOOK_KEYS):
-            t_in = j * 1.0
-            if st < t_in:
-                continue
-            bk = K.BOOK_BY_KEY[key]
-            k = ease_out((st - t_in) / 0.35)
-            cx = VW / 2 + (j - 1) * 330
-            cy = 330 + (1 - k) * 300
-            pul = 0.5 + 0.5 * math.sin(self.t * 6 + j)
-            K.add_glow(c, cx, cy, 190, colr, 0.25 + 0.2 * pul)
-            K.draw_book(c, cx, cy, 200, bk, self.t, locked=False, glow=True)
-            if self.at(st, t_in):
-                self.sfx("shing", 0.6)
-                self.sfx("levelup", 0.4)
-                self.punch(0.05)
-
-        def draw(out):
-            for j, (key, colr) in enumerate(self.BOOK_KEYS):
-                t_in = j * 1.0
-                if st < t_in + 0.15:
-                    continue
-                cx = W / 2 + (j - 1) * 330 * S
-                nm = K.bk_name(K.BOOK_BY_KEY[key]).upper()
-                self.title(out, nm, cx, 790, 54, self.t - st + t_in + 0.15, None, color=colr,
-                           grad=(WHITE, colr), stroke=5, slam=0.3)
-            self.title(out, "KİTAPLAR", W / 2, 110, 96, self.t - st + 0.1, None,
-                       grad=((230, 210, 255), (170, 120, 255)), stroke=8, glow=(140, 80, 255))
-            if st > 3.0:
-                self.title(out, "HER KİTAP SİLAHINI BAŞKA BİR YÖNE BÜYÜTÜR", W / 2, 960, 48,
-                           self.t - st + 3.0, None, color=(236, 232, 244), stroke=4, slam=0.2,
-                           style="heavy")
-        self.ov(draw)
-
-    def _s_charge(self, st, dt, first, dur):
-        c = self.sh.display.canvas
-        self.bg(c, (30, 18, 46), (6, 4, 12), "charge")
-        q = st / dur
-        self.zoom, self.focus = 1.0 + 0.22 * ease_in_out(q), None
-        cx, cy = VW / 2, VH / 2 - 10
-        self.rays(c, cx, cy, self.t * (1 + 3 * q), col=(255, 230, 170), alpha=int(18 + 40 * q))
-        merge = ease_in_out((st - 1.9) / 0.6)
-        wx = cx - 300 * (1 - merge)
-        bx = cx + 300 * (1 - merge)
-        w = K.WEAPON_BY_KEY["tesla"]
-        bk = K.BOOK_BY_KEY["r_dmg"]
-        K.add_glow(c, wx, cy, 200, (150, 200, 255), 0.25 + 0.4 * q)
-        K.add_glow(c, bx, cy, 200, (255, 110, 90), 0.25 + 0.4 * q)
-        K.draw_weapon_emblem(c, wx, cy, 190, w, self.t, locked=False, glow=True)
-        K.draw_book(c, bx, cy, 190, bk, self.t, locked=False, glow=True)
-        # birleşen enerji parçacıkları
-        rnd = random.Random(3)
-        for i in range(60):
-            a = rnd.uniform(0, math.tau)
-            ph = (self.t * (0.6 + q * 1.8) + rnd.random()) % 1.0
-            r = 520 * (1 - ph)
-            x, y = cx + math.cos(a) * r, cy + math.sin(a) * r * 0.7
-            K.blit_disc(c, x, y, 2 + 2 * ph, (255, 240, 200), int(255 * ph))
-        K.add_glow(c, cx, cy, 120 + 380 * q, (255, 245, 220), 0.1 + 0.5 * q * q)
-        wl = 1 + int(min(1.0, st / 1.6) * 9)
-        bl = 1 + int(min(1.0, st / 1.4) * 2)
-        if int(st * FPS) % 5 == 0 and st < 1.7:
-            self.sfx("crit", 0.18)
-        if self.at(st, 1.6):
-            self.sfx("levelup", 0.8)
-            self.punch(0.06)
-        self.shakes.append((self.t, 3 + 9 * q, 1.0 / FPS + 0.001))
+        self.bg(c, (36, 22, 40), (8, 5, 12), "evologic")
+        self.rays(c, VW / 2, 150, self.t, col=(255, 200, 150), alpha=16)
         self.vig = 1.0
-
-        def draw(out):
-            if merge < 0.5:
-                a = 1 - merge * 2
-                for x, txt, sub, colr in ((wx * S, f"SEVİYE {wl}", "YILDIRIM ZİNCİRİ", (150, 200, 255)),
-                                          (bx * S, f"SEVİYE {bl}", "HASAR KİTABI", (255, 120, 100))):
-                    img = self.T.render(txt, 72, colr, "black", 6,
-                                        grad=(WHITE, colr) if not txt.endswith(("10", " 3")) else ((255, 250, 210), GOLD),
-                                        glow=GOLD if txt.endswith(("10", " 3")) else None).copy()
-                    img.set_alpha(int(255 * a))
-                    out.blit(img, (x - img.get_width() / 2, (cy + 150) * S))
-                    s2 = self.T.render(sub, 36, (236, 232, 244), "heavy", 4).copy()
-                    s2.set_alpha(int(255 * a))
-                    out.blit(s2, (x - s2.get_width() / 2, (cy + 150) * S + 100))
-                plus = self.T.render("+", 140, GOLD, "black", 8, glow=(255, 160, 40)).copy()
-                plus.set_alpha(int(255 * a))
-                out.blit(plus, (W / 2 - plus.get_width() / 2, cy * S - plus.get_height() / 2))
-            # yükselen beyazlık
-            wh = pygame.Surface((W, H))
-            wh.fill((255, 250, 236))
-            wh.set_alpha(int(200 * ease_in_out((st - 1.8) / 0.7) ** 2))
-            out.blit(wh, (0, 0))
-        self.ov(draw)
-
-    def _s_evolve(self, st, dt, first, dur):
-        c = self.sh.display.canvas
         if first:
-            self.flash(0.9, col=(255, 255, 255), power=1.6)
-            self.punch(0.3)
-            self.shake(26, 0.6)
-            self.speed(0.9, 1.2)
-            self.sfx("shing", 1.0)
-        self.bg(c, (255, 214, 120), (90, 40, 10), "evo")
-        self.rays(c, VW / 2, VH / 2 - 20, self.t * 3, col=(255, 255, 230), alpha=70, n=28)
-        cx, cy = VW / 2, VH / 2 - 20
-        K.add_glow(c, cx, cy, 420, (255, 255, 240), 0.8)
-        # altın, evrimleşmiş silah amblemi
-        w = dict(K.WEAPON_BY_KEY["tesla"])
-        w["color"] = GOLD
-        sc = 1.0 + 0.08 * math.sin(self.t * 10)
-        for r in range(3):
-            K.ring_aa(c, cx, cy, (150 + r * 40 + st * 220) % 520, (255, 240, 190), 3)
-        K.draw_weapon_emblem(c, cx + 230, cy, 220 * sc, w, self.t, locked=False, glow=True)
-        K.draw_skin_preview(c, self.skin, cx - 210, cy + 10, self.t, r=78)
-        K.add_glow(c, cx - 210, cy + 10, 160, (255, 255, 255), 0.55 + 0.25 * math.sin(self.t * 14))
-        self.zoom, self.focus = 1.0 + 0.1 * (1 - ease_out(st / 0.8)), None
-        self.grade = ((255, 245, 225), (12, 8, 0))
+            self.flash(0.25, col=(200, 160, 255), power=0.8)
+            self.sfx("whoosh_down", 0.7)
+        w = K.WEAPON_BY_KEY[EVO_KEY]
+        bk = K.BOOK_BY_KEY[K.EVOLUTIONS[EVO_KEY][0]]
+        tier_now = 1 + min(2, int(max(0.0, st - 0.6) / 0.9))
+        ecol = tuple(K.evo_color(EVO_KEY, tier_now))
+        k1 = ease_out(st / 0.35)
+        cy = 190
+        K.add_glow(c, 330, cy, 150, tuple(w["color"]), 0.3)
+        K.draw_weapon_emblem(c, 330, cy + (1 - k1) * 200, 150, w, self.t, locked=False, glow=True)
+        K.add_glow(c, 640, cy, 150, (196, 150, 255), 0.3)
+        K.draw_book(c, 640, cy + (1 - k1) * 200, 150, bk, self.t, locked=False, glow=True)
+        evw = dict(w)
+        evw["color"] = ecol
+        K.add_glow(c, 950, cy, 170 + 20 * math.sin(self.t * 6), ecol, 0.45)
+        K.draw_weapon_emblem(c, 950, cy + (1 - k1) * 200, 160, evw, self.t, locked=False, glow=True)
+        for i in range(1, 4):
+            t_in = 0.6 + (i - 1) * 0.9
+            if self.at(st, t_in):
+                self.sfx("levelup", 0.5)
+                self.punch(0.03)
 
         def draw(out):
-            self.title(out, "EVRİM!", W / 2, 180, 210, self.t - st + 0.15, None,
-                       grad=((255, 255, 230), (255, 160, 30)), stroke=10, scol=(70, 30, 0),
-                       glow=(255, 200, 80), slam=1.0)
-            self.title(out, "YILDIRIM ZİNCİRİ  ★  EVRİMLEŞTİ", W / 2, 930, 60, self.t - st + 0.6, None,
-                       color=WHITE, stroke=6, scol=(70, 30, 0), slam=0.3)
+            self.title(out, "KİTAPLAR SİLAHINI EVRİMLEŞTİRİR", W / 2, 60, 66, self.t - st + 0.05, None,
+                       grad=((235, 220, 255), (170, 120, 255)), stroke=6, glow=(120, 60, 255), slam=0.3)
+            for sx, txt in ((485, "+"), (795, "=")):
+                img = self.T.render(txt, 120, GOLD, "black", 8, glow=(255, 160, 40))
+                out.blit(img, (sx * S - img.get_width() / 2, cy * S - img.get_height() / 2))
+            for x, nm in ((330, K.w_name(w)), (640, K.bk_name(bk).upper()),
+                          (950, K.evo_name(EVO_KEY, tier_now))):
+                img = self.T.render(nm, 34, WHITE if x != 950 else ecol, "heavy", 4)
+                out.blit(img, (x * S - img.get_width() / 2, (cy + 110) * S))
+            for i in range(1, 4):
+                t_in = 0.6 + (i - 1) * 0.9
+                lt = st - t_in
+                if lt < 0:
+                    continue
+                k = ease_out(lt / 0.25)
+                col = tuple(K.evo_color(EVO_KEY, i))
+                y = 560 + (i - 1) * 140
+                x0 = int(260 - (1 - k) * 600)
+                row = pygame.Surface((1400, 116), pygame.SRCALPHA)
+                row.fill((14, 10, 22, 225))
+                pygame.draw.rect(row, col + (255,), pygame.Rect(0, 0, 14, 116))
+                pygame.draw.rect(row, col + (255,), row.get_rect(), width=3, border_radius=4)
+                out.blit(row, (x0, y))
+                rn = self.T.render(K.EVO_ROMAN[i], 74, col, "black", 5, grad=(WHITE, col))
+                out.blit(rn, (x0 + 40, y + 58 - rn.get_height() / 2))
+                req = self.T.render(f"SİLAH LV.{K.evo_level_need(EVO_KEY, i)}  +  KİTAP LV.{K.evo_book_need(EVO_KEY, i)}",
+                                    44, WHITE, "heavy", 4)
+                out.blit(req, (x0 + 170, y + 58 - req.get_height() / 2))
+                nm = self.T.render("→  " + K.evo_name(EVO_KEY, i), 52, col, "black", 5,
+                                   grad=((255, 255, 240), col))
+                out.blit(nm, (x0 + 1380 - nm.get_width(), y + 58 - nm.get_height() / 2))
         self.ov(draw)
-        if self.at(st, 0.15):
-            self.sfx("impact", 0.6)
+
+    def _s_evocard(self, st, dt, first, dur):
+        sh = self.sh
+        if first:
+            run = self.make_run(9, {EVO_KEY: K.evo_level_need(EVO_KEY, 1), "whip": 8, "tornado": 7},
+                                20, 30, books={K.EVOLUTIONS[EVO_KEY][0]: (K.evo_book_need(EVO_KEY, 1), 1),
+                                               "r_dmg": (3, 1)}, ring=20, prewarm=0.3)
+            p = run.player
+            try:
+                o_w = run._weapon_offer(K.WEAPON_BY_KEY["whip"], p.weapons["whip"] + 1, False)
+                o_e = run.evo_offer(EVO_KEY)
+                o_b = run._book_offer(K.BOOK_BY_KEY["r_aspd"], 1, True)
+                run.levelup_choices = [o_w, o_e, o_b]
+                run.pending_levelups = 1
+                sh.state = K.STATE_LEVELUP
+            except Exception:
+                sh.state = K.STATE_PLAY
+            self.flash(0.15, power=0.6)
+            self.sfx("levelup", 0.9)
+        run = sh.run
+        hit = EVO_HIT - (self.t - st)               # sahne içindeki tıklama anı
+        if sh.state == K.STATE_LEVELUP:
+            cards = [r.center for (r, _c, _i) in sh.levelup_ui.cards] or [(342, 352), (640, 352), (938, 352)]
+            cards = (cards + [cards[-1]] * 3)[:3]
+            m = lerp_path([(0.0, (640, 690)), (0.6, cards[0]), (1.1, cards[0]), (1.6, cards[1]),
+                           (3.0, cards[1])], st)
+            clicked = self.at(st, hit)
+            if clicked:
+                self.tap(m, 0.9)
+            sh.update_levelup(dt, m, clicked)
+            self.cursor(m)
+        else:
+            self.play(dt)
+        if self.at(st, hit):
+            if EVO_KEY not in run.player.evolved:
+                run.evolve_weapon(EVO_KEY)
+            sh.state = K.STATE_PLAY
+            run.pending_levelups = 0
+            self.flash(0.6, power=1.3)
+            self.punch(0.12)
+            self.shake(18, 0.5)
+            self.speed(0.6, 1.0)
+        self.ov(lambda out: (self.band(out, "SEVİYE ATLA  →  EVRİM KARTI", self.t - st + 0.3,
+                                       self.t - st + hit, col=(255, 120, 90)),
+                             self.title(out, "EVRİM!", W / 2, 300, 200, self.t - st + hit + 0.05, None,
+                                        grad=((255, 255, 230), (255, 160, 30)), stroke=10,
+                                        scol=(70, 30, 0), glow=(255, 200, 80), slam=1.0)))
 
     def _s_power(self, st, dt, first, dur):
+        run = self.sh.run
         if first:
-            self.make_run(20, {"tesla": 22, "tornado": 20, "beam": 22, "pentagram": 22,
-                               "meteor": 14}, 74, 80,
-                          books={"r_dmg": (16, 4), "r_aspd": (12, 3), "r_crit": (10, 3)},
-                          ring=60, prewarm=0.4)
-            self.flash(0.3, col=(255, 240, 200), power=1.0)
-        for x in (0.5, 2.5, 4.0):
+            p = run.player
+            p.weapons.update({"tesla": 20, "beam": 20, "pentagram": 18})
+            for k in ("tesla", "beam", "pentagram"):
+                p.weapon_timers[k] = 0.0
+            for bk, lv in (("r_echo", 1), ("r_xp", 5)):
+                for _ in range(lv):
+                    p.take_book(bk, 1)
+            self.pilot.crowd = 60
+            self.ring(run, 30)
+        for x, key, tier in ((1.0, "tesla", 2), (2.5, "beam", 2)):
             if self.at(st, x):
-                self.bonk(1.2)
-                self.ring(self.sh.run, 26)
-        for x in (1.0, 2.0, 3.0):
-            if self.at(st, x):
-                self.punch(0.06)
+                self.evolve(run, key, tier)
+                self.punch(0.04)
+                self.sfx("shing", 0.6)
+        if self.at(st, 3.5):
+            self.bonk(1.0)
         self.play(dt)
-        self.zoom = 1.08 + 0.1 * math.sin(st * 0.6)
-        self.grade = ((255, 240, 210), (16, 10, 0))
 
         def draw(out):
-            self.title(out, "SİLAHINI EVRİMLEŞTİR.", W / 2, 170, 120, self.t - st + 0.2, None,
+            self.title(out, "SİLAHINI EVRİMLEŞTİR.", W / 2, 300, 110, self.t - st + 0.3, None,
                        grad=(WHITE, (255, 210, 130)), stroke=9, glow=(255, 130, 30))
-            self.title(out, "GÜCÜNÜ KATLA.", W / 2, 930, 150, self.t - st + 1.5, None,
+            self.title(out, "GÜCÜNÜ KATLA.", W / 2, 440, 140, self.t - st + 1.5, None,
                        grad=((255, 236, 160), (255, 120, 20)), stroke=10, glow=(255, 110, 20))
         if self.at(st, 1.5):
             self.sfx("impact", 0.6)
         self.ov(draw)
 
     # ------------------------------------------------------------------
+    # DÜNYALAR — kamera yalnız patron gelişinde yaklaşır
     def _world(self, theme, st, dt, first, dur):
         wd = WORLDS[theme]
         if first:
-            run = self.make_run(12, {"tesla": 8, "tornado": 6, "beam": 8, "pentagram": 8}, 30, 46,
-                                theme=theme, books={"r_dmg": (6, 2)}, ring=34, prewarm=0.2)
-            self.add_boss(run, wd["bosses"][0], -260, -150, theme=theme)
-            self.add_boss(run, wd["bosses"][1], 260, -130, theme=theme)
+            self.make_run(12, {"tesla": 10, "tornado": 8, "beam": 10, "pentagram": 10}, 30, 46,
+                          theme=theme, books={"r_dmg": (6, 2)}, ring=34, prewarm=0.2)
             self.sfx("whoosh", 0.8)
-            self.sfx("growl", 0.45, self.t + 0.3)
-            self.punch(0.1)
+        run = self.sh.run
+        if self.at(st, 1.0):
+            self.add_boss(run, wd["bosses"][0], -230, -150, theme=theme)
+            self.add_boss(run, wd["bosses"][1], 230, -130, theme=theme)
+            self.punch(0.06)
+            self.shake(14, 0.4)
+            self.sfx("growl", 0.7)
+            self.sfx("impact", 0.6)
         self.wipe = (st / 0.32, wd["col"])
         self.play(dt)
-        run = self.sh.run
-        if run.bosses:
-            bx = sum(b.x for b in run.bosses) / len(run.bosses)
-            by = sum(b.y for b in run.bosses) / len(run.bosses)
-            px, py = run.world_to_screen(run.player.x, run.player.y)
-            qx, qy = run.world_to_screen(bx, by)
-            self.focus = ((px + qx) / 2, (py + qy) / 2)
-        self.zoom = 1.12 + 0.06 * st / dur
+        self.boss_zoom(run, st, t_in=1.0, hold=1.2)
         self.grade = wd["grade"]
         part = {"frost": "snow", "jungle": "leaves", "desert": "dust"}[theme]
         names = [K.MAP_BOSS_NAMES[theme][b] for b in wd["bosses"]]
+        wname = K.L("map.%s.name" % theme)
 
         def draw(out):
-            self.particles(out, part, n=140 if part != "dust" else 70)
-            self.title(out, wd["name"], 70, 150, 120, self.t - st + 0.25, None, align="left",
+            self.particles(out, part, n=110 if part != "dust" else 60)
+            self.title(out, wname, W / 2, 330, 130, self.t - st + 0.15, self.t - st + 1.1,
                        grad=(WHITE, wd["col"]), stroke=9, glow=tuple(int(v * 0.7) for v in wd["col"]))
-            self.title(out, wd["mobs"], 76, 250, 40, self.t - st + 0.55, None, align="left",
-                        color=(236, 236, 244), stroke=4, style="heavy", slam=0.2)
-            self.title(out, "PATRON: " + "  /  ".join(names), 76, 310, 46, self.t - st + 0.85, None,
-                       align="left", color=(255, 120, 100), grad=((255, 210, 190), (255, 80, 60)),
-                       stroke=5, slam=0.3)
-            box = pygame.Surface((W, 92), pygame.SRCALPHA)
-            box.fill((8, 6, 14, 190))
-            out.blit(box, (0, H - 120))
-            tl = self.T.render("3 FARKLI DÜNYA. HER BİRİ KENDİ CANAVARLARIYLA.", 54, WHITE, "black", 5)
-            out.blit(tl, (W / 2 - tl.get_width() / 2, H - 74 - tl.get_height() / 2))
+            self.title(out, wd["mobs"], W / 2, 440, 44, self.t - st + 0.35, self.t - st + 1.1,
+                       color=(236, 236, 244), stroke=4, style="heavy", slam=0.2)
+            self.title(out, "PATRON: " + "  /  ".join(names), W / 2, 820, 64, self.t - st + 1.1,
+                       self.t - st + 2.9, grad=((255, 220, 200), (255, 80, 60)), stroke=6, slam=0.4)
+            self.band(out, "3 FARKLI DÜNYA. HER BİRİ KENDİ CANAVARLARIYLA.", self.t - st,
+                      self.t - st + dur + 0.01, col=wd["col"], size=54)
         self.ov(draw)
 
     def _s_frost(self, st, dt, first, dur):
@@ -1213,6 +1380,7 @@ class Trailer(K.GameTour):
         self._world("desert", st, dt, first, dur)
 
     # ------------------------------------------------------------------
+    # CEHENNEM
     def _s_gate(self, st, dt, first, dur):
         if first:
             run = self.make_run(K.HELL_PORTAL_WAVE, {"tesla": 12, "tornado": 10, "beam": 12,
@@ -1229,17 +1397,12 @@ class Trailer(K.GameTour):
         hp = run.hell_portal
         if hp is not None:
             self.pilot.target = (hp.x, hp.y)
-            px, py = self.player_screen()
-            qx, qy = run.world_to_screen(hp.x, hp.y)
-            self.focus = (px * 0.35 + qx * 0.65, py * 0.35 + qy * 0.65)
         self.play(dt)
-        self.zoom = 1.15 + 0.35 * ease_in_out(st / dur)
-        self.grade = ((190, 120, 120), (18, 0, 0))
+        self.grade = ((205, 140, 140), (14, 0, 0))
         self.vig = 1.0
         blink = int(self.t * 6) % 2 == 0
 
         def draw(out):
-            # uyarı şeritleri
             for yy in (0, H - 56):
                 band = pygame.Surface((W, 56), pygame.SRCALPHA)
                 band.fill((0, 0, 0, 220))
@@ -1249,21 +1412,17 @@ class Trailer(K.GameTour):
                                                                    (x + off + 10, 56), (x + off - 30, 56)])
                 out.blit(band, (0, yy))
             if blink or st < 0.4:
-                self.title(out, "⚠ UYARI ⚠", W / 2, 200, 70, self.t - st + 0.05, None,
+                self.title(out, "UYARI", W / 2, 200, 70, self.t - st + 0.05, None,
                            color=(255, 70, 50), stroke=6, slam=0.2)
-            self.title(out, "25. DALGADA", W / 2, H / 2 + 120, 96, self.t - st + 0.2, None,
+            self.title(out, "25. DALGADA", W / 2, H / 2 + 140, 96, self.t - st + 0.2, None,
                        grad=(WHITE, (255, 170, 150)), stroke=8, glow=(160, 10, 0), slam=0.3)
-            self.title(out, "CEHENNEM KAPISI AÇILIR...", W / 2, H / 2 + 240, 104, self.t - st + 0.7,
+            self.title(out, "CEHENNEM KAPISI AÇILIR...", W / 2, H / 2 + 260, 104, self.t - st + 0.7,
                        None, grad=((255, 200, 180), (255, 40, 20)), stroke=8, glow=(200, 20, 0),
-                       slam=0.3, flicker=st > 2.0, chroma=st > 2.2)
+                       slam=0.3, flicker=st > 2.0)
         self.ov(draw)
         if self.at(st, 2.2):
-            self.glitch(0.3)
-            self.sfx("glitch", 0.7)
-
-    def _hell_common(self, st, out_fn=None):
-        self.grade = ((255, 150, 120), (26, 0, 0))
-        self.vig = 1.0
+            self.glitch(0.25)
+            self.sfx("glitch", 0.6)
 
     def _s_hellord(self, st, dt, first, dur):
         if first:
@@ -1272,37 +1431,28 @@ class Trailer(K.GameTour):
                                 books={"r_dmg": (10, 3)}, hell=True, ring=30, prewarm=0.2)
             self.add_boss(run, "warlord", 0, -170, hellish=True)
             self.flash(0.5, col=(255, 90, 40), power=1.2)
-            self.punch(0.25)
-            self.shake(24, 0.7)
+            self.punch(0.12)
+            self.shake(22, 0.6)
             self.sfx("growl", 1.0)
         run = self.sh.run
-        if self.at(st, 2.0):
-            self.bonk(1.2)
+        if self.at(st, 2.6):
+            self.bonk(1.0)
         self.play(dt)
-        if run.bosses and st < 1.3:
-            b = run.bosses[0]
-            qx, qy = run.world_to_screen(b.x, b.y)
-            k = ease_in_out(st / 1.3)
-            px, py = self.player_screen()
-            self.focus = (qx + (px - qx) * k, qy + (py - qy) * k)
-            self.zoom = 1.55 - 0.45 * k
-        else:
-            self.zoom = 1.1
-        self._hell_common(st)
+        self.boss_zoom(run, st, t_in=0.0, hold=1.0, z=1.5)
+        self.grade = ((255, 165, 135), (20, 0, 0))
+        self.vig = 1.0
 
         def draw(out):
-            self.particles(out, "embers", n=150)
-            self.title(out, "CEHENNEM LORDU", W / 2, 170, 140, self.t - st + 0.1, None,
+            self.particles(out, "embers", n=130)
+            self.title(out, "CEHENNEM LORDU", W / 2, 180, 140, self.t - st + 0.1, None,
                        grad=((255, 220, 180), (255, 50, 20)), stroke=10, scol=(30, 0, 0),
                        glow=(220, 30, 0), slam=0.6)
-            if st > 1.8:
-                self.title(out, "EVRİMSİZ GİRME.", W / 2, 930, 130, self.t - st + 1.8, None,
-                           grad=(WHITE, (255, 80, 50)), stroke=10, scol=(30, 0, 0),
-                           glow=(220, 30, 0), chroma=int(self.t * 8) % 4 == 0)
-        if self.at(st, 1.8):
-            self.punch(0.12)
+            if st > 1.9:
+                self.title(out, "EVRİMSİZ GİRME.", W / 2, 930, 130, self.t - st + 1.9, None,
+                           grad=(WHITE, (255, 80, 50)), stroke=10, scol=(30, 0, 0), glow=(220, 30, 0))
+        if self.at(st, 1.9):
+            self.punch(0.06)
             self.sfx("impact", 0.8)
-            self.glitch(0.2)
         self.ov(draw)
 
     def _s_dragon(self, st, dt, first, dur):
@@ -1319,14 +1469,25 @@ class Trailer(K.GameTour):
             K.scale_bosses_to_player(run.bosses, run.player)
             run.waves.boss_active = True
             self.flash(0.4, col=(255, 120, 40), power=1.2)
-            self.punch(0.2)
-            self.shake(28, 0.8)
+            self.punch(0.1)
+            self.shake(24, 0.7)
             self.sfx("impact_big", 0.9)
-        if self.at(st, 2.4):
-            self.bonk(1.2)
+        if self.at(st, 2.8):
+            self.bonk(1.0)
         self.play(dt)
-        self.zoom = 1.12 if st > 0.8 else 1.25
-        self._hell_common(st)
+        if st >= 0.8:
+            alive = [b for b in run.bosses if b.alive and b.kind == "dragon"]
+            if alive:
+                b = alive[0]
+                q = st - 0.8
+                k = ease_out(q / 0.35) if q < 0.35 else (1.0 if q < 1.5 else
+                                                          1.0 - ease_in_out((q - 1.5) / 0.5))
+                if k > 0:
+                    qx, qy = run.world_to_screen(b.x, b.y)
+                    self.zoom = 1.0 + 0.5 * k
+                    self.focus = (VW / 2 + (qx - VW / 2) * k, VH / 2 + (qy - VH / 2) * k)
+        self.grade = ((255, 165, 135), (20, 0, 0))
+        self.vig = 1.0
 
         def draw(out):
             if st < 1.0:                    # başın üstünden geçen ejderha gölgesi
@@ -1345,33 +1506,30 @@ class Trailer(K.GameTour):
                                                           (x + 200, y + 20)])
                 pygame.draw.polygon(lay, (0, 0, 0, 170), [(x - 320, y), (x - 560, y - 40), (x - 520, y + 10)])
                 out.blit(lay, (0, 0))
-            self.particles(out, "embers", n=170)
+            self.particles(out, "embers", n=150)
             if st > 0.8:
-                self.title(out, "KOR EJDERHA", W / 2, 170, 150, self.t - st + 0.85, None,
+                self.title(out, "KOR EJDERHA", W / 2, 180, 150, self.t - st + 0.85, None,
                            grad=((255, 230, 160), (255, 90, 20)), stroke=10, scol=(30, 0, 0),
                            glow=(255, 80, 0), slam=0.7)
-            if st > 2.2:
-                self.title(out, "EVRİMSİZ GİRME.", W / 2, 930, 130, self.t - st + 2.2, None,
+            if st > 2.4:
+                self.title(out, "EVRİMSİZ GİRME.", W / 2, 930, 130, self.t - st + 2.4, None,
                            grad=(WHITE, (255, 80, 50)), stroke=10, scol=(30, 0, 0),
-                           glow=(220, 30, 0), flicker=st > 3.0)
+                           glow=(220, 30, 0), flicker=st > 3.3)
         self.ov(draw)
 
     # ------------------------------------------------------------------
     def _s_crit(self, st, dt, first, dur):
         if first:
-            self.make_run(14, {"knives": 10, "tesla": 8}, 30, 50,
+            self.make_run(14, {"knives": 12, "tesla": 10, "axe": 10}, 34, 50,
                           books={"r_crit": (12, 4), "r_critd": (10, 4), "r_luck": (8, 3)},
-                          shop={"gambler_dice": 2, "multishot": 3, "haste": 4}, ring=40, prewarm=0.3)
+                          ring=40, prewarm=0.3)
             self.flash(0.35, col=(255, 240, 160), power=1.0)
-            self.punch(0.1)
         self.play(dt)
-        self.zoom = 1.12
-        self.grade = ((255, 246, 215), (10, 8, 0))
-        pops = [0.25, 0.75, 1.25, 1.5, 1.75, 2.25, 2.5, 2.75, 3.0, 3.25]
+        self.grade = ((255, 248, 222), (8, 6, 0))
+        pops = [0.25, 0.75, 1.25, 1.5, 1.75, 2.25, 2.5, 2.75]
         for x in pops:
             if self.at(st, x):
                 self.sfx("crit", 0.55)
-                self.punch(0.05)
         icons = (("horseshoe", 1.0, -560), ("dice", 1.5, 0), ("clover", 2.0, 560))
         for _n, x, _dx in icons:
             if self.at(st, x):
@@ -1380,7 +1538,7 @@ class Trailer(K.GameTour):
         def draw(out):
             rnd = random.Random(21)
             for j, x in enumerate(pops):
-                px, py = rnd.uniform(330, W - 330), rnd.uniform(330, H - 300)
+                px, py = rnd.uniform(380, W - 380), rnd.uniform(380, H - 360)
                 lt = st - x
                 if 0 <= lt < 0.6:
                     sz = 92 if j % 3 else 120
@@ -1392,7 +1550,7 @@ class Trailer(K.GameTour):
                 if lt < 0:
                     continue
                 k = ease_out(lt / 0.3)
-                cx, cy = W / 2 + dx, 190
+                cx, cy = W / 2 + dx, 240
                 rr = int(80 * (0.4 + 0.6 * k))
                 K.add_glow(out, cx, cy, 170, (120, 255, 140) if kind == "clover" else GOLD, 0.35)
                 pygame.draw.circle(out, (24, 18, 36), (int(cx), int(cy)), rr)
@@ -1409,121 +1567,62 @@ class Trailer(K.GameTour):
                         pygame.draw.circle(out, (200, 30, 40), (int(cx + rx * sq * 0.25), int(cy + ry * sq * 0.25)), 6)
                 else:
                     K.draw_icon(out, cx, cy, kind, (120, 255, 140) if kind == "clover" else GOLD, r=int(48 * k) + 1)
-            self.title(out, "ŞANSINI DENE.", W / 2, 930, 140, self.t - st + 0.3, None,
+            self.title(out, "ŞANSINI DENE.", W / 2, 900, 140, self.t - st + 0.3, None,
                        grad=((200, 255, 200), (90, 220, 110)), stroke=9, scol=(0, 30, 10),
                        glow=(60, 200, 90))
         self.ov(draw)
 
-    RIVALS = (("ZeyNo", 148200, 41), ("BonkUstası", 131900, 38), ("Ayaz_41", 120450, 36),
-              ("KralMert", 98700, 33), ("Efe_TR", 91200, 31), ("Duru", 84330, 29),
-              ("Selin07", 77010, 27), ("Ozi", 65800, 24), ("Kuzey", 52400, 22))
+    # ------------------------------------------------------------------
+    # GERÇEK DÜNYA SIRALAMASI EKRANI — oyuncu sıralamada yükselir
+    def _rank_rows(self, mine):
+        rows = [dict(name=n, score=s, wave=w, kills=k, diff="normal", run_time=1200)
+                for n, s, w, k in RIVALS]
+        rows.append(dict(name=PLAYER, score=int(mine), wave=44, kills=5320, diff="kabus", run_time=1700))
+        rows.sort(key=lambda r: -r["score"])
+        return rows
 
     def _s_ranking(self, st, dt, first, dur):
-        c = self.sh.display.canvas
-        self.bg(c, (22, 30, 64), (8, 8, 20), "rank")
-        self.rays(c, VW / 2, -80, self.t, col=(120, 160, 255), alpha=16)
-        self.zoom, self.focus = 1.0, None
+        sh = self.sh
         if first:
-            self.flash(0.2, col=(160, 200, 255), power=0.8)
+            if not sh.account.logged_in():
+                sh.account.sign_in(PLAYER, self.REG_FIELDS[2][1])
+            sh.state = K.STATE_WORLD_LB
+            self.flash(0.2, col=(160, 200, 255), power=0.7)
             self.sfx("whoosh", 0.8)
-        q = ease_in_out((st - 0.3) / 2.5)
-        mine = 40500 + (152340 - 40500) * q
-        rows = [(n, s, w, False) for n, s, w in self.RIVALS] + [("SEN", mine, 44, True)]
-        rows.sort(key=lambda r: -r[1])
-        rank_now = [r[0] for r in rows].index("SEN")
-        prev_rank = getattr(self, "_prev_rank", rank_now)
-        if rank_now < prev_rank:
+            self._prev_rank = None
+        q = ease_in_out((st - 0.4) / 2.6)
+        mine = 30500 + (168420 - 30500) * q
+        rows = self._rank_rows(mine)
+        sh.online.world_scores = rows
+        rank = [r["name"] for r in rows].index(PLAYER)
+        if self._prev_rank is not None and rank < self._prev_rank:
             self.sfx("coin", 0.7)
-            self.sfx("whoosh", 0.25)
-        if rank_now == 0 and prev_rank != 0:
-            self._rank1_t = self.t
-            self.sfx("impact", 0.8)
-            self.punch(0.12)
-            self.flash(0.25, col=(255, 230, 150), power=0.7)
-        self._prev_rank = rank_now
-        top = 150
-        rh = 47
-        for i, (nm, sc, wv, me) in enumerate(rows):
-            ty = top + i * rh
-            y = self.rank_y.get(nm, ty)
-            y += (ty - y) * min(1.0, dt * 14)
-            self.rank_y[nm] = y
-        for i, (nm, sc, wv, me) in sorted(enumerate(rows), key=lambda r: r[1][3]):
-            y = self.rank_y[nm]
-            r = pygame.Rect(240, int(y), 800, rh - 8)
-            if me:
-                K.add_glow(c, r.centerx, r.centery, 420, GOLD, 0.25)
-                K.panel(c, r, bg=(70, 52, 20), edge=GOLD, alpha=250, radius=12, edge_w=3)
-            else:
-                K.panel(c, r, bg=(26, 26, 46), edge=(70, 80, 130), alpha=235, radius=12, edge_w=1)
-            medal = {0: (255, 214, 90), 1: (210, 214, 230), 2: (214, 150, 90)}.get(i)
-            if medal:
-                pygame.draw.circle(c, medal, (r.x + 34, r.centery), 17)
-                K.draw_text(c, str(i + 1), (r.x + 34, r.centery), 18, (30, 20, 10), bold=True, center=True)
-            else:
-                K.draw_text(c, str(i + 1), (r.x + 34, r.centery), 20, (200, 205, 230), bold=True, center=True)
-            K.draw_text(c, nm, (r.x + 72, r.centery - 12), 22, GOLD if me else (236, 236, 250), bold=True)
-            K.draw_text(c, f"Dalga {wv}", (r.x + 470, r.centery - 10), 18, (170, 176, 210), bold=True)
-            K.draw_text(c, fmt_int(sc), (r.right - 24, r.centery - 12), 22, GOLD if me else WHITE,
-                        bold=True, right=True)
-            if me and rank_now > 0:
-                K.draw_text(c, "▲", (r.x + 130, r.centery - 12), 20, (120, 255, 140), bold=True)
-        if rank_now == 0:                      # konfeti
-            lt = st - 2.8
-            for i in range(80):
+            if rank == 0:
+                self._rank1_t = self.t
+                self.sfx("impact", 0.8)
+                self.punch(0.05)
+                self.flash(0.25, col=(255, 230, 150), power=0.6)
+        self._prev_rank = rank
+        m = (1100 + math.sin(st) * 40, 600)
+        sh.update_world_leaderboard(dt, m, False)
+        if rank == 0:                          # konfeti
+            c = sh.display.canvas
+            lt = self.t - getattr(self, "_rank1_t", self.t)
+            for i in range(70):
                 x = (i * 97.7 + math.sin(st * 2 + i) * 30) % VW
-                y = (max(0, lt) * (200 + (i % 7) * 40) + i * 23) % (VH + 40) - 20
+                y = (lt * (200 + (i % 7) * 40) + i * 23) % (VH + 40) - 20
                 colr = ((255, 214, 110), (255, 120, 140), (120, 210, 255), (150, 240, 160))[i % 4]
                 pygame.draw.rect(c, colr, pygame.Rect(int(x), int(y), 6, 10))
 
         def draw(out):
-            self.title(out, "DÜNYA SIRALAMASI", W / 2, 95, 96, self.t - st + 0.1, None,
-                       grad=(WHITE, (140, 190, 255)), stroke=8, glow=(60, 110, 255))
-            self.title(out, "DÜNYAYLA YARIŞ.", W / 2, 1000, 104, self.t - st + 0.5, None,
-                       grad=((200, 230, 255), (90, 160, 255)), stroke=9, glow=(50, 100, 255))
-            if rank_now == 0:
-                self.title(out, "1.", 1740, 330, 190, getattr(self, "_rank1_t", self.t), None,
+            if rank != 0:
+                self.band(out, "DÜNYAYLA YARIŞ.", self.t - st + 0.3, self.t + 1, col=(140, 190, 255))
+            else:
+                t1 = getattr(self, "_rank1_t", self.t)
+                self.band(out, "ZİRVEYE ÇIK.", t1, self.t + 1, col=GOLD)
+                self.title(out, "1. SENSİN!", W / 2, H / 2 - 40, 150, t1, t1 + 1.3,
                            grad=((255, 250, 200), (255, 180, 40)), stroke=9, glow=(255, 170, 30),
                            slam=1.0)
-                self.title(out, "SENSİN!", 1740, 470, 64, getattr(self, "_rank1_t", self.t) + 0.1, None,
-                           grad=((255, 250, 200), (255, 180, 40)), stroke=8, glow=(255, 170, 30),
-                           slam=0.9)
-        self.ov(draw)
-
-    def _s_badges(self, st, dt, first, dur):
-        c = self.sh.display.canvas
-        self.bg(c, (40, 28, 64), (10, 6, 20), "badge")
-        self.rays(c, VW / 2, VH / 2, self.t, alpha=22)
-        self.zoom, self.focus = 1.02, None
-        achs = [a for a in K.ACHIEVEMENTS if a.get("icon")][::max(1, len(K.ACHIEVEMENTS) // 8)][:6]
-        tiers = {"bronz": (214, 150, 90), "gümüş": (210, 214, 230), "altın": GOLD}
-        for j, a in enumerate(achs):
-            t_in = j * 0.16
-            if st < t_in:
-                continue
-            if self.at(st, t_in):
-                self.sfx("crit", 0.45)
-                self.punch(0.03)
-            k = ease_out((st - t_in) / 0.25)
-            cx = VW / 2 + (j - 2.5) * 185
-            cy = 330
-            col = tiers.get(a.get("tier"), GOLD)
-            rr = 64 * (0.3 + 0.7 * k) * (1 + 0.15 * (1 - k))
-            K.add_glow(c, cx, cy, 130, col, 0.3)
-            pygame.draw.circle(c, (30, 22, 44), (int(cx), int(cy)), int(rr))
-            pygame.draw.circle(c, col, (int(cx), int(cy)), int(rr), 6)
-            K.draw_icon(c, cx, cy, a["icon"], col, r=int(30 * k) + 1)
-            K.draw_text(c, K.ach_name(a) if hasattr(K, "ach_name") else a["name"], (cx, cy + 92), 18,
-                        (236, 232, 244), bold=True, center=True)
-
-        def draw(out):
-            self.title(out, "BAŞARIM AÇILDI!", W / 2, 130, 72, self.t - st + 0.05, None,
-                       color=GOLD, grad=((255, 250, 210), GOLD), stroke=6, slam=0.3)
-            self.title(out, "ZİRVEYE ÇIK.", W / 2, 880, 170, self.t - st + 0.35, None,
-                       grad=((255, 250, 200), (255, 170, 30)), stroke=10, glow=(255, 150, 20))
-        if self.at(st, 0.35):
-            self.sfx("impact", 0.7)
-            self.punch(0.1)
         self.ov(draw)
 
     # ------------------------------------------------------------------
@@ -1536,63 +1635,56 @@ class Trailer(K.GameTour):
             if self.snaps and i < n:
                 snap = self.snaps[int(i * len(self.snaps) / n)]
                 lt = st - i * 0.2
-                z = 1.12 - 0.12 * ease_out(lt / 0.2)
+                z = 1.08 - 0.08 * ease_out(lt / 0.2)
                 img = pygame.transform.smoothscale(snap, (int(W * z), int(H * z)))
                 out.blit(img, (-(img.get_width() - W) / 2, -(img.get_height() - H) / 2))
             else:
                 out.fill((255, 255, 255))
-        if int(st / 0.2) != int((st - 1.0 / FPS) / 0.2) or first:
+        if first or int(st / 0.2) != int((st - 1.0 / FPS) / 0.2):
             if i < n:
-                self.flash(0.09, power=0.8)
+                self.flash(0.08, power=0.7)
                 self.sfx("impact" if i % 4 == 0 else "whoosh", 0.35)
-                self.glitch(0.06)
         self.ov(draw)
         self.sh.display.canvas.fill((0, 0, 0))
 
     def _s_logo(self, st, dt, first, dur):
         c = self.sh.display.canvas
         c.fill((0, 0, 0))
-        self.zoom, self.focus = 1.0, None
         self.vig = 1.0
         if first:
             self.sfx("whoosh_down", 0.7)
         if self.at(st, 0.3):
-            self.punch(0.15)
-            self.shake(18, 0.4)
+            self.punch(0.08)
+            self.shake(14, 0.4)
             self.sfx("impact", 0.7)
             self.flash(0.2, col=(255, 220, 160), power=0.8)
-        if self.at(st, 2.5):                     # 89,0 — final vuruş
-            self.punch(0.22)
-            self.shake(30, 0.6)
+        hit = FINAL_HIT - (self.t - st)
+        if self.at(st, hit):
+            self.punch(0.12)
+            self.shake(24, 0.5)
             self.flash(0.3, power=1.0)
-            self.glitch(0.25)
         if st > 0.3:
             k = ease_out((st - 0.3) / 0.6)
-            self.rays(c, VW / 2, VH / 2 - 70, self.t, alpha=int(34 * k))
-            K.add_glow(c, VW / 2, VH / 2 - 70, 520, (230, 140, 50), 0.35 * k)
-            badge = K.brand_scaled("badge", h=150)
-            if badge is not None:
-                img = badge.copy()
-                img.set_alpha(int(255 * k))
-                c.blit(img, (VW / 2 - img.get_width() / 2, 40 + (1 - k) * -60))
+            self.rays(c, VW / 2, VH / 2 - 70, self.t, col=(170, 120, 255), alpha=int(30 * k))
+            K.add_glow(c, VW / 2, VH / 2 - 70, 520, (150, 90, 230), 0.35 * k)
 
         def draw(out):
-            self.particles(out, "embers", n=90)
+            self.particles(out, "embers", n=80)
             if st >= 0.3:
-                self.title(out, "EVOLVE", W / 2, 440, 230, self.t - st + 0.3, None,
-                           grad=((255, 252, 230), (255, 196, 80)), stroke=12, scol=(40, 16, 0),
-                           glow=(255, 150, 30), slam=0.9)
-                self.title(out, "ARENA", W / 2, 640, 230, self.t - st + 0.45, None,
-                           grad=((255, 160, 90), (210, 50, 20)), stroke=12, scol=(40, 8, 0),
-                           glow=(255, 70, 20), slam=0.9)
+                k = ease_out((st - 0.3) / 0.25)
+                sc = 1.0 + 0.5 * (1 - k)
+                logo = K.brand_scaled("logo", w=int(1250 * sc))
+                if logo is not None:
+                    img = logo.copy()
+                    img.set_alpha(int(255 * min(1.0, (st - 0.3) / 0.1)))
+                    out.blit(img, (W / 2 - img.get_width() / 2, 430 - img.get_height() / 2))
             if st >= 1.1:
-                self.title(out, "ŞİMDİ İNDİR.", W / 2, 850, 110, self.t - st + 1.1, None,
+                self.title(out, "ŞİMDİ İNDİR.", W / 2, 820, 110, self.t - st + 1.1, None,
                            color=WHITE, stroke=8, glow=(255, 255, 255), slam=0.4)
             if st >= 1.6:
-                self.title(out, "HAYATTA KALABİLECEK MİSİN?", W / 2, 965, 64, self.t - st + 1.6, None,
-                           grad=((255, 220, 200), (255, 90, 60)), stroke=6, slam=0.3,
-                           chroma=st > 2.5 and st < 2.8)
-            fade = max(0.0, (st - 3.2) / 0.3)
+                self.title(out, "HAYATTA KALABİLECEK MİSİN?", W / 2, 940, 64, self.t - st + 1.6, None,
+                           grad=((255, 220, 200), (255, 90, 60)), stroke=6, slam=0.3)
+            fade = max(0.0, (st - (dur - 0.4)) / 0.4)
             if fade > 0:
                 blk = pygame.Surface((W, H))
                 blk.fill((0, 0, 0))
@@ -1604,11 +1696,12 @@ class Trailer(K.GameTour):
 # =====================================================================
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("-o", "--out", default=os.path.join(ROOT, "evolve_arena_trailer.mp4"))
+    ap.add_argument("--game", default=GAME, help="oyun dosyası (kasma_arena13.py, EvolveArena sürümü)")
+    ap.add_argument("-o", "--out", default=os.path.join(ROOT, "trailer", "evolve_arena_trailer.mp4"))
     ap.add_argument("--stills", default="", help="virgülle saniyeler: yalnız PNG kareler yaz")
     ap.add_argument("--from", dest="t_from", type=float, default=0.0)
     ap.add_argument("--to", dest="t_to", type=float, default=LENGTH)
-    ap.add_argument("--crf", type=int, default=19)
+    ap.add_argument("--bitrate", default="4200k", help="H.264 hedef bit hızı (dosya < 100 MB kalsın)")
     ap.add_argument("--seed", type=int, default=2026)
     args = ap.parse_args()
 
@@ -1629,10 +1722,12 @@ def main():
     proc = None
     silent = os.path.join(_TMP, "video.mp4")
     if not stills:
+        os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
         proc = subprocess.Popen(
             ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24",
-             "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-", "-c:v", "libx264", "-preset", "medium",
-             "-crf", str(args.crf), "-pix_fmt", "yuv420p", silent],
+             "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-", "-c:v", "libx264", "-preset", "slow",
+             "-b:v", args.bitrate, "-maxrate", "7000k", "-bufsize", "10000k",
+             "-pix_fmt", "yuv420p", silent],
             stdin=subprocess.PIPE)
     t0 = time.time()
     still_dir = os.path.splitext(args.out)[0] + "_stills"
@@ -1646,18 +1741,19 @@ def main():
                 os.makedirs(still_dir, exist_ok=True)
                 p = os.path.join(still_dir, f"t{s:05.1f}_{tr.cur_scene}.png")
                 pygame.image.save(out, p)
-                print("kare:", p)
+                print("kare:", p, flush=True)
         if i % (FPS * 5) == 0:
             print(f"  {t:5.1f} sn  [{tr.cur_scene}]  ({time.time() - t0:.0f} sn geçti)", flush=True)
     if not proc:
         return
     proc.stdin.close()
-    proc.wait()
+    if proc.wait() != 0:
+        sys.exit("ffmpeg görüntü kodlaması başarısız")
     print("görüntü bitti, ses sentezleniyor...", flush=True)
     wav = os.path.join(_TMP, "audio.wav")
     # ses her zaman tam film zaman çizelgesinde üretilir; parça render'da
     # ilgili aralık -ss ile kesilir (müzik ve kesimler senkron kalsın)
-    A.render(list(tr.events), LENGTH, wav)
+    A.render(list(tr.events), LENGTH, wav, plan=AUDIO_PLAN)
     cmd = ["ffmpeg", "-y", "-loglevel", "error", "-i", silent, "-ss", str(args.t_from),
            "-t", str(t_end - args.t_from), "-i", wav, "-map", "0:v", "-map", "1:a",
            "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart",

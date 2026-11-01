@@ -9,16 +9,18 @@ burada üretilir.
 Tempo 120 BPM: 1 vuruş = 0,5 sn, 1 ölçü = 2 sn. Fragmanın bütün kesimleri
 vuruş ızgarasına oturur; böylece görüntü ve müzik kendiliğinden senkron.
 
-Dinamik akış (senaryoya göre):
-   0 -  8  gergin: drone + nabız + homurtular, sona doğru riser
-   8 - 38  tempolu ve agresif: 4/4 kick, clap, hi-hat, bas, arpej
-  38 - 45  kitaplar: davul düşer, tik-tak + pad, 42,5'ten itibaren riser
-  45       EVRİM: beyaz patlama -> BRAAAM + tam drop
-  45 - 65  agresif (dünyalar)
-  65 - 67,5 cehennem kapısı: "gerilim nefesi" (sessizlik + kalp atışı)
-  67,5- 75 cehennem: yarım tempo, ağır BRAAAM'ler
-  75 - 84  zafer: majör renkli dönüş
-  84 - 90  highlight + logo, 89'da final bas drop'u
+Zaman planı render(..., plan=...) ile verilir (bkz. PLAN_90 ve
+make_evolve_trailer.AUDIO_PLAN). Bölüm türleri:
+  tense   gergin: drone + boğuk nabız + homurtular
+  lite    hafif groove (menü / kayıt): kick + hi-hat + bas + arpej, clap yok
+  drive   tempolu ve agresif: 4/4 kick, clap, hi-hat, bas, arpej
+  books   davul düşer, tik-tak + pad; son 2,5 sn hızlanan yükseliş
+  breath  cehennem kapısı: "gerilim nefesi" (sessizlik + kalp atışı)
+  hell    yarım tempo, ağır kick, karanlık akorlar
+  win     zafer: majör renkli dönüş
+  final   highlight + logo, snare yükselişi
+  end     final vuruşundan sonraki kuyruk
+Yapısal vuruşlar (BRAAAM, impact, riser, kalp atışı) da plandan gelir.
 """
 import math
 import wave
@@ -308,33 +310,47 @@ PROG_HELL = [(38, (62, 65, 69)), (39, (63, 67, 70))]
 PROG_WIN = [(34, (58, 62, 65)), (36, (60, 64, 67)), (38, (62, 66, 69)), (38, (62, 66, 69))]
 
 
-def chord_at(t):
-    bar = int(t // BAR)
-    if 65.0 <= t < 75.0:
-        return PROG_HELL[bar % 2]
-    if t >= 75.0:
-        return PROG_WIN[bar % 4]
-    return PROG_MAIN[bar % 4]
+# ---------------------------------------------------------------------------
+# ZAMAN PLANI — fragmanın bölümleri ve yapısal vuruşları. Varsayılan plan ilk
+# 90 sn'lik kurgunun planıdır; make_evolve_trailer.py kendi planını verir.
+# Bölümler: tense / lite / drive / books / breath / hell / win / final / end
+# ---------------------------------------------------------------------------
+PLAN_90 = dict(
+    sections=((0.0, "tense"), (8.0, "drive"), (38.0, "books"), (45.0, "drive"),
+              (65.0, "breath"), (67.5, "hell"), (75.0, "win"), (84.0, "final"), (89.0, "end")),
+    braams=((8.0, 26, 1.0, 0.9), (45.0, 26, 1.3, 1.0), (67.5, 25, 1.1, 1.0),
+            (71.5, 25, 1.2, 0.95), (89.0, 26, 1.4, 1.0)),
+    impacts=((8.0, 0.9), (45.0, 1.0), (67.5, 1.0), (75.0, 0.6), (89.0, 1.0)),
+    risers=((5.0, 3.0, 0.55), (35.5, 2.5, 0.45), (42.5, 2.5, 0.75), (62.0, 3.0, 0.4),
+            (86.5, 2.5, 0.6)),
+    heart_fast=65.0, heart_slow=67.5,
+)
+PLAN = dict(PLAN_90)
+
+
+def sec_info(t):
+    """(bölüm adı, başlangıç, bitiş)"""
+    secs = PLAN["sections"]
+    name, st, en = secs[0][1], 0.0, 1e9
+    for i, (t0, nm) in enumerate(secs):
+        if t >= t0:
+            name, st = nm, t0
+            en = secs[i + 1][0] if i + 1 < len(secs) else 1e9
+    return name, st, en
 
 
 def _section(t):
-    if t < 8.0:
-        return "tense"
-    if t < 38.0:
-        return "drive"
-    if t < 45.0:
-        return "books"
-    if t < 65.0:
-        return "drive"
-    if t < 67.5:
-        return "breath"
-    if t < 75.0:
-        return "hell"
-    if t < 84.0:
-        return "win"
-    if t < 89.0:
-        return "final"
-    return "end"
+    return sec_info(t)[0]
+
+
+def chord_at(t):
+    bar = int(t // BAR)
+    sec = _section(t)
+    if sec in ("hell", "breath"):
+        return PROG_HELL[bar % 2]
+    if sec in ("win", "final", "end"):
+        return PROG_WIN[bar % 4]
+    return PROG_MAIN[bar % 4]
 
 
 def build_music(m, length):
@@ -347,7 +363,14 @@ def build_music(m, length):
         sec = _section(t)
         beat_i, sub = divmod(s, 4)          # vuruş, 16'lık
         in_bar = beat_i % 4
-        if sec in ("drive", "win", "final"):
+        _n, s0, s1 = sec_info(t)
+        if sec == "lite":                   # hafif groove: kick + hi-hat, clap yok
+            if sub == 0:
+                m.add("drums", t, k1, 0.7)
+                kick_times.append(t)
+            if sub == 2:
+                m.add("drums", t, hh, 0.38, pan=0.25)
+        elif sec in ("drive", "win", "final"):
             if sub == 0:
                 m.add("drums", t, k1, 0.95)
                 kick_times.append(t)
@@ -357,25 +380,26 @@ def build_music(m, length):
                 m.add("drums", t, ho if in_bar == 3 else hh, 0.5, pan=0.25)
             elif sec != "win" or sub in (1, 3):
                 m.add("drums", t, hh, 0.22, pan=-0.25)
-            if sec == "final" and t > 86.5 and sub in (1, 3):
+            if sec == "final" and t > s0 + 2.5 and sub in (1, 3):
                 m.add("drums", t, cl, 0.25)       # snare roll havası
         elif sec == "hell":
             # yarım tempo: kick 1 ve 3'te değil, ölçüde iki kez ağır
-            if sub == 0 and in_bar in (0, 2) and t >= 67.5:
+            if sub == 0 and in_bar in (0, 2):
                 m.add("drums", t, kick(1.4), 1.0)
                 kick_times.append(t)
-            if sub == 0 and in_bar == 2 and t >= 67.5:
+            if sub == 0 and in_bar == 2:
                 m.add("drums", t, cl, 0.7, verb=0.5)
-            if sub in (0, 2) and t >= 67.5:
+            if sub in (0, 2):
                 m.add("drums", t, hh, 0.18)
         elif sec == "books":
-            if t < 42.5:
+            ramp0 = s1 - 2.5
+            if t < ramp0:
                 if sub in (0, 2):
                     m.add("drums", t, tk, 0.6 if sub == 0 else 0.35, pan=0.3 if sub else -0.3)
-            else:                           # 42,5 - 45: hızlanan tik-tak (yükseliş)
-                m.add("drums", t, tk, 0.5 + 0.4 * (t - 42.5) / 2.5)
+            else:                           # son 2,5 sn: hızlanan tik-tak (yükseliş)
+                m.add("drums", t, tk, 0.5 + 0.4 * (t - ramp0) / 2.5)
                 if sub == 0:
-                    m.add("drums", t, kick(0.7), 0.45 + 0.4 * (t - 42.5) / 2.5)
+                    m.add("drums", t, kick(0.7), 0.45 + 0.4 * (t - ramp0) / 2.5)
         elif sec == "tense":
             if sub == 0:                    # boğuk nabız
                 g = 0.25 + 0.35 * t / 8.0
@@ -398,30 +422,29 @@ def build_music(m, length):
                 for det in (-0.08, 0.08):
                     pad += band_saw(midi(nm + det - 12), tt, cut, harmonics=24)
             pe = np.clip(tt / 0.35, 0, 1) * np.clip((BAR - tt) / 0.3, 0, 1)
-            g = {"tense": 0.05, "books": 0.11, "breath": 0.04, "hell": 0.08, "win": 0.1}.get(sec, 0.07)
+            g = {"tense": 0.05, "books": 0.11, "breath": 0.04, "hell": 0.08, "win": 0.1,
+                 "lite": 0.08}.get(sec, 0.07)
             m.add("music", t0, pad * pe, g, verb=0.6)
         # BAS: 8'likler, sidechain zarfıyla kick'e yer açar
-        if sec in ("drive", "win", "final", "hell"):
+        if sec in ("drive", "win", "final", "hell", "lite"):
             for e8 in range(8):
                 t = t0 + e8 * BEAT / 2
-                if sec == "hell" and t < 67.5:
-                    continue
                 d = BEAT / 2
                 tb = tvec(d)
                 f = midi(root - (12 if sec == "hell" else 0))
-                if sec == "drive" and e8 % 2 == 1:
+                if sec in ("drive", "lite") and e8 % 2 == 1:
                     f *= 2
                 x = (band_saw(f, tb, 420 + 500 * np.exp(-tb * 18), harmonics=24) * 0.8
                      + np.sin(2 * np.pi * f * tb) * 0.6)
                 x *= np.clip(tb / 0.004, 0, 1) * np.clip((d - tb) / 0.01, 0, 1)
-                m.add("music", t, np.tanh(x * 1.6), 0.33)
+                m.add("music", t, np.tanh(x * 1.6), 0.24 if sec == "lite" else 0.33)
         elif sec == "tense":
             tb = tvec(BAR)
             drone = np.sin(2 * np.pi * midi(26) * tb) + 0.4 * band_saw(midi(26), tb, 220, 12)
             m.add("music", t0, drone * np.clip(tb / 0.2, 0, 1) * np.clip((BAR - tb) / 0.2, 0, 1),
                   0.25 + 0.1 * t0 / 8.0)
         # ARPEJ: 16'lık kare dalga, akor tonlarında
-        if sec in ("drive", "win", "final") or (sec == "books" and t0 >= 38.0):
+        if sec in ("drive", "win", "final", "books", "lite"):
             notes = [ch[0] + 12, ch[1] + 12, ch[2] + 12, ch[1] + 24, ch[2] + 12, ch[0] + 24,
                      ch[1] + 12, ch[2] + 24]
             stepd = BEAT / 4 if sec != "books" else BEAT / 2
@@ -433,7 +456,7 @@ def build_music(m, length):
                 ta = tvec(d)
                 x = square(midi(nt), ta, 0.3) * np.exp(-ta * (14 if sec != "books" else 6))
                 x = filt(x, "lowpass", 2600 if sec != "books" else 1600)
-                m.add("music", t, x, 0.07 if sec != "win" else 0.085,
+                m.add("music", t, x, {"win": 0.085, "lite": 0.06}.get(sec, 0.07),
                       pan=0.35 if i % 2 else -0.35, verb=0.35)
     return kick_times
 
@@ -465,30 +488,30 @@ SFX = {
     "impact": lambda: impact(1.0), "impact_big": lambda: impact(1.5), "whoosh": whoosh,
     "whoosh_down": lambda: whoosh(0.5, False), "shing": shing, "growl": growl,
     "heartbeat": heartbeat, "coin": coin, "crit": crit_ding, "glitch": glitch,
-    "bonk": bonk_hit, "levelup": level_up,
+    "bonk": bonk_hit, "levelup": level_up, "click": lambda: tick() * 1.6,
 }
 
 
-def render(events, length, path):
+def render(events, length, path, plan=None):
     """events: [(t, ad, kazanç)] — sahnelerin istediği SFX'ler.
-    Müzik yapısı yukarıdaki bölümlerden kendiliğinden kurulur."""
+    plan: bölümler ve yapısal vuruşlar (yoksa PLAN_90)."""
+    PLAN.clear()
+    PLAN.update(PLAN_90 if plan is None else plan)
     m = Mix(length)
     kick_times = build_music(m, length)
     # ---- yapısal vuruşlar (senaryo) ----
-    m.add("sfx", 5.0, riser(3.0), 0.55)
-    for t, root, br, g in ((8.0, 26, 1.0, 0.9), (45.0, 26, 1.3, 1.0), (67.5, 25, 1.1, 1.0),
-                           (71.5, 25, 1.2, 0.95), (89.0, 26, 1.4, 1.0)):
+    for t, root, br, g in PLAN["braams"]:
         m.add("sfx", t, braaam(root, 3.4, br), g * 0.75, verb=0.4)
-    for t, g in ((8.0, 0.9), (45.0, 1.0), (67.5, 1.0), (75.0, 0.6), (89.0, 1.0)):
+    for t, g in PLAN["impacts"]:
         m.add("sfx", t, impact(1.4), g)
-    m.add("sfx", 35.5, riser(2.5), 0.45)
-    m.add("sfx", 42.5, riser(2.5), 0.75)
-    m.add("sfx", 62.0, riser(3.0), 0.4)
-    m.add("sfx", 86.5, riser(2.5), 0.6)
-    for i in range(4):                          # cehennem kapısı: kalp atışları
-        m.add("sfx", 65.0 + i * 0.62, heartbeat(), 0.85)
-    for i in range(8):
-        m.add("sfx", 67.5 + i * 0.95, heartbeat(), 0.35)
+    for t, d, g in PLAN["risers"]:
+        m.add("sfx", t, riser(d), g)
+    if PLAN.get("heart_fast") is not None:      # cehennem kapısı: kalp atışları
+        for i in range(4):
+            m.add("sfx", PLAN["heart_fast"] + i * 0.62, heartbeat(), 0.85)
+    if PLAN.get("heart_slow") is not None:
+        for i in range(8):
+            m.add("sfx", PLAN["heart_slow"] + i * 0.95, heartbeat(), 0.35)
     for t, name, g in events:
         gen = SFX.get(name)
         if gen is None or t < 0 or t > length:
