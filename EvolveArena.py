@@ -22991,6 +22991,21 @@ class Chakram(_NwObj):
             self.y += math.sin(self.ang) * self.SPEED * dt
             self.travel += self.SPEED * dt
             if self.travel >= self.range or not ARENA_RECT.collidepoint(self.x, self.y):
+                # II kanlı ay: dönmeden önce en yakın vurulmamış yaratığa sekip keser
+                if ev >= 2 and getattr(self, "bounces", 0) < 2:
+                    nxt = None
+                    bd = 340.0
+                    for e in run._all_targets():
+                        if e.alive and id(e) not in self.hits:
+                            d_ = dist(e.x, e.y, self.x, self.y)
+                            if d_ < bd:
+                                nxt, bd = e, d_
+                    if nxt is not None:
+                        self.bounces = getattr(self, "bounces", 0) + 1
+                        self.ang = math.atan2(nxt.y - self.y, nxt.x - self.x)
+                        self.travel = self.range - bd - 40
+                        run.fx.ring(self.x, self.y, (240, 90, 110), n=10, speed=160, life=0.3, r=2.6)
+                        return
                 self.back = True
                 self.hits = set()
                 if ev >= 3:
@@ -23105,12 +23120,24 @@ class Boulder(_NwObj):
         sp = math.hypot(self.vx, self.vy)
         self.rot += sp * dt / max(8.0, self.r)
         A = ARENA_RECT
+        bounced = False
         if self.x < A.left + self.r or self.x > A.right - self.r:
             self.vx = -self.vx
             self.x = clamp(self.x, A.left + self.r, A.right - self.r)
+            bounced = True
         if self.y < A.top + self.r or self.y > A.bottom - self.r:
             self.vy = -self.vy
             self.y = clamp(self.y, A.top + self.r, A.bottom - self.r)
+            bounced = True
+        if ev >= 1 and int(self.t * 10) % 3 == 0:
+            # evrilmiş kaya arkasında kızgın taş tozu bırakır
+            run.fx.spark(self.x, self.y + self.r * 0.5, (255, 150, 60) if ev >= 3 else (230, 200, 150),
+                         random.uniform(-40, 40), random.uniform(-60, -20), 0.5, 3.2)
+        if bounced and ev >= 1:
+            run.fx.shockwave(self.x, self.y, self.r * 3, self.col(BOULDER_COLOR), 0.3, 5)
+            for e in run._all_targets():
+                if e.alive and dist(e.x, e.y, self.x, self.y) < self.r * 3:
+                    run._weapon_hit(e, self.dmg * 0.6, kb=200, wlvl=self.lvl)
         now = run.run_time
         rr = self.r * (1.15 if ev >= 1 else 1.0)
         for e in run._all_targets():
@@ -23188,6 +23215,10 @@ class RuneTrap(_NwObj):
             if e.alive and dist(e.x, e.y, self.x, self.y) < self.radius + getattr(e, "radius", 12):
                 run._weapon_hit(e, self.dmg, kb=130, wlvl=self.lvl)
         sfx("explosion", 0.28, 0.12)
+        if ev >= 1:
+            # evrilmiş rün patlayınca yerde 2 sn yanan / donduran rün alanı kalır
+            self.field_t = 2.0
+            self.field_tick = 0.0
         if ev >= 3 and not self.chain:
             # III rün zinciri: patlama çevresinde üç küçük rünü tetikler
             for i in range(3):
@@ -23201,10 +23232,23 @@ class RuneTrap(_NwObj):
                 run.nw_objs.append(r2)
 
     def update(self, dt, run):
-        self.tier(run)
+        ev = self.tier(run)
         if self.boom_t >= 0:
             self.boom_t += dt
-            if self.boom_t > 0.3:
+            ft = getattr(self, "field_t", 0.0)
+            if ft > 0:
+                self.field_t = ft - dt
+                self.field_tick = getattr(self, "field_tick", 0.0) - dt
+                if self.field_tick <= 0:
+                    self.field_tick = 0.4
+                    for e in run._all_targets():
+                        if e.alive and dist(e.x, e.y, self.x, self.y) < self.radius * 0.85:
+                            run._field_damage(e, self.dmg * 0.22, wlvl=self.lvl)
+                            if ev == 2:
+                                freeze_enemy(e, 0.5, run)
+                            elif hasattr(e, "apply_burn"):
+                                e.apply_burn(self.dmg * 0.06, 1.2)
+            if self.boom_t > 0.3 and getattr(self, "field_t", 0.0) <= 0:
                 self.alive = False
             return
         self.t += dt
@@ -23225,8 +23269,25 @@ class RuneTrap(_NwObj):
         col = self.col(RUNE_COLOR)
         x, y = self.x, self.y
         if self.boom_t >= 0:
-            k = self.boom_t / 0.3
-            add_glow(surf, x, y, self.radius * (0.6 + 0.6 * k), col, 0.6 * (1 - k))
+            k = min(1.0, self.boom_t / 0.3)
+            if k < 1.0:
+                add_glow(surf, x, y, self.radius * (0.6 + 0.6 * k), col, 0.6 * (1 - k))
+                for i in range(6):
+                    # rün sütunları: patlamada yükselen yazıt ışınları
+                    a = self.seed + i * math.tau / 6
+                    bx_, by_ = x + math.cos(a) * self.radius * 0.6, y + math.sin(a) * self.radius * 0.45
+                    thick_line(surf, (bx_, by_), (bx_, by_ - 70 * (1 - k)), 4 * (1 - k) + 1, lighten(col, 0.3))
+            ft = getattr(self, "field_t", 0.0)
+            if ft > 0:
+                fk = min(1.0, ft / 0.5)
+                rot = t * 1.6 + self.seed
+                ring_aa(surf, x, y, self.radius * 0.85, scale_col(col, 0.4 + 0.6 * fk), 2)
+                ring_aa(surf, x, y, self.radius * 0.60, scale_col(col, 0.3 + 0.5 * fk), 1)
+                pts = [(x + math.cos(rot + i * math.tau / 5 * 2) * self.radius * 0.6,
+                        y + math.sin(rot + i * math.tau / 5 * 2) * self.radius * 0.6) for i in range(6)]
+                for a_, b_ in zip(pts, pts[1:]):
+                    thick_line(surf, a_, b_, 1.6, scale_col(col, 0.5 + 0.5 * fk))
+                add_glow(surf, x, y, self.radius * 0.9, col, 0.18 * fk)
             return
         armed = self.t >= self.ARM
         pulse = 0.5 + 0.5 * math.sin(t * 6 + self.seed)
@@ -23372,7 +23433,18 @@ class Scarab(_NwObj):
                 if died and ev >= 3 and random.random() < 0.30:
                     # III firavun hazinesi: öldürdüğü yaratıktan fazladan altın
                     run.drop_pickup(e.x, e.y, "coin", max(1.0, getattr(e, "coin", 1.0)))
-        sfx("explosion", 0.22, 0.15)
+        sfx("explosion", 0.22 if not getattr(self, "giant", False) else 0.6, 0.15)
+        if getattr(self, "giant", False):
+            run.fx.shake(6, 0.2)
+            run.fx.burst(self.x, self.y, (255, 236, 150), n=26, speed=300, life=0.6, r=4)
+        if ev >= 2 and not getattr(self, "child", False) and not getattr(self, "giant", False):
+            # II güneş böceği: patlayınca iki yavru böcek doğar
+            for k_ in (-1, 1):
+                c_ = Scarab(run.player, self.ang + k_ * 1.2, self.dmg * 0.5, self.lvl, self.radius * 0.7)
+                c_.x, c_.y = self.x, self.y
+                c_.child = True
+                c_.life = 2.0
+                run.nw_objs.append(c_)
 
     def update(self, dt, run):
         self.tier(run)
@@ -23416,7 +23488,7 @@ class Scarab(_NwObj):
         ca, sa = math.cos(self.ang), math.sin(self.ang)
         nx, ny = -sa, ca
 
-        S = 1.5
+        S = 1.5 * (2.0 if getattr(self, "giant", False) else (0.75 if getattr(self, "child", False) else 1.0))
 
         def P(f, s_):
             return (x + (ca * f + nx * s_) * S, y + (sa * f + ny * s_) * S)
@@ -23433,6 +23505,124 @@ class Scarab(_NwObj):
         circle_aa(surf, *P(10, 0), 3.6, (70, 46, 14))
         if self.evo >= 3:
             _sparkle(surf, *P(-2, 0), 6 + 2 * math.sin(t * 9), (255, 250, 210))
+
+
+# 5. paket evrimleri sıkıcı ve zayıf kalıyordu: her kademe ek hasar çarpanı
+# (EVO_TIER_MULT'un üstüne) ve kendi yeni mekaniğini alır.
+NW_EVO_BONUS = (1.0, 1.20, 1.45, 1.75)
+
+
+def _nw_dmg(p, key, dmg):
+    ev = evo_tier(p, key) if EVO_ON else 0
+    return dmg * NW_EVO_BONUS[min(3, ev)], ev
+
+
+class MoonOrbit(_NwObj):
+    """Ay Çarkı III (Dolunay): oyuncunun çevresinde sürekli dönen dev dolunay."""
+    key = "chakram"
+
+    def __init__(self, p, dmg, lvl):
+        self.p = p
+        self.dmg = dmg
+        self.lvl = lvl
+        self.ang = random.uniform(0, math.tau)
+        self.x, self.y = p.x, p.y
+        self.alive = True
+        self.hit_t = {}
+        self.evo = 3
+
+    def update(self, dt, run):
+        p = self.p
+        if evo_tier(p, "chakram") < 3 or p.weapons.get("chakram", 0) <= 0 or not p.alive:
+            self.alive = False
+            return
+        self.ang += dt * 2.4
+        R = 150.0
+        self.x, self.y = p.x + math.cos(self.ang) * R, p.y + math.sin(self.ang) * R
+        now = run.run_time
+        for e in run._all_targets():
+            if not e.alive or dist(e.x, e.y, self.x, self.y) > 34 + getattr(e, "radius", 12):
+                continue
+            if self.hit_t.get(id(e), -9.0) > now:
+                continue
+            self.hit_t[id(e)] = now + 0.45
+            run._weapon_hit(e, self.dmg * 0.8, kb=110, wlvl=self.lvl)
+            run.fx.spark(e.x, e.y, CHAKRAM_COLOR2, 0, -40, 0.25, 3.0)
+
+    def draw(self, surf, t):
+        x, y = self.x, self.y
+        add_glow(surf, x, y, 78, (220, 230, 255), 0.55)
+        circle_aa(surf, x, y, 30, (40, 44, 80))
+        circle_aa(surf, x, y, 27, (236, 240, 255))
+        for cx_, cy_, rr in ((-8, -6, 6), (9, 5, 5), (-3, 11, 4), (10, -10, 3)):
+            circle_aa(surf, x + cx_, y + cy_, rr, (200, 208, 236))
+        for i in range(10):
+            a = -t * 2.0 + i * math.tau / 10
+            _sparkle(surf, x + math.cos(a) * 40, y + math.sin(a) * 40, 4 + 2 * math.sin(t * 6 + i), CHAKRAM_COLOR2)
+
+
+class TreeOfLife(_NwObj):
+    """Sarmaşık III (Yaşam Ağacı): yere kök salan ağaç - dikenli tohum fırlatır,
+    yakınındaki oyuncuyu iyileştirir."""
+    key = "vines"
+    LIFE = 9.0
+
+    def __init__(self, x, y, dmg, lvl):
+        self.x, self.y = x, y
+        self.dmg = dmg
+        self.lvl = lvl
+        self.t = 0.0
+        self.cd = 0.0
+        self.alive = True
+        self.evo = 3
+        self.shots = []      # [x, y, vx, vy, life]
+
+    def update(self, dt, run):
+        self.t += dt
+        if self.t > self.LIFE:
+            self.alive = False
+            return
+        p = run.player
+        if dist(p.x, p.y, self.x, self.y) < 170:
+            p.heal(p.max_hp * 0.012 * dt)
+        self.cd -= dt
+        if self.cd <= 0:
+            self.cd = 0.28
+            tg = [e for e in run._all_targets() if e.alive and dist(e.x, e.y, self.x, self.y) < 520]
+            if tg:
+                e = random.choice(tg)
+                a = math.atan2(e.y - (self.y - 40), e.x - self.x)
+                self.shots.append([self.x, self.y - 40, math.cos(a) * 520, math.sin(a) * 520, 1.2])
+        for sh in self.shots:
+            sh[0] += sh[2] * dt
+            sh[1] += sh[3] * dt
+            sh[4] -= dt
+            for e in run._all_targets():
+                if e.alive and dist(e.x, e.y, sh[0], sh[1]) < 12 + getattr(e, "radius", 12):
+                    run._weapon_hit(e, self.dmg * 0.55, kb=50, wlvl=self.lvl)
+                    sh[4] = -1
+                    break
+        self.shots = [sh for sh in self.shots if sh[4] > 0]
+
+    def draw(self, surf, t):
+        x, y = self.x, self.y
+        k = clamp(min(self.t / 0.4, (self.LIFE - self.t) / 0.5), 0.0, 1.0)
+        add_glow(surf, x, y - 30, 110 * k, (150, 255, 120), 0.35)
+        ring_aa(surf, x, y, 170 * k, (120, 220, 110), 1)
+        surf.blit(shadow_sprite(int(70 * k) + 6), (int(x - 35 * k), int(y + 4)))
+        thick_line(surf, (x, y + 6), (x, y - 40 * k), 12 * k + 1, (96, 64, 40))
+        for s_ in (-1, 1):
+            thick_line(surf, (x, y - 22 * k), (x + s_ * 24 * k, y - 46 * k), 6 * k + 1, (96, 64, 40))
+        sw = math.sin(t * 2.0) * 3
+        for cx_, cy_, rr in ((0, -66, 30), (-26, -50, 22), (26, -50, 22), (-12, -84, 18), (14, -84, 18)):
+            circle_aa(surf, x + cx_ * k + sw, y + cy_ * k, rr * k + 1, (70, 160, 70))
+            circle_aa(surf, x + cx_ * k + sw - 4 * k, y + cy_ * k - 4 * k, rr * 0.6 * k + 1, (130, 220, 110))
+        for i in range(5):
+            a = i * 1.3 + t * 0.4
+            circle_aa(surf, x + math.cos(a) * 26 * k + sw, y - 66 * k + math.sin(a) * 18 * k, 3.5 * k + 0.5, (240, 90, 120))
+        for sh in self.shots:
+            thick_line(surf, (sh[0], sh[1]), (sh[0] - sh[2] * 0.03, sh[1] - sh[3] * 0.03), 3, (120, 230, 90))
+            circle_aa(surf, sh[0], sh[1], 3, (230, 255, 200))
 
 
 def _nw_spread(base, n, gap):
@@ -23454,9 +23644,13 @@ def _nw_aims(p, targets, n):
 
 def _fire_chakram(run, w, lvl, dmg, targets):
     p = run.player
-    ev = evo_tier(p, "chakram") if EVO_ON else 0
-    n = chakram_count(lvl) + (2 if ev >= 3 else 0)
-    size = 1.0 + 0.012 * weapon_growth(lvl)
+    dmg, ev = _nw_dmg(p, "chakram", dmg)
+    n = chakram_count(lvl) + (1 if ev >= 1 else 0) + (1 if ev >= 3 else 0)
+    size = (1.0 + 0.012 * weapon_growth(lvl)) * (1.0 + 0.12 * ev)
+    if ev >= 3 and not any(isinstance(o, MoonOrbit) for o in run.nw_objs):
+        mo = MoonOrbit(p, dmg, lvl)
+        mo._wsrc = "chakram"
+        run.nw_objs.append(mo)
     for a in _nw_aims(p, targets, n):
         run.nw_objs.append(Chakram(p, a, dmg, lvl, size))
     sfx("whip", 0.25, 0.1)
@@ -23464,17 +23658,20 @@ def _fire_chakram(run, w, lvl, dmg, targets):
 
 def _fire_boulder(run, w, lvl, dmg, targets):
     p = run.player
+    dmg, ev = _nw_dmg(p, "boulder", dmg)
     near = min(targets, key=lambda e: (e.x - p.x) ** 2 + (e.y - p.y) ** 2)
     base = math.atan2(near.y - p.y, near.x - p.x)
     for a in _nw_spread(base, boulder_count(lvl), 0.42):
-        run.nw_objs.append(Boulder(p.x + math.cos(a) * 30, p.y + math.sin(a) * 30, a, dmg, lvl, boulder_size(lvl)))
+        run.nw_objs.append(Boulder(p.x + math.cos(a) * 30, p.y + math.sin(a) * 30, a, dmg, lvl,
+                                   boulder_size(lvl) * (1.0 + 0.15 * ev)))
     sfx("bonk", 0.3, 0.1)
 
 
 def _fire_runes(run, w, lvl, dmg, targets):
     p = run.player
+    dmg, ev = _nw_dmg(p, "runes", dmg)
     mine = [o for o in run.nw_objs if isinstance(o, RuneTrap) and not o.chain and o.boom_t < 0]
-    room = rune_max(lvl) - len(mine)
+    room = rune_max(lvl) + (2 if ev >= 2 else 0) - len(mine)
     if room <= 0:
         return
     near = sorted(targets, key=lambda e: (e.x - p.x) ** 2 + (e.y - p.y) ** 2)[:8]
@@ -23491,24 +23688,39 @@ def _fire_runes(run, w, lvl, dmg, targets):
         y += random.uniform(-25, 25)
         x = clamp(x, ARENA_RECT.left + 30, ARENA_RECT.right - 30)
         y = clamp(y, ARENA_RECT.top + 30, ARENA_RECT.bottom - 30)
-        run.nw_objs.append(RuneTrap(x, y, dmg, lvl, rune_radius(lvl)))
+        run.nw_objs.append(RuneTrap(x, y, dmg, lvl, rune_radius(lvl) * (1.0 + 0.12 * ev)))
     run.fx.ring(p.x, p.y, RUNE_COLOR, n=8, speed=120, life=0.25, r=2)
 
 
 def _fire_vines(run, w, lvl, dmg, targets):
     p = run.player
-    ev = evo_tier(p, "vines") if EVO_ON else 0
+    dmg, ev = _nw_dmg(p, "vines", dmg)
+    if ev >= 3 and not any(isinstance(o, TreeOfLife) for o in run.nw_objs):
+        a = random.uniform(0, math.tau)
+        tr = TreeOfLife(clamp(p.x + math.cos(a) * 90, ARENA_RECT.left + 60, ARENA_RECT.right - 60),
+                        clamp(p.y + math.sin(a) * 90, ARENA_RECT.top + 90, ARENA_RECT.bottom - 60), dmg, lvl)
+        tr._wsrc = "vines"
+        run.nw_objs.append(tr)
     for a in _nw_aims(p, targets, vine_count(lvl) + (1 if ev >= 3 else 0)):
         run.nw_objs.append(VineLash(p, a, dmg, lvl, vine_len(lvl)))
 
 
 def _fire_scarab(run, w, lvl, dmg, targets):
     p = run.player
-    ev = evo_tier(p, "scarab") if EVO_ON else 0
+    dmg, ev = _nw_dmg(p, "scarab", dmg)
     n = scarab_count(lvl) + (2 if ev >= 3 else 0)
     base = random.uniform(0, math.tau)
     for i in range(n):
         run.nw_objs.append(Scarab(p, base + i * math.tau / n, dmg, lvl, scarab_radius(lvl)))
+    if ev >= 3:
+        # III firavun: her atışta dev altın bokböceği (3 kat patlama)
+        cnt = run.__dict__.get("_scarab_n", 0) + 1
+        run.__dict__["_scarab_n"] = cnt
+        if cnt % 2 == 0:
+            g = Scarab(p, base + math.pi, dmg * 3.0, lvl, scarab_radius(lvl) * 2.2)
+            g.giant = True
+            g.SPEED = 220.0
+            run.nw_objs.append(g)
     run.fx.burst(p.x, p.y + 10, (220, 180, 100), n=8, speed=120, life=0.4, r=3)
 
 
