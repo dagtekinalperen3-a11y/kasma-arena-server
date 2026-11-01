@@ -2796,8 +2796,11 @@ def add_score():
         # dünya sıralaması yalnızca Taş Meydan'da (öbür haritaların kuralları
         # skoru kolaylaştırıyor); öbür koşular oyuncunun geçmişinde durur
         payload["ranked"] = (mp == "stone")
-        if rid or flags:
+        acn = _clean_text(data.get("acn"), 60) if data.get("acn") else ""
+        if rid or flags or acn:
             det = dict(payload.get("details") or {"v": 1})
+            if acn:
+                det["acn"] = acn          # oyunun yerel sezgi notu (sıralamayı etkilemez)
             if rid:
                 det["rid"] = rid
             if flags:

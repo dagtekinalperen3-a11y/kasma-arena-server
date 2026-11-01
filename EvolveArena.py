@@ -16389,6 +16389,12 @@ import types as _ac_types
 #    sayılmaz. İmzasız-DLL sezgisi (yayın bindirmeleri yüzünden yanlış alarm
 #    riski) tamamen kaldırıldı; yalnız adıyla bilinen hile programları sayılır.
 _AC_ENFORCE_INJECTION = True
+# Kod / DLL / yama SEZGİLERİ koşuyu geçersiz kılmaz (3.51): Windows'ta yayın
+# bindirmeleri, paketleyiciler ve sürücüler yanlış alarm verip dürüst oyuncunun
+# koşusunu "doğrulanamadı" yapıyordu. Sezgi yalnız kayda geçer (ac_log.txt +
+# skor gönderisinde not); asıl karar sunucudaki koşu bileti / nabız zincirinde.
+# Kanıtlı denetimler (bellek mührü, hız hilesi) aynen işler.
+_AC_VOID_KOD = False
 _AC_MAIN_TID = _ac_thread.get_ident()
 _AC_TID = _ac_thread.get_ident
 _AC_GETFRAME = sys._getframe
@@ -16398,10 +16404,29 @@ _AC_ON = [False]              # modül tamamen yüklenince açılır
 _AC_STATE = {"taint": "", "tool": "", "snap": None, "mods": set(), "reported": False}
 
 
+def _ac_note(txt):
+    """Sezgi bulgusunu kayda geçirir (koşuyu bozmaz). Aynı bulgu bir kez yazılır."""
+    try:
+        txt = str(txt)[:80]
+        if _AC_STATE.get("note") == txt:
+            return
+        if not _AC_STATE.get("note"):
+            _AC_STATE["note"] = txt
+        seen = _AC_STATE.setdefault("noted", set())
+        if txt in seen or len(seen) > 20:
+            return
+        seen.add(txt)
+        with open(os.path.join(get_save_dir(), "ac_log.txt"), "a", encoding="utf-8") as f_:
+            f_.write("%s  %s\n" % (time.strftime("%Y-%m-%d %H:%M:%S"), txt))
+    except Exception:
+        pass
+
+
 def _ac_hit(kind, field, value=""):
     if len(_AC_HITS) < 8:
         _AC_HITS.append((kind, str(field)[:40], str(value)[:40]))
-    if _AC_ENFORCE_INJECTION and not _AC_STATE.get("taint"):
+    _ac_note("%s:%s:%s" % (kind, field, value))
+    if _AC_VOID_KOD and not _AC_STATE.get("taint"):
         _AC_STATE["taint"] = "%s:%s" % (kind, field)
 
 
@@ -16452,7 +16477,8 @@ def _ac_audit_factory():
                 list.append(priv, h)
             if len(pub) < 8:
                 list.append(pub, h)
-            if _AC_ENFORCE_INJECTION and not state.get("taint"):
+            _ac_note("%s:%s" % (h[0], h[1]))
+            if _AC_VOID_KOD and not state.get("taint"):
                 state["taint"] = "%s:%s" % (h[0], h[1])
 
     hits = _Hits()
@@ -16888,7 +16914,8 @@ def _ac_mod_loop():
 def ac_note_hit(hit):
     """Kesin bulgu kaydı. Enjeksiyon katmanları tespit modundayken yalnızca
     günlüğe yazar (ban/engel yok)."""
-    if _AC_ENFORCE_INJECTION and not _AC_STATE.get("taint"):
+    _ac_note("%s:%s" % (hit[0], hit[1]))
+    if _AC_VOID_KOD and not _AC_STATE.get("taint"):
         _AC_STATE["taint"] = "%s:%s" % (hit[0], hit[1])
     _AC_STATE["reported"] = True
 
@@ -40509,8 +40536,8 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
 
     def run_is_clean(self):
         """Bu koşu sıralamalara yazılabilir mi?"""
-        if _AC_ENFORCE_INJECTION and (getattr(self, "ac_tool", "") or getattr(self, "ac_void", "")
-                                      or _AC_STATE.get("taint")):
+        if _AC_ENFORCE_INJECTION and (getattr(self, "ac_tool", "") or (_AC_VOID_KOD and (
+                getattr(self, "ac_void", "") or _AC_STATE.get("taint")))):
             return False
         return not self.cheat_flag and not getattr(self, "ac_flag", "")
 
@@ -40555,6 +40582,10 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
             except Exception as e:
                 print("hile bildirimi:", repr(e))
         else:
+            if not _AC_VOID_KOD:
+                # sezgi: koşu sürer ve geçerlidir, yalnız kayda geçer
+                _ac_note("%s:%s:%s" % (kind, field, str(value)[:30]))
+                return
             # enjeksiyon: koşuyu geçersiz kıl (sıralamaya gitmez) ama BAN YOK
             if not getattr(self, "ac_void", ""):
                 self.ac_void = "%s:%s" % (kind, field)
@@ -63078,7 +63109,7 @@ class App:
             return L("ui.taint_prefix", self.save.taint_text())
         if self.save.is_board_banned():
             return L("ui.banned_title")
-        if _AC_ENFORCE_INJECTION and _AC_STATE.get("taint"):
+        if _AC_VOID_KOD and _AC_STATE.get("taint"):
             return L("ui.ac_banned_sub")
         if _AC_ENFORCE_INJECTION and self.run is not None and getattr(self.run, "ac_tool", ""):
             return L("ui.ac_tool", self.run.ac_tool)
@@ -63221,6 +63252,8 @@ class App:
         _tk = self._run_ticket_final()
         if _tk:
             payload["ticket"] = _tk
+        if _AC_STATE.get("note"):
+            payload["acn"] = str(_AC_STATE["note"])[:60]      # sezgi notu (yönetici görür)
         self.online.submit_score_async(payload, on_done=on_done)
 
     def _gameover_backdrop(self, r):
