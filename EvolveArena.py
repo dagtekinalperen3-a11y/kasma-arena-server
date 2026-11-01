@@ -33504,6 +33504,7 @@ ARMY_GOLD = 1000
 ARMY_LEVELS = 3
 ARMY_CHEST_TIER = 3             # epik sandık
 GRAVE_COUNT = 15
+GRAVE_COUNT_HELL = 10           # cehenneme geçişte 10 mezarlık daha (aynı kural: her biri +%7,5)
 GRAVE_COLOR = (150, 200, 120)
 GRAVE_R = 70.0
 GRAVE_STEP = 0.075              # her mezarlık zorluğu %7,5 artırır
@@ -37063,6 +37064,17 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
         # zemini burada (geçiş parlamasının altında) hazırlanır.
         _FLOOR_CACHE.pop("arena", None)
         floor_surface("hell")
+
+        # cehennem mezarlıkları: arenadakilerle aynı oyun kuralı (oyuncu açar,
+        # zorluk ve kazanç birlikte artar) - oyunun kendi sayacı, koşu
+        # denetimine takılacak hiçbir değer dışarıdan yazılmaz.
+        if self.relics_active():
+            rnd = random.Random()
+            placed = [(p.x, p.y)]
+            for _ in range(GRAVE_COUNT_HELL):
+                gx, gy = self._relic_spot(500, max(ARENA_RECT.w, ARENA_RECT.h), placed, anywhere=True)
+                placed.append((gx, gy))
+                self.graves.append(Graveyard(gx, gy, rnd.random()))
 
         self.fx.do_flash(HELL_PORTAL_COLOR, 0.9)
         self.fx.shake(18, 0.7)
@@ -44569,7 +44581,8 @@ def player_stat_groups(p, run):
     if run is not None and hasattr(run, "grave_n"):
         # mezarlıklar: açılan sayı ve toplam zorluk artışı
         _gn = int(getattr(run, "grave_n", 0) or 0)
-        kazanc.append((L("st.graves"), "+%s  (%d/%d)" % (fmt_pct1(GRAVE_STEP * _gn), _gn, GRAVE_COUNT),
+        kazanc.append((L("st.graves"), "+%s  (%d/%d)" % (fmt_pct1(GRAVE_STEP * _gn), _gn,
+                                                         GRAVE_COUNT + (GRAVE_COUNT_HELL if getattr(run, "biome", "") == "hell" else 0)),
                        GRAVE_COLOR if _gn else TEXT_DIM))
     if getattr(p, "ice_book", 0) > 0:
         hasar.append((L("bs.ice"), fmt_book_stat(ice_freeze_time(p.ice_book), "sec"), (150, 220, 255)))
