@@ -2110,6 +2110,13 @@ STRINGS = {
     "fx.no_camping":  _T("KÖŞEDE SAKLANMAK YOK! YARATIKLAR ÇEVRENDE DOĞUYOR", "NO CORNER CAMPING! ENEMIES SPAWN AROUND YOU",
                          "¡NADA DE ESCONDERSE! LOS ENEMIGOS APARECEN CERCA", "KEIN CAMPEN! GEGNER ERSCHEINEN UM DICH",
                          "НЕ ПРЯЧЬСЯ! ВРАГИ ПОЯВЛЯЮТСЯ РЯДОМ"),
+    "fx.corner_curse": _T("KÖŞE LANETİ! İYİLEŞME YOK, SKOR YOK - ORTAYA ÇIK!",
+                          "CORNER CURSE! NO HEALING, NO SCORE - GET OUT!",
+                          "¡MALDICIÓN DE ESQUINA! SIN CURACIÓN NI PUNTOS - ¡SAL!",
+                          "ECKENFLUCH! KEINE HEILUNG, KEINE PUNKTE - RAUS!",
+                          "ПРОКЛЯТИЕ УГЛА! НИ ЛЕЧЕНИЯ, НИ ОЧКОВ - ВЫХОДИ!"),
+    "fx.corner_warn":  _T("KÖŞEDEN ÇIK: {0}", "LEAVE THE CORNER: {0}", "SAL DE LA ESQUINA: {0}",
+                          "RAUS AUS DER ECKE: {0}", "УЙДИ ИЗ УГЛА: {0}"),
     "fx.keys_new":    _T("HARİTADA BİR ANAHTAR BELİRDİ", "A KEY APPEARED ON THE MAP", "APARECIÓ UNA LLAVE", "EIN SCHLÜSSEL ERSCHEINT", "ПОЯВИЛСЯ КЛЮЧ"),
     "fx.legend_open": _T("EFSANEVİ ÖDÜL!  +{0} SEVİYE", "LEGENDARY REWARD!  +{0} LEVELS", "¡RECOMPENSA LEGENDARIA!  +{0} NIVELES",
                          "LEGENDÄRE BELOHNUNG!  +{0} STUFEN", "ЛЕГЕНДАРНАЯ НАГРАДА!  +{0} УР."),
@@ -16790,7 +16797,8 @@ class Player(_AcGuard):
             if self.frenzy_timer <= 0:
                 self.frenzy_stacks = 0
 
-        if self.eff_regen() > 0 and self.hp < self.max_hp and RUN_EVENT[0] != "bloodmoon":
+        if (self.eff_regen() > 0 and self.hp < self.max_hp and RUN_EVENT[0] != "bloodmoon"
+                and not self.__dict__.get("corner_curse")):
             self.regen_acc += self.eff_regen() * dt * (1.0 - self.wound)
             heal = int(self.regen_acc)
             if heal > 0:
@@ -16831,6 +16839,8 @@ class Player(_AcGuard):
     def heal(self, amount):
         if amount <= 0 or not self.alive:
             return
+        if self.__dict__.get("corner_curse"):
+            return                          # köşe laneti: hiçbir şifa işlemez
         amount *= 1.0 - self.wound            # yara: patron sahadayken az şifa
         before = self.hp
         self.hp = min(self.max_hp, self.hp + amount)
@@ -34521,7 +34531,19 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
     CAMP_STILL_R = 170.0        # bu yarıçapın içinde kalan oyuncu "duruyor"
     CAMP_STILL_T = 7.0          # ... bu kadar süre durursa AFK sayılır
     CAMP_RING = (230.0, 430.0)  # içeride doğum halkası (oyuncuya uzaklık)
-    CAMP_RING_CORNER = (50.0, 190.0)   # köşede: doğum doğrudan oyuncunun dibinde
+    CAMP_RING_CORNER = (150.0, 300.0)  # köşede: doğum oyuncunun yakınında (dibinde değil:
+    #                                   dibinde doğan yaratık alan silahına yem oluyordu)
+    # ---- köşe laneti ----
+    # Köşede pusup rekor kasma: yaratıklar tek yönden geliyor, alan silahları
+    # hepsini yığın hâlinde eritiyor, can çalma da gelen hasarı anında geri
+    # dolduruyordu. Köşede CORNER_GRACE sn'den fazla kalan oyuncu lanetlenir:
+    # hiçbir şifa işlemez, kalkan/zırh/kaçınmayı delen ve süreyle büyüyen
+    # gerçek hasar alır, öldürmeler skor vermez (tecrübe/altın da kısılır).
+    CORNER_GRACE = 3.0
+    CORNER_DPS0 = 0.05          # lanetin ilk saniyesi: azami canın %5'i / sn
+    CORNER_DPS_GROW = 0.03      # her saniye +%3
+    CORNER_DPS_MAX = 0.35
+    CORNER_LOOT = 0.25          # lanet altında tecrübe / altın çarpanı
 
     def _update_camping(self, dt):
         p = self.player
@@ -34546,6 +34568,7 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
         self._camp_factor = f
         self._camp_corner = corner
         # köşede oyalanınca uzakta kalan yaratıklar (elitler dahil) dibine gelir
+        self._corner_curse_tick(dt, corner)
         if corner and p.alive:
             self._corner_t = getattr(self, "_corner_t", 0.0) + dt
             self._corner_pull = getattr(self, "_corner_pull", 0.0) - dt
@@ -34557,6 +34580,46 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
         if f >= 0.6 and p.alive and not getattr(self, "_camp_warned", False):
             self._camp_warned = True
             self.fx.popup(p.x, p.y - 100, L("fx.no_camping"), (255, 150, 120), 20, life=2.4)
+
+    def _corner_curse_tick(self, dt, corner):
+        p = self.player
+        ct = getattr(self, "_curse_corner_t", 0.0)
+        ct = ct + dt if (corner and p.alive) else 0.0
+        self._curse_corner_t = ct
+        cursed = ct > self.CORNER_GRACE and p.alive
+        if bool(p.__dict__.get("corner_curse")) != cursed:
+            p.corner_curse = cursed
+        if not p.alive:
+            return
+        if corner and not cursed and ct > 0.6:
+            # geri sayım: oyuncu neden cezalandığını bilsin
+            left = int(math.ceil(self.CORNER_GRACE - ct))
+            if left != getattr(self, "_curse_cd_shown", -1):
+                self._curse_cd_shown = left
+                self.fx.popup(p.x, p.y - 70, L("fx.corner_warn", left), (255, 170, 120), 20, life=0.9)
+        if not cursed:
+            self._curse_cd_shown = -1
+            return
+        if not getattr(self, "_curse_told", 0.0) > 0:
+            self._curse_told = 2.5
+            self.fx.popup(p.x, p.y - 96, L("fx.corner_curse"), (255, 80, 90), 22, life=2.2)
+            sfx("warn", 0.8, 0.05)
+        self._curse_told = getattr(self, "_curse_told", 0.0) - dt
+        el = ct - self.CORNER_GRACE
+        dps = min(self.CORNER_DPS_MAX, self.CORNER_DPS0 + self.CORNER_DPS_GROW * el)
+        self._curse_acc = getattr(self, "_curse_acc", 0.0) + dt
+        if self._curse_acc < 0.25:
+            return
+        tick = self._curse_acc
+        self._curse_acc = 0.0
+        # gerçek hasar: dokunulmazlık, kalkan, zırh, kaçınma hiçbiri işlemez
+        dmg = p.max_hp * dps * tick
+        p.hp -= dmg
+        p.last_hit_by = "köşe laneti"
+        p.hit_flash = 0.2
+        self.fx.popup(p.x + random.uniform(-14, 14), p.y - 24, f"-{int(dmg)}", (255, 60, 80), 18, life=0.6)
+        self.fx.ring(p.x, p.y, (200, 30, 60), n=10, speed=120, life=0.3, r=2.6)
+        p._resolve_lethal(self.fx)
 
     def _camp_spawn_point(self):
         p = self.player
@@ -36956,6 +37019,11 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
             p.add_focus(FOCUS_KILL)
         gain = (e.score * combo_mult * (1.0 + self.curse_score_bonus) * SCORE_GAIN
                 * p.focus_score_mult() * DIFF_SCORE.get(self.diff, 1.0) + self.score_frac)
+        if p.__dict__.get("corner_curse"):
+            # köşe laneti: köşede kasılan öldürme skor vermez
+            gain = 0.0
+            coin_gain *= self.CORNER_LOOT
+            xp_gain *= self.CORNER_LOOT
         self.score += int(gain)
         self.score_frac = gain - int(gain)
         if not getattr(e, "raised", False):
@@ -42445,6 +42513,26 @@ def _hud_plate(w, h, edge, hellish=False):
 _HUD_TOP_MOB = {}
 
 
+_CURSE_VIG = {}
+
+
+def _draw_corner_curse(surf, t):
+    """Köşe laneti: kenarlardan nabız gibi atan kırmızı çerçeve + uyarı."""
+    W, H = surf.get_size()
+    v = _CURSE_VIG.get((W, H))
+    if v is None:
+        v = pygame.Surface((W, H), pygame.SRCALPHA)
+        for i in range(28):
+            a = int(150 * (1 - i / 28.0) ** 2)
+            pygame.draw.rect(v, (200, 10, 40, a), (i * 3, i * 3, W - i * 6, H - i * 6), 3)
+        _CURSE_VIG[(W, H)] = v
+    k = 0.55 + 0.45 * math.sin(t * 7.0)
+    v.set_alpha(int(150 + 105 * k))
+    surf.blit(v, (0, 0))
+    msg = L("fx.corner_curse")
+    draw_text(surf, msg, (W // 2, H - 150), 22, (255, int(90 + 80 * k), 100), bold=True, center=True)
+
+
 def draw_hud(surf, run, t):
     """Üst bilgi şeridi + ekranın ortasındaki duyurular."""
     if MOBILE:
@@ -42458,6 +42546,8 @@ def draw_hud(surf, run, t):
     else:
         hud_layer(surf, "top", run, t, lambda b: _draw_hud_top(b, run, t), 0)
     _draw_hud_center(surf, run, t)
+    if run.player.__dict__.get("corner_curse"):
+        _draw_corner_curse(surf, t)
     if getattr(run, "ac_flag", "") and getattr(run, "ac_banner_t", 0.0) > 0:
         # hile tespit edildi: üstte kırmızı bant (koşu sürer ama geçersiz)
         k = min(1.0, run.ac_banner_t)
