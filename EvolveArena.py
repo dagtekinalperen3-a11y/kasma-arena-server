@@ -2140,6 +2140,8 @@ STRINGS = {
                   "¡ERES EL CAMPEÓN! La capa GOD es tuya {0} días más.",
                   "DU BIST CHAMPION! Der GOD-Umhang gehört dir noch {0} Tage.",
                   "ТЫ ЧЕМПИОН! Плащ GOD твой ещё {0} дн."),
+    "lu.loadout_hide": _T("TAB: gizle", "TAB: hide", "TAB: ocultar", "TAB: ausblenden", "TAB: скрыть"),
+    "lu.loadout_show": _T("TAB: SİLAHLIK", "TAB: LOADOUT", "TAB: EQUIPO", "TAB: AUSRÜSTUNG", "TAB: СНАРЯЖЕНИЕ"),
     "fx.keys_new":    _T("HARİTADA BİR ANAHTAR BELİRDİ", "A KEY APPEARED ON THE MAP", "APARECIÓ UNA LLAVE", "EIN SCHLÜSSEL ERSCHEINT", "ПОЯВИЛСЯ КЛЮЧ"),
     "fx.legend_open": _T("EFSANEVİ ÖDÜL!  +{0} SEVİYE", "LEGENDARY REWARD!  +{0} LEVELS", "¡RECOMPENSA LEGENDARIA!  +{0} NIVELES",
                          "LEGENDÄRE BELOHNUNG!  +{0} STUFEN", "ЛЕГЕНДАРНАЯ НАГРАДА!  +{0} УР."),
@@ -43839,6 +43841,79 @@ def hud_scale_pct():
 _STRIP_K = [1.0]           # silah/kitap şeridinin ölçeği (masaüstü: doğrudan çizim)
 
 
+def draw_levelup_loadout(surf, run, t, open_=True):
+    """Seviye ekranının solunda silahlık + kitaplık (TAB ile aç/kapa)."""
+    p = run.player
+    x, y, w = 8, 104, 192
+    if not open_:
+        r = pygame.Rect(x, y, 112, 26)
+        pygame.draw.rect(surf, (24, 18, 22), r, border_radius=8)
+        ink_frame(surf, r, (110, 96, 130), 8, 1)
+        draw_text(surf, L("lu.loadout_show"), r.center, 11, (200, 196, 220), bold=True, center=True, shadow=False)
+        return
+    wkeys = [k for k in BOSS_WEAPONS_ORDER if p.weapons.get(k, 0) > 0]
+    normals = [k for k in p.books if not BOOK_BY_KEY.get(k, {}).get("rare")]
+    rares = [k for k in p.books if BOOK_BY_KEY.get(k, {}).get("rare")]
+    nw_, nb_, nr_ = slot_max(p, "w"), slot_max(p, "b"), slot_max(p, "r")
+    rows_w = max(nw_, len(wkeys))
+    rows_b = max(nb_, len(normals)) + max(nr_, len(rares))
+    rh = 30
+    h = 34 + rows_w * rh + 30 + rows_b * rh + 30
+    r = pygame.Rect(x, y, w, h)
+    bg = pygame.Surface(r.size, pygame.SRCALPHA)
+    pygame.draw.rect(bg, (16, 12, 18, 232), bg.get_rect(), border_radius=12)
+    surf.blit(bg, r.topleft)
+    ink_frame(surf, r, (120, 104, 140), 12, 2)
+    yy = y + 8
+    draw_text(surf, "%s  %d/%d" % (L("ui.weapons"), len(wkeys), nw_), (x + 12, yy), 12, GOLD, bold=True,
+              shadow=False)
+    yy += 24
+    evolved = getattr(p, "evolved", ())
+    for i in range(rows_w):
+        rr = pygame.Rect(x + 8, yy, w - 16, rh - 4)
+        if i < len(wkeys):
+            key = wkeys[i]
+            wd = WEAPON_BY_KEY[key]
+            et = evo_tier(p, key) if key in evolved else 0
+            col = evo_color(key, et) if et else tuple(wd["color"])
+            pygame.draw.rect(surf, (30, 24, 30), rr, border_radius=7)
+            blit_sigil(surf, rr.x + 13, rr.centery, 10, key, col)
+            nm = evo_name(key, et) if et else w_name(wd)
+            draw_text(surf, _fit_text(nm, 11, rr.w - 70, bold=True), (rr.x + 28, rr.y + 6), 11, lighten(col, 0.2),
+                      bold=True, shadow=False)
+            lv = "Lv.%d" % p.weapons[key] + ((" " + EVO_ROMAN[et]) if et else "")
+            draw_text(surf, lv, (rr.right - 6, rr.y + 7), 10, GOLD if et else (200, 204, 224), bold=True,
+                      right=True, shadow=False)
+        else:
+            pygame.draw.rect(surf, (40, 34, 44), rr, 1, border_radius=7)
+            draw_text(surf, "+", rr.center, 12, (90, 86, 110), bold=True, center=True, shadow=False)
+        yy += rh
+    yy += 6
+    draw_text(surf, "%s  %d/%d" % (L("ui.books_hud"), len(normals), nb_), (x + 12, yy), 12, (186, 150, 255),
+              bold=True, shadow=False)
+    yy += 24
+    for src, n_ in ((normals, max(nb_, len(normals))), (rares, max(nr_, len(rares)))):
+        for i in range(n_):
+            rr = pygame.Rect(x + 8, yy, w - 16, rh - 4)
+            if i < len(src):
+                bk = BOOK_BY_KEY[src[i]]
+                col = tuple(bk["color"])
+                pygame.draw.rect(surf, (30, 24, 30), rr, border_radius=7)
+                if bk.get("rare"):
+                    ink_frame(surf, rr, scale_col(GOLD, 0.7), 7, 1)
+                draw_icon(surf, rr.x + 13, rr.centery, bk.get("icon", "star"), col, 8)
+                draw_text(surf, _fit_text(bk_name(bk), 11, rr.w - 66, bold=True), (rr.x + 28, rr.y + 6), 11,
+                          lighten(col, 0.2), bold=True, shadow=False)
+                if not bk.get("rare"):
+                    draw_text(surf, "Lv.%d" % p.books[src[i]], (rr.right - 6, rr.y + 7), 10, (200, 204, 224),
+                              bold=True, right=True, shadow=False)
+            else:
+                pygame.draw.rect(surf, (40, 34, 44), rr, 1, border_radius=7)
+                draw_text(surf, "+", rr.center, 12, (90, 86, 110), bold=True, center=True, shadow=False)
+            yy += rh
+    draw_text(surf, L("lu.loadout_hide"), (r.centerx, r.bottom - 20), 10, (150, 146, 170), center=True, shadow=False)
+
+
 def draw_team_strips(surf, run, t):
     """Silah ve kitap şeritlerini ayardaki boyutta çizer."""
     pct = hud_scale_pct()
@@ -61831,6 +61906,10 @@ class App:
                         self.display.toggle_fullscreen()
                 elif event.key == pygame.K_F3:
                     CFG["fps"] = not CFG["fps"]
+                elif event.key == pygame.K_TAB and self.state == STATE_LEVELUP:
+                    # seviye ekranı: soldaki silahlık / kitaplık panelini aç-kapa
+                    CFG["lu_loadout"] = not CFG.get("lu_loadout", True)
+                    sfx("click", 0.4, 0.0)
                 elif event.key == pygame.K_ESCAPE:
                     self.handle_escape()
                 elif self.state == STATE_PLAY and key_hit("bonk", event.key):
@@ -62512,6 +62591,7 @@ class App:
         self._draw_run_frame(canvas)
         self.levelup_ui.rebuild(self.run.levelup_choices)
         act = self.levelup_ui.draw_and_handle(canvas, self.run, mouse_pos, clicked, self.t)
+        draw_levelup_loadout(canvas, self.run, self.t, bool(CFG.get("lu_loadout", True)))
         if act:
             kind, idx = act
             if kind == "pick":
