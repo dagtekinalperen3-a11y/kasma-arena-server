@@ -855,7 +855,7 @@ WEAPON_FX_LEGACY = {"full": 100, "dim": 32, "off": 0}
 # oyunun adı EvolveArena (E ve A büyük). (Kayıt klasörü "KasmaArena" olarak
 # kalıyor: adı değiştirmek oyuncuların ilerlemesini kaybettirirdi)
 GAME_TITLE = "EvolveArena"
-GAME_VERSION = "3.50"
+GAME_VERSION = "3.51"
 
 
 # ---- dil sistemi ----
@@ -2119,6 +2119,11 @@ STRINGS = {
                           "RAUS AUS DER ECKE: {0}", "УЙДИ ИЗ УГЛА: {0}"),
     "ui.legend_key": _T("EFSANEVİ ANAHTAR", "LEGENDARY KEY", "LLAVE LEGENDARIA", "LEGENDÄRER SCHLÜSSEL",
                         "ЛЕГЕНДАРНЫЙ КЛЮЧ"),
+    "ui.ac_review": _T("Koşu incelemeye alındı: sunucu doğrulayınca sıralamaya girer.",
+                       "Run sent for review: it enters the leaderboard once the server verifies it.",
+                       "Partida en revisión: entrará en el ranking cuando el servidor la verifique.",
+                       "Lauf wird geprüft: er kommt nach der Prüfung in die Rangliste.",
+                       "Забег на проверке: попадёт в рейтинг после проверки сервером."),
     "fx.keys_new":    _T("HARİTADA BİR ANAHTAR BELİRDİ", "A KEY APPEARED ON THE MAP", "APARECIÓ UNA LLAVE", "EIN SCHLÜSSEL ERSCHEINT", "ПОЯВИЛСЯ КЛЮЧ"),
     "fx.legend_open": _T("EFSANEVİ ÖDÜL!  +{0} SEVİYE", "LEGENDARY REWARD!  +{0} LEVELS", "¡RECOMPENSA LEGENDARIA!  +{0} NIVELES",
                          "LEGENDÄRE BELOHNUNG!  +{0} STUFEN", "ЛЕГЕНДАРНАЯ НАГРАДА!  +{0} УР."),
@@ -59743,6 +59748,11 @@ class App:
         # kod enjeksiyonu / yama / DLL: işlem çapında, menüde de
         if not IS_WEB:
             self._ac_frame_check(_ac_run)
+        # sunucu imzalı koşu bileti + nabız (dünya sıralamasının asıl koruması)
+        try:
+            self._run_ticket_tick()
+        except Exception as e:
+            print("koşu bileti:", repr(e))
         self._pt1 = time.perf_counter()
         self._pt_wait = (self._pt1 - _pt0) * 1000.0
         self.t += dt
@@ -61134,6 +61144,62 @@ class App:
         # sıralamasına değil, yalnızca oyuncunun skor geçmişine yazar.
         return None
 
+    # ---- koşu bileti + nabız zinciri ----
+    # Koşu başında sunucudan, YALNIZ sunucunun bildiği anahtarla imzalı bir
+    # bilet alınır; koşu boyunca her RUN_BEAT_EVERY sn'de bir o anki süre /
+    # skor / öldürme / dalga sunucuya bildirilir ve sunucu bileti yeniler.
+    # Skor gönderisi son bileti taşır. Oyunun içindeki imza anahtarı çıkarılsa
+    # bile sahte skor yazılamaz: bilet sunucunun gözü önünde oynanan koşudan
+    # gelir. Bilet durumu RunState'te değil burada (düz sözlükte) tutulur:
+    # cevap arka plan iş parçacığından yazılıyor.
+    RUN_BEAT_EVERY = 60.0
+
+    def _run_ticket_tick(self):
+        run = self.run
+        if (run is None or self.state != STATE_PLAY or type(run) is not RunState
+                or getattr(run, "game_over", False) or not self.online.enabled
+                or not getattr(self.account, "token", None)):
+            return
+        tk = getattr(self, "_tk", None)
+        if tk is None or tk.get("run") is not run:
+            tk = self._tk = {"run": run, "ticket": None, "busy": False, "next": 0.0}
+        if tk["busy"]:
+            return
+        now = float(run.run_time)
+        if now < tk["next"]:
+            return
+        base = {"token": self.account.token, "device": device_id(),
+                "device_legacy": device_id_legacy(), "ver": GAME_VERSION}
+        if tk["ticket"] is None:
+            tk["next"] = now + 20.0              # sunucu uyuyorsa 20 sn sonra yine dene
+            body = dict(base, diff=run.diff, map=getattr(run, "map_theme", "stone"), t=now)
+            path = "/run/start"
+        else:
+            tk["next"] = now + self.RUN_BEAT_EVERY
+            body = dict(base, ticket=tk["ticket"], t=now, s=int(run.score), k=int(run.kills),
+                        w=int(run.total_wave()))
+            path = "/run/beat"
+        tk["busy"] = True
+
+        async def _go(tk=tk, body=body, path=path):
+            try:
+                res = await http_json(self.online.base_url + path, body, 20)
+                if isinstance(res, dict) and res.get("success") and res.get("ticket"):
+                    tk["ticket"] = str(res["ticket"])
+                    if path == "/run/start":
+                        tk["next"] = float(body.get("t", 0.0)) + self.RUN_BEAT_EVERY
+            except Exception as e:
+                log_net_error("run ticket", e, net_error_kind(e))
+            finally:
+                tk["busy"] = False
+        spawn(_go)
+
+    def _run_ticket_final(self):
+        tk = getattr(self, "_tk", None)
+        if tk and tk.get("run") is self.run and tk.get("ticket"):
+            return tk["ticket"]
+        return None
+
     def _maybe_submit_online(self):
         if self.run.submitted_online:
             return
@@ -61156,6 +61222,11 @@ class App:
 
         def on_done(ok, why="", res=None):
             res = res or {}
+            if ok and res.get("review"):
+                self.online_submit_status = "başarısız"
+                self.online_block_text = L("ui.ac_review")
+                self.online_rank = None
+                return
             if ok and res.get("ranked") is False:
                 self.online_submit_status = "harita"
             else:
@@ -61202,6 +61273,10 @@ class App:
             payload["token"] = self.account.token
             payload["device"] = device_id()
             payload["device_legacy"] = device_id_legacy()
+        # sunucu imzalı koşu bileti (imzanın dışında: kendisi zaten sunucu imzalı)
+        _tk = self._run_ticket_final()
+        if _tk:
+            payload["ticket"] = _tk
         self.online.submit_score_async(payload, on_done=on_done)
 
     def _gameover_backdrop(self, r):

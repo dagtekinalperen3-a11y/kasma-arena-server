@@ -1280,7 +1280,8 @@ def _is_paid(list_key, item):
     if list_key == "skins_owned":
         return item in PAID_SKINS
     if list_key == "cosmetics_owned":
-        return str(item).startswith("pet_") or item in WHEEL_ONLY_COSMETICS or item in ADMIN_ONLY_COSMETICS
+        return (str(item).startswith("pet_") or item in WHEEL_ONLY_COSMETICS or item in ADMIN_ONLY_COSMETICS
+                or item in GOD_ONLY_COSMETICS)
     return False
 
 # ---- arena ustalığı (koşular arası kalıcı yükseltme) ----
@@ -1575,6 +1576,13 @@ def _merge_progress(old, new, gem_cap=GEM_GAIN_CAP_PER_PUSH):
     if isinstance(out.get("books_muted"), list):
         out["books_muted"] = [b for b in out["books_muted"] if b not in REMOVED_BOOKS]
     _drop_unpaid_items(old, out, new)
+    # günlük şampiyon ödülü yalnız sunucuda yazılır; süresi dolunca geri alınır
+    for k in ("god_until", "god_days", "god_wins"):
+        if k in old:
+            out[k] = old[k]
+        else:
+            out.pop(k, None)
+    _god_cleanup(out)
     return out
 
 
@@ -1587,7 +1595,10 @@ def player_load():
     acc = _acct(data)
     if not acc:
         return jsonify({"success": False, "error": "oturum geçersiz"}), 401
-    return jsonify({"success": True, "progress": _public_progress(_stored_progress(_player_row(acc["id"])))})
+    _champion_tick()          # dünün şampiyonu bu oyuncuysa ödül şimdi yazılır
+    prog = _stored_progress(_player_row(acc["id"]))
+    _god_cleanup(prog)
+    return jsonify({"success": True, "progress": _public_progress(prog)})
 
 
 def _log_event(account_id, kind, delta, total, note=""):
@@ -2373,7 +2384,8 @@ SUBMIT_SIG_V = "v2"
 SUBMIT_KEY_V2 = hmac.new(SUBMIT_SECRET.encode("utf-8"), b"evolve-arena|submit|" + SUBMIT_SIG_V.encode(),
                          hashlib.sha256).digest()
 # Skor gönderebilen en düşük oyun sürümü (Render'da KASMA_MIN_VERSION ile değişir).
-MIN_GAME_VERSION = os.environ.get("KASMA_MIN_VERSION", "3.50")
+# 3.51: koşu bileti + nabız zinciri. Eski oyunlar (bilet yok) skor gönderemez.
+MIN_GAME_VERSION = os.environ.get("KASMA_MIN_VERSION", "3.51")
 OLD_VERSION_ERR = "oyun sürümün eski, oyunu güncelle"
 
 
@@ -2603,6 +2615,7 @@ def get_scores():
     if not supabase:
         return jsonify({"error": "Supabase bağlantısı yapılandırılmamış!"}), 500
     try:
+        _champion_tick()
         # Bir oyuncu tabloda birden çok kez yer alabilir, her koşu ayrı satır.
         # ?platform=mobile telefon tablosunu verir.
         plat = "mobile" if request.args.get("platform") == "mobile" else "pc"
@@ -2653,6 +2666,9 @@ def _profile_summary(d):
         "runs": _int(st.get("runs"), 0), "kills": _int(st.get("total_kills"), 0),
         "best_wave": _int(st.get("best_wave"), 0), "bosses": _int(st.get("bosses"), 0),
         "books_n": len(d.get("books_owned") or []), "weapons_n": len(d.get("weapons_owned") or []),
+        # günlük şampiyon: "I'M GOD" rozeti (7 gün)
+        "god": _num(d.get("god_until"), 0.0) > time.time(),
+        "god_wins": _int(d.get("god_wins"), 0),
     }
 
 
@@ -2729,6 +2745,28 @@ def add_score():
             if seen:
                 return jsonify({"success": True, "again": True})
 
+        # hesap başına gönderi sınırı (IP değiştirerek sınırı aşmak olmasın)
+        if not _rate_ok("suba:" + str(account_id), 30, 3600):
+            return jsonify({"success": False, "error": "çok sık gönderim, biraz bekle"}), 429
+
+        # ---- koşu bileti + nabız zinciri (sunucu imzalı) ----
+        flags, rid, tk_err = _check_ticket(data, acc, score, kills, wave, run_time, ver)
+        if tk_err:
+            if "forge" in flags:
+                app.logger.warning("sahte koşu bileti: hesap %s", account_id)
+            return jsonify({"success": False, "error": tk_err}), 403
+        if rid and _rid_used_in_db(rid):
+            return jsonify({"success": True, "again": True})
+        # bilet olmasa da: ortalama hızlar ve dalga/süre uyumu
+        if run_time > 30:
+            if score > _score_rate_cap(wave) * run_time + 50000:
+                flags.append("score")
+            if kills > KILL_RATE_MAX * run_time + 300:
+                flags.append("kills")
+        if not _wave_reachable(wave, run_time, diff):
+            flags.append("wave")
+        flags = sorted(set(flags) - {"noticket"})
+
         platform = "mobile" if data.get("platform") == "mobile" else "pc"
         payload = {
             "account_id": account_id,
@@ -2755,12 +2793,24 @@ def add_score():
         # dünya sıralaması yalnızca Taş Meydan'da (öbür haritaların kuralları
         # skoru kolaylaştırıyor); öbür koşular oyuncunun geçmişinde durur
         payload["ranked"] = (mp == "stone")
+        if rid or flags:
+            det = dict(payload.get("details") or {"v": 1})
+            if rid:
+                det["rid"] = rid
+            if flags:
+                # şüpheli koşu: sıralamaya girmez, yönetici incelemesine düşer
+                det["review"] = flags
+                payload["ranked"] = False
+                app.logger.warning("incelemeye düşen koşu: hesap %s bayraklar %s skor %s", account_id, flags, score)
+            payload["details"] = det
         try:
             db(WORLD_TABLE).insert(payload).execute()
         except Exception as e:
             if sig and _is_duplicate_error(e):
                 return jsonify({"success": True, "again": True})
             raise
+        if rid:
+            _rid_mark(rid)
         rank = None
         if payload["ranked"]:
             try:
@@ -2770,9 +2820,448 @@ def add_score():
                     rank = int(res.count) + 1
             except Exception:
                 rank = None
-        return jsonify({"success": True, "ranked": payload["ranked"], "rank": rank})
+        return jsonify({"success": True, "ranked": payload["ranked"], "rank": rank,
+                        "review": bool(flags)})
     except Exception as e:
         return _oops(e, "skor kaydedilemedi")
+
+
+# =====================================================================
+# ---- güçlü hile koruması: sunucu imzalı koşu bileti + nabız zinciri ----
+# =====================================================================
+# Sorun: SUBMIT_SECRET oyunun içinde duruyor. Python bilen biri oyunu açıp
+# anahtarı çıkarabilir ve curl ile istediği skoru imzalayıp gönderebilir.
+# İstemcideki her koruma eninde sonunda aşılır; o yüzden asıl karar sunucuda:
+#
+# 1) KOŞU BİLETİ: koşu başlarken oyun /run/start'a gider, sunucu YALNIZ
+#    SUNUCUDA bulunan bir anahtarla (RUN_SECRET - oyunda yok) imzalı bir bilet
+#    verir: hesap, koşu kimliği, başlangıç saati. Bilet olmadan dünya
+#    sıralamasına skor yazılamaz. Bileti taklit etmek için sunucunun anahtarı
+#    gerekir. 40 dakikalık bir koşu, biletten 40 dakika sonra gönderilebilir:
+#    duvar saati sunucuda tutulur, oyunun saatine güvenilmez.
+# 2) NABIZ ZİNCİRİ: koşu sürerken oyun her ~60 sn'de /run/beat'e o anki
+#    (süre, skor, öldürme, dalga, seviye) bilgisini gönderir. Sunucu her nabızda
+#    bileti yeniler (zincir) ve şunlara bakar:
+#      - değerler geri gitmiyor mu (skor/öldürme/dalga/süre),
+#      - oyun saati duvar saatinden hızlı akmıyor mu (hız hilesi),
+#      - skor ve öldürme artış hızı makul mü,
+#      - dalga, süreyle ulaşılabilecek dalgayı aşıyor mu.
+#    Son gönderi son nabızla tutarlı olmalı: koşu bitince skoru şişirmek
+#    zincirden anlaşılır.
+# 3) İNCELEME: şüpheli koşu reddedilmez (dürüst ama çok güçlü koşu yanlışlıkla
+#    yanmasın); dünya sıralamasına girmez, "incelemede" olarak yazılır.
+#    Yönetici /admin/review ile görür, /admin/review_ok ile onaylar.
+#    Kesin kanıt (bilet sahteciliği, hız hilesi, imkânsız dalga) ise direkt
+#    reddedilir.
+RUN_SECRET = (os.environ.get("KASMA_RUN_SECRET")
+              or hashlib.sha256(("evolve-run-v1|" + (SUPABASE_KEY or SUBMIT_SECRET or "dev")).encode()).hexdigest())
+_RUN_KEY = hashlib.sha256(("run-ticket|" + RUN_SECRET).encode()).digest()
+# bilet zorunlu mu? (sürüm MIN_GAME_VERSION'a çekilince eski oyunlar zaten giremez)
+REQUIRE_TICKET = os.environ.get("KASMA_REQUIRE_TICKET", "1") == "1"
+TICKET_FROM_VERSION = "3.51"
+RUN_START_PER_HOUR = 40         # hesap başına saatte en çok bu kadar koşu bileti
+LATE_TICKET_MAX = 150.0         # koşu başladıktan en çok bu kadar sn sonra bilet alınabilir
+BEAT_MIN_GAP = 15.0             # iki nabız arası en az (duvar saniyesi)
+BEAT_EXPECT = 60.0              # oyun bu aralıkla nabız atar
+SPEED_SLACK = 1.30              # oyun saati duvar saatinin en çok bu katı akabilir
+SPEED_GRACE = 12.0              # ağ gecikmesi payı (sn)
+# artış hızları (saniyede). Gerçek oyunda görülen en hızlı koşuların birkaç
+# katı: dürüst oyuncu buraya yaklaşamaz, "999.999.999" yazan hileci aşar.
+SCORE_RATE_BASE = float(os.environ.get("KASMA_SCORE_RATE_BASE", "4000"))
+SCORE_RATE_PER_WAVE = float(os.environ.get("KASMA_SCORE_RATE_WAVE", "1.16"))
+SCORE_RATE_MAX = float(os.environ.get("KASMA_SCORE_RATE_MAX", "600000"))
+KILL_RATE_MAX = float(os.environ.get("KASMA_KILL_RATE_MAX", "60"))
+# bu bayraklar kesin kanıt sayılır: gönderi reddedilir
+HARD_FLAGS = frozenset(("forge", "speed", "time", "mono", "wave"))
+
+# ---- dalga takvimi (oyundaki WAVE_PLAN_* ile birebir aynı) ----
+WAVE_PLAN_COUNT = 25
+WAVE_PLAN_GROW = 0.07
+WAVE_PLAN_SCALE = 2.0
+WAVE_PLAN_TOTAL = {
+    "arena": {"normal": 35 * 60.0 * WAVE_PLAN_SCALE, "hard": 30 * 60.0 * WAVE_PLAN_SCALE,
+              "nightmare": 20 * 60.0 * WAVE_PLAN_SCALE},
+    "hell": {"normal": 40 * 60.0 * WAVE_PLAN_SCALE, "hard": 40 * 60.0 * 30 / 35 * WAVE_PLAN_SCALE,
+             "nightmare": 40 * 60.0 * 20 / 35 * WAVE_PLAN_SCALE},
+}
+_WAVE_PLAN_W = sum(1.0 + WAVE_PLAN_GROW * (i - 1) for i in range(1, WAVE_PLAN_COUNT + 1))
+
+
+def _wave_length(wave, diff="normal", biome="arena"):
+    tbl = WAVE_PLAN_TOTAL["hell" if biome == "hell" else "arena"]
+    w = min(WAVE_PLAN_COUNT, max(1, int(wave)))
+    return float(tbl.get(diff, tbl["normal"])) * (1.0 + WAVE_PLAN_GROW * (w - 1)) / _WAVE_PLAN_W
+
+
+def _wave_start_time(wave, diff="normal", biome="arena"):
+    w = max(1, int(wave))
+    t = 0.0
+    for i in range(1, min(w, WAVE_PLAN_COUNT + 1)):
+        t += _wave_length(i, diff, biome)
+    if w > WAVE_PLAN_COUNT + 1:
+        t += (w - WAVE_PLAN_COUNT - 1) * _wave_length(WAVE_PLAN_COUNT, diff, biome)
+    return t
+
+
+def _min_time_for_wave(total_wave, diff="normal"):
+    w = max(1, min(int(total_wave), 5000))
+    t = _wave_start_time(w, diff, "arena")
+    for a in range(WAVE_PLAN_COUNT, w):
+        t = min(t, _wave_start_time(a, diff, "arena") + _wave_start_time(w - a, diff, "hell"))
+    return t
+
+
+def _wave_reachable(total_wave, run_time, diff="normal"):
+    """Bu dalgaya bu sürede ulaşılabilir mi? (oyundaki time_wave_reachable)"""
+    w = max(1, int(total_wave))
+    if w <= 2:
+        return True
+    return _min_time_for_wave(w - 1, diff) <= float(run_time) + 10.0
+
+
+def _score_rate_cap(wave):
+    w = max(1, min(int(wave), 400))
+    return min(SCORE_RATE_MAX, SCORE_RATE_BASE * (SCORE_RATE_PER_WAVE ** min(w, 60)) * (1.0 + 0.02 * max(0, w - 60)))
+
+
+def _tk_pack(st):
+    raw = base64.urlsafe_b64encode(json.dumps(st, separators=(",", ":"), sort_keys=True).encode()).decode().rstrip("=")
+    sig = hmac.new(_RUN_KEY, raw.encode(), hashlib.sha256).hexdigest()[:40]
+    return raw + "." + sig
+
+
+def _tk_unpack(tok):
+    """Bileti çözer; imza tutmazsa None."""
+    try:
+        tok = str(tok or "")
+        if len(tok) > 4000 or "." not in tok:
+            return None
+        raw, sig = tok.rsplit(".", 1)
+        want = hmac.new(_RUN_KEY, raw.encode(), hashlib.sha256).hexdigest()[:40]
+        if not hmac.compare_digest(sig, want):
+            return None
+        st = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)).decode())
+        return st if isinstance(st, dict) else None
+    except Exception:
+        return None
+
+
+def _tk_flag(st, f):
+    fl = list(st.get("f") or [])
+    if f not in fl:
+        fl.append(f)
+    st["f"] = fl[:12]
+
+
+def _tk_step(st, now, t, s, k, w, final=False):
+    """Bilet durumunu yeni ölçümle ilerletir ve şüpheleri işaretler."""
+    g0, s0, k0, w0 = _num(st.get("g"), 0.0), _num(st.get("s"), 0.0), _num(st.get("k"), 0.0), _int(st.get("w"), 1)
+    lt = _num(st.get("lt"), now)
+    t0 = _num(st.get("t0"), now)
+    diff = str(st.get("d") or "normal")
+    if t + 0.5 < g0 or s + 0.5 < s0 or k + 0.5 < k0 or w < w0:
+        _tk_flag(st, "mono")                      # değer geri gitti: kurcalama
+    wall_dt = max(0.0, now - lt)
+    game_dt = max(0.0, t - g0)
+    if game_dt > wall_dt * SPEED_SLACK + SPEED_GRACE:
+        _tk_flag(st, "speed")                     # oyun saati duvar saatinden hızlı
+    if t > (now - t0) * SPEED_SLACK + SPEED_GRACE * 2:
+        _tk_flag(st, "time")                      # biletten bu yana bu kadar süre geçmedi
+    if not _wave_reachable(w, t, diff):
+        _tk_flag(st, "wave")
+    dt_ = max(5.0, game_dt)
+    if (s - s0) > _score_rate_cap(max(w, w0)) * dt_ + 50000:
+        _tk_flag(st, "score")
+    if (k - k0) > KILL_RATE_MAX * dt_ + 300:
+        _tk_flag(st, "kills")
+    st.update(g=round(t, 2), s=int(s), k=int(k), w=int(w), lt=round(now, 2), n=_int(st.get("n"), 0) + (0 if final else 1))
+    return st
+
+
+def _tk_account_ok(st, acc):
+    return st is not None and str(st.get("a")) == str(acc.get("id"))
+
+
+@app.route("/run/start", methods=["POST"])
+def run_start():
+    """Koşu başı: sunucu imzalı koşu bileti."""
+    data = _body()
+    acc = _acct(data)
+    if not acc:
+        return jsonify({"success": False, "error": "oturum geçersiz"}), 401
+    if not _rate_ok("runst:" + str(acc.get("id")), RUN_START_PER_HOUR, 3600):
+        return jsonify({"success": False, "error": "çok sık koşu başlatıldı"}), 429
+    diff = str(data.get("diff") or "normal")
+    if diff not in ("normal", "hard", "nightmare"):
+        diff = "normal"
+    now = time.time()
+    # sunucu uyurken (Render) bilet koşunun ilk saniyelerinde alınamayabilir:
+    # oyun o anki koşu süresini yollar, en çok LATE_TICKET_MAX sn geriye sayılır
+    late = max(0.0, min(LATE_TICKET_MAX, _num(data.get("t"), 0.0)))
+    st = {"a": str(acc.get("id")), "r": secrets.token_hex(8), "t0": round(now - late, 2),
+          "lt": round(now - late, 2), "g": 0.0, "s": 0, "k": 0, "w": 1, "n": 0, "f": [], "d": diff,
+          "m": str(data.get("map") or "stone")[:12], "v": str(data.get("ver") or "")[:16]}
+    return jsonify({"success": True, "ticket": _tk_pack(st), "beat": BEAT_EXPECT})
+
+
+@app.route("/run/beat", methods=["POST"])
+def run_beat():
+    """Koşu nabzı: bileti doğrular, ölçümü işler, yenilenmiş bileti döner."""
+    data = _body()
+    acc = _acct(data)
+    if not acc:
+        return jsonify({"success": False, "error": "oturum geçersiz"}), 401
+    st = _tk_unpack(data.get("ticket"))
+    if not _tk_account_ok(st, acc):
+        return jsonify({"success": False, "error": "bilet geçersiz"}), 403
+    now = time.time()
+    if now - _num(st.get("lt"), 0.0) < BEAT_MIN_GAP:
+        # çok sık: bilet olduğu gibi geri (zincir bozulmaz)
+        return jsonify({"success": True, "ticket": data.get("ticket"), "skip": True})
+    st = _tk_step(st, now, _num(data.get("t"), 0.0), _num(data.get("s"), 0.0),
+                  _num(data.get("k"), 0.0), _int(data.get("w"), 1))
+    return jsonify({"success": True, "ticket": _tk_pack(st)})
+
+
+_USED_RIDS = deque(maxlen=20000)
+_USED_RID_SET = set()
+_USED_RID_LOCK = threading.Lock()
+
+
+def _rid_seen(rid):
+    with _USED_RID_LOCK:
+        return rid in _USED_RID_SET
+
+
+def _rid_mark(rid):
+    with _USED_RID_LOCK:
+        if len(_USED_RIDS) == _USED_RIDS.maxlen:
+            _USED_RID_SET.discard(_USED_RIDS[0])
+        _USED_RIDS.append(rid)
+        _USED_RID_SET.add(rid)
+
+
+def _check_ticket(data, acc, score, kills, wave, run_time, ver):
+    """Gönderinin biletini denetler -> (bayraklar, koşu kimliği, hata metni|None)."""
+    tok = data.get("ticket")
+    need = REQUIRE_TICKET and (_ver_tuple(ver) or (0,)) >= (_ver_tuple(TICKET_FROM_VERSION) or (9,))
+    if not tok:
+        if need:
+            return [], None, "koşu bileti yok (oyun sunucuya bağlanamadı ya da güncel değil)"
+        return ["noticket"], None, None
+    st = _tk_unpack(tok)
+    if st is None:
+        return ["forge"], None, "koşu bileti sahte"
+    if not _tk_account_ok(st, acc):
+        return ["forge"], None, "koşu bileti başka bir hesaba ait"
+    rid = str(st.get("r") or "")[:24]
+    if not rid or _rid_seen(rid):
+        return ["reuse"], rid, "bu koşu zaten gönderildi"
+    now = time.time()
+    beats_before = _int(st.get("n"), 0)
+    st = _tk_step(st, now, run_time, score, kills, wave, final=True)
+    flags = list(st.get("f") or [])
+    # uzun koşuda hiç nabız yok: koşu sunucunun gözü önünde oynanmadı
+    expect = int(run_time // (BEAT_EXPECT * 2.5))
+    if expect >= 3 and beats_before < expect // 2:
+        flags.append("nobeat")
+    if str(st.get("d") or "normal") != str(data.get("diff") or "normal"):
+        flags.append("diff")
+    return sorted(set(flags)), rid, None
+
+
+def _rid_used_in_db(rid):
+    try:
+        q = db(WORLD_TABLE)
+        rows = q._wrap(q._q.select("id").eq(q._col("details") + "->>rid", rid).limit(1)).execute().data
+        return bool(rows)
+    except Exception:
+        return False
+
+
+def _admin_acc(data, tag):
+    acc = _acct(data)
+    if not acc:
+        return None, (jsonify({"success": False, "error": "oturum geçersiz"}), 401)
+    if str(acc.get("username") or "").strip().lower() not in ADMIN_USERNAMES:
+        app.logger.warning("yetkisiz %s denemesi: hesap %s", tag, acc.get("id"))
+        return None, (jsonify({"success": False, "error": "bu komut için yetkin yok"}), 403)
+    if not _rate_ok("adm:" + str(acc.get("id")), 30, 60):
+        return None, (jsonify({"success": False, "error": "çok sık istek"}), 429)
+    return acc, None
+
+
+@app.route("/admin/review", methods=["POST"])
+def admin_review():
+    """İncelemedeki (şüpheli) koşular."""
+    acc, err = _admin_acc(_body(), "/admin/review")
+    if err:
+        return err
+    try:
+        q = db(WORLD_TABLE)
+        rows = q._wrap(q._q.select("*").not_.is_(q._col("details") + "->review", "null")
+                       .eq(q._col("ranked"), False).order(q._col("score"), desc=True).limit(50)).execute().data or []
+        out = [{"id": r.get("id"), "name": r.get("name"), "score": r.get("score"), "kills": r.get("kills"),
+                "wave": r.get("wave"), "run_time": r.get("run_time"),
+                "flags": ((r.get("details") or {}).get("review") or [])} for r in rows]
+        return jsonify({"success": True, "runs": out})
+    except Exception as e:
+        return _oops(e, "inceleme listesi okunamadı")
+
+
+@app.route("/admin/review_ok", methods=["POST"])
+def admin_review_ok():
+    """Yönetici şüpheli koşuyu onaylar: dünya sıralamasına girer."""
+    data = _body()
+    acc, err = _admin_acc(data, "/admin/review_ok")
+    if err:
+        return err
+    rid = data.get("id")
+    try:
+        rows = db(WORLD_TABLE).select("*").eq("id", rid).limit(1).execute().data or []
+        if not rows:
+            return jsonify({"success": False, "error": "koşu yok"}), 404
+        det = dict(rows[0].get("details") or {})
+        det["review_ok"] = str(acc.get("username"))[:20]
+        det.pop("review", None)
+        db(WORLD_TABLE).update({"ranked": (det.get("map") or "stone") == "stone", "details": det}).eq("id", rid).execute()
+        return jsonify({"success": True})
+    except Exception as e:
+        return _oops(e, "onaylanamadı")
+
+
+# =====================================================================
+# ---- günlük şampiyon: "I'M GOD" rozeti + GOD pelerini (7 gün) ----
+# =====================================================================
+# Her gün (Türkiye saatiyle gece 00:00'da biten gün) dünya sıralamasında o
+# günün en yüksek skorunu yapan oyuncu ödül alır:
+#   - "I'M GOD" rozeti: sıralamada ve profilde adının yanında parlar,
+#   - GOD Pelerini (cape_imgod): alevli, yıldızlı, altın kanatlı pelerin.
+# İkisi de 7 gün sürer, sonra sunucu kendiliğinden geri alır. Pelerin
+# satılamaz, oyun kendi kendine ekleyemez (_is_paid -> sunucuya özel).
+# Ödül tembel dağıtılır: gün değiştikten sonra gelen ilk sıralama / profil
+# isteği dünün şampiyonunu bulur ve ödülü bir kez yazar (aynı gün iki kez
+# yazılmaz: oyuncunun kaydında god_days listesi tutulur).
+GOD_DAYS = 7
+GOD_COSMETIC = "cape_imgod"
+GOD_ONLY_COSMETICS = {GOD_COSMETIC}
+_champ_cache = {}            # gün -> {"name", "score", "aid"} ya da {}
+_champ_lock = threading.Lock()
+
+
+def _day_bounds(day):
+    """Türkiye günü 'YYYY-AA-GG' -> (başlangıç, bitiş) epoch."""
+    st = datetime.datetime.strptime(day, "%Y-%m-%d").replace(tzinfo=datetime.timezone.utc).timestamp() \
+        - REWARD_TZ_OFFSET
+    return st, st + 86400.0
+
+
+def _day_top(day, n=1):
+    st, en = _day_bounds(day)
+    rows = (db(WORLD_TABLE).select("name,score,kills,wave,run_time,diff,created_at,skin,account_id")
+            .eq("platform", "pc").eq("ranked", True).gte("created_at", st).lt("created_at", en)
+            .order("score", desc=True).limit(n).execute().data or [])
+    return rows
+
+
+def _god_active(prog, now=None):
+    now = time.time() if now is None else now
+    return _num(prog.get("god_until"), 0.0) > now
+
+
+def _god_cleanup(prog, now=None):
+    """Süresi dolan GOD ödülünü geri alır (rozet + pelerin). Değiştiyse True."""
+    if _god_active(prog, now):
+        return False
+    cos = list(prog.get("cosmetics_owned") or [])
+    if GOD_COSMETIC not in cos:
+        return False
+    prog["cosmetics_owned"] = [c for c in cos if c != GOD_COSMETIC]
+    eq = dict(prog.get("equipped_cosmetics") or {})
+    for k, v in list(eq.items()):
+        if v == GOD_COSMETIC:
+            eq[k] = None
+    prog["equipped_cosmetics"] = eq
+    return True
+
+
+def _award_champion(day):
+    """O günün şampiyonuna ödülü (bir kez) yazar; şampiyonu döner."""
+    with _champ_lock:
+        if day in _champ_cache:
+            return _champ_cache[day]
+    champ = {}
+    try:
+        top = _day_top(day, 1)
+        if top:
+            r = top[0]
+            champ = {"name": r.get("name"), "score": r.get("score"), "aid": r.get("account_id"),
+                     "skin": r.get("skin"), "day": day}
+            aid = r.get("account_id")
+            if aid is not None:
+                with _acct_lock(aid):
+                    row = _player_row(aid)
+                    prog = _stored_progress(row)
+                    days = list(prog.get("god_days") or [])
+                    if day not in days:
+                        st, en = _day_bounds(day)
+                        prog["god_until"] = max(_num(prog.get("god_until"), 0.0), en + GOD_DAYS * 86400.0)
+                        days.append(day)
+                        prog["god_days"] = days[-60:]
+                        prog["god_wins"] = _int(prog.get("god_wins"), 0) + 1
+                        cos = list(prog.get("cosmetics_owned") or [])
+                        if GOD_COSMETIC not in cos:
+                            cos.append(GOD_COSMETIC)
+                        prog["cosmetics_owned"] = cos
+                        # pelerin hemen kuşanılsın: ödül görünsün
+                        eq = dict(prog.get("equipped_cosmetics") or {})
+                        eq["cape"] = GOD_COSMETIC
+                        prog["equipped_cosmetics"] = eq
+                        payload = {"account_id": aid,
+                                   "data": {k: v for k, v in prog.items()
+                                            if k not in ("gems", "gems_earned", "gems_spent")},
+                                   "updated_at": time.time()}
+                        if row:
+                            db("player_data").update(payload).eq("account_id", aid).execute()
+                        else:
+                            payload.update(gems=0, gems_earned=0, gems_spent=0)
+                            db("player_data").insert(payload).execute()
+                        _log_event(aid, "god", 1, prog["god_wins"], "günün şampiyonu " + day)
+    except Exception:
+        app.logger.exception("günlük şampiyon yazılamadı")
+        return {}
+    with _champ_lock:
+        _champ_cache[day] = champ
+        for k in sorted(_champ_cache)[:-10]:
+            _champ_cache.pop(k, None)
+    return champ
+
+
+def _champion_tick():
+    """Dünün şampiyonu ödülünü aldı mı? (ucuz: gün başına bir kez sorgu)"""
+    try:
+        return _award_champion(_server_day(-1))
+    except Exception:
+        return {}
+
+
+@app.route("/daily/scores", methods=["GET"])
+def daily_scores():
+    """Bugünün sıralaması + dünün şampiyonu + gece yarısına kalan süre."""
+    if not supabase:
+        return jsonify({"error": "Supabase bağlantısı yapılandırılmamış!"}), 500
+    try:
+        champ = _champion_tick()
+        day = _server_day(0)
+        rows = _day_top(day, 20)
+        st, en = _day_bounds(day)
+        out = [{k: r.get(k) for k in ("name", "score", "kills", "wave", "run_time", "diff", "skin")}
+               for r in rows]
+        return jsonify({"day": day, "scores": out, "ends_in": max(0, int(en - time.time())),
+                        "champion": {k: champ.get(k) for k in ("name", "score", "day", "skin")} if champ else None,
+                        "god_days": GOD_DAYS})
+    except Exception as e:
+        return _oops(e)
 
 
 # ---- eski steam uçları (oyun artık kullanmıyor, varsayılan kapalı) ----
