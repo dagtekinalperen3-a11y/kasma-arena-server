@@ -2131,7 +2131,7 @@ STRINGS = {
     "god.today": _T("BUGÜNÜN LİDERİ", "TODAY'S LEADER", "LÍDER DE HOY", "HEUTIGER ANFÜHRER", "ЛИДЕР ДНЯ"),
     "god.ends": _T("GECE 00:00'A {0}", "MIDNIGHT IN {0}", "MEDIANOCHE EN {0}", "MITTERNACHT IN {0}",
                    "ДО ПОЛУНОЧИ {0}"),
-    "god.prize": _T("1.'YE: I'M GOD ROZETİ + GOD PELERİNİ (7 GÜN)", "#1 WINS: I'M GOD BADGE + GOD CAPE (7 DAYS)",
+    "god.prize": _T("GECE 00:00'DA BUGÜNÜN 1.'SİNE: I'M GOD ROZETİ + GOD PELERİNİ (7 GÜN)", "#1 WINS: I'M GOD BADGE + GOD CAPE (7 DAYS)",
                     "EL #1 GANA: INSIGNIA I'M GOD + CAPA GOD (7 DÍAS)",
                     "PLATZ 1: I'M-GOD-ABZEICHEN + GOD-UMHANG (7 TAGE)",
                     "№1 ПОЛУЧАЕТ: ЗНАЧОК I'M GOD + ПЛАЩ GOD (7 ДНЕЙ)"),
@@ -11103,7 +11103,7 @@ def draw_god_badge(surf, cx, cy, t, k=1.0):
     sx = r.x + ((t * 90) % (w + 40)) - 20
     if r.x < sx < r.right:
         pygame.draw.line(surf, (255, 250, 220), (sx, r.y + 3), (sx - 6, r.bottom - 3), 2)
-    draw_god_crown(surf, r.x + int(11 * k), r.centery, max(5.0, 6.5 * k), t, glow=False, label="")
+    draw_god_crown(surf, r.x + int(2 * k), r.centery - int(3 * k), max(7.0, 10.0 * k), t, glow=False, label="")
     draw_text(surf, txt, (r.centerx + int(6 * k), r.centery), sz, mix_col((255, 236, 150), hue_col(hue + 0.5), 0.25),
               bold=True, center=True, shadow=True)
 
@@ -11118,8 +11118,6 @@ def _draw_daily_strip(canvas, panel_rect, daily, t):
     champ = daily.get("champion") or {}
     today = (daily.get("scores") or [None])[0] or {}
     parts = []
-    if champ.get("name"):
-        parts.append("%s: %s" % (L("god.champ"), str(champ.get("name"))[:14]))
     if today.get("name"):
         parts.append("%s: %s (%s)" % (L("god.today"), str(today.get("name"))[:14], fmt_num(today.get("score", 0))))
     parts.append(L("god.ends", "%02d:%02d:%02d" % (hh, mm, ss)))
@@ -11191,9 +11189,6 @@ def _god_cape(surf, p, item, px, py, t, r, bx, by, nx, ny, col, acc, sp, ph):
         a = t * 1.3 + j * math.tau / 6
         sx_, sy_ = cx + math.cos(a) * r * 1.9, cy + math.sin(a) * r * 1.3
         _sparkle(surf, sx_, sy_, r * (0.18 + 0.08 * math.sin(t * 5 + j)), (255, 246, 210))
-    # 5) başın üstünde I'M GOD
-    if getattr(p, "radius", 0) >= 10:
-        draw_god_badge(surf, px, py - r * 2.6 - 4 * math.sin(t * 2.0), t, 0.72)
 
 
 NEW_CAPE_DRAW = {"cape_imgod": _god_cape}
@@ -24096,6 +24091,7 @@ class BossChest:
 #   seçilir,
 # * ardından +3 seviye (üç normal kart eli).
 KEY_COUNT = 1
+KEY_MAP_SHOW = 5.0              # görüldükten sonra küçük haritada kalma süresi (sn)
 KEY_PICK_R = 40
 KEY_SPACING = 900               # anahtarlar arası en az mesafe
 KEY_PLAYER_MIN = 700            # oyuncuya en az bu kadar uzakta doğar
@@ -37285,8 +37281,11 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
                     self.place_keys()
                     if p.alive:
                         self.fx.popup(p.x, p.y - 96, L("fx.keys_new"), KEY_COLOR, 20, life=2.2)
+        cam = self.cam_rect()
         for k in self.map_keys:
             k.update(dt)
+            if getattr(k, "seen_at", None) is None and not k.taken and cam.collidepoint(k.x, k.y):
+                k.seen_at = self.run_time       # ilk kez ekranda görüldü
             if (not k.taken and p.alive
                     and dist(k.x, k.y, p.x, p.y) < KEY_PICK_R + p.radius):
                 k.taken = True
@@ -43472,7 +43471,9 @@ def draw_minimap(surf, run, t, big=False):
 
     # anahtarlar (altın) ve efsanevi sandık (büyük, nabız gibi)
     for _mk in getattr(run, "map_keys", ()):
-        if _mk.taken:
+        # anahtar yalnız ekranda görüldükten sonra 5 sn küçük haritada belirir
+        _sa = getattr(_mk, "seen_at", None)
+        if _mk.taken or _sa is None or not (0.0 <= run.run_time - _sa <= KEY_MAP_SHOW):
             continue
         px, py = mp(_mk.x, _mk.y)
         pulse = 0.5 + 0.5 * math.sin(t * 6)
@@ -43604,9 +43605,7 @@ def draw_offscreen_markers(surf, run, cam, t):
     _lc = getattr(run, "legend_chest", None)
     if _lc is not None and not _lc.opened:
         marks.append((_lc.x, _lc.y, LEGEND_COLOR, "gem"))
-    for _mk in getattr(run, "map_keys", ()):
-        if not _mk.taken:
-            marks.append((_mk.x, _mk.y, KEY_COLOR, "key"))
+
     _rt = getattr(run, "roulette", None)
     if _rt is not None and not _rt.used:
         marks.append((_rt.x, _rt.y, _rt.color, "star"))
@@ -60750,7 +60749,7 @@ def draw_profile_title(surf, x, y, tid, t, size=12):
     return w_
 
 
-def draw_profile_banner(surf, rect, name, style, t, skin_id=None, sub=None, name_size=24):
+def draw_profile_banner(surf, rect, name, style, t, skin_id=None, sub=None, name_size=24, god=False):
     """Profil şeridi: arka plan + skin + parlayan isim + söz + çerçeve."""
     st = clean_profile_style(style)
     draw_profile_bg(surf, rect, st["bg"], t)
@@ -60783,6 +60782,12 @@ def draw_profile_banner(surf, rect, name, style, t, skin_id=None, sub=None, name
     if st.get("title"):
         tsz = 11 if name_size < 24 else 12
         ex += draw_profile_title(surf, ex, ny + name_size * 0.55 - (tsz + 10) / 2, st["title"], t, tsz) + 10
+    if god:
+        # günün dünya 1.'si (7 gün): I'M GOD rozeti profil kartında
+        gk = 1.0 if name_size >= 26 else 0.8
+        gw = text_width("I'M GOD", max(9, int(13 * gk)), True) + 30 * gk
+        draw_god_badge(surf, ex + gw / 2 + 4, ny + name_size * 0.55, t, gk)
+        ex += gw + 14
     if side:
         draw_text(surf, side, (ex + 4, ny + name_size * 0.35), 12,
                   (200, 205, 225), shadow=False)
@@ -60846,7 +60851,7 @@ def _app_draw_profile_editor(self, canvas, dt, mouse_pos, clicked, t):
     # ---- önizleme ----
     pv = pygame.Rect(40, 96, VIRTUAL_W - 80, 128)
     draw_profile_banner(canvas, pv, name, tryst, t, skin_id=sv.equipped_skin_id(),
-                        sub=L("pf.preview_sub"), name_size=30)
+                        sub=L("pf.preview_sub"), name_size=30, god=sv.god_active())
     trying = any(tryst.get(k) and tryst.get(k) != cur.get(k) for k in PROFILE_STYLE_SLOTS)
     if trying:
         tg = L("pf.trying")
@@ -73127,7 +73132,7 @@ def _app_update_friends(self, dt, mouse_pos, clicked, wheel_y=0.0):
             # arkadaşın kendi tasarladığı profil kartı (arka plan, çerçeve, parlama, söz)
             hb = pygame.Rect(RP.x + 8, RP.y + 8, RP.w - 16, 72)
             draw_profile_banner(canvas, hb, nm, prof.get("style"), t, skin_id=prof.get("skin") or "default",
-                                sub=stt, name_size=22)
+                                sub=stt, name_size=22, god=bool(prof.get("god")))
             circle_aa(canvas, hb.x + 66, hb.y + 14, 5, GREEN if on else (90, 90, 100))
             can_inv = coop_available() and not (self.coop is not None and self.coop.phase == "play")
             btns.append(Button((RP.right - 392, RP.y + 22, 230, 48), L("fr.invite"),
