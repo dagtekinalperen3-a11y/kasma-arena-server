@@ -2508,13 +2508,13 @@ SCORE_PUBLIC_FIELDS = ("name", "score", "kills", "wave", "run_time", "diff",
 BUILD_WEAPONS = frozenset((
     "axe", "book", "pentagram", "whip", "zemzem", "shoe", "frost", "emanet", "cloak",
     "tornado", "ghost_swords", "wolves", "tesla", "meteor", "beam", "hawk", "bats",
-    "nova", "knives", "quake"))
+    "nova", "knives", "quake", "chakram", "boulder", "runes", "vines", "scarab"))
 BUILD_BOOKS = frozenset((
     "r_armor", "r_aspd", "r_bonk", "r_bosshunter", "r_clover", "r_coin", "r_crit",
     "r_critd", "r_dashslow", "r_dmg", "r_echo", "r_evade", "r_execute", "r_hp",
     "r_hp_big", "r_killheal", "r_lasthope", "r_luck", "r_mag", "r_pierce", "r_poison",
     "r_rage", "r_regen", "r_roar", "r_spd", "r_swarm", "r_vamp", "r_wspd", "r_xp",
-    "r_ice"))
+    "r_ice", "r_moon", "r_stone", "r_rune", "r_thorns", "r_sun"))
 BUILD_DMG_EXTRA = frozenset(("gun", "bonk", "storm", "ult", "orbit", "other"))
 BUILD_MAPS = frozenset(("stone", "frost", "jungle", "desert"))
 BUILD_WEAPON_MAX = 6            # oyunda 4 yuva (+ pay)

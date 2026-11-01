@@ -14366,6 +14366,44 @@ BOOKS = [
                           rq_stat("total_healed", 5000, "Toplam 5.000 can yenile"),
                           rq_ach("wave10", "«Hayatta Kalan» başarımını aç")])},
 ]
+
+# ---- 5. paket: yeni kitaplar (her biri yeni bir silahın evrim eşi) ----
+NEW_BOOKS = [
+    {"key": "r_moon", "name": "Ay Kitabı", "max": 15,
+     "desc": "Mermilerin hızlanır, kritik vuruşların sertleşir. Ay Çarkı'nın evrim kitabı.",
+     "color": (170, 200, 255), "icon": "orbit", "rare": False,
+     "unlock": dict(text="Taş Meydan'da 10. dalgaya ulaş",
+                    reqs=[rq_stat("best_stone_wave", 10, "Taş Meydan'da 10. dalgaya ulaş")])},
+    {"key": "r_stone", "name": "Granit Kitabı", "max": 15,
+     "desc": "Zırh, can ve BONK alanı verir. Yuvarlanan Kaya'nın evrim kitabı.",
+     "color": (186, 164, 136), "icon": "shield", "rare": False,
+     "unlock": dict(text="Toplam 20 patron devir",
+                    reqs=[rq_stat("bosses", 20, "Toplam 20 patron devir")])},
+    {"key": "r_rune", "name": "Rün Kitabı", "max": 15,
+     "desc": "Silahların daha sık çalışır, daha çok tecrübe kazanırsın. Rün Tuzakları'nın evrim kitabı.",
+     "color": (110, 226, 255), "icon": "gem", "rare": False,
+     "unlock": dict(text="Toplam 3 efsanevi sandık aç",
+                    reqs=[rq_stat("legend_chests", 3, "Toplam 3 efsanevi sandık aç")])},
+    {"key": "r_thorns", "name": "Diken Kitabı", "max": 15,
+     "desc": "Sana dokunan yaratık aldığın hasarın bir kısmını geri yer; biraz can yenilersin. "
+             "Sarmaşık'ın evrim kitabı.",
+     "color": (110, 200, 90), "icon": "cross", "rare": False,
+     "unlock": dict(text="Zümrüt Orman'da 15. dalgaya ulaş",
+                    reqs=[rq_stat("best_jungle_wave", 15, "Zümrüt Orman'da 15. dalgaya ulaş")])},
+    {"key": "r_sun", "name": "Güneş Kitabı", "max": 15,
+     "desc": "Altın kazancın ve hasarın artar. Altın Bokböcekleri'nin evrim kitabı.",
+     "color": (255, 196, 70), "icon": "star", "rare": False,
+     "unlock": dict(text="Kızıl Çöl'de 15. dalgaya ulaş",
+                    reqs=[rq_stat("best_desert_wave", 15, "Kızıl Çöl'de 15. dalgaya ulaş")])},
+]
+BOOKS.extend(NEW_BOOKS)
+BOOK_GAINS.update({
+    "r_moon": (("pspeed", 0.05), ("critd", 0.05)),
+    "r_stone": (("armor", 0.012), ("hp", 7.0), ("bonk_r", 0.03)),
+    "r_rune": (("wspd", 0.022), ("xp", 0.03)),
+    "r_thorns": (("thorns", 0.16), ("regen", 0.15)),
+    "r_sun": (("coin", 0.035), ("dmg", 0.025)),
+})
 BOOK_BY_KEY = {b["key"]: b for b in BOOKS}
 # oyundan kaldırılan kitaplar. Eski kayıtlarda / sunucu birleştirmesinde geri
 # gelebilirler; yüklemede ve içe aktarmada süzülürler.
@@ -16419,6 +16457,8 @@ class Player(_AcGuard):
         elif stat == "wspd": self.weapon_speed_bonus += a
         elif stat == "evade": self.evade_pts += a
         elif stat == "ice": self.ice_book += a
+        elif stat == "thorns": self.thorns_level += a        # diken kitabı: yansıtma
+        elif stat == "pspeed": self.proj_speed_mult += a     # ay kitabı: mermi hızı
         self.book_totals[stat] = self.book_totals.get(stat, 0.0) + a
 
     def boss_hunter_bonus(self):
@@ -16489,6 +16529,7 @@ class Player(_AcGuard):
         "ghost_swords": 0.70, "wolves": 0.80, "tesla": 0.55, "meteor": 0.45,
         "beam": 0.40,
         "hawk": 0.85, "bats": 0.45, "nova": 0.35, "knives": 0.55, "quake": 0.40,
+        "chakram": 0.60, "boulder": 0.50, "runes": 0.35, "vines": 0.45, "scarab": 0.50,
     }
     # tek hedefe (patrona) aynı anda kaç parçanın değdiği.
     WEAPON_BOSS_PIECES = {"axe": None, "whip": 2, "book": 1}
@@ -21798,6 +21839,759 @@ BOSS_WEAPONS = [
          unlock=dict(text="Kızıl Çöl'de BONK ile toplam 800 düşmana vur", tkey="wu.quake",
                      reqs=[dict(rq_ach("kum_tepesi", "«Kum Tepesi» başarımını aç (Kızıl Çöl'de BONK ile toplam 800 düşmana vur)"), tkey="wq.kum_tepesi")])),
 ]
+
+# =====================================================================
+# ---- 5. paket: yeni silahlar (Ay Çarkı, Yuvarlanan Kaya, Rün Tuzakları,
+#      Sarmaşık, Altın Bokböcekleri) ----
+# =====================================================================
+# Üçü Taş Meydan'da, biri Zümrüt Orman'da, biri Kızıl Çöl'de açılır. Her biri
+# yeni bir kitapla evrilir (3 kademe). Dünya nesneleri tek bir listede
+# (RunState.nw_objs) durur; her nesnenin kendi update(dt, run) / draw(surf, t)
+# metodu var ve vuruşlar _weapon_hit / _field_damage kapısından geçer (kritik,
+# kan emme, zehir kitabı, evrim etkileri, tek-atma freni hepsi işler).
+CHAKRAM_COLOR = (150, 196, 255)
+CHAKRAM_COLOR2 = (236, 246, 255)
+BOULDER_COLOR = (168, 146, 120)
+RUNE_COLOR = (110, 226, 255)
+VINE_COLOR = (96, 196, 84)
+SCARAB_COLOR = (255, 196, 64)
+
+
+def chakram_count(lvl):
+    return 1 + (lvl >= 7) + (lvl >= 14) + (lvl >= 21)
+
+
+def chakram_range(lvl):
+    return 300.0 + 6.0 * weapon_growth(lvl)
+
+
+def boulder_count(lvl):
+    return 1 + (lvl >= 12) + (lvl >= 22)
+
+
+def boulder_size(lvl):
+    return 24.0 + 0.55 * weapon_growth(lvl)
+
+
+def rune_max(lvl):
+    return min(7, 3 + int(lvl) // 6)
+
+
+def rune_radius(lvl):
+    return 84.0 + 2.4 * weapon_growth(lvl)
+
+
+def vine_count(lvl):
+    return 1 + (lvl >= 10) + (lvl >= 20)
+
+
+def vine_len(lvl):
+    return 250.0 + 7.0 * weapon_growth(lvl)
+
+
+def scarab_count(lvl):
+    return min(6, 2 + int(lvl) // 6)
+
+
+def scarab_radius(lvl):
+    return 56.0 + 1.3 * weapon_growth(lvl)
+
+
+NEW_WEAPONS = [
+    dict(key="chakram", name="AY ÇARKI", icon="orbit", color=CHAKRAM_COLOR,
+         cd=1.7, dmg=3.3, style=None, dpl=0.060, cdl=0.986,
+         up="çark daha uzağa gider, daha sert keser; 7., 14. ve 21. seviyede bir çark daha",
+         desc="Hilal ağızlı ay çarkları en yakın yaratıklara fırlar, yol boyunca hepsini keser "
+              "ve sana geri dönerken bir kez daha biçer. 7., 14. ve 21. seviyede bir çark daha.",
+         how="Ay, Taş Meydan'ın gecesinde doğar: Taş Meydan'da 12. dalgaya ulaş.",
+         unlock=dict(text="Taş Meydan'da 12. dalgaya ulaş",
+                     reqs=[rq_stat("best_stone_wave", 12, "Taş Meydan'da 12. dalgaya ulaş")])),
+    dict(key="boulder", name="YUVARLANAN KAYA", icon="fist", color=BOULDER_COLOR,
+         cd=3.0, dmg=8.0, style=None, dpl=0.062, cdl=0.985,
+         up="kaya büyür ve daha ağır ezer; 12. ve 22. seviyede bir kaya daha",
+         desc="Kalabalığa doğru dev bir kaya yuvarlar: yolundaki her şeyi ezer, savurur ve "
+              "kısa süre sersemletir; duvarlardan seker. 12. ve 22. seviyede bir kaya daha.",
+         how="Meydanın taşı, meydanı fetheden içindir: Taş Meydan'ı bitir (25. dalga patronu).",
+         unlock=dict(text="Taş Meydan'ı bitir (25. dalga patronunu devir)",
+                     reqs=[rq_stat("stone_cleared", 1, "Taş Meydan'ın 25. dalga patronunu devir")])),
+    dict(key="runes", name="RÜN TUZAKLARI", icon="gem", color=RUNE_COLOR,
+         cd=2.2, dmg=5.0, style=None, dpl=0.060, cdl=0.985,
+         up="patlama alanı büyür, daha çok rün aynı anda kurulur",
+         desc="Kalabalığın yoluna parlayan rünler kurar. Üstüne basan yaratık rünü patlatır: "
+              "alandaki her şey hasar alır. Kurulmuş en çok 3 rün (seviyeyle 7'ye çıkar).",
+         how="Rünleri anahtarlar açar: toplam 5 efsanevi anahtar topla.",
+         unlock=dict(text="Toplam 5 efsanevi anahtar topla",
+                     reqs=[rq_stat("total_keys", 5, "Toplam 5 efsanevi anahtar topla")])),
+    dict(key="vines", name="SARMAŞIK", icon="cross", color=VINE_COLOR,
+         cd=2.8, dmg=3.1, style=None, dpl=0.060, cdl=0.986,
+         up="sarmaşık uzar ve daha sert dolar; 10. ve 20. seviyede bir dal daha",
+         desc="Yerden dikenli sarmaşıklar fışkırır: hattaki yaratıkları yaralar, ayaklarına "
+              "dolanıp yavaşlatır ve bir süre dikenleriyle kanatır.",
+         how="Orman kendini koruyana bağlanır: Zümrüt Orman'da toplam 2.500 düşman öldür.",
+         unlock=dict(text="Zümrüt Orman'da toplam 2.500 düşman öldür",
+                     reqs=[rq_stat("jungle_kills", 2500, "Zümrüt Orman'da toplam 2.500 düşman öldür")])),
+    dict(key="scarab", name="ALTIN BOKBÖCEKLERİ", icon="coin", color=SCARAB_COLOR,
+         cd=2.1, dmg=3.9, style=None, dpl=0.060, cdl=0.986,
+         up="daha çok böcek salınır, patlamaları büyür",
+         desc="Kumdan altın bokböcekleri çıkar, en yakın yaratıklara koşar ve çarptıkları yerde "
+              "altın tozuyla patlar. 1. seviyede 2, en çok 6 böcek.",
+         how="Çölün altını sabırlıya görünür: Kızıl Çöl'de toplam 2.500 düşman öldür.",
+         unlock=dict(text="Kızıl Çöl'de toplam 2.500 düşman öldür",
+                     reqs=[rq_stat("desert_kills", 2500, "Kızıl Çöl'de toplam 2.500 düşman öldür")])),
+]
+BOSS_WEAPONS.extend(NEW_WEAPONS)
+
+
+class _NwObj:
+    """Yeni silah nesnelerinin ortak tabanı."""
+    key = ""
+
+    def tier(self, run):
+        self.evo = evo_tier(run.player, self.key) if EVO_ON else 0
+        return self.evo
+
+    def col(self, base):
+        ev = getattr(self, "evo", 0)
+        return evo_color(self.key, ev) if ev else base
+
+
+class Chakram(_NwObj):
+    """Ay çarkı: hedefe doğru uçar, yol boyunca keser, oyuncuya geri döner."""
+    key = "chakram"
+    SPEED = 640.0
+    RET_SPEED = 780.0
+
+    def __init__(self, p, ang, dmg, lvl, size=1.0):
+        self.p = p
+        self.x, self.y = p.x, p.y
+        self.ang = ang
+        self.dmg = dmg
+        self.lvl = max(1, int(lvl))
+        self.range = chakram_range(self.lvl)
+        self.size = size
+        self.travel = 0.0
+        self.back = False
+        self.hits = set()
+        self.alive = True
+        self.spin = random.uniform(0, math.tau)
+        self.life = 4.0
+        self.evo = 0
+        self.trail = []
+
+    def update(self, dt, run):
+        ev = self.tier(run)
+        self.life -= dt
+        self.spin += dt * 17.0
+        ox, oy = self.x, self.y
+        p = self.p
+        if not self.back:
+            self.x += math.cos(self.ang) * self.SPEED * dt
+            self.y += math.sin(self.ang) * self.SPEED * dt
+            self.travel += self.SPEED * dt
+            if self.travel >= self.range or not ARENA_RECT.collidepoint(self.x, self.y):
+                self.back = True
+                self.hits = set()
+                if ev >= 3:
+                    # III dolunay: dönüş noktasında ay ışığı patlar
+                    rr = 70.0
+                    run.fx.shockwave(self.x, self.y, rr, CHAKRAM_COLOR2, 0.3, 3)
+                    for e in run._all_targets():
+                        if e.alive and dist(e.x, e.y, self.x, self.y) < rr + getattr(e, "radius", 12):
+                            run._weapon_hit(e, self.dmg * 0.6, kb=90, wlvl=self.lvl)
+        else:
+            d = dist(self.x, self.y, p.x, p.y)
+            step = self.RET_SPEED * dt
+            if d <= step + 12 or self.life <= 0 or not p.alive:
+                self.alive = False
+                return
+            dx, dy = (p.x - self.x) / d, (p.y - self.y) / d
+            self.x += dx * step
+            self.y += dy * step
+        rad = 15.0 * self.size * (1.25 if ev >= 2 else 1.0)
+        for e in run._all_targets():
+            if not e.alive or id(e) in self.hits:
+                continue
+            if _seg_dist(e.x, e.y, ox, oy, self.x, self.y) < rad + getattr(e, "radius", 12):
+                self.hits.add(id(e))
+                run._weapon_hit(e, self.dmg, kb=70, wlvl=self.lvl)
+                run.fx.spark(e.x, e.y, CHAKRAM_COLOR2, 0, 0, 0.18, 2.4)
+        self.trail.append((self.x, self.y))
+        if len(self.trail) > 7:
+            self.trail.pop(0)
+
+    def draw(self, surf, t):
+        col = self.col(CHAKRAM_COLOR)
+        ev = self.evo
+        R = 15.0 * self.size * (1.25 if ev >= 2 else 1.0)
+        n = len(self.trail)
+        for i, (tx, ty) in enumerate(self.trail[:-1]):
+            k = (i + 1) / float(n)
+            circle_aa(surf, tx, ty, max(1.0, R * 0.55 * k), scale_col(col, 0.25 + 0.35 * k))
+        add_glow(surf, self.x, self.y, R * (2.2 if ev >= 3 else 1.6), col, 0.40 if ev else 0.28)
+        x, y = self.x, self.y
+        # dış çark: altı hilal ağız
+        pts = []
+        for i in range(12):
+            a = self.spin + i * math.tau / 12
+            rr = R * (1.0 if i % 2 == 0 else 0.62)
+            pts.append((x + math.cos(a) * rr, y + math.sin(a) * rr))
+        poly_aa(surf, [(px_ + 1, py_ + 2) for px_, py_ in pts], OUTLINE)
+        poly_aa(surf, pts, col)
+        poly_aa(surf, [(x + (px_ - x) * 0.72, y + (py_ - y) * 0.72) for px_, py_ in pts], lighten(col, 0.35))
+        # ortada hilal ay
+        circle_aa(surf, x, y, R * 0.42, (30, 34, 60))
+        circle_aa(surf, x, y, R * 0.36, CHAKRAM_COLOR2)
+        circle_aa(surf, x + math.cos(self.spin * 0.3) * R * 0.14, y - R * 0.10, R * 0.30, (30, 34, 60))
+        if ev >= 3:
+            for i in range(3):
+                a = -self.spin * 0.5 + i * math.tau / 3
+                _sparkle(surf, x + math.cos(a) * R * 1.4, y + math.sin(a) * R * 1.4, R * 0.35, CHAKRAM_COLOR2)
+
+
+class Boulder(_NwObj):
+    """Yuvarlanan kaya: düz yuvarlanır, ezer, savurur, duvardan seker."""
+    key = "boulder"
+    SPEED = 330.0
+    LIFE = 2.4
+
+    def __init__(self, x, y, ang, dmg, lvl, r):
+        self.x, self.y = x, y
+        self.vx, self.vy = math.cos(ang) * self.SPEED, math.sin(ang) * self.SPEED
+        self.dmg = dmg
+        self.lvl = max(1, int(lvl))
+        self.r = r
+        self.rot = random.uniform(0, math.tau)
+        self.t = 0.0
+        self.alive = True
+        self.hit_t = {}
+        self.evo = 0
+        self.child = False
+        rnd = random.Random(int(x * 7 + y * 13))
+        self.shape = [0.82 + rnd.random() * 0.22 for _ in range(10)]
+
+    def _end(self, run):
+        self.alive = False
+        ev = self.evo
+        run.fx.burst(self.x, self.y, BOULDER_COLOR, n=16, speed=200, life=0.5, r=4)
+        if ev >= 2:
+            # II artçı sarsıntı: kaya dağılırken yer sarsılır
+            rr = self.r * 3.6
+            run.fx.shockwave(self.x, self.y, rr, self.col(BOULDER_COLOR), 0.35, 5)
+            for e in run._all_targets():
+                if e.alive and dist(e.x, e.y, self.x, self.y) < rr + getattr(e, "radius", 12):
+                    run._weapon_hit(e, self.dmg * 0.7, kb=140, wlvl=self.lvl)
+                    stun_enemy(e, 0.5)
+            sfx("bonk", 0.35, 0.1)
+        if ev >= 3 and not self.child:
+            # III çığ: kaya üç küçük kayaya bölünür
+            base = math.atan2(self.vy, self.vx)
+            for k in (-0.7, 0.0, 0.7):
+                b = Boulder(self.x, self.y, base + k + math.pi * 0.0, self.dmg * 0.6, self.lvl, self.r * 0.62)
+                b.child = True
+                b.t = self.LIFE * 0.45
+                b._wsrc = "boulder"
+                run.nw_objs.append(b)
+
+    def update(self, dt, run):
+        ev = self.tier(run)
+        self.t += dt
+        if self.t >= self.LIFE:
+            self._end(run)
+            return
+        self.x += self.vx * dt
+        self.y += self.vy * dt
+        sp = math.hypot(self.vx, self.vy)
+        self.rot += sp * dt / max(8.0, self.r)
+        A = ARENA_RECT
+        if self.x < A.left + self.r or self.x > A.right - self.r:
+            self.vx = -self.vx
+            self.x = clamp(self.x, A.left + self.r, A.right - self.r)
+        if self.y < A.top + self.r or self.y > A.bottom - self.r:
+            self.vy = -self.vy
+            self.y = clamp(self.y, A.top + self.r, A.bottom - self.r)
+        now = run.run_time
+        rr = self.r * (1.15 if ev >= 1 else 1.0)
+        for e in run._all_targets():
+            if not e.alive:
+                continue
+            if dist(e.x, e.y, self.x, self.y) > rr + getattr(e, "radius", 12):
+                continue
+            k = id(e)
+            if self.hit_t.get(k, -9.0) > now:
+                continue
+            self.hit_t[k] = now + (0.45 if getattr(e, "is_boss", False) else 0.8)
+            run._weapon_hit(e, self.dmg, kb=260, wlvl=self.lvl)
+            stun_enemy(e, 0.35)
+            run.fx.burst(e.x, e.y, (190, 170, 140), n=5, speed=140, life=0.3, r=3)
+        if random.random() < dt * 22:
+            run.fx.burst(self.x - self.vx * 0.06, self.y - self.vy * 0.06 + self.r * 0.6,
+                         (150, 132, 110), n=1, speed=60, life=0.45, r=3.2)
+
+    def draw(self, surf, t):
+        x, y, r = self.x, self.y, self.r
+        ev = self.evo
+        base = self.col(BOULDER_COLOR) if ev < 3 else (120, 92, 80)
+        k = clamp(1.0 - (self.t - (self.LIFE - 0.25)) / 0.25, 0.0, 1.0)
+        surf.blit(shadow_sprite(int(r * 2.2)), (int(x - r * 1.1), int(y + r * 0.55)))
+        pts = []
+        for i, f in enumerate(self.shape):
+            a = self.rot + i * math.tau / len(self.shape)
+            pts.append((x + math.cos(a) * r * f * k, y + math.sin(a) * r * f * k))
+        poly_aa(surf, [(px_ + 2, py_ + 3) for px_, py_ in pts], OUTLINE)
+        poly_aa(surf, pts, scale_col(base, 0.78))
+        poly_aa(surf, [(x + (px_ - x) * 0.80 - r * 0.10, y + (py_ - y) * 0.80 - r * 0.12) for px_, py_ in pts], base)
+        circle_aa(surf, x - r * 0.32, y - r * 0.36, r * 0.20 * k, lighten(base, 0.35))
+        # çatlaklar dönüyor (yuvarlandığı belli olsun); III'te çatlaklardan lav parlar
+        crack = (255, 120, 40) if ev >= 3 else scale_col(base, 0.45)
+        for j in range(3):
+            a = self.rot * 1.0 + j * 2.1
+            p0 = (x + math.cos(a) * r * 0.1, y + math.sin(a) * r * 0.1)
+            p1 = (x + math.cos(a + 0.4) * r * 0.55 * k, y + math.sin(a + 0.4) * r * 0.55 * k)
+            p2 = (x + math.cos(a + 0.1) * r * 0.85 * k, y + math.sin(a + 0.1) * r * 0.85 * k)
+            thick_line(surf, p0, p1, max(1.5, r * 0.08), crack)
+            thick_line(surf, p1, p2, max(1.0, r * 0.06), crack)
+        if ev >= 3:
+            add_glow(surf, x, y, r * 1.6, (255, 110, 40), 0.30 + 0.1 * math.sin(t * 8))
+        elif ev:
+            add_glow(surf, x, y, r * 1.4, base, 0.18)
+
+
+class RuneTrap(_NwObj):
+    """Rün: kurulur, üstüne basan yaratıkla patlar (ya da süresi dolunca)."""
+    key = "runes"
+    ARM = 0.45
+    LIFE = 7.0
+    TRIG = 30.0
+
+    def __init__(self, x, y, dmg, lvl, radius, delay=0.0, chain=False):
+        self.x, self.y = x, y
+        self.dmg = dmg
+        self.lvl = max(1, int(lvl))
+        self.radius = radius
+        self.t = -delay
+        self.alive = True
+        self.boom_t = -1.0
+        self.evo = 0
+        self.chain = chain
+        self.seed = random.uniform(0, 100)
+
+    def _explode(self, run):
+        ev = self.evo
+        self.boom_t = 0.0
+        col = self.col(RUNE_COLOR)
+        run.fx.shockwave(self.x, self.y, self.radius, col, 0.35, 6)
+        run.fx.ring(self.x, self.y, col, n=18, speed=self.radius * 3.0, life=0.35, r=3)
+        run.fx.burst(self.x, self.y, lighten(col, 0.4), n=10, speed=200, life=0.4, r=3)
+        for e in run._all_targets():
+            if e.alive and dist(e.x, e.y, self.x, self.y) < self.radius + getattr(e, "radius", 12):
+                run._weapon_hit(e, self.dmg, kb=130, wlvl=self.lvl)
+        sfx("explosion", 0.28, 0.12)
+        if ev >= 3 and not self.chain:
+            # III rün zinciri: patlama çevresinde üç küçük rünü tetikler
+            for i in range(3):
+                a = self.seed + i * math.tau / 3
+                d = self.radius * 1.1
+                r2 = RuneTrap(self.x + math.cos(a) * d, self.y + math.sin(a) * d, self.dmg * 0.45,
+                              self.lvl, self.radius * 0.65, delay=0.12 + 0.08 * i, chain=True)
+                r2._wsrc = "runes"
+                r2.t = r2.ARM - 0.12 - 0.08 * i
+                r2.LIFE = r2.ARM + 0.01
+                run.nw_objs.append(r2)
+
+    def update(self, dt, run):
+        self.tier(run)
+        if self.boom_t >= 0:
+            self.boom_t += dt
+            if self.boom_t > 0.3:
+                self.alive = False
+            return
+        self.t += dt
+        if self.t < 0:
+            return
+        if self.t >= self.LIFE:
+            self._explode(run)
+            return
+        if self.t >= self.ARM:
+            for e in run._all_targets():
+                if e.alive and dist(e.x, e.y, self.x, self.y) < self.TRIG + getattr(e, "radius", 12):
+                    self._explode(run)
+                    return
+
+    def draw(self, surf, t):
+        if self.t < 0:
+            return
+        col = self.col(RUNE_COLOR)
+        x, y = self.x, self.y
+        if self.boom_t >= 0:
+            k = self.boom_t / 0.3
+            add_glow(surf, x, y, self.radius * (0.6 + 0.6 * k), col, 0.6 * (1 - k))
+            return
+        armed = self.t >= self.ARM
+        pulse = 0.5 + 0.5 * math.sin(t * 6 + self.seed)
+        R = 22.0
+        add_glow(surf, x, y, R * (1.8 + 0.4 * pulse), col, (0.30 + 0.25 * pulse) if armed else 0.12)
+        ring_aa(surf, x, y, R, col if armed else scale_col(col, 0.5), 2)
+        ring_aa(surf, x, y, R * 0.66, scale_col(col, 0.7), 1)
+        rot = t * 1.4 + self.seed
+        pts = [(x + math.cos(rot + i * math.tau / 5 * 2) * R * 0.66, y + math.sin(rot + i * math.tau / 5 * 2) * R * 0.66)
+               for i in range(6)]
+        for a_, b_ in zip(pts, pts[1:]):
+            thick_line(surf, a_, b_, 1.6, lighten(col, 0.3) if armed else scale_col(col, 0.6))
+        for i in range(4):
+            a = -rot * 0.7 + i * math.tau / 4
+            circle_aa(surf, x + math.cos(a) * R, y + math.sin(a) * R, 2.4, lighten(col, 0.5))
+        if self.t > self.LIFE - 1.2:
+            # patlamak üzere: hızlı yanıp söner
+            if int(t * 12) % 2 == 0:
+                ring_aa(surf, x, y, R * 1.15, WHITE, 1)
+
+
+class VineLash(_NwObj):
+    """Sarmaşık: yerden sırayla fışkıran dikenli dal; yaralar, dolanır, kanatır."""
+    key = "vines"
+    SEG = 34.0
+    STEP_T = 0.045
+    STAY = 1.7
+
+    def __init__(self, p, ang, dmg, lvl, length):
+        self.dmg = dmg
+        self.lvl = max(1, int(lvl))
+        n = max(4, int(length / self.SEG))
+        nx, ny = -math.sin(ang), math.cos(ang)
+        ph = random.uniform(0, math.tau)
+        self.pts = []
+        for i in range(n):
+            d = 30 + i * self.SEG
+            w = math.sin(ph + i * 0.9) * 12
+            self.pts.append((p.x + math.cos(ang) * d + nx * w, p.y + math.sin(ang) * d + ny * w))
+        self.x, self.y = self.pts[len(self.pts) // 2]
+        self.t = 0.0
+        self.done = [False] * n
+        self.tick = 0.0
+        self.alive = True
+        self.evo = 0
+
+    def update(self, dt, run):
+        ev = self.tier(run)
+        self.t += dt
+        n = len(self.pts)
+        if self.t > n * self.STEP_T + self.STAY:
+            self.alive = False
+            return
+        targets = run._all_targets()
+        for i in range(n):
+            if self.done[i] or self.t < i * self.STEP_T:
+                continue
+            self.done[i] = True
+            sx, sy = self.pts[i]
+            run.fx.burst(sx, sy, VINE_COLOR, n=3, speed=90, life=0.3, r=2.4, gravity=120)
+            for e in targets:
+                if e.alive and dist(e.x, e.y, sx, sy) < 34 + getattr(e, "radius", 12):
+                    run._weapon_hit(e, self.dmg, kb=25, wlvl=self.lvl)
+                    if e.alive and hasattr(e, "apply_slow"):
+                        e.apply_slow(0.25 if ev < 2 else 0.12, 1.4)
+        # dikenler: dalın üstünde kalan yaratık yarım saniyede bir kanar
+        self.tick -= dt
+        if self.tick <= 0:
+            self.tick = 0.5
+            k = 0.18 if ev < 3 else 0.30
+            for e in targets:
+                if not e.alive:
+                    continue
+                for i, (sx, sy) in enumerate(self.pts):
+                    if self.done[i] and dist(e.x, e.y, sx, sy) < 28 + getattr(e, "radius", 12):
+                        run._field_damage(e, self.dmg * k, wlvl=self.lvl)
+                        break
+
+    def draw(self, surf, t):
+        col = self.col(VINE_COLOR)
+        ev = self.evo
+        n = len(self.pts)
+        fade = clamp((n * self.STEP_T + self.STAY - self.t) / 0.35, 0.0, 1.0)
+        shown = [self.pts[i] for i in range(n) if self.done[i]]
+        if len(shown) < 2:
+            return
+        w = 9.0 * fade
+        for a_, b_ in zip(shown, shown[1:]):
+            thick_line(surf, (a_[0] + 1, a_[1] + 2), (b_[0] + 1, b_[1] + 2), w + 3, OUTLINE)
+        for a_, b_ in zip(shown, shown[1:]):
+            thick_line(surf, a_, b_, w, scale_col(col, 0.75))
+            thick_line(surf, a_, b_, max(1.0, w * 0.4), lighten(col, 0.25))
+        for i, (sx, sy) in enumerate(shown):
+            # dikenler
+            a = i * 1.7
+            for s in (-1, 1):
+                tx, ty = sx + math.cos(a + s * 1.2) * 12 * fade, sy + math.sin(a + s * 1.2) * 12 * fade
+                thick_line(surf, (sx, sy), (tx, ty), 2.0, (60, 110, 50))
+                circle_aa(surf, tx, ty, 1.4, (230, 240, 210))
+            if i % 2 == 0:
+                # yaprak
+                la = a + math.sin(t * 3 + i) * 0.3
+                lp = [(sx, sy), (sx + math.cos(la - 0.4) * 10 * fade, sy + math.sin(la - 0.4) * 10 * fade),
+                      (sx + math.cos(la) * 16 * fade, sy + math.sin(la) * 16 * fade),
+                      (sx + math.cos(la + 0.4) * 10 * fade, sy + math.sin(la + 0.4) * 10 * fade)]
+                poly_aa(surf, lp, lighten(col, 0.15))
+            if ev >= 3 and i % 3 == 1:
+                # III yaşam ağacı: kırmızı çiçekler açar
+                circle_aa(surf, sx, sy - 4, 5 * fade, (230, 60, 90))
+                circle_aa(surf, sx, sy - 4, 2.2 * fade, (255, 220, 120))
+
+
+class Scarab(_NwObj):
+    """Altın bokböceği: en yakın yaratığa koşar, çarpınca altın tozuyla patlar."""
+    key = "scarab"
+    SPEED = 300.0
+    TURN = 7.0
+
+    def __init__(self, p, ang, dmg, lvl, radius):
+        self.x, self.y = p.x + math.cos(ang) * 22, p.y + math.sin(ang) * 22
+        self.ang = ang
+        self.dmg = dmg
+        self.lvl = max(1, int(lvl))
+        self.radius = radius
+        self.target = None
+        self.retarget = 0.0
+        self.life = 4.5
+        self.alive = True
+        self.boom = -1.0
+        self.evo = 0
+        self.leg = random.uniform(0, 10)
+
+    def _explode(self, run):
+        ev = self.evo
+        self.boom = 0.0
+        col = self.col(SCARAB_COLOR)
+        rr = self.radius * (1.2 if ev >= 2 else 1.0)
+        run.fx.shockwave(self.x, self.y, rr, col, 0.3, 4)
+        run.fx.burst(self.x, self.y, (255, 226, 120), n=12, speed=220, life=0.45, r=2.8)
+        for e in run._all_targets():
+            if e.alive and dist(e.x, e.y, self.x, self.y) < rr + getattr(e, "radius", 12):
+                died = run._weapon_hit(e, self.dmg, kb=110, wlvl=self.lvl)
+                if died and ev >= 3 and random.random() < 0.30:
+                    # III firavun hazinesi: öldürdüğü yaratıktan fazladan altın
+                    run.drop_pickup(e.x, e.y, "coin", max(1.0, getattr(e, "coin", 1.0)))
+        sfx("explosion", 0.22, 0.15)
+
+    def update(self, dt, run):
+        self.tier(run)
+        if self.boom >= 0:
+            self.boom += dt
+            if self.boom > 0.25:
+                self.alive = False
+            return
+        self.life -= dt
+        self.leg += dt * 30
+        if self.life <= 0:
+            self._explode(run)
+            return
+        self.retarget -= dt
+        if self.target is None or not self.target.alive or self.retarget <= 0:
+            self.retarget = 0.3
+            best, bd = None, 560.0
+            for e in run._all_targets():
+                if e.alive:
+                    d = dist(e.x, e.y, self.x, self.y)
+                    if d < bd:
+                        best, bd = e, d
+            self.target = best
+        if self.target is not None:
+            want = math.atan2(self.target.y - self.y, self.target.x - self.x)
+            diff = (want - self.ang + math.pi) % math.tau - math.pi
+            self.ang += clamp(diff, -self.TURN * dt, self.TURN * dt)
+            if dist(self.x, self.y, self.target.x, self.target.y) < 14 + getattr(self.target, "radius", 12):
+                self._explode(run)
+                return
+        self.x += math.cos(self.ang) * self.SPEED * dt
+        self.y += math.sin(self.ang) * self.SPEED * dt
+
+    def draw(self, surf, t):
+        col = self.col(SCARAB_COLOR)
+        x, y = self.x, self.y
+        if self.boom >= 0:
+            k = self.boom / 0.25
+            add_glow(surf, x, y, self.radius * (0.5 + 0.7 * k), col, 0.6 * (1 - k))
+            return
+        ca, sa = math.cos(self.ang), math.sin(self.ang)
+        nx, ny = -sa, ca
+
+        S = 1.5
+
+        def P(f, s_):
+            return (x + (ca * f + nx * s_) * S, y + (sa * f + ny * s_) * S)
+        add_glow(surf, x, y, 30, col, 0.32)
+        for i, f in enumerate((5, 0, -5)):
+            sw = math.sin(self.leg + i * 2.1) * 3
+            for s in (-1, 1):
+                thick_line(surf, P(f, s * 5), P(f + sw * s, s * 11), 1.6, (60, 40, 14))
+        body = [P(9, 0), P(6, 6), P(-6, 7), P(-10, 0), P(-6, -7), P(6, -6)]
+        poly_aa(surf, [(px_ + 1, py_ + 2) for px_, py_ in body], OUTLINE)
+        poly_aa(surf, body, scale_col(col, 0.8))
+        thick_line(surf, P(5, 0), P(-9, 0), 1.4, (90, 60, 16))
+        poly_aa(surf, [P(5, 1), P(3, 5), P(-6, 5.5), P(-8, 1)], lighten(col, 0.35))
+        circle_aa(surf, *P(10, 0), 3.6, (70, 46, 14))
+        if self.evo >= 3:
+            _sparkle(surf, *P(-2, 0), 6 + 2 * math.sin(t * 9), (255, 250, 210))
+
+
+def _nw_spread(base, n, gap):
+    if n <= 1:
+        return [base]
+    return [base + (i - (n - 1) / 2.0) * gap for i in range(n)]
+
+
+def _nw_aims(p, targets, n):
+    """En yakın n hedefe doğru açılar; hedef azsa en yakına doğru yelpaze."""
+    by_d = sorted(targets, key=lambda e: (e.x - p.x) ** 2 + (e.y - p.y) ** 2)
+    out = [math.atan2(e.y - p.y, e.x - p.x) for e in by_d[:n]]
+    if len(out) < n:
+        base = out[0] if out else random.uniform(0, math.tau)
+        extra = _nw_spread(base, n - len(out) + 1, 0.55)[1:]
+        out += extra
+    return out
+
+
+def _fire_chakram(run, w, lvl, dmg, targets):
+    p = run.player
+    ev = evo_tier(p, "chakram") if EVO_ON else 0
+    n = chakram_count(lvl) + (2 if ev >= 3 else 0)
+    size = 1.0 + 0.012 * weapon_growth(lvl)
+    for a in _nw_aims(p, targets, n):
+        run.nw_objs.append(Chakram(p, a, dmg, lvl, size))
+    sfx("whip", 0.25, 0.1)
+
+
+def _fire_boulder(run, w, lvl, dmg, targets):
+    p = run.player
+    near = min(targets, key=lambda e: (e.x - p.x) ** 2 + (e.y - p.y) ** 2)
+    base = math.atan2(near.y - p.y, near.x - p.x)
+    for a in _nw_spread(base, boulder_count(lvl), 0.42):
+        run.nw_objs.append(Boulder(p.x + math.cos(a) * 30, p.y + math.sin(a) * 30, a, dmg, lvl, boulder_size(lvl)))
+    sfx("bonk", 0.3, 0.1)
+
+
+def _fire_runes(run, w, lvl, dmg, targets):
+    p = run.player
+    mine = [o for o in run.nw_objs if isinstance(o, RuneTrap) and not o.chain and o.boom_t < 0]
+    room = rune_max(lvl) - len(mine)
+    if room <= 0:
+        return
+    near = sorted(targets, key=lambda e: (e.x - p.x) ** 2 + (e.y - p.y) ** 2)[:8]
+    for _ in range(min(room, 2)):
+        if near:
+            e = random.choice(near)
+            # yaratığın oyuncuya geleceği yola: aradaki mesafenin ~yarısına
+            k = random.uniform(0.35, 0.65)
+            x, y = e.x + (p.x - e.x) * k, e.y + (p.y - e.y) * k
+        else:
+            a = random.uniform(0, math.tau)
+            x, y = p.x + math.cos(a) * 120, p.y + math.sin(a) * 120
+        x += random.uniform(-25, 25)
+        y += random.uniform(-25, 25)
+        x = clamp(x, ARENA_RECT.left + 30, ARENA_RECT.right - 30)
+        y = clamp(y, ARENA_RECT.top + 30, ARENA_RECT.bottom - 30)
+        run.nw_objs.append(RuneTrap(x, y, dmg, lvl, rune_radius(lvl)))
+    run.fx.ring(p.x, p.y, RUNE_COLOR, n=8, speed=120, life=0.25, r=2)
+
+
+def _fire_vines(run, w, lvl, dmg, targets):
+    p = run.player
+    ev = evo_tier(p, "vines") if EVO_ON else 0
+    for a in _nw_aims(p, targets, vine_count(lvl) + (1 if ev >= 3 else 0)):
+        run.nw_objs.append(VineLash(p, a, dmg, lvl, vine_len(lvl)))
+
+
+def _fire_scarab(run, w, lvl, dmg, targets):
+    p = run.player
+    ev = evo_tier(p, "scarab") if EVO_ON else 0
+    n = scarab_count(lvl) + (2 if ev >= 3 else 0)
+    base = random.uniform(0, math.tau)
+    for i in range(n):
+        run.nw_objs.append(Scarab(p, base + i * math.tau / n, dmg, lvl, scarab_radius(lvl)))
+    run.fx.burst(p.x, p.y + 10, (220, 180, 100), n=8, speed=120, life=0.4, r=3)
+
+
+NEW_WEAPON_FIRE = {"chakram": _fire_chakram, "boulder": _fire_boulder, "runes": _fire_runes,
+                   "vines": _fire_vines, "scarab": _fire_scarab}
+
+
+def _sig_chakram(surf, cx, cy, r, col, t):
+    pts = []
+    for i in range(12):
+        a = t * 1.2 + i * math.tau / 12
+        rr = r * (0.95 if i % 2 == 0 else 0.60)
+        pts.append((cx + math.cos(a) * rr, cy + math.sin(a) * rr))
+    poly_aa(surf, [(x + 1, y + 2) for x, y in pts], OUTLINE)
+    poly_aa(surf, pts, col)
+    circle_aa(surf, cx, cy, r * 0.40, (30, 34, 60))
+    circle_aa(surf, cx, cy, r * 0.33, CHAKRAM_COLOR2)
+    circle_aa(surf, cx + r * 0.10, cy - r * 0.08, r * 0.27, (30, 34, 60))
+
+
+def _sig_boulder(surf, cx, cy, r, col, t):
+    rnd = random.Random(3)
+    pts = [(cx + math.cos(i * math.tau / 9) * r * (0.78 + rnd.random() * 0.2),
+            cy + math.sin(i * math.tau / 9) * r * (0.78 + rnd.random() * 0.2)) for i in range(9)]
+    poly_aa(surf, [(x + 1, y + 2) for x, y in pts], OUTLINE)
+    poly_aa(surf, pts, scale_col(col, 0.8))
+    poly_aa(surf, [(cx + (x - cx) * 0.78 - r * 0.08, cy + (y - cy) * 0.78 - r * 0.1) for x, y in pts], col)
+    thick_line(surf, (cx - r * 0.1, cy - r * 0.2), (cx + r * 0.25, cy + r * 0.2), max(1.0, r * 0.08),
+               scale_col(col, 0.45))
+    circle_aa(surf, cx - r * 0.3, cy - r * 0.32, r * 0.15, lighten(col, 0.4))
+
+
+def _sig_runes(surf, cx, cy, r, col, t):
+    add_glow(surf, cx, cy, r * 1.2, col, 0.3)
+    ring_aa(surf, cx, cy, r * 0.9, col, max(1, int(r * 0.12)))
+    pts = [(cx + math.cos(-math.pi / 2 + i * math.tau / 5 * 2) * r * 0.62,
+            cy + math.sin(-math.pi / 2 + i * math.tau / 5 * 2) * r * 0.62) for i in range(6)]
+    for a_, b_ in zip(pts, pts[1:]):
+        thick_line(surf, a_, b_, max(1.0, r * 0.10), lighten(col, 0.35))
+
+
+def _sig_vines(surf, cx, cy, r, col, t):
+    pts = [(cx - r * 0.8 + i * r * 0.32, cy + math.sin(i * 1.3) * r * 0.35) for i in range(6)]
+    for a_, b_ in zip(pts, pts[1:]):
+        thick_line(surf, a_, b_, max(2.0, r * 0.22), scale_col(col, 0.75))
+    for i, (x, y) in enumerate(pts[1:-1]):
+        s = 1 if i % 2 else -1
+        thick_line(surf, (x, y), (x + r * 0.15, y + s * r * 0.35), max(1.0, r * 0.08), (230, 240, 210))
+        poly_aa(surf, [(x, y), (x - r * 0.25, y - s * r * 0.30), (x + r * 0.05, y - s * r * 0.45)], lighten(col, 0.2))
+
+
+def _sig_scarab(surf, cx, cy, r, col, t):
+    add_glow(surf, cx, cy, r * 1.2, col, 0.25)
+    for s in (-1, 1):
+        for j in (-0.4, 0.0, 0.4):
+            thick_line(surf, (cx + s * r * 0.4, cy + j * r), (cx + s * r * 0.9, cy + j * r * 1.3),
+                       max(1.0, r * 0.08), (70, 46, 14))
+    body = [(cx, cy - r * 0.85), (cx + r * 0.55, cy - r * 0.35), (cx + r * 0.6, cy + r * 0.5),
+            (cx, cy + r * 0.85), (cx - r * 0.6, cy + r * 0.5), (cx - r * 0.55, cy - r * 0.35)]
+    poly_aa(surf, [(x + 1, y + 2) for x, y in body], OUTLINE)
+    poly_aa(surf, body, col)
+    thick_line(surf, (cx, cy - r * 0.4), (cx, cy + r * 0.8), max(1.0, r * 0.07), (110, 76, 20))
+    circle_aa(surf, cx, cy - r * 0.78, r * 0.25, (80, 54, 16))
+    circle_aa(surf, cx - r * 0.2, cy + r * 0.05, r * 0.14, lighten(col, 0.5))
+
+
+NEW_WEAPON_SIGIL = {"chakram": _sig_chakram, "boulder": _sig_boulder, "runes": _sig_runes,
+                    "vines": _sig_vines, "scarab": _sig_scarab}
+
+
+def new_weapon_stat_values(key, lvl, w):
+    g = weapon_growth(lvl)
+    if key == "chakram":
+        return [("cs.count", chakram_count(lvl), "n"), ("cs.length", chakram_range(lvl), "px")]
+    if key == "boulder":
+        return [("cs.count", boulder_count(lvl), "n"), ("cs.area", boulder_size(lvl) * 2, "px")]
+    if key == "runes":
+        return [("cs.count", rune_max(lvl), "n"), ("cs.area", rune_radius(lvl), "px")]
+    if key == "vines":
+        return [("cs.count", vine_count(lvl), "n"), ("cs.length", vine_len(lvl), "px")]
+    if key == "scarab":
+        return [("cs.count", scarab_count(lvl), "n"), ("cs.area", scarab_radius(lvl), "px")]
+    return [("cs.cd", weapon_cooldown(w, lvl), "s")]
+
+
 WEAPON_BY_KEY = {w["key"]: w for w in BOSS_WEAPONS}
 # Yetenek çubuğunda silahların hep aynı sırada görünmesi için.
 BOSS_WEAPONS_ORDER = [w["key"] for w in BOSS_WEAPONS]
@@ -32515,6 +33309,59 @@ EVO_TIERS = {
 # vuruşta değil, kare kare işleyen etkiler (evo_update)
 EVO_FIELD_PERKS = frozenset(("aegis", "shroud", "haven", "bless", "veil", "nightfall"))
 
+# ---- 5. paket evrimleri: yeni silah + yeni kitap ----
+# I. kademe 10. seviye + kitap 3, II 20 + 5, III 25 + 10 (genel kural).
+#   Ay Çarkı      + Ay Kitabı     -> HİLAL ÇARKI / KANLI AY / DOLUNAY
+#                    (kanatır, sıçrar, dönüşte ay ışığı patlaması + 2 çark daha)
+#   Yuvarlanan Kaya + Granit      -> DEV KAYA / ARTÇI SARSINTI / ÇIĞ
+#                    (sersemletir, dağılırken sarsar, üç kayaya bölünür)
+#   Rün Tuzakları + Rün Kitabı    -> ATEŞ RÜNÜ / BUZ RÜNÜ / RÜN ZİNCİRİ
+#                    (yakar, dondurur, patlama 3 küçük rünü tetikler)
+#   Sarmaşık      + Diken Kitabı  -> ZEHİRLİ SARMAŞIK / KÖK AĞI / YAŞAM AĞACI
+#                    (zehirler, köklere hapseder, öldürdükçe iyileştirir)
+#   Altın Bokböcekleri + Güneş    -> KUTSAL BÖCEK / GÜNEŞ BÖCEĞİ / FİRAVUN SÜRÜSÜ
+#                    (patlatır, yakar, +2 böcek ve fazladan altın)
+EVOLUTIONS.update({
+    "chakram": ("r_moon",   "bleed",  (176, 206, 255)),
+    "boulder": ("r_stone",  "stun",   (214, 170, 110)),
+    "runes":   ("r_rune",   "burn",   (255, 140, 70)),
+    "vines":   ("r_thorns", "poison", (130, 230, 90)),
+    "scarab":  ("r_sun",    "blast",  (255, 210, 70)),
+})
+EVO_TIERS.update({
+    "chakram": ("bleed", "chain", "execute"),
+    "boulder": ("stun", "aftershock", "sunder"),
+    "runes":   ("burn", "freeze", "blast"),
+    "vines":   ("poison", "root", "phoenix"),
+    "scarab":  ("blast", "burn", "sunder"),
+})
+EVO_COLOR_OVERRIDE.update({
+    ("chakram", 1): (176, 206, 255), ("chakram", 2): (230, 80, 100), ("chakram", 3): (255, 244, 200),
+    ("boulder", 1): (214, 170, 110), ("boulder", 2): (240, 170, 90), ("boulder", 3): (255, 110, 40),
+    ("runes", 1): (255, 140, 70), ("runes", 2): (150, 220, 255), ("runes", 3): (200, 120, 255),
+    ("vines", 1): (130, 230, 90), ("vines", 2): (90, 200, 120), ("vines", 3): (170, 240, 110),
+    ("scarab", 1): (255, 210, 70), ("scarab", 2): (255, 150, 50), ("scarab", 3): (255, 236, 140),
+})
+STRINGS.update({
+    "evo.name.chakram":  _T("HİLAL ÇARKI", "CRESCENT WHEEL", "RUEDA CRECIENTE", "SICHELRAD", "СЕРПОВОЕ КОЛЕСО"),
+    "evo.name2.chakram": _T("KANLI AY", "BLOOD MOON", "LUNA DE SANGRE", "BLUTMOND", "КРОВАВАЯ ЛУНА"),
+    "evo.name3.chakram": _T("DOLUNAY", "FULL MOON", "LUNA LLENA", "VOLLMOND", "ПОЛНОЛУНИЕ"),
+    "evo.name.boulder":  _T("DEV KAYA", "GIANT ROCK", "ROCA GIGANTE", "RIESENFELS", "ГИГАНТСКИЙ КАМЕНЬ"),
+    "evo.name2.boulder": _T("ARTÇI SARSINTI", "AFTERSHOCK", "RÉPLICA", "NACHBEBEN", "АФТЕРШОК"),
+    "evo.name3.boulder": _T("ÇIĞ", "AVALANCHE", "AVALANCHA", "LAWINE", "ЛАВИНА"),
+    "evo.name.runes":    _T("ATEŞ RÜNÜ", "FIRE RUNE", "RUNA DE FUEGO", "FEUERRUNE", "РУНА ОГНЯ"),
+    "evo.name2.runes":   _T("BUZ RÜNÜ", "FROST RUNE", "RUNA DE HIELO", "FROSTRUNE", "РУНА ЛЬДА"),
+    "evo.name3.runes":   _T("RÜN ZİNCİRİ", "RUNE CHAIN", "CADENA RÚNICA", "RUNENKETTE", "ЦЕПЬ РУН"),
+    "evo.name.vines":    _T("ZEHİRLİ SARMAŞIK", "VENOM VINE", "ENREDADERA VENENOSA", "GIFTRANKE", "ЯДОВИТАЯ ЛОЗА"),
+    "evo.name2.vines":   _T("KÖK AĞI", "ROOT WEB", "RED DE RAÍCES", "WURZELNETZ", "СЕТЬ КОРНЕЙ"),
+    "evo.name3.vines":   _T("YAŞAM AĞACI", "TREE OF LIFE", "ÁRBOL DE LA VIDA", "LEBENSBAUM", "ДРЕВО ЖИЗНИ"),
+    "evo.name.scarab":   _T("KUTSAL BÖCEK", "SACRED SCARAB", "ESCARABAJO SAGRADO", "HEILIGER SKARABÄUS",
+                            "СВЯЩЕННЫЙ СКАРАБЕЙ"),
+    "evo.name2.scarab":  _T("GÜNEŞ BÖCEĞİ", "SUN SCARAB", "ESCARABAJO SOLAR", "SONNENSKARABÄUS", "СОЛНЕЧНЫЙ СКАРАБЕЙ"),
+    "evo.name3.scarab":  _T("FİRAVUN SÜRÜSÜ", "PHARAOH SWARM", "ENJAMBRE DEL FARAÓN", "PHARAONENSCHWARM",
+                            "РОЙ ФАРАОНА"),
+})
+
 STRINGS.update({
     "evo.name.axe":          _T("KIYAMET BALTASI", "DOOM AXE", "HACHA DEL FIN", "UNTERGANGSAXT", "ТОПОР РОКА"),
     "evo.name.book":         _T("TUNÇ KALE", "BRONZE BASTION", "BASTIÓN DE BRONCE", "BRONZEBASTION", "БРОНЗОВЫЙ БАСТИОН"),
@@ -34274,6 +35121,7 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
         self.bats = []              # yarasa sürüsü yarasaları
         self.novas = []             # ayaz patlaması görselleri
         self.knives = []            # bıçak yelpazesi bıçakları
+        self.nw_objs = []           # 5. paket: çark, kaya, rün, sarmaşık, bokböceği
         self.quakes = []            # deprem halkaları
         self.bat_heal_budget = 0.0  # yarasa iyileştirmesinin saniye kovası
         self.minion_t = 0.0         # minyonların ortak saati (yörünge fazı)
@@ -36069,7 +36917,7 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
     # ---- yeni silahların dünya nesneleri ----
     WEAPON_OBJECT_LISTS = ("water_zones", "fire_rings", "tornados",
                            "flying_axes", "whip_lashes", "sword_slashes",
-                           "meteors", "beams", "bats", "novas", "knives", "quakes")
+                           "meteors", "beams", "bats", "novas", "knives", "quakes", "nw_objs")
     WEAPON_OBJECT_SRC = {"water_zones": "zemzem", "tornados": "tornado",
                          "flying_axes": "axe", "whip_lashes": "whip",
                          "sword_slashes": "emanet", "meteors": "meteor",
@@ -36234,6 +37082,9 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
         p = self.player
         dmg = weapon_damage(p, w, lvl)
         key = w["key"]
+        if key in NEW_WEAPON_FIRE:
+            NEW_WEAPON_FIRE[key](self, w, lvl, dmg, targets)
+            return
         nearest = min(targets, key=lambda e: dist(p.x, p.y, e.x, e.y))
         ang = math.atan2(nearest.y - p.y, nearest.x - p.x)
 
@@ -43820,6 +44671,9 @@ def draw_run(surf, run, t, aim_pos=None, shake=(0, 0), world_only=False):
         for kn in run.knives:
             if vis_near.collidepoint(kn.x, kn.y):
                 kn.draw(world, t)
+        for nw in getattr(run, "nw_objs", ()):
+            if vis_far.collidepoint(nw.x, nw.y):
+                nw.draw(world, t)
         for bt in run.bats:
             if vis_near.collidepoint(bt.x, bt.y):
                 bt.draw(world, t)
@@ -43921,6 +44775,9 @@ def blit_sigil(surf, cx, cy, r, key, col):
 
 def draw_weapon_sigil(surf, cx, cy, r, key, col, t=0.0):
     """Silaha özel, elle çizilmiş sembol."""
+    if key in NEW_WEAPON_SIGIL:
+        NEW_WEAPON_SIGIL[key](surf, cx, cy, r, col, t)
+        return
     lite = lighten(col, 0.45)
     dark = scale_col(col, 0.58)
     # Malzeme tonları, gelen rengin parlaklığına göre kısılır.
@@ -44678,6 +45535,8 @@ def weapon_stat_values(key, lvl):
     if w is None or lvl <= 0:
         return []
     g = weapon_growth(lvl)
+    if key in NEW_WEAPON_FIRE:
+        return new_weapon_stat_values(key, lvl, w)
     if key == "axe":
         return [("cs.count", weapon_count(lvl), "n")]
     if key == "book":
@@ -54119,7 +54978,7 @@ COOP_PERSONAL = (
     "offer_miss", "legend_hands", "shop_offers", "want_open_shop", "cam_x", "cam_y",
     "player_projectiles", "water_zones", "fire_rings", "sword_slashes", "tornados",
     "black_holes", "flying_axes", "whip_lashes", "ghost_blades", "wolves", "meteors",
-    "beams", "hawks", "bats", "novas", "knives", "quakes", "bat_heal_budget", "minion_t",
+    "beams", "hawks", "bats", "novas", "knives", "quakes", "nw_objs", "bat_heal_budget", "minion_t",
     "wolf_howl_cd", "penta_inside", "combo", "dmg_log", "coins_earned", "gem_coins",
     "kills", "score", "score_frac", "merchant_open", "show_map", "show_stats",
     "bonk_hits", "new_books", "new_weapons", "death_cause", "_pet", "_pet_id",
@@ -54133,7 +54992,7 @@ COOP_PERSONAL = (
 COOP_MERGE_LISTS = (
     "player_projectiles", "water_zones", "fire_rings", "sword_slashes", "tornados",
     "black_holes", "flying_axes", "whip_lashes", "ghost_blades", "wolves", "meteors",
-    "beams", "hawks", "bats", "novas", "knives", "quakes",
+    "beams", "hawks", "bats", "novas", "knives", "quakes", "nw_objs",
 )
 _COOP_CTX = [None]      # ev sahibinde o an işlenen oyuncu (hasarın kime yazılacağı)
 
@@ -57553,7 +58412,9 @@ class DeathReplay:
 # kopyasıyla) otomatik pilotla oynatılır ve pencereye küçültülüp basılır.
 # Kademe seçilince koşu bir alt kademeden başlar, kısa süre sonra evrim
 # gerçekleşir (şerit + parlama) ve yeni hâli savaşırken görünür.
-EVO_PV_SECS = 14.0              # bir döngünün süresi; sonra baştan
+EVO_PV_SECS = 16.0              # bir döngünün süresi; sonra baştan
+EVO_PV_WAVE = 10                # önizleme bu dalgada oynar (1. dalgada evrim anlaşılmıyordu)
+EVO_PV_STEP = 1.0 / 30.0        # önizleme simülasyonu sabit 30 Hz (menü kare hızından bağımsız)
 EVO_PV_EVOLVE_AT = 1.6          # döngünün bu anında evrim olur
 EVO_PV_FIRE_EVERY = 2.0         # önizlemede her silah en geç bu kadar saniyede bir atılır
 
@@ -57593,9 +58454,11 @@ class EvoPreview:
                 run.evolve_weapon(key)
             run.evo_banner = None
             run.fx = EffectSystem()
-            run.waves._begin_wave(6, 0)
+            run._focus_hint = True          # önizlemede ipucu yazıları çıkmasın
+            run._camp_warned = True
+            run.waves._begin_wave(EVO_PV_WAVE, 0)
             run.waves.announce_timer = 0.0
-            pilot = _TourPilot(run, crowd=16)
+            pilot = _TourPilot(run, crowd=18)
             orig = run.update
 
             def upd(dt, inp, _orig=orig):
@@ -57609,6 +58472,9 @@ class EvoPreview:
             self.t = 0.0
             self.evolved_now = tier <= 0
             self.err = False
+            self._acc = 0.0
+            self._dirty = True          # yeni kare çizilmeli
+            self._stepped = False       # bu karede simülasyon adımı atıldı mı
         except Exception as e:
             log_net_error("evo preview", e, ("evo", ""))
             self.run = None
@@ -57618,12 +58484,23 @@ class EvoPreview:
         if self.run is None:
             return
         self.t += dt
+        # sabit adım: simülasyon 30 Hz akar, menü 60/144 fps olsa da hız aynı.
+        # Adım ile çizim ayrı karelere düşer (iş tek kareye yığılıp takılmasın);
+        # yalnızca menü çok yavaşsa ikisi aynı karede yapılır.
+        self._acc = min(EVO_PV_STEP * 3, getattr(self, "_acc", 0.0) + dt)
+        self._stepped = False
+        if self._acc < EVO_PV_STEP or (getattr(self, "_dirty", False) and self._acc < EVO_PV_STEP * 2):
+            return
         try:
-            if not self.evolved_now and self.t >= EVO_PV_EVOLVE_AT:
-                self.evolved_now = True
-                self.run.evolve_weapon(self.key)
-            self.pilot.step(min(dt, 1 / 30))
-            self._force_fire()
+            while self._acc >= EVO_PV_STEP:
+                self._acc -= EVO_PV_STEP
+                if not self.evolved_now and self.t >= EVO_PV_EVOLVE_AT:
+                    self.evolved_now = True
+                    self.run.evolve_weapon(self.key)
+                self.pilot.step(EVO_PV_STEP)
+                self._force_fire()
+            self._dirty = True
+            self._stepped = self._acc < EVO_PV_STEP
         except Exception as e:
             log_net_error("evo preview", e, ("evo", ""))
             self.run = None
@@ -57653,28 +58530,34 @@ class EvoPreview:
         if run is None:
             pygame.draw.rect(canvas, (14, 10, 12), rect, border_radius=10)
             return
-        # görüntü iki karede bir yeniden çizilir (video gibi ~30 kare; menü akıcı kalır)
-        self._n = getattr(self, "_n", 0) + 1
+        # 30 fps "video": yeni kare yalnız simülasyon ilerleyince ve adımın
+        # atıldığı karede DEĞİL bir sonrakinde çizilir (iş iki kareye bölünür).
         img = getattr(self, "_img", None)
-        if img is not None and img.get_size() == rect.size and self._n % 2:
+        if img is not None and img.get_size() == rect.size and (
+                not getattr(self, "_dirty", True) or getattr(self, "_stepped", False)):
             canvas.blit(img, rect.topleft)
             return
+        self._dirty = False
         try:
             draw_run(self.surf, run, t, world_only=True)
         except Exception as e:
             log_net_error("evo preview", e, ("evo", ""))
             self.run = None
             return
-        # oyuncunun çevresi biraz yakından (pencere küçük)
-        cw, ch = int(rect.w * 1.25), int(rect.h * 1.25)
+        # 720p: oyun 1280x720 çiziliyor; pencere bu görüntüden BİREBİR piksel
+        # kırpılır (ölçekleme yok = bulanıklık yok, kare başına daha ucuz).
         px, py = run.world_to_screen(run.player.x, run.player.y)
-        src = pygame.Rect(0, 0, cw, ch)
-        src.center = (int(px), int(py))
-        src.clamp_ip(self.surf.get_rect())
-        try:
+        sr = self.surf.get_rect()
+        if rect.w <= sr.w and rect.h <= sr.h:
+            src = pygame.Rect(0, 0, rect.w, rect.h)
+            src.center = (int(px), int(py))
+            src.clamp_ip(sr)
+            img = self.surf.subsurface(src).copy()
+        else:
+            src = pygame.Rect(0, 0, min(sr.w, int(rect.w)), min(sr.h, int(rect.h)))
+            src.center = (int(px), int(py))
+            src.clamp_ip(sr)
             img = pygame.transform.smoothscale(self.surf.subsurface(src), rect.size)
-        except Exception:
-            img = pygame.transform.scale(self.surf.subsurface(src), rect.size)
         self._img = img
         canvas.blit(img, rect.topleft)
 
