@@ -2124,6 +2124,22 @@ STRINGS = {
                        "Partida en revisión: entrará en el ranking cuando el servidor la verifique.",
                        "Lauf wird geprüft: er kommt nach der Prüfung in die Rangliste.",
                        "Забег на проверке: попадёт в рейтинг после проверки сервером."),
+    "god.only": _T("GÜNÜN DÜNYA 1.'SİNE", "DAILY WORLD #1 ONLY", "SOLO PARA EL #1 DEL DÍA", "NUR FÜR TAGES-#1",
+                   "ТОЛЬКО ДЛЯ №1 ДНЯ"),
+    "god.champ": _T("DÜNÜN ŞAMPİYONU", "YESTERDAY'S CHAMPION", "CAMPEÓN DE AYER", "GESTRIGER CHAMPION",
+                    "ВЧЕРАШНИЙ ЧЕМПИОН"),
+    "god.today": _T("BUGÜNÜN LİDERİ", "TODAY'S LEADER", "LÍDER DE HOY", "HEUTIGER ANFÜHRER", "ЛИДЕР ДНЯ"),
+    "god.ends": _T("GECE 00:00'A {0}", "MIDNIGHT IN {0}", "MEDIANOCHE EN {0}", "MITTERNACHT IN {0}",
+                   "ДО ПОЛУНОЧИ {0}"),
+    "god.prize": _T("1.'YE: I'M GOD ROZETİ + GOD PELERİNİ (7 GÜN)", "#1 WINS: I'M GOD BADGE + GOD CAPE (7 DAYS)",
+                    "EL #1 GANA: INSIGNIA I'M GOD + CAPA GOD (7 DÍAS)",
+                    "PLATZ 1: I'M-GOD-ABZEICHEN + GOD-UMHANG (7 TAGE)",
+                    "№1 ПОЛУЧАЕТ: ЗНАЧОК I'M GOD + ПЛАЩ GOD (7 ДНЕЙ)"),
+    "god.you": _T("SEN GÜNÜN ŞAMPİYONUSUN! GOD pelerini {0} gün daha senin.",
+                  "YOU ARE THE CHAMPION! The GOD cape is yours for {0} more days.",
+                  "¡ERES EL CAMPEÓN! La capa GOD es tuya {0} días más.",
+                  "DU BIST CHAMPION! Der GOD-Umhang gehört dir noch {0} Tage.",
+                  "ТЫ ЧЕМПИОН! Плащ GOD твой ещё {0} дн."),
     "fx.keys_new":    _T("HARİTADA BİR ANAHTAR BELİRDİ", "A KEY APPEARED ON THE MAP", "APARECIÓ UNA LLAVE", "EIN SCHLÜSSEL ERSCHEINT", "ПОЯВИЛСЯ КЛЮЧ"),
     "fx.legend_open": _T("EFSANEVİ ÖDÜL!  +{0} SEVİYE", "LEGENDARY REWARD!  +{0} LEVELS", "¡RECOMPENSA LEGENDARIA!  +{0} NIVELES",
                          "LEGENDÄRE BELOHNUNG!  +{0} STUFEN", "ЛЕГЕНДАРНАЯ НАГРАДА!  +{0} УР."),
@@ -5552,6 +5568,7 @@ class SaveManager:
         "rewards", "gem_pet_bought",
         "profile_owned", "profile_style",
         "skins_rebought", "skin_reset",
+        "god_until", "god_wins",
     )
 
     def __init__(self):
@@ -6378,7 +6395,22 @@ class SaveManager:
     def equipped_cosmetic_id(self, slot):
         eq = self.data.get("equipped_cosmetics", {})
         cid = eq.get(slot)
+        if cid == "cape_imgod" and not self.god_active():
+            return None                     # GOD pelerininin süresi doldu
         return cid if cid and self.owns_cosmetic(cid) else None
+
+    def god_active(self):
+        """Günlük dünya birinciliği ödülü (I'M GOD) hâlâ sürüyor mu?"""
+        try:
+            return float(self.data.get("god_until") or 0) > time.time()
+        except (TypeError, ValueError):
+            return False
+
+    def god_days_left(self):
+        try:
+            return max(0.0, (float(self.data.get("god_until") or 0) - time.time()) / 86400.0)
+        except (TypeError, ValueError):
+            return 0.0
 
     def cosmetics_locked(self):
         """Kuşanılmış skin kendi kostümüyle mi geliyor?"""
@@ -6730,7 +6762,7 @@ def _is_paid_item(list_key, item):
     if list_key == "skins_owned":
         return bool(get_skin(item).get("premium")) and item in SKIN_BY_ID
     if list_key == "cosmetics_owned":
-        return str(item).startswith("pet_") or item == "crown_50m"
+        return str(item).startswith("pet_") or item in ("crown_50m", "cape_imgod")
     return False
 
 
@@ -8133,6 +8165,8 @@ class OnlineClient:
 
     def fetch_world_scores_async(self):
         self.flush_pending_async()
+        if self.enabled:
+            spawn(self._fetch_daily)
         if not self.enabled:
             self.world_scores = []
             self.world_error = "Çevrimiçi sunucu ayarlanmamış (yerel modda)."
@@ -8141,6 +8175,16 @@ class OnlineClient:
         self.world_error = None
         self.world_scores = None
         spawn(self._fetch_worker)
+
+    async def _fetch_daily(self):
+        """Günün sıralaması + dünün şampiyonu (I'M GOD)."""
+        try:
+            d = await http_json(self.base_url + "/daily/scores", None, WORLD_FETCH_TIMEOUT)
+            if isinstance(d, dict):
+                d["_got"] = time.time()
+                self.daily = d
+        except Exception as e:
+            log_net_error("daily", e, net_error_kind(e))
 
     async def _fetch_worker(self):
         try:
@@ -9356,6 +9400,13 @@ COSMETICS = [
          color=(110, 230, 255), accent=(235, 252, 255),
          desc="Elmastan dövülmüş efsanevi taç. Yalnızca yönetici verir.",
          perk_text="Elmas Kazancı +%50", perk_add=dict()),
+    # günlük dünya sıralamasının 1.'sine 7 günlüğüne verilen pelerin (sunucu
+    # verir, sunucu geri alır; satılmaz)
+    dict(id="cape_imgod", slot="cape", name="GOD Pelerini", cost=0, wheel_only=True, admin_only=True,
+         god_only=True, color=(28, 18, 40), accent=(255, 210, 80),
+         desc="Günün dünya birincisine 7 gün boyunca verilir: altın alevler, ışık kanatları, "
+              "yıldız tozu ve başının üstünde I'M GOD yazısı.",
+         perk_text="Hasar +%10, Deneyim +%10, Şans +%10", perk_add=dict()),
 ]
 COSMETIC_BY_ID = {c["id"]: c for c in COSMETICS}
 
@@ -9424,6 +9475,7 @@ COS_PERKS = {
     "ember_shades": (("critd", 0.08), ("dmg", 0.04)), "cape_steel": (("armor", 0.06), ("hp", 20)),
     "crown_god": (("dmg", 0.12), ("luck", 0.12)),
     "crown_50m": (("gem", 0.50),),
+    "cape_imgod": (("dmg", 0.10), ("xp", 0.10), ("luck", 0.10)),
     "samurai_helm": (("crit", 0.06), ("dmg", 0.06)), "storm_crown": (("aspd", 0.06), ("pspeed", 0.08)),
     "witch_hat": (("critd", 0.10), ("luck", 0.05)), "falcon_helm": (("speed", 12), ("pspeed", 0.08)),
     "ninja_mask": (("crit", 0.05), ("dashd", 0.10)), "dragon_eye": (("dmg", 0.05), ("critd", 0.08)),
@@ -10682,6 +10734,9 @@ def draw_cosmetic_cape(surf, p, px, py, t):
     bx, by, sp, ph = _cape_motion(p, t)
     nx, ny = -by, bx
     col, acc = item["color"], item["accent"]
+    if item["id"] in NEW_CAPE_DRAW:
+        NEW_CAPE_DRAW[item["id"]](surf, p, item, px, py, t, r, bx, by, nx, ny, col, acc, sp, ph)
+        return
     if item["id"] == "wings_angelic":
         # melek kanadı: her kanat üç sıra tüyden oluşur (uzun uçuş tüyleri,
         # orta sıra, omuzdaki kısa örtü tüyleri).
@@ -10749,6 +10804,134 @@ def draw_cosmetic_cape(surf, p, px, py, t):
                                max(1, int(2.4 * (1.0 - ph))))
     else:
         _draw_cloth_cape(surf, p, item, px, py, t, r, bx, by, nx, ny, col, acc, sp, ph)
+
+
+
+# ---- günlük dünya birinciliği: I'M GOD rozeti + GOD pelerini ----
+def _pf_god(e):
+    pf = e.get("pf") if isinstance(e, dict) else None
+    return isinstance(pf, dict) and bool(pf.get("god"))
+
+
+def draw_god_badge(surf, cx, cy, t, k=1.0):
+    """'I'M GOD' rozeti: altın-gökkuşağı akan yazı, ışınlı hap, minik taç."""
+    txt = "I'M GOD"
+    sz = max(9, int(13 * k))
+    w = text_width(txt, sz, True) + int(30 * k)
+    h = int(22 * k)
+    r = pygame.Rect(0, 0, w, h)
+    r.center = (int(cx), int(cy))
+    pulse = 0.5 + 0.5 * math.sin(t * 4.0)
+    add_glow(surf, r.centerx, r.centery, w * 0.75, (255, 200, 80), 0.30 + 0.20 * pulse)
+    for i in range(8):
+        a = t * 0.8 + i * math.tau / 8
+        ln = w * (0.55 + 0.10 * math.sin(t * 3 + i))
+        thick_line(surf, (r.centerx + math.cos(a) * w * 0.32, r.centery + math.sin(a) * h * 0.4),
+                   (r.centerx + math.cos(a) * ln, r.centery + math.sin(a) * ln * 0.55),
+                   max(1.0, 1.5 * k), scale_col((255, 210, 90), 0.35 + 0.25 * pulse), cap=False)
+    pygame.draw.rect(surf, (30, 16, 6), r.inflate(4, 4), border_radius=h)
+    pygame.draw.rect(surf, (70, 40, 10), r, border_radius=h)
+    hue = (t * 0.35) % 1.0
+    edge = mix_col((255, 214, 90), hue_col(hue), 0.35)
+    pygame.draw.rect(surf, edge, r, 2, border_radius=h)
+    # akan parıltı
+    sx = r.x + ((t * 90) % (w + 40)) - 20
+    if r.x < sx < r.right:
+        pygame.draw.line(surf, (255, 250, 220), (sx, r.y + 3), (sx - 6, r.bottom - 3), 2)
+    draw_god_crown(surf, r.x + int(11 * k), r.centery, max(5.0, 6.5 * k), t, glow=False, label="")
+    draw_text(surf, txt, (r.centerx + int(6 * k), r.centery), sz, mix_col((255, 236, 150), hue_col(hue + 0.5), 0.25),
+              bold=True, center=True, shadow=True)
+
+
+def _draw_daily_strip(canvas, panel_rect, daily, t):
+    """Dünya sıralamasının üstünde: dünün şampiyonu, bugünün lideri, geri sayım."""
+    if not isinstance(daily, dict):
+        return
+    left = int(daily.get("ends_in") or 0) - int(time.time() - float(daily.get("_got") or time.time()))
+    left = max(0, left)
+    hh, mm, ss = left // 3600, (left % 3600) // 60, left % 60
+    champ = daily.get("champion") or {}
+    today = (daily.get("scores") or [None])[0] or {}
+    parts = []
+    if champ.get("name"):
+        parts.append("%s: %s" % (L("god.champ"), str(champ.get("name"))[:14]))
+    if today.get("name"):
+        parts.append("%s: %s (%s)" % (L("god.today"), str(today.get("name"))[:14], fmt_num(today.get("score", 0))))
+    parts.append(L("god.ends", "%02d:%02d:%02d" % (hh, mm, ss)))
+    line = "   •   ".join(parts)
+    w = min(540, text_width(line, 12, True) + 70)
+    r = pygame.Rect(0, 0, int(w), 24)
+    r.midtop = (panel_rect.centerx + 20, panel_rect.y + 48)
+    pulse = 0.5 + 0.5 * math.sin(t * 3)
+    add_glow(canvas, r.centerx, r.centery, r.w * 0.55, (255, 200, 80), 0.10 + 0.06 * pulse)
+    pygame.draw.rect(canvas, (44, 28, 10), r, border_radius=13)
+    ink_frame(canvas, r, (255, 206, 90), 13, 2)
+    draw_god_crown(canvas, r.x + 18, r.centery + 1, 8, t, glow=False, label="")
+    draw_text(canvas, _fit_text(line, 12, r.w - 44, bold=True), (r.x + 34, r.y + 5), 12, (255, 228, 160),
+              bold=True, shadow=False)
+    draw_text(canvas, _fit_text(L("god.prize"), 10, r.w), (r.centerx, r.y - 13), 10, (230, 196, 120),
+              center=True, shadow=False)
+
+
+def _god_cape(surf, p, item, px, py, t, r, bx, by, nx, ny, col, acc, sp, ph):
+    """GOD pelerini: arkada dönen altın ışın halesi + ışıktan kanatlar, siyah-altın
+    kumaş üstünde akan altın alev ve yıldız tozu, başın üstünde I'M GOD."""
+    pulse = 0.5 + 0.5 * math.sin(t * 3.2)
+    cx, cy = px + bx * r * 0.9, py + by * r * 0.9
+    # 1) ışın halesi
+    add_glow(surf, px, py, r * 5.5, (255, 190, 60), 0.30 + 0.14 * pulse)
+    add_glow(surf, px, py, r * 2.6, (255, 240, 200), 0.22 + 0.10 * pulse)
+    for i in range(16):
+        a = t * 0.45 + i * math.tau / 16
+        ln = r * (3.6 + 0.8 * math.sin(t * 2.4 + i * 1.3))
+        pts = [(px, py), (px + math.cos(a - 0.06) * ln, py + math.sin(a - 0.06) * ln),
+               (px + math.cos(a + 0.06) * ln, py + math.sin(a + 0.06) * ln)]
+        poly_alpha(surf, pts, (255, 226, 130) if i % 2 else (255, 160, 50), 70)
+    # dönen altın halka (yerde)
+    ring_aa(surf, px, py + r * 0.9, r * (2.3 + 0.15 * pulse), (255, 210, 90), 2)
+    for i in range(8):
+        a = -t * 1.2 + i * math.tau / 8
+        circle_aa(surf, px + math.cos(a) * r * 2.3, py + r * 0.9 + math.sin(a) * r * 0.75,
+                  max(1.5, r * 0.12), (255, 246, 200))
+    # 2) ışıktan kanatlar (çırparak)
+    flap = math.sin(t * 4.0)
+    base = math.atan2(by, bx)
+    for side in (-1, 1):
+        for i in range(6):
+            f = i / 5.0
+            a = base + side * (0.55 + (0.95 + flap * 0.18) * (0.25 + f * 0.75))
+            ln = r * (3.8 - f * 1.1)
+            x0, y0 = px + bx * r * 0.2, py + by * r * 0.2
+            x1, y1 = x0 + math.cos(a) * ln, y0 + math.sin(a) * ln
+            c1 = mix_col((255, 240, 190), hue_col((t * 0.2 + f * 0.3) % 1.0), 0.18)
+            add_glow(surf, x1, y1, r * 0.8, (255, 220, 140), 0.35)
+            thick_line(surf, (x0, y0), (x1, y1), max(3.0, r * (0.42 - f * 0.16)), scale_col(c1, 0.55), cap=True)
+            thick_line(surf, (x0, y0), (x1, y1), max(1.5, r * (0.20 - f * 0.07)), c1, cap=True)
+            circle_aa(surf, x1, y1, max(1.2, r * 0.09), (255, 255, 230))
+    # 3) kumaş: siyah-altın asalet pelerini
+    _draw_cloth_cape(surf, p, dict(item, id="cape_royal"), px, py, t, r, bx, by, nx, ny,
+                     (36, 22, 52), acc, sp, ph)
+    # 4) eteğe doğru akan altın alev dilleri + yıldız tozu
+    for j in range(9):
+        u = (j + 0.5) / 9.0
+        s = (t * 0.55 + j * 0.37) % 1.0
+        al = r * (1.95 + 0.5 * sp) * (0.25 + 0.75 * s)
+        off = (u - 0.5) * r * (1.6 + 1.0 * s)
+        fx_ = px + bx * (r * 0.22 + al) + nx * off
+        fy_ = py + by * (r * 0.22 + al) + ny * off
+        k = math.sin(math.pi * s)
+        add_glow(surf, fx_, fy_, r * 0.55, (255, 170, 50), 0.35 * k)
+        circle_aa(surf, fx_, fy_, max(1.0, r * 0.10 * k + 0.6), (255, 236, 160))
+    for j in range(6):
+        a = t * 1.3 + j * math.tau / 6
+        sx_, sy_ = cx + math.cos(a) * r * 1.9, cy + math.sin(a) * r * 1.3
+        _sparkle(surf, sx_, sy_, r * (0.18 + 0.08 * math.sin(t * 5 + j)), (255, 246, 210))
+    # 5) başın üstünde I'M GOD
+    if getattr(p, "radius", 0) >= 10:
+        draw_god_badge(surf, px, py - r * 2.6 - 4 * math.sin(t * 2.0), t, 0.72)
+
+
+NEW_CAPE_DRAW = {"cape_imgod": _god_cape}
 
 
 # ---- kumaş pelerin ----
@@ -66401,6 +66584,8 @@ class App:
             draw_text(canvas, L("ui.you"), (row.x + 96 + text_width(nm, 16, True),
                                       row.centery - 6), 10, GREEN, bold=True,
                       shadow=False)
+        if _pf_god(e):
+            draw_god_badge(canvas, row.x + 150 + text_width(nm, 16, True), row.centery, t, 0.75)
         self._lb_hits.append((row, e, i))
         draw_coin_label(canvas, row.x + 340, row.centery, fmt_num(e.get("score", 0)),
                         GOLD if not is_me else (190, 245, 190), 16, icon="star",
@@ -66456,6 +66641,8 @@ class App:
             draw_text(canvas, nm_fit, (x_, ny), nsz, GREEN if is_me else WHITE, bold=True)
         if pst.get("badge"):
             draw_profile_badge(canvas, x_ + nw + 14, ny + nsz * 0.6, pst["badge"], t, 10)
+        if _pf_god(e):
+            draw_god_badge(canvas, r.centerx, ny - 14, t, 1.0)
         yy = ny + nsz + 8
         if pst.get("title"):
             tw0 = text_width(profile_title_text(pst["title"]), 11, True) + 18
@@ -66522,6 +66709,9 @@ class App:
         ex = x_ + text_width(nm_fit, 16, True) + 8
         if pst.get("badge"):
             draw_profile_badge(canvas, ex + 9, ny + 10, pst["badge"], t, 8)
+            ex += 22
+        if _pf_god(e):
+            draw_god_badge(canvas, ex + 30, ny + 10, t, 0.8)
         if pst.get("title"):
             draw_profile_title(canvas, x_, ny + 22, pst["title"], t, 10)
         draw_coin_label(canvas, row.right - 92, row.centery - 8, fmt_num(e.get("score", 0)), GOLD, 17, icon="star",
@@ -66650,6 +66840,7 @@ class App:
         draw_text(canvas, L("ui.lb_sub", WORLD_LB_SIZE), (panel_rect.x + 66, panel_rect.y + 56), 12, TEXT_DIM,
                   shadow=False)
         body_top = panel_rect.y + 86
+        _draw_daily_strip(canvas, panel_rect, getattr(self.online, "daily", None), t)
         board_all = (self.online.world_scores or [])[:WORLD_LB_SIZE]
         mine_i = next((i for i, e in enumerate(board_all)
                        if my_name and str(e.get("name", "")).strip().lower() == my_name), None)
@@ -68481,7 +68672,7 @@ class App:
             sfx("click", 0.6, 0.0)
             return
         if item.get("admin_only"):
-            sfx("error", 0.5, 0.0)          # satılmaz, yalnız yönetici verir
+            sfx("error", 0.5, 0.0)          # satılmaz, yalnız yönetici / günün birincisi
             return
         if item.get("wheel_only"):
             # satılmaz: şans çarkına götür
@@ -68593,6 +68784,8 @@ class App:
                 # pet'ler elmasla değil, mağaza'dan gerçek parayla alınır (tek satır, çakışma yok)
                 draw_text(canvas, _fit_text("%s  ·  %s" % (item.get("price_hint", ""), L("ui.store")), 14, tw,
                                             bold=True), (tx, by), 14, PURPLE, bold=True)
+            elif item.get("god_only"):
+                draw_text(canvas, _fit_text(L("god.only"), 12, tw, bold=True), (tx, by + 1), 12, GOLD, bold=True)
             elif item.get("admin_only"):
                 draw_text(canvas, L("c.admin_only"), (tx, by + 1), 12, CYAN, bold=True)
             elif item.get("wheel_only"):
