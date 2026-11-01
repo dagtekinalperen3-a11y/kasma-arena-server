@@ -43836,12 +43836,19 @@ def hud_scale_pct():
         return 100
 
 
+_STRIP_K = [1.0]           # silah/kitap şeridinin ölçeği (masaüstü: doğrudan çizim)
+
+
 def draw_team_strips(surf, run, t):
     """Silah ve kitap şeritlerini ayardaki boyutta çizer."""
     pct = hud_scale_pct()
     # şeritlerin hemen altında koşu görevleri kutusu
     _oy = HUD_WEAPON_Y - 22
     qy = int(_oy + (HUD_BOOK_Y + BSLOT_CELL + 22 - _oy) * pct / 100.0) + 6
+    if pct < 99 and not MOBILE:
+        _k = pct / 100.0
+        _fs = lambda v: max(7, int(round(v * _k)))
+        qy += 2 * max(0, _fs(10) + _fs(17) // 2 + 4 - int(17 * _k))
     if MOBILE:
         _mob_team_strips(surf, run, t, pct, qy)
         return
@@ -43855,6 +43862,16 @@ def draw_team_strips(surf, run, t):
         return
     if show_q:
         draw_quest_hud(surf, run, HUD_STRIP_X - 8, qy, t)
+    if not MOBILE:
+        # masaüstü: şeritler seçilen boyutta DOĞRUDAN çizilir (eskiden tam boyda
+        # çizilip küçültülüyordu: yazılar ve simgeler bulanıklaşıyordu)
+        _STRIP_K[0] = pct / 100.0
+        try:
+            draw_weapon_slots(surf, run, t)
+            draw_book_slots(surf, run, t)
+        finally:
+            _STRIP_K[0] = 1.0
+        return
     global _GLOW_ON_ALPHA
     ox, oy = HUD_STRIP_X - 12, HUD_WEAPON_Y - 22
     w, h = 470, HUD_BOOK_Y + BSLOT_CELL + 42 - oy
@@ -43951,19 +43968,25 @@ def _mob_team_strips(surf, run, t, pct, qy):
 def draw_weapon_slots(surf, run, t):
     """Canın altındaki yatay silah şeridi."""
     p = run.player
-    cell, gap = WSLOT_CELL, WSLOT_GAP
+    k = _STRIP_K[0]
+    cell, gap = max(20, int(round(WSLOT_CELL * k))), max(3, int(round(WSLOT_GAP * k)))
     keys = [k for k in BOSS_WEAPONS_ORDER if p.weapons.get(k, 0) > 0]
     n_filled = len(keys)
     n = max(slot_max(p, 'w'), n_filled)
-    x0, y0 = HUD_STRIP_X, HUD_WEAPON_Y
+    ox, oy = HUD_STRIP_X - 12, HUD_WEAPON_Y - 22
+    x0, y0 = int(ox + 12 * k), int(oy + 22 * k)
+    fs = lambda v: max(7, int(round(v * k)))       # yazı boyu da ölçeklenir (keskin)
 
-    back = pygame.Rect(x0 - 8, y0 - 17, n * cell + (n - 1) * gap + 16, cell + 25)
+    hx = (0 if k >= 0.99 else max(0, fs(10) + fs(17) // 2 + 4 - int(17 * k)))          # küçük boyutta başlığa yer aç
+    y0 += hx
+    back = pygame.Rect(x0 - int(8 * k), y0 - int(17 * k) - hx, n * cell + (n - 1) * gap + int(16 * k),
+                       cell + int(25 * k) + hx)
     surf.blit(_slot_strip(back.w, back.h), back.topleft)
     full = n_filled >= slot_max(p, 'w')
     hcol = GOLD if full else TEXT_DIM
-    draw_text(surf, L("ui.weapons"), (back.x + 10, y0 - 15), 10, hcol, bold=True, shadow=False)
+    draw_text(surf, L("ui.weapons"), (back.x + int(10 * k), back.y + 2), fs(10), hcol, bold=True, shadow=False)
     draw_text(surf, f"{n_filled}/{slot_max(p, 'w')}",
-              (back.x + 14 + text_width(L("ui.weapons"), 10, True), y0 - 15), 10,
+              (back.x + int(14 * k) + text_width(L("ui.weapons"), fs(10), True), back.y + 2), fs(10),
               hcol if full else (104, 110, 136), bold=True, shadow=False)
 
     evolved = getattr(p, "evolved", ())
@@ -44026,31 +44049,31 @@ def draw_weapon_slots(surf, run, t):
 
         if frac > 0:
             txt = f"{remain:.1f}"
-            plaque = pygame.Rect(0, 0, text_width(txt, 12, True) + 8, 14)
+            plaque = pygame.Rect(0, 0, text_width(txt, fs(12), True) + 8, fs(14))
             plaque.center = (r.centerx, r.centery - 2)
             ps = pygame.Surface(plaque.size, pygame.SRCALPHA)
             pygame.draw.rect(ps, (15, 10, 11, 175), ps.get_rect(), border_radius=5)
             surf.blit(ps, plaque.topleft)
-            draw_text(surf, txt, (r.centerx, r.centery - 4), 12, WHITE, bold=True, center=True)
+            draw_text(surf, txt, (r.centerx, r.centery - 4), fs(12), WHITE, bold=True, center=True)
 
         # Rozet üst sağ köşede: alttaki ad yazısının üstüne binmesin.
         _level_badge(surf, r.right - 1, r.y + 1, lvl, col,
-                     maxed=lvl >= weapon_max_level(w), h=17)
+                     maxed=lvl >= weapon_max_level(w), h=fs(17))
         if is_evo or key in ready_evo:
             # evrilmiş: sol üstte EVO etiketi; evrime hazır: yanıp sönen ok
             # kademe: EVO I / II / III; bir sonrakine hazırsa etiket altın yanıp söner
             tag = (L("evo.short") + " " + EVO_ROMAN[evo_t]) if is_evo else "!"
             nxt = key in ready_evo
-            tr_ = pygame.Rect(r.x - 4, r.y - 6, text_width(tag, 9, True) + 8, 14)
+            tr_ = pygame.Rect(r.x - 4, r.y - 6, text_width(tag, fs(9), True) + 8, fs(14))
             if is_evo or pulse > 0.4:
                 pygame.draw.rect(surf, GOLD if (nxt and pulse > 0.4) or not is_evo else col, tr_,
                                  border_radius=4)
                 pygame.draw.rect(surf, INK, tr_, width=1, border_radius=4)
-                draw_text(surf, tag, tr_.center, 9, INK, bold=True, center=True, shadow=False)
-        name = _fit_text(evo_name(key, evo_t) if is_evo else w_name(w), 8, cell + gap - 7, bold=True)
+                draw_text(surf, tag, tr_.center, fs(9), INK, bold=True, center=True, shadow=False)
+        name = _fit_text(evo_name(key, evo_t) if is_evo else w_name(w), fs(8), cell + gap - 7, bold=True)
         ncol = (CLOAK_COLOR2 if invis_now else
                 (lighten(col, 0.25) if ready else (118, 124, 148)))
-        draw_text(surf, name, (r.centerx, r.bottom + 3), 8, ncol, bold=True,
+        draw_text(surf, name, (r.centerx, r.bottom + 3), fs(8), ncol, bold=True,
                   center=True, shadow=False)
 
 
@@ -44089,24 +44112,28 @@ def _slot_cool(w, h, line_col):
 def draw_book_slots(surf, run, t):
     """Silah şeridinin altındaki yatay kitap şeridi."""
     p = run.player
-    cell, gap = BSLOT_CELL, BSLOT_GAP
+    k = _STRIP_K[0]
+    fs = lambda v: max(7, int(round(v * k)))
+    cell, gap = max(18, int(round(BSLOT_CELL * k))), max(3, int(round(BSLOT_GAP * k)))
     normals = [k for k in p.books if not BOOK_BY_KEY.get(k, {}).get("rare")]
     rares = [k for k in p.books if BOOK_BY_KEY.get(k, {}).get("rare")]
     n_norm = max(slot_max(p, 'b'), len(normals))
     n_rare = max(slot_max(p, 'r'), len(rares))
     n_tot = n_norm + n_rare
-    x0, y0 = HUD_STRIP_X, HUD_BOOK_Y
+    ox, oy = HUD_STRIP_X - 12, HUD_WEAPON_Y - 22
+    x0, y0 = int(ox + 12 * k), int(oy + (HUD_BOOK_Y - oy) * k) + 2 * (0 if k >= 0.99 else max(0, fs(10) + fs(17) // 2 + 4 - int(17 * k)))
     # Nadir yuva, normallerden biraz ayrı dursun: aradaki boşluk iki katı.
     sep = gap * 2
 
     width = n_tot * cell + (n_tot - 1) * gap + sep
-    back = pygame.Rect(x0 - 8, y0 - 17, width + 16, cell + 22)
+    hx = (0 if k >= 0.99 else max(0, fs(10) + fs(17) // 2 + 4 - int(17 * k)))
+    back = pygame.Rect(x0 - int(8 * k), y0 - int(17 * k) - hx, width + int(16 * k), cell + int(22 * k) + hx)
     surf.blit(_slot_strip(back.w, back.h), back.topleft)
     full_b = len(normals) >= slot_max(p, 'b')
     hcol = GOLD if full_b else TEXT_DIM
-    draw_text(surf, L("ui.books_hud"), (back.x + 10, y0 - 15), 10, hcol, bold=True, shadow=False)
+    draw_text(surf, L("ui.books_hud"), (back.x + int(10 * k), back.y + 2), fs(10), hcol, bold=True, shadow=False)
     draw_text(surf, f"{len(normals)}/{slot_max(p, 'b')}",
-              (back.x + 14 + text_width(L("ui.books_hud"), 10, True), y0 - 15), 10,
+              (back.x + int(14 * k) + text_width(L("ui.books_hud"), fs(10), True), back.y + 2), fs(10),
               hcol if full_b else (104, 110, 136), bold=True, shadow=False)
 
     def slot_rect(i):
@@ -44139,9 +44166,9 @@ def draw_book_slots(surf, run, t):
         surf.blit(tint, r.topleft)
         ink_frame(surf, r, GOLD if rare_slot else col, 8, 3 if rare_slot else 2)
         draw_icon(surf, r.centerx, r.centery - 1, bk.get("icon", "star"), col, cell * 0.26)
-        _level_badge(surf, r.right - 1, r.y + 1, lvl, col, maxed=maxed, h=15)
-        name = _fit_text(bk_short(bk), 8, cell + gap - 7, bold=True)
-        draw_text(surf, name, (r.centerx, r.bottom + 3), 8, lighten(col, 0.2),
+        _level_badge(surf, r.right - 1, r.y + 1, lvl, col, maxed=maxed, h=fs(15))
+        name = _fit_text(bk_short(bk), fs(8), cell + gap - 7, bold=True)
+        draw_text(surf, name, (r.centerx, r.bottom + 3), fs(8), lighten(col, 0.2),
                   bold=True, center=True, shadow=False)
 
 
