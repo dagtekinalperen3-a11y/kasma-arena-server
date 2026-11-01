@@ -29550,6 +29550,50 @@ def max_alive_enemies(wave, diff="normal"):
 MOBILE_MAX_ALIVE = 120
 MOBILE_MAX_TEXTS = 26
 
+# ---- az ama güçlü yaratık (Megabonk tarzı) ----
+# Eskiden ekran yüzlerce zayıf yaratıkla doluyordu: alan silahları hepsini
+# yığın hâlinde eritiyordu, oyun bir "kıyma makinesi" gibi oynanıyordu. Şimdi
+# daha AZ yaratık doğar ama her biri daha canlı ve daha sert vurur; tek tek
+# yaratık bir tehdit olur. Ekonomi değişmesin diye her yaratığın skoru /
+# tecrübesi / altını da aynı oranda büyür (toplam kazanç aynı, öldürme sayısı
+# azalır). Patronlar etkilenmez.
+CROWD_COUNT = 0.55          # doğum başına yaratık sayısı çarpanı
+CROWD_CAP = 0.60            # aynı anda yaşayan yaratık tavanı çarpanı
+CROWD_HP = 2.10             # tek yaratığın can çarpanı
+CROWD_DMG = 1.30            # tek yaratığın hasar çarpanı (temas + mermi)
+CROWD_SPD = 1.04            # biraz daha çevik
+CROWD_LOOT = 1.0 / CROWD_COUNT   # skor / tecrübe / altın çarpanı
+CROWD_SIZE = 1.10           # güçlü yaratık biraz daha iri görünsün
+
+
+def crowd_count(n):
+    """Doğum sayısını CROWD_COUNT ile kısar (kesir rastgele yuvarlanır)."""
+    v = n * CROWD_COUNT
+    k = int(v)
+    if random.random() < v - k:
+        k += 1
+    return max(1, k)
+
+
+def crowd_scale(e):
+    """Doğan sıradan yaratığı 'az ama güçlü' kuralına göre güçlendirir."""
+    if getattr(e, "is_boss", False) or e.__dict__.get("_crowd"):
+        return
+    e._crowd = True
+    e.max_hp *= CROWD_HP
+    e.hp *= CROWD_HP
+    e.dmg *= CROWD_DMG
+    e.contact_dps *= CROWD_DMG
+    e.speed *= CROWD_SPD
+    for a in ("score", "xp", "coin"):
+        v = getattr(e, a, None)
+        if isinstance(v, (int, float)):
+            setattr(e, a, v * CROWD_LOOT)
+    for a in ("radius", "hit_r"):
+        v = getattr(e, a, None)
+        if isinstance(v, (int, float)):
+            setattr(e, a, v * CROWD_SIZE)
+
 
 # Patron varken yaratık doğumu: normal hızın bu kadarı ve normal kalabalık
 # tavanının bu kadarı.
@@ -29940,6 +29984,7 @@ class WaveManager(_AcGuard):
             gm = getattr(self, "grave_mult", 1.0)
             if gm != 1.0:
                 cap = int(cap * gm)
+            cap = max(8, int(cap * CROWD_CAP))
             if surging:
                 cap = int(cap * 1.25)       # yoğunlukta arena daha kalabalık
             if boss_time:
@@ -29975,6 +30020,7 @@ class WaveManager(_AcGuard):
             # geç dalgalarda doğum başına ek yaratık (late_wave_boost)
             count += late_wave_boost(self.wave, self.biome)[2]
             frenzy = int(self.curses.get("frenzy", 0))
+            count = crowd_count(count)
             for _ in range(count):
                 kind = self.pick_kind()
                 x, y = self.spawn_pos()
@@ -29998,6 +30044,7 @@ class WaveManager(_AcGuard):
                 if self.doom:
                     self._doomify(e_new)
                 self._late_boost(e_new)
+                crowd_scale(e_new)
                 if kind not in CURSE_KINDS:
                     self._mutate_roll(e_new)
                     self._void_roll(e_new)
@@ -30007,6 +30054,7 @@ class WaveManager(_AcGuard):
             elite_chance = 0.12 + min(0.28, self.wave * 0.008)
             if self.surge_active():
                 elite_chance += 0.10
+            elite_chance *= CROWD_COUNT      # az yaratık: elit payı da aynı kalsın
             if (not boss_time and self.wave % 5 == 0
                     and random.random() < elite_chance):
                 x, y = self.spawn_pos()
@@ -30019,6 +30067,7 @@ class WaveManager(_AcGuard):
                     if self.doom:
                         self._doomify(el)
                 self._late_boost(el)
+                crowd_scale(el)
                 if surging:
                     self._surge_buff(el)
                 enemies.append(el)
