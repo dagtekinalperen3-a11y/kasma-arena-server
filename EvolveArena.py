@@ -22683,7 +22683,7 @@ BOSS_WEAPONS = [
          unlock=dict(text="Kızıl Çöl'de 10. dalgaya ulaş", tkey="wu.meteor",
                      reqs=[dict(rq_ach("gunes_yakici", "«Güneş Yakıcı» başarımını aç (Kızıl Çöl'de 10. dalgaya ulaş)"), tkey="wq.gunes_yakici")])),
     dict(key="beam", name="GÜNEŞ IŞINI", icon="star", color=BEAM_COLOR,
-         cd=4.5, dmg=3.0, style=None, dpl=0.045, cdl=0.9125,       # 25. seviyede 0,5 sn
+         cd=4.5, dmg=3.5, style=None, dpl=0.045, cdl=0.9125,       # 25. seviyede 0,5 sn
          up="ışın uzar ve daha sık döner, 9. ve 20. seviyede bir ışın daha",
          desc="Çevrende tam tur dönen bir güneş ışını: değdiği her yaratığı bir "
               "kez yakar. 9. seviyede iki, 20. seviyede üç ışın döner.",
@@ -38355,6 +38355,17 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
                 self.fx.ring(p.x, p.y, (255, 200, 60), n=20, speed=240, life=0.4, r=3.4)
                 sfx("blaze", 0.40, 0.0)
                 return
+            # tek ışın grubu: bekleme süresi turdan kısa olunca üst üste binen
+            # 2-3 grup (özellikle dash'te) dağınık bir yelpaze gibi görünüyordu.
+            # Yeni atış, dönmekte olan grubu yeniden başlatır.
+            for b_ in self.beams:
+                if b_.alive and b_.p is p and not getattr(b_, "endless", False):
+                    b_.t = min(b_.t, BEAM_SWEEP_T * 0.12)
+                    b_.n = nb
+                    b_.length = beam_len(lvl)
+                    b_.dmg = dmg
+                    b_.hit_sets = [set() for _ in range(nb)]
+                    return
             self.beams.append(SunBeam(p, math.atan2(ady, adx), nb,
                                       beam_len(lvl), dmg, lvl))
             self.fx.ring(p.x, p.y, BEAM_COLOR, n=14, speed=200, life=0.35, r=3)
