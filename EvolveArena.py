@@ -46360,7 +46360,9 @@ def draw_sky_passes(surf, owner, t, alpha=120, shadow=True, once=False):
         else:
             kind = random.choices(("dragon", "wyvern", "phoenix"), weights=(5, 3, 2))[0]
         span, _b, _e, spd, n = SKY_KINDS[kind]
-        a = random.uniform(0, math.tau)
+        # oyun içi tek geçiş yatay uçar: dönüş 90 derecenin katı olur (hızlı,
+        # kayıpsız); rastgele açıda büyük sprite döndürmek ilk karelerde takıyordu
+        a = random.choice((0.0, math.pi)) if once else random.uniform(0, math.tau)
         dx, dy = math.cos(a), math.sin(a)
         W, H = surf.get_size()
         cx0, cy0 = W / 2 - dx * (W * 0.5 + span), H / 2 - dy * (H * 0.5 + span)
@@ -61384,7 +61386,13 @@ class DeathReplay:
             # Masaüstü: ham pikseller kopyalanır (~0.5 ms), sıkıştırma arka
             # planda zlib ile olur. zlib çalışırken Python'u kilitlemez; eski
             # JPEG kaydı her karede 5-15 ms oyunu durduruyordu (kasma).
-            raw = _replay_raw(canvas)
+            # FPS: ana iş parçacığı yalnız yüzeyi kopyalar (SDL memcpy, Python
+            # nesnesi yok); 3,7 MB'lık bayt dizisi + zlib arka planda yapılır.
+            # Eskiden bayt kopyası ana döngüde arada 20 ms'lik takılma yapıyordu.
+            try:
+                raw = ("surf", canvas.copy()) if canvas.get_bitsize() == 32 else None
+            except Exception:
+                raw = None
             if raw is not None:
                 item = (self.gen, self.clock, raw)
                 if self.th is None:
@@ -61425,11 +61433,25 @@ class DeathReplay:
 
     def _store(self, item):
         gen, t, surf = item
+        if isinstance(surf, tuple) and surf and surf[0] == "surf":
+            surf = _replay_raw(surf[1])          # arka planda ham bayta çevir
+            if surf is None:
+                return
         if isinstance(surf, tuple):
             # ham kare: zlib (Python kilidini bırakır, oyun takılmaz)
             raw, size, fmt = surf
             try:
-                data = ("z", zlib.compress(raw, 1), size, fmt)
+                # FPS: 3,7 MB tek parça sıkıştırılırken ana döngü arada 20 ms
+                # bekliyordu. Parça parça sıkıştırılır, her parçadan sonra kilit
+                # ana döngüye bırakılır (çıktı aynı zlib akışı).
+                co = zlib.compressobj(1)
+                parts = []
+                mv = memoryview(raw)
+                for i in range(0, len(mv), 262144):
+                    parts.append(co.compress(mv[i:i + 262144]))
+                    time.sleep(0)
+                parts.append(co.flush())
+                data = ("z", b"".join(parts), size, fmt)
             except Exception:
                 return
             if gen == self.gen:
@@ -63951,6 +63973,12 @@ class App:
 
     def run_loop(self):
         gc_settle(desktop=True)
+        try:
+            # arka plan iş parçacıkları (ölüm tekrarı sıkıştırması, ağ) Python
+            # kilidini en çok 1 ms tutsun: ana döngü 5-20 ms beklemesin (takılma)
+            sys.setswitchinterval(0.001)
+        except Exception:
+            pass
         state_prev = self.state
         while self.running:
             self.frame()
