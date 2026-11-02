@@ -11144,8 +11144,9 @@ def draw_god_badge(surf, cx, cy, t, k=1.0):
 
 
 def _draw_daily_strip(canvas, panel_rect, daily, t):
-    """Dünya sıralamasının üstünde: dünün şampiyonu, bugünün lideri, geri sayım."""
-    if not isinstance(daily, dict):
+    """Dünya sıralamasının üstünde: dünün şampiyonu, bugünün lideri, geri sayım.
+    Yalnız yönetici etkinliği başlattıysa ("gün" komutu) görünür."""
+    if not isinstance(daily, dict) or not daily.get("event_on"):
         return
     left = int(daily.get("ends_in") or 0) - int(time.time() - float(daily.get("_got") or time.time()))
     left = max(0, left)
@@ -51126,6 +51127,36 @@ def parse_crown_cmd(line):
     return parts[1].strip() if len(parts) >= 2 else ""
 
 
+def parse_god_cmd(line):
+    """Günlük şampiyon (I'M GOD) yönetici komutları:
+        gün                      -> ("start", "")   etkinliği bugünden başlat
+        gün dur / gün kapat      -> ("stop", "")
+        gün durum                -> ("status", "")
+        gün sıfırla              -> ("reset", "")   herkesten rozet + pelerin
+        ver pelerin gün <ad>     -> ("give", ad)    rozet + pelerin (7 gün)
+        al pelerin gün <ad>      -> ("take", ad)
+    Komut değilse None; ad eksikse ad "" olur."""
+    tr = str.maketrans("çğıöşüÇĞİÖŞÜ", "cgiosuCGIOSU")
+    w = [x.translate(tr).lower().strip("/!") for x in str(line or "").split()]
+    raw = str(line or "").split()
+    if not w:
+        return None
+    if w[0] == "gun":
+        sub = w[1] if len(w) > 1 else ""
+        if sub in ("", "baslat", "ac"):
+            return ("start", "")
+        if sub in ("dur", "durdur", "kapat", "bitir"):
+            return ("stop", "")
+        if sub in ("durum", "?"):
+            return ("status", "")
+        if sub in ("sifirla", "temizle"):
+            return ("reset", "")
+        return None
+    if len(w) >= 3 and w[0] in ("ver", "al") and w[1] == "pelerin" and w[2] == "gun":
+        return ("give" if w[0] == "ver" else "take", raw[3].strip() if len(raw) >= 4 else "")
+    return None
+
+
 class ChatConsole:
     """Sol alttaki sohbet kutusu ve satır geçmişi."""
 
@@ -62470,6 +62501,19 @@ class App:
             elif self._chat_admin_gate():
                 self._admin_unban(target)
             return
+        god = parse_god_cmd(line)
+        # "gün" sıradan bir sohbet sözcüğü de olabilir: yalnız yöneticide komut
+        if god is not None and self._is_chat_admin():
+            op, who = god
+            if op in ("give", "take") and not who:
+                self.chat.say("kullanım: ver pelerin gün kullanıcıadı  /  al pelerin gün kullanıcıadı",
+                              TEXT_DIM)
+            elif self._chat_admin_gate():
+                if op in ("give", "take"):
+                    self._admin_god_give(who, op == "give")
+                else:
+                    self._admin_god_event(op)
+            return
         crown_to = parse_crown_cmd(line)
         if crown_to is not None:
             if not crown_to:
@@ -62589,6 +62633,71 @@ class App:
                 return
             shown = str(res.get("name") or name)
             self.chat.say("%s: 50M Tacı verildi%s" % (shown, " (zaten vardı)" if res.get("had") else ""), GOLD)
+            if shown.lower() == str((acc.account or {}).get("username") or "").lower():
+                await acc.pull_progress()
+        spawn(worker)
+
+    def _admin_god_event(self, op):
+        """Yönetici: günlük şampiyon etkinliğini başlat / durdur / durum / herkesten sıfırla."""
+        acc = self.account
+        tok = acc.token
+        self.chat.say({"start": "günlük şampiyon başlatılıyor ...", "stop": "günlük şampiyon durduruluyor ...",
+                       "status": "günlük şampiyon durumu soruluyor ...",
+                       "reset": "herkesten GOD rozeti ve pelerini alınıyor ..."}.get(op, "..."), TEXT_DIM)
+
+        async def worker():
+            path = "/admin/god_reset_all" if op == "reset" else "/admin/god_event"
+            body = {"token": tok, "device": device_id(), "device_legacy": device_id_legacy()}
+            if op != "reset":
+                body["op"] = op
+            try:
+                res = await acc._post(path, body, timeout=60)
+            except Exception as e:
+                self.chat.say("olmadı: %s" % acc._err_text(e), RED)
+                return
+            if not (isinstance(res, dict) and res.get("success")):
+                self.chat.say("olmadı: %s" % ((res or {}).get("error") if isinstance(res, dict) else "?"), RED)
+                return
+            if op == "reset":
+                self.chat.say("%d oyuncudan GOD rozeti + pelerini alındı" % int(res.get("cleared") or 0), GOLD)
+                await acc.pull_progress()
+            elif res.get("on"):
+                self.chat.say("GÜNLÜK ŞAMPİYON AÇIK (%s'den beri): her gece 00:00'da günün 1.'si "
+                              "I'M GOD rozeti + GOD pelerini alır (%s gün)" % (res.get("from"), res.get("days")),
+                              GOLD)
+            else:
+                self.chat.say("günlük şampiyon KAPALI: kimse otomatik ödül almaz", GOLD)
+            try:
+                await self.online._fetch_daily()     # sıralamadaki şerit hemen güncellensin
+            except Exception:
+                pass
+        spawn(worker)
+
+    def _admin_god_give(self, name, give):
+        """Yönetici: bir oyuncuya I'M GOD rozeti + GOD pelerini verir / alır."""
+        acc = self.account
+        name = "".join(c for c in str(name) if c.isalnum() or c == "_")[:USERNAME_MAX]
+        if not name:
+            return
+        tok = acc.token
+        self.chat.say("%s: GOD rozeti + pelerini %s ..." % (name, "veriliyor" if give else "alınıyor"), TEXT_DIM)
+
+        async def worker():
+            try:
+                res = await acc._post("/admin/god_give", {
+                    "token": tok, "device": device_id(), "device_legacy": device_id_legacy(),
+                    "name": name, "give": bool(give)}, timeout=30)
+            except Exception as e:
+                self.chat.say("olmadı: %s" % acc._err_text(e), RED)
+                return
+            if not (isinstance(res, dict) and res.get("success")):
+                self.chat.say("olmadı: %s" % ((res or {}).get("error") if isinstance(res, dict) else "?"), RED)
+                return
+            shown = str(res.get("name") or name)
+            if give:
+                self.chat.say("%s: I'M GOD rozeti + GOD pelerini verildi (7 gün)" % shown, GOLD)
+            else:
+                self.chat.say("%s: I'M GOD rozeti + GOD pelerini alındı" % shown, GOLD)
             if shown.lower() == str((acc.account or {}).get("username") or "").lower():
                 await acc.pull_progress()
         spawn(worker)

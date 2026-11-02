@@ -1580,7 +1580,7 @@ def _merge_progress(old, new, gem_cap=GEM_GAIN_CAP_PER_PUSH):
         out["books_muted"] = [b for b in out["books_muted"] if b not in REMOVED_BOOKS]
     _drop_unpaid_items(old, out, new)
     # günlük şampiyon ödülü yalnız sunucuda yazılır; süresi dolunca geri alınır
-    for k in ("god_until", "god_days", "god_wins"):
+    for k in ("god_until", "god_days", "god_wins", "god_rev"):
         if k in old:
             out[k] = old[k]
         else:
@@ -2670,7 +2670,7 @@ def _profile_summary(d):
         "best_wave": _int(st.get("best_wave"), 0), "bosses": _int(st.get("bosses"), 0),
         "books_n": len(d.get("books_owned") or []), "weapons_n": len(d.get("weapons_owned") or []),
         # günlük şampiyon: "I'M GOD" rozeti (7 gün)
-        "god": _num(d.get("god_until"), 0.0) > time.time(),
+        "god": _god_active(d),
         "god_wins": _int(d.get("god_wins"), 0),
     }
 
@@ -3171,18 +3171,31 @@ def _day_top(day, n=1):
     return rows
 
 
+# GOD_REV: bu sürümden önce (otomatik) verilmiş GOD ödülleri geçersizdir; herkesten
+# geri alınır. Bundan sonra ödül yalnız yöneticinin başlattığı etkinlikte
+# ("gün" komutu) ya da yöneticinin elle verdiği ("ver pelerin gün <ad>") ödül
+# olarak yazılır ve bu sayıyla damgalanır.
+GOD_REV = 2
+
+
 def _god_active(prog, now=None):
     now = time.time() if now is None else now
+    if _int(prog.get("god_rev"), 0) < GOD_REV:
+        return False
     return _num(prog.get("god_until"), 0.0) > now
 
 
 def _god_cleanup(prog, now=None):
-    """Süresi dolan GOD ödülünü geri alır (rozet + pelerin). Değiştiyse True."""
+    """Süresi dolan ya da geçersiz GOD ödülünü geri alır (rozet + pelerin). Değiştiyse True."""
     if _god_active(prog, now):
         return False
+    changed = False
+    if _num(prog.get("god_until"), 0.0) > 0 and _int(prog.get("god_rev"), 0) < GOD_REV:
+        prog["god_until"] = 0.0           # eski (otomatik) ödül: rozet de düşer
+        changed = True
     cos = list(prog.get("cosmetics_owned") or [])
     if GOD_COSMETIC not in cos:
-        return False
+        return changed
     prog["cosmetics_owned"] = [c for c in cos if c != GOD_COSMETIC]
     eq = dict(prog.get("equipped_cosmetics") or {})
     for k, v in list(eq.items()):
@@ -3199,6 +3212,9 @@ def _award_champion(day):
             return _champ_cache[day]
     if day < GOD_FIRST_DAY:
         return {}
+    ev = _god_event()
+    if not ev.get("on") or not ev.get("from") or day < ev["from"]:
+        return {}                       # yönetici "gün" ile başlatmadı: ödül yok
     champ = {}
     try:
         top = _day_top(day, 1)
@@ -3218,6 +3234,7 @@ def _award_champion(day):
                         days.append(day)
                         prog["god_days"] = days[-60:]
                         prog["god_wins"] = _int(prog.get("god_wins"), 0) + 1
+                        prog["god_rev"] = GOD_REV
                         cos = list(prog.get("cosmetics_owned") or [])
                         if GOD_COSMETIC not in cos:
                             cos.append(GOD_COSMETIC)
@@ -3246,6 +3263,148 @@ def _award_champion(day):
     return champ
 
 
+_god_evt_cache = {"t": 0.0, "on": False, "from": ""}
+
+
+def _god_event(fresh=False):
+    """Günlük şampiyon etkinliği açık mı? Yönetici "gün" / "gün dur" komutları
+    player_events tablosuna kind="god_evt" kaydı yazar; en son kayıt geçerlidir
+    (ayrı bir tablo / şema değişikliği gerekmez). 60 sn önbellekli."""
+    c = _god_evt_cache
+    now = time.time()
+    if not fresh and now - c["t"] < 60.0:
+        return c
+    try:
+        rows = (db("player_events").select("delta,note,at").eq("kind", "god_evt")
+                .order("at", desc=True).limit(1).execute().data or [])
+        if rows:
+            c["on"] = _int(rows[0].get("delta"), 0) > 0
+            c["from"] = str(rows[0].get("note") or "")[:10]
+        else:
+            c["on"], c["from"] = False, ""
+    except Exception:
+        app.logger.exception("god_evt okunamadı")
+    c["t"] = now
+    return c
+
+
+def _god_write(prog, give, now=None):
+    """Oyuncunun kaydına GOD ödülünü yazar (give=True) ya da geri alır."""
+    now = time.time() if now is None else now
+    cos = list(prog.get("cosmetics_owned") or [])
+    eq = dict(prog.get("equipped_cosmetics") or {})
+    if give:
+        prog["god_until"] = max(_num(prog.get("god_until"), 0.0) if _god_active(prog, now) else 0.0,
+                                now) + GOD_DAYS * 86400.0
+        prog["god_rev"] = GOD_REV
+        if GOD_COSMETIC not in cos:
+            cos.append(GOD_COSMETIC)
+        eq["cape"] = GOD_COSMETIC
+    else:
+        prog["god_until"] = 0.0
+        cos = [c for c in cos if c != GOD_COSMETIC]
+        for k, v in list(eq.items()):
+            if v == GOD_COSMETIC:
+                eq[k] = None
+    prog["cosmetics_owned"] = cos
+    prog["equipped_cosmetics"] = eq
+
+
+def _god_save(aid, row, prog):
+    payload = {"account_id": aid,
+               "data": {k: v for k, v in prog.items() if k not in ("gems", "gems_earned", "gems_spent")},
+               "updated_at": time.time()}
+    if row:
+        db("player_data").update(payload).eq("account_id", aid).execute()
+    else:
+        payload.update(gems=0, gems_earned=0, gems_spent=0)
+        db("player_data").insert(payload).execute()
+
+
+@app.route("/admin/god_event", methods=["POST"])
+def admin_god_event():
+    """Yönetici: günlük şampiyon etkinliğini başlatır / durdurur / durumunu sorar.
+    op = "start" (bugünden itibaren her gecenin 1.'si ödül alır) | "stop" | "status"."""
+    data = _body()
+    acc, err = _admin_acc(data, "/admin/god_event")
+    if err:
+        return err
+    op = str(data.get("op") or "status")
+    try:
+        if op in ("start", "stop"):
+            day = _server_day(0)
+            db("player_events").insert({"account_id": acc.get("id"), "at": time.time(), "kind": "god_evt",
+                                        "delta": 1 if op == "start" else 0, "total": 0,
+                                        "note": day}).execute()
+            with _champ_lock:
+                _champ_cache.clear()
+        ev = _god_event(fresh=True)
+        return jsonify({"success": True, "on": bool(ev.get("on")), "from": ev.get("from") or "",
+                        "today": _server_day(0), "days": GOD_DAYS})
+    except Exception as e:
+        return _oops(e, "etkinlik güncellenemedi")
+
+
+@app.route("/admin/god_give", methods=["POST"])
+def admin_god_give():
+    """Yönetici: bir oyuncuya I'M GOD rozeti + GOD pelerini verir (give=true) ya da alır."""
+    if not _accounts_enabled():
+        return jsonify({"success": False, "error": "hesap sistemi kapalı"}), 503
+    data = _body()
+    acc, err = _admin_acc(data, "/admin/god_give")
+    if err:
+        return err
+    give = bool(data.get("give", True))
+    tgt = _account_named(data.get("name"))
+    if not tgt:
+        return jsonify({"success": False, "error": "bu adda oyuncu yok"}), 404
+    tid = tgt.get("id")
+    try:
+        with _acct_lock(tid):
+            row = _player_row(tid)
+            prog = _stored_progress(row)
+            had = _god_active(prog)
+            _god_write(prog, give)
+            _god_save(tid, row, prog)
+        _log_event(tid, "god", 1 if give else -1, _int(prog.get("god_wins"), 0),
+                   ("yönetici %s: %s" % ("verdi" if give else "aldı", acc.get("username")))[:120])
+    except Exception as e:
+        return _oops(e, "GOD ödülü yazılamadı")
+    return jsonify({"success": True, "name": tgt.get("username"), "give": give, "had": had,
+                    "until": _num(prog.get("god_until"), 0.0)})
+
+
+@app.route("/admin/god_reset_all", methods=["POST"])
+def admin_god_reset_all():
+    """Yönetici: herkesten GOD rozeti + pelerini geri alır (tek seferlik temizlik)."""
+    data = _body()
+    acc, err = _admin_acc(data, "/admin/god_reset_all")
+    if err:
+        return err
+    n = 0
+    try:
+        rows = db("player_data").select("account_id,data").execute().data or []
+        for r in rows:
+            prog = r.get("data") or {}
+            if not isinstance(prog, dict):
+                continue
+            cos = prog.get("cosmetics_owned") or []
+            if _num(prog.get("god_until"), 0.0) <= 0 and GOD_COSMETIC not in cos:
+                continue
+            aid = r.get("account_id")
+            with _acct_lock(aid):
+                row = _player_row(aid)
+                p2 = _stored_progress(row)
+                _god_write(p2, False)
+                _god_save(aid, row, p2)
+            n += 1
+        with _champ_lock:
+            _champ_cache.clear()
+    except Exception as e:
+        return _oops(e, "temizlenemedi")
+    return jsonify({"success": True, "cleared": n})
+
+
 def _champion_tick():
     """Dünün şampiyonu ödülünü aldı mı? (ucuz: gün başına bir kez sorgu)"""
     try:
@@ -3268,7 +3427,7 @@ def daily_scores():
                for r in rows]
         return jsonify({"day": day, "scores": out, "ends_in": max(0, int(en - time.time())),
                         "champion": {k: champ.get(k) for k in ("name", "score", "day", "skin")} if champ else None,
-                        "god_days": GOD_DAYS})
+                        "god_days": GOD_DAYS, "event_on": bool(_god_event().get("on"))})
     except Exception as e:
         return _oops(e)
 
@@ -5145,7 +5304,7 @@ def social_profile():
            "skins": _n(row.get("skin_count")) or len(prog.get("skins_owned") or []),
            "skin": str(prog.get("equipped_skin") or "default")[:40],
            "style": _clean_profile_style(prog.get("profile_style"), prog.get("profile_owned")),
-           "god": _num(prog.get("god_until"), 0.0) > time.time(),
+           "god": _god_active(prog),
            "banned": bool(prog.get("board_banned"))}
     on, stt = _presence(tid)
     out["online"], out["status"] = on, stt
