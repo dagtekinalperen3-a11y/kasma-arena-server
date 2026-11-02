@@ -457,9 +457,11 @@ def web_restore_files():
 
 
 # ---- arka plan işleri ----
-def gc_settle():
-    """Çöp toplayıcıyı oyuna uygun hale getirir (yalnız web/telefon)."""
-    if not (IS_WEB or MOBILE):
+def gc_settle(desktop=False):
+    """Çöp toplayıcıyı oyuna uygun hale getirir. Masaüstünde de (desktop=True)
+    ekran geçişlerinde çağrılır: o ana dek kurulan her şey (görseller, tablolar)
+    donar, sık ve uzun toplama turları oyunun ortasında takılma yapmaz."""
+    if not (IS_WEB or MOBILE or desktop):
         return
     try:
         import gc
@@ -4712,8 +4714,10 @@ def add_glow(surf, x, y, r, color, k=1.0):
 
 
 def mob_rle(s):
-    """telefon: saydam önbellek yüzeyini RLE ile hızlandırır."""
-    if MOBILE and s is not None:
+    """Saydam, bir daha üstüne çizilmeyen önbellek yüzeyini RLE ile hızlandırır.
+    FPS: önceden yalnız telefonda açıktı; masaüstünde de yaratık / eşya / can
+    çubuğu blit'lerini ~%30 ucuzlatıyor (geç dalgada kare başına ~3 ms)."""
+    if s is not None:
         try:
             s.set_alpha(255, pygame.RLEACCEL)
         except Exception:
@@ -21760,15 +21764,32 @@ class SunBeam:
         self.ang += math.tau / BEAM_SWEEP_T * dt
         kb = BEAM_PUSH_KB if ev >= 2 else 45
         fx_left = 3
+        # FPS: önce ışının erişemeyeceği yaratıklar tek bir daire denetimiyle
+        # elenir; kalanlar için doğru parçasına uzaklık satır içinde, kare
+        # uzaklıkla (kök yok) hesaplanır. Sonuç _seg_dist ile birebir aynı.
+        px_, py_, L_ = self.x, self.y, self.length
+        reach = L_ + BEAM_WIDTH + 90.0
+        reach2 = reach * reach
+        near = []
+        for e in run._all_targets():
+            if e.alive:
+                dx_, dy_ = e.x - px_, e.y - py_
+                if dx_ * dx_ + dy_ * dy_ < reach2:
+                    near.append((e, dx_, dy_, BEAM_WIDTH + getattr(e, "radius", 12)))
+        ll_ = L_ * L_ if L_ > 1e-6 else 1e-6
         for i in range(self.n):
             a = self.ang + i * math.tau / self.n
-            ex = self.x + math.cos(a) * self.length
-            ey = self.y + math.sin(a) * self.length
+            vx_, vy_ = math.cos(a) * L_, math.sin(a) * L_
+            ex = px_ + vx_
+            ey = py_ + vy_
             hs = self.hit_sets[i]
-            for e in run._all_targets():
-                if not e.alive or id(e) in hs:
+            for e, dx_, dy_, lim in near:
+                if not e.alive or id(e) in hs:      # önceki ışın öldürmüş olabilir
                     continue
-                if _seg_dist(e.x, e.y, self.x, self.y, ex, ey) < BEAM_WIDTH + getattr(e, "radius", 12):
+                k_ = (dx_ * vx_ + dy_ * vy_) / ll_
+                k_ = 0.0 if k_ < 0.0 else (1.0 if k_ > 1.0 else k_)
+                qx_, qy_ = dx_ - vx_ * k_, dy_ - vy_ * k_
+                if qx_ * qx_ + qy_ * qy_ < lim * lim:
                     hs.add(id(e))
                     run._weapon_hit(e, self.dmg, kb=kb, wlvl=self.lvl)
                     if fx_left > 0:
@@ -39630,10 +39651,13 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
     # Artık birleştirme yok: her yaratık kendi altınını ve tecrübesini ayrı
     # düşürür. Yalnız yerde çok fazla eşya birikirse (kare hızı) en yakın
     # yığına katılır; kazanç kaybolmaz.
-    PICKUP_SOFT_CAP = 520
+    # FPS: yerde yüzlerce para/taş birikince hem güncelleme hem çizim
+    # pahalanıyordu (geç dalgada 540+). Yığınlar daha erken birleşir; kazanç
+    # kaybolmaz, yalnızca ekrandaki nesne sayısı azalır.
+    PICKUP_SOFT_CAP = 200
     PICKUP_MERGE_R = 0.0
-    PICKUP_MERGE_R_BUSY = 60.0
-    PICKUP_HARD_CAP = 640
+    PICKUP_MERGE_R_BUSY = 90.0
+    PICKUP_HARD_CAP = 300
 
     def drop_pickup(self, x, y, kind, value):
         """Yere altın/tecrübe düşürür; yakındaki aynı türden eşyayla birleştirir."""
@@ -39641,12 +39665,12 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
             return
         merge_r = (self.PICKUP_MERGE_R_BUSY if len(self.pickups) > self.PICKUP_SOFT_CAP
                    else self.PICKUP_MERGE_R)
-        best, best_d = None, merge_r
+        best, best_d = None, merge_r * merge_r
         for pu in (self.pickups if merge_r > 0 else ()):
             if pu.kind != kind or pu.collected or pu.magnet:
                 continue
-            # altın: yalnızca yeterince yeni bir parayla birleşir.
-            d = dist(x, y, pu.x, pu.y)
+            dx_, dy_ = x - pu.x, y - pu.y
+            d = dx_ * dx_ + dy_ * dy_            # kare uzaklık (kök yok: hızlı)
             if d < best_d:
                 best, best_d = pu, d
         if best is None and len(self.pickups) >= self.PICKUP_HARD_CAP:
@@ -39655,7 +39679,8 @@ class RunState(_AcGuard, EvoMixin, WorldExtrasMixin, SkillMixin, WaveEventMixin,
             for pu in self.pickups:
                 if pu.kind != kind or pu.collected or pu.magnet:
                     continue
-                d = dist(x, y, pu.x, pu.y)
+                dx_, dy_ = x - pu.x, y - pu.y
+                d = dx_ * dx_ + dy_ * dy_
                 if best is None or d < best_d:
                     best, best_d = pu, d
         if best is not None:
@@ -45568,7 +45593,9 @@ _HUD_LAYERS = {}
 def hud_period():
     """Masaüstü HUD katmanlarının kaç karede bir tazeleneceği (yüksek 2, orta 3, düşük 5)."""
     gl = gfx_level()
-    return 2 if gl >= 2 else (3 if gl == 1 else 5)
+    # FPS: 60 FPS'te 4 karede bir = saniyede 15 tazeleme; göz farkı yok,
+    # HUD'un payı yarıya iner.
+    return 4 if gl >= 2 else (5 if gl == 1 else 6)
 
 
 def hud_layer(surf, name, run, t, draw, phase=0):
@@ -46183,6 +46210,37 @@ def _status_ring_sprite(r, slow, burn, poison):
     return img
 
 
+_SPAWN_SC = {}
+_SPAWN_STEPS = (0.3, 0.55, 0.75, 0.9)
+
+
+def _spawn_q(spawn_t):
+    """Doğuş animasyonunun hangi küçültme adımında olduğu (0..3)."""
+    k = ease_out_cubic(clamp(spawn_t / 0.3, 0.0, 1.0))
+    for i, sc in enumerate(_SPAWN_STEPS):
+        if k <= sc + 0.08:
+            return i
+    return len(_SPAWN_STEPS) - 1
+
+
+def _spawn_scaled(spr, off, q):
+    """Ortak gövdenin küçültülmüş hali (önbellekli): (görüntü, merkez payı)."""
+    key = (id(spr), q)
+    ent = _SPAWN_SC.get(key)
+    if ent is None or ent[0] is not spr:
+        if len(_SPAWN_SC) > 2000:
+            _SPAWN_SC.clear()
+        sc = _SPAWN_STEPS[q]
+        w, h = spr.get_size()
+        try:
+            img = pygame.transform.smoothscale(spr, (max(1, int(w * sc)), max(1, int(h * sc))))
+        except Exception:
+            img = pygame.transform.scale(spr, (max(1, int(w * sc)), max(1, int(h * sc))))
+        ent = (spr, img, (int(off[0] * sc), int(off[1] * sc)))
+        _SPAWN_SC[key] = ent
+    return ent[1], ent[2]
+
+
 # Bu kadar yaratığın üstünde mor / mutant / kudurmuş yaratıklar da ortak hazır
 # karelerden çizilir (üstlerinde yalnız hâle ve halka). Geç dalgada neredeyse
 # hepsi böyle ve tek tek çizilince cehennemde kare hızı 20'ye düşüyordu.
@@ -46232,6 +46290,15 @@ def _draw_enemies_fast(world, ens, t):
         blord = e.kind == "bloodlord"
         cosmetic = e.rage > 0 or e.mutant or ed.get("voidling") or blord
         status = ed.get("_freeze_t", 0.0) > 0 or ed.get("_stun_t", 0.0) > 0
+        if (e.spawn_t < 0.3 and not e.phased and e.kind != "kamikaze" and not ed.get("army")
+                and not ((cosmetic or status) and not crowd) and e._atlas_ok()):
+            # FPS: doğuş animasyonu da ortak hazır gövdeden, önbellekli birkaç
+            # küçültme adımıyla basılır. Eskiden doğan her yaratık (geç
+            # dalgada aynı anda ~90 tane) her karede baştan çiziliyordu.
+            e._ensure_shared(t, e.radius)
+            img, off = _spawn_scaled(e._spr, e._spr_off, _spawn_q(e.spawn_t))
+            batch.append((img, (int(e.x) - off[0], int(e.y) - off[1])))
+            continue
         if (e.spawn_t < 0.3 or e.phased or e.kind == "kamikaze" or ed.get("army")
                 or ((cosmetic or status) and not crowd)):
             if batch:
@@ -46406,17 +46473,22 @@ def draw_run(surf, run, t, aim_pos=None, shake=(0, 0), world_only=False):
             _fast_blits(world, _bt)
     else:
         _bt = []
+        _spk = []
         _bob = t * 4
         for pu in run.pickups:
             if vis_near.collidepoint(pu.x, pu.y):
-                if pu.kind == "coin":
-                    pu.draw(world, t)          # parıltı için
-                    continue
                 img = _pickup_sprite(pickup_sprite_kind(pu))
-                _bt.append((img, (int(pu.x) - img.get_width() // 2,
-                                  int(pu.y + math.sin(_bob + pu.bob) * 2.5) - img.get_height() // 2)))
+                _yb = int(pu.y + math.sin(_bob + pu.bob) * 2.5)
+                _bt.append((img, (int(pu.x) - img.get_width() // 2, _yb - img.get_height() // 2)))
+                if pu.kind == "coin" and ((t * 0.9 + pu.bob) % 2.2) < 0.18:
+                    _spk.append((int(pu.x), _yb, pu.bob))
         if _bt:
-            _fast_blits(world, _bt)
+            _fast_blits(world, _bt)          # FPS: paralar da tek toplu blit
+        for _x, _y, _b in _spk:              # ara sıra parlama (kalabalıkta da göze çarpsın)
+            _k = ((t * 0.9 + _b) % 2.2) / 0.18
+            _r = int(3 + 6 * math.sin(_k * math.pi))
+            pygame.draw.line(world, (255, 250, 220), (_x - _r, _y - 3), (_x + _r, _y - 3), 1)
+            pygame.draw.line(world, (255, 250, 220), (_x, _y - 3 - _r), (_x, _y - 3 + _r), 1)
     if _coop_o or getattr(run, "is_coop", False):
         draw_coop_soul(world, run, t)
     for mg in run.magnets:
@@ -62564,8 +62636,16 @@ class App:
         sfx("buy", 0.9, 0.0)
 
     def run_loop(self):
+        gc_settle(desktop=True)
+        state_prev = self.state
         while self.running:
             self.frame()
+            if self.state != state_prev:
+                state_prev = self.state
+                if self.state in (STATE_PLAY, STATE_MENU):
+                    # FPS: koşu başında / menüye dönünce bir kez topla ve
+                    # dondur (takılma geçişte olur, savaşın ortasında değil)
+                    gc_settle(desktop=True)
         self.save.save()
         self.account.say_bye()
         pygame.quit()
