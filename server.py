@@ -1360,6 +1360,7 @@ PROGRESS_STATS = ("runs", "best_score", "total_kills", "total_time", "bosses",
 # oyundan kaldırılan kitaplar (Çoğalma Kitabı). Eski istemciler göndermeye
 # devam edebilir; sunucu bunları saklamaz.
 REMOVED_BOOKS = frozenset({"r_multi"})
+REMOVED_WEAPONS = frozenset({"boulder"})      # yuvarlanan kaya oyundan kaldırıldı
 
 
 def _player_row(account_id):
@@ -1578,6 +1579,9 @@ def _merge_progress(old, new, gem_cap=GEM_GAIN_CAP_PER_PUSH):
             out[k] = list(old[k])
     if isinstance(out.get("books_muted"), list):
         out["books_muted"] = [b for b in out["books_muted"] if b not in REMOVED_BOOKS]
+    for k in ("weapons_owned", "weapons_muted"):
+        if isinstance(out.get(k), list):
+            out[k] = [w for w in out[k] if w not in REMOVED_WEAPONS]
     _drop_unpaid_items(old, out, new)
     # günlük şampiyon ödülü yalnız sunucuda yazılır; süresi dolunca geri alınır
     for k in ("god_until", "god_days", "god_wins", "god_rev"):

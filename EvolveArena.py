@@ -5796,6 +5796,9 @@ class SaveManager:
         for lk in ("books_owned", "books_muted"):
             if isinstance(data.get(lk), list):
                 data[lk] = [k for k in data[lk] if k not in REMOVED_BOOKS]
+        for lk in ("weapons_owned", "weapons_muted"):
+            if isinstance(data.get(lk), list):
+                data[lk] = [k for k in data[lk] if k not in REMOVED_WEAPONS]
         # kaldırılmış skinler karşılığına çevrilir
         migrate_removed_skins(data)
         # skin sıfırlaması (bütün profillerde)
@@ -5924,6 +5927,8 @@ class SaveManager:
                 self.data[k] = [x for x in merged_l if not _is_paid_item(k, x) or x in v]
                 if k == "books_owned":
                     self.data[k] = [x for x in self.data[k] if x not in REMOVED_BOOKS]
+                if k in ("weapons_owned", "weapons_muted"):
+                    self.data[k] = [x for x in self.data[k] if x not in REMOVED_WEAPONS]
                 if k == "skins_owned":
                     migrate_removed_skins(self.data)
             elif k == "stats" and isinstance(v, dict):
@@ -15315,6 +15320,8 @@ BOOK_BY_KEY = {b["key"]: b for b in BOOKS}
 # oyundan kaldırılan kitaplar. Eski kayıtlarda / sunucu birleştirmesinde geri
 # gelebilirler; yüklemede ve içe aktarmada süzülürler.
 REMOVED_BOOKS = frozenset({"r_multi"})
+# kaldırılmış silahlar (kayıtlardan süzülür): yuvarlanan kaya
+REMOVED_WEAPONS = frozenset({"boulder"})
 # Artık "şartsız" kitap yok. temel kitaplar yalnızca bir emniyet listesidir:
 # oyuncunun hiç kitabı yoksa seviye atlama ekranı boş kalmasın diye
 # start_levelup_choice bu listeye düşer.
@@ -22926,14 +22933,6 @@ NEW_WEAPONS = [
          how="Ay, Taş Meydan'ın gecesinde doğar: Taş Meydan'da 12. dalgaya ulaş.",
          unlock=dict(text="Taş Meydan'da 12. dalgaya ulaş",
                      reqs=[rq_stat("best_stone_wave", 12, "Taş Meydan'da 12. dalgaya ulaş")])),
-    dict(key="boulder", name="YUVARLANAN KAYA", icon="fist", color=BOULDER_COLOR,
-         cd=3.0, dmg=8.0, style=None, dpl=0.062, cdl=0.985,
-         up="kaya büyür ve daha ağır ezer; 12. ve 22. seviyede bir kaya daha",
-         desc="Kalabalığa doğru dev bir kaya yuvarlar: yolundaki her şeyi ezer, savurur ve "
-              "kısa süre sersemletir; duvarlardan seker. 12. ve 22. seviyede bir kaya daha.",
-         how="Meydanın taşı, meydanı fetheden içindir: Taş Meydan'ı bitir (25. dalga patronu).",
-         unlock=dict(text="Taş Meydan'ı bitir (25. dalga patronunu devir)",
-                     reqs=[rq_stat("stone_cleared", 1, "Taş Meydan'ın 25. dalga patronunu devir")])),
     dict(key="runes", name="RÜN TUZAKLARI", icon="gem", color=RUNE_COLOR,
          cd=2.2, dmg=5.0, style=None, dpl=0.060, cdl=0.985,
          up="patlama alanı büyür, daha çok rün aynı anda kurulur",
@@ -23327,39 +23326,73 @@ class RuneTrap(_NwObj):
                 ring_aa(surf, x, y, R * 1.15, WHITE, 1)
 
 
+VINE_ROOT_T = 0.45          # sarmaşık: vurduğunu bu kadar yere dolar (II: x2)
+VINE_THORN_T = 0.4          # dalın üstünde kalan yaratık bu aralıkla kanar
+VINE_SPORE_R = 52.0         # I: dal kururken boğumlarından zehirli spor
+VINE_PULSE_T = 2.0          # III: yaşam ağacının kök dalgası aralığı
+VINE_PULSE_R = 230.0
+
+
 class VineLash(_NwObj):
-    """Sarmaşık: yerden sırayla fışkıran dikenli dal; yaralar, dolanır, kanatır."""
+    """Sarmaşık: yerden sırayla fışkıran dikenli dal. Değdiği yaratığı kısa süre
+    YERE DOLAR (kıpırdayamaz), sonra yavaşlatır; dalın üstünde kalan kanar.
+    I zehirli spor, II dal ucundan ikiye çatallanır ve daha uzun dolar,
+    III yaşam ağacı (bkz. TreeOfLife)."""
     key = "vines"
     SEG = 34.0
     STEP_T = 0.045
     STAY = 1.7
 
-    def __init__(self, p, ang, dmg, lvl, length):
+    def __init__(self, p, ang, dmg, lvl, length, origin=None, delay=0.0):
         self.dmg = dmg
         self.lvl = max(1, int(lvl))
         n = max(4, int(length / self.SEG))
         nx, ny = -math.sin(ang), math.cos(ang)
         ph = random.uniform(0, math.tau)
+        ox, oy = (p.x, p.y) if origin is None else origin
+        d0 = 30 if origin is None else 0
         self.pts = []
         for i in range(n):
-            d = 30 + i * self.SEG
+            d = d0 + i * self.SEG
             w = math.sin(ph + i * 0.9) * 12
-            self.pts.append((p.x + math.cos(ang) * d + nx * w, p.y + math.sin(ang) * d + ny * w))
+            self.pts.append((ox + math.cos(ang) * d + nx * w, oy + math.sin(ang) * d + ny * w))
         self.x, self.y = self.pts[len(self.pts) // 2]
-        self.t = 0.0
+        self.ang = ang
+        self.t = -max(0.0, delay)
         self.done = [False] * n
         self.tick = 0.0
         self.alive = True
+        self.spored = False
         self.evo = 0
+
+    def end_point(self):
+        return self.pts[-1]
+
+    def _spores(self, run):
+        """I: kuruyan dalın boğumlarından zehirli spor bulutu patlar."""
+        self.spored = True
+        targets = run._all_targets()
+        for sx, sy in self.pts[::2]:
+            run.fx.burst(sx, sy, (150, 235, 90), n=5, speed=70, life=0.55, r=3.0, gravity=-40)
+            for e in targets:
+                if e.alive and (e.x - sx) ** 2 + (e.y - sy) ** 2 < (VINE_SPORE_R + getattr(e, "radius", 12)) ** 2:
+                    run._field_damage(e, self.dmg * 0.35, wlvl=self.lvl)
+                    if e.alive and hasattr(e, "apply_poison"):
+                        e.apply_poison(max(0.5, self.dmg * 0.08))
 
     def update(self, dt, run):
         ev = self.tier(run)
         self.t += dt
+        if self.t < 0:
+            return                       # çatal: ana dal ucuna varınca fışkırır
         n = len(self.pts)
         if self.t > n * self.STEP_T + self.STAY:
+            if ev >= 1 and not self.spored:
+                self._spores(run)
             self.alive = False
             return
         targets = run._all_targets()
+        root_t = VINE_ROOT_T * (2.0 if ev >= 2 else 1.0)
         for i in range(n):
             if self.done[i] or self.t < i * self.STEP_T:
                 continue
@@ -23367,20 +23400,27 @@ class VineLash(_NwObj):
             sx, sy = self.pts[i]
             run.fx.burst(sx, sy, VINE_COLOR, n=3, speed=90, life=0.3, r=2.4, gravity=120)
             for e in targets:
-                if e.alive and dist(e.x, e.y, sx, sy) < 34 + getattr(e, "radius", 12):
-                    run._weapon_hit(e, self.dmg, kb=25, wlvl=self.lvl)
+                if e.alive and (e.x - sx) ** 2 + (e.y - sy) ** 2 < (34 + getattr(e, "radius", 12)) ** 2:
+                    run._weapon_hit(e, self.dmg, kb=0, wlvl=self.lvl)
                     if e.alive and hasattr(e, "apply_slow"):
-                        e.apply_slow(0.25 if ev < 2 else 0.12, 1.4)
-        # dikenler: dalın üstünde kalan yaratık yarım saniyede bir kanar
+                        if getattr(e, "is_boss", False):
+                            e.apply_slow(0.55, 1.2)
+                        else:
+                            # dolanır: kıpırdayamaz, sonra bir süre ağır aksak
+                            e.apply_slow(0.0, root_t)
+                            e.knock_x = e.knock_y = 0.0
+                            e._vine_root = run.run_time + root_t
+        # dikenler: dalın üstünde kalan yaratık kanar
         self.tick -= dt
         if self.tick <= 0:
-            self.tick = 0.5
-            k = 0.18 if ev < 3 else 0.30
+            self.tick = VINE_THORN_T
+            k = 0.25 if ev < 3 else 0.35
             for e in targets:
                 if not e.alive:
                     continue
+                rr = (28 + getattr(e, "radius", 12)) ** 2
                 for i, (sx, sy) in enumerate(self.pts):
-                    if self.done[i] and dist(e.x, e.y, sx, sy) < 28 + getattr(e, "radius", 12):
+                    if self.done[i] and (e.x - sx) ** 2 + (e.y - sy) ** 2 < rr:
                         run._field_damage(e, self.dmg * k, wlvl=self.lvl)
                         break
 
@@ -23418,6 +23458,175 @@ class VineLash(_NwObj):
                 circle_aa(surf, sx, sy - 4, 2.2 * fade, (255, 220, 120))
 
 
+class GoldDust(_NwObj):
+    """Kutsal Böcek (I): patlamanın bıraktığı, içindekileri yakan altın toz bulutu."""
+    key = "scarab"
+    LIFE = 1.6
+    TICK = 0.3
+
+    def __init__(self, x, y, r, dmg, lvl):
+        self.x, self.y, self.r = x, y, max(24.0, r)
+        self.dmg, self.lvl = dmg, lvl
+        self.t = 0.0
+        self.tick = 0.1
+        self.alive = True
+        self.evo = 1
+        self.ph = random.uniform(0, math.tau)
+
+    def update(self, dt, run):
+        self.t += dt
+        if self.t > self.LIFE:
+            self.alive = False
+            return
+        self.tick -= dt
+        if self.tick <= 0:
+            self.tick = self.TICK
+            r2 = self.r * self.r
+            for e in run._all_targets():
+                if e.alive and (e.x - self.x) ** 2 + (e.y - self.y) ** 2 < r2:
+                    run._field_damage(e, self.dmg * 0.2, wlvl=self.lvl)
+
+    def draw(self, surf, t):
+        k = clamp(min(self.t / 0.2, (self.LIFE - self.t) / 0.5), 0.0, 1.0)
+        add_glow(surf, self.x, self.y, self.r * 1.1, (255, 200, 80), 0.28 * k)
+        for i in range(9):
+            a = self.ph + t * (1.6 if i % 2 else -1.2) + i * math.tau / 9
+            rr = self.r * (0.35 + 0.55 * ((i * 37) % 10) / 10.0)
+            blit_disc(surf, self.x + math.cos(a) * rr, self.y + math.sin(a) * rr * 0.8,
+                      2.2 + (i % 3), (255, 226, 130), int(200 * k))
+
+
+class SunFlare(_NwObj):
+    """Güneş Böceği (II): patlamadan altı yöne yayılan kısa, yakan güneş ışınları."""
+    key = "scarab"
+    LIFE = 0.32
+    LEN = 125.0
+    N = 6
+
+    def __init__(self, x, y, ang, dmg, lvl):
+        self.x, self.y, self.ang = x, y, ang
+        self.dmg, self.lvl = dmg, lvl
+        self.t = 0.0
+        self.alive = True
+        self.evo = 2
+
+    def fire(self, run):
+        L_ = self.LEN
+        for e in run._all_targets():
+            if not e.alive:
+                continue
+            dx, dy = e.x - self.x, e.y - self.y
+            if dx * dx + dy * dy > (L_ + 40) ** 2:
+                continue
+            lim = 10 + getattr(e, "radius", 12)
+            for i in range(self.N):
+                a = self.ang + i * math.tau / self.N
+                vx, vy = math.cos(a) * L_, math.sin(a) * L_
+                k = clamp((dx * vx + dy * vy) / (L_ * L_), 0.0, 1.0)
+                qx, qy = dx - vx * k, dy - vy * k
+                if qx * qx + qy * qy < lim * lim:
+                    run._weapon_hit(e, self.dmg * 0.6, kb=60, wlvl=self.lvl)
+                    if e.alive and hasattr(e, "apply_burn"):
+                        e.apply_burn(max(1.0, self.dmg * 0.15), 2.0)
+                    break
+
+    def update(self, dt, run):
+        self.t += dt
+        if self.t > self.LIFE:
+            self.alive = False
+
+    def draw(self, surf, t):
+        k = 1.0 - self.t / self.LIFE
+        for i in range(self.N):
+            a = self.ang + i * math.tau / self.N
+            ex, ey = self.x + math.cos(a) * self.LEN, self.y + math.sin(a) * self.LEN
+            taper_line(surf, [(self.x, self.y), (ex, ey)], 7.0 * k + 1, 1.0, (255, 170, 60))
+            taper_line(surf, [(self.x, self.y), (ex, ey)], 3.0 * k + 1, 0.6, (255, 244, 200))
+        add_glow(surf, self.x, self.y, 46, (255, 190, 70), 0.5 * k)
+
+
+class SunBall(_NwObj):
+    """Firavun (III): dev bokböceğinin yuvarladığı altın güneş topu. Kalabalığın
+    içinden geçer, yolundakileri ezip savurur, sonunda büyük patlar."""
+    key = "scarab"
+    SPEED = 250.0
+    LIFE = 2.4
+
+    def __init__(self, x, y, ang, dmg, lvl, r):
+        self.x, self.y, self.ang = x + math.cos(ang) * 40, y + math.sin(ang) * 40, ang
+        self.dmg, self.lvl = dmg, lvl
+        self.R = max(26.0, r * 0.55)
+        self.t = 0.0
+        self.hit_t = {}
+        self.alive = True
+        self.evo = 3
+        self.boom = -1.0
+
+    def update(self, dt, run):
+        if self.boom >= 0:
+            self.boom += dt
+            if self.boom > 0.4:
+                self.alive = False
+            return
+        self.t += dt
+        self.x += math.cos(self.ang) * self.SPEED * dt
+        self.y += math.sin(self.ang) * self.SPEED * dt
+        ar = ARENA_RECT
+        if self.t > self.LIFE or not ar.inflate(-40, -40).collidepoint(self.x, self.y):
+            self._explode(run)
+            return
+        now = run.run_time
+        rr = self.R + 8
+        for e in run._all_targets():
+            if not e.alive or (e.x - self.x) ** 2 + (e.y - self.y) ** 2 > (rr + getattr(e, "radius", 12)) ** 2:
+                continue
+            if self.hit_t.get(id(e), -9.0) > now:
+                continue
+            self.hit_t[id(e)] = now + 0.5
+            run._weapon_hit(e, self.dmg * 1.2, kb=260, wlvl=self.lvl)
+
+    def _explode(self, run):
+        self.boom = 0.0
+        R2 = self.R * 3.2
+        run.fx.shockwave(self.x, self.y, R2, (255, 214, 90), 0.4, 7)
+        run.fx.burst(self.x, self.y, (255, 236, 150), n=30, speed=320, life=0.6, r=4)
+        run.fx.shake(6, 0.2)
+        sfx("explosion", 0.55, 0.15)
+        for e in run._all_targets():
+            if e.alive and (e.x - self.x) ** 2 + (e.y - self.y) ** 2 < (R2 + getattr(e, "radius", 12)) ** 2:
+                died = run._weapon_hit(e, self.dmg * 3.0, kb=200, wlvl=self.lvl)
+                if died and random.random() < 0.30:
+                    run.drop_pickup(e.x, e.y, "coin", max(1.0, getattr(e, "coin", 1.0)))
+
+    def draw(self, surf, t):
+        x, y, R = self.x, self.y, self.R
+        if self.boom >= 0:
+            k = self.boom / 0.4
+            add_glow(surf, x, y, R * (2.0 + 2.5 * k), (255, 210, 90), 0.7 * (1 - k))
+            return
+        ca, sa = math.cos(self.ang), math.sin(self.ang)
+        add_glow(surf, x, y, R * 2.2, (255, 190, 60), 0.45)
+        surf.blit(shadow_sprite(int(R * 2.2)), (int(x - R * 1.1), int(y + R * 0.6)))
+        circle_aa(surf, x, y, R + 2, OUTLINE)
+        circle_aa(surf, x, y, R, (236, 176, 52))
+        circle_aa(surf, x - R * 0.25, y - R * 0.3, R * 0.55, (255, 226, 120))
+        rot = self.t * self.SPEED / max(8.0, R)
+        for i in range(4):                    # yuvarlanan topun şeritleri
+            a = rot + i * math.pi / 2
+            thick_line(surf, (x + math.cos(a) * R * 0.2, y + math.sin(a) * R * 0.2),
+                       (x + math.cos(a) * R * 0.92, y + math.sin(a) * R * 0.92), 2.4, (190, 120, 30))
+        # topu iten dev bokböceği (arkada)
+        bx, by = x - ca * (R + 16), y - sa * (R + 16)
+        nx, ny = -sa, ca
+        body = [(bx + ca * 12, by + sa * 12), (bx + ca * 6 + nx * 11, by + sa * 6 + ny * 11),
+                (bx - ca * 12 + nx * 12, by - sa * 12 + ny * 12), (bx - ca * 18, by - sa * 18),
+                (bx - ca * 12 - nx * 12, by - sa * 12 - ny * 12), (bx + ca * 6 - nx * 11, by + sa * 6 - ny * 11)]
+        poly_aa(surf, [(px_ + 1, py_ + 2) for px_, py_ in body], OUTLINE)
+        poly_aa(surf, body, (255, 236, 140))
+        thick_line(surf, (bx + ca * 8, by + sa * 8), (bx - ca * 16, by - sa * 16), 1.6, (150, 100, 20))
+        _sparkle(surf, x, y - R - 6, 6 + 2 * math.sin(t * 9), (255, 250, 210))
+
+
 class Scarab(_NwObj):
     """Altın bokböceği: en yakın yaratığa koşar, çarpınca altın tozuyla patlar."""
     key = "scarab"
@@ -23443,6 +23652,17 @@ class Scarab(_NwObj):
         self.boom = 0.0
         col = self.col(SCARAB_COLOR)
         rr = self.radius * (1.2 if ev >= 2 else 1.0)
+        if ev >= 1:
+            # I KUTSAL BÖCEK: patladığı yerde yakan altın toz bulutu kalır
+            gd = GoldDust(self.x, self.y, rr * 0.95, self.dmg, self.lvl)
+            gd._wsrc = "scarab"
+            run.nw_objs.append(gd)
+        if ev >= 2:
+            # II GÜNEŞ BÖCEĞİ: patlama altı yöne yakan güneş ışını saçar
+            sf = SunFlare(self.x, self.y, random.uniform(0, math.tau), self.dmg, self.lvl)
+            sf._wsrc = "scarab"
+            sf.fire(run)
+            run.nw_objs.append(sf)
         run.fx.shockwave(self.x, self.y, rr, col, 0.3, 4)
         run.fx.burst(self.x, self.y, (255, 226, 120), n=12, speed=220, life=0.45, r=2.8)
         for e in run._all_targets():
@@ -23455,14 +23675,6 @@ class Scarab(_NwObj):
         if getattr(self, "giant", False):
             run.fx.shake(6, 0.2)
             run.fx.burst(self.x, self.y, (255, 236, 150), n=26, speed=300, life=0.6, r=4)
-        if ev >= 2 and not getattr(self, "child", False) and not getattr(self, "giant", False):
-            # II güneş böceği: patlayınca iki yavru böcek doğar
-            for k_ in (-1, 1):
-                c_ = Scarab(run.player, self.ang + k_ * 1.2, self.dmg * 0.5, self.lvl, self.radius * 0.7)
-                c_.x, c_.y = self.x, self.y
-                c_.child = True
-                c_.life = 2.0
-                run.nw_objs.append(c_)
 
     def update(self, dt, run):
         self.tier(run)
@@ -23493,8 +23705,9 @@ class Scarab(_NwObj):
             if dist(self.x, self.y, self.target.x, self.target.y) < 14 + getattr(self.target, "radius", 12):
                 self._explode(run)
                 return
-        self.x += math.cos(self.ang) * self.SPEED * dt
-        self.y += math.sin(self.ang) * self.SPEED * dt
+        spd = self.SPEED * (1.3 if self.evo >= 2 else 1.0)     # II: güneş böcekleri hızlı
+        self.x += math.cos(self.ang) * spd * dt
+        self.y += math.sin(self.ang) * spd * dt
 
     def draw(self, surf, t):
         col = self.col(SCARAB_COLOR)
@@ -23601,11 +23814,29 @@ class TreeOfLife(_NwObj):
             self.alive = False
             return
         p = run.player
-        if dist(p.x, p.y, self.x, self.y) < 170:
-            p.heal(p.max_hp * 0.012 * dt)
+        if dist(p.x, p.y, self.x, self.y) < 200:
+            p.heal(p.max_hp * 0.02 * dt)       # gölgesinde can dolar (saniyede %2)
+        # KÖK DALGASI: ağacın çevresinden halka halinde kökler fışkırır, içindeki
+        # yaratıkları yere zincirler ve yaralar
+        self.pulse = getattr(self, "pulse", 0.6) - dt
+        if self.pulse <= 0:
+            self.pulse = VINE_PULSE_T
+            self.pulse_t = self.t
+            run.fx.shockwave(self.x, self.y, VINE_PULSE_R, (150, 240, 110), 0.45, 6)
+            for e in run._all_targets():
+                if e.alive and (e.x - self.x) ** 2 + (e.y - self.y) ** 2 < VINE_PULSE_R ** 2:
+                    run._weapon_hit(e, self.dmg * 0.6, kb=0, wlvl=self.lvl)
+                    if e.alive:
+                        if getattr(e, "is_boss", False):
+                            e.apply_slow(0.5, 1.0)
+                        else:
+                            e.apply_slow(0.0, 1.0)
+                            e.knock_x = e.knock_y = 0.0
+                            e._vine_root = run.run_time + 1.0
+                        run.fx.burst(e.x, e.y + 6, (110, 200, 80), n=3, speed=60, life=0.35, r=2.4, add=False)
         self.cd -= dt
         if self.cd <= 0:
-            self.cd = 0.28
+            self.cd = 0.22
             tg = [e for e in run._all_targets() if e.alive and dist(e.x, e.y, self.x, self.y) < 520]
             if tg:
                 e = random.choice(tg)
@@ -23626,7 +23857,16 @@ class TreeOfLife(_NwObj):
         x, y = self.x, self.y
         k = clamp(min(self.t / 0.4, (self.LIFE - self.t) / 0.5), 0.0, 1.0)
         add_glow(surf, x, y - 30, 110 * k, (150, 255, 120), 0.35)
-        ring_aa(surf, x, y, 170 * k, (120, 220, 110), 1)
+        ring_aa(surf, x, y, 200 * k, (120, 220, 110), 1)
+        pq = (self.t - getattr(self, "pulse_t", -9.0)) / 0.5
+        if 0.0 <= pq <= 1.0:
+            # kök dalgası: halka halinde dikenli kökler
+            rr = VINE_PULSE_R * (0.35 + 0.65 * pq)
+            ring_aa(surf, x, y, rr, scale_col((150, 240, 110), 1.0 - 0.6 * pq), max(1, int(5 * (1 - pq))))
+            for i in range(16):
+                a = i * math.tau / 16 + 0.2
+                bx_, by_ = x + math.cos(a) * rr, y + math.sin(a) * rr
+                thick_line(surf, (bx_, by_ + 8), (bx_ + math.cos(a) * 6, by_ - 14 * (1 - pq) - 4), 3, (70, 130, 50))
         surf.blit(shadow_sprite(int(70 * k) + 6), (int(x - 35 * k), int(y + 4)))
         thick_line(surf, (x, y + 6), (x, y - 40 * k), 12 * k + 1, (96, 64, 40))
         for s_ in (-1, 1):
@@ -23720,7 +23960,14 @@ def _fire_vines(run, w, lvl, dmg, targets):
         tr._wsrc = "vines"
         run.nw_objs.append(tr)
     for a in _nw_aims(p, targets, vine_count(lvl) + (1 if ev >= 3 else 0)):
-        run.nw_objs.append(VineLash(p, a, dmg, lvl, vine_len(lvl)))
+        main = VineLash(p, a, dmg, lvl, vine_len(lvl))
+        run.nw_objs.append(main)
+        if ev >= 2:
+            # II KÖK AĞI: dal ucundan iki kola ayrılır (ana dal ucuna varınca)
+            grow = len(main.pts) * VineLash.STEP_T
+            for s_ in (-1, 1):
+                run.nw_objs.append(VineLash(p, a + s_ * 0.75, dmg * 0.8, lvl, vine_len(lvl) * 0.6,
+                                            origin=main.end_point(), delay=grow))
 
 
 def _fire_scarab(run, w, lvl, dmg, targets):
@@ -23731,14 +23978,18 @@ def _fire_scarab(run, w, lvl, dmg, targets):
     for i in range(n):
         run.nw_objs.append(Scarab(p, base + i * math.tau / n, dmg, lvl, scarab_radius(lvl)))
     if ev >= 3:
-        # III firavun: her atışta dev altın bokböceği (3 kat patlama)
+        # III FİRAVUN: iki atışta bir dev bokböceği altın bir güneş topu
+        # yuvarlar; top kalabalığın içinden geçer, yolundakileri ezer ve
+        # sonunda büyük bir altın patlamasıyla biter.
         cnt = run.__dict__.get("_scarab_n", 0) + 1
         run.__dict__["_scarab_n"] = cnt
-        if cnt % 2 == 0:
-            g = Scarab(p, base + math.pi, dmg * 3.0, lvl, scarab_radius(lvl) * 2.2)
-            g.giant = True
-            g.SPEED = 220.0
-            run.nw_objs.append(g)
+        if cnt % 2 == 0 and targets:
+            near = sorted(targets, key=lambda e: (e.x - p.x) ** 2 + (e.y - p.y) ** 2)[:12]
+            cx_ = sum(e.x for e in near) / len(near)
+            cy_ = sum(e.y for e in near) / len(near)
+            sb = SunBall(p.x, p.y, math.atan2(cy_ - p.y, cx_ - p.x), dmg, lvl, scarab_radius(lvl))
+            sb._wsrc = "scarab"
+            run.nw_objs.append(sb)
     run.fx.burst(p.x, p.y + 10, (220, 180, 100), n=8, speed=120, life=0.4, r=3)
 
 
@@ -34570,21 +34821,31 @@ EVO_FIELD_PERKS = frozenset(("aegis", "shroud", "haven", "bless", "veil", "night
 #                    (patlatır, yakar, +2 böcek ve fazladan altın)
 EVOLUTIONS.update({
     "chakram": ("r_moon",   "bleed",  (176, 206, 255)),
-    "boulder": ("r_stone",  "stun",   (214, 170, 110)),
     "runes":   ("r_rune",   "burn",   (255, 140, 70)),
     "vines":   ("r_thorns", "poison", (130, 230, 90)),
     "scarab":  ("r_sun",    "blast",  (255, 210, 70)),
 })
 EVO_TIERS.update({
     "chakram": ("bleed", "chain", "execute"),
-    "boulder": ("stun", "aftershock", "sunder"),
     "runes":   ("burn", "freeze", "blast"),
-    "vines":   ("poison", "root", "phoenix"),
-    "scarab":  ("blast", "burn", "sunder"),
+    "vines":   ("vine_spore", "vine_web", "vine_tree"),
+    "scarab":  ("scarab_dust", "scarab_sun", "scarab_king"),
+})
+# yeni sarmaşık / bokböceği evrimleri: vuruşta tetiklenen temel etkiler
+EVO_PERK_BASE.update({
+    "vine_spore": ("poison",), "vine_web": ("root",), "vine_tree": ("phoenix",),
+    "scarab_dust": ("blast",), "scarab_sun": ("burn",), "scarab_king": ("sunder",),
+})
+EVO_PERK_COLOR.update({
+    "vine_spore": (150, 235, 90), "vine_web": (110, 200, 120), "vine_tree": (170, 240, 110),
+    "scarab_dust": (255, 214, 90), "scarab_sun": (255, 160, 60), "scarab_king": (255, 236, 140),
+})
+EVO_PERK_ICON.update({
+    "vine_spore": "skull", "vine_web": "orbit", "vine_tree": "heart",
+    "scarab_dust": "star", "scarab_sun": "flame", "scarab_king": "coin",
 })
 EVO_COLOR_OVERRIDE.update({
     ("chakram", 1): (176, 206, 255), ("chakram", 2): (230, 80, 100), ("chakram", 3): (255, 244, 200),
-    ("boulder", 1): (214, 170, 110), ("boulder", 2): (240, 170, 90), ("boulder", 3): (255, 110, 40),
     ("runes", 1): (255, 140, 70), ("runes", 2): (150, 220, 255), ("runes", 3): (200, 120, 255),
     ("vines", 1): (130, 230, 90), ("vines", 2): (90, 200, 120), ("vines", 3): (170, 240, 110),
     ("scarab", 1): (255, 210, 70), ("scarab", 2): (255, 150, 50), ("scarab", 3): (255, 236, 140),
@@ -34607,6 +34868,36 @@ STRINGS.update({
     "evo.name2.scarab":  _T("GÜNEŞ BÖCEĞİ", "SUN SCARAB", "ESCARABAJO SOLAR", "SONNENSKARABÄUS", "СОЛНЕЧНЫЙ СКАРАБЕЙ"),
     "evo.name3.scarab":  _T("FİRAVUN SÜRÜSÜ", "PHARAOH SWARM", "ENJAMBRE DEL FARAÓN", "PHARAONENSCHWARM",
                             "РОЙ ФАРАОНА"),
+    "evo.perk.vine_spore": _T("vuruşlar zehirler; dal kururken boğumlarından zehirli spor patlar",
+                              "hits poison; the drying vine bursts into toxic spores",
+                              "los golpes envenenan; la enredadera seca suelta esporas tóxicas",
+                              "Treffer vergiften; die welkende Ranke platzt in Giftsporen",
+                              "удары отравляют; увядая, лоза взрывается ядовитыми спорами"),
+    "evo.perk.vine_web": _T("dal ucundan ikiye çatallanır, dolanan yaratık 2 kat uzun kıpırdayamaz",
+                            "the vine forks in two at its tip; entangled foes are held twice as long",
+                            "la enredadera se bifurca en la punta; los atrapados quedan el doble",
+                            "die Ranke gabelt sich an der Spitze; Gefesselte bleiben doppelt so lange",
+                            "лоза ветвится на конце; опутанные стоят вдвое дольше"),
+    "evo.perk.vine_tree": _T("yaşam ağacı: 2 sn'de bir kök dalgası yere zincirler, gölgesinde can dolar",
+                             "tree of life: a root wave roots foes every 2 s, its shade heals you",
+                             "árbol de la vida: cada 2 s una ola de raíces inmoviliza; su sombra cura",
+                             "Lebensbaum: alle 2 s fesselt eine Wurzelwelle, sein Schatten heilt",
+                             "древо жизни: каждые 2 с волна корней сковывает, его тень лечит"),
+    "evo.perk.scarab_dust": _T("patladığı yerde yakan altın toz bulutu kalır",
+                               "leaves a burning cloud of golden dust where it bursts",
+                               "deja una nube de polvo dorado que quema",
+                               "hinterlässt eine brennende Goldstaubwolke",
+                               "оставляет жгучее облако золотой пыли"),
+    "evo.perk.scarab_sun": _T("böcekler hızlanır; patlama 6 yöne yakan güneş ışını saçar",
+                              "scarabs run faster; bursts fire 6 burning sun rays",
+                              "escarabajos más rápidos; la explosión lanza 6 rayos solares",
+                              "Skarabäen schneller; Explosionen feuern 6 brennende Sonnenstrahlen",
+                              "жуки быстрее; взрыв выпускает 6 жгучих солнечных лучей"),
+    "evo.perk.scarab_king": _T("dev böcek altın güneş topu yuvarlar: yolundakini ezer, büyük patlar",
+                               "a giant scarab rolls a golden sun ball that crushes its path and blows up",
+                               "un escarabajo gigante rueda una bola solar que aplasta y explota",
+                               "ein Riesenskarabäus rollt eine Sonnenkugel, die alles zermalmt und explodiert",
+                               "гигантский жук катит солнечный шар: давит всё на пути и взрывается"),
 })
 
 STRINGS.update({
