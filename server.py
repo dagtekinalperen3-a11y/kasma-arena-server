@@ -1223,6 +1223,33 @@ REVOKED_SKINS = frozenset((
     "orbit_guardian", "pink_dream", "lucky_fox", "cosmic", "shadow_warrior", "dragon_soul", "chrono_sage"))
 
 
+# oyundan kaldırılan skinler -> sahibine verilen karşılık (oyundaki REMOVED_SKINS ile aynı).
+# Sıfırlamadan SONRA uygulanır: yalnız gerçekten sahip olunan (yeniden alınmış) skin
+# karşılığına çevrilir; karşılık eski kayıtta da göründüğü için ödenmemiş sayılmaz.
+REMOVED_SKINS = {
+    "toxic": "toxic_alchemist",
+    "crimson": "phoenix_heir", "royal": "star_knight", "inferno": "samurai_oni",
+    "gold": "lionheart", "prism": "crystal_mage", "shadow_hunter": "ghost_lantern",
+    "frost_witch": "frost_wolf", "blood_countess": "vampire_lord", "iron_sentinel": "mech_pilot",
+    "storm_bringer": "ocean_tide", "venom_striker": "toxic_alchemist", "homing_falcon": "jade_monk",
+}
+
+
+def _migrate_removed_skins(prog):
+    own = list(prog.get("skins_owned") or [])
+    out = []
+    for sid in own:
+        rep = REMOVED_SKINS.get(sid)
+        nid = rep if rep else sid
+        if nid not in out:
+            out.append(nid)
+    prog["skins_owned"] = out
+    eq = prog.get("equipped_skin")
+    if eq in REMOVED_SKINS:
+        prog["equipped_skin"] = REMOVED_SKINS[eq]
+    return prog
+
+
 def _apply_skin_reset(prog):
     keep = set(prog.get("skins_rebought") or [])
     own = [x for x in (prog.get("skins_owned") or ["default"]) if x not in REVOKED_SKINS or x in keep]
@@ -1232,7 +1259,7 @@ def _apply_skin_reset(prog):
     if prog.get("equipped_skin") and prog["equipped_skin"] not in own:
         prog["equipped_skin"] = "default"
     prog["skin_reset"] = 1
-    return prog
+    return _migrate_removed_skins(prog)
 # profil kartı süsleri (oyundaki PROFILE_ITEMS ile aynı anahtarlar)
 PROFILE_ITEM_KIND = {
     **{k: "bg" for k in ("bg_skull", "bg_rainbow", "bg_galaxy", "bg_inferno", "bg_frost", "bg_neon",
@@ -1447,6 +1474,11 @@ ITEM_GEM_COST = {
     "cosmetics_owned": {'cap_red': 80, 'wizard_hat': 260, 'crown_gold': 420, 'halo_ring': 520, 'beanie_gray': 70, 'viking_helm': 340, 'ninja_hood': 300, 'flower_crown': 260, 'top_hat': 380, 'dragon_horns': 560, 'space_helmet': 640, 'pink_bow': 300, 'shades': 90, 'goggles': 150, 'monocle': 220, 'visor': 340, 'round_glasses': 60, 'heart_glasses': 200, 'steampunk_goggles': 310, 'ski_mask': 250, 'laser_visor': 420, 'blindfold': 480, 'star_glasses': 360, 'pink_shades': 260, 'cape_red': 180, 'cape_royal': 460, 'cape_shadow': 520, 'wings_angelic': 900, 'cape_forest': 150, 'cape_ice': 300, 'cape_flame': 400, 'cape_storm': 520, 'cape_starlight': 600, 'cape_bat': 340, 'cape_gold_trim': 700, 'cape_pink': 320, 'cap_blue': 90, 'leaf_crown': 120, 'neon_headband': 220, 'ember_horns': 280, 'dragon_helm': 520, 'immortal_helm': 760, 'nightmare_helm': 620, 'crystal_helm': 680, 'leaf_visor': 140, 'frost_lens': 260, 'ember_shades': 230, 'cape_steel': 290, 'samurai_helm': 700, 'storm_crown': 650, 'witch_hat': 480, 'falcon_helm': 560, 'ninja_mask': 520, 'dragon_eye': 560, 'chrono_monocle': 500, 'cyber_shades': 450},
 }
 # 5. paket (yeni skinler + kozmetikler): oyundaki fiyatlarla aynı
+# 6. paket: kaldırılan 12 skinin yerine gelen 12 yeni skin
+ITEM_GEM_COST["skins_owned"].update({'frost_wolf': 4300, 'samurai_oni': 4900, 'crystal_mage': 4600,
+                                     'vampire_lord': 5000, 'mech_pilot': 4700, 'phoenix_heir': 5200,
+                                     'ocean_tide': 4200, 'jade_monk': 3900, 'toxic_alchemist': 4100,
+                                     'star_knight': 5400, 'ghost_lantern': 4400, 'lionheart': 4800})
 ITEM_GEM_COST["skins_owned"].update({'sakura_ninja': 4200, 'thunder_god': 5200, 'pirate_king': 3900, 'lava_golem': 4600, 'neon_rider': 4400, 'forest_spirit': 3800, 'sand_pharaoh': 4800, 'void_walker': 5200, 'candy_pop': 3800, 'steam_knight': 4500})
 ITEM_GEM_COST["cosmetics_owned"].update({'pirate_hat': 480, 'chef_hat': 220, 'cowboy_hat': 360, 'jester_hat': 300, 'mushroom_cap': 260, 'pharaoh_nemes': 720, 'bunny_ears': 240, 'propeller_cap': 200, 'flame_crown': 800, 'headphones': 420, 'aviator': 380, 'nerd_glasses': 120, 'vr_visor': 540, 'glasses_3d': 160, 'eyepatch': 180, 'sunset_shades': 320, 'diamond_shades': 900, 'snow_goggles': 280, 'cat_eye': 260, 'matrix_shades': 600, 'cape_ocean': 420, 'cape_galaxy': 880, 'cape_phoenix': 950, 'cape_sakura': 460, 'cape_toxic': 380, 'cape_rainbow': 700, 'cape_vampire': 640, 'cape_desert': 300, 'cape_emerald': 560, 'cape_void': 1000})
 # Eski oyun sürümleri eski (3,5 kat ucuz) fiyatla satın almış olabilir: bedelin

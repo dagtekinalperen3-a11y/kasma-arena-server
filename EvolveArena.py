@@ -8787,20 +8787,6 @@ SKINS = [
                 "Her seviye: Atış Hızı +%0.6 (en çok %30)"],
          perk_add=dict(base_pickup=20, base_speed=10, dash_cd_mult=-0.10),
          perk_level=dict(skin_aspd=(0.006, 0.30))),
-    dict(id="crimson", name="Kızıl Şahin",     color=(225, 70, 85),   accent=(255, 190, 160), cost=500,
-         weapon="crossbow", proj="feather",   aura="falcon",   sfx="a", wlen=26,
-         desc="Kanatlarını çırpar, tüy gibi keskin oklar yağdırır.",
-         perks=["Mermi Hızı +%12", "Kritik Şans +%5",
-                "Her seviye: Kritik Hasar +%1.2 (en çok %60), Hasar +%0.4 (en çok %24)"],
-         perk_add=dict(proj_speed_mult=0.12, crit_chance=0.05),
-         perk_level=dict(crit_dmg_mult=(0.012, 0.60), skin_power=(0.004, 0.24))),
-    dict(id="royal",   name="Kraliyet Moru",   color=(175, 120, 235), accent=(255, 220, 120), cost=1100,
-         weapon="scepter",  proj="star",      aura="royal",   sfx="a", wlen=38,
-         desc="Tacını takar, asasıyla dönen yıldızlar fırlatır.",
-         perks=["Deneyim Kazancı +%10", "Kritik Hasar +%10", "Şans +%5",
-                "Her seviye: Kritik Hasar +%1 (en çok %50)"],
-         perk_add=dict(xp_mult=0.10, crit_dmg_mult=0.10, luck=0.05),
-         perk_level=dict(crit_dmg_mult=(0.010, 0.50))),
     dict(id="cyan",    name="Elektrik Cyan",   color=(100, 225, 225), accent=(230, 255, 255), cost=1700,
          weapon="tesla",    proj="lightning", aura="tesla",    sfx="c", wlen=30,
          desc="Tesla bobini. Bedeninde her an bir zincir yıldırım hazır bekler.",
@@ -8817,92 +8803,6 @@ SKINS = [
                 "Her seviye: Kritik Şans +%0.2 (en çok %12)"],
          perk_add=dict(dash_dist_mult=0.20, pierce_bonus=1),
          perk_level=dict(crit_chance=(0.002, 0.12))),
-    dict(id="inferno", name="İnferno",         color=(245, 125, 40),  accent=(255, 225, 110), cost=1700,
-         weapon="cannon",   proj="fireball",  aura="inferno",  sfx="d", wlen=28,
-         desc="Tepesinde alev, elinde alev topu atan top. Yaktıkça yanar.",
-         perks=["BONK Yarıçapı +%15", "BONK Hasarı +%10", "Can +30",
-                "Her seviye: Hasar +%0.5 (en çok %30), BONK Hasarı +%1"],
-         perk_add=dict(bonk_radius_mult=0.15, bonk_mult=0.10, base_max_hp=30),
-         perk_level=dict(skin_power=(0.005, 0.30), bonk_mult=(0.01, 0.60))),
-    dict(id="gold",    name="Altın Efsane",    color=(232, 186, 90),  accent=(255, 245, 190), cost=2500,
-         weapon="goldgun",  proj="gold",      aura="goldsun",    sfx="a", wlen=33,
-         desc="Halesi ve işlemeli altın tüfeğiyle gerçek bir efsane.",
-         perks=["Altın Kazancı +%20", "Toplama Menzili +20", "Hasar +%10",
-                "Her seviye: Hasar +%0.4, Şans +%0.2 (en çok %24 / %12)"],
-         perk_add=dict(coin_mult=0.20, base_pickup=20, skin_power=0.10),
-         perk_level=dict(skin_power=(0.004, 0.24), luck=(0.002, 0.12))),
-    dict(id="prism",   name="Prizma",          color=(255, 120, 200), accent=(255, 255, 255), cost=3500,
-         weapon="crystal",  proj="prism",     aura="prism2",   sfx="c", wlen=30,
-         desc="Sürekli renk değiştiren kristal silah ve mermiler.",
-         perks=["Çoklu Atış Lv. +1", "Mermi Hızı +%10", "Mermi Delme +1", "Kritik Şans +%6",
-                "Her seviye: Hasar +%0.6 (en çok %36)"],
-         perk_add=dict(multishot_level=1, proj_speed_mult=0.10, pierce_bonus=1, crit_chance=0.06),
-         perk_level=dict(skin_power=(0.006, 0.36))),
-
-    # ---- yeni: özel yetenekli skinler (elmasla alınan kalıcı avantajlar) ----
-    dict(id="shadow_hunter", name="Gölge Avcı", color=(52, 44, 78), accent=(200, 150, 255), cost=2300,
-         weapon="crossbow", proj="blackfire", aura="hunter", sfx="b", wlen=27,
-         desc="Karanlıkta pusuya yatan bir avcı. Ayak sesi yok, ok sesi yok.",
-         perks=["Hareket Hızı +30", "Dash Bekleme Süresi -%15",
-                "Her seviye: Kritik Şans +%0.2, Atış Hızı +%0.3"],
-         perk_add=dict(base_speed=30, dash_cd_mult=-0.15),
-         perk_level=dict(crit_chance=(0.002, 0.12), skin_aspd=(0.003, 0.18))),
-    dict(id="frost_witch", name="Buz Büyücüsü", color=(160, 225, 255), accent=(255, 255, 255), cost=3000,
-         weapon="scepter", proj="star", aura="frost", sfx="a", wlen=36,
-         desc="Asasının ucu buz gibi soğuk. Düşmanları donduran kristaller fırlatır.",
-         perks=["Buz Lv.2 ile başlar (yavaşlatma)", "Kritik Vuruş Şansı +%8", "Hasar +%6",
-                "Her 15 seviyede Buz +1 (en çok Lv.5)", "Her seviye: Hasar +%0.3"],
-         perk_set=dict(ice_level=2),
-         perk_add=dict(crit_chance=0.08, skin_power=0.06),
-         perk_every=dict(ice_level=(15, 5)),
-         perk_level=dict(skin_power=(0.003, 0.18))),
-    dict(id="blood_countess", name="Kan Kontesi", color=(200, 30, 55), accent=(255, 120, 130), cost=3000,
-         weapon="flask", proj="toxic", aura="vampire", sfx="d", wlen=24,
-         desc="Şişesinde kendi kanını taşır. Her vuruşta biraz can çalar.",
-         perks=["Kan Emme Lv.2 ile başlar", "Can Yenilenmesi +0.8/sn", "Hasar +%6",
-                "Her 15 seviyede Kan Emme +1 (en çok Lv.5)",
-                "Her seviye: saniyede maks canın %0.012'si yenilenir (en çok %0.6)"],
-         perk_set=dict(vamp_level=2),
-         perk_add=dict(base_regen=0.8, skin_power=0.06),
-         perk_every=dict(vamp_level=(15, 5)),
-         perk_level=dict(regen_pct=(0.00012, 0.006))),
-    dict(id="iron_sentinel", name="Zırhlı Devriye", color=(120, 128, 145), accent=(230, 235, 245), cost=2600,
-         weapon="goldgun", proj="gold", aura="knight", sfx="a", wlen=30,
-         desc="Ağır zırh giyer, yavaş ama sağlam. Bir tank gibi öne dalar.",
-         perks=["Zırh +%8 (hasar azaltma)", "Can +40", "Hareket Hızı -15 (ağır zırh)",
-                "Her seviye: Can +6 (en çok +360), Hasar Alma -%0.3 (en çok %18)"],
-         perk_add=dict(base_armor=0.08, base_max_hp=40, base_speed=-15),
-         perk_level=dict(_hp=(6, 360), dmg_taken_mult=(-0.003, -0.18))),
-    dict(id="storm_bringer", name="Fırtına Getirici", color=(90, 150, 245), accent=(230, 245, 255), cost=4200,
-         weapon="cannon", proj="fireball", aura="storm", sfx="c", wlen=29,
-         desc="Gökyüzünü kendine bağlamış. Etrafına düzenli yıldırım fırtınası çağırır.",
-         perks=["Fırtına Lv.1 ile başlar (periyodik alan hasarı)", "Mermi Hızı +%18", "Atış Hızı +%8",
-                "Her 12 seviyede Fırtına +1 (en çok Lv.5)", "Her seviye: Hasar +%0.3"],
-         perk_set=dict(storm_level=1),
-         perk_add=dict(proj_speed_mult=0.18, skin_aspd=0.08),
-         perk_every=dict(storm_level=(12, 5)),
-         perk_level=dict(skin_power=(0.003, 0.18))),
-
-    # ---- yeni +5 skin ----
-    dict(id="venom_striker", name="Zehir Vuruşçu", color=(90, 205, 115), accent=(220, 255, 210), cost=2100,
-         weapon="flask", proj="toxic", aura="venom", sfx="d", wlen=25,
-         desc="Zehirli şişesiyle yakın dövüşe girer, teması bile acıtır.",
-         perks=["Dikenler Lv.1 ile başlar (temas hasarına karşılık verir)", "Can Yenilenmesi +0.5/sn", "Hasar +%8",
-                "Her 12 seviyede Dikenler +1 (en çok Lv.5)",
-                "Her seviye: saniyede maks canın %0.01'i yenilenir (en çok %0.5)"],
-         perk_set=dict(thorns_level=1),
-         perk_add=dict(base_regen=0.5, skin_power=0.08),
-         perk_every=dict(thorns_level=(12, 5)),
-         perk_level=dict(regen_pct=(0.0001, 0.005))),
-    dict(id="homing_falcon", name="Yönelmeli Şahin", color=(90, 160, 245), accent=(220, 240, 255), cost=2500,
-         weapon="crossbow", proj="feather", aura="jet", sfx="a", wlen=27,
-         desc="Okları hedefi asla şaşırmaz; havada bile yön değiştirir.",
-         perks=["Yönelme Lv.1 ile başlar (mermiler hedefe yönelir)", "Dash Bekleme Süresi -%10", "Hasar +%10",
-                "Her 15 seviyede Yönelme +1 (en çok Lv.4)", "Her seviye: Hasar +%0.4 (en çok %24)"],
-         perk_set=dict(homing_level=1),
-         perk_add=dict(dash_cd_mult=-0.10, skin_power=0.10),
-         perk_every=dict(homing_level=(15, 4)),
-         perk_level=dict(skin_power=(0.004, 0.24))),
     dict(id="frenzy_beast", name="Çılgın Canavar", color=(220, 60, 40), accent=(255, 180, 90), cost=2800,
          weapon="cannon", proj="fireball", aura="beast", sfx="d", wlen=28,
          desc="Ne kadar çok vurursa o kadar çılgınlaşır, durmak bilmez.",
@@ -9020,9 +8920,10 @@ SKIN_RESET_V = 1
 
 
 def revoked_skin_ids():
-    # sıfırlamadan sonra eklenen skinler (5. paket) sıfırlamaya hiç girmez
+    # sıfırlamadan sonra eklenen skinler (5. ve 6. paket) sıfırlamaya hiç girmez;
+    # sonradan kaldırılan elmaslı skinler sıfırlamaya hâlâ dahildir
     return {sk["id"] for sk in SKINS if not sk.get("premium") and (sk.get("cost") or 0) > 0
-            and sk["id"] not in _NEW_SKIN_IDS}
+            and sk["id"] not in _NEW_SKIN_IDS} | set(REMOVED_PAID_SKINS)
 
 
 def apply_skin_reset(data):
@@ -9042,7 +8943,17 @@ def apply_skin_reset(data):
 
 
 # oyundan kaldırılan skinler -> sahiplerine verilen karşılık
-REMOVED_SKINS = {"toxic": "venom_striker"}
+REMOVED_SKINS = {
+    "toxic": "toxic_alchemist",
+    # 6. paket: kırmızı çerçevedeki 12 skin kaldırıldı; sahibi yerine yenisini alır
+    "crimson": "phoenix_heir", "royal": "star_knight", "inferno": "samurai_oni",
+    "gold": "lionheart", "prism": "crystal_mage", "shadow_hunter": "ghost_lantern",
+    "frost_witch": "frost_wolf", "blood_countess": "vampire_lord", "iron_sentinel": "mech_pilot",
+    "storm_bringer": "ocean_tide", "venom_striker": "toxic_alchemist", "homing_falcon": "jade_monk",
+}
+# elmasla satılmış olanlar: skin sıfırlamasından (SKIN_RESET_V) geçmemiş kayıtta
+# önce sıfırlama karar verir, yalnız gerçekten sahip olunan karşılığa çevrilir
+REMOVED_PAID_SKINS = frozenset(k for k in REMOVED_SKINS if k != "toxic")
 
 
 def migrate_removed_skins(data):
@@ -9050,12 +8961,17 @@ def migrate_removed_skins(data):
     owned = data.get("skins_owned")
     if not isinstance(owned, list):
         return data
+    reset_done = int(data.get("skin_reset", 0) or 0) >= SKIN_RESET_V
+    rebought = set(data.get("skins_rebought") or [])
     out = []
     for sid in owned:
         rep_ = REMOVED_SKINS.get(sid)
         if rep_ is None:
             if sid not in out:
                 out.append(sid)
+        elif sid in REMOVED_PAID_SKINS and not (reset_done or sid in rebought):
+            if sid not in out:
+                out.append(sid)          # önce skin sıfırlaması karar versin
         elif rep_ not in out and rep_ not in owned:
             out.append(rep_)
     data["skins_owned"] = out
@@ -9127,7 +9043,116 @@ NEW_SKINS = [
          perk_level=dict(_hp=(4, 240))),
 ]
 SKINS.extend(NEW_SKINS)
-_NEW_SKIN_IDS = frozenset(s_["id"] for s_ in NEW_SKINS)
+
+# ---- 6. paket: kaldırılan 12 skinin yerine 12 yeni skin ----
+# Her birinin kendi görünüşü (aura katmanı), yeteneği ve İMZA pasifi var.
+NEW_SKINS2 = [
+    dict(id="frost_wolf", name="Kutup Kurdu", color=(176, 214, 240), accent=(240, 250, 255), cost=4300,
+         weapon="crossbow", proj="feather", aura="frostwolf", sfx="a", wlen=27,
+         desc="Kuzey buzullarının yalnız avcısı. Kar beyazı postu, buz gibi nefesi ve ulumasıyla sürüleri dondurur.",
+         perks=["İMZA: Ayaz Isırığı - her 5. atışında en yakın yaratık 1,2 sn donar, çevresine buz saçılır",
+                "İMZA: Kar İzi - dash attığın yerde 2,5 sn kar kalır, içindeki yaratıklar yarı hızda",
+                "Hareket Hızı +12, Kritik Şans +%5", "Her seviye: Atış Hızı +%0.5 (en çok %30)",
+                "Yetenek: Kutup Uluması"],
+         perk_add=dict(base_speed=12, crit_chance=0.05),
+         perk_level=dict(skin_aspd=(0.005, 0.30))),
+    dict(id="samurai_oni", name="Oni Samuray", color=(200, 40, 50), accent=(255, 210, 90), cost=4900,
+         weapon="twinblades", proj="blackfire", aura="oni", sfx="b", wlen=40,
+         desc="Şeytan maskeli, boynuzlu bir savaşçı. Yaralandıkça öfkesi kabarır, iki kılıcı kızıl bir iz bırakır.",
+         perks=["İMZA: Oni Öfkesi - canın yarının altındayken hasarın +%25, atış hızın +%15",
+                "İMZA: Her 10 öldürmede çevrene kızıl bir kılıç dalgası savurursun",
+                "Hasar +%10, Kritik Hasar +%15", "Her seviye: Hasar +%0.5 (en çok %30)",
+                "Yetenek: Oni Kesiği"],
+         perk_add=dict(skin_power=0.10, crit_dmg_mult=0.15),
+         perk_level=dict(skin_power=(0.005, 0.30))),
+    dict(id="crystal_mage", name="Kristal Büyücü", color=(120, 90, 200), accent=(130, 255, 240), cost=4600,
+         weapon="crystal", proj="prism", aura="crystal", sfx="c", wlen=30,
+         desc="Mağaraların derinindeki kristallerle konuşan büyücü. Çevresinde ışık kıran kristaller döner.",
+         perks=["İMZA: Kristal Kalkan - 15 sn'de bir kalkan yükü (en çok 2)",
+                "İMZA: Öldürdüğün yaratıkların %15'i kristal kırıklarına bölünür, yakındakilere saplanır",
+                "Şans +%8, Deneyim +%10", "Her seviye: Hasar +%0.4 (en çok %24)",
+                "Yetenek: Kristal Yağmuru"],
+         perk_add=dict(luck=0.08, xp_mult=0.10),
+         perk_level=dict(skin_power=(0.004, 0.24))),
+    dict(id="vampire_lord", name="Gece Lordu", color=(150, 36, 70), accent=(255, 70, 100), cost=5000,
+         weapon="scepter", proj="blackfire", aura="nightlord", sfx="b", wlen=38,
+         desc="Yüksek yakalı pelerini ve yarasa kanatlarıyla gecenin efendisi. Kan döküldükçe güçlenir.",
+         perks=["İMZA: Kan Bağı - her öldürme maks canının %0,8'ini doldurur",
+                "İMZA: Yarasa Sürüsü - 12 sn'de bir 6 yarasa en yakın yaratıklara dalar (hasar + yavaşlatma)",
+                "Can +40, Kritik Hasar +%12", "Her seviye: Hasar +%0.5 (en çok %30)",
+                "Yetenek: Kızıl Gece"],
+         perk_add=dict(base_max_hp=40, crit_dmg_mult=0.12),
+         perk_level=dict(skin_power=(0.005, 0.30))),
+    dict(id="mech_pilot", name="Mekanik Pilot", color=(120, 130, 150), accent=(255, 150, 40), cost=4700,
+         weapon="cannon", proj="bullet", aura="mech", sfx="d", wlen=30,
+         desc="Jet itiş motorlu çelik zırhın pilotu. Vizörü yanıp söner, sırtından roket yağar.",
+         perks=["İMZA: Roket Desteği - 9 sn'de bir 5 roket en yakın yaratıkların üstüne iner",
+                "Zırh +%8, Can +50, BONK Hasarı +%10", "Her seviye: Can +4 (en çok +240)",
+                "Yetenek: Füze Yağmuru"],
+         perk_add=dict(base_armor=0.08, base_max_hp=50, bonk_mult=0.10),
+         perk_level=dict(_hp=(4, 240))),
+    dict(id="phoenix_heir", name="Anka Varisi", color=(255, 120, 40), accent=(255, 230, 120), cost=5200,
+         weapon="scepter", proj="fireball", aura="phoenixheir", sfx="c", wlen=38,
+         desc="Ateş kuşunun son varisi. Alevden kanatları açıldığında küllerinden yeniden doğar.",
+         perks=["İMZA: Küllerinden Doğuş - 90 sn'de bir ölümcül darbede %40 canla dirilirsin, çevren alev alır",
+                "İMZA: Öldürdüğün yaratıkların %20'si yanarak çevresine ateş sıçratır",
+                "Hasar +%8, Can Yenilenmesi +0.6/sn", "Her seviye: Hasar +%0.5 (en çok %30)",
+                "Yetenek: Anka Alevi"],
+         perk_add=dict(skin_power=0.08, base_regen=0.6),
+         perk_level=dict(skin_power=(0.005, 0.30))),
+    dict(id="ocean_tide", name="Gelgit Ruhu", color=(40, 140, 200), accent=(160, 240, 255), cost=4200,
+         weapon="scepter", proj="star", aura="tide", sfx="c", wlen=38,
+         desc="Okyanusun derinliklerinden gelen ruh. Deniz kabuğu tacı taşır, çevresinde dalgalar halkalanır.",
+         perks=["İMZA: Gelgit - 8 sn'de bir çevrene dalga yayılır: yaratıkları iter ve yaralar",
+                "Can Yenilenmesi +1.5/sn, Toplama Menzili +25", "Her seviye: Hasar +%0.4 (en çok %24)",
+                "Yetenek: Dev Dalga"],
+         perk_add=dict(base_regen=1.5, base_pickup=25),
+         perk_level=dict(skin_power=(0.004, 0.24))),
+    dict(id="jade_monk", name="Yeşim Keşiş", color=(70, 170, 120), accent=(255, 220, 140), cost=3900,
+         weapon="fists", proj="bolt", aura="jade", sfx="a", wlen=26,
+         desc="Dağ manastırından inen keşiş. Yeşim tespihi havada döner, avuçlarıyla düşmanı savurur.",
+         perks=["İMZA: İç Huzur - her 10 öldürmede 3 sn %30 daha az hasar alırsın",
+                "BONK Hasarı +%30, BONK Yarıçapı +%15, Dash Bekleme -%10",
+                "Her seviye: Can +3 (en çok +180)", "Yetenek: Yeşim Kalkanı"],
+         perk_add=dict(bonk_mult=0.30, bonk_radius_mult=0.15, dash_cd_mult=-0.10),
+         perk_level=dict(_hp=(3, 180))),
+    dict(id="toxic_alchemist", name="Zehir Simyacısı", color=(110, 200, 80), accent=(200, 120, 255), cost=4100,
+         weapon="flask", proj="toxic", aura="alchemy", sfx="c", wlen=28,
+         desc="Gözlüklü, kazanından yeşil dumanlar tüten simyacı. Şişeleri çevresinde döner, asidi her şeyi eritir.",
+         perks=["İMZA: Asit Şişesi - 7 sn'de bir en kalabalık yere asit gölü atar (4 sn zehirler ve yakar)",
+                "Şans +%6, Deneyim +%8, Toplama Menzili +20", "Her seviye: Hasar +%0.4 (en çok %24)",
+                "Yetenek: Zehir Bulutu"],
+         perk_add=dict(luck=0.06, xp_mult=0.08, base_pickup=20),
+         perk_level=dict(skin_power=(0.004, 0.24))),
+    dict(id="star_knight", name="Yıldız Şövalyesi", color=(230, 236, 255), accent=(255, 214, 90), cost=5400,
+         weapon="blaster", proj="star", aura="starknight", sfx="a", wlen=28,
+         desc="Takımyıldızlardan dökülmüş beyaz-altın zırhlı şövalye. Sırtında yıldızlar birbirine bağlanır.",
+         perks=["İMZA: Takımyıldız - her 12 öldürmede en kalabalık yere gökten yıldız düşer",
+                "Kritik Şans +%6, Kritik Hasar +%15, Zırh +%4", "Her seviye: Kritik Hasar +%1 (en çok %50)",
+                "Yetenek: Yıldız Kayması"],
+         perk_add=dict(crit_chance=0.06, crit_dmg_mult=0.15, base_armor=0.04),
+         perk_level=dict(crit_dmg_mult=(0.010, 0.50))),
+    dict(id="ghost_lantern", name="Fener Hayaleti", color=(96, 110, 170), accent=(120, 220, 255), cost=4400,
+         weapon="clockstaff", proj="blackfire", aura="lantern", sfx="b", wlen=36,
+         desc="Kukuletası altında yüzü görünmeyen gezgin. Elindeki fener, topladığı ruhlarla mavi yanar.",
+         perks=["İMZA: Ruh Feneri - her öldürme fenere bir ruh doldurur; 15 ruhta mavi alev patlaması (yavaşlatır)",
+                "Hareket Hızı +10, Dash Mesafesi +%10, Deneyim +%8", "Her seviye: Atış Hızı +%0.5 (en çok %30)",
+                "Yetenek: Sise Karış"],
+         perk_add=dict(base_speed=10, dash_dist_mult=0.10, xp_mult=0.08),
+         perk_level=dict(skin_aspd=(0.005, 0.30))),
+    dict(id="lionheart", name="Aslan Yürek", color=(220, 160, 60), accent=(255, 240, 200), cost=4800,
+         weapon="fists", proj="gold", aura="lion", sfx="d", wlen=26,
+         desc="Altın yeleli, taç takan aslan savaşçı. Kükrediğinde sürü dağılır.",
+         perks=["İMZA: Kükreme - 11 sn'de bir çevrendeki yaratıklar 1,2 sn sersemler",
+                "Can +60, Altın Kazancı +%12, BONK Hasarı +%15", "Her seviye: Can +5 (en çok +300)",
+                "Yetenek: Aslan Pençesi"],
+         perk_add=dict(base_max_hp=60, coin_mult=0.12, bonk_mult=0.15),
+         perk_level=dict(_hp=(5, 300))),
+]
+_SKIN_INSERT_AT = next((i + 1 for i, s_ in enumerate(SKINS) if s_["id"] == "shadow"), len(SKINS))
+SKINS[_SKIN_INSERT_AT:_SKIN_INSERT_AT] = NEW_SKINS2
+
+_NEW_SKIN_IDS = frozenset(s_["id"] for s_ in NEW_SKINS + NEW_SKINS2)
 SKIN_BY_ID = {s["id"]: s for s in SKINS}
 
 
@@ -9285,6 +9310,47 @@ SKIN_ULTS.update({
     "steam_knight": dict(name="ZIRH KİLİDİ", icon="shield", color=(255, 200, 120), cd=24.0,
                          kind="bulwark", mode="auto", duration=6.0,
                          desc="6 saniye aldığın hasar %55 azalır ve çevrendeki düşmanları savurursun."),
+})
+
+# 6. paket skinlerinin yetenekleri
+SKIN_ULTS.update({
+    "frost_wolf": dict(name="KUTUP ULUMASI", icon="snow", color=(190, 230, 255), cd=20.0,
+                       kind="ice_age", mode="auto", freeze=2.5,
+                       desc="Uluması bütün ekranı dondurur: yaratıklar 2,5 saniye kıpırdayamaz ve hasar alır."),
+    "samurai_oni": dict(name="ONİ KESİĞİ", icon="skull", color=(255, 90, 80), cd=16.0,
+                        kind="shadow_strike", mode="auto", n=9, mult=3.0, duration=2.0,
+                        desc="Kızıl bir gölgeye dönüşüp en yakın 9 yaratığın arasından geçer: her birine kesin "
+                             "kritik vurur; ardından kısa süre dokunulmaz kalırsın."),
+    "crystal_mage": dict(name="KRİSTAL YAĞMURU", icon="star", color=(150, 255, 240), cd=17.0,
+                         kind="nova", mode="auto", n=22, mult=0.95, pierce=2,
+                         desc="Çevrene 22 kristal kırığı saçar; her biri iki yaratığı deler."),
+    "vampire_lord": dict(name="KIZIL GECE", icon="drop", color=(230, 40, 70), cd=20.0,
+                         kind="blood_rite", mode="auto", radius=330,
+                         desc="Çevredeki yaratıkların kanını çeker: hasar verir, çaldığı kadar can doldurursun."),
+    "mech_pilot": dict(name="FÜZE YAĞMURU", icon="target", color=(255, 160, 60), cd=16.0,
+                       kind="salvo", mode="auto", n=14, mult=1.0,
+                       desc="Sırtındaki rampadan hedefi şaşmayan 14 güdümlü füze fırlatır."),
+    "phoenix_heir": dict(name="ANKA ALEVİ", icon="flame", color=(255, 150, 50), cd=18.0,
+                         kind="fire_ring", mode="auto", radius=370,
+                         desc="Kanatlarını açar: çevrene genişleyen bir alev halkası salar; değdiği yaratık yanar."),
+    "ocean_tide": dict(name="DEV DALGA", icon="drop", color=(120, 210, 255), cd=18.0,
+                       kind="quake", mode="auto", mult=1.3,
+                       desc="Yeri sarsan dev bir dalga kaldırır: çevredeki yaratıklar savrulur ve yaralanır."),
+    "jade_monk": dict(name="YEŞİM KALKANI", icon="shield", color=(120, 230, 160), cd=22.0,
+                      kind="orbit_shield", mode="auto", duration=8.0,
+                      desc="Yeşim tespih taneleri 8 saniye çevrende dönerek kalkan olur; değdikleri yaratığı savurur."),
+    "toxic_alchemist": dict(name="ZEHİR BULUTU", icon="drop", color=(150, 235, 90), cd=18.0,
+                            kind="thorn_field", mode="auto", duration=6.0, radius=260,
+                            desc="6 saniye boyunca çevrendeki yaratıklar sürekli zehir hasarı alır."),
+    "star_knight": dict(name="YILDIZ KAYMASI", icon="star", color=(255, 220, 110), cd=18.0,
+                        kind="star_fall", mode="auto", n=8, mult=1.4,
+                        desc="Gökten 8 yıldız kayar; her biri düştüğü yerde patlar."),
+    "ghost_lantern": dict(name="SİSE KARIŞ", icon="ghost", color=(140, 220, 255), cd=18.0,
+                          kind="ambush", mode="auto", duration=4.0,
+                          desc="4 saniye sise karışıp görünmez olursun; sisten çıktığın ilk vuruşlar çok sert."),
+    "lionheart": dict(name="ASLAN PENÇESİ", icon="fist", color=(255, 200, 90), cd=17.0,
+                      kind="ash_spin", mode="auto", radius=240, mult=2.1,
+                      desc="Pençelerinle dönerek çevrendeki her şeyi parçalarsın."),
 })
 
 # yetenek hasarı = (bu kadar saniyelik tam atış) x yeteneğin çarpanı
@@ -13998,6 +14064,262 @@ AURA_FX_ALIAS.update({
     "forest": "bubbles", "pharaoh": "halo", "void": "shadow", "candy": "stars", "steam": "bubbles",
 })
 
+# ---- 6. paket skinlerinin görünüşü (arka / ön katman) ----
+def _snowflake(surf, x, y, rr, col):
+    for k in range(3):
+        a = k * math.pi / 3
+        thick_line(surf, (x - math.cos(a) * rr, y - math.sin(a) * rr), (x + math.cos(a) * rr, y + math.sin(a) * rr),
+                   max(1.0, rr * 0.22), col)
+
+
+def _frostwolf_layer(surf, p, px, py, r, col, acc, t, front):
+    if not front:
+        add_glow(surf, px, py, r * 2.4, (170, 220, 255), 0.22)
+        for i in range(6):
+            a = t * 0.7 + i * math.tau / 6
+            _snowflake(surf, px + math.cos(a) * r * 1.8, py + math.sin(a) * r * 1.35, r * 0.24, (235, 248, 255))
+        return
+    for s in (-1, 1):                              # kurt kulakları
+        bx = px + s * r * 0.48
+        ear = [(bx - r * 0.24, py - r * 0.72), (bx + s * r * 0.08, py - r * 1.32), (bx + r * 0.24, py - r * 0.72)]
+        poly_aa(surf, [(x_ + 1, y_ + 2) for x_, y_ in ear], OUTLINE)
+        poly_aa(surf, ear, (220, 236, 250))
+        poly_aa(surf, [(bx - r * 0.1, py - r * 0.78), (bx + s * r * 0.05, py - r * 1.12), (bx + r * 0.1, py - r * 0.78)],
+                (150, 180, 210))
+    ph = (t * 0.8) % 1.0                          # buz gibi nefes
+    blit_disc(surf, px + r * (0.9 + ph * 0.8), py + r * 0.2 - ph * r * 0.3, r * (0.15 + ph * 0.3),
+              (235, 248, 255), int(150 * (1 - ph)))
+
+
+def _oni_layer(surf, p, px, py, r, col, acc, t, front):
+    if not front:
+        add_glow(surf, px, py, r * 2.5, (220, 40, 40), 0.24 + 0.08 * math.sin(t * 4))
+        for s in (-1, 1):                          # sırtta çapraz iki katana
+            x0, y0 = px - s * r * 1.2, py + r * 0.9
+            x1, y1 = px + s * r * 1.3, py - r * 1.5
+            thick_line(surf, (x0, y0), (x1, y1), max(2.0, r * 0.14), (210, 214, 226))
+            thick_line(surf, (x0, y0), (x0 + (x1 - x0) * 0.22, y0 + (y1 - y0) * 0.22), max(3.0, r * 0.2), (60, 20, 24))
+        return
+    for s in (-1, 1):                              # oni boynuzları
+        bx = px + s * r * 0.42
+        horn = [(bx - s * r * 0.12, py - r * 0.72), (bx + s * r * 0.28, py - r * 1.45),
+                (bx + s * r * 0.20, py - r * 0.95), (bx + s * r * 0.12, py - r * 0.70)]
+        poly_aa(surf, [(x_ + 1, y_ + 2) for x_, y_ in horn], OUTLINE)
+        poly_aa(surf, horn, acc)
+    circle_aa(surf, px, py - r * 0.95, r * 0.18, (40, 20, 24))      # topuz
+
+
+def _crystal_layer(surf, p, px, py, r, col, acc, t, front):
+    if not front:
+        add_glow(surf, px, py, r * 2.4, acc, 0.20)
+        for i in range(5):
+            a = t * 1.1 + i * math.tau / 5
+            cx, cy = px + math.cos(a) * r * 1.85, py + math.sin(a) * r * 1.4
+            h_, w_ = r * 0.42, r * 0.2
+            pts = [(cx, cy - h_), (cx + w_, cy), (cx, cy + h_), (cx - w_, cy)]
+            poly_aa(surf, [(x_ + 1, y_ + 2) for x_, y_ in pts], OUTLINE)
+            poly_aa(surf, pts, acc if i % 2 else (190, 160, 255))
+            thick_line(surf, (cx, cy - h_), (cx, cy + h_ * 0.4), 1.2, (255, 255, 255))
+        return
+    for k, dx in enumerate((-0.42, 0.0, 0.42)):  # kristal taç
+        h_ = r * (0.55 if k == 1 else 0.38)
+        cx, cy = px + dx * r, py - r * 0.92
+        pts = [(cx, cy - h_), (cx + r * 0.13, cy), (cx, cy + r * 0.12), (cx - r * 0.13, cy)]
+        poly_aa(surf, pts, acc)
+    if (t * 1.7) % 1.0 < 0.12:
+        _sparkle(surf, px, py - r * 1.4, r * 0.4, (255, 255, 255))
+
+
+def _nightlord_layer(surf, p, px, py, r, col, acc, t, front):
+    if not front:
+        flap = math.sin(t * 5) * 0.18
+        for s in (-1, 1):                          # yarasa kanatları
+            root = (px + s * r * 0.5, py - r * 0.1)
+            tip = (px + s * r * 2.2, py - r * (0.9 + flap))
+            pts = [root, (px + s * r * 1.2, py - r * (1.0 + flap)), tip, (px + s * r * 1.9, py - r * 0.1),
+                   (px + s * r * 1.5, py + r * 0.25), (px + s * r * 1.05, py - r * 0.05), (px + s * r * 0.7, py + r * 0.3)]
+            poly_aa(surf, [(x_ + 1, y_ + 2) for x_, y_ in pts], OUTLINE)
+            poly_aa(surf, pts, (40, 12, 28))
+            thick_line(surf, root, tip, 1.5, acc)
+        add_glow(surf, px, py, r * 2.0, (200, 20, 60), 0.16)
+        return
+    for s in (-1, 1):                              # yüksek yaka
+        poly_aa(surf, [(px + s * r * 0.35, py + r * 0.35), (px + s * r * 0.95, py - r * 0.55),
+                       (px + s * r * 0.75, py + r * 0.45)], acc)
+    a = t * 2.4
+    bx, by = px + math.cos(a) * r * 1.5, py - r * 0.6 + math.sin(a) * r * 0.5
+    w = abs(math.sin(t * 12)) * r * 0.3 + r * 0.1
+    poly_aa(surf, [(bx - w, by - r * 0.08), (bx, by + r * 0.06), (bx + w, by - r * 0.08), (bx, by - r * 0.02)], (30, 10, 22))
+
+
+def _mech_layer(surf, p, px, py, r, col, acc, t, front):
+    if not front:
+        for s in (-1, 1):                          # jet iticiler
+            rx = int(px + s * r * 1.05 - r * 0.22)
+            pygame.draw.rect(surf, (70, 76, 90), (rx, int(py - r * 0.5), int(r * 0.44), int(r * 0.9)), border_radius=3)
+            pygame.draw.rect(surf, acc, (rx, int(py - r * 0.5), int(r * 0.44), int(r * 0.14)))
+            fl = 0.6 + 0.4 * math.sin(t * 30 + s)
+            blit_disc(surf, px + s * r * 1.05, py + r * 0.55, r * 0.26 * fl, (255, 170, 60), 220)
+            blit_disc(surf, px + s * r * 1.05, py + r * 0.5, r * 0.13 * fl, (255, 240, 200), 240)
+        return
+    pygame.draw.rect(surf, (20, 24, 32), (int(px - r * 0.62), int(py - r * 0.32), int(r * 1.24), int(r * 0.28)),
+                     border_radius=4)                          # vizör
+    sx = px - r * 0.5 + ((t * 0.9) % 1.0) * r * 1.0
+    pygame.draw.rect(surf, (90, 230, 255), (int(sx), int(py - r * 0.28), int(r * 0.24), int(r * 0.2)), border_radius=2)
+    thick_line(surf, (px + r * 0.3, py - r * 0.8), (px + r * 0.45, py - r * 1.35), 1.5, (150, 156, 170))
+    if (t * 2.0) % 1.0 < 0.5:
+        circle_aa(surf, px + r * 0.45, py - r * 1.38, r * 0.1, (255, 80, 60))
+
+
+def _phoenixheir_layer(surf, p, px, py, r, col, acc, t, front):
+    if not front:
+        add_glow(surf, px, py, r * 2.6, (255, 140, 40), 0.28 + 0.08 * math.sin(t * 5))
+        for s in (-1, 1):                          # alev kanatlar (tüy yelpazesi)
+            for k in range(5):
+                a = -math.pi / 2 + s * (0.55 + k * 0.28) + math.sin(t * 4 + k) * 0.05
+                ln = r * (1.5 + 0.35 * (4 - abs(k - 2)))
+                x1, y1 = px + math.cos(a) * ln, py + math.sin(a) * ln * 0.8
+                c = (255, 110 + k * 25, 40)
+                poly_aa(surf, [(px + s * r * 0.4, py - r * 0.1), (x1 - math.sin(a) * r * 0.16, y1 + math.cos(a) * r * 0.16),
+                               (x1, y1), (x1 + math.sin(a) * r * 0.16, y1 - math.cos(a) * r * 0.16)], c)
+        return
+    for k, dx in enumerate((-0.25, 0.0, 0.25)):  # tüy tepeliği
+        a = -math.pi / 2 + dx * 1.4 + math.sin(t * 6 + k) * 0.08
+        x0, y0 = px + dx * r, py - r * 0.85
+        x1, y1 = x0 + math.cos(a) * r * 0.7, y0 + math.sin(a) * r * 0.7
+        thick_line(surf, (x0, y0), (x1, y1), max(2.0, r * 0.14), acc if k == 1 else (255, 150, 50))
+    for i in range(3):
+        ph = (t * 0.8 + i / 3.0) % 1.0
+        circle_aa(surf, px + (i - 1) * r * 0.5, py - r * (1.0 + ph * 1.3), max(1.0, r * 0.09 * (1 - ph)), (255, 210, 90))
+
+
+def _tide_layer(surf, p, px, py, r, col, acc, t, front):
+    if not front:
+        for k in range(3):                         # halkalanan dalgalar
+            ph = (t * 0.6 + k / 3.0) % 1.0
+            rr = r * (1.2 + ph * 1.2)
+            rect = pygame.Rect(0, 0, int(rr * 2), int(rr * 0.9))
+            rect.center = (int(px), int(py + r * 0.55))
+            pygame.draw.ellipse(surf, scale_col(acc, 0.9 - 0.6 * ph), rect, 2)
+        for i in range(4):
+            ph = (t * 0.5 + i * 0.25) % 1.0
+            circle_aa(surf, px + (i - 1.5) * r * 0.7, py + r * 0.4 - ph * r * 2.0, max(1.0, r * 0.12), (200, 245, 255))
+        return
+    cx, cy = px, py - r * 0.95                     # deniz kabuğu taç
+    pts = [(cx - r * 0.45, cy + r * 0.12)] + [(cx + math.cos(math.pi + k * math.pi / 6) * r * 0.45,
+                                                 cy + math.sin(math.pi + k * math.pi / 6) * r * 0.45) for k in range(7)]
+    poly_aa(surf, pts, (255, 214, 220))
+    for k in range(1, 6):
+        a = math.pi + k * math.pi / 6
+        thick_line(surf, (cx, cy + r * 0.1), (cx + math.cos(a) * r * 0.42, cy + math.sin(a) * r * 0.42), 1.2, (220, 150, 170))
+
+
+def _jade_layer(surf, p, px, py, r, col, acc, t, front):
+    if not front:
+        for i in range(10):                        # yeşim tespih halkası
+            a = t * 1.3 + i * math.tau / 10
+            x_, y_ = px + math.cos(a) * r * 1.7, py + math.sin(a) * r * 1.0 - r * 0.2
+            circle_aa(surf, x_, y_ + 1, r * 0.17, OUTLINE)
+            circle_aa(surf, x_, y_, r * 0.16, (90, 200, 140) if i % 3 else acc)
+            circle_aa(surf, x_ - r * 0.05, y_ - r * 0.05, r * 0.05, (220, 255, 230))
+        return
+    pygame.draw.rect(surf, (200, 40, 50), (int(px - r * 0.85), int(py - r * 0.62), int(r * 1.7), int(r * 0.22)),
+                     border_radius=3)                          # kafa bandı
+    sw = math.sin(t * 5) * r * 0.15
+    for k in (0, 1):
+        thick_line(surf, (px + r * 0.8, py - r * 0.52), (px + r * (1.25 + 0.15 * k), py - r * (0.3 - 0.2 * k) + sw),
+                   max(2.0, r * 0.12), (200, 40, 50))
+
+
+def _alchemy_layer(surf, p, px, py, r, col, acc, t, front):
+    if not front:
+        add_glow(surf, px, py + r * 0.2, r * 2.2, (120, 230, 90), 0.20)
+        for i in range(5):
+            ph = (t * 0.5 + i * 0.2) % 1.0
+            blit_disc(surf, px + (i - 2) * r * 0.45 + math.sin(t * 2 + i) * r * 0.2, py + r * 0.4 - ph * r * 2.2,
+                      r * (0.2 + 0.35 * ph), (130, 230, 90), int(120 * (1 - ph)))
+        return
+    for s in (-1, 1):                              # alnındaki gözlük
+        circle_aa(surf, px + s * r * 0.26, py - r * 0.78, r * 0.2, (60, 50, 40))
+        circle_aa(surf, px + s * r * 0.26, py - r * 0.78, r * 0.13, (180, 255, 150))
+    for i in range(3):                             # dönen iksir şişeleri
+        a = t * 1.8 + i * math.tau / 3
+        bx, by = px + math.cos(a) * r * 1.6, py + math.sin(a) * r * 0.9
+        c = ((150, 235, 90), acc, (255, 180, 80))[i]
+        circle_aa(surf, bx, by, r * 0.2, OUTLINE)
+        circle_aa(surf, bx, by, r * 0.17, c)
+        pygame.draw.rect(surf, (200, 190, 170), (int(bx - r * 0.06), int(by - r * 0.36), int(r * 0.12), int(r * 0.18)))
+
+
+def _starknight_layer(surf, p, px, py, r, col, acc, t, front):
+    if not front:
+        add_glow(surf, px, py, r * 2.3, (200, 210, 255), 0.18)
+        pts = []
+        for i in range(6):                         # takımyıldız
+            a = t * 0.35 + i * math.tau / 6 + (0.3 if i % 2 else 0)
+            pts.append((px + math.cos(a) * r * (1.6 + 0.3 * (i % 2)), py + math.sin(a) * r * 1.3))
+        for a_, b_ in zip(pts, pts[1:] + pts[:1]):
+            thick_line(surf, a_, b_, 1.0, (200, 210, 255))
+        for i, (x_, y_) in enumerate(pts):
+            _sparkle(surf, x_, y_, r * (0.22 + 0.06 * math.sin(t * 5 + i)), acc if i % 2 else (255, 255, 255))
+        return
+    a = math.sin(t * 3) * 0.1                      # miğfer sorgucu
+    x0, y0 = px, py - r * 0.9
+    pts = [(x0, y0), (x0 - r * 0.15, y0 - r * 0.5), (x0 + r * 0.3 + a * r, y0 - r * 0.95),
+           (x0 + r * 0.55 + a * r, y0 - r * 0.7), (x0 + r * 0.2, y0 - r * 0.25)]
+    poly_aa(surf, pts, acc)
+
+
+def _lantern_layer(surf, p, px, py, r, col, acc, t, front):
+    if not front:
+        for i in range(4):                         # ruh alevleri
+            a = t * 1.5 + i * math.tau / 4
+            x_, y_ = px + math.cos(a) * r * 1.7, py + math.sin(a) * r * 1.2
+            add_glow(surf, x_, y_, r * 0.7, acc, 0.35)
+            blit_disc(surf, x_, y_, r * 0.18, (200, 245, 255), 220)
+        return
+    hood = [(px - r * 0.95, py - r * 0.05), (px - r * 0.7, py - r * 0.95), (px, py - r * 1.3),
+            (px + r * 0.7, py - r * 0.95), (px + r * 0.95, py - r * 0.05), (px + r * 0.6, py - r * 0.6),
+            (px, py - r * 0.85), (px - r * 0.6, py - r * 0.6)]
+    poly_aa(surf, hood, (40, 44, 70))                # kukuleta
+    lx, ly = px + r * 1.25, py + r * 0.3 + math.sin(t * 3) * r * 0.06   # fener
+    thick_line(surf, (px + r * 0.8, py - r * 0.1), (lx, ly - r * 0.3), 1.4, (120, 110, 90))
+    add_glow(surf, lx, ly, r * 1.0, acc, 0.5)
+    pygame.draw.rect(surf, (70, 60, 40), (int(lx - r * 0.2), int(ly - r * 0.3), int(r * 0.4), int(r * 0.55)), 2,
+                     border_radius=3)
+    circle_aa(surf, lx, ly, r * 0.13, (200, 245, 255))
+
+
+def _lion_layer(surf, p, px, py, r, col, acc, t, front):
+    if not front:
+        n = 14                                     # altın yele
+        for i in range(n):
+            a = i * math.tau / n + math.sin(t * 2) * 0.03
+            ln = r * (1.45 + 0.12 * math.sin(t * 3 + i))
+            pts = [(px + math.cos(a - 0.22) * r * 0.85, py + math.sin(a - 0.22) * r * 0.85),
+                   (px + math.cos(a) * ln, py + math.sin(a) * ln),
+                   (px + math.cos(a + 0.22) * r * 0.85, py + math.sin(a + 0.22) * r * 0.85)]
+            poly_aa(surf, pts, (190, 110, 30) if i % 2 else (230, 150, 50))
+        return
+    cy = py - r * 1.0                              # küçük taç
+    pts = [(px - r * 0.42, cy + r * 0.2), (px - r * 0.32, cy - r * 0.2), (px - r * 0.12, cy + r * 0.02),
+           (px, cy - r * 0.32), (px + r * 0.12, cy + r * 0.02), (px + r * 0.32, cy - r * 0.2), (px + r * 0.42, cy + r * 0.2)]
+    poly_aa(surf, pts, (255, 214, 90))
+    circle_aa(surf, px, cy - r * 0.32, r * 0.07, (230, 60, 70))
+
+
+_NEW_AURA_LAYERS.update({
+    "frostwolf": _frostwolf_layer, "oni": _oni_layer, "crystal": _crystal_layer, "nightlord": _nightlord_layer,
+    "mech": _mech_layer, "phoenixheir": _phoenixheir_layer, "tide": _tide_layer, "jade": _jade_layer,
+    "alchemy": _alchemy_layer, "starknight": _starknight_layer, "lantern": _lantern_layer, "lion": _lion_layer,
+})
+AURA_FX_ALIAS.update({
+    "frostwolf": "stars", "oni": "flames", "crystal": "prism", "nightlord": "shadow", "mech": "arcs",
+    "phoenixheir": "flames", "tide": "bubbles", "jade": "halo", "alchemy": "bubbles", "starknight": "stars",
+    "lantern": "shadow", "lion": "halo",
+})
+
+
 
 
 def _cosmos_layer(surf, px, py, r, col, acc, t, front):
@@ -17768,6 +18090,13 @@ class Player(_AcGuard):
     def _resolve_lethal(self, fx):
         """Can sıfırın altına düştüyse ölümü engelleyen güçleri sırayla dener."""
         if self.hp > 0 or not self.alive:
+            return
+        if self.skin.get("id") == "phoenix_heir" and float(getattr(self, "sp_void_cd", 0.0) or 0.0) <= 0:
+            # küllerinden doğuş: %40 canla dirilir, çevresi alev alır (koşu tarafı sp_tick'te)
+            self.hp = self.max_hp * 0.40
+            self.sp_void_cd = SP_PHOENIX_CD
+            self.invuln = max(self.invuln, 2.0)
+            self.sp_phoenix_now = True
             return
         if self.skin.get("id") == "void_walker" and float(getattr(self, "sp_void_cd", 0.0) or 0.0) <= 0:
             # boşluğa kaçış: ölümcül darbede boşluğa düşüp uzakta yeniden belirir
@@ -36565,6 +36894,39 @@ SP_VOID_CD = 70.0
 SP_CANDY_CHANCE = 0.12
 SP_CANDY_SHIELD_T = 20.0
 SP_STEAM_MAX = 100.0
+# 6. paket İMZA pasifleri
+SP_WOLF_EVERY = 5            # kutup kurdu: her 5. atış dondurur
+SP_WOLF_SNOW_T = 2.5
+SP_ONI_HP = 0.5
+SP_ONI_KILLS = 10
+SP_CRYSTAL_SHIELD_T = 15.0
+SP_CRYSTAL_SHARD = 0.15
+SP_VAMP_HEAL = 0.008
+SP_VAMP_BATS_T = 12.0
+SP_MECH_T = 9.0
+SP_PHOENIX_CD = 90.0
+SP_TIDE_T = 8.0
+SP_JADE_KILLS = 10
+SP_ACID_T = 7.0
+SP_STAR_KILLS = 12
+SP_LANTERN_SOULS = 15
+SP_LION_T = 11.0
+
+
+def _sp_crowd_point(run, radius=650):
+    """Oyuncu çevresinde yaratıkların en yoğun olduğu nokta (yoksa None)."""
+    tg = run._ult_targets(radius)
+    if not tg:
+        return None
+    best, bn = tg[0], -1
+    for e in tg[:30]:
+        n = 0
+        for o in tg:
+            if (o.x - e.x) ** 2 + (o.y - e.y) ** 2 < 120 * 120:
+                n += 1
+        if n > bn:
+            best, bn = e, n
+    return best.x, best.y
 
 
 def sp_mark_mult(e, now):
@@ -36583,7 +36945,9 @@ class SkinPassiveMixin:
         self.sp = {"kills": 0, "shots": 0, "lava": [], "trail": [], "candies": [], "rifts": [],
                    "bloom_t": 0.0, "volley": SP_PIRATE_VOLLEY_T, "curse": SP_PHARAOH_T, "calm": 0.0,
                    "neon": 0.0, "steam": 0.0, "shield": SP_CANDY_SHIELD_T, "drop": 0.0,
-                   "dash_hit": set(), "petal_t": 0.0}
+                   "dash_hit": set(), "petal_t": 0.0,
+                   # 6. paket
+                   "snow": [], "acid": [], "oni_on": False, "souls": 0, "cd2": 0.0, "fall": []}
 
     def sp_id(self):
         sk = getattr(self.player, "skin", None) or {}
@@ -36751,6 +37115,128 @@ class SkinPassiveMixin:
                 self.fx.burst(p.x, p.y, (220, 220, 228), n=26, speed=260, life=0.6, r=5)
                 self.fx.popup(p.x, p.y - 64, L("sp.steam_blast"), (255, 210, 150), 20, life=1.0)
                 sfx("explosion", 0.7, 0.0)
+        else:
+            self._sp_tick6(sid, sp, p, dt, now)
+
+    def _sp_tick6(self, sid, sp, p, dt, now):
+        """6. paket skinlerinin İMZA pasifleri (her kare)."""
+        if sid == "phoenix_heir":
+            p.sp_void_cd = max(0.0, float(getattr(p, "sp_void_cd", 0.0) or 0.0) - dt)
+            if getattr(p, "sp_phoenix_now", False):
+                p.sp_phoenix_now = False
+                rr = 260.0
+                for e in self._ult_targets(rr):
+                    self._ult_hit(e, self._ult_unit() * 2.0, kb=260)
+                    if hasattr(e, "apply_burn"):
+                        e.apply_burn(self._ult_unit() * 0.12, 3.0)
+                self.fx.shockwave(p.x, p.y, rr, (255, 150, 50), 0.55, 8)
+                self.fx.do_flash((255, 140, 40), 0.4)
+                self.fx.burst(p.x, p.y, (255, 200, 90), n=36, speed=300, life=0.7, r=4, gravity=-60)
+                self.fx.popup(p.x, p.y - 70, "KÜLLERİNDEN DOĞDU!", (255, 200, 90), 22, life=1.4)
+                sfx("second", 1.0, 0.0)
+        elif sid == "frost_wolf":
+            for z in sp["snow"]:
+                z[2] -= dt
+                z[3] -= dt
+                if z[3] <= 0:
+                    z[3] = 0.3
+                    for e in self._all_targets():
+                        if e.alive and (e.x - z[0]) ** 2 + (e.y - z[1]) ** 2 < (70 + getattr(e, "radius", 12)) ** 2:
+                            e.apply_slow(0.5, 0.5)
+            sp["snow"] = [z for z in sp["snow"] if z[2] > 0][-8:]
+        elif sid == "samurai_oni":
+            low = p.hp < p.max_hp * SP_ONI_HP
+            if low != sp["oni_on"]:
+                k = 1.0 if low else -1.0
+                p.run_dmg_mult += 0.25 * k
+                p.run_aspd_mult += 0.15 * k
+                sp["oni_on"] = low
+                if low:
+                    self.fx.popup(p.x, p.y - 60, "ONİ ÖFKESİ!", (255, 90, 80), 18, life=1.0)
+                    self.fx.ring(p.x, p.y, (255, 70, 60), n=18, speed=220, life=0.45, r=3)
+        elif sid == "crystal_mage":
+            sp["shield"] -= dt
+            if sp["shield"] <= 0:
+                sp["shield"] = SP_CRYSTAL_SHIELD_T
+                if p.shield_charges < 2:
+                    p.shield_charges += 1
+                    self.fx.ring(p.x, p.y, (150, 255, 240), n=14, speed=160, life=0.4, r=2.6)
+        elif sid == "vampire_lord":
+            sp["cd2"] -= dt
+            if sp["cd2"] <= 0:
+                sp["cd2"] = SP_VAMP_BATS_T
+                tg = sorted(self._ult_targets(520), key=lambda e: (e.x - p.x) ** 2 + (e.y - p.y) ** 2)[:6]
+                for e in tg:
+                    self.fx.bolt([(p.x, p.y - 20), (e.x, e.y)], (200, 30, 70), 0.25)
+                    self._ult_hit(e, self._ult_unit() * 0.9, kb=40)
+                    if e.alive:
+                        e.apply_slow(0.5, 1.5)
+                    self.fx.burst(e.x, e.y, (60, 10, 30), n=6, speed=140, life=0.4, r=3, add=False)
+        elif sid == "mech_pilot":
+            sp["cd2"] -= dt
+            if sp["cd2"] <= 0:
+                sp["cd2"] = SP_MECH_T
+                tg = sorted(self._ult_targets(600), key=lambda e: (e.x - p.x) ** 2 + (e.y - p.y) ** 2)[:5]
+                for e in tg:
+                    sp["fall"].append([e.x, e.y, 0.45, "rocket"])
+                if tg:
+                    sfx("whip", 0.4, 0.1)
+        elif sid == "ocean_tide":
+            sp["cd2"] -= dt
+            if sp["cd2"] <= 0:
+                sp["cd2"] = SP_TIDE_T
+                rr = 220.0
+                for e in self._ult_targets(rr):
+                    self._ult_hit(e, self._ult_unit() * 0.8, kb=300)
+                self.fx.shockwave(p.x, p.y, rr, (120, 210, 255), 0.45, 7)
+                self.fx.burst(p.x, p.y, (180, 240, 255), n=18, speed=240, life=0.5, r=3)
+        elif sid == "toxic_alchemist":
+            sp["cd2"] -= dt
+            if sp["cd2"] <= 0:
+                sp["cd2"] = SP_ACID_T
+                pt = _sp_crowd_point(self, 600)
+                if pt is not None:
+                    sp["acid"].append([pt[0], pt[1], 4.0, 0.0])
+                    self.fx.burst(pt[0], pt[1], (150, 235, 90), n=14, speed=180, life=0.5, r=3)
+            for ac in sp["acid"]:
+                ac[2] -= dt
+                ac[3] -= dt
+                if ac[3] <= 0:
+                    ac[3] = 0.4
+                    for e in self._all_targets():
+                        if e.alive and (e.x - ac[0]) ** 2 + (e.y - ac[1]) ** 2 < (90 + getattr(e, "radius", 12)) ** 2:
+                            self._ult_hit(e, self._ult_unit() * 0.25)
+                            if hasattr(e, "apply_poison"):
+                                e.apply_poison(self._ult_unit() * 0.05)
+                            if hasattr(e, "apply_burn"):
+                                e.apply_burn(self._ult_unit() * 0.04, 1.5)
+            sp["acid"] = [ac for ac in sp["acid"] if ac[2] > 0][-6:]
+        elif sid == "lionheart":
+            sp["cd2"] -= dt
+            if sp["cd2"] <= 0:
+                sp["cd2"] = SP_LION_T
+                rr = 200.0
+                tg = self._ult_targets(rr)
+                for e in tg:
+                    stun_enemy(e, 1.2)
+                self.fx.shockwave(p.x, p.y, rr, (255, 210, 110), 0.4, 6)
+                if tg:
+                    self.fx.popup(p.x, p.y - 64, "KÜKREME!", (255, 210, 110), 20, life=0.9)
+                    sfx("roar", 0.35, 0.05)
+        # gökten düşen roket / yıldız (mekanik pilot, yıldız şövalyesi)
+        for fl in sp["fall"]:
+            fl[2] -= dt
+            if fl[2] <= 0:
+                big = fl[3] == "star"
+                rr = 120.0 if big else 70.0
+                col = (255, 230, 140) if big else (255, 150, 60)
+                for e in self._all_targets():
+                    if e.alive and (e.x - fl[0]) ** 2 + (e.y - fl[1]) ** 2 < (rr + getattr(e, "radius", 12)) ** 2:
+                        self._ult_hit(e, self._ult_unit() * (1.6 if big else 0.9), kb=150)
+                self.fx.shockwave(fl[0], fl[1], rr, col, 0.35, 5)
+                self.fx.burst(fl[0], fl[1], col, n=16 if big else 10, speed=220, life=0.45, r=3)
+                sfx("explosion", 0.35 if big else 0.2, 0.15)
+        sp["fall"] = [fl for fl in sp["fall"] if fl[2] > 0]
 
     # ---- tetikleyiciler ----
     def sp_on_kill(self, e):
@@ -36773,6 +37259,47 @@ class SkinPassiveMixin:
         elif sid == "candy_pop" and random.random() < SP_CANDY_CHANCE:
             sp["candies"].append([e.x, e.y, 8.0, random.choice(((255, 120, 190), (140, 230, 255),
                                                                  (255, 230, 100), (150, 240, 140)))])
+        elif sid == "samurai_oni" and sp["kills"] % SP_ONI_KILLS == 0:
+            p = self.player
+            rr = 160.0
+            for o in self._ult_targets(rr):
+                self._ult_hit(o, self._ult_unit() * 1.1, kb=140)
+            self.fx.shockwave(p.x, p.y, rr, (255, 70, 60), 0.35, 6)
+        elif sid == "crystal_mage" and random.random() < SP_CRYSTAL_SHARD:
+            near = sorted((o for o in self._all_targets() if o.alive and o is not e),
+                          key=lambda o: (o.x - e.x) ** 2 + (o.y - e.y) ** 2)[:3]
+            for o in near:
+                if (o.x - e.x) ** 2 + (o.y - e.y) ** 2 < 180 * 180:
+                    self.fx.bolt([(e.x, e.y), (o.x, o.y)], (150, 255, 240), 0.2)
+                    self._ult_hit(o, self._ult_unit() * 0.5)
+            self.fx.burst(e.x, e.y, (150, 255, 240), n=8, speed=200, life=0.35, r=2.6)
+        elif sid == "vampire_lord":
+            self.player.heal(self.player.max_hp * SP_VAMP_HEAL)
+        elif sid == "phoenix_heir" and random.random() < 0.20:
+            for o in self._all_targets():
+                if o.alive and o is not e and (o.x - e.x) ** 2 + (o.y - e.y) ** 2 < 90 * 90 and hasattr(o, "apply_burn"):
+                    o.apply_burn(self._ult_unit() * 0.08, 2.5)
+            self.fx.burst(e.x, e.y, (255, 140, 40), n=10, speed=160, life=0.4, r=3, gravity=-80)
+        elif sid == "jade_monk" and sp["kills"] % SP_JADE_KILLS == 0:
+            self.player.add_temp_buff(3.0, dmg_taken_mult=-0.30)
+            self.fx.ring(self.player.x, self.player.y, (120, 230, 160), n=16, speed=150, life=0.45, r=2.6)
+        elif sid == "star_knight" and sp["kills"] % SP_STAR_KILLS == 0:
+            pt = _sp_crowd_point(self, 600)
+            if pt is not None:
+                sp["fall"].append([pt[0], pt[1], 0.6, "star"])
+        elif sid == "ghost_lantern":
+            sp["souls"] += 1
+            if sp["souls"] >= SP_LANTERN_SOULS:
+                sp["souls"] = 0
+                p = self.player
+                rr = 240.0
+                for o in self._ult_targets(rr):
+                    self._ult_hit(o, self._ult_unit() * 1.4, kb=120)
+                    if o.alive:
+                        o.apply_slow(0.45, 2.0)
+                self.fx.shockwave(p.x, p.y, rr, (120, 220, 255), 0.5, 7)
+                self.fx.burst(p.x, p.y, (180, 240, 255), n=22, speed=230, life=0.55, r=3)
+                sfx("lightning", 0.4, 0.05)
 
     def sp_on_dash(self):
         sp = getattr(self, "sp", None)
@@ -36785,10 +37312,30 @@ class SkinPassiveMixin:
             self.fx.burst(p.x, p.y, (255, 190, 215), n=14, speed=200, life=0.5, r=3)
         elif sid == "void_walker":
             sp["rifts"].append([p.x, p.y, 1.6, 0.0])
+        elif sid == "frost_wolf":
+            sp["snow"].append([p.x, p.y, SP_WOLF_SNOW_T, 0.0])
 
     def sp_on_shot(self):
         sp = getattr(self, "sp", None)
-        if sp is None or self.sp_id() != "thunder_god":
+        if sp is None:
+            return
+        if self.sp_id() == "frost_wolf":
+            sp["shots"] += 1
+            if sp["shots"] % SP_WOLF_EVERY == 0:
+                p = self.player
+                tg = sorted(self._ult_targets(450), key=lambda e: (e.x - p.x) ** 2 + (e.y - p.y) ** 2)
+                if tg:
+                    e0 = tg[0]
+                    stun_enemy(e0, 1.2)
+                    for o in tg[:6]:
+                        if (o.x - e0.x) ** 2 + (o.y - e0.y) ** 2 < 80 * 80:
+                            self._ult_hit(o, self._ult_unit() * 0.5)
+                            o.apply_slow(0.5, 1.2)
+                    self.fx.burst(e0.x, e0.y, (200, 240, 255), n=12, speed=170, life=0.45, r=3)
+                    draw_t = getattr(self, "run_time", 0.0)
+                    e0.__dict__["_wolf_ice"] = draw_t + 1.2
+            return
+        if self.sp_id() != "thunder_god":
             return
         sp["shots"] += 1
         if sp["shots"] % SP_THUNDER_EVERY:
@@ -36872,7 +37419,36 @@ def draw_skin_passives(world, run, t, vis):
             bx, by = p.x + math.cos(a) * 92, p.y + math.sin(a) * 92
             _petal(world, bx, by, a + math.pi / 2, 14, (255, 190, 215))
             add_glow(world, bx, by, 26, (255, 170, 210), 0.35)
+    for z in sp.get("snow", ()):                       # kutup kurdu: kar izi
+        if vis.collidepoint(z[0], z[1]):
+            k = clamp(z[2] / SP_WOLF_SNOW_T, 0.0, 1.0)
+            blit_disc(world, z[0], z[1] + 4, 70 * (0.7 + 0.3 * k), (220, 240, 255), int(90 * k))
+            for i in range(5):
+                a = i * 1.26 + z[0] * 0.01
+                _snowflake(world, z[0] + math.cos(a) * 40, z[1] + math.sin(a) * 26, 4, (240, 250, 255))
+    for ac in sp.get("acid", ()):                      # simyacı: asit gölü
+        if vis.collidepoint(ac[0], ac[1]):
+            k = clamp(ac[2] / 4.0, 0.0, 1.0)
+            blit_disc(world, ac[0], ac[1] + 4, 90 * (0.8 + 0.2 * k), (90, 200, 60), int(110 * k))
+            for i in range(6):
+                ph = (t * 1.2 + i / 6.0) % 1.0
+                circle_aa(world, ac[0] + math.cos(i * 1.1) * 50, ac[1] + math.sin(i * 1.1) * 30 - ph * 8,
+                          max(1.0, 5 * (1 - ph)), (190, 255, 140))
+    for fl in sp.get("fall", ()):                      # düşmekte olan roket / yıldız
+        k = clamp(1.0 - fl[2] / (0.6 if fl[3] == "star" else 0.45), 0.0, 1.0)
+        col = (255, 230, 140) if fl[3] == "star" else (255, 150, 60)
+        ring_aa(world, fl[0], fl[1], (120 if fl[3] == "star" else 70) * (1.0 - 0.3 * k), col, 2)
+        sx, sy = fl[0] + 140 * (1 - k), fl[1] - 420 * (1 - k)
+        if fl[3] == "star":
+            _sparkle(world, sx, sy, 14, col)
+        else:
+            thick_line(world, (sx, sy), (sx + 22, sy - 44), 4, (200, 200, 210))
+        add_glow(world, sx, sy, 40, col, 0.5)
     sid = run.sp_id()
+    if sid == "ghost_lantern":
+        k = sp.get("souls", 0) / float(SP_LANTERN_SOULS)
+        if k > 0.02:
+            ring_aa(world, p.x, p.y, p.radius + 14, scale_col((120, 220, 255), 0.4 + 0.6 * k), 2)
     if sid == "steam_knight":
         k = sp.get("steam", 0.0) / SP_STEAM_MAX
         if k > 0.02:
@@ -53318,8 +53894,8 @@ class GameTour:
                       "best_combo": 24, "best_run_kills": 160, "total_dashes": 160,
                       "total_bonks": 40, "total_bonk_hits": 150}
         d["achievements"] = {a["id"]: "24.12.2026" for a in ACHIEVEMENTS[:6]}
-        d["skins_owned"] = ["default", "ranger", "crimson", "royal", "inferno"]
-        d["equipped_skin"] = "inferno"
+        d["skins_owned"] = ["default", "ranger", "phoenix_heir", "star_knight", "samurai_oni"]
+        d["equipped_skin"] = "samurai_oni"
         d["cosmetics_owned"] = ["pet_dragon"]
         d.setdefault("equipped_cosmetics", {})
         d["equipped_cosmetics"] = {"hat": None, "eyewear": None, "cape": None, "pet": "pet_dragon"}
@@ -53327,7 +53903,7 @@ class GameTour:
         d["gems_spent"] = 0
         d["mastery"] = {"m_dmg": 3, "m_hp": 2, "m_luck": 2, "m_wmute": 1}
         d["rewards"] = {"pid": self.sh.save.profile_id()}
-        self.sh.selected_skin = "inferno"
+        self.sh.selected_skin = "samurai_oni"
         self.sh.diff = "normal"
         self.sh.online.world_scores = self._world_rows()
 
@@ -54123,8 +54699,8 @@ class GameTour:
         pygame.draw.ellipse(c, (40, 26, 66), pygame.Rect(cx - 470, cy + 40, 940, 150))
         pygame.draw.ellipse(c, (120, 90, 180), pygame.Rect(cx - 470, cy + 40, 940, 150), 2)
         add_glow(c, cx, cy + 110, 360, (160, 110, 255), 0.18)
-        picks = ["default", "crimson", "royal", "inferno", "frost_witch", "storm_bringer",
-                 "prism", "web_master", "green_titan", "immortal_merc", "lucky_fox"]
+        picks = ["default", "phoenix_heir", "star_knight", "samurai_oni", "frost_wolf", "ocean_tide",
+                 "crystal_mage", "web_master", "green_titan", "immortal_merc", "lucky_fox"]
         sks = [SKIN_BY_ID[k] for k in picks if k in SKIN_BY_ID]
         n = len(sks)
         rot = st * 0.85
