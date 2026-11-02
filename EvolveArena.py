@@ -24720,6 +24720,8 @@ ENEMY_BUFF = 1.10
 ENEMY_HP_TUNE = 0.90 * ENEMY_HP_NERF * ENEMY_BUFF
 ENEMY_DMG_TUNE = 0.90 * ENEMY_DMG_NERF * ENEMY_BUFF * 1.10   # +%10 hasar (2. tur)
 ENEMY_SPEED_BUFF = 1.10         # bütün yaratıklar +%10 hızlı
+# Cehennem yaratıkları (patronlar hariç) can, hasar ve hızda %10 yumuşadı.
+HELL_MOB_NERF = 0.90
 
 ENEMY_DEFS = {
     "red":      {"hp": 30,  "speed": 100, "dmg": 10, "radius": 14, "coin": 5,  "xp": 4,  "score": 12,  "contact_dps": 17},
@@ -24984,6 +24986,13 @@ class Enemy:
             self.dmg = min(self.dmg, d["dmg"] * STINGER_DMG_CAP)
             self.contact_dps = min(self.contact_dps,
                                    d["contact_dps"] * STINGER_DMG_CAP)
+        if biome == "hell":
+            # cehennem yaratıkları: can, hasar ve hız %10 az (HELL_MOB_NERF)
+            self.max_hp *= HELL_MOB_NERF
+            self.hp = self.max_hp
+            self.dmg *= HELL_MOB_NERF
+            self.contact_dps *= HELL_MOB_NERF
+            self.speed *= HELL_MOB_NERF
         # Kırmızı toplar (temel düşman) ne kadar güçlüyse görsel olarak o kadar
         # doygun/canlı kırmızı olsun - oyuncu tehlikeyi bir bakışta anlasın.
         if self.shape == "red":
@@ -31815,8 +31824,12 @@ def crowd_scale(e):
     if getattr(e, "is_boss", False) or e.__dict__.get("_crowd"):
         return
     e._crowd = True
-    e.max_hp *= CROWD_HP
-    e.hp *= CROWD_HP
+    # İLK DALGA eskisi gibi: yavru (mavi) tek vuruşta, yuvarlak (kırmızı) iki
+    # vuruşta ölür. Can çarpanı yalnız 1. dalgada bu ikisine uygulanmaz;
+    # 2. dalgadan sonrası "az ama güçlü" kuralıyla aynen devam eder.
+    if not (int(getattr(e, "spawn_wave", 2) or 2) <= 1 and e.kind in ("red", "blue")):
+        e.max_hp *= CROWD_HP
+        e.hp *= CROWD_HP
     e.dmg *= CROWD_DMG
     e.contact_dps *= CROWD_DMG
     e.speed *= CROWD_SPD
@@ -45451,20 +45464,28 @@ def _sky_shadow(kind, frame):
     return s
 
 
-def draw_sky_passes(surf, owner, t, alpha=120, shadow=True):
-    """owner: geçişlerin durumunu taşıyan nesne (koşu ya da menü arka planı)."""
+def draw_sky_passes(surf, owner, t, alpha=120, shadow=True, once=False):
+    """owner: geçişlerin durumunu taşıyan nesne (koşu ya da menü arka planı).
+    once=True (oyun içi): koşunun başında yalnız BİR ejderha geçer, sonra hiç."""
     if gfx_level() == 0 or CFG.get("sky_fx", True) is False:
         return
     st = _SKY_STATE.get("owner")
     if st is not owner:
         _SKY_STATE.clear()
         _SKY_STATE["owner"] = owner
-        _SKY_STATE["next"] = t + random.uniform(4.0, 9.0)
+        _SKY_STATE["next"] = t + (random.uniform(2.0, 3.5) if once else random.uniform(4.0, 9.0))
         _SKY_STATE["list"] = []
+        _SKY_STATE["done"] = False
     lst = _SKY_STATE["list"]
-    if t >= _SKY_STATE["next"] and not lst:
+    if not lst and once and _SKY_STATE.get("done"):
+        return                          # tek geçiş bitti: koşunun geri kalanında yok
+    if t >= _SKY_STATE["next"] and not lst and not (once and _SKY_STATE.get("done")):
         _SKY_STATE["next"] = t + random.uniform(*SKY_GAP)
-        kind = random.choices(("dragon", "wyvern", "phoenix"), weights=(5, 3, 2))[0]
+        if once:
+            _SKY_STATE["done"] = True
+            kind = "dragon"
+        else:
+            kind = random.choices(("dragon", "wyvern", "phoenix"), weights=(5, 3, 2))[0]
         span, _b, _e, spd, n = SKY_KINDS[kind]
         a = random.uniform(0, math.tau)
         dx, dy = math.cos(a), math.sin(a)
@@ -45542,7 +45563,7 @@ def draw_hud(surf, run, t):
     """Üst bilgi şeridi + ekranın ortasındaki duyurular."""
     if not MOBILE:
         try:
-            draw_sky_passes(surf, run, t)        # arenanın üstünden geçen dev siluetler
+            draw_sky_passes(surf, run, t, once=True)   # koşu başında tek ejderha geçişi
         except Exception as e:
             print("gökyüzü:", repr(e))
     if MOBILE:
