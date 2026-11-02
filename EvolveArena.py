@@ -1870,17 +1870,17 @@ STRINGS = {
                              "Más gemas al final de la partida", "Mehr Edelsteine am Ende eines Laufs",
                              "Больше алмазов в конце забега"),
     "mastery.m_wmute.name": _T("SİLAH ELEĞİ", "WEAPON FILTER", "FILTRO DE ARMAS", "WAFFENFILTER", "ФИЛЬТР ОРУЖИЯ"),
-    "mastery.m_wmute.desc": _T("+1 silah kapatma hakkı (bedava 4'e ek, en çok +4)",
-                               "+1 weapon mute slot (on top of the free 4, up to +4)",
-                               "+1 espacio para silenciar armas (además de 4 gratis, hasta +4)",
-                               "+1 Waffen-Sperrplatz (zusätzlich zu 4 gratis, bis +4)",
-                               "+1 слот отключения оружия (к 4 бесплатным, до +4)"),
+    "mastery.m_wmute.desc": _T("+1 silah kapatma hakkı (bedava 8'e ek, en çok +4)",
+                               "+1 weapon mute slot (on top of the free 8, up to +4)",
+                               "+1 espacio para silenciar armas (además de 8 gratis, hasta +4)",
+                               "+1 Waffen-Sperrplatz (zusätzlich zu 8 gratis, bis +4)",
+                               "+1 слот отключения оружия (к 8 бесплатным, до +4)"),
     "mastery.m_bmute.name": _T("KİTAP ELEĞİ", "BOOK FILTER", "FILTRO DE LIBROS", "BUCHFILTER", "ФИЛЬТР КНИГ"),
-    "mastery.m_bmute.desc": _T("+1 kitap kapatma hakkı (bedava 6'ya ek, en çok +4)",
-                               "+1 book mute slot (on top of the free 6, up to +4)",
-                               "+1 espacio para silenciar libros (además de 6 gratis, hasta +4)",
-                               "+1 Buch-Sperrplatz (zusätzlich zu 6 gratis, bis +4)",
-                               "+1 слот отключения книг (к 6 бесплатным, до +4)"),
+    "mastery.m_bmute.desc": _T("+1 kitap kapatma hakkı (bedava 10'a ek, en çok +4)",
+                               "+1 book mute slot (on top of the free 10, up to +4)",
+                               "+1 espacio para silenciar libros (además de 10 gratis, hasta +4)",
+                               "+1 Buch-Sperrplatz (zusätzlich zu 10 gratis, bis +4)",
+                               "+1 слот отключения книг (к 10 бесплатным, до +4)"),
     "ui.gift_day": _T("{0}. GÜN", "DAY {0}", "DÍA {0}", "TAG {0}", "ДЕНЬ {0}"),
     "ui.mst_now": _T("ŞU AN", "NOW", "AHORA", "JETZT", "СЕЙЧАС"),
     "ui.mst_next": _T("SONRAKİ KADEME", "NEXT TIER", "SIGUIENTE", "NÄCHSTE STUFE", "СЛЕДУЮЩИЙ"),
@@ -2222,6 +2222,11 @@ STRINGS = {
                          "Только на этот забег — при смерти теряется."),
     "ui.close_b":     _T("KAPAT (B)", "CLOSE (B)", "CERRAR (B)", "SCHLIESSEN (B)", "ЗАКРЫТЬ (B)"),
     "ui.buy":         _T("SATIN AL  »", "BUY  »", "COMPRAR  »", "KAUFEN  »", "КУПИТЬ  »"),
+    "ui.logo_tag":   _T("HAYATTA KAL. VUR. EVRİL.", "SURVIVE. HIT. EVOLVE.", "SOBREVIVE. GOLPEA. EVOLUCIONA.",
+                        "ÜBERLEBE. TRIFF. ENTWICKLE.", "ВЫЖИВИ. БЕЙ. ЭВОЛЮЦИОНИРУЙ."),
+    "c.confirm_title": _T("SATIN ALINSIN MI?", "BUY THIS?", "¿COMPRAR?", "KAUFEN?", "КУПИТЬ?"),
+    "c.confirm_yes":  _T("SATIN AL", "BUY", "COMPRAR", "KAUFEN", "КУПИТЬ"),
+    "c.confirm_no":   _T("VAZGEÇ", "CANCEL", "CANCELAR", "ABBRECHEN", "ОТМЕНА"),
     "ui.no_gold":     _T("altının yetmiyor", "not enough gold", "oro insuficiente", "zu wenig Gold", "не хватает золота"),
     "ui.maxed":       _T("MAKSİMUM", "MAXED", "AL MÁXIMO", "MAXIMUM", "МАКСИМУМ"),
     "ui.level_nocap": _T("Seviye {0} - tavanı yok", "Level {0} - no cap", "Nivel {0} - sin tope", "Stufe {0} - kein Limit", "Уровень {0} - без предела"),
@@ -15650,7 +15655,7 @@ REMOVED_WEAPONS = frozenset({"boulder"})
 STARTER_BOOKS = [b["key"] for b in BOOKS if b.get("basic")]
 # Oyuncunun "bu bana gelmesin" diyerek kapatabileceği en fazla kitap sayısı.
 # Kitap sayısı 27'ye çıktığı için pay da büyüdü: 6 kitap kapatılabilir.
-MAX_MUTED_BOOKS = 6
+MAX_MUTED_BOOKS = 10          # bedava kitap kapatma hakkı (+4: 6 -> 10)
 # nadir kitaplar için ayrı ve sert bir tavan. Tek nadir kapatma hakkı,
 # "sevmediğim bir kartı eleyeyim" isteğini karşılar ama havuzu belirleyemez.
 MAX_MUTED_RARE_BOOKS = 1
@@ -24770,7 +24775,7 @@ def slot_max(p, kind):
         return int(getattr(p, "max_books", MAX_RUN_BOOKS))
     return int(getattr(p, "max_rare", MAX_RUN_RARE_BOOKS))
 # Oyuncunun "bu bana gelmesin" diyerek kapatabileceği en fazla silah sayısı.
-MAX_MUTED_WEAPONS = 4
+MAX_MUTED_WEAPONS = 8         # bedava silah kapatma hakkı (+4: 4 -> 8)
 
 
 def weapon_max_level(w):
@@ -46474,6 +46479,8 @@ def draw_hud(surf, run, t):
         draw_coop_hud(surf, run, t)       # 2 kişilik - arkadaşın kartı
 
 
+# ana menünün iki yan paneli (karakter / mağaza): aynı boy, simetrik
+MENU_SIDE_W, MENU_SIDE_H, MENU_SIDE_Y = 184, 260, 302
 HUD_TOP_H = 236          # telefon önbelleği: üst şerit + küçük harita + anahtar sayacı
 _MOB_LAYERS = {}
 _HUD_LAYERS = {}
@@ -50772,6 +50779,312 @@ class MenuArena:
 
 
 # ---- kaydırmalı listelerin kenarı: keskin kesik yerine zemine karışan geçiş ----
+# =====================================================================
+# ANA MENÜ GÖRÜNÜMÜ (v3.52): mor gece göğü, kuzey ışıkları, ayın önünde şato,
+# yüzen adalar, kayaya konmuş buz ejderhası; mor-altın düğmeler ve yeni logo.
+# Sabit katmanlar önbellekte; kare başına yalnız hafif hareketli parçalar.
+# =====================================================================
+_MENU_ART = {}
+
+
+def _menu_sky_static():
+    img = _MENU_ART.get("sky")
+    if img is not None:
+        return img
+    W, H = VIRTUAL_W, VIRTUAL_H
+    img = pygame.Surface((W, H)).convert()
+    for y in range(H):
+        k = y / float(H)
+        if k < 0.45:
+            c = mix_col((14, 10, 38), (62, 36, 104), k / 0.45)
+        else:
+            c = mix_col((62, 36, 104), (30, 20, 56), (k - 0.45) / 0.55)
+        pygame.draw.line(img, c, (0, y), (W, y))
+    rnd = random.Random(52)
+    for _ in range(170):                               # yıldızlar
+        x, y = rnd.randrange(W), rnd.randrange(0, 300)
+        b = rnd.randint(130, 255)
+        img.set_at((x, y), (b, b, min(255, b + 20)))
+        if rnd.random() < 0.12:
+            img.set_at((x + 1, y), (b, b, b))
+    # uzak karlı dağlar
+    pts = [(0, 300)]
+    x = 0
+    while x <= W:
+        pts.append((x, 300 - rnd.randint(40, 110)))
+        x += rnd.randint(70, 140)
+    pts += [(W, 300), (W, H), (0, H)]
+    pygame.draw.polygon(img, (40, 28, 72), pts)
+    for i in range(1, len(pts) - 3):
+        px_, py_ = pts[i]
+        if py_ < 230:
+            pygame.draw.polygon(img, (150, 140, 200), [(px_, py_), (px_ - 18, py_ + 22), (px_ + 18, py_ + 22)])
+    # ayın önünde tepedeki şato (sol)
+    base = 300
+    col = (26, 18, 52)
+    pygame.draw.polygon(img, col, [(10, base), (60, base - 70), (150, base - 92), (250, base - 70), (300, base)])
+    for (x0, w_, h_) in ((96, 26, 120), (130, 34, 160), (172, 24, 128), (200, 30, 104)):
+        r_ = pygame.Rect(x0, base - 70 - h_, w_, h_)
+        pygame.draw.rect(img, col, r_)
+        pygame.draw.polygon(img, col, [(r_.x - 4, r_.y), (r_.centerx, r_.y - w_ * 1.1), (r_.right + 4, r_.y)])
+        for j in range(3):
+            if rnd.random() < 0.7:
+                wy = r_.y + 14 + j * 28
+                pygame.draw.rect(img, (255, 200, 110), (r_.centerx - 2, wy, 4, 7))
+    _MENU_ART["sky"] = img
+    return img
+
+
+def _menu_island(w, seed):
+    key = ("island", w, seed)
+    img = _MENU_ART.get(key)
+    if img is not None:
+        return img
+    rnd = random.Random(seed)
+    h = int(w * 0.7)
+    img = pygame.Surface((w, h), pygame.SRCALPHA)
+    top = int(h * 0.30)
+    rock = [(0, top)]
+    for i in range(1, 8):
+        rock.append((int(w * i / 8 + rnd.uniform(-6, 6)), int(top + (h - top) * (1 - abs(i - 4) / 4.5)
+                                                                     + rnd.uniform(-8, 4))))
+    rock.append((w, top))
+    pygame.draw.polygon(img, (58, 44, 86), rock)
+    pygame.draw.polygon(img, (40, 30, 64), rock[:5] + [(w // 2, top)])
+    pygame.draw.ellipse(img, (226, 232, 250), (0, top - 9, w, 20))           # karlı üst
+    pygame.draw.ellipse(img, (190, 200, 236), (6, top + 1, w - 12, 9))
+    for k in range(3):                                                        # karlı çamlar
+        tx = int(w * (0.22 + 0.25 * k + rnd.uniform(-0.05, 0.05)))
+        th = rnd.randint(22, 34)
+        for j in range(3):
+            yy = top - 4 - j * th // 3
+            ww = (3 - j) * th // 5
+            pygame.draw.polygon(img, (36, 76, 70), [(tx - ww, yy), (tx + ww, yy), (tx, yy - th // 2)])
+            pygame.draw.line(img, (230, 240, 255), (tx - ww + 2, yy - 1), (tx, yy - th // 2 + 3), 2)
+    _MENU_ART[key] = img
+    return img
+
+
+def _ice_dragon_sprite():
+    """Kayaya tünemiş buz ejderhası (yandan, kanatları toplu)."""
+    img = _MENU_ART.get("icedragon")
+    if img is not None:
+        return img
+    W_, H_ = 150, 120
+    img = pygame.Surface((W_, H_), pygame.SRCALPHA)
+    body, dark, lite = (150, 200, 240), (84, 126, 186), (225, 245, 255)
+    # kuyruk (kayanın üstünden sarkar)
+    pygame.draw.lines(img, dark, False, [(40, 96), (22, 104), (12, 116), (26, 118)], 7)
+    # gövde
+    pygame.draw.ellipse(img, body, (34, 62, 70, 44))
+    pygame.draw.ellipse(img, lite, (46, 80, 46, 18))
+    # toplu kanat
+    pygame.draw.polygon(img, dark, [(56, 70), (74, 22), (98, 40), (112, 30), (100, 74)])
+    pygame.draw.lines(img, lite, False, [(74, 24), (82, 70)], 2)
+    pygame.draw.lines(img, lite, False, [(98, 40), (96, 72)], 2)
+    # boyun + baş
+    pygame.draw.polygon(img, body, [(92, 74), (104, 46), (114, 44), (106, 76)])
+    pygame.draw.ellipse(img, body, (100, 30, 36, 22))
+    pygame.draw.polygon(img, body, [(128, 36), (146, 42), (128, 48)])               # burun
+    pygame.draw.polygon(img, lite, [(106, 32), (98, 12), (112, 30)])                # boynuzlar
+    pygame.draw.polygon(img, lite, [(114, 30), (112, 8), (120, 30)])
+    # bacaklar
+    for lx in (48, 86):
+        pygame.draw.rect(img, dark, (lx, 98, 9, 14), border_radius=3)
+    _MENU_ART["icedragon"] = img
+    return img
+
+
+def draw_menu_backdrop(surf, t):
+    """Ana menünün gökyüzü katmanı (arena surlarının arkası)."""
+    surf.blit(_menu_sky_static(), (0, 0))
+    # kuzey ışıkları: küçük yüzeyde çizilip yumuşakça büyütülür (ucuz)
+    lay = _MENU_ART.get("aurora_lay")
+    if lay is None:
+        lay = _MENU_ART["aurora_lay"] = pygame.Surface((320, 80), pygame.SRCALPHA)
+    lay.fill((0, 0, 0, 0))
+    for k, (col, base) in enumerate((((90, 255, 190), 26), ((120, 200, 255), 38), ((210, 130, 255), 50))):
+        pts = [(x, base + math.sin(x * 0.03 + t * (0.35 + 0.1 * k) + k * 1.7) * 9
+                + math.sin(x * 0.011 - t * 0.2) * 6) for x in range(0, 321, 10)]
+        for w_, a_ in ((9, 26), (4, 44)):
+            pygame.draw.lines(lay, col + (a_,), False, pts, w_)
+    surf.blit(pygame.transform.smoothscale(lay, (VIRTUAL_W, 300)), (0, -10))
+    # pırıldayan birkaç yıldız
+    for i in range(14):
+        x = (i * 397) % VIRTUAL_W
+        y = (i * 151) % 210 + 10
+        k = 0.5 + 0.5 * math.sin(t * 2.2 + i * 1.7)
+        if k > 0.6:
+            blit_disc(surf, x, y, 1.2 + 1.4 * k, (255, 255, 255), int(220 * k))
+    # yüzen adalar (sağ) + adaya tünemiş buz ejderhası
+    for (x, y, w_, sd, ph) in ((1010, 214, 120, 3, 0.0), (1150, 150, 150, 7, 1.7)):
+        bob = math.sin(t * 0.9 + ph) * 5
+        img = _menu_island(w_, sd)
+        surf.blit(img, (x - w_ // 2, int(y + bob)))
+        if sd == 7:
+            dx, dy = x - 76, int(y + bob) - 92
+            add_glow(surf, dx + 110, dy + 40, 60, (120, 200, 255), 0.16 + 0.06 * math.sin(t * 2))
+            surf.blit(_ice_dragon_sprite(), (dx, dy))
+            # buz nefesi: arada bir burnundan buz buharı
+            ph2 = (t * 0.45) % 1.0
+            if ph2 < 0.35:
+                q = ph2 / 0.35
+                for j in range(4):
+                    blit_disc(surf, dx + 146 + q * 50 + j * 9, dy + 42 + math.sin(j + t * 6) * 3,
+                              4 + q * 8 - j, (220, 240, 255), int(170 * (1 - q)))
+            if int(t * 1.3) % 6 != 0:                              # göz parlaması
+                blit_disc(surf, dx + 120, dy + 38, 2.2, (120, 230, 255), 255)
+
+
+# ---- yeni logo: altın kanatlı arma + "Evolve Arena" ----
+def _menu_logo_surface(lang_key=""):
+    key = ("logo", lang_key)
+    img = _MENU_ART.get(key)
+    if img is not None:
+        return img
+    f1 = get_font(78, True)
+    t_ev = f1.render("Evolve", True, WHITE).convert_alpha()
+    t_ar = f1.render("Arena", True, WHITE).convert_alpha()
+
+    def grad(src, top, bot):
+        g = pygame.Surface(src.get_size(), pygame.SRCALPHA)
+        h_ = src.get_height()
+        for y in range(h_):
+            g.fill(mix_col(top, bot, y / max(1, h_ - 1)) + (255,), (0, y, g.get_width(), 1))
+        g.blit(src, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+        return g
+
+    def outlined(src_col, src_shape, oc, ow):
+        w_, h_ = src_shape.get_size()
+        out = pygame.Surface((w_ + ow * 2 + 2, h_ + ow * 2 + 4), pygame.SRCALPHA)
+        sh = src_shape.copy()
+        sh.fill(oc + (255,), special_flags=pygame.BLEND_RGBA_MULT)
+        for a in range(0, 360, 30):
+            out.blit(sh, (ow + math.cos(math.radians(a)) * ow, ow + 3 + math.sin(math.radians(a)) * ow))
+        out.blit(src_col, (ow, ow))
+        return out
+
+    ev = outlined(grad(t_ev, (255, 255, 255), (214, 206, 236)), t_ev, (26, 12, 46), 5)
+    ar = outlined(grad(t_ar, (236, 120, 255), (170, 70, 230)), t_ar, (26, 12, 46), 5)
+    tag = str(L("ui.logo_tag")) if "ui.logo_tag" in STRINGS else "HAYATTA KAL. VUR. EVRİL."
+    f2 = get_font(20, True)
+    tg = f2.render("  ".join(tag.split(" ")), True, (240, 226, 190)).convert_alpha()
+    em = 140                                     # arma alanı
+    W_ = em + 10 + ev.get_width() + ar.get_width() - 10
+    H_ = max(ev.get_height(), em) + 40
+    img = pygame.Surface((W_, H_), pygame.SRCALPHA)
+    # arma: altın kanatlar + mor zümrüt köşeli "V"
+    cx, cy = em // 2, em // 2 + 4
+    gold, gold_d = (255, 206, 90), (170, 112, 30)
+    for s_ in (-1, 1):
+        for k in range(4):
+            a = math.radians(-90 + s_ * (38 + k * 16))
+            ln = 62 - k * 7
+            tip = (cx + math.cos(a) * ln, cy + math.sin(a) * ln)
+            base_ = (cx + s_ * 10, cy + 10)
+            pygame.draw.polygon(img, gold_d, [base_, (tip[0] - s_ * 6, tip[1] + 8), tip, (tip[0] + s_ * 7, tip[1] + 2)])
+            pygame.draw.polygon(img, gold, [base_, (tip[0] - s_ * 3, tip[1] + 6), tip])
+    for k, c_ in enumerate(((150, 70, 230), (200, 110, 255), (240, 180, 255))):
+        yy = cy + 26 - k * 20
+        pts = [(cx - 40 + k * 4, yy - 16), (cx, yy + 8), (cx + 40 - k * 4, yy - 16), (cx + 40 - k * 4, yy - 4),
+               (cx, yy + 22), (cx - 40 + k * 4, yy - 4)]
+        pygame.draw.polygon(img, (26, 12, 46), [(x_, y_ + 3) for x_, y_ in pts])
+        pygame.draw.polygon(img, c_, pts)
+        pygame.draw.polygon(img, gold, pts, 2)
+    pygame.draw.polygon(img, gold, [(cx - 12, cy - 50), (cx, cy - 66), (cx + 12, cy - 50), (cx, cy - 42)])
+    # yazı
+    tx = em + 6
+    img.blit(ev, (tx, 10))
+    img.blit(ar, (tx + ev.get_width() - 14, 10))
+    ty = 10 + ev.get_height() + 2
+    tcx = tx + (ev.get_width() + ar.get_width() - 14) // 2
+    img.blit(tg, (tcx - tg.get_width() // 2, ty))
+    for s_ in (-1, 1):
+        x0 = tcx + s_ * (tg.get_width() // 2 + 12)
+        pygame.draw.line(img, gold, (x0, ty + tg.get_height() // 2), (x0 + s_ * 70, ty + tg.get_height() // 2), 2)
+    _MENU_ART[key] = img
+    return img
+
+
+# ---- ana menü düğmeleri: koyu mor gövde, altın çerçeve, solda simge ----
+def _menu_btn_body(w, h, top, bot, radius):
+    key = ("btn", w, h, top, bot, radius)
+    img = _MENU_ART.get(key)
+    if img is None:
+        img = pygame.Surface((w, h), pygame.SRCALPHA)
+        for y in range(h):
+            img.fill(mix_col(top, bot, y / max(1, h - 1)) + (255,), (0, y, w, 1))
+        mask = pygame.Surface((w, h), pygame.SRCALPHA)
+        pygame.draw.rect(mask, (255, 255, 255, 255), (0, 0, w, h), border_radius=radius)
+        img.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+        pygame.draw.line(img, lighten(top, 0.25) + (120,), (radius, 2), (w - radius, 2), 2)   # üst parıltı
+        if len(_MENU_ART) > 300:
+            for k_ in [k_ for k_ in _MENU_ART if k_[0] == "btn"][:40]:
+                _MENU_ART.pop(k_, None)
+        _MENU_ART[key] = img
+    return img
+
+
+def _menu_btn_icon(surf, key, x, y, col, t):
+    if key == "play":
+        pygame.draw.polygon(surf, col, [(x - 9, y - 13), (x - 9, y + 13), (x + 13, y)])
+    elif key == "codex":
+        for s_ in (-1, 1):
+            thick_line(surf, (x - 10 * s_, y + 10), (x + 10 * s_, y - 10), 3, col)
+            thick_line(surf, (x - 10 * s_ - 4 * s_, y + 6), (x - 10 * s_ + 4 * s_, y + 14), 2.5, col)
+    elif key == "scores":
+        pygame.draw.polygon(surf, col, [(x - 10, y - 10), (x + 10, y - 10), (x + 6, y + 2), (x - 6, y + 2)])
+        pygame.draw.rect(surf, col, (x - 2, y + 2, 4, 6))
+        pygame.draw.rect(surf, col, (x - 8, y + 8, 16, 4), border_radius=2)
+        for s_ in (-1, 1):
+            pygame.draw.arc(surf, col, (x + (6 if s_ > 0 else -16), y - 9, 10, 10), -1.6, 1.6 if s_ > 0 else 4.7, 2)
+    elif key == "books":
+        draw_icon(surf, x, y, "book", col, 12)
+    elif key == "ach":
+        pygame.draw.polygon(surf, (200, 60, 70), [(x - 7, y - 12), (x - 1, y - 2), (x - 9, y - 2)])
+        pygame.draw.polygon(surf, (200, 60, 70), [(x + 7, y - 12), (x + 1, y - 2), (x + 9, y - 2)])
+        circle_aa(surf, x, y + 4, 9, col)
+        circle_aa(surf, x, y + 4, 5, scale_col(col, 0.7))
+    elif key == "world":
+        draw_god_crown(surf, x, y + 2, 10, t, glow=False, label="")
+    elif key == "skin":
+        pts = [(x - 12, y - 6), (x - 5, y - 11), (x - 2, y - 8), (x + 2, y - 8), (x + 5, y - 11),
+               (x + 12, y - 6), (x + 8, y - 1), (x + 6, y - 3), (x + 6, y + 11), (x - 6, y + 11), (x - 6, y - 3), (x - 8, y - 1)]
+        pygame.draw.polygon(surf, col, pts)
+    elif key == "mastery":
+        for k, hh in enumerate((8, 14, 20)):
+            pygame.draw.rect(surf, col, (x - 11 + k * 8, y + 10 - hh, 6, hh), border_radius=1)
+
+
+def draw_menu_button(surf, b, t):
+    """Ana menü düğmesi (yalnız ana menüde; öbür ekranların düğmeleri aynı kalır)."""
+    play = getattr(b, "mkey", "") == "play"
+    k = b.anim
+    r = b.rect.move(0, -int(2 * k))
+    radius = 14 if play else 12
+    if play:
+        top, bot = mix_col((255, 210, 100), (255, 232, 150), k), mix_col((222, 128, 32), (240, 150, 50), k)
+        edge, tc, icol = (110, 58, 12), (64, 30, 8), (64, 30, 8)
+        pulse = 0.5 + 0.5 * math.sin(t * 3)
+        add_glow(surf, r.centerx, r.centery, r.w * 0.62, (255, 190, 70), 0.16 + 0.10 * pulse + 0.1 * k)
+    else:
+        top, bot = mix_col((70, 46, 118), (96, 66, 156), k), mix_col((34, 22, 66), (48, 32, 90), k)
+        edge, tc, icol = mix_col((206, 162, 84), (255, 214, 120), k), (246, 240, 255), (255, 214, 120)
+    sh = pygame.Rect(r.x + 2, r.y + 5, r.w, r.h)
+    pygame.draw.rect(surf, (10, 6, 20), sh, border_radius=radius)
+    surf.blit(_menu_btn_body(r.w, r.h, top, bot, radius), r.topleft)
+    pygame.draw.rect(surf, edge, r, 3 if play else 2, border_radius=radius)
+    pygame.draw.rect(surf, scale_col(edge, 0.55), r.inflate(-8, -8), 1, border_radius=max(4, radius - 4))
+    label, sz = _fit_size(TRX(b.text), b.text_size, r.w - 80, True, min_size=12)
+    tw = text_width(label, sz, True)
+    ix = r.centerx - (tw + 40) / 2 + 12
+    if not play:
+        circle_aa(surf, ix, r.centery, 15, (24, 16, 46))
+        ring_aa(surf, ix, r.centery, 15, scale_col(edge, 0.8), 1)
+    _menu_btn_icon(surf, getattr(b, "mkey", ""), ix, r.centery, icol, t)
+    draw_text(surf, label, (ix + 24 + tw / 2, r.centery), sz, tc, bold=True, center=True, shadow=not play)
+
+
 _FADE_MASKS = {}
 
 
@@ -52981,8 +53294,12 @@ def draw_library_bg(surf, t):
             pygame.draw.rect(wall, (60, 38, 26), (x - 8, 0, 16, VIRTUAL_H))
             pygame.draw.line(wall, (94, 62, 42), (x - 7, 0), (x - 7, VIRTUAL_H), 2)
             pygame.draw.line(wall, (30, 20, 14), (x + 7, 0), (x + 7, VIRTUAL_H), 2)
+        # Sade görünüm: raflar hafif bulanık ve koyu (kartlar öne çıksın; eskiden
+        # rengârenk sırtlar kartlarla yarışıp ekranı "göz alıcı" yapıyordu)
+        small = pygame.transform.smoothscale(wall, (VIRTUAL_W // 3, VIRTUAL_H // 3))
+        wall = pygame.transform.smoothscale(small, (VIRTUAL_W, VIRTUAL_H)).convert()
         dk = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
-        dk.fill((10, 6, 16, 118))
+        dk.fill((10, 6, 16, 178))
         wall.blit(dk, (0, 0))
         _vignette(wall)
         _HALL_CACHE["library"] = wall
@@ -52990,7 +53307,7 @@ def draw_library_bg(surf, t):
     # sıcak mum ışığı + şamdanlar
     for (cx, cy) in ((38, 286), (VIRTUAL_W - 38, 286)):
         fl = 0.8 + 0.2 * math.sin(t * 9 + cx) * math.sin(t * 5.3)
-        add_glow(surf, cx, cy - 10, 250 * fl, (255, 160, 80), 0.26)
+        add_glow(surf, cx, cy - 10, 220 * fl, (255, 160, 80), 0.14)
         _candelabra(surf, cx, cy, t, seed=cx * 0.01)
     # süzülen sayfalar
     for i in range(8):
@@ -65819,7 +66136,7 @@ class App:
     def _draw_loadout_panel(self, canvas, dt, mouse_pos, clicked):
         """Ana menüdeki sol panel: kuşanılmış karakterin canlı önizlemesi."""
         t = self.t
-        rect = pygame.Rect(26, 302, 184, 212)
+        rect = pygame.Rect(26, MENU_SIDE_Y, MENU_SIDE_W, MENU_SIDE_H)
         hover = rect.collidepoint(mouse_pos)
         sk = get_skin(self.save.equipped_skin_id())
         panel(canvas, rect, bg=(55, 40, 41) if hover else (39, 28, 29),
@@ -65829,7 +66146,7 @@ class App:
                   bold=True, center=True, shadow=False)
 
         # ---- canlı karakter ----
-        cx, cy = rect.centerx, rect.y + 84
+        cx, cy = rect.centerx, rect.y + 96
         bob = math.sin(t * 1.8) * 3
         cy += bob
         fake = type("FP", (), {})()
@@ -65854,7 +66171,7 @@ class App:
         if _pt and CFG.get("pet_show", True):
             draw_pet_def(canvas, _pt, cx + 52, cy + 16, 10, t, face=-1, shadow=False)
 
-        draw_text(canvas, skin_name(sk), (rect.centerx, rect.y + 126), 15, sk["color"],
+        draw_text(canvas, skin_name(sk), (rect.centerx, rect.y + 142), 15, sk["color"],
                   bold=True, center=True)
 
         # ---- kuşanılmış parçalar: 3 küçük yuva ----
@@ -65863,7 +66180,7 @@ class App:
         sw = 60
         sx0 = rect.centerx - (len(slots) * sw) / 2
         for i, (slot, label) in enumerate(slots):
-            sr = pygame.Rect(int(sx0 + i * sw + 3), rect.y + 150, sw - 6, 32)
+            sr = pygame.Rect(int(sx0 + i * sw + 3), rect.y + 172, sw - 6, 32)
             cid = eq.get(slot)
             item = COSMETIC_BY_ID.get(cid) if cid else None
             pygame.draw.rect(canvas, (30, 22, 23), sr, border_radius=7)
@@ -65881,7 +66198,7 @@ class App:
         if self.save.cosmetics_locked():
             # Premium skin kendi kostümüyle gelir: slotların üstüne kilit
             # şeridi.
-            lr = pygame.Rect(int(sx0 + 3), rect.y + 150, int(len(slots) * sw - 6), 32)
+            lr = pygame.Rect(int(sx0 + 3), rect.y + 172, int(len(slots) * sw - 6), 32)
             ls = pygame.Surface(lr.size, pygame.SRCALPHA)
             pygame.draw.rect(ls, (*mix_col((35, 25, 26), PURPLE, 0.16), 225), ls.get_rect(), border_radius=7)
             canvas.blit(ls, lr.topleft)
@@ -65936,7 +66253,7 @@ class App:
     # ---- logo (ana menü başlığı) ----
     # Logonun içindeki yuvarlak amblemin yeri (logo yüksekliğine oranla);
     # yılbaşı şapkası buraya oturur. tools/make_assets.py çıktısından ölçüldü.
-    LOGO_BADGE = (0.1725, 0.50, 0.408)
+    LOGO_BADGE = (0.12, 0.45, 0.30)
     LOGO_H = 164
 
     def _logo_rays(self):
@@ -65974,7 +66291,10 @@ class App:
         rays = self._logo_rays()
         rays.set_alpha(int(70 + 40 * pulse))
         canvas.blit(rays, (cx - rays.get_width() / 2 + 40, cy - rays.get_height() / 2))
-        logo = brand_scaled("logo", h=self.LOGO_H)
+        try:
+            logo = _menu_logo_surface(lang())
+        except Exception:
+            logo = brand_scaled("logo", h=self.LOGO_H)
         if logo is None:
             # Gömülü görsel çözülemezse eski yazı başlığı (asla boş kalmasın).
             draw_text(canvas, GAME_TITLE, (cx, cy), 60, GOLD, bold=True, center=True)
@@ -66079,7 +66399,10 @@ class App:
             clicked = False          # reklam oynarken menü kilitli
         self.bg.update(dt)
         canvas = self.display.canvas
-        self.bg.draw(canvas)
+        if MOBILE:
+            self.bg.draw(canvas)
+        else:
+            draw_menu_backdrop(canvas, self.t)      # mor gece göğü, şato, adalar, buz ejderhası
         if self.xmas:
             self.xmas.update(dt)
             self.xmas.draw_sky(canvas)
@@ -66126,13 +66449,9 @@ class App:
 
         for b in self.menu_buttons:
             b.update(mouse_pos, dt)
-            b.draw(canvas)
+            draw_menu_button(canvas, b, self.t)
             if clicked:
                 b.click(mouse_pos)
-        if self.xmas:
-            for i, b in enumerate(self.menu_buttons):
-                g = b.anim * 4
-                self.xmas.draw_cap(canvas, b.rect.inflate(g, g), seed=i)
         self._draw_event_snowman(canvas, mouse_pos, clicked)
         self._menu_corner_buttons(canvas, mouse_pos, clicked)
 
@@ -66266,7 +66585,8 @@ class App:
     # ---- mağaza kartı (ana menü, sağ) ----
     # kare kart yerine karakterin paneliyle aynı hizadan başlayıp ekranın
     # dibine inen uzun kart.
-    STORE_CARD_RECT = (VIRTUAL_W - 26 - 184, 302, 184, 398)
+    # karakterin paneliyle AYNI boy ve aynı hizada, ekranın iki yanında simetrik
+    STORE_CARD_RECT = (VIRTUAL_W - 26 - MENU_SIDE_W, MENU_SIDE_Y, MENU_SIDE_W, MENU_SIDE_H)
     SHOWCASE_EVERY = 3.4
 
     def _showcase_items(self):
@@ -66400,74 +66720,77 @@ class App:
             draw_text(canvas, "!", (rect.right - 8, rect.y + 8), 11, WHITE, bold=True,
                       center=True, shadow=False)
 
-        # ---- vitrin ----
-        items = self._showcase_items()
-        idx = int(self.store_card_t / self.SHOWCASE_EVERY) % len(items)
-        ph = (self.store_card_t % self.SHOWCASE_EVERY) / self.SHOWCASE_EVERY
-        fade = min(1.0, ph / 0.08, (1.0 - ph) / 0.08)
-        kind, it = items[idx]
-        sc = pygame.Rect(pl, rect.y + 58, pr_ - pl, 110)
-        sc_hover = sc.collidepoint(mouse_pos)
-        icol = tuple(it.get("color", accent))
-        pygame.draw.rect(canvas, (24, 16, 22), sc, border_radius=12)
-        prev_clip = canvas.get_clip()
-        canvas.set_clip(sc.inflate(-2, -2))
-        # spot ışığı + kaide
-        add_glow(canvas, sc.centerx, sc.y + 44, 80, icol, 0.24 * fade + 0.06)
-        for k_ in range(8):
-            a = self.t * 0.35 + k_ * math.tau / 8
-            p0 = (sc.centerx, sc.y + 44)
-            thick_line(canvas, p0, (p0[0] + math.cos(a) * 80, p0[1] + math.sin(a) * 80), 6,
-                       scale_col(icol, 0.16 * fade + 0.05), cap=False)
-        pygame.draw.ellipse(canvas, scale_col(icol, 0.30), (sc.centerx - 34, sc.y + 60, 68, 12))
-        pygame.draw.ellipse(canvas, scale_col(icol, 0.55), (sc.centerx - 34, sc.y + 60, 68, 12), 1)
-        cy_ = sc.y + 44 + math.sin(self.t * 2) * 2
-        if kind == "skin":
-            draw_skin_preview(canvas, it, sc.centerx, cy_, self.t, r=int(15 + 4 * fade))
-            tag, price = L("ui.showcase_premium"), None
-            name = skin_name(it)
-        elif kind == "pet":
-            draw_pet(canvas, it["kind"], sc.centerx, cy_ + 4, int(10 + 5 * fade), self.t, face=1,
-                     moving=True, col=it["color"], acc=it["accent"])
-            tag, price = L("ui.showcase_pet"), None
-            name = it["name"]
-        else:
-            for j_ in range(4):
-                ang = -math.pi / 2 + (j_ - 1.5) * 0.55
-                draw_icon(canvas, sc.centerx + math.cos(ang) * 22, cy_ + 6 + math.sin(ang) * 8,
-                          "gem", it["color"], int(10 + 3 * fade))
-            tag, price, name = L("ui.tab_gems"), None, fmt_num(gem_pack_total(it)) + " " + L("ui.gem")
-        canvas.set_clip(prev_clip)
-        ink_frame(canvas, sc, lighten(icol, 0.2) if sc_hover else scale_col(icol, 0.7), 12, 2)
-        # altın köşe süsleri
-        for cx_, cy2, sx, sy in ((sc.x, sc.y, 1, 1), (sc.right, sc.y, -1, 1), (sc.x, sc.bottom, 1, -1),
-                                 (sc.right, sc.bottom, -1, -1)):
-            thick_line(canvas, (cx_ + sx * 2, cy2 + sy * 2), (cx_ + sx * 12, cy2 + sy * 2), 2, (230, 190, 110))
-            thick_line(canvas, (cx_ + sx * 2, cy2 + sy * 2), (cx_ + sx * 2, cy2 + sy * 12), 2, (230, 190, 110))
-        # etiket şeridi
-        tg = _fit_text(tag, 9, sc.w - 20, bold=True)
-        tgw = text_width(tg, 9, True) + 16
-        tr = pygame.Rect(0, 0, int(tgw), 16)
-        tr.midtop = (sc.centerx, sc.y - 7)
-        pygame.draw.rect(canvas, PURPLE if kind != "pack" else (40, 110, 155), tr, border_radius=8)
-        ink_frame(canvas, tr, (255, 230, 255), 8, 1)
-        draw_text(canvas, tg, tr.center, 9, WHITE, bold=True, center=True, shadow=False)
-        draw_text(canvas, _fit_text(name, 12, sc.w - 12, bold=True), (sc.centerx, sc.y + 80), 12,
-                  TEXT, bold=True, center=True, alpha=int(255 * max(0.3, fade)))
-        ptxt = fmt_num(price) if price is not None else str(it.get("price_hint", ""))
-        if ptxt:
-            pw_ = text_width(ptxt, 11, True) + 18
-            pr2 = pygame.Rect(0, 0, int(pw_), 17)
-            pr2.center = (sc.centerx, sc.y + 98)
-            pygame.draw.rect(canvas, (70, 52, 18), pr2, border_radius=8)
-            ink_frame(canvas, pr2, GOLD, 8, 1)
-            draw_text(canvas, ptxt, pr2.center, 11, GOLD, bold=True, center=True, shadow=False)
-        # nokta göstergesi
-        n = len(items)
-        dx0 = sc.centerx - (n - 1) * 7 / 2
-        for j_ in range(n):
-            circle_aa(canvas, dx0 + j_ * 7, sc.bottom + 7, 2.4 if j_ == idx else 1.6,
-                      accent if j_ == idx else (70, 78, 104))
+        # ---- vitrin (yalnız uzun kartta; ana menüde kart karakter paneliyle aynı boyda) ----
+        sc_hover = False
+        kind = "pack"
+        if rect.h >= 380:
+            items = self._showcase_items()
+            idx = int(self.store_card_t / self.SHOWCASE_EVERY) % len(items)
+            ph = (self.store_card_t % self.SHOWCASE_EVERY) / self.SHOWCASE_EVERY
+            fade = min(1.0, ph / 0.08, (1.0 - ph) / 0.08)
+            kind, it = items[idx]
+            sc = pygame.Rect(pl, rect.y + 58, pr_ - pl, 110)
+            sc_hover = sc.collidepoint(mouse_pos)
+            icol = tuple(it.get("color", accent))
+            pygame.draw.rect(canvas, (24, 16, 22), sc, border_radius=12)
+            prev_clip = canvas.get_clip()
+            canvas.set_clip(sc.inflate(-2, -2))
+            # spot ışığı + kaide
+            add_glow(canvas, sc.centerx, sc.y + 44, 80, icol, 0.24 * fade + 0.06)
+            for k_ in range(8):
+                a = self.t * 0.35 + k_ * math.tau / 8
+                p0 = (sc.centerx, sc.y + 44)
+                thick_line(canvas, p0, (p0[0] + math.cos(a) * 80, p0[1] + math.sin(a) * 80), 6,
+                           scale_col(icol, 0.16 * fade + 0.05), cap=False)
+            pygame.draw.ellipse(canvas, scale_col(icol, 0.30), (sc.centerx - 34, sc.y + 60, 68, 12))
+            pygame.draw.ellipse(canvas, scale_col(icol, 0.55), (sc.centerx - 34, sc.y + 60, 68, 12), 1)
+            cy_ = sc.y + 44 + math.sin(self.t * 2) * 2
+            if kind == "skin":
+                draw_skin_preview(canvas, it, sc.centerx, cy_, self.t, r=int(15 + 4 * fade))
+                tag, price = L("ui.showcase_premium"), None
+                name = skin_name(it)
+            elif kind == "pet":
+                draw_pet(canvas, it["kind"], sc.centerx, cy_ + 4, int(10 + 5 * fade), self.t, face=1,
+                         moving=True, col=it["color"], acc=it["accent"])
+                tag, price = L("ui.showcase_pet"), None
+                name = it["name"]
+            else:
+                for j_ in range(4):
+                    ang = -math.pi / 2 + (j_ - 1.5) * 0.55
+                    draw_icon(canvas, sc.centerx + math.cos(ang) * 22, cy_ + 6 + math.sin(ang) * 8,
+                              "gem", it["color"], int(10 + 3 * fade))
+                tag, price, name = L("ui.tab_gems"), None, fmt_num(gem_pack_total(it)) + " " + L("ui.gem")
+            canvas.set_clip(prev_clip)
+            ink_frame(canvas, sc, lighten(icol, 0.2) if sc_hover else scale_col(icol, 0.7), 12, 2)
+            # altın köşe süsleri
+            for cx_, cy2, sx, sy in ((sc.x, sc.y, 1, 1), (sc.right, sc.y, -1, 1), (sc.x, sc.bottom, 1, -1),
+                                     (sc.right, sc.bottom, -1, -1)):
+                thick_line(canvas, (cx_ + sx * 2, cy2 + sy * 2), (cx_ + sx * 12, cy2 + sy * 2), 2, (230, 190, 110))
+                thick_line(canvas, (cx_ + sx * 2, cy2 + sy * 2), (cx_ + sx * 2, cy2 + sy * 12), 2, (230, 190, 110))
+            # etiket şeridi
+            tg = _fit_text(tag, 9, sc.w - 20, bold=True)
+            tgw = text_width(tg, 9, True) + 16
+            tr = pygame.Rect(0, 0, int(tgw), 16)
+            tr.midtop = (sc.centerx, sc.y - 7)
+            pygame.draw.rect(canvas, PURPLE if kind != "pack" else (40, 110, 155), tr, border_radius=8)
+            ink_frame(canvas, tr, (255, 230, 255), 8, 1)
+            draw_text(canvas, tg, tr.center, 9, WHITE, bold=True, center=True, shadow=False)
+            draw_text(canvas, _fit_text(name, 12, sc.w - 12, bold=True), (sc.centerx, sc.y + 80), 12,
+                      TEXT, bold=True, center=True, alpha=int(255 * max(0.3, fade)))
+            ptxt = fmt_num(price) if price is not None else str(it.get("price_hint", ""))
+            if ptxt:
+                pw_ = text_width(ptxt, 11, True) + 18
+                pr2 = pygame.Rect(0, 0, int(pw_), 17)
+                pr2.center = (sc.centerx, sc.y + 98)
+                pygame.draw.rect(canvas, (70, 52, 18), pr2, border_radius=8)
+                ink_frame(canvas, pr2, GOLD, 8, 1)
+                draw_text(canvas, ptxt, pr2.center, 11, GOLD, bold=True, center=True, shadow=False)
+            # nokta göstergesi
+            n = len(items)
+            dx0 = sc.centerx - (n - 1) * 7 / 2
+            for j_ in range(n):
+                circle_aa(canvas, dx0 + j_ * 7, sc.bottom + 7, 2.4 if j_ == idx else 1.6,
+                          accent if j_ == idx else (70, 78, 104))
 
         def row(y0, col):
             r_ = pygame.Rect(pl, y0, pr_ - pl, 46)
@@ -66479,7 +66802,8 @@ class App:
         # ---- 1) reklam ----
         ready = rw.ad_ready()
         gcol = (90, 210, 130)
-        ar, ar_h = row(rect.y + 180, gcol)
+        _ry = (180, 230, 280) if rect.h >= 380 else (52, 99, 146)
+        ar, ar_h = row(rect.y + _ry[0], gcol)
         ix, iy = ar.x + 20, ar.centery
         disc_grad(canvas, ix, iy, 13, (70, 170, 100), (20, 54, 34), 6)
         ring_aa(canvas, ix, iy, 13, lighten(gcol, 0.3), 2)
@@ -66513,7 +66837,7 @@ class App:
 
         # ---- 2) günlük hediye ----
         gift_ok = rw.gift_ready()
-        gr, gr_h = row(rect.y + 230, GOLD)
+        gr, gr_h = row(rect.y + _ry[1], GOLD)
         hop = abs(math.sin(self.t * 4.0)) * 3 if gift_ok else 0.0
         if gift_ok:
             add_glow(canvas, gr.x + 20, gr.centery, 26, GOLD, 0.25 + 0.15 * math.sin(self.t * 4))
@@ -66545,7 +66869,7 @@ class App:
         # ---- 3) şans çarkı ----
         wh = self.wheel
         wcol = (255, 190, 80)
-        wr, wr_h = row(rect.y + 280, wcol)
+        wr, wr_h = row(rect.y + _ry[2], wcol)
         draw_wheel_icon(canvas, wr.x + 20, wr.centery + 2, 12, self.t * 40.0)
         draw_text(canvas, _fit_text(L("wh.title"), 10, wr.w - 44, bold=True), (wr.x + 40, wr.y + 5), 10,
                   (255, 214, 140), bold=True, shadow=False)
@@ -72520,14 +72844,67 @@ class App:
             self.wheel.show()
             return
         if self.save.get_gems() >= item["cost"]:
-            if self.save.buy_cosmetic(item["id"], item["cost"]):
-                self.save.equip_cosmetic(slot, item["id"])
-                sfx("buy", 1.0, 0.0)
+            # skin alır gibi önce sorulur: tek tıkla elmas harcanmasın
+            self.cos_confirm = item
+            self.cos_confirm_t = 0.0
+            sfx("click", 0.6, 0.0)
         else:
             sfx("error", 0.6, 0.0)
 
+    def _confirm_cosmetic_buy(self):
+        item = getattr(self, "cos_confirm", None)
+        self.cos_confirm = None
+        if not item or self.save.owns_cosmetic(item["id"]):
+            return
+        if self.save.get_gems() >= item["cost"] and self.save.buy_cosmetic(item["id"], item["cost"]):
+            self.save.equip_cosmetic(item["slot"], item["id"])
+            self.save.save()
+            sfx("buy", 1.0, 0.0)
+        else:
+            sfx("error", 0.6, 0.0)
+
+    def _draw_cosmetic_confirm(self, canvas, dt, mouse_pos, clicked):
+        """Şapka / gözlük / pelerin satın alma onayı (skin satın alır gibi)."""
+        item = self.cos_confirm
+        self.cos_confirm_t = min(1.0, getattr(self, "cos_confirm_t", 0.0) + dt / 0.18)
+        k = ease_out_cubic(self.cos_confirm_t)
+        dim = pygame.Surface((VIRTUAL_W, VIRTUAL_H), pygame.SRCALPHA)
+        dim.fill((6, 6, 12, int(200 * k)))
+        canvas.blit(dim, (0, 0))
+        col = tuple(item.get("color", GEM_COLOR))
+        r = pygame.Rect(0, 0, 440, 350)
+        r.center = (VIRTUAL_W // 2, VIRTUAL_H // 2 + int((1 - k) * 30))
+        panel(canvas, r, bg=(30, 26, 40), edge=col, alpha=250, radius=18, edge_w=3)
+        draw_text(canvas, L("c.confirm_title"), (r.centerx, r.y + 22), 20, GEM_COLOR, bold=True, center=True)
+        add_glow(canvas, r.centerx, r.y + 138, 90, col, 0.25)
+        self._cosmetic_preview(canvas, r.centerx, r.y + 138, 40, item["slot"], item["id"], self.t)
+        draw_text(canvas, _fit_text(cos_name(item), 20, r.w - 40, bold=True),
+                  (r.centerx, r.y + 204), 20, col, bold=True, center=True)
+        cost_txt = fmt_num(item["cost"])
+        draw_coin_label(canvas, r.centerx, r.y + 242, cost_txt, GEM_COLOR, 18, icon="gem", icon_r=9)
+        bw = 180
+        ok = Button((r.centerx - bw - 8, r.bottom - 66, bw, 46), L("c.confirm_yes"), self._confirm_cosmetic_buy,
+                    color=(60, 130, 90), hover_color=(80, 170, 115), text_size=16)
+        no = Button((r.centerx + 8, r.bottom - 66, bw, 46), L("c.confirm_no"),
+                    lambda: setattr(self, "cos_confirm", None), color=(90, 74, 80), hover_color=(120, 98, 104),
+                    text_size=16)
+        for b in (ok, no):
+            b.update(mouse_pos, dt)
+            b.draw(canvas)
+        if clicked:
+            if ok.rect.collidepoint(mouse_pos):
+                ok.click(mouse_pos)
+            elif no.rect.collidepoint(mouse_pos) or not r.collidepoint(mouse_pos):
+                self.cos_confirm = None
+                sfx("click", 0.45, 0.0)
+
     def update_cosmetic_market(self, dt, mouse_pos, clicked, wheel_y=0):
         canvas = self.display.canvas
+        _confirm = getattr(self, "cos_confirm", None)
+        if _confirm is not None:
+            # onay penceresi açıkken arkadaki liste / sekmeler tıklanmaz
+            _real_mouse, _real_click = mouse_pos, clicked
+            mouse_pos, clicked, wheel_y = (-9999, -9999), False, 0
         # düz menü zemini yerine butik - askılar, aynalar, spot ışıkları.
         draw_wardrobe_bg(canvas, self.t)
 
@@ -72650,6 +73027,8 @@ class App:
         btn.draw(canvas)
         if clicked:
             btn.click(mouse_pos)
+        if _confirm is not None:
+            self._draw_cosmetic_confirm(canvas, dt, _real_mouse, _real_click)
 
 
 # giriş noktası

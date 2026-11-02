@@ -1601,8 +1601,8 @@ def _merge_progress(old, new, gem_cap=GEM_GAIN_CAP_PER_PUSH):
     # sonucu (kazanılanla sınırlı harcama).
     out["mastery"] = _merge_mastery(old.get("mastery"), new.get("mastery"),
                                     out["gems_spent"])
-    # kapatılan silah/kitaplar: en çok alınmış hak kadar (bedava 4 / 6 + ustalık)
-    for k, m, free in (("weapons_muted", "m_wmute", 4), ("books_muted", "m_bmute", 6)):
+    # kapatılan silah/kitaplar: en çok alınmış hak kadar (bedava 8 / 10 + ustalık)
+    for k, m, free in (("weapons_muted", "m_wmute", 8), ("books_muted", "m_bmute", 10)):
         lst = new.get(k)
         if isinstance(lst, list):
             room = free + _int((out["mastery"] or {}).get(m, 0))
