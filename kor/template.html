@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>KÖR</title>
+<style>
+/*__FONTS__*/
+:root{
+  color-scheme:dark;
+  --bg:#000; --guide:#7fd4ff; --fg:#d8d2c4; --dim:#8a8478; --blood:#a10d0d; --blood2:#ff2a2a; --panel:rgba(0,0,0,.72);
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#000; } }
+:root[data-theme="dark"]{ --bg:#000; }
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--fg);font-family:"Special Elite",ui-monospace,monospace;user-select:none;-webkit-user-select:none;touch-action:none}
+canvas#game{position:fixed;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated}
+.layer{position:fixed;inset:0;pointer-events:none}
+#vignette{background:radial-gradient(ellipse at center,rgba(0,0,0,0) 38%,rgba(0,0,0,.55) 72%,rgba(0,0,0,.95) 100%);transition:opacity .3s}
+#fearTint{background:radial-gradient(ellipse at center,rgba(120,0,0,0) 30%,rgba(120,0,0,.55) 100%);opacity:0}
+#flash{background:#fff;opacity:0}
+#redflash{background:#7a0000;opacity:0;mix-blend-mode:multiply}
+#lockerView{opacity:0;transition:opacity .25s;background:
+  repeating-linear-gradient(to bottom,#000 0 26px,rgba(0,0,0,.0) 26px 40px);}
+#lockerView::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#000 0 18%,transparent 30% 70%,#000 82%)}
+#blackout{background:#000;opacity:0}
+/* HUD */
+#marker{position:absolute;left:0;top:0;transform:translate(-50%,-50%);display:none;flex-direction:column;align-items:center;gap:2px;color:var(--guide);text-shadow:0 0 6px #000,0 0 2px #000;font-size:13px;letter-spacing:1px;white-space:nowrap;transition:opacity .3s}
+#marker .dia{width:16px;height:16px;border:2px solid var(--guide);transform:rotate(45deg);box-shadow:0 0 10px var(--guide),inset 0 0 6px var(--guide);animation:pulse 1.4s ease-in-out infinite}
+#marker .arr{display:none;width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-bottom:18px solid var(--guide);filter:drop-shadow(0 0 6px var(--guide))}
+#marker.edge .dia{display:none}
+#marker.edge .arr{display:block}
+@keyframes pulse{50%{transform:rotate(45deg) scale(1.25);opacity:.7}}
+#banner{position:absolute;left:50%;top:30%;transform:translate(-50%,-50%);text-align:center;opacity:0;transition:opacity .6s;width:min(92vw,720px)}
+#banner .k{font-size:13px;letter-spacing:8px;color:var(--blood2)}
+#banner .t{font-family:Creepster,"Special Elite",cursive;font-size:clamp(34px,6vw,64px);color:#efe6d2;text-shadow:0 0 18px #600,0 0 4px #000;line-height:1.05;margin:6px 0}
+#banner .d{font-size:16px;color:#d8d2c4;text-shadow:0 0 6px #000}
+#guideHint{position:absolute;right:18px;top:16px;font-size:12px;color:var(--guide);opacity:.75;text-shadow:0 0 4px #000;text-align:right;line-height:1.5}
+#tutor{position:absolute;left:50%;bottom:90px;transform:translateX(-50%);font-size:15px;background:rgba(0,0,0,.55);border:1px solid rgba(127,212,255,.35);padding:8px 16px;border-radius:4px;opacity:0;transition:opacity .4s;white-space:nowrap;color:#e6f6ff}
+#tutor kbd{border-color:#9cf}
+#hud{position:fixed;inset:0;pointer-events:none;display:none}
+#tasks{position:absolute;left:18px;top:16px;font-size:15px;line-height:1.55;text-shadow:0 0 6px #000,0 0 2px #000;max-width:min(78vw,380px)}
+#tasks .h{color:var(--blood2);letter-spacing:3px;font-size:12px;opacity:.85}
+#tasks .done{text-decoration:line-through;opacity:.4}
+#tasks .cur::before{content:"› ";color:var(--blood2)}
+#cross{position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:50%;background:rgba(255,255,255,.55);box-shadow:0 0 3px #000}
+#prompt{position:absolute;left:50%;top:58%;transform:translateX(-50%);font-size:17px;text-shadow:0 0 6px #000;white-space:nowrap;opacity:0;transition:opacity .15s}
+#prompt b{border:1px solid var(--fg);padding:0 6px;margin-right:6px;border-radius:3px}
+#holdbar{position:absolute;left:50%;top:63%;width:200px;height:4px;margin-left:-100px;background:rgba(255,255,255,.12);display:none}
+#holdbar i{display:block;height:100%;width:0;background:var(--blood2)}
+#bars{position:absolute;left:18px;bottom:18px;display:flex;flex-direction:column;gap:6px;font-size:12px;text-shadow:0 0 4px #000}
+.bar{display:flex;align-items:center;gap:8px}
+.bar span{width:96px;opacity:.7}
+.bar .t{width:120px;height:5px;background:rgba(255,255,255,.1);overflow:hidden}
+.bar .t i{display:block;height:100%;background:var(--fg);width:100%}
+#breathBar{opacity:0;transition:opacity .2s}
+#inv{position:absolute;right:18px;bottom:18px;text-align:right;font-size:14px;line-height:1.6;text-shadow:0 0 4px #000}
+#msg{position:absolute;left:50%;top:22%;transform:translateX(-50%);font-size:20px;text-align:center;text-shadow:0 0 8px #000;opacity:0;transition:opacity .5s;max-width:88vw}
+#sub{position:absolute;left:50%;bottom:16%;transform:translateX(-50%);font-size:18px;text-align:center;text-shadow:0 0 8px #000;opacity:0;transition:opacity .4s;color:#e9e1cf;max-width:88vw}
+#noiseMeter{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);display:flex;gap:3px;align-items:flex-end;height:22px}
+#noiseMeter i{width:5px;background:rgba(255,255,255,.15);display:block}
+#noiseLbl{position:absolute;left:50%;bottom:48px;transform:translateX(-50%);font-size:11px;letter-spacing:3px;opacity:.5}
+/* screens */
+.screen{position:fixed;inset:0;display:none;align-items:center;justify-content:safe center;flex-direction:column;text-align:center;padding:16px;z-index:20;overflow-y:auto}
+.screen.on{display:flex}
+#title{background:radial-gradient(ellipse at 50% 40%,rgba(20,6,6,.55) 0%,rgba(0,0,0,.8) 75%)}
+#title h1{font-family:Creepster,cursive;font-weight:400;font-size:clamp(56px,min(22vw,26vh),210px);line-height:1;margin:0;color:var(--blood);letter-spacing:12px;text-shadow:0 0 30px #500,0 0 4px #f00;animation:flick 4s infinite}
+@keyframes flick{0%,100%{opacity:1}41%{opacity:1}42%{opacity:.2}43%{opacity:1}47%{opacity:.4}48%{opacity:1}80%{opacity:1}81%{opacity:.1}83%{opacity:1}}
+#title .tag{font-size:clamp(15px,3.6vw,22px);color:var(--dim);margin:-6px 0 28px;letter-spacing:2px}
+.btn{pointer-events:auto;background:transparent;color:var(--fg);border:1px solid #5a1a1a;font:inherit;font-size:19px;padding:11px 30px;margin:6px;cursor:pointer;letter-spacing:3px;min-width:240px;transition:all .15s}
+.btn:hover,.btn:focus-visible{background:#3a0808;border-color:var(--blood2);color:#fff;outline:none;box-shadow:0 0 18px #600}
+.btn.sel{border-color:var(--blood2);color:#fff;background:#2a0505}
+.row{display:flex;flex-wrap:wrap;justify-content:center}
+.small{font-size:13px;color:var(--dim);margin-top:18px;line-height:1.6;max-width:560px}
+.diff .btn{min-width:0;font-size:14px;padding:8px 14px}
+#howto,#pause{background:rgba(0,0,0,.92)}
+#howto .box,#pause .box{max-width:640px;text-align:left;line-height:1.7;font-size:15px}
+#howto h2,#pause h2,#dead h2,#win h2,#intro h2{font-family:Creepster,cursive;font-weight:400;color:var(--blood);font-size:56px;margin:0 0 10px;text-align:center;letter-spacing:4px}
+kbd{border:1px solid #777;border-radius:3px;padding:0 5px;font-family:inherit;font-size:13px}
+#dead{background:radial-gradient(ellipse at center,#2a0000 0%,#000 75%)}
+#dead h2{font-size:clamp(70px,18vw,150px)}
+#deadTip{color:var(--dim);margin:6px 0 24px;max-width:520px}
+#win{background:radial-gradient(ellipse at center,#0d1a12 0%,#000 75%)}
+#win h2{color:#cfd8c4;font-size:clamp(60px,14vw,120px)}
+#intro{background:#000;cursor:pointer}
+#introText{max-width:620px;font-size:clamp(16px,3.8vw,21px);line-height:1.8;min-height:8em;white-space:pre-line}
+#note{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:15;background:rgba(0,0,0,.6)}
+#note .paper{max-width:460px;width:88vw;background:#cbbf9f;color:#221a10;padding:28px 30px;font-size:17px;line-height:1.6;box-shadow:0 0 40px #000;transform:rotate(-1.2deg);white-space:pre-line;background-image:radial-gradient(circle at 80% 20%,rgba(120,60,20,.25),transparent 40%),radial-gradient(circle at 10% 90%,rgba(80,0,0,.25),transparent 30%)}
+#note .paper i{display:block;margin-top:14px;font-size:13px;opacity:.6;text-align:right}
+#mapView{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:14;background:rgba(0,0,0,.75)}
+#mapView canvas{max-width:92vw;max-height:80vh;background:#c9bc98;box-shadow:0 0 40px #000;transform:rotate(.6deg)}
+#jumpImg{position:fixed;inset:0;pointer-events:none;opacity:0;z-index:12}
+/* touch */
+#touch{position:fixed;inset:0;display:none;z-index:9;pointer-events:none}
+#stick{position:absolute;left:28px;bottom:36px;width:130px;height:130px;border-radius:50%;border:2px solid rgba(255,255,255,.18);pointer-events:auto;background:rgba(255,255,255,.03)}
+#knob{position:absolute;left:40px;top:40px;width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.18)}
+.tb{position:absolute;pointer-events:auto;width:62px;height:62px;border-radius:50%;border:2px solid rgba(255,255,255,.22);background:rgba(0,0,0,.35);color:#ddd;font:12px "Special Elite",monospace;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.05}
+.tb.on{background:rgba(160,20,20,.5);border-color:#f44}
+#tPause{right:14px;top:14px;width:46px;height:46px}
+#tMap{right:70px;top:14px;width:46px;height:46px}
+@media (max-width:700px){ #tasks{font-size:13px} #bars{bottom:auto;top:auto} }
+body.touch #bars{left:18px;bottom:auto;top:96px}
+body.touch #inv{top:70px;bottom:auto}
+body.touch #tasks{font-size:12px}
+body.touch #noiseMeter,body.touch #noiseLbl{display:none}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div class="layer" id="vignette"></div>
+<div class="layer" id="fearTint"></div>
+<div class="layer" id="lockerView"></div>
+<div class="layer" id="blackout"></div>
+<div class="layer" id="redflash"></div>
+<div class="layer" id="flash"></div>
+
+<div id="hud">
+  <div id="marker"><div class="dia"></div><div class="arr"></div><span id="mkLabel"></span></div>
+  <div id="banner"><div class="k">YENİ GÖREV</div><div class="t" id="bnT"></div><div class="d" id="bnD"></div></div>
+  <div id="guideHint"></div>
+  <div id="tutor"></div>
+  <div id="tasks"></div>
+  <div id="cross"></div>
+  <div id="prompt"></div>
+  <div id="holdbar"><i></i></div>
+  <div id="msg"></div>
+  <div id="sub"></div>
+  <div id="bars">
+    <div class="bar"><span>DAYANIKLILIK</span><div class="t"><i id="stamI"></i></div></div>
+    <div class="bar"><span>FENER</span><div class="t"><i id="battI"></i></div></div>
+    <div class="bar" id="breathBar"><span>NEFES</span><div class="t"><i id="breathI"></i></div></div>
+  </div>
+  <div id="noiseLbl">SES</div>
+  <div id="noiseMeter"></div>
+  <div id="inv"></div>
+</div>
+
+<div id="touch">
+  <div id="stick"><div id="knob"></div></div>
+  <div class="tb" id="tRun" style="right:24px;bottom:150px">KOŞ</div>
+  <div class="tb" id="tCrouch" style="right:96px;bottom:110px">EĞİL</div>
+  <div class="tb" id="tUse" style="right:24px;bottom:72px;width:74px;height:74px;font-size:15px">AL /<br>KULLAN</div>
+  <div class="tb" id="tLight" style="right:110px;bottom:30px">FENER</div>
+  <div class="tb" id="tThrow" style="right:170px;bottom:84px">ŞİŞE<br>AT</div>
+  <div class="tb" id="tBreath" style="right:96px;bottom:188px">NEFES<br>TUT</div>
+  <div class="tb" id="tPause">II</div>
+  <div class="tb" id="tMap">⌖</div>
+  <div class="tb" id="tGuide" style="right:126px;top:14px;width:58px;height:46px;border-radius:23px;color:var(--guide);border-color:var(--guide)">YOL</div>
+</div>
+
+<div class="screen on" id="title">
+  <h1>KÖR</h1>
+  <div class="tag">O seni göremez. Ama her şeyi duyar.</div>
+  <button class="btn" id="bStart">OYUNA BAŞLA</button>
+  <div class="row diff" id="diffRow">
+    <button class="btn" data-d="0">KOLAY</button>
+    <button class="btn sel" data-d="1">NORMAL</button>
+    <button class="btn" data-d="2">KÂBUS</button>
+  </div>
+  <div class="row diff" id="qRow">
+    <span style="align-self:center;color:var(--dim);font-size:12px;letter-spacing:2px;margin-right:4px">GRAFİK</span>
+    <button class="btn" data-q="0">DÜŞÜK</button>
+    <button class="btn" data-q="1">ORTA</button>
+    <button class="btn" data-q="2">YÜKSEK</button>
+  </div>
+  <button class="btn" id="bHow">NASIL OYNANIR</button>
+  <div class="small">🎧 KULAKLIKLA, IŞIKLAR KAPALI oyna. Ses her şey: yaratığın nerede olduğunu kulağınla bulacaksın.<br><span id="best"></span></div>
+</div>
+
+<div class="screen" id="howto">
+  <div class="box">
+    <h2>NE YAPACAĞIM?</h2>
+    <b style="color:#7fd4ff">Ekrandaki mavi ◆ işaretini takip et.</b> Kaybolursan <kbd>H</kbd>'ye bas: yere parlayan bir iz düşer, seni hedefe götürür.<br><br>
+    <b>1.</b> Hastanede saklı <b>3 sigortayı</b> topla.<br>
+    <b>2.</b> Sigortaları <b>jeneratör odasındaki</b> kutuya tak, elektriği ver.<br>
+    <b>3.</b> <b>Başhekim odasından</b> çıkış kartını al.<br>
+    <b>4.</b> <b>Lobideki çıkışa koş</b>, kartı okut ve kaç!<br><br>
+    <b style="color:var(--blood2)">DİKKAT:</b> İçeride <b>kör</b> bir yaratık var. Seni göremez ama <b>sesini duyar</b>. Koşarsan gelir. Eğilirsen duymaz.<br><br>
+    <kbd>W A S D</kbd> yürü &nbsp; <kbd>Fare</kbd> bak &nbsp; <kbd>Shift</kbd> koş (gürültülü!) &nbsp; <kbd>C</kbd> eğil (sessiz)<br>
+    <kbd>E</kbd> al / kapı aç / dolaba saklan &nbsp; <kbd>F</kbd> fener &nbsp; <kbd>H</kbd> yolu göster<br>
+    <kbd>Sağ tık</kbd> / <kbd>G</kbd> şişe fırlat (yaratık sese koşar) &nbsp; <kbd>Q</kbd> basılı: nefesini tut<br>
+    <kbd>M</kbd> kroki &nbsp; <kbd>Esc</kbd> duraklat<br><br>
+    <div style="text-align:center"><button class="btn" id="bHowBack">GERİ</button></div>
+  </div>
+</div>
+
+<div class="screen" id="intro"><div id="introText"></div><div class="small" style="margin-top:30px">tıkla / dokun → geç</div></div>
+
+<div class="screen" id="pause">
+  <div class="box" style="text-align:center">
+    <h2>DURAKLATILDI</h2>
+    <button class="btn" id="bResume">DEVAM ET</button><br>
+    <button class="btn" id="bRestartCp">SON KAYITTAN BAŞLA</button><br>
+    <button class="btn" id="bQuit">ANA MENÜ</button>
+    <div class="small">Fare hassasiyeti <input type="range" id="sens" min="0.3" max="2.5" step="0.05" value="1" style="pointer-events:auto;vertical-align:middle"></div>
+    <div class="small">Ses <input type="range" id="vol" min="0" max="1.2" step="0.05" value="1" style="pointer-events:auto;vertical-align:middle"></div>
+  </div>
+</div>
+
+<div class="screen" id="dead">
+  <h2>ÖLDÜN</h2>
+  <div id="deadTip"></div>
+  <button class="btn" id="bRetry">SON KAYITTAN DEVAM</button>
+  <button class="btn" id="bMenu2">ANA MENÜ</button>
+</div>
+
+<div class="screen" id="win">
+  <h2>KAÇTIN</h2>
+  <div id="winStats" style="font-size:18px;line-height:1.8;margin-bottom:24px"></div>
+  <button class="btn" id="bMenu3">ANA MENÜ</button>
+</div>
+
+<div id="note"><div class="paper" id="noteText"></div></div>
+<div id="mapView"><canvas id="mapCanvas" width="740" height="540"></canvas></div>
+
+<script>
+/*__GAME__*/
+</script>
+</body>
+</html>
