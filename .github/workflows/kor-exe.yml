@@ -7,6 +7,9 @@ on:
       - 'kor/**'
       - '.github/workflows/kor-exe.yml'
 
+permissions:
+  contents: write
+
 jobs:
   exe:
     runs-on: windows-latest
@@ -25,3 +28,15 @@ jobs:
           name: KOR-Korku-Oyunu
           path: kor/exe/KOR-Korku-Oyunu.exe
           retention-days: 30
+      # Herkese açık, giriş gerektirmeyen doğrudan indirme linki:
+      # https://github.com/<sahip>/<repo>/releases/download/kor-son/KOR-Korku-Oyunu.exe
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: kor-son
+          name: KÖR - Korku Oyunu (EXE)
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          body: |
+            İndir: aşağıdaki **KOR-Korku-Oyunu.exe** dosyasına tıkla, çift tıklayıp oyna. Kurulum yok.
+            Windows "bilgisayarınızı korudu" derse: **Ek bilgi → Yine de çalıştır**.
+          files: kor/exe/KOR-Korku-Oyunu.exe
