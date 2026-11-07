@@ -116,17 +116,23 @@ composer.addPass(new OutputPass());
 const filmPass = new ShaderPass({
   uniforms: {
     tDiffuse: { value: null }, uTime: { value: 0 }, uFear: { value: 0 }, uGrain: { value: .09 },
-    uCA: { value: .0015 }, uHit: { value: 0 }, uRes: { value: new THREE.Vector2(innerWidth, innerHeight) },
+    uCA: { value: .0015 }, uHit: { value: 0 }, uGlitch: { value: 0 }, uRes: { value: new THREE.Vector2(innerWidth, innerHeight) },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float uTime, uFear, uGrain, uCA, uHit; uniform vec2 uRes; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float uTime, uFear, uGrain, uCA, uHit, uGlitch; uniform vec2 uRes; varying vec2 vUv;
     float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
     void main(){
       vec2 uv = vUv; vec2 c = uv - .5; float r = length(c);
       // korku: ekran kenarları dalgalanır
       uv += c * sin(uTime * 7. + r * 20.) * .004 * uFear;
-      float ca = uCA * (1. + uFear * 4. + uHit * 10.) * r * 2.;
+      // bozulma: yatay bant kaymaları
+      float fr = floor(uTime * 24.);
+      float band = floor(vUv.y * 18.);
+      float gOn = step(.62, h(vec2(band, fr))) * uGlitch;
+      uv.x += (h(vec2(band * 1.7, fr + 3.)) - .5) * .16 * gOn;
+      uv.y += (h(vec2(fr, 9.)) - .5) * .03 * uGlitch;
+      float ca = uCA * (1. + uFear * 4. + uHit * 10. + uGlitch * 30.) * r * 2. + uGlitch * .012;
       vec3 col;
       col.r = texture2D(tDiffuse, uv + c * ca).r;
       col.g = texture2D(tDiffuse, uv).g;
@@ -145,6 +151,7 @@ const filmPass = new ShaderPass({
       col += g * uGrain * (.6 + l);
       col *= .965 + .035 * sin(vUv.y * uRes.y * 1.4 + uTime * 30.);
       col += vec3(1.,.1,.05) * uHit * .35;
+      col = mix(col, 1. - col, step(.93, h(vec2(fr, 2.))) * step(.5, uGlitch));
       gl_FragColor = vec4(col, 1.);
     }`,
 });
@@ -1179,6 +1186,7 @@ function addLamp(x, z, opts = {}) {
   light.position.set(g.position.x, WALL_H - .4, g.position.z);
   world.add(light);
   const L = { g, tube, light, base: opts.intensity ?? 7, mode: opts.mode || 'flicker', on: opts.mode !== 'off', t: rand(0, 10), hum: null, cell: [x, z], power: !!opts.power };
+  L.mode0 = L.mode; L.base0 = L.base; L.c0 = light.color.clone();
   lamps.push(L); return L;
 }
 
@@ -1527,7 +1535,7 @@ function emitNoise(pos, loud, fromPlayer = true, label = '') {
   if (fromPlayer) S.noiseLevel = Math.max(S.noiseLevel, loud);
   if (!mon.active || S.state !== 'play') return;
   const dist = Math.hypot(pos.x - mon.pos.x, pos.z - mon.pos.z);
-  let range = loud * DIFF[diff].hear * (mon.rage ? 1.4 : 1);
+  let range = loud * DIFF[diff].hear * (mon.rage ? 1.4 : 1) * (1 + .12 * ((S.chapter || 1) - 1));
   if (!lineClear(pos.x, pos.z, mon.pos.x, mon.pos.z)) range *= .62;
   if (dist > range) return;
   if (!fromPlayer && loud >= 20) { // şişe / radyo: kovalamayı bile böler
@@ -1578,7 +1586,7 @@ function updateMonster(dt) {
       else { const a = rand(0, 6.28), r = rand(1.5, 4.5); const tx = mon.lastHeard ? mon.lastHeard.x : mon.pos.x, tz = mon.lastHeard ? mon.lastHeard.z : mon.pos.z; monSetTarget(tx + Math.cos(a) * r, tz + Math.sin(a) * r); mon.frozenT = rand(.6, 1.6); if (Math.random() < .5) A.click(mon.pos.clone().setY(2), 5, .5); }
     }
   } else if (mon.state === 'chase') {
-    spd = D.chaseSpeed * (mon.rage ? 1.08 : 1);
+    spd = D.chaseSpeed * (mon.rage ? 1.04 : 1) + .12 * ((S.chapter || 1) - 1);
     mon.trackT -= dt;
     if (mon.trackT <= 0 && mon.pathI >= mon.path.length) {
       mon.state = 'search'; mon.stateT = 0; mon.searchN = 0; A.growl(mon.pos.clone().setY(2), 1.4, .5, .9);
@@ -1813,21 +1821,22 @@ function findFocus() {
     const score = d * (1.6 - dot);
     if (score < bd) { bd = score; best = o; }
   };
-  for (const it of items) if (!it.taken) {
-    const txt = { fuse: 'Sigortayı al', battery: 'Pili al', bottle: 'Şişeyi al', card: 'Kartı al', note: 'Notu oku' }[it.type];
+  for (const it of items) if (!it.taken && it.mesh.visible) {
+    const txt = { fuse: 'Sigortayı al', battery: 'Pili al', bottle: 'Şişeyi al', card: 'Kartı al', note: 'Notu oku', doll: 'Bebeği al' }[it.type];
     consider(it.mesh.position, 2.2, { kind: 'item', obj: it, text: txt });
   }
   for (const d of doors) {
     const p = new THREE.Vector3(cc(d.x), 1.2, cc(d.z));
     let txt = d.open > .5 ? 'Kapıyı kapat' : 'Kapıyı aç';
-    if (d.locked) txt = S.power ? 'Kapıyı aç' : 'Kilitli — elektrik yok';
+    if (d.locked) txt = 'Kilitli';
     consider(p, 2.6, { kind: 'door', obj: d, text: txt + (d.locked ? '' : (S.crouch ? '  (sessiz)' : '')) });
   }
   for (const L of lockers) if (L.hideable) consider(L.pos.clone().setY(1.2).addScaledVector(L.facing, .4), 2.0, { kind: 'locker', obj: L, text: 'Dolaba saklan' });
   if (S.fuses > 0 && !S.power) consider(fuseBox.pos.clone().setY(1.4), 2.4, { kind: 'fusebox', text: `Sigortaları tak (${S.fuses}/${S.fuseNeed})` });
   else if (!S.power) consider(fuseBox.pos.clone().setY(1.4), 2.4, { kind: 'none', text: 'Sigorta kutusu — 3 sigorta gerekli' });
+  if (S.chapter === 2 && !S.ritual) consider(ALTAR.clone().setY(1), 2.6, { kind: 'altar', text: S.dolls >= 4 ? 'Bebekleri mumlarda YAK' : `Sunak — ${S.dolls}/4 bebek` });
   const gp = new THREE.Vector3(cc(27), 1.3, cc(26) - C / 2);
-  consider(gp, 2.8, { kind: 'gate', text: S.keycard ? 'Kartı okut (basılı tut)' : (S.power ? 'Kart okuyucu — kart gerekli' : 'Kapı kilitli. Elektrik yok.') });
+  consider(gp, 2.8, { kind: 'gate', text: S.keycard ? 'Kartı okut (basılı tut)' : 'Kart okuyucu — çıkış kartı gerekli' });
   return best;
 }
 let holdT = 0;
@@ -1850,8 +1859,10 @@ function interact(dt, pressed, held) {
   else if (f.kind === 'door') {
     const d = f.obj;
     if (d.locked) {
-      if (!S.power) { A.slam(new THREE.Vector3(cc(d.x), 1.2, cc(d.z)), .2); sub('Kilitli. Elektrik gerekiyor.'); emitNoise(player.pos, 3); return; }
-      d.locked = false; d.light.material = M.green; sub('Kilit açıldı.');
+      A.slam(new THREE.Vector3(cc(d.x), 1.2, cc(d.z)), .2); emitNoise(player.pos, 3);
+      sub(S.chapter < 3 ? 'Kilitli. İçeriden bir şey nefes alıyor...' : 'Kilitli.');
+      if (S.chapter < 3 && Math.random() < .5) later(.6, () => A.knock(new THREE.Vector3(cc(d.x), 1.3, cc(d.z)), 3, 1.3));
+      return;
     }
     d.target = d.target > .5 ? 0 : 1;
     // açılış yönü: oyuncudan uzağa
@@ -1864,6 +1875,7 @@ function interact(dt, pressed, held) {
     emitNoise(player.pos, quiet ? 1.5 : 8.5);
   }
   else if (f.kind === 'locker') hide(f.obj);
+  else if (f.kind === 'altar') { if (S.dolls >= 4) ritual(); else { sub(`Sunağa 4 bebek lazım (${S.dolls}/4)`); A.whisper(0, 1.4, .3); } }
   else if (f.kind === 'unhide') unhide();
   else if (f.kind === 'fusebox') {
     for (let i = 0; i < S.fuses; i++) { fuseLights[i].fz.visible = true; fuseLights[i].lt.material = M.green; }
@@ -1887,10 +1899,16 @@ function takeItem(it) {
     saveCheckpoint();
   } else if (it.type === 'battery') { S.battery = Math.min(1, S.battery + .55); sub('Pil (+%55)'); }
   else if (it.type === 'bottle') { S.bottles++; sub('Şişe. Fırlat: sağ tık / G'); }
+  else if (it.type === 'doll') takeDoll(it);
   else if (it.type === 'card') {
-    S.keycard = true; sub('Başhekimin kartı. ÇIKIŞA KOŞ!', 3);
-    A.sting(.8); mon.rage = true; A.screech(mon.pos.clone().setY(2), 1.3, 1);
-    later(1, () => monSetTarget(player.pos.x, player.pos.z, 'investigate'));
+    S.keycard = true; sub('KARTI ALDIN. ÇIKIŞA KOŞ!', 3);
+    mon.rage = true; duck(1);
+    later(1, () => { screamer(true); });
+    later(2.2, () => { // final kovalaması: arkanda belirir
+      const c = floorCells.filter(([x, z]) => { const d = Math.hypot(cc(x) - player.pos.x, cc(z) - player.pos.z); return d > 11 && d < 17; });
+      if (c.length) { const q = pick(c); mon.pos.set(cc(q[0]), 0, cc(q[1])); }
+      A.screech(mon.pos.clone().setY(2), 1.5, 1.2); mon.state = 'chase'; mon.trackT = 6; monSetTarget(player.pos.x, player.pos.z);
+    });
     saveCheckpoint();
   }
   updateTasks();
@@ -1900,9 +1918,9 @@ function powerOn() {
   fuseBox.lever.rotation.x = -1; fuseBox.warn.color.set(0x30ff40);
   A.boom(1); A.siren(5);
   lamps.forEach(L => { if (L.power) { L.on = true; L.mode = L.mode === 'dead' ? 'flicker' : 'alarm'; } });
-  doors.forEach(d => { if (d.electric) { d.locked = false; d.light.material = M.green; d.target = 1; d.swing = 1; } });
   later(.4, () => { blackout(.3); });
-  sub('ELEKTRİK GELDİ. Başhekim odasının kapısı açıldı.', 4);
+  sub('ELEKTRİK GELDİ...', 3);
+  later(3.2, () => startChapter(2));
   // güç gelince her yer gürültü — yaratık öfkelenir
   emitNoise(fuseBox.pos, 40, true);
   later(2, () => A.screech(mon.pos.clone().setY(2), 1.6, 1));
@@ -1960,15 +1978,13 @@ function updateThrown(dt) {
 
 /* ============================ HUD / UI =============================== */
 function updateTasks() {
-  const t = [];
-  const fuseLine = `Sigortaları bul (${S.fuses}/${S.fuseNeed})`;
-  t.push(`<div class="h">— GÖREVLER —</div>`);
-  t.push(`<div class="${S.fuses >= S.fuseNeed || S.power ? 'done' : 'cur'}">${fuseLine}</div>`);
-  t.push(`<div class="${S.power ? 'done' : (S.fuses >= S.fuseNeed ? 'cur' : '')}">Jeneratör odasında elektriği ver</div>`);
-  if (S.power || S.fuses >= S.fuseNeed) t.push(`<div class="${S.keycard ? 'done' : (S.power ? 'cur' : '')}">Başhekim odasından kartı al</div>`);
-  if (S.keycard) t.push(`<div class="cur">Lobideki ÇIKIŞ kapısından kaç</div>`);
+  const ch = S.chapter || 1, t = [`<div class="h">— BÖLÜM ${ch} · ${CHAPTERS[ch].t} —</div>`];
+  const line = (done, cur, txt) => t.push(`<div class="${done ? 'done' : cur ? 'cur' : ''}">${txt}</div>`);
+  if (ch === 1) { line(S.fuses >= S.fuseNeed, S.fuses < S.fuseNeed, `Sigortaları bul (${S.fuses}/${S.fuseNeed})`); line(S.power, S.fuses >= S.fuseNeed, 'Jeneratör odasında elektriği ver'); }
+  if (ch === 2) { line(S.dolls >= 4, S.dolls < 4, `Lanetli bebekleri bul (${S.dolls}/4)`); line(S.ritual, S.dolls >= 4, 'Şapelde mumlarda yak'); }
+  if (ch === 3) { line(S.keycard, !S.keycard, 'Başhekim odasından kartı al'); line(false, S.keycard, 'Lobideki ÇIKIŞTAN kaç'); }
   $('tasks').innerHTML = t.join('');
-  $('inv').innerHTML = `🍾 Şişe × ${S.bottles}<br>${S.fuses && !S.power ? '⚡ Sigorta × ' + S.fuses + '<br>' : ''}${S.keycard ? '💳 Başhekim kartı' : ''}`;
+  $('inv').innerHTML = `🍾 Şişe × ${S.bottles}<br>${S.fuses && !S.power ? '⚡ Sigorta × ' + S.fuses + '<br>' : ''}${ch === 2 && S.dolls && !S.ritual ? '🪆 Bebek × ' + S.dolls + '<br>' : ''}${S.keycard ? '💳 Çıkış kartı' : ''}`;
 }
 let subT = 0, msgT = 0;
 function sub(text, dur = 2.2) { $('sub').textContent = text; $('sub').style.opacity = 1; subT = dur; }
@@ -2114,6 +2130,7 @@ function saveCheckpoint() {
     fuses: S.fuses, power: S.power, keycard: S.keycard, bottles: Math.max(1, S.bottles), battery: Math.max(.5, S.battery),
     taken: items.map(i => i.taken), triggered: new Set(S.triggered), rage: mon.rage,
     doors: doors.map(d => ({ locked: d.locked })),
+    chapter: S.chapter, dolls: S.dolls, ritual: S.ritual,
   };
 }
 function loadCheckpoint() {
@@ -2121,8 +2138,9 @@ function loadCheckpoint() {
   player.pos.copy(c.pos); player.yaw = c.yaw; player.pitch = 0;
   S.fuses = c.fuses; S.power = c.power; S.keycard = c.keycard; S.bottles = c.bottles; S.battery = c.battery;
   S.stamina = 1; S.breath = 1; S.hidden = null; S.flashOn = true; S.triggered = new Set(c.triggered);
+  S.chapter = c.chapter; S.dolls = c.dolls; S.ritual = c.ritual; S.stalk = null; S.cryArm = null; S.grinT = 0; grin.visible = false; crumbs.length = 0;
   $('lockerView').style.opacity = 0;
-  items.forEach((it, i) => { it.taken = c.taken[i]; it.mesh.visible = !it.taken; });
+  items.forEach((it, i) => { it.taken = c.taken[i]; it.mesh.visible = !it.taken && (it.type !== 'doll' || S.chapter >= 2); });
   doors.forEach((d, i) => { d.locked = c.doors[i].locked; if (d.light) d.light.material = d.locked ? M.red : M.green; });
   fuseLights.forEach((f, i) => { f.fz.visible = S.power; f.lt.material = S.power ? M.green : M.red; });
   if (!S.power) { lamps.forEach(L => { if (L.power) { L.on = false; L.mode = L.cell[0] === 11 && L.cell[1] === 11 ? 'dead' : 'off'; } }); fuseBox.lever.rotation.x = 0; fuseBox.warn.color.set(0xff3020); }
@@ -2133,6 +2151,8 @@ function loadCheckpoint() {
   events.length = 0; holdT = 0;
   silhouette.visible = crawler.visible = faceScare.visible = peekHead.visible = shadowRunner.visible = child.visible = false;
   actorRuns.length = 0; S.behindArm = null; S.dirT = 20; S.duckT = 0; guideT = 0; guideDots.forEach(d => d.visible = false);
+  if (!S.ritual) resetAltar();
+  if (S.power && S.chapter === 1) later(1, () => startChapter(2));
   updateTasks();
 }
 function newGame() {
@@ -2147,13 +2167,15 @@ function newGame() {
   battSpots.sort(() => Math.random() - .5).slice(0, 5).forEach(([x, z]) => addItem('battery', x, z));
   const noteSpots = [[2, 4, 0], [14, 9, 1], [9, 16, 2], [4, 13, 3], [29, 23, 4]];
   noteSpots.forEach(([x, z, n]) => addItem('note', x, z, { text: notesText[n], noteId: n }));
-  Object.assign(S, { stage: 0, dirT: 25, wxT: 10, recentScares: [], behindArm: null, duckT: 0, bannerT: 0, fuses: 0, power: false, keycard: false, bottles: 2, battery: 1, stamina: 1, breath: 1, hidden: null, flashOn: true, crouchToggle: false, deaths: 0, time: 0, startTime: 0, triggered: new Set(), visited: new Set(), notesRead: new Set() });
+  DOLL_SPOTS.slice().sort(() => Math.random() - .5).slice(0, 4).forEach(([x, z]) => addDoll(x, z));
+  Object.assign(S, { chapter: 1, dolls: 0, ritual: false, stalk: null, cryArm: null, grinT: 0, glitch: 0, stage: 0, dirT: 25, wxT: 10, recentScares: [], behindArm: null, duckT: 0, bannerT: 0, fuses: 0, power: false, keycard: false, bottles: 2, battery: 1, stamina: 1, breath: 1, hidden: null, flashOn: true, crouchToggle: false, deaths: 0, time: 0, startTime: 0, triggered: new Set(), visited: new Set(), notesRead: new Set() });
   doors.forEach(d => { d.open = d.target = 0; d.locked = d.electric; if (d.light) d.light.material = M.red; d.pivot.rotation.y = d.baseRot; });
   lockers.forEach(L => { L.open = L.target = 0; });
   lockerCorpse.body.visible = false; lockerCorpse.fall = null; S.candlesOut = false; candles.forEach(c => c.visible = true);
   hangBody.visible = false; wchair.position.set(cc(28.4), 0, cc(13.4)); wchair.userData.roll = null;
   fuseLights.forEach(f => { f.fz.visible = false; f.lt.material = M.red; });
-  lamps.forEach(L => { L.broken = false; if (L.power) { L.on = false; L.mode = (L.cell[0] === 11 && L.cell[1] === 11) ? 'dead' : 'off'; } });
+  lamps.forEach(L => { L.broken = false; L.mode = L.mode0; L.on = L.mode0 !== 'off'; L.base = L.base0; L.light.color.copy(L.c0); });
+  resetAltar();
   fuseBox.lever.rotation.x = 0; fuseBox.warn.color.set(0xff3020);
   exitGate.open = 0; exitGate.l.position.x = -C / 4; exitGate.r.position.x = C / 4;
   player.pos.set(cc(3), 0, cc(3)); player.yaw = Math.PI; player.pitch = -.1;
@@ -2168,6 +2190,7 @@ const INTRO = [
   'Kardeşin burada gece bekçisiydi.\nSon telefonunda fısıldıyordu:\n"Bağırma. Koşma. O duyar."',
   'Uyandığında 13 numaralı odadaydın.\nKapılar kilitli. Elektrik yok.\nVe koridorda bir şey... tıkırdıyor.',
   'O seni GÖREMEZ.\nAma her sesi DUYAR.\nKoşarsan gelir. Eğilirsen duymaz.',
+  'Üç bölüm. Üç gece.\nKARANLIK. AYİN. KAÇIŞ.\n\nArkandan gelen ayak seslerine kulak verme.',
   'Ekrandaki mavi ◆ işaret sana yolu gösterecek.\nKaybolursan H tuşu.\n\nŞimdi... sessizce çık.',
 ];
 let introI = 0;
@@ -2194,6 +2217,7 @@ function startPlay() {
   later(12, () => tutor(K('Kapılara bak ve <kbd>E</kbd> bas &nbsp; <kbd>C</kbd> ile eğilirsen sessiz olursun', 'Kapılara bakıp <b>KULLAN</b> &nbsp; <b>EĞİL</b> = sessiz'), 5));
   later(18, () => { A.click(new THREE.Vector3(cc(14), 2, cc(6)), 6, .7); A.growl(new THREE.Vector3(cc(16), 2, cc(9)), 1.6, .5); sub('...o neydi?', 2); });
   later(19.5, () => tutor(K('<kbd>Shift</kbd> koşar ama <b>O DUYAR</b> &nbsp; <kbd>G</kbd> şişe fırlat, sesin peşinden gider', '<b>KOŞ</b> = gürültü! &nbsp; <b>ŞİŞE AT</b> = onu başka yere çeker'), 5.5));
+  chapterCard(1);
 }
 function pause() {
   if (S.state !== 'play') return;
@@ -2207,11 +2231,11 @@ function resume() {
 }
 function killPlayer(tip) {
   if (S.state !== 'play') return;
-  S.state = 'jumpscare'; S.deaths++;
+  S.state = 'jumpscare'; S.deaths++; $('chapter').style.opacity = 0;
   S.jumpT = 0; S.deathTip = tip;
   document.exitPointerLock?.();
   $('lockerView').style.opacity = 0;
-  A.screech(null, 1.6, 1.25); A.sting(1); A.boom(1.2);
+  A.screech(null, 1.6, 1.25); A.sting(1); A.boom(1.2); S.glitch = 1; setTimeout(() => A.ring(.04), 1500);
   // yaratığı kameraya doğru çevir
   const dx = player.pos.x - mon.pos.x, dz = player.pos.z - mon.pos.z;
   mon.dir = Math.atan2(dx, dz);
@@ -2314,6 +2338,7 @@ function movePlayer(dt) {
       const vol = S.running ? .55 : S.crouch ? .05 : .2;
       A.step(vol, null, false, S.running ? 1.1 : .9);
       emitNoise(player.pos, S.running ? 15 : S.crouch ? 1.0 : 5.5);
+      onPlayerStep();
     }
   }
   return sp;
@@ -2324,20 +2349,24 @@ const STAGES = [
   null,
   { t: 'SİGORTALARI BUL', d: 'Hastanede 3 sigorta saklı. Mavi ◆ işaretini takip et.', mk: 'SİGORTA' },
   { t: 'ELEKTRİĞİ VER', d: 'Sigortaları jeneratör odasındaki kutuya tak.', mk: 'SİGORTA KUTUSU' },
-  { t: 'KARTI AL', d: 'Başhekim odasının kapısı açıldı. Çıkış kartı masada.', mk: 'ÇIKIŞ KARTI' },
+  { t: 'BEBEKLERİ BUL', d: '4 lanetli bebek var. Müzik kutusu sesini dinle.', mk: 'BEBEK' },
+  { t: 'ŞAPELE GİT', d: 'Bebekleri sunaktaki mumlarda yak.', mk: 'SUNAK' },
+  { t: 'KARTI AL', d: 'Başhekim odasının kapısı açıldı. Kart masada.', mk: 'ÇIKIŞ KARTI' },
   { t: 'KAÇ!', d: 'Lobideki ÇIKIŞ kapısına koş ve kartı okut.', mk: 'ÇIKIŞ' },
 ];
+const nearestItem = type => { let best = null, bd = 1e9; for (const it of items) if (it.type === type && !it.taken) { const d = it.pos.distanceTo(player.pos); if (d < bd) { bd = d; best = it; } } return best; };
 function objective() {
-  if (!S.power) {
-    if (S.fuses < S.fuseNeed) {
-      let best = null, bd = 1e9;
-      for (const it of items) if (it.type === 'fuse' && !it.taken) { const d = it.pos.distanceTo(player.pos); if (d < bd) { bd = d; best = it; } }
-      if (best) return { stage: 1, pos: best.pos.clone().setY(1) };
-    }
-    return { stage: 2, pos: fuseBox.pos.clone().setY(1.4) };
+  const ch = S.chapter || 1;
+  if (ch === 1) {
+    const f = S.fuses < S.fuseNeed && nearestItem('fuse');
+    return f ? { stage: 1, pos: f.pos.clone().setY(1) } : { stage: 2, pos: fuseBox.pos.clone().setY(1.4) };
   }
-  if (!S.keycard) { const c = items.find(i => i.type === 'card'); return { stage: 3, pos: c.pos.clone().setY(1) }; }
-  return { stage: 4, pos: new THREE.Vector3(cc(27), 1.4, cc(26) - C / 2) };
+  if (ch === 2) {
+    const d = S.dolls < 4 && nearestItem('doll');
+    return d ? { stage: 3, pos: d.pos.clone().setY(.6) } : { stage: 4, pos: ALTAR.clone().setY(1.1) };
+  }
+  if (!S.keycard) { const c = items.find(i => i.type === 'card'); return { stage: 5, pos: c.pos.clone().setY(1) }; }
+  return { stage: 6, pos: new THREE.Vector3(cc(27), 1.4, cc(26) - C / 2) };
 }
 function banner(stage) {
   const st = STAGES[stage]; if (!st) return;
@@ -2576,11 +2605,343 @@ function updateDirector(dt) {
   if (S.state !== 'play') return;
   S.dirT = (S.dirT ?? 22) - dt;
   if (S.dirT > 0 || mon.state === 'chase') return;
-  const pool = S.hidden ? ['knock', 'rush', 'ceiling', 'phone'] : Object.keys(DIRECTOR);
+  const pool = S.hidden ? ['knock', 'rush', 'ceiling', 'phone', 'cry', 'drag'] : Object.keys(DIRECTOR);
   const recent = S.recentScares || (S.recentScares = []);
   const order = pool.filter(n => !recent.includes(n)).sort(() => Math.random() - .5);
   for (const n of order) if (DIRECTOR[n]()) { recent.push(n); if (recent.length > 5) recent.shift(); break; }
-  S.dirT = diff === 0 ? rand(20, 34) : diff === 2 ? rand(10, 20) : rand(14, 26);
+  S.dirT = (diff === 0 ? rand(18, 30) : diff === 2 ? rand(9, 17) : rand(12, 22)) * [1, 1, .8, .6][S.chapter || 1];
+}
+
+/* ============================== BÖLÜMLER ============================== */
+const CHAPTERS = [null,
+  { n: 'BÖLÜM 1', t: 'KARANLIK', d: 'Elektrik yok. Hastanede saklı 3 sigortayı bul ve jeneratörü çalıştır.' },
+  { n: 'BÖLÜM 2', t: 'AYİN', d: 'Işıklar geldi... ve bir şey uyandı. 4 lanetli bebeği bul, şapeldeki mumlarda yak. Müzik kutusu sesini dinle.' },
+  { n: 'BÖLÜM 3', t: 'KAÇIŞ', d: 'Ayin bozuldu. Bütün ışıklar söndü ve O artık çok öfkeli. Başhekimin kartını al ve ÇIK.' },
+];
+function chapterCard(n) {
+  const c = CHAPTERS[n];
+  $('chN').textContent = c.n; $('chT').textContent = c.t; $('chD').textContent = c.d;
+  $('chapter').style.opacity = 1; S.state = 'chapter'; S.chapT = 4.5;
+  A.gong(); A.boom(.8); later(0, () => {});
+  updateTasks();
+}
+function startChapter(n) {
+  S.chapter = n; S.stage = 0; S.stalk = null; S.cryArm = null;
+  if (n === 2) {
+    items.forEach(it => { if (it.type === 'doll' && !it.taken) it.mesh.visible = true; });
+    S.dirT = 14;
+  }
+  if (n === 3) {
+    // her yer kırmızı acil durum ışığı
+    lamps.forEach(L => { L.broken = false; L.on = true; L.mode = 'alarm'; L.base = 3.5; L.light.color.set(0xff1808); });
+    S.candlesOut = true; candles.forEach(c => c.visible = false);
+    doors.forEach(d => { if (d.electric) { d.locked = false; d.light.material = M.green; d.target = 1; d.swing = 1; d.speed = 6; } });
+    mon.rage = true;
+    const c = floorCells.filter(([x, z]) => { const d = Math.hypot(cc(x) - player.pos.x, cc(z) - player.pos.z); return d > 16 && d < 24; });
+    if (c.length) { const q = pick(c); mon.pos.set(cc(q[0]), 0, cc(q[1])); monSetTarget(player.pos.x, player.pos.z, 'investigate'); }
+    S.dirT = 10;
+    later(.5, () => { A.slam(new THREE.Vector3(cc(32), 1.2, cc(11)), 1.4); A.siren(4); });
+  }
+  saveCheckpoint();
+  chapterCard(n);
+}
+
+/* ============================ AYİN: BEBEKLER =========================== */
+const DOLL_SPOTS = [[13, 2], [20, 4], [28, 12], [2, 9], [8, 23], [33, 24], [34, 2], [14, 13], [24, 9], [6, 13], [21, 23], [1, 19]];
+Object.assign(M, {
+  porcelain: new THREE.MeshStandardMaterial({ color: 0xe6ddcc, roughness: .25, metalness: .05 }),
+  dollDress: new THREE.MeshStandardMaterial({ color: 0x6a3f48, roughness: .95 }),
+  dollEye: new THREE.MeshBasicMaterial({ color: 0x000000 }),
+});
+function dollModel() {
+  const g = new THREE.Group();
+  const dress = new THREE.Mesh(new THREE.ConeGeometry(.13, .27, 10), M.dollDress); dress.position.y = .135; g.add(dress);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.085, 14, 10), M.porcelain); head.position.y = .33; head.rotation.z = .35; g.add(head);
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(.092, 12, 8, 0, Math.PI * 2, 0, Math.PI / 1.8), M.hair); hair.position.y = .34; hair.rotation.set(-.3, 0, .35); g.add(hair);
+  for (const s of [-1, 1]) {
+    const e = new THREE.Mesh(new THREE.SphereGeometry(.017, 8, 6), M.dollEye); e.position.set(s * .032 + .012, .345, .072); g.add(e);
+    const tear = box(.007, .07, .004, M.blood); tear.position.set(s * .032 + .014, .3, .078); g.add(tear);
+    const arm = cyl(.016, .013, .14, M.porcelain, 5); arm.position.set(s * .11, .2, 0); arm.rotation.z = s * .7; g.add(arm);
+  }
+  const mouth = box(.03, .008, .005, M.blood); mouth.position.set(.008, .3, .082); g.add(mouth);
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  return g;
+}
+function addDoll(x, z) {
+  const g = dollModel();
+  g.position.set(cc(x) + rand(-.5, .5), 0, cc(z) + rand(-.5, .5)); g.rotation.y = rand(0, 6.28); g.scale.setScalar(1.8);
+  const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xff3020, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: .4 }));
+  gl.scale.setScalar(.8); gl.position.y = .25; g.add(gl);
+  g.visible = false; world.add(g);
+  const it = { type: 'doll', mesh: g, pos: g.position, taken: false, id: items.length, glow: gl, beacon: rand(0, 4) };
+  items.push(it); return it;
+}
+function takeDoll(it) {
+  S.dolls++;
+  sub(`Lanetli bebek (${S.dolls}/4)`, 2.5);
+  const p = it.pos.clone().setY(.4);
+  if (S.dolls === 1) { A.laugh(p); later(.5, subliminal); later(1.6, () => sub('...bebek güldü mü?', 2)); }
+  if (S.dolls === 2) { duck(1.1); later(1.1, () => screamer(true)); }
+  if (S.dolls === 3) { DIRECTOR.grin(); }
+  if (S.dolls === 4) {
+    later(1, () => { sub('HEPSİ TAMAM. ŞAPELE KOŞ!', 3); startStalker(16); });
+    later(2, () => { const c = floorCells.filter(([x, z]) => { const d = Math.hypot(cc(x) - player.pos.x, cc(z) - player.pos.z); return d > 12 && d < 18; }); if (c.length) { const q = pick(c); mon.pos.set(cc(q[0]), 0, cc(q[1])); monSetTarget(player.pos.x, player.pos.z, 'investigate'); A.screech(mon.pos.clone().setY(2), 1.2, 1); } });
+  }
+  saveCheckpoint();
+}
+const ALTAR = new THREE.Vector3(cc(14), 0, cc(24) + .3);
+let altarFire, altarDolls = [];
+function buildAltar() {
+  const a = box(1.8, .95, .8, M.wood); a.position.set(ALTAR.x, .475, ALTAR.z + .35); world.add(a); addSolid(ALTAR.x, ALTAR.z + .35, .9, .4);
+  const cloth = box(1.85, .02, .85, M.bloodSheet); cloth.position.set(ALTAR.x, .96, ALTAR.z + .35); world.add(cloth);
+  for (let i = 0; i < 4; i++) { const d = dollModel(); d.position.set(ALTAR.x - .6 + i * .4, .97, ALTAR.z + .35); d.visible = false; world.add(d); altarDolls.push(d); }
+  altarFire = new THREE.PointLight(0xff6a20, 0, 9, 2); altarFire.position.set(ALTAR.x, 1.4, ALTAR.z); world.add(altarFire);
+}
+function resetAltar() { S.fireT = 0; if (altarFire) altarFire.intensity = 0; altarDolls.forEach(d => { d.visible = false; d.scale.setScalar(1); }); }
+function ritual() {
+  S.ritual = true; updateTasks();
+  altarDolls.forEach(d => d.visible = true);
+  sub('Yanın...', 2);
+  duck(1.5);
+  later(1.5, () => {
+    S.fireT = 5; A.boom(1.3); A.hit(1); burstSparks(ALTAR.clone().setY(1.1)); shake(.8); flash(.35);
+    S.candlesOut = false; candles.forEach(c => c.visible = true);
+    for (let i = 0; i < 6; i++) later(i * .4, () => A.cry(ALTAR.clone().setY(1), .8));
+  });
+  later(3.4, () => screamer(true));
+  later(5, () => { A.distantScream(); blackout(1.2); });
+  later(6.4, () => startChapter(3));
+}
+
+/* ========================= ANİ KORKU YÜZLERİ ========================= */
+function drawScreamer() {
+  const W = 640, H = 640, c = makeCanvas(W, H), x = c.getContext('2d');
+  const bg = x.createRadialGradient(W / 2, H / 2, 40, W / 2, H / 2, W * .72); bg.addColorStop(0, '#3a0303'); bg.addColorStop(1, '#000');
+  x.fillStyle = bg; x.fillRect(0, 0, W, H);
+  x.save(); x.translate(W / 2 + rand(-20, 20), H * .5); x.rotate(rand(-.15, .15)); x.scale(1, rand(1.12, 1.3));
+  const fg = x.createRadialGradient(-30, -70, 20, 0, 0, 240); fg.addColorStop(0, '#d8cfbd'); fg.addColorStop(.55, '#8a8070'); fg.addColorStop(1, '#1c1813');
+  x.fillStyle = fg; x.beginPath(); x.ellipse(0, 0, 178, 232, 0, 0, 7); x.fill();
+  for (const sx of [-1, 1]) { const g = x.createRadialGradient(sx * 100, 50, 5, sx * 100, 50, 90); g.addColorStop(0, 'rgba(20,10,5,.75)'); g.addColorStop(1, 'rgba(20,10,5,0)'); x.fillStyle = g; x.fillRect(-200, -100, 400, 300); }
+  // damarlar ve çatlaklar
+  x.strokeStyle = 'rgba(80,10,30,.7)'; x.lineWidth = 1.6; for (let i = 0; i < 14; i++) crack(x, rand(-140, 140), rand(-200, 160), rand(40, 120), rand(0, 6), 2);
+  x.strokeStyle = 'rgba(0,0,0,.8)'; x.lineWidth = 2.5; for (let i = 0; i < 4; i++) crack(x, rand(-120, 120), rand(-200, -60), rand(60, 140), rand(0, 6), 2);
+  // göz çukurları: dipsiz, kanlı
+  for (const sx of [-1, 1]) {
+    x.save(); x.translate(sx * 72, -58); x.rotate(sx * .28);
+    const g = x.createRadialGradient(0, 0, 10, 0, 0, 78); g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(.55, 'rgba(0,0,0,.95)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = g; x.beginPath(); x.ellipse(0, 0, 66, 78, 0, 0, 7); x.fill();
+    if (Math.random() < .6) { x.fillStyle = '#fff'; x.beginPath(); x.arc(rand(-6, 6), rand(-4, 6), rand(2, 4), 0, 7); x.fill(); }
+    x.restore();
+    x.fillStyle = '#5a0000'; for (let k = 0; k < 4; k++) { const tx = sx * 72 + rand(-26, 26), L = rand(60, 180); x.fillRect(tx, -10, rand(3, 7), L); x.beginPath(); x.arc(tx + 3, -10 + L, 5, 0, 7); x.fill(); }
+  }
+  // burun yarıkları
+  x.fillStyle = '#000'; for (const sx of [-1, 1]) { x.beginPath(); x.ellipse(sx * 12, 20, 6, 16, sx * .3, 0, 7); x.fill(); }
+  // dev ağız
+  const mw = rand(90, 115), mh = rand(110, 140), my = 125;
+  const mg = x.createRadialGradient(0, my, 10, 0, my, mh); mg.addColorStop(0, '#000'); mg.addColorStop(.7, '#140000'); mg.addColorStop(1, '#4a0505');
+  x.fillStyle = mg; x.beginPath(); x.ellipse(0, my, mw, mh, 0, 0, 7); x.fill();
+  x.fillStyle = '#e4d6a8'; x.strokeStyle = '#3a2a10'; x.lineWidth = 1.5;
+  const tooth = (a, up) => { const tx = Math.sin(a) * mw * .96, ty = my + (up ? -1 : 1) * Math.cos(a) * mh * .96, L = rand(22, 46) * (1 - Math.abs(a) * .3), w = rand(7, 12);
+    x.beginPath(); x.moveTo(tx - w, ty); x.lineTo(tx + w, ty); x.lineTo(tx + rand(-3, 3), ty + (up ? L : -L)); x.closePath(); x.fill(); x.stroke(); };
+  for (let i = 0; i < 15; i++) { const a = (i / 14 - .5) * 2.4; tooth(a, true); tooth(a + rand(-.05, .05), false); }
+  x.restore();
+  // saç
+  x.lineCap = 'round';
+  for (let i = 0; i < 170; i++) {
+    let sx = W / 2 + rand(-230, 230); if (Math.abs(sx - W / 2) < 120 && Math.random() < .85) sx += Math.sign(sx - W / 2 || 1) * 120;
+    x.strokeStyle = `rgba(0,0,0,${rand(.6, .95)})`; x.lineWidth = rand(1, 4);
+    x.beginPath(); x.moveTo(sx, -10); x.bezierCurveTo(sx + rand(-40, 40), H * .25, sx + rand(-70, 70), H * .55, sx + rand(-80, 80), rand(H * .45, H * 1.05)); x.stroke();
+  }
+  // kan sıçraması
+  x.fillStyle = 'rgba(120,0,0,.85)'; for (let i = 0; i < 40; i++) { x.beginPath(); x.arc(rand(0, W), rand(0, H), rand(1, 9), 0, 7); x.fill(); }
+  // bozulma dilimleri
+  for (let i = 0; i < 9; i++) { const y = rand(0, H), h = rand(6, 40), dx = rand(-50, 50); const d = x.getImageData(0, y, W, h); x.putImageData(d, dx, y); }
+  const img = x.getImageData(0, 0, W, H), d = img.data;
+  for (let i = 0; i < d.length; i += 4) { const n = (Math.random() - .5) * 60; d[i] += n + 10; d[i + 1] += n; d[i + 2] += n; }
+  x.putImageData(img, 0, 0);
+  const v = x.createRadialGradient(W / 2, H / 2, W * .3, W / 2, H / 2, W * .75); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.9)'); x.fillStyle = v; x.fillRect(0, 0, W, H);
+  return c;
+}
+const screamFaces = [];
+let screamCd = 0;
+function showFace(cls, ms) {
+  if (!screamFaces.length) for (let i = 0; i < 3; i++) screamFaces.push(drawScreamer());
+  const el = $('screamer'), f = pick(screamFaces);
+  el.width = f.width; el.height = f.height; el.getContext('2d').drawImage(f, 0, 0);
+  el.classList.remove('on', 'sub'); void el.offsetWidth; el.classList.add(cls);
+  setTimeout(() => el.classList.remove(cls), ms);
+}
+function screamer(force = false) {
+  if (!force && screamCd > 0) return false;
+  screamCd = 40;
+  showFace('on', 650);
+  A.screech(null, 1.2, 1.3); A.hit(1.1); setTimeout(() => A.ring(), 700);
+  S.glitch = 1.3; shake(1.2); redFlash(.7);
+  return true;
+}
+function subliminal() {
+  showFace('sub', 60 + Math.random() * 50);
+  A.boom(.35); S.glitch = Math.max(S.glitch || 0, .7);
+}
+
+/* ======================= YENİ ÜRPERTİCİ SESLER ======================= */
+Object.assign(A, {
+  cry(pos, dur = 3) { // uzaktan kadın ağlaması
+    const d = pos ? this.panner(pos) : this.out(null, .5);
+    let t = this.t;
+    while (t < this.t + dur) {
+      const L = rand(.25, .6), f0 = rand(300, 420);
+      const o = this.ctx.createOscillator(); o.type = 'sawtooth';
+      o.frequency.setValueAtTime(f0, t); o.frequency.linearRampToValueAtTime(f0 * rand(.7, .85), t + L);
+      const v = this.ctx.createOscillator(); v.frequency.value = rand(6, 9); const vg = this.ctx.createGain(); vg.gain.value = 9; v.connect(vg); vg.connect(o.frequency);
+      const f1 = this.ctx.createBiquadFilter(); f1.type = 'bandpass'; f1.frequency.value = 850; f1.Q.value = 5;
+      const f2 = this.ctx.createBiquadFilter(); f2.type = 'bandpass'; f2.frequency.value = 1250; f2.Q.value = 6;
+      const g = this.ctx.createGain(); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.22, t + .05); g.gain.exponentialRampToValueAtTime(.0001, t + L);
+      o.connect(f1); o.connect(f2); f1.connect(g); f2.connect(g); g.connect(d);
+      o.start(t); o.stop(t + L + .02); v.start(t); v.stop(t + L + .02);
+      t += L + rand(.08, .35);
+      if (Math.random() < .3) { // hıçkırık nefesi
+        const n = this.src(), nf = this.ctx.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = 1600; nf.Q.value = 2;
+        const ng = this.ctx.createGain(); ng.gain.setValueAtTime(.0001, t); ng.gain.exponentialRampToValueAtTime(.12, t + .15); ng.gain.exponentialRampToValueAtTime(.0001, t + .3);
+        n.connect(nf); nf.connect(ng); ng.connect(d); n.start(t, Math.random()); n.stop(t + .32); t += .35;
+      }
+    }
+  },
+  ring(vol = .035) { // kulak çınlaması
+    const t = this.t, d = this.out(null, 0);
+    [6200, 6260].forEach(f => { const o = this.ctx.createOscillator(); o.frequency.value = f; const g = this.ctx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + 3.5); o.connect(g); g.connect(d); o.start(t); o.stop(t + 3.6); });
+  },
+  scrape(pos, dur = 1.2, vol = .4) { // yerde sürüklenen metal
+    const t = this.t, d = this.dest(pos, .5);
+    const n = this.src(), f = this.ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 14;
+    for (let i = 0; i < dur * 20; i++) f.frequency.setValueAtTime(rand(1200, 2600), t + i * .05);
+    const g = this.ctx.createGain(); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .1); g.gain.setValueAtTime(vol, t + dur - .2); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    n.connect(f); f.connect(g); g.connect(d); n.start(t, Math.random()); n.stop(t + dur + .05);
+    const o = this.ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = rand(70, 95); const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 300;
+    const og = this.ctx.createGain(); og.gain.setValueAtTime(.0001, t); og.gain.exponentialRampToValueAtTime(vol * .5, t + .1); og.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    o.connect(lp); lp.connect(og); og.connect(d); o.start(t); o.stop(t + dur + .05);
+  },
+});
+
+/* ==================== KARANLIKTA SIRITAN DİŞLER ===================== */
+const grin = new THREE.Group();
+{
+  const tm = new THREE.MeshBasicMaterial({ color: 0xfff2d8 });
+  for (let i = 0; i < 14; i++) {
+    const a = (i / 13 - .5) * 2.6;
+    const u = new THREE.Mesh(new THREE.ConeGeometry(.013, rand(.05, .09), 4), tm); u.position.set(Math.sin(a) * .2, .02 - Math.cos(a) * .03, Math.cos(a) * .04); u.rotation.x = Math.PI; grin.add(u);
+    const l = new THREE.Mesh(new THREE.ConeGeometry(.012, rand(.04, .08), 4), tm); l.position.set(Math.sin(a) * .18, -.06 + Math.cos(a) * .02, Math.cos(a) * .04); grin.add(l);
+  }
+  grin.visible = false; scene.add(grin);
+}
+
+/* ================= ARKANDAN GELEN AYAK SESLERİ (TAKİPÇİ) ================= */
+const crumbs = []; let crumbT = 0;
+function stalkerPos() { return crumbs.length ? crumbs[Math.max(0, crumbs.length - 1 - 22)] : player.pos; }
+function startStalker(dur = 14) { if (!S.stalk) S.stalk = { t: dur, extra: false, lastStep: S.time }; }
+function onPlayerStep() {
+  if (!S.stalk) return;
+  S.stalk.extra = false; S.stalk.lastStep = S.time;
+  later(rand(.28, .42), () => {
+    if (!S.stalk) return;
+    const p = stalkerPos(); if (p.distanceTo(player.pos) < 1.6) return;
+    A.step(S.running ? .7 : .45, p.clone().setY(.1), Math.random() < .35, .85);
+  });
+}
+function updateStalker(dt) {
+  crumbT -= dt;
+  if (crumbT <= 0) { crumbT = .1; crumbs.push(player.pos.clone()); if (crumbs.length > 40) crumbs.shift(); }
+  const st = S.stalk; if (!st) return;
+  st.t -= dt;
+  const p = stalkerPos(), dx = p.x - player.pos.x, dz = p.z - player.pos.z, d = Math.hypot(dx, dz);
+  // sen durunca... o da durur. Ama bir adım geç.
+  if (S.time - st.lastStep > .8 && !st.extra && d > 1.6) {
+    st.extra = true;
+    later(.45, () => { if (S.stalk) A.step(.55, p.clone().setY(.1), false, .8); });
+    later(1.5, () => { if (S.stalk) A.breath(.12, false); });
+  }
+  // dönüp bakarsan...
+  const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
+  if (d > 2 && (dx * fx + dz * fz) / d > .8 && lineClear(player.pos.x, player.pos.z, p.x, p.z)) {
+    S.stalk = null;
+    if (Math.random() < .45) { standFacing(shadowRunner, p); animateMonster(shadowRunner, 0, 0, false, true); shadowRunner.visible = true; A.hit(.9); shake(.6); S.glitch = .8; setTimeout(() => { shadowRunner.visible = false; }, 180); }
+    else { duck(2); A.ring(.02); }
+    return;
+  }
+  if (st.t <= 0) { S.stalk = null; A.whisper(0, 1.4, .45, camera.localToWorld(new THREE.Vector3(-.25, 0, .35))); }
+}
+
+/* =========================== YENİ KORKULAR =========================== */
+Object.assign(DIRECTOR, {
+  screamer() { return screamer(); },
+  subliminal() { if (S.flashOn === false) return false; subliminal(); return true; },
+  stalker() { if (S.hidden || S.stalk) return false; startStalker(rand(12, 20)); return true; },
+  stalker2() { if (S.hidden || S.stalk) return false; startStalker(rand(10, 16)); return true; },
+  cry() {
+    const c = floorCells.filter(([x, z]) => { const d = Math.hypot(cc(x) - player.pos.x, cc(z) - player.pos.z); return d > 9 && d < 16 && roomOf(x, z); });
+    if (!c.length) return false; const q = pick(c);
+    S.cryArm = { pos: new THREE.Vector3(cc(q[0]), 1, cc(q[1])), t: 22, k: 0 };
+    return true;
+  },
+  grin() {
+    const p = spotAhead(5, 9); if (!p) return false;
+    const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
+    blackout(2.8); S.flashForcedOff = 2.8; A.flashClick(); duck(2.8);
+    S.grinT = 2.8; S.grinFar = p.clone().setY(1.75); S.grinNear = new THREE.Vector3(player.pos.x + fx * 2.2, 1.7, player.pos.z + fz * 2.2);
+    later(.6, () => A.growl(S.grinFar, 1.2, .35, 1.3));
+    later(1.6, () => { A.whisper(0, .9, .5, S.grinNear); });
+    later(2.8, () => { A.hit(1); shake(.7); S.glitch = 1; });
+    return true;
+  },
+  doorBehind() {
+    const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
+    const d = doors.find(d => { const dx = cc(d.x) - player.pos.x, dz = cc(d.z) - player.pos.z, l = Math.hypot(dx, dz); return !d.locked && d.open < .3 && l < 9 && l > 1.5 && (dx * fx + dz * fz) / l < -.3; });
+    if (!d) return false;
+    d.target = 1; d.speed = .3; d.swing = 1; A.creak(new THREE.Vector3(cc(d.x), 1.2, cc(d.z)), 3.2, .3, .6);
+    return true;
+  },
+  drag() {
+    const a = Math.random() * 6.28, r = rand(7, 11);
+    for (let i = 0; i < 5; i++) later(i * .7, () => A.scrape(new THREE.Vector3(player.pos.x + Math.cos(a + i * .2) * r, .2, player.pos.z + Math.sin(a + i * .2) * r), .9, .45));
+    later(3.8, () => A.growl(new THREE.Vector3(player.pos.x + Math.cos(a + 1) * r, 2, player.pos.z + Math.sin(a + 1) * r), 1.6, .6));
+    return true;
+  },
+});
+// karanlıkta görünmesi için dişler daha parlak: sis dışı
+grin.traverse(o => { if (o.material) o.material.fog = false; });
+
+function updateHorror(dt) {
+  screamCd -= dt;
+  S.glitch = Math.max(0, (S.glitch || 0) - dt * 1.4);
+  updateStalker(dt);
+  // ağlayan kadın
+  const cr = S.cryArm;
+  if (cr) {
+    cr.t -= dt; cr.k -= dt;
+    if (cr.k <= 0) { cr.k = 3.4; A.cry(cr.pos, 3); }
+    if (cr.pos.distanceTo(player.pos.clone().setY(1)) < 4.5) { S.cryArm = null; A.hit(1); A.screech(cr.pos, .9, 1); subliminal(); shake(.6); }
+    else if (cr.t <= 0) S.cryArm = null;
+  }
+  // sırıtan dişler: uzakta belirir, sonra dibine gelir
+  if (S.grinT > 0) {
+    S.grinT -= dt;
+    const near = S.grinT < 1.3;
+    grin.visible = S.grinT < 2.5 && S.grinT > .05;
+    grin.position.copy(near ? S.grinNear : S.grinFar);
+    grin.lookAt(player.pos.x, grin.position.y, player.pos.z);
+    grin.scale.setScalar(near ? 1.3 : 1);
+    if (S.grinT <= 0) grin.visible = false;
+  }
+  // ateş
+  if (S.fireT > 0) { S.fireT -= dt; altarFire.intensity = (S.fireT > 0 ? 9 : 0) * (.7 + Math.random() * .5); altarDolls.forEach(d => d.scale.setScalar(Math.max(.01, S.fireT / 5))); if (S.fireT <= 0) altarDolls.forEach(d => d.visible = false); }
+  // bebeklerin müzik kutusu fenerleri
+  if (S.chapter === 2) for (const it of items) if (it.type === 'doll' && !it.taken) {
+    it.beacon -= dt;
+    if (it.beacon <= 0) {
+      it.beacon = rand(4, 6);
+      if (it.pos.distanceTo(player.pos) < 30) A.musicBox(it.pos.clone().setY(.4), [[1319, .22], [1175, .22], [988, .22], [880, .5]].map(([f, l]) => [f * rand(.97, 1.0), l]));
+    }
+  }
 }
 
 /* ============================ ANA DÖNGÜ ============================== */
@@ -2713,6 +3074,11 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(.05, (now - last) / 1000); last = now;
   const playing = S.state === 'play';
+  if (S.state === 'chapter') {
+    S.chapT -= dt;
+    if (S.chapT < 1) $('chapter').style.opacity = 0;
+    if (S.chapT <= 0) S.state = 'play';
+  }
   if (playing || S.state === 'jumpscare') S.time += dt;
 
   if (playing) {
@@ -2782,6 +3148,7 @@ function frame(now) {
     updateThrown(dt);
     updateMarker();
     updateGuide(dt);
+    updateHorror(dt);
     if (tutorT > 0) { tutorT -= dt; if (tutorT <= 0) $('tutor').style.opacity = 0; }
     if (S.bannerT > 0) { S.bannerT -= dt; if (S.bannerT <= 0) $('banner').style.opacity = 0; }
     // kamera sallanması
@@ -2831,7 +3198,7 @@ function frame(now) {
     }
   }
 
-  if (playing || S.state === 'jumpscare' || S.state === 'win') {
+  if (playing || S.state === 'jumpscare' || S.state === 'win' || S.state === 'chapter') {
     updateLamps(dt); updateDoors(dt); updateDirector(dt);
     if (S.state === 'win' && exitGate.opening) { exitGate.open = Math.min(1, exitGate.open + dt * .5); exitGate.l.position.x = -C / 4 - exitGate.open * C / 2; exitGate.r.position.x = C / 4 + exitGate.open * C / 2; }
     // kamera
@@ -2875,6 +3242,7 @@ function frame(now) {
   filmPass.uniforms.uTime.value = now / 1000;
   filmPass.uniforms.uFear.value = S.state === 'play' ? S.fear : (S.state === 'jumpscare' ? 1 : 0);
   filmPass.uniforms.uHit.value = Math.max(0, player.shake - .3);
+  filmPass.uniforms.uGlitch.value = Math.min(1.2, (S.glitch || 0) + (S.state === 'jumpscare' ? .5 : 0));
   composer.render();
 }
 
@@ -2883,6 +3251,7 @@ function frame(now) {
   try { await Promise.race([Promise.all([document.fonts.load('150px Creepster'), document.fonts.load('58px "Special Elite"')]), new Promise(r => setTimeout(r, 2500))]); } catch (e) {}
   buildWorld();
   buildExtras();
+  buildAltar();
   newGame();
   mon.pos.set(cc(11), 0, cc(15));
   applyQuality();
@@ -2892,4 +3261,4 @@ document.querySelectorAll('#qRow .btn').forEach(b => {
   b.classList.toggle('sel', +b.dataset.q === quality);
   b.onclick = () => { quality = +b.dataset.q; store.set('quality', quality); document.querySelectorAll('#qRow .btn').forEach(x => x.classList.toggle('sel', x === b)); applyQuality(); };
 });
-window.__kor = { DIRECTOR, showGuide, objective, lightning, S, mon, player, scares, killPlayer, emitNoise, camera, A, items, doors, lockers, takeItem, powerOn, hide, unhide, interact, throwBottle, loadCheckpoint, faceJumpscare, monster, drawMap, get focus() { return focus; } };
+window.__kor = { startChapter, ritual, screamer, subliminal, startStalker, DIRECTOR, showGuide, objective, lightning, S, mon, player, scares, killPlayer, emitNoise, camera, A, items, doors, lockers, takeItem, powerOn, hide, unhide, interact, throwBottle, loadCheckpoint, faceJumpscare, monster, drawMap, get focus() { return focus; } };

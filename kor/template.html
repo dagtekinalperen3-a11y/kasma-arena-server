@@ -24,6 +24,14 @@ canvas#game{position:fixed;inset:0;width:100%;height:100%;display:block;image-re
   repeating-linear-gradient(to bottom,#000 0 26px,rgba(0,0,0,.0) 26px 40px);}
 #lockerView::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#000 0 18%,transparent 30% 70%,#000 82%)}
 #blackout{background:#000;opacity:0}
+#screamer{z-index:13;opacity:0;width:100%;height:100%;object-fit:cover}
+#screamer.on{animation:scream .6s steps(12) forwards}
+@keyframes scream{0%{opacity:1;transform:scale(1.02) translate(0,0)}20%{transform:scale(1.12) translate(-14px,9px)}40%{transform:scale(1.18) translate(12px,-10px);filter:contrast(1.6) saturate(1.5)}60%{transform:scale(1.26) translate(-10px,12px)}80%{opacity:1;transform:scale(1.34) translate(9px,-6px);filter:invert(1)}100%{opacity:0;transform:scale(1.4)}}
+#screamer.sub{opacity:.5;filter:invert(1) contrast(2)}
+#chapter{position:fixed;inset:0;z-index:16;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:#000;opacity:0;pointer-events:none;transition:opacity .9s;padding:16px}
+#chapter .n{font-size:15px;letter-spacing:12px;color:var(--blood2)}
+#chapter .t{font-family:Creepster,"Special Elite",cursive;font-size:clamp(60px,14vw,150px);color:var(--blood);text-shadow:0 0 30px #500;line-height:1;margin:10px 0}
+#chapter .d{font-size:clamp(15px,3.6vw,20px);color:#d8d2c4;max-width:620px;line-height:1.6}
 /* HUD */
 #marker{position:absolute;left:0;top:0;transform:translate(-50%,-50%);display:none;flex-direction:column;align-items:center;gap:2px;color:var(--guide);text-shadow:0 0 6px #000,0 0 2px #000;font-size:13px;letter-spacing:1px;white-space:nowrap;transition:opacity .3s}
 #marker .dia{width:16px;height:16px;border:2px solid var(--guide);transform:rotate(45deg);box-shadow:0 0 10px var(--guide),inset 0 0 6px var(--guide);animation:pulse 1.4s ease-in-out infinite}
@@ -111,6 +119,8 @@ body.touch #noiseMeter,body.touch #noiseLbl{display:none}
 <div class="layer" id="fearTint"></div>
 <div class="layer" id="lockerView"></div>
 <div class="layer" id="blackout"></div>
+<canvas class="layer" id="screamer"></canvas>
+<div id="chapter"><div class="n" id="chN"></div><div class="t" id="chT"></div><div class="d" id="chD"></div></div>
 <div class="layer" id="redflash"></div>
 <div class="layer" id="flash"></div>
 
@@ -171,10 +181,9 @@ body.touch #noiseMeter,body.touch #noiseLbl{display:none}
   <div class="box">
     <h2>NE YAPACAĞIM?</h2>
     <b style="color:#7fd4ff">Ekrandaki mavi ◆ işaretini takip et.</b> Kaybolursan <kbd>H</kbd>'ye bas: yere parlayan bir iz düşer, seni hedefe götürür.<br><br>
-    <b>1.</b> Hastanede saklı <b>3 sigortayı</b> topla.<br>
-    <b>2.</b> Sigortaları <b>jeneratör odasındaki</b> kutuya tak, elektriği ver.<br>
-    <b>3.</b> <b>Başhekim odasından</b> çıkış kartını al.<br>
-    <b>4.</b> <b>Lobideki çıkışa koş</b>, kartı okut ve kaç!<br><br>
+    <b>BÖLÜM 1 · KARANLIK</b> — <b>3 sigortayı</b> bul, jeneratör odasındaki kutuya tak.<br>
+    <b>BÖLÜM 2 · AYİN</b> — <b>4 lanetli bebeği</b> bul (müzik kutusu sesini dinle), şapelde yak.<br>
+    <b>BÖLÜM 3 · KAÇIŞ</b> — Başhekim odasından <b>kartı al</b>, lobideki <b>ÇIKIŞA</b> koş.<br><br>
     <b style="color:var(--blood2)">DİKKAT:</b> İçeride <b>kör</b> bir yaratık var. Seni göremez ama <b>sesini duyar</b>. Koşarsan gelir. Eğilirsen duymaz.<br><br>
     <kbd>W A S D</kbd> yürü &nbsp; <kbd>Fare</kbd> bak &nbsp; <kbd>Shift</kbd> koş (gürültülü!) &nbsp; <kbd>C</kbd> eğil (sessiz)<br>
     <kbd>E</kbd> al / kapı aç / dolaba saklan &nbsp; <kbd>F</kbd> fener &nbsp; <kbd>H</kbd> yolu göster<br>
