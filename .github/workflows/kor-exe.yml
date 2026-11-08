@@ -21,8 +21,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm ci
-      - run: npm run exe:win
+      # GitHub indirmeleri bazen 502/503/504 veriyor: birkaç kez tekrar dene
+      - name: npm ci (tekrar denemeli)
+        shell: bash
+        run: |
+          for i in 1 2 3 4 5; do npm ci && exit 0; echo "deneme $i olmadi, bekleniyor"; sleep $((i * 30)); done; exit 1
+      - name: EXE derle (tekrar denemeli)
+        shell: bash
+        run: |
+          for i in 1 2 3 4 5; do npm run exe:win && exit 0; echo "deneme $i olmadi, bekleniyor"; sleep $((i * 30)); done; exit 1
       - uses: actions/upload-artifact@v4
         with:
           name: KOR-Korku-Oyunu
