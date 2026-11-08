@@ -69,7 +69,7 @@ canvas#game{position:fixed;inset:0;width:100%;height:100%;display:block;image-re
 .bar .t i{display:block;height:100%;background:var(--fg);width:100%}
 #breathBar{opacity:0;transition:opacity .2s}
 #inv{position:absolute;right:18px;bottom:18px;text-align:right;font-size:14px;line-height:1.6;text-shadow:0 0 4px #000}
-#msg{position:absolute;left:50%;top:22%;transform:translateX(-50%);font-size:20px;text-align:center;text-shadow:0 0 8px #000;opacity:0;transition:opacity .5s;max-width:88vw}
+#msg{position:absolute;left:50%;top:13%;transform:translateX(-50%);font-size:20px;text-align:center;text-shadow:0 0 8px #000;opacity:0;transition:opacity .5s;max-width:88vw}
 #sub{position:absolute;left:50%;bottom:16%;transform:translateX(-50%);font-size:18px;text-align:center;text-shadow:0 0 8px #000;opacity:0;transition:opacity .4s;color:#e9e1cf;max-width:88vw}
 #noiseMeter{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);display:flex;gap:3px;align-items:flex-end;height:22px}
 #noiseMeter i{width:5px;background:rgba(255,255,255,.15);display:block}
@@ -101,6 +101,15 @@ kbd{border:1px solid #777;border-radius:3px;padding:0 5px;font-family:inherit;fo
 #note{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:15;background:rgba(0,0,0,.6)}
 #note .paper{max-width:460px;width:88vw;background:#cbbf9f;color:#221a10;padding:28px 30px;font-size:17px;line-height:1.6;box-shadow:0 0 40px #000;transform:rotate(-1.2deg);white-space:pre-line;background-image:radial-gradient(circle at 80% 20%,rgba(120,60,20,.25),transparent 40%),radial-gradient(circle at 10% 90%,rgba(80,0,0,.25),transparent 30%)}
 #note .paper i{display:block;margin-top:14px;font-size:13px;opacity:.6;text-align:right}
+#keypad{position:fixed;inset:0;z-index:17;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45)}
+#keypad .kp{background:linear-gradient(#2c2f33,#16181a);border:2px solid #4a4f55;border-radius:10px;padding:18px;width:min(86vw,300px);box-shadow:0 0 40px #000;text-align:center}
+#keypad .kpT{font-size:12px;letter-spacing:4px;color:#9aa}
+#kpScreen{font-family:ui-monospace,monospace;font-size:38px;letter-spacing:14px;background:#0b1a0e;color:#5f5;border-radius:4px;margin:10px 0 14px;padding:6px 0 6px 14px;text-shadow:0 0 8px #3f3}
+#kpScreen.bad{color:#f44;background:#1a0b0b;text-shadow:0 0 8px #f33}
+#keypad .kpGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+#keypad button{font:22px "Special Elite",monospace;padding:12px 0;background:#3a3e44;color:#ddd;border:1px solid #555;border-radius:6px;cursor:pointer}
+#keypad button:active,#keypad button:hover{background:#4c525a}
+#keypad .kpH{font-size:11px;color:#889;margin-top:10px}
 #mapView{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:14;background:rgba(0,0,0,.75)}
 #mapView canvas{max-width:92vw;max-height:80vh;background:#c9bc98;box-shadow:0 0 40px #000;transform:rotate(.6deg)}
 #jumpImg{position:fixed;inset:0;pointer-events:none;opacity:0;z-index:12}
@@ -189,7 +198,8 @@ body.touch #noiseMeter,body.touch #noiseLbl{display:none}
     <b style="color:#7fd4ff">Ekrandaki mavi ◆ işaretini takip et.</b> Kaybolursan <kbd>H</kbd>'ye bas: yere parlayan bir iz düşer, seni hedefe götürür.<br><br>
     <b>BÖLÜM 1 · KARANLIK</b> — <b>3 sigortayı</b> bul, jeneratör odasındaki kutuya tak.<br>
     <b>BÖLÜM 2 · AYİN</b> — <b>4 lanetli bebeği</b> bul (müzik kutusu sesini dinle), şapelde yak.<br>
-    <b>BÖLÜM 3 · KAÇIŞ</b> — Başhekim odasından <b>kartı al</b>, lobideki <b>ÇIKIŞA</b> koş.<br><br>
+    <b>BÖLÜM 3 · KAÇIŞ</b> — Kanlı nottaki <b>şifreyi</b> bul, başhekimin <b>kasasını</b> aç, kartla <b>ÇIKIŞA</b> koş.<br><br>
+    Karanlıkta seni izleyen <b>gözler</b> var. Kapıları açarken dikkat et. Yaratık ara sıra <b>AVA</b> çıkar: o zaman saklan.<br><br>
     <b style="color:var(--blood2)">DİKKAT:</b> İçeride <b>kör</b> bir yaratık var. Seni göremez ama <b>sesini duyar</b>. Koşarsan gelir. Eğilirsen duymaz.<br><br>
     <kbd>W A S D</kbd> yürü &nbsp; <kbd>Fare</kbd> bak &nbsp; <kbd>Shift</kbd> koş (gürültülü!) &nbsp; <kbd>C</kbd> eğil (sessiz)<br>
     <kbd>E</kbd> al / kapı aç / dolaba saklan &nbsp; <kbd>F</kbd> fener &nbsp; <kbd>H</kbd> yolu göster<br>
@@ -226,6 +236,19 @@ body.touch #noiseMeter,body.touch #noiseLbl{display:none}
 </div>
 
 <div id="note"><div class="paper" id="noteText"></div></div>
+<div id="keypad">
+  <div class="kp">
+    <div class="kpT">BAŞHEKİMİN KASASI</div>
+    <div id="kpScreen">····</div>
+    <div class="kpGrid">
+      <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+      <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+      <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+      <button data-k="del">⌫</button><button data-k="0">0</button><button data-k="ok">OK</button>
+    </div>
+    <div class="kpH">Rakamlar + Enter &nbsp;·&nbsp; Esc kapat &nbsp;·&nbsp; Yanlış şifre ÖTER</div>
+  </div>
+</div>
 <div id="mapView"><canvas id="mapCanvas" width="740" height="540"></canvas></div>
 
 <script>
