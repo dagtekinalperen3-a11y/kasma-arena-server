@@ -28,6 +28,12 @@ canvas#game{position:fixed;inset:0;width:100%;height:100%;display:block;image-re
 #screamer.on{animation:scream .6s steps(12) forwards}
 @keyframes scream{0%{opacity:1;transform:scale(1.02) translate(0,0)}20%{transform:scale(1.12) translate(-14px,9px)}40%{transform:scale(1.18) translate(12px,-10px);filter:contrast(1.6) saturate(1.5)}60%{transform:scale(1.26) translate(-10px,12px)}80%{opacity:1;transform:scale(1.34) translate(9px,-6px);filter:invert(1)}100%{opacity:0;transform:scale(1.4)}}
 #screamer.sub{opacity:.5;filter:invert(1) contrast(2)}
+#screamer.rush{animation:rush .7s cubic-bezier(.2,0,.2,1) forwards}
+@keyframes rush{0%{opacity:1;transform:scale(.15);filter:blur(6px) brightness(.4)}22%{transform:scale(1.15);filter:blur(0) brightness(1.3)}30%{transform:scale(1.1) translate(10px,-8px)}45%{transform:scale(1.2) translate(-12px,10px);filter:contrast(1.8)}75%{opacity:1;transform:scale(1.32) translate(8px,-6px)}100%{opacity:0;transform:scale(1.6);filter:blur(8px)}}
+#screamer.strobe{animation:strobe .75s steps(1) forwards}
+@keyframes strobe{0%{opacity:1;transform:scale(1.1)}12%{opacity:0}20%{opacity:1;transform:scale(1.25) rotate(-3deg);filter:invert(1)}32%{opacity:0}40%{opacity:1;transform:scale(1.4) rotate(2deg);filter:none}55%{opacity:1;transform:scale(1.55) rotate(-2deg);filter:contrast(2) saturate(2)}70%{opacity:0}78%{opacity:1;transform:scale(1.7);filter:invert(1)}100%{opacity:0}}
+#screamer.slide{animation:slide .65s ease-in forwards}
+@keyframes slide{0%{opacity:1;transform:translateX(-60%) scale(1.2) rotate(-8deg)}25%{transform:translateX(0) scale(1.2) rotate(0)}40%{transform:translateX(3%) scale(1.25)}60%{opacity:1;transform:translateX(-2%) scale(1.35);filter:contrast(1.7)}100%{opacity:0;transform:translateX(0) scale(1.8)}}
 #chapter{position:fixed;inset:0;z-index:16;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:#000;opacity:0;pointer-events:none;transition:opacity .9s;padding:16px}
 #chapter .n{font-size:15px;letter-spacing:12px;color:var(--blood2)}
 #chapter .t{font-family:Creepster,"Special Elite",cursive;font-size:clamp(60px,14vw,150px);color:var(--blood);text-shadow:0 0 30px #500;line-height:1;margin:10px 0}
