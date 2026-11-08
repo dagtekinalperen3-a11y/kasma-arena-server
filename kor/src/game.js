@@ -3712,7 +3712,7 @@ function afterTask() {
 }
 
 /* ============================ ÇOK OYUNCULU ============================ */
-const KOR_WS = (() => { try { const q = new URLSearchParams(location.search).get('server'); if (q && /^wss?:\/\//.test(q)) return q; if (/onrender\.com$/i.test(location.host)) return (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/kor/ws'; } catch (e) {} return 'wss://kasma-arena-server.onrender.com/kor/ws'; })();
+const KOR_WS = (() => { try { const q = new URLSearchParams(location.search).get('server'); if (q && /^wss?:\/\//.test(q)) return q; if (/onrender\.com$/i.test(location.host)) return (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/kor/ws'; } catch (e) {} return 'wss://kasma-arena-server-wir3.onrender.com/kor/ws'; })();  // Render'daki sunucunun asıl adresi
 const KOR_HTTP = KOR_WS.replace(/^ws/, 'http').replace('/kor/ws', '');
 function mkRemote(id, name) {
   return { id, name, roles: [], pos: new THREE.Vector3(cc(3), 0, cc(3)), tpos: new THREE.Vector3(cc(3), 0, cc(3)), yaw: 0, tyaw: 0, pitch: 0, crouch: 0, flash: 1, down: 0, hid: 0, run: 0, inv: 0, seen: false, avatar: null, light: null, stepT: 0, last: 0 };
