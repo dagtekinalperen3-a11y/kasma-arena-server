@@ -1,0 +1,49 @@
+name: KÖR EXE
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'kor/**'
+      - '.github/workflows/kor-exe.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  exe:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: kor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # GitHub indirmeleri bazen 502/503/504 veriyor: birkaç kez tekrar dene
+      - name: npm ci (tekrar denemeli)
+        shell: bash
+        run: |
+          for i in 1 2 3 4 5; do npm ci && exit 0; echo "deneme $i olmadi, bekleniyor"; sleep $((i * 30)); done; exit 1
+      - name: EXE derle (tekrar denemeli)
+        shell: bash
+        run: |
+          for i in 1 2 3 4 5; do npm run exe:win && exit 0; echo "deneme $i olmadi, bekleniyor"; sleep $((i * 30)); done; exit 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KOR-Korku-Oyunu
+          path: kor/exe/KOR-Korku-Oyunu.exe
+          retention-days: 30
+      # Herkese açık, giriş gerektirmeyen doğrudan indirme linki:
+      # https://github.com/<sahip>/<repo>/releases/download/kor-son/KOR-Korku-Oyunu.exe
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: kor-son
+          name: KÖR - Korku Oyunu (EXE)
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          body: |
+            İndir: aşağıdaki **KOR-Korku-Oyunu.exe** dosyasına tıkla, çift tıklayıp oyna. Kurulum yok.
+            Windows "bilgisayarınızı korudu" derse: **Ek bilgi → Yine de çalıştır**.
+          files: kor/exe/KOR-Korku-Oyunu.exe
