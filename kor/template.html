@@ -39,6 +39,17 @@ canvas#game{position:fixed;inset:0;width:100%;height:100%;display:block;image-re
 #chapter .t{font-family:Creepster,"Special Elite",cursive;font-size:clamp(60px,14vw,150px);color:var(--blood);text-shadow:0 0 30px #500;line-height:1;margin:10px 0}
 #chapter .d{font-size:clamp(15px,3.6vw,20px);color:#d8d2c4;max-width:620px;line-height:1.6}
 /* HUD */
+#nvHud{position:absolute;inset:0;display:none;pointer-events:none;border:2px solid rgba(160,255,160,.25);margin:3vh 3vw;border-radius:6px}
+#nvHud .rec{position:absolute;left:14px;top:10px;color:#ff3b3b;font:15px monospace;animation:blink 1s steps(2) infinite}
+#nvHud .nvt{position:absolute;right:14px;top:10px;color:#9f9;font:13px monospace;letter-spacing:3px}
+#nvHud .nvb{position:absolute;right:14px;bottom:12px;width:120px;height:8px;border:1px solid #9f9}
+#nvHud .nvb i{display:block;height:100%;background:#9f9;width:100%}
+@keyframes blink{50%{opacity:0}}
+#pings{position:absolute;inset:0;pointer-events:none}
+#pings .pg{position:absolute;transform:translate(-50%,-100%);font:12px "Special Elite",monospace;text-align:center;text-shadow:0 0 4px #000;white-space:nowrap}
+#pings .pg i{display:block;margin:0 auto 2px;width:12px;height:12px;border-radius:50%;border:2px solid currentColor;box-shadow:0 0 8px currentColor}
+#feed{position:absolute;left:18px;top:42%;font-size:14px;line-height:1.6;text-shadow:0 0 5px #000;max-width:45vw}
+#feed div{opacity:1;transition:opacity 1s}
 #marker{position:absolute;left:0;top:0;transform:translate(-50%,-50%);display:none;flex-direction:column;align-items:center;gap:2px;color:var(--guide);text-shadow:0 0 6px #000,0 0 2px #000;font-size:13px;letter-spacing:1px;white-space:nowrap;transition:opacity .3s}
 #marker .dia{width:16px;height:16px;border:2px solid var(--guide);transform:rotate(45deg);box-shadow:0 0 10px var(--guide),inset 0 0 6px var(--guide);animation:pulse 1.4s ease-in-out infinite}
 #marker .arr{display:none;width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-bottom:18px solid var(--guide);filter:drop-shadow(0 0 6px var(--guide))}
@@ -121,7 +132,7 @@ kbd{border:1px solid #777;border-radius:3px;padding:0 5px;font-family:inherit;fo
 .tb.on{background:rgba(160,20,20,.5);border-color:#f44}
 #tPause{right:14px;top:14px;width:46px;height:46px}
 #tMap{right:70px;top:14px;width:46px;height:46px}
-@media (max-width:700px){ #tasks{font-size:13px} #bars{bottom:auto;top:auto} }
+@media (max-width:700px){ #tasks{font-size:13px} }
 body.touch #bars{left:18px;bottom:auto;top:96px}
 body.touch #inv{top:70px;bottom:auto}
 body.touch #tasks{font-size:12px}
@@ -140,6 +151,9 @@ body.touch #noiseMeter,body.touch #noiseLbl{display:none}
 <div class="layer" id="flash"></div>
 
 <div id="hud">
+  <div id="nvHud"><div class="rec">● REC</div><div class="nvb"><i id="nvBar"></i></div><div class="nvt">GECE GÖRÜŞÜ</div></div>
+  <div id="pings"></div>
+  <div id="feed"></div>
   <div id="marker"><div class="dia"></div><div class="arr"></div><span id="mkLabel"></span></div>
   <div id="banner"><div class="k">YENİ GÖREV</div><div class="t" id="bnT"></div><div class="d" id="bnD"></div></div>
   <div id="guideHint"></div>
@@ -167,6 +181,8 @@ body.touch #noiseMeter,body.touch #noiseLbl{display:none}
   <div class="tb" id="tUse" style="right:24px;bottom:72px;width:74px;height:74px;font-size:15px">AL /<br>KULLAN</div>
   <div class="tb" id="tLight" style="right:110px;bottom:30px">FENER</div>
   <div class="tb" id="tThrow" style="right:170px;bottom:84px">ŞİŞE<br>AT</div>
+  <div class="tb" id="tNV" style="right:170px;bottom:160px;color:#9f9;border-color:#9f9">KAMERA</div>
+  <div class="tb" id="tPing" style="right:190px;top:14px;width:58px;height:46px;border-radius:23px">İŞARET</div>
   <div class="tb" id="tBreath" style="right:96px;bottom:188px">NEFES<br>TUT</div>
   <div class="tb" id="tPause">II</div>
   <div class="tb" id="tMap">⌖</div>
@@ -176,7 +192,8 @@ body.touch #noiseMeter,body.touch #noiseLbl{display:none}
 <div class="screen on" id="title">
   <h1>KÖR</h1>
   <div class="tag">O seni göremez. Ama her şeyi duyar.</div>
-  <button class="btn" id="bStart">OYUNA BAŞLA</button>
+  <button class="btn" id="bStart">TEK BAŞINA OYNA</button>
+  <button class="btn" id="bCoop" style="border-color:#2f62b8">ARKADAŞLARLA OYNA (3 KİŞİ)</button>
   <div class="row diff" id="diffRow">
     <button class="btn" data-d="0">KOLAY</button>
     <button class="btn sel" data-d="1">NORMAL</button>
@@ -192,6 +209,27 @@ body.touch #noiseMeter,body.touch #noiseLbl{display:none}
   <div class="small">🎧 KULAKLIKLA, IŞIKLAR KAPALI oyna. Ses her şey: yaratığın nerede olduğunu kulağınla bulacaksın.<br><span id="best"></span></div>
 </div>
 
+<div class="screen" id="lobby">
+  <div class="box" style="max-width:560px;width:100%;text-align:center">
+    <h2 style="font-family:Creepster,cursive;font-weight:400;color:var(--blood);font-size:52px;margin:0 0 6px;letter-spacing:4px">ARKADAŞLARLA</h2>
+    <div id="lbPre">
+      <div class="small" style="margin:0 0 10px">En fazla 3 kişi. Herkesin ayrı görevi var; görevini bitiren arkadaşına yardım eder.</div>
+      <input id="lbName" maxlength="14" placeholder="Adın" style="pointer-events:auto;font:18px 'Special Elite',monospace;padding:10px;width:240px;background:#111;color:#eee;border:1px solid #5a1a1a;text-align:center"><br>
+      <button class="btn" id="lbCreate">ODA KUR</button><br>
+      <input id="lbCode" maxlength="5" placeholder="ODA KODU" style="pointer-events:auto;font:20px monospace;letter-spacing:6px;padding:10px;width:200px;background:#111;color:#eee;border:1px solid #2f62b8;text-align:center;text-transform:uppercase">
+      <button class="btn" id="lbJoin" style="min-width:120px">KATIL</button>
+    </div>
+    <div id="lbRoom" style="display:none">
+      <div class="small" style="margin:0">ODA KODU — arkadaşlarına söyle</div>
+      <div id="lbCodeBig" style="font:46px monospace;letter-spacing:12px;color:#fff;margin:4px 0 12px;text-shadow:0 0 12px #600"></div>
+      <div id="lbList" style="text-align:left;display:inline-block;font-size:17px;line-height:1.9"></div>
+      <div id="lbStartRow"><button class="btn" id="lbStart">OYUNU BAŞLAT</button></div>
+    </div>
+    <div id="lbStatus" class="small" style="min-height:1.6em;color:#e6b"></div>
+    <button class="btn" id="lbBack" style="min-width:140px">GERİ</button>
+  </div>
+</div>
+
 <div class="screen" id="howto">
   <div class="box">
     <h2>NE YAPACAĞIM?</h2>
@@ -202,7 +240,8 @@ body.touch #noiseMeter,body.touch #noiseLbl{display:none}
     Karanlıkta seni izleyen <b>gözler</b> var. Kapıları açarken dikkat et. Yaratık ara sıra <b>AVA</b> çıkar: o zaman saklan.<br><br>
     <b style="color:var(--blood2)">DİKKAT:</b> İçeride <b>kör</b> bir yaratık var. Seni göremez ama <b>sesini duyar</b>. Koşarsan gelir. Eğilirsen duymaz.<br><br>
     <kbd>W A S D</kbd> yürü &nbsp; <kbd>Fare</kbd> bak &nbsp; <kbd>Shift</kbd> koş (gürültülü!) &nbsp; <kbd>C</kbd> eğil (sessiz)<br>
-    <kbd>E</kbd> al / kapı aç / dolaba saklan &nbsp; <kbd>F</kbd> fener &nbsp; <kbd>H</kbd> yolu göster<br>
+    <kbd>E</kbd> al / kapı aç / dolaba saklan &nbsp; <kbd>F</kbd> fener &nbsp; <kbd>V</kbd> gece görüş kamerası &nbsp; <kbd>H</kbd> yolu göster<br>
+    <kbd>T</kbd> işaret koy &nbsp; <kbd>1-4</kbd> hızlı mesaj (arkadaşlarla) &nbsp; <kbd>E</kbd> basılı: yerdeki arkadaşını kaldır<br>
     <kbd>Sağ tık</kbd> / <kbd>G</kbd> şişe fırlat (yaratık sese koşar) &nbsp; <kbd>Q</kbd> basılı: nefesini tut<br>
     <kbd>M</kbd> kroki &nbsp; <kbd>Esc</kbd> duraklat<br><br>
     <div style="text-align:center"><button class="btn" id="bHowBack">GERİ</button></div>
@@ -235,6 +274,10 @@ body.touch #noiseMeter,body.touch #noiseLbl{display:none}
   <button class="btn" id="bMenu3">ANA MENÜ</button>
 </div>
 
+<div id="downView" style="position:fixed;inset:0;z-index:11;display:none;align-items:center;justify-content:center;flex-direction:column;text-align:center;pointer-events:none;background:radial-gradient(ellipse at center,rgba(90,0,0,.15),rgba(60,0,0,.75))">
+  <div style="font-family:Creepster,cursive;font-size:clamp(48px,10vw,96px);color:#c01010;text-shadow:0 0 20px #400">YERE DÜŞTÜN</div>
+  <div id="downText" style="font-size:18px;text-shadow:0 0 6px #000"></div>
+</div>
 <div id="note"><div class="paper" id="noteText"></div></div>
 <div id="keypad">
   <div class="kp">

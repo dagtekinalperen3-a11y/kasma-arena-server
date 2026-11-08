@@ -6573,6 +6573,136 @@ def admin_give_item():
     return jsonify({"success": True, "name": tgt.get("username"), "item": item, "had": had})
 
 
+# ---- KÖR (korku oyunu): 3 kişilik oda + websocket aktarıcı ----
+# Hesap gerekmez: odayı kuran 5 harflik kodu arkadaşlarına söyler. Sunucu
+# mesajların içine bakmaz, yalnızca geçerli JSON olduğunu denetler, gönderenin
+# numarasını ekler ve odadaki diğer oyunculara iletir. Hiçbir şey saklanmaz;
+# oda son oyuncu çıkınca kapanır. Oyunu odadaki "ev sahibi" yönetir; o çıkarsa
+# sıradaki oyuncu ev sahibi olur. (Yine gthread başlatma komutu gerekir.)
+KOR_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+KOR_CODE_RE = _re.compile(r"^[A-HJ-NP-Z2-9]{5}$")
+KOR_MAX_ROOMS = max(1, min(300, int(os.environ.get("KOR_MAX_ROOMS", "60") or 60)))
+KOR_MAX_PLAYERS = 3
+KOR_MSG_MAX = 8 * 1024
+KOR_MAX_AGE = 4 * 3600.0
+_KOR_ROOMS = {}
+_kor_lock = threading.Lock()
+
+
+def _kor_name(n):
+    n = _re.sub(r"[^0-9A-Za-zÇĞİÖŞÜçğıöşü _\-]", "", str(n or ""))[:14].strip()
+    return n or "Oyuncu"
+
+
+def _kor_send_all(room, data, skip=None, only=None):
+    for pid, p in list(room["players"].items()):
+        if pid == skip or (only is not None and pid != only):
+            continue
+        p["conn"].send(data)
+
+
+def _kor_roster(room):
+    return [{"id": pid, "name": p["name"]} for pid, p in sorted(room["players"].items())]
+
+
+if _coop_sock is not None:
+    @_coop_sock.route("/kor/ws")
+    def kor_ws(ws):
+        ip = _client_ip()
+        if not _rate_ok("korw:" + ip, 40, 300):
+            return
+        create = request.args.get("create") == "1"
+        code = str(request.args.get("code") or "").strip().upper()[:8]
+        name = _kor_name(request.args.get("name"))
+        err = None
+        with _kor_lock:
+            now = time.time()
+            for c in [c for c, r in _KOR_ROOMS.items() if now - r["created"] > KOR_MAX_AGE]:
+                for p in _KOR_ROOMS[c]["players"].values():
+                    p["conn"].close()
+                _KOR_ROOMS.pop(c, None)
+            room = None
+            if create:
+                if len(_KOR_ROOMS) >= KOR_MAX_ROOMS:
+                    err = "sunucu dolu, birazdan tekrar dene"
+                else:
+                    for _ in range(50):
+                        code = "".join(secrets.choice(KOR_CODE_CHARS) for _ in range(5))
+                        if code not in _KOR_ROOMS:
+                            break
+                    room = {"code": code, "created": now, "players": {}, "host": None, "started": False}
+                    _KOR_ROOMS[code] = room
+            elif not KOR_CODE_RE.match(code):
+                err = "oda kodu 5 karakter olmalı"
+            else:
+                room = _KOR_ROOMS.get(code)
+                if room is None:
+                    err = "oda bulunamadı"
+                elif len(room["players"]) >= KOR_MAX_PLAYERS:
+                    err = "oda dolu (en fazla 3 kişi)"
+                elif room["started"]:
+                    err = "oyun başladı, yeni oyuncu alınmıyor"
+            if err is None:
+                pid = next(i for i in range(KOR_MAX_PLAYERS) if i not in room["players"])
+                conn = _CoopConn(ws, "guest")
+                room["players"][pid] = {"conn": conn, "name": name}
+                if room["host"] is None:
+                    room["host"] = pid
+                hello = {"t": "srv", "ev": "hello", "id": pid, "code": code, "host": room["host"],
+                         "players": _kor_roster(room)}
+                join = json.dumps({"t": "srv", "ev": "join", "id": pid, "name": name,
+                                   "players": _kor_roster(room)}, ensure_ascii=False)
+        if err is not None:
+            time.sleep(0.3)
+            try:
+                ws.send(json.dumps({"t": "srv", "ev": "error", "why": err}, ensure_ascii=False))
+            except Exception:
+                pass
+            return
+        conn.send(json.dumps(hello, ensure_ascii=False))
+        _kor_send_all(room, join, skip=pid)
+        try:
+            while True:
+                data = ws.receive(timeout=60)
+                if conn.closed:
+                    break
+                if data is None or not isinstance(data, str):
+                    continue
+                if data == "ping":
+                    conn.send('{"t":"srv","ev":"pong"}')
+                    continue
+                n = len(data)
+                if n > KOR_MSG_MAX or not conn.allow(n):
+                    if conn.drops > 400:
+                        break
+                    continue
+                try:
+                    msg = json.loads(data)
+                except Exception:
+                    continue
+                if not isinstance(msg, dict):
+                    continue
+                to = msg.get("to")
+                with _kor_lock:
+                    if msg.get("k") == "start" and room["host"] == pid:
+                        room["started"] = True
+                out = '{"f":%d,"d":%s}' % (pid, data)
+                _kor_send_all(room, out, skip=pid, only=to if isinstance(to, int) else None)
+        except Exception:
+            pass
+        finally:
+            with _kor_lock:
+                room["players"].pop(pid, None)
+                if room["host"] == pid:
+                    room["host"] = min(room["players"]) if room["players"] else None
+                left = json.dumps({"t": "srv", "ev": "leave", "id": pid, "host": room["host"],
+                                   "players": _kor_roster(room)}, ensure_ascii=False)
+                if not room["players"]:
+                    _KOR_ROOMS.pop(room["code"], None)
+            conn.closed = True
+            _kor_send_all(room, left)
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
