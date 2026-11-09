@@ -4371,4 +4371,9 @@ document.querySelectorAll('#qRow .btn').forEach(b => {
   b.classList.toggle('sel', +b.dataset.q === quality);
   b.onclick = () => { quality = +b.dataset.q; store.set('quality', quality); document.querySelectorAll('#qRow .btn').forEach(x => x.classList.toggle('sel', x === b)); applyQuality(); };
 });
-window.__kor = { STATIONS, TASK_BY_ID, useStairs, doStation, doDeliver, NET, startHunt, hallucinate, doorSurprise, spawnEyes, watchers, openKeypad, kpPress, scare3d, ghostDoors, autoDoors, startChapter, ritual, screamer, subliminal, startStalker, DIRECTOR, showGuide, objective, lightning, S, mon, player, scares, killPlayer, emitNoise, camera, A, items, doors, lockers, takeItem, powerOn, hide, unhide, interact, throwBottle, loadCheckpoint, faceJumpscare, monster, drawMap, get focus() { return focus; } };
+window.__kor = {
+  // tanıtım videosu ve testler için
+  get monster() { return monster; }, get lunger() { return lunger; }, get peekHead() { return peekHead; }, get shadowRunner() { return shadowRunner; },
+  get child() { return child; }, get hangBody() { return hangBody; }, get exitGate() { return exitGate; }, get halluFigs() { return halluFigs; },
+  grin, scene, lamps, REMOTE_LIGHTS, animateMonster, spreadJaw, placeHeadAt, standFacing, makeAvatar, mkRemote, flicker, blackout, setNV, drawScreamer, burstSparks, humanoid, M, refreshItemVisibility, applyStations, ALTAR,
+ STATIONS, TASK_BY_ID, useStairs, doStation, doDeliver, NET, startHunt, hallucinate, doorSurprise, spawnEyes, watchers, openKeypad, kpPress, scare3d, ghostDoors, autoDoors, startChapter, ritual, screamer, subliminal, startStalker, DIRECTOR, showGuide, objective, lightning, S, mon, player, scares, killPlayer, emitNoise, camera, A, items, doors, lockers, takeItem, powerOn, hide, unhide, interact, throwBottle, loadCheckpoint, faceJumpscare, drawMap, get focus() { return focus; } };
