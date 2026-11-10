@@ -9,6 +9,16 @@ Repo kökündeki **`tersbomba.html`** dosyasını tarayıcıda aç (internet ger
 `/tersbomba.html` adresine git. Biri **Oda Kur** der, 5 harfli kodu diğerleri **Katıl** ile girer.
 Tek başına denemek için **Antrenman**: oyunda `TAB` ile roller arasında geçilir.
 
+## v2.1 ile gelenler
+- **Yeni görsel kimlik:** "Ters Bomba A.Ş. İmha Eğitim Tesisi". Afiş yazı tipi, tehlike şeritleri,
+  çelik paneller, daktilo yazılı gizli notlar, çizgi ikon seti, 7 parçalı LED sayaç.
+- **Sade ekranlar:** tek sütun ana menü, rol dosyalı ekip odası, küçülen görev kartı (`H` ile açılır).
+- **Yeni oda havası:** boyalı beton duvarlar, koyu parlak zemin, lamba huzmeleri, LED şeritler,
+  ikaz lambaları, duvar sayacı, canlı ekranlı kontrol masası, dolaplar, sarkan kablolar.
+- **Lazer Kilidi (5 kişi):** İŞARETÇİ duvarlardaki 4 sensörü lazerle doğru sırada vurur; sırayı
+  sadece MİNİK bilir.
+- **Büyük final:** tüm modüller bitince herkes aynı anda kendi renkli plakasına basmalı.
+
 ## v2.0 ile gelenler
 - **2 yeni modül:** 🧭 Labirent (yolu sadece uçan görür, karışık tuşlu oyuncu yürür) ve
   🔑 Çift Anahtar (iki kişi odanın iki ucunda aynı anda çevirir).
@@ -26,7 +36,7 @@ Tek başına denemek için **Antrenman**: oyunda `TAB` ile roller arasında geç
 2. Bu klasördeki **`EXE-YAP.bat`** dosyasını çift tıkla.
 3. Bitince `exe/Ters-Bomba.exe` hazır: tek dosya, kurulum istemez, tam ekran açılır (F11).
 
-GitHub'da: `tersbomba.html` ya da `tersbomba/` değişikliği `main` dalına girdiğinde **Actions → Ters Bomba EXE**
+GitHub'da: `tersbomba.html` ya da `tersbomba/` değiştiğinde **Actions → Ters Bomba EXE**
 iş akışı EXE'yi kendisi derler ve `tersbomba-son` sürümüne yükler.
 
 ## Steam için

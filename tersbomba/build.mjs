@@ -16,8 +16,9 @@ const face = (family, pkg, slug, weight) => [['latin', LATIN], ['latin-ext', LAT
   `@font-face{font-family:"${family}";font-style:normal;font-weight:${weight};font-display:block;` +
   `src:url(data:font/woff2;base64,${readFileSync(nm(pkg, 'files', `${slug}-${sub}-${weight}-normal.woff2`)).toString('base64')}) format("woff2");unicode-range:${range}}`).join('\n');
 const fonts = [
-  ...[600, 800].map(w => face('Baloo 2', '@fontsource/baloo-2', 'baloo-2', w)),
-  ...[600, 800, 900].map(w => face('Nunito', '@fontsource/nunito', 'nunito', w)),
+  face('Anton', '@fontsource/anton', 'anton', 400),
+  ...[500, 600, 700].map(w => face('Barlow Condensed', '@fontsource/barlow-condensed', 'barlow-condensed', w)),
+  face('Special Elite', '@fontsource/special-elite', 'special-elite', 400),
 ].join('\n');
 
 let html = readFileSync(join(here, '..', 'tersbomba.html'), 'utf8');

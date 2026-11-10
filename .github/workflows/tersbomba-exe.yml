@@ -3,7 +3,7 @@ name: Ters Bomba EXE
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, claude/funny-cannon-m5sh3k]
     paths:
       - 'tersbomba/**'
       - 'tersbomba.html'
