@@ -1,0 +1,51 @@
+name: Ters Bomba EXE
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'tersbomba/**'
+      - 'tersbomba.html'
+      - '.github/workflows/tersbomba-exe.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  exe:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: tersbomba
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # GitHub indirmeleri bazen 502/503/504 veriyor: birkaç kez tekrar dene
+      - name: npm ci (tekrar denemeli)
+        shell: bash
+        run: |
+          for i in 1 2 3 4 5; do npm ci && exit 0; echo "deneme $i olmadi, bekleniyor"; sleep $((i * 30)); done; exit 1
+      - name: EXE derle (tekrar denemeli)
+        shell: bash
+        run: |
+          for i in 1 2 3 4 5; do npm run exe:win && exit 0; echo "deneme $i olmadi, bekleniyor"; sleep $((i * 30)); done; exit 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ters-Bomba
+          path: tersbomba/exe/Ters-Bomba.exe
+          retention-days: 30
+      # Herkese açık, giriş gerektirmeyen doğrudan indirme linki:
+      # https://github.com/<sahip>/<repo>/releases/download/tersbomba-son/Ters-Bomba.exe
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: tersbomba-son
+          name: Ters Bomba (EXE)
+          target_commitish: ${{ github.sha }}
+          make_latest: false
+          body: |
+            İndir: aşağıdaki **Ters-Bomba.exe** dosyasına tıkla, çift tıklayıp oyna. Kurulum yok.
+            Windows "bilgisayarınızı korudu" derse: **Ek bilgi → Yine de çalıştır**.
+          files: tersbomba/exe/Ters-Bomba.exe
