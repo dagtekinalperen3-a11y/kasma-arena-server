@@ -213,6 +213,8 @@ kbd{display:inline-block;min-width:22px;text-align:center;padding:0 6px;border-r
 #chaos .bar b{display:block;height:100%;background:var(--haz)}
 #finale{position:absolute;top:158px;left:50%;transform:translateX(-50%);text-align:center;padding:12px 28px 9px;background:var(--green);color:#06230b;border-radius:4px;box-shadow:0 0 40px rgba(88,210,106,.5);animation:pop .4s cubic-bezier(.3,1.6,.6,1)}
 #finale h2{font-size:34px;letter-spacing:2px;line-height:1.1}#finale div{font-weight:700;letter-spacing:1px;text-transform:uppercase}
+#vacBanner{position:absolute;left:50%;bottom:168px;transform:translateX(-50%);padding:9px 18px 7px;text-align:center;border-top:4px solid var(--haz);font:700 17px var(--body);letter-spacing:.8px;text-transform:uppercase;white-space:nowrap}
+#vacBanner div{display:flex;align-items:center;justify-content:center;gap:8px}#vacBanner .ic{font-size:22px;color:var(--rc)}#vacBanner b{color:#fff}#vacBanner small{display:block;font:600 13px var(--body);letter-spacing:1px;color:var(--dim);margin-top:2px}
 #roleIntro{position:absolute;left:50%;bottom:20%;transform:translateX(-50%);padding:0 0 12px;text-align:center;width:max-content;max-width:min(560px,90vw);animation:pop .4s cubic-bezier(.3,1.6,.6,1);overflow:hidden}
 #roleIntro .top{background:var(--rc);color:#111;padding:12px 30px 6px;display:flex;align-items:center;justify-content:center;gap:14px}
 #roleIntro .top .ic{font-size:50px}
@@ -434,6 +436,7 @@ kbd{display:inline-block;min-width:22px;text-align:center;padding:0 6px;border-r
   <div id="toasts"></div>
   <div id="chaos" class="hidden"><h2 id="chaosT"></h2><div id="chaosD" class="small"></div><div class="bar"><b id="chaosBar"></b></div></div>
   <div id="finale" class="hidden"><h2>Son adım: herkes plakasına!</h2><div id="finaleD"></div></div>
+  <div id="vacBanner" class="glass hidden"></div>
   <div id="manual" class="hidden"><div class="tabs" id="mtabs"></div><div class="pg" id="mpage"></div><div class="foot"><kbd>M</kbd> kapat · <kbd>Q</kbd>/<kbd>E</kbd> sayfa çevir · tekerlek kaydır</div></div>
   <div id="bottom"></div>
 </div>
@@ -715,6 +718,7 @@ function genPuzzle(dk, roles, muts, nPlayers) {
     mods: D.mods.filter(m => modAvailable(m, roles)),
     laserSeq: shuffle([0, 1, 2, 3]),
     keypadInfo: infoHolder('keypad', roles), duckInfo: infoHolder('ducks', roles), mouseInfo: infoHolder('mouse', roles),
+    serialInfo: 'floater', mazeInfo: 'floater', fuseInfo: 'defuser', laserInfo: 'tiny', moved: [], manualAll: false, kmShown: false, // tur ortasında rol boşalırsa değişir (applyVacancy)
     ducks: { spots: shuffle(DUCK_SPOTS).slice(0, 7), gold: shuffle([0, 1, 2, 3, 4, 5, 6]).slice(0, 3) }, mouseCode: [rand(10), rand(10), rand(10)], serial, wires, wireAns: solveWires(wires, serial), order, layout,
     button, btnAns: solveButton(button, serial), pw: genPassword(), fuseColors, fuseOn, fuseTarget, fuseStart,
   };
@@ -997,19 +1001,61 @@ function hostRoom(solo) {
 function dropPlayer(id, conn) {
   if (conn && !net.conns.includes(conn)) return;        // zaten düşürülmüş (close + error art arda gelebilir)
   net.conns = net.conns.filter(c => c.peer !== id);
+  const meta = hostMeta[id] || {};
   delete hostBuckets[id]; delete hostMeta[id];
   if (game && hostR && hostR.btnBy === id) { game.btnHeld = false; hostR.btnBy = null; if (inGame && game.status === 'playing') pushState(); } // düğmeyi tutan gitti
   if (!players[id]) return;
   const gone = players[id];
   toast(`👋 ${gone.name} kaçtı!`);
   delete players[id]; removeAvatar(id);
-  // oyun ortasında biri çıkarsa rolünü bir izleyici devralır
-  if (inGame && gone.role !== 'none') {
+  // oyun ortasında biri çıkarsa rolünü bir izleyici devralır; izleyici yoksa rol bir süre beklenir (hostVacTick)
+  const live = inGame && game && hostR && game.status === 'playing';
+  if (live && gone.role !== 'none') {
     const spec = Object.keys(players).find(k => players[k].role === 'none');
-    if (spec) { players[spec].role = gone.role; broadcast({ t: 'note', msg: `🔄 ${players[spec].name} artık ${ROLES[gone.role].emoji} ${ROLES[gone.role].name}!` }); }
-    else broadcast({ t: 'note', msg: `⚠️ ${ROLES[gone.role].emoji} ${ROLES[gone.role].name} rolü boş kaldı! Oda sahibi ESC ile lobiye döndürebilir.` });
+    if (spec) { players[spec].role = gone.role; delete hostR.vac[gone.role]; broadcast({ t: 'note', msg: `🔄 ${players[spec].name} artık ${ROLES[gone.role].emoji} ${ROLES[gone.role].name}!` }); }
+    else if (!(hostR.vac[gone.role] && hostR.vac[gone.role].done)) hostR.vac[gone.role] = { left: VAC.grace, token: meta.token || null, name: gone.name, done: false };
   }
   broadcastLobby();
+  if (live) pushState();
+}
+// ---- Tur ortasında boşalan rol (§3.3). Sayılar ilk tahmindir, oyun testiyle doğrulanmadı. ----
+const VAC = { grace: 30, autoPenalty: 15, minLeft: 20, freezeCap: 90 };   // bekleme sn · otomatik bakım cezası sn/modül · cezanın inemeyeceği alt sınır · tur başına en çok donma sn
+const VAC_INFO = { floater: [['serialInfo', 'defuser'], ['mazeInfo', 'defuser']], defuser: [['fuseInfo', 'floater']], tiny: [['laserInfo', 'pointer']] }; // rol giderse elindeki bilgi kime geçer
+// tur ortasında gelen oyuncu: aynı jetonla eski rolü (hâlâ boşsa), yoksa ilk boş rol, o da yoksa izleyici
+function vacantRoleFor(token) {
+  const used = new Set(Object.values(players).map(p => p.role)), open = ROLE_ORDER.filter(r => hostR.roles.has(r) && !used.has(r));
+  return (token && open.find(r => hostR.vac[r] && hostR.vac[r].token === token)) || open[0] || 'none';
+}
+function hostSendViews() { broadcast({ t: 'view', puzzle: hostR.P }); }
+// bekleme süresi doldu: o rolün uygulayacağı modüller kapatılır, tuttuğu bilgi başkasına geçer → tur her zaman bitirilebilir
+function applyVacancy(role) {
+  const P = hostR.P, S = game.solved, have = new Set(Object.values(players).map(p => p.role)); have.delete('none');
+  const closed = P.mods.filter(m => S[m] === false && (MOD_NEEDS[m].apply === role || (m === 'keys' && P.nPlayers > 1 && have.size < 2)));
+  for (const m of closed) { S[m] = true; game.auto.push(m); }
+  if (closed.length) {
+    const cut = Math.round(Math.max(0, Math.min(closed.length * VAC.autoPenalty, game.timeLeft - VAC.minLeft))), msg = `🛠️ Otomatik bakım: ${closed.map(m => MOD_INFO[m].name).join(', ')} kapatıldı (${ROLES[role].name} yok)`;
+    game.timeLeft -= cut; if (cut > 0) game.fxQ.push({ sec: -cut, msg }); else broadcast({ t: 'note', msg });
+  }
+  const move = (k, to) => { P[k] = to; if (!P.moved.includes(k)) P.moved.push(k); };
+  for (const m in MOD_NEEDS) { const N = MOD_NEEDS[m]; if (N.chain && P[N.info] === role) move(N.info, N.chain.find(r => have.has(r)) || (have.has(N.apply) ? N.apply : null)); }
+  for (const [k, to] of VAC_INFO[role] || []) if (P[k] === role) move(k, have.has(to) ? to : null);
+  if (role === 'reader') { P.manualAll = true; P.kmShown = true; hostR.kmFrozen = true; }   // kitapçık herkese açılır, TERS TUŞ'un tuşları sabitlenip kendisine gösterilir
+  if (Object.values(S).every(Boolean) && !game.final) game.final = { hold: 0, on: [] };
+  broadcast({ t: 'note', msg: `⌛ ${ROLES[role].emoji} ${ROLES[role].name} dönmedi: görevleri devredildi, oyun sürüyor.` });
+  hostSendViews();
+}
+function hostVacTick(dt) { // dönüş: durum hemen yayınlanmalı mı
+  let frozen = false, force = false;
+  for (const r in hostR.vac) {
+    const v = hostR.vac[r]; if (v.done) continue;
+    v.left -= dt;
+    if (v.left <= 0) { v.done = true; applyVacancy(r); force = true; }
+    else if (REQ_ROLES.includes(r) && hostR.frozeFor < VAC.freezeCap) frozen = true;   // şart rol beklenirken bomba sayacı durur
+  }
+  if (frozen) hostR.frozeFor += dt;
+  if (frozen !== game.frozen) { game.frozen = frozen; force = true; }
+  if (hostR.kmFrozen) game.keymapIn = Math.max(game.keymapIn, 60);                      // tuşlar artık karışmaz
+  return force;
 }
 function joinRoom(code) {
   code = code.trim().toUpperCase();
@@ -1069,9 +1115,12 @@ function hostHello(m, from) {
   const conn = net.conns.find(c => c.peer === from); if (!conn) return;
   if (Object.keys(players).length >= HOST_LIM.maxPlayers) { try { conn.send({ t: 'full' }); } catch (e) {} setTimeout(() => { try { conn.close(); } catch (e) {} }, 400); return; }
   hostMeta[from] = { token: typeof m.token === 'string' && /^[\w-]{8,64}$/.test(m.token) ? m.token : null, seen: performance.now() };
-  players[from] = { name: cleanName(m.name), role: freeRole() };
+  const live = game && inGame && hostR && game.status === 'playing';
+  const role = live ? vacantRoleFor(hostMeta[from].token) : freeRole();   // tur ortasında: boşalan rol ya da izleyici
+  players[from] = { name: cleanName(m.name), role };
+  if (live && hostR.vac[role]) { const back = !hostR.vac[role].done; delete hostR.vac[role]; if (back) broadcast({ t: 'note', msg: `🔌 ${players[from].name} bağlandı: ${ROLES[role].emoji} ${ROLES[role].name} yeniden görevde!` }); }
   broadcastLobby();
-  if (game && inGame) { try { conn.send({ t: 'start', puzzle: game.puzzle, players: lobbyPlayers() }); } catch (e) {} }
+  if (game && inGame && hostR) { try { conn.send({ t: 'start', puzzle: hostR.P, players: lobbyPlayers() }); } catch (e) {} if (live) pushState(); }
 }
 // Sessizlik denetimi: istemciler 2 sn'de bir "ping" yollar; uzun süre hiç paket gelmeyen oyuncu kopmuş sayılır
 // (sekme kapanınca ya da ağ gidince WebRTC'nin kendi "close" olayı 30 sn'yi bulabiliyor).
@@ -1134,6 +1183,7 @@ function newGameState(puzzle) {
     keymap: genKeymap(), keymapIn: D.keymix, btnHeld: false, pwIdx: puzzle.pw.start.slice(), fuse: puzzle.fuseStart.slice(), ducksGot: [], mouseDial: [0, 0, 0],
     mazeVisited: [], mazeAt: -1, mazeFails: 0, laserProg: 0, final: null, keyArm: [0, 0], keyBy: [null, null], fxQ: [],
     chaos: null, chaosIn: D.chaos * 0.55, lastChaos: '', stats: {},
+    frozen: false, vac: [], auto: [],   // boş rol beklenirken sayaç donuk mu / beklenen roller / otomatik bakımla kapanan modüller
   };
 }
 function snapshot() {
@@ -1142,6 +1192,7 @@ function snapshot() {
     timeLeft: g.timeLeft, countdown: g.countdown, strikes: g.strikes, status: g.status, solved: { ...g.solved }, wireCut: g.wireCut.slice(),
     keyProg: g.keyProg, keyPressed: g.keyPressed.slice(), keymap: { ...g.keymap }, keymapIn: g.keymapIn, btnHeld: g.btnHeld,
     pwIdx: g.pwIdx.slice(), fuse: g.fuse.slice(), ducksGot: g.ducksGot.slice(), mouseDial: g.mouseDial.slice(), elapsed: g.elapsed, laserProg: g.laserProg, final: g.final ? { hold: g.final.hold, on: g.final.on.slice() } : null, mazeVisited: g.mazeVisited.slice(), mazeFails: g.mazeFails, keyArm: g.keyArm.slice(), chaos: g.chaos ? { ...g.chaos } : null, stats: JSON.parse(JSON.stringify(g.stats)),
+    frozen: !!g.frozen, auto: (g.auto || []).slice(), vac: hostR ? Object.keys(hostR.vac).filter(r => !hostR.vac[r].done).map(r => ({ role: r, name: hostR.vac[r].name, left: Math.ceil(hostR.vac[r].left) })) : [],
   };
 }
 // Şart olan rollerden hangileri boş? (boş dizi = başlatılabilir; antrenmanda tüm roller var sayılır)
@@ -1159,7 +1210,7 @@ function hostStart() {
   let puzzle = null;
   for (let k = 0; k < 40 && !puzzle; k++) { const p = genPuzzle(lobbyDiff, roles, lobbyMuts, nPl); if (!checkSolvable(p, roles).length) puzzle = p; }
   if (!puzzle) { toast('Çözülebilir bir bomba üretilemedi, tekrar dene.', 'bad'); return false; }
-  hostR = { P: puzzle, roles, btnBy: null, btnT0: 0, lsr: { on: -1, t: 0 } };
+  hostR = { P: puzzle, roles, btnBy: null, btnT0: 0, lsr: { on: -1, t: 0 }, vac: {}, frozeFor: 0, kmFrozen: false };
   broadcast({ t: 'start', puzzle, players: lobbyPlayers() });
   return true;
 }
@@ -1320,7 +1371,9 @@ function hostTick() {
     if (game.countdown > 0) { game.countdown -= dt; if (game.countdown <= 0) force = true; }
     else {
       const D = DIFF[game.puzzle.diff];
-      game.timeLeft -= dt * (1 + 0.25 * game.strikes); game.elapsed += dt;
+      if (hostR && hostVacTick(dt)) force = true;
+      if (!game.frozen) game.timeLeft -= dt * (1 + 0.25 * game.strikes);
+      game.elapsed += dt;
       game.keymapIn -= dt;
       if (game.final) {
         const need = [...new Set(Object.values(players).map(p => p.role).filter(r => r !== 'none'))];
@@ -1378,6 +1431,12 @@ function clientHandle(m) {
       startRound(m.puzzle);
       break;
     case 'state': applyState(m.g, m.why, m.fx); break;
+    case 'view': // bulmacada bana görünen kısım değişti (rol devri, bilgi devri)
+      if (!game || !m.puzzle || typeof m.puzzle !== 'object') break;
+      game.puzzle = m.puzzle;
+      if (m.puzzle.manualAll) { pagesGot.add('button'); pagesGot.add('password'); }
+      setupRoleHud();
+      break;
     case 'poses':
       for (const id in m.list) {
         if (id === myId) continue;
@@ -2253,7 +2312,7 @@ function refreshModules() {
   if (M.mazeTiles) {
     const flash = performance.now() < mazeFlash;
     M.mazeTiles.forEach((t, i) => {
-      const safe = P.maze.safe.includes(i), v = game.mazeVisited.includes(i) || (S.maze && safe), hint = !S.maze && role === 'floater' && safe;
+      const safe = P.maze.safe.includes(i), v = game.mazeVisited.includes(i) || (S.maze && safe), hint = !S.maze && role === (P.mazeInfo || 'floater') && safe;
       t.material.emissive.setHex(flash ? 0xff2020 : v ? 0x30ff50 : hint ? 0x18b8d8 : 0x000000); t.material.color.setHex(v ? 0x2a7a35 : 0x3a4058);
     });
   }
@@ -2338,7 +2397,13 @@ function applyState(g, why, fx) {
   if (ct !== prev.chaos) { if (ct) startChaos(g.chaos); else endChaos(prev.chaos); }
   if (g.status !== prev.status) endRound(g.status, why);
   lastFx = { strikes: g.strikes, keymapStr: ks, solved: { ...g.solved }, status: g.status, chaos: ct, countdown: cd, mazeFails: g.mazeFails, final: !!g.final, laserProg: g.laserProg };
-  refreshModules(); updateKeymapHud();
+  refreshModules(); updateKeymapHud(); renderVac();
+}
+// boşalan rol bandı: "X koptu — bekleniyor NN sn"
+function renderVac() {
+  const el = $('#vacBanner'), v = game && game.status === 'playing' ? (game.vac || []) : [];
+  el.classList.toggle('hidden', !v.length);
+  if (v.length) el.innerHTML = v.map(x => { const R0 = ROLES[x.role] || ROLES.none; return `<div style="--rc:${R0.css}">${icon(R0.ic)}<b>${esc(x.name)}</b> (${R0.name}) koptu — bekleniyor <b>${Math.max(0, x.left | 0)}</b> sn</div>`; }).join('') + (game.frozen ? '<small>Sayaç durdu · aynı kodla yeniden katılabilir</small>' : '<small>Dönmezse görevleri devredilecek</small>');
 }
 function timeFloat(sec) {
   const d = document.createElement('div'); d.className = 'tfloat ' + (sec > 0 ? 'good' : 'bad'); d.textContent = (sec > 0 ? '+' : '−') + Math.abs(sec) + ' sn';
@@ -2391,6 +2456,7 @@ function endRound(status, why) {
     const s = top('strikes'); if (s) aw.push(`💣 <b>Yanlış Kablo Ödülü:</b> ${esc(s.name)} (${s.strikes} hata)`);
     const mv = top('solves'); if (mv) aw.push(`🏆 <b>Günün Kahramanı:</b> ${esc(mv.name)} (${mv.solves} modül çözdü)`);
     const ph = top('phone'); if (ph) aw.push(`📞 <b>Santral Memuru:</b> ${esc(ph.name)} (telefona o baktı)`);
+    if ((game.auto || []).length) aw.push(`🛠️ <b>Otomatik bakımla kapanan:</b> ${game.auto.map(m => MOD_INFO[m].name).join(', ')}`);
     if (game.mazeFails > 0) aw.push(`🧭 <b>Labirentte kaybolma sayısı:</b> ${game.mazeFails}`);
     if (!won) aw.push(`✂️ <b>Doğru kablo:</b> ${P.wireAns + 1}. kablo idi${P.mods.includes('password') ? ` · <b>Şifre:</b> ${P.pw.word}` : ''}`);
     if (!aw.length) aw.push('🦆 <b>Ördek Ödülü:</b> herkese, katıldığınız için');
@@ -2401,7 +2467,7 @@ const RANKS = [[0, 'Fitil Çırağı', '🧨'], [700, 'Kablo Kesici', '✂️'],
 const rankOf = s => RANKS.filter(r => s >= r[0]).pop();
 function calcScore(g) {
   const P = g.puzzle, D = DIFF[P.diff] || DIFF.normal, won = g.status === 'won';
-  const solvedN = Object.values(g.solved).filter(Boolean).length;
+  const solvedN = Object.values(g.solved).filter(Boolean).length - (g.auto || []).length;   // otomatik bakımla kapananlar puan getirmez
   const raw = solvedN * 150 + (won ? 500 + g.timeLeft * 6 : 0) - g.strikes * 120;
   const score = Math.max(0, Math.round(raw * D.mult * (1 + 0.2 * (P.muts || []).length)));
   const stars = !won ? 0 : (g.strikes === 0 && g.timeLeft / (P.time || D.time) > 0.25) ? 3 : g.strikes <= 1 ? 2 : 1;
@@ -3044,10 +3110,14 @@ function renderTasks() {
 function renderSecret() {
   const el = $('#secret'); if (!game) return;
   const P = game.puzzle, r = myRole(), has = m => P.mods.includes(m), L = [];
-  if (has('keypad') && P.keypadInfo === r && r === 'pointer') L.push(`🔣 Sembol sırası<div class="big">${P.order.map((s, i) => `<span>${i + 1}.${s}</span>`).join(' ')}</div>`);
+  const moved = P.moved || [];
+  if (has('keypad') && P.keypadInfo === r && (r === 'pointer' || moved.includes('keypadInfo'))) L.push(`🔣 Sembol sırası<div class="big">${P.order.map((s, i) => `<span>${i + 1}.${s}</span>`).join(' ')}</div>`);
   if (has('mouse') && P.mouseInfo === r) L.push(`🐭 Fare kodu${game.solved.mouse ? ' ✅' : ''}<div class="big">${P.mouseCode.map(d => `<span>${d}</span>`).join(' ')}</div>`);
   if (has('ducks') && P.duckInfo === r) L.push(`🦆 Altın ördekler: tavanda <b>parlayanlar</b> (sadece sen görüyorsun) ${game.solved.ducks ? '✅' : ''}`);
-  if (has('laser') && r === 'tiny') L.push(`Lazer sensör sırası${game.solved.laser ? ' ✅' : ''}<div class="big">${P.laserSeq.map((i, k) => `<span style="border-bottom:5px solid ${hexCss(BTN_HEX[LSR[i].c])}">${k + 1}. ${LSR[i].n}</span>`).join(' ')}</div>`);
+  if (P.serialInfo === r && r !== 'floater' && (has('wires') || has('button')) && !(game.solved.wires && game.solved.button)) L.push(`🔢 Seri no (YERÇEKİMSİZ yok)<div class="big"><span>${esc(P.serial)}</span></div>`);
+  if (has('maze') && P.mazeInfo === r && r !== 'floater' && !game.solved.maze) L.push('🧭 Labirentin güvenli kareleri artık <b>sana</b> turkuaz parlıyor.');
+  if (has('fuse') && P.fuseInfo === r && r !== 'defuser' && !game.solved.fuse) L.push(`⚡ Bombada yanan renkler (TERS TUŞ yok)<div class="big">${P.fuseOn.map(c => `<span style="border-bottom:5px solid ${hexCss(BTN_HEX[c])}">${TR[c]}</span>`).join(' ')}</div>`);
+  if (has('laser') && (P.laserInfo || 'tiny') === r) L.push(`Lazer sensör sırası${game.solved.laser ? ' ✅' : ''}<div class="big">${P.laserSeq.map((i, k) => `<span style="border-bottom:5px solid ${hexCss(BTN_HEX[LSR[i].c])}">${k + 1}. ${LSR[i].n}</span>`).join(' ')}</div>`);
   el.classList.toggle('hidden', !L.length);
   el.innerHTML = '<div class="small">SADECE SEN BİLİYORSUN</div>' + L.join('<hr>');
 }
@@ -3082,6 +3152,11 @@ function updateKeymapHud() {
   const box = $('#keymapBox'); if (!game) return;
   const r = myRole(), km = game.keymap, sec = Math.max(0, Math.ceil(game.keymapIn));
   box.classList.toggle('def', r === 'defuser');
+  if (r === 'defuser' && game.puzzle.kmShown && game.countdown <= 0) { // TERS SES yok: tuşlar sabit ve açık
+    box.classList.remove('hidden');
+    box.innerHTML = `🔓 TERS SES yok — tuşların sabitlendi → İleri <span class="k">${keyName(km.f)}</span> Geri <span class="k">${keyName(km.b)}</span> Sol <span class="k">${keyName(km.l)}</span> Sağ <span class="k">${keyName(km.r)}</span>`;
+    return;
+  }
   if (r === 'reader') {
     box.classList.remove('hidden');
     box.innerHTML = `🎮 TERS TUŞ'un tuşları → İleri <span class="k">${keyName(km.f)}</span> Geri <span class="k">${keyName(km.b)}</span> Sol <span class="k">${keyName(km.l)}</span> Sağ <span class="k">${keyName(km.r)}</span> <span class="small">⏱ ${sec} sn · tersten söyle!</span>`;
@@ -3139,7 +3214,14 @@ function renderManual() {
   $('#mpage').innerHTML = locked ? `<div class="locked"><div>KAYIP</div><h2>Bu sayfa kayıp!</h2><p>Odada parlayan pembe bir kâğıt ara.<br><b>İpucu: ${pg ? pg.hint : 'odada bir yerde'}</b></p></div>` : MANUAL[manualTab]();
   $('#mpage').scrollTop = 0;
   $$('#mtabs b').forEach(b => b.onclick = () => { manualTab = b.dataset.t; renderManual(); });
+  $('#manual .foot').innerHTML = myRole() === 'reader' ? '<kbd>M</kbd> kapat · <kbd>Q</kbd>/<kbd>E</kbd> sayfa çevir · tekerlek kaydır' : '<kbd>M</kbd> aç/kapat · <kbd>0</kbd> sonraki sayfa · TERS SES yok, kitapçık herkese açık';
 }
+// TERS SES tur ortasında koparsa (puzzle.manualAll) kitapçık herkese açılır: M aç/kapat, 0 sonraki sayfa (Q/E TERS TUŞ'un yürüme tuşu olabilir)
+addEventListener('keydown', e => {
+  if (e.repeat || e.target.tagName === 'INPUT' || !canPlay() || !game.puzzle.manualAll || myRole() === 'reader' || myRole() === 'none') return;
+  if (e.code === 'KeyM') { $('#manual').classList.toggle('hidden'); renderManual(); sfx.page(); }
+  else if (e.code === 'Digit0' && !$('#manual').classList.contains('hidden')) flipManual(1);
+});
 
 // =====================================================================
 //  MENÜ / LOBİ / AYARLAR
@@ -3275,7 +3357,7 @@ function loop() {
   if (inGame && game) {
     if (!net.isHost && game.status === 'playing') {
       if (game.countdown > 0) game.countdown -= dt;
-      else { game.timeLeft = Math.max(0, game.timeLeft - dt * (1 + 0.25 * game.strikes)); game.keymapIn -= dt; }
+      else { if (!game.frozen) game.timeLeft = Math.max(0, game.timeLeft - dt * (1 + 0.25 * game.strikes)); game.keymapIn -= dt; }
     }
     updateMe(dt);
     buildViewModel();
@@ -3395,7 +3477,7 @@ $('#menu').classList.remove('hidden');
 loop();
 window.__tb = { get game() { return game; }, me, players: () => players, net, act: m => sendToHost(m), myRole, avatars, emote: doEmote, M, camera, setRole: r => { players[myId].role = r; refreshModules(); setupRoleHud(); syncAvatars(); }, laser: v => { laserOn = v; } }; // test için
 let tbLaserPt = null; // test: İŞARETÇİ'nin lazer noktasını zorla (T.laser([x, y, z])); gerçek oyunda hep null
-Object.assign(window.__tb, { laser: v => { laserOn = !!v; tbLaserPt = Array.isArray(v) ? v : null; }, hostPuzzle: () => hostR && hostR.P, LSR, REACH, BTN_RULE, get myId() { return myId; }, plateOf, MOD_ROLE, ACT_MOD, hostDiag, hostMeta, cleanName, checkSolvable, genPuzzle, MOD_NEEDS, REQ_ROLES, missingRoles, hostStart, raw: m => net.hostConn && net.hostConn.send(m) }); // PKG-A test kancaları
+Object.assign(window.__tb, { laser: v => { laserOn = !!v; tbLaserPt = Array.isArray(v) ? v : null; }, hostPuzzle: () => hostR && hostR.P, hostR: () => hostR, VAC, LSR, REACH, BTN_RULE, get myId() { return myId; }, plateOf, MOD_ROLE, ACT_MOD, hostDiag, hostMeta, cleanName, checkSolvable, genPuzzle, MOD_NEEDS, REQ_ROLES, missingRoles, hostStart, raw: m => net.hostConn && net.hostConn.send(m) }); // PKG-A test kancaları
 
 </script>
 </body>
