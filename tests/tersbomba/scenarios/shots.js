@@ -38,7 +38,7 @@ H.run('shots', async t => {
       await crowd(c, [['reader', -4, -1, Math.PI], ['defuser', -2, -1, Math.PI], ['floater', 0, -1, Math.PI], ['pointer', 2, -1, Math.PI], ['tiny', 4, -1, Math.PI]]);
       await c.tb(T => T.setRole('none'));
       await view(c, 'none', [0, 0, 9.4], 0, 0.02); await settle(c, 6); await shot('avatars');
-      if (want('placard') && await c.tb(T => typeof T.playEmote === 'function')) { await c.tb(T => { T.playEmote('f3', 5); T.playEmote('f0', 7); }); await settle(c, 12); await shot('placard'); }
+      if (want('placard') && await c.tb(T => typeof T.playEmote === 'function')) { await c.tb(T => { T.EMOTE_TUNE.placardMs = 1e7; T.playEmote('f3', 5); T.playEmote('f0', 7); T.avatars.f0.emote.until = 1e12; }); await settle(c, 3); await shot('placard'); }
     }
     if (want('disco')) { await view(c, 'defuser', [0, 0, 8.6], 0, 0.05); await c.tb(T => { T.game.chaos = { type: 'disko', left: 60, dur: 60, target: 'solo', seed: 1 }; }); await t.sleep(1500); await settle(c, 6); await shot('disco'); }
     t.check(`${q}: sayfa hatası yok`, c.errors.length === 0, c.errors.join(' | '));
