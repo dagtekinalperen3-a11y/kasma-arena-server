@@ -347,7 +347,7 @@ kbd{display:inline-block;min-width:22px;text-align:center;padding:0 6px;border-r
   <h3>🎈 YERÇEKİMSİZ</h3>
   <ul><li><kbd>W A S D</kbd> itme, <kbd>Boşluk</kbd> yukarı, <kbd>Shift</kbd> aşağı. Görevlerin tavanda: oraya kimse zıplayarak ulaşamaz.</li>
   <li>⚡ <b>Sigorta kutusu</b> (doğu duvarı, tepede): TERS TUŞ bombadaki yanan renkleri söyler, sen şalterleri ayarlayıp kolu çekersin.</li>
-  <li>🦆 <b>Ördek avı</b>: lambaların üstündeki 7 ördekten sadece 3'ü altın. Hangileri olduğunu İŞARETÇİ (yoksa TERS SES) bilir. Sahte ördek = hata!</li>
+  <li>🦆 <b>Ördek avı</b>: lambaların üstündeki 7 ördekten sadece 3'ü altın. Hangileri olduğunu İŞARETÇİ (yoksa MİNİK, o da yoksa TERS SES) bilir. Sahte ördek = hata!</li>
   <li>🔢 Seri numarası batı duvarında yüksek rafta; sadece sen görürsün.</li></ul>
   <h3>👉 İŞARETÇİ</h3>
   <ul><li>Herkesi duyarsın ama <b>konuşamazsın</b>. <kbd>Sağ tık</kbd> basılı = herkesin gördüğü lazer. <kbd>6</kbd> ✅ Evet, <kbd>7</kbd> ❌ Hayır.</li>
@@ -559,8 +559,26 @@ const MOD_INFO = {
   password: { name: 'Şifre', icon: '🔤', ic: 'password' }, fuse: { name: 'Sigorta', icon: '⚡', ic: 'fuse' }, ducks: { name: 'Ördek Avı', icon: '🦆', ic: 'ducks' }, mouse: { name: 'Fare Paneli', icon: '🐭', ic: 'mouse' },
   maze: { name: 'Labirent', icon: '🧭', ic: 'maze' }, keys: { name: 'Çift Anahtar', icon: '🔑', ic: 'keys' }, laser: { name: 'Lazer Kilidi', icon: '🎯', ic: 'laser' },
 };
-// hangi modüle kim dokunabilir
-const MOD_ROLE = { wires: 'defuser', button: 'defuser', keypad: 'defuser', password: 'defuser', fuse: 'floater', ducks: 'floater', mouse: 'tiny', maze: 'defuser', laser: 'pointer', keys: 'any', phone: 'any', egg: 'any' };
+// Modül tablosu (tek kaynak). apply = modüle dokunabilen rol · needs = bilgisi/kuralı şart olan roller (yoksa modül o tura girmez)
+// chain = gizli bilgiyi tutacak rol sırası: ilk mevcut olan tutar ve bulmacada P[info] alanına yazılır
+const REQ_ROLES = ['reader', 'defuser', 'floater'];   // bunlar yoksa tur başlatılamaz
+const MOD_NEEDS = {
+  wires:    { apply: 'defuser', needs: ['reader', 'floater'] },                           // kural kitapçıkta, seri no YERÇEKİMSİZ'de
+  button:   { apply: 'defuser', needs: ['reader', 'floater'] },
+  keypad:   { apply: 'defuser', info: 'keypadInfo', chain: ['pointer', 'floater'] },
+  password: { apply: 'defuser', needs: ['reader'] },
+  fuse:     { apply: 'floater', needs: ['defuser'] },                                     // yanan renkleri TERS TUŞ görür
+  ducks:    { apply: 'floater', info: 'duckInfo', chain: ['pointer', 'tiny', 'reader'] },
+  mouse:    { apply: 'tiny',    info: 'mouseInfo', chain: ['pointer', 'reader'] },
+  maze:     { apply: 'defuser', needs: ['floater'] },                                     // güvenli yolu YERÇEKİMSİZ görür
+  laser:    { apply: 'pointer', needs: ['tiny'] },                                        // renk sırası MİNİK'te
+  keys:     { apply: 'any' },
+};
+const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+// hangi modüle kim dokunabilir (tablodan türetilir)
+const MOD_ROLE = { phone: 'any', egg: 'any' }; for (const k in MOD_NEEDS) MOD_ROLE[k] = MOD_NEEDS[k].apply;
+const infoHolder = (mod, roles) => (MOD_NEEDS[mod].chain || []).find(r => roles.has(r)) || null;
+const modAvailable = (mod, roles) => { const N = own(MOD_NEEDS, mod) && MOD_NEEDS[mod]; return !!N && (N.apply === 'any' || roles.has(N.apply)) && (N.needs || []).every(r => roles.has(r)) && (!N.chain || !!infoHolder(mod, roles)); };
 const allowed = (role, need) => need === 'any' ? role !== 'none' : role === need;
 const ACT_MOD = { cut: 'wires', key: 'keypad', btnDown: 'button', btnUp: 'button', pw: 'password', pwOk: 'password', fuse: 'fuse', fuseOk: 'fuse', duck: 'ducks', dial: 'mouse', dialOk: 'mouse', maze: 'maze', turnKey: 'keys', laser: 'laser' };
 const DIFF = {
@@ -678,8 +696,7 @@ function genPassword() {
 function genPuzzle(dk, roles, muts, nPlayers) {
   muts = (muts || []).filter(m => MUTS[m]); nPlayers = nPlayers || 1;
   const D = DIFF[dk] || DIFF.normal;
-  roles = roles || new Set(ROLE_ORDER);
-  const ptr = roles.has('pointer');
+  roles = new Set(roles || ROLE_ORDER); roles.delete('none');
   const L = 'ABCDEFGHJKLMNPRSTUVYZ';
   const serial = pick(L) + pick(L) + rand(10) + pick(L) + rand(10);
   const n = 4 + rand(3);
@@ -695,12 +712,44 @@ function genPuzzle(dk, roles, muts, nPlayers) {
   return {
     diff: dk, pages: D.pages, muts, nPlayers, time: Math.round(D.time * (muts.includes('hiz') ? 0.65 : 1)),
     theme: muts.includes('gece') ? 'gece' : pick(['gunduz', 'gunbatimi', 'gece']), maze: genMaze(), keyWin: nPlayers <= 1 ? 25 : 2.5,
-    mods: D.mods.filter(m => (m !== 'mouse' || roles.has('tiny')) && ((m !== 'fuse' && m !== 'ducks' && m !== 'maze') || roles.has('floater')) && (m !== 'laser' || (roles.has('pointer') && roles.has('tiny')))),
+    mods: D.mods.filter(m => modAvailable(m, roles)),
     laserSeq: shuffle([0, 1, 2, 3]),
-    keypadInfo: ptr ? 'pointer' : 'floater', duckInfo: ptr ? 'pointer' : 'reader', mouseInfo: ptr ? 'pointer' : 'reader',
+    keypadInfo: infoHolder('keypad', roles), duckInfo: infoHolder('ducks', roles), mouseInfo: infoHolder('mouse', roles),
     ducks: { spots: shuffle(DUCK_SPOTS).slice(0, 7), gold: shuffle([0, 1, 2, 3, 4, 5, 6]).slice(0, 3) }, mouseCode: [rand(10), rand(10), rand(10)], serial, wires, wireAns: solveWires(wires, serial), order, layout,
     button, btnAns: solveButton(button, serial), pw: genPassword(), fuseColors, fuseOn, fuseTarget, fuseStart,
   };
+}
+// Üretilen bulmaca bu rollerle gerçekten çözülebilir mi? Sorun listesi döner (boş = çözülebilir).
+// hostStart bunu geçmeyen bulmacayı asla başlatmaz; testler de aynı fonksiyonu kullanır.
+function checkSolvable(P, roles) {
+  const bad = [], R = new Set(roles || []), int = (v, n) => Number.isInteger(v) && v >= 0 && v < n;
+  const perm = (a, b) => Array.isArray(a) && a.length === b.length && new Set(a).size === a.length && a.every(v => b.includes(v));
+  if (!P || typeof P !== 'object') return ['bulmaca yok'];
+  for (const r of REQ_ROLES) if (!R.has(r)) bad.push('şart rol yok: ' + r);
+  if (!Array.isArray(P.mods) || !P.mods.length) return bad.concat('modül yok');
+  if (!(P.time > 0)) bad.push('süre');
+  for (const m of P.mods) {
+    if (!modAvailable(m, R)) { bad.push(m + ': gereken rol yok'); continue; }
+    const N = MOD_NEEDS[m];
+    if (N.chain && !(N.chain.includes(P[N.info]) && R.has(P[N.info]))) bad.push(m + ': bilgiyi tutan rol yok');
+  }
+  if (!/^[A-Z]{2}\d[A-Z]\d$/.test(P.serial || '')) bad.push('seri no');
+  if (!Array.isArray(P.wires) || P.wires.length < 4 || P.wires.length > 6 || P.wires.some(c => !own(WIRE_COLORS, c))) bad.push('kablolar');
+  else if (!int(P.wireAns, P.wires.length) || P.wireAns !== solveWires(P.wires, P.serial)) bad.push('kablo cevabı');
+  if (!P.button || !P.btnAns || !['tap', 'hold'].includes(P.btnAns.mode) || !int(P.btnAns.digit, 10) || P.btnAns.digit !== STRIP_DIGIT[P.button.strip]) bad.push('düğme');
+  if (!perm(P.order, P.order || []) || (P.order || []).length !== 4 || !perm(P.layout, P.order || [])) bad.push('semboller');
+  const pw = P.pw;
+  if (!pw || !WORDS.includes(pw.word) || !Array.isArray(pw.cols) || pw.cols.length !== 5 || pw.cols.some((c, i) => !Array.isArray(c) || c.length !== 5 || new Set(c).size !== 5 || !c.includes([...pw.word][i]))) bad.push('şifre');
+  else if (WORDS.filter(w => [...w].every((c, i) => pw.cols[i].includes(c))).length !== 1 || !Array.isArray(pw.start) || pw.start.length !== 5 || pw.start.some(s => !int(s, 5)) || pw.start.every((s, i) => pw.cols[i][s] === [...pw.word][i])) bad.push('şifre başlangıcı');
+  if (!perm(P.fuseColors, FUSE_COLORS) || !Array.isArray(P.fuseOn) || !P.fuseOn.length || P.fuseOn.some(c => !FUSE_COLORS.includes(c)) || !Array.isArray(P.fuseTarget) || P.fuseTarget.length !== 5 || P.fuseTarget.some((v, i) => v !== P.fuseOn.includes(P.fuseColors[i]))) bad.push('sigorta');
+  else if (!Array.isArray(P.fuseStart) || P.fuseStart.length !== 5 || P.fuseStart.every((v, i) => v === P.fuseTarget[i])) bad.push('sigorta başlangıcı');
+  if (!P.ducks || !Array.isArray(P.ducks.spots) || P.ducks.spots.length !== 7 || !Array.isArray(P.ducks.gold) || P.ducks.gold.length !== 3 || new Set(P.ducks.gold).size !== 3 || P.ducks.gold.some(g => !int(g, 7))) bad.push('ördekler');
+  if (!Array.isArray(P.mouseCode) || P.mouseCode.length !== 3 || P.mouseCode.some(d => !int(d, 10))) bad.push('fare kodu');
+  const mz = P.maze && P.maze.safe, nT = MZ.cols * MZ.rows;
+  if (!Array.isArray(mz) || !mz.length || mz.some(i => !int(i, nT)) || new Set(mz).size !== mz.length || mz[0] >= MZ.cols || mz[mz.length - 1] < MZ.cols * (MZ.rows - 1) || mz.some((t, k) => k > 0 && !mazeAdj(mz[k - 1], t))) bad.push('labirent yolu');
+  if (!perm(P.laserSeq, [0, 1, 2, 3])) bad.push('lazer sırası');
+  if (P.mods.includes('keys') && !(P.nPlayers >= 2 || P.keyWin >= 20)) bad.push('çift anahtar: tek kişi yetişemez');
+  return bad;
 }
 function genKeymap(prev) {
   let km;
@@ -1040,10 +1089,23 @@ function snapshot() {
     pwIdx: g.pwIdx.slice(), fuse: g.fuse.slice(), ducksGot: g.ducksGot.slice(), mouseDial: g.mouseDial.slice(), elapsed: g.elapsed, laserProg: g.laserProg, final: g.final ? { hold: g.final.hold, on: g.final.on.slice() } : null, mazeVisited: g.mazeVisited.slice(), mazeFails: g.mazeFails, keyArm: g.keyArm.slice(), chaos: g.chaos ? { ...g.chaos } : null, stats: JSON.parse(JSON.stringify(g.stats)),
   };
 }
+// Şart olan rollerden hangileri boş? (boş dizi = başlatılabilir; antrenmanda tüm roller var sayılır)
+function missingRoles() { if (net.solo) return []; const have = new Set(Object.values(players).map(p => p.role)); return REQ_ROLES.filter(r => !have.has(r)); }
 function hostStart() {
-  const roles = new Set(net.solo ? ROLE_ORDER : Object.values(players).map(p => p.role));
-  const puzzle = genPuzzle(lobbyDiff, roles, lobbyMuts, net.solo ? 1 : Object.values(players).filter(p => p.role !== 'none').length);
+  if (!net.isHost) return false;
+  const miss = missingRoles();
+  if (miss.length) { // çözülemeyecek tur asla başlamaz
+    const msg = `Başlatılamaz — şart olan boş roller: ${miss.map(r => ROLES[r].name).join(', ')}`;
+    if (inGame) { broadcast({ t: 'toLobby' }); broadcast({ t: 'note', msg }); } else { toast(msg, 'bad'); renderLobby(); }
+    return false;
+  }
+  const roles = new Set(net.solo ? ROLE_ORDER : Object.values(players).map(p => p.role)); roles.delete('none');
+  const nPl = net.solo ? 1 : Object.values(players).filter(p => p.role !== 'none').length;
+  let puzzle = null;
+  for (let k = 0; k < 40 && !puzzle; k++) { const p = genPuzzle(lobbyDiff, roles, lobbyMuts, nPl); if (!checkSolvable(p, roles).length) puzzle = p; }
+  if (!puzzle) { toast('Çözülebilir bir bomba üretilemedi, tekrar dene.', 'bad'); return false; }
   broadcast({ t: 'start', puzzle, players: lobbyPlayers() });
+  return true;
 }
 function hostStrike(why, from) {
   game.strikes++; game.lastWhy = why; stat(from, 'strikes');
@@ -2801,6 +2863,7 @@ function renderModsHud() {
     (game.puzzle.muts || []).map(m => `<span class="chip mut" title="${MUTS[m].name}">${MUTS[m].icon}</span>`).join('');
 }
 const WHO = r => `${ROLES[r].emoji} ${ROLES[r].name}`;
+const holdsTxt = r => r === myRole() ? 'SEN' : (ROLES[r] || ROLES.none).name; // bir bilgiyi kim tutuyor (kitapçık metinleri için)
 function myTasks() {
   if (!game) return [];
   const P = game.puzzle, r = myRole(), has = m => P.mods.includes(m), T = [];
@@ -2836,6 +2899,7 @@ function myTasks() {
     mod('mouse', 'MASANIN ALTINDA! (sadece sen sığarsın)');
     info(`🔢 Kodu ${WHO(P.mouseInfo)} biliyor`);
     info('🐭 Sesin incecik, bol bol konuş!');
+    if (has('ducks') && P.duckInfo === 'tiny') info('🦆 Altın ördekler sadece sana parlıyor → YERÇEKİMSİZ\'e tarif et');
     if (has('laser')) info('🎯 Lazer sensörlerinin renk sırası sende → İŞARETÇİ\'ye söyle');
   }
   if (r !== 'none' && has('keys')) T.push({ t: '<b>Çift Anahtar</b> — batı ve doğu duvarı; iki kişi AYNI ANDA çevirmeli', done: game.solved.keys });
@@ -2922,9 +2986,9 @@ const MANUAL = {
   fuse: () => `<h2>⚡ SİGORTA KUTUSU</h2><p>Bu da <b>senin değil</b>. Doğu duvarında, tavana yakın; sadece <b>YERÇEKİMSİZ</b> uçup ulaşabilir.</p>
     <ol><li>Bombanın yan yüzünde <b>SİGORTA</b> göstergesi var; hangi renklerin yandığını <b>TERS TUŞ</b> görür.</li><li>YERÇEKİMSİZ, <b>yanan renklerdeki</b> şalterleri <b>AÇIK (yukarı)</b>, diğerlerini <b>KAPALI (aşağı)</b> yapar.</li><li>Sonra kırmızı <b>ONAYLA</b> kolunu çeker.</li></ol>`,
   ducks: () => `<h2>🦆 ÖRDEK AVI</h2><p>Tavandaki lambaların ve boruların üstünde <b>7 lastik ördek</b> var. Sadece <b>3 tanesi altın</b> (bomba çipi içlerinde!), gerisi sahte.</p>
-    <ol><li>Altın olanları sadece <b>${game.puzzle.duckInfo === 'pointer' ? 'İŞARETÇİ' : 'SEN'}</b> görür: parlıyorlar.</li><li><b>YERÇEKİMSİZ</b> uçup ördeğe tıklayarak yakalar.</li><li>Sahte ördek yakalamak = hata (ve çok utanç verici bir VAK sesi).</li></ol>`,
+    <ol><li>Altın olanları sadece <b>${holdsTxt(game.puzzle.duckInfo)}</b> görür: parlıyorlar.</li><li><b>YERÇEKİMSİZ</b> uçup ördeğe tıklayarak yakalar.</li><li>Sahte ördek yakalamak = hata (ve çok utanç verici bir VAK sesi).</li></ol>`,
   mouse: () => `<h2>🐭 FARE PANELİ</h2><p>Masanın <b>altında</b> küçük bir panel var. Oraya sadece <b>MİNİK</b> sığar.</p>
-    <ol><li>3 haneli kodu <b>${game.puzzle.mouseInfo === 'pointer' ? 'İŞARETÇİ' : 'SEN'}</b> biliyor${game.puzzle.mouseInfo === 'pointer' ? ' (panodaki rakamları lazerle gösterir)' : ' (ekranının sol altında)'}.</li><li>MİNİK her kutuya tıklayarak rakamı 1 artırır, sonra <b>TAMAM</b>'a basar.</li><li>Yanlış kod = hata.</li></ol>`,
+    <ol><li>3 haneli kodu <b>${holdsTxt(game.puzzle.mouseInfo)}</b> biliyor${game.puzzle.mouseInfo === 'pointer' ? ' (panodaki rakamları lazerle gösterir)' : game.puzzle.mouseInfo === myRole() ? ' (ekranının sol altında)' : ''}.</li><li>MİNİK her kutuya tıklayarak rakamı 1 artırır, sonra <b>TAMAM</b>'a basar.</li><li>Yanlış kod = hata.</li></ol>`,
   maze: () => `<h2>🧭 LABİRENT</h2><p>Bu da <b>senin değil</b> ama kuralları sen biliyorsun: kuzeydoğu köşede, yerde 5×4 karelik bir alan var.</p>
     <ol><li>Güvenli kareleri sadece <b>YERÇEKİMSİZ</b> görür: yukarıdan bakınca turkuaz parlarlar.</li><li><b>TERS TUŞ</b> sarı <b>GİRİŞ</b> çizgisinden girip güvenli karelerden yürüyerek en arka sıraya ulaşmalı. Evet, karışık tuşlarla. 😈</li><li>Yanlış kareye basmak ya da kare <b>atlamak</b> (zıplamak yok!) → labirent sıfırlanır ve <b>8 saniye</b> gider. Hata sayılmaz.</li></ol>
     <div class="tip">YERÇEKİMSİZ "bir ileri, iki sağ" gibi adım adım tarif etsin. Doğru basılan kareler herkese yeşil yanar.</div>`,
@@ -3011,8 +3075,10 @@ function renderLobby() {
     if (net.solo) renderLobby(); else broadcastLobby();
   });
   const n = Object.keys(players).length;
-  const miss = ['defuser', 'reader', 'floater'].filter(r => !byRole(r).length);
-  if (net.isHost && !net.solo) $('#lobbyStatus').textContent = miss.length ? `${n}/5 kişi · Şart olan boş roller: ${miss.map(r => ROLES[r].name).join(', ')}` : n < 5 ? `${n}/5 kişi · Başlatabilirsin ama oyun 5 kişiyle tam tadında: İŞARETÇİ ve MİNİK gelince Lazer Kilidi ve Fare Paneli de açılır.` : 'Ekip tam: 5/5. Vardiyayı başlat!';
+  const miss = missingRoles(), missTxt = miss.map(r => ROLES[r].name).join(', ');
+  if (net.isHost && !net.solo) $('#lobbyStatus').textContent = miss.length ? `${n}/5 kişi · Başlatılamaz — şart olan boş roller: ${missTxt}. Biri o rol kartına tıklamalı.` : n < 5 ? `${n}/5 kişi · Başlatabilirsin ama oyun 5 kişiyle tam tadında: İŞARETÇİ ve MİNİK gelince Lazer Kilidi ve Fare Paneli de açılır.` : 'Ekip tam: 5/5. Vardiyayı başlat!';
+  else if (!net.isHost) $('#lobbyStatus').textContent = miss.length ? `Vardiya başlayamaz — şart olan boş roller: ${missTxt}. Boş karta tıkla!` : 'Oda sahibinin vardiyayı başlatmasını bekle...';
+  const bs = $('#btnStart'); bs.disabled = miss.length > 0; bs.title = miss.length ? `Şart olan boş roller: ${missTxt}` : '';
 }
 function pickRole(r) {
   if (net.solo) { players[myId].role = r; renderLobby(); return; }
@@ -3020,11 +3086,7 @@ function pickRole(r) {
 }
 $$('#diffSeg button').forEach(b => b.onclick = () => { if (!net.isHost) return; sfx.ui(); lobbyDiff = b.dataset.d; if (net.solo) renderLobby(); else broadcastLobby(); });
 $('#btnShuffle').onclick = () => { const ids = shuffle(Object.keys(players)); ids.forEach((id, i) => players[id].role = ROLE_ORDER[i] || 'none'); if (net.solo) renderLobby(); else broadcastLobby(); };
-$('#btnStart').onclick = () => {
-  const n = Object.keys(players).length;
-  if (!net.solo && n < 3 && !confirm(`Şu an ${n} kişisiniz. Yine de başlatılsın mı? (Oyun 5 kişi için tasarlandı, en az 3 kişi gerekir)`)) return;
-  hostStart(); lockPointer();
-};
+$('#btnStart').onclick = () => { if (hostStart()) lockPointer(); };
 const copyText = (t, msg) => { (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => { $('#lobbyStatus').textContent = msg; }, () => prompt('Kopyala:', t)); };
 $('#btnCopy').onclick = () => copyText(net.code, '📋 Kod kopyalandı: ' + net.code);
 $('#btnLink').onclick = () => copyText(location.origin + location.pathname + '?oda=' + net.code, '🔗 Davet linki kopyalandı! Arkadaşına gönder.');
@@ -3032,7 +3094,7 @@ const micBtn = $('#btnMic');
 micBtn.addEventListener('pointerdown', () => { micBtn.textContent = 'Konuş... (bırakınca tersten çalar)'; startRec('prova'); });
 const micUp = () => { if (recMode === 'prova') { stopRec('prova'); micBtn.textContent = 'Ters sesini dene (basılı tut)'; } };
 micBtn.addEventListener('pointerup', micUp); micBtn.addEventListener('pointerleave', micUp);
-$('#btnAgain').onclick = () => { hostStart(); lockPointer(); };
+$('#btnAgain').onclick = () => { if (hostStart()) lockPointer(); };
 $('#btnToLobby').onclick = () => broadcast({ t: 'toLobby' });
 // tüm butonlara ses
 document.addEventListener('mouseover', e => { const b = e.target.closest && e.target.closest('.btn,.seg button'); if (b && b !== document._lastHover) { document._lastHover = b; ac(); sfx.hover(); } });
@@ -3201,6 +3263,7 @@ $('#roleStrip').innerHTML = LOBBY_ORDER.map(r => `<div style="--rc:${ROLES[r].cs
 $('#menu').classList.remove('hidden');
 loop();
 window.__tb = { get game() { return game; }, me, players: () => players, net, act: m => sendToHost(m), myRole, avatars, emote: doEmote, M, camera, setRole: r => { players[myId].role = r; refreshModules(); setupRoleHud(); syncAvatars(); }, laser: v => { laserOn = v; } }; // test için
+Object.assign(window.__tb, { checkSolvable, genPuzzle, MOD_NEEDS, REQ_ROLES, missingRoles, hostStart, raw: m => net.hostConn && net.hostConn.send(m) }); // PKG-A test kancaları
 
 </script>
 </body>
