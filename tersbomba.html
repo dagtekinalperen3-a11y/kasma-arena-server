@@ -2472,7 +2472,7 @@ function aimed() {
   if (!canPlay() || game.countdown > 0) return null;
   ray.setFromCamera({ x: 0, y: 0 }, camera);
   const hits = ray.intersectObjects(interactables, false);
-  return hits.length ? hits[0].object : null;
+  return hits.length ? (hits.find(h => !h.object.userData.pad) || hits[0]).object : null; // gerçek parça, büyütülmüş dokunma alanından (hitPad) önce gelir
 }
 const NOPE = ['🙅 Elini çek! Bu TERS TUŞ\'un işi.', '🚫 Sen dokunursan patlar. Ciddiyim.', '👀 Göremediğin şeye dokunma!', '🤚 TERS TUŞ\'a söyle, o yapsın.'];
 document.addEventListener('mousedown', e => {
@@ -2487,7 +2487,7 @@ document.addEventListener('mousedown', e => {
     return;
   }
   if (game.solved[u.mod]) return;
-  popCross();
+  popCross(); popObject(o);
   const at = new THREE.Vector3(); o.getWorldPosition(at);
   if (u.kind === 'wire') { if (!game.wireCut[u.i]) { sfx.snip(); burst(14, [0xffd23f, 0xffffff, 0xff8c1a], 2.5, 0.6, at, 0.035); sendToHost({ t: 'act', a: 'cut', i: u.i }); } }
   else if (u.kind === 'key') { if (!game.keyPressed[u.i]) { sfx.click(); sendToHost({ t: 'act', a: 'key', i: u.i }); } }
@@ -3310,11 +3310,47 @@ function buildViewModel() {
 // =====================================================================
 const HINTS = { turnKey: () => '🔑 Anahtarı çevir (ikisi AYNI ANDA!)', phone: () => game.chaos && game.chaos.type === 'telefon' && !game.chaos.done ? '📞 AÇ! AÇ! AÇ!' : '📞 Acil hat (çalınca aç)', egg: () => '🦆 Vak?', duck: () => '🦆 Ördeği yakala', dial: () => '🔢 Rakamı çevir', dialOk: () => '✔ Kodu onayla', wire: u => `✂️ ${u.i + 1}. kabloyu kes`, key: () => '👆 Sembole bas', button: () => '🔴 Bas / basılı tut', pw: u => u.d > 0 ? '🔼 Harfi çevir' : '🔽 Harfi çevir', pwOk: () => '✔ Şifreyi gönder', fuse: () => '⚡ Şalteri çevir', fuseOk: () => '🔴 ONAYLA kolunu çek' };
 let last = performance.now(), sendT = 0, lastSec = -1, censorT = 0, posKey = '';
+// ---------- etkileşim hissi: vurgu çerçevesi, tıklama "pop"u, büyütülmüş dokunma alanı ----------
+const hoverTex = canvasTex(128, 128, x => { x.strokeStyle = '#fff'; x.lineWidth = 12; x.lineCap = 'round'; x.lineJoin = 'round'; for (const [a, b] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const X = a ? 120 : 8, Y = b ? 120 : 8, d = a ? -34 : 34, e = b ? -34 : 34; x.beginPath(); x.moveTo(X + d, Y); x.lineTo(X, Y); x.lineTo(X, Y + e); x.stroke(); } });
+const hoverMark = new THREE.Sprite(new THREE.SpriteMaterial({ map: hoverTex, transparent: true, depthTest: false, depthWrite: false })); hoverMark.renderOrder = 15; hoverMark.visible = false; hoverMark.userData.laserSkip = true; scene.add(hoverMark);
+const _hb = new THREE.Box3(), _hs = new THREE.Sphere(), pops = [];
+let hoverR = 0.2, hoverPopT = -1e9;
+const visOf = o => o.userData.proxy || o; // dokunma alanı (hitPad) → asıl görünen parça
 function setHover(o) {
   if (hovered === o) return;
-  if (hovered && hovered.material.emissive) hovered.material.emissive.setHex(hovered.userData.baseEm || 0);
-  hovered = o;
-  if (o && o.material.emissive) o.material.emissive.setHex(allowed(myRole(), canUse(o)) ? 0x5a4a10 : 0x400808);
+  if (hovered) { const v = visOf(hovered); if (v.material && v.material.emissive) v.material.emissive.setHex(v.userData.baseEm || 0); }
+  hovered = o; hoverMark.visible = !!o;
+  if (!o) return;
+  const v = visOf(o), ok = allowed(myRole(), canUse(o)) || o.userData.kind === 'egg';
+  if (v.material && v.material.emissive) v.material.emissive.setHex(ok ? 0x80680f : 0x5a0a0a);
+  _hb.setFromObject(v).getBoundingSphere(_hs); hoverMark.position.copy(_hs.center); hoverR = clamp(_hs.radius, 0.1, 0.9);
+  hoverMark.material.color.setHex(ok ? 0xf5b800 : 0xe5382b); // sarı köşeler: dokunabilirsin · kırmızı: bu senin işin değil
+}
+function updateHover(now) {
+  for (let i = pops.length - 1; i >= 0; i--) { // tıklanan parça kısa bir an büyür; ölçek göreli çarpıldığı için başka kodun yaptığı ölçek değişikliklerini bozmaz
+    const p = pops[i], u = (now - p.t0) / 170, k = u >= 1 ? 1 : 1 + 0.16 * Math.sin(u * Math.PI), f = k / p.k; p.k = k;
+    p.o.scale.x *= f; p.o.scale.z *= f; if (!p.keepY) p.o.scale.y *= f;
+    if (u >= 1) pops.splice(i, 1);
+  }
+  if (!hoverMark.visible) return;
+  const pu = (now - hoverPopT) / 220, s = hoverR * 2.5 * (1 + Math.sin(now / 150) * 0.04) * (pu < 1 ? 1 + 0.45 * Math.sin(pu * Math.PI) : 1);
+  hoverMark.scale.set(s, s, 1); hoverMark.material.opacity = 0.92;
+}
+function popObject(o) {
+  hoverPopT = performance.now();
+  let v = visOf(o); if (v.material && v.material.opacity === 0 && v.parent) v = v.parent; // görünmez dokunma küresi (ördek): görünen gövdeyi zıplat
+  if (v.userData.noPop || pops.some(p => p.o === v)) return;
+  pops.push({ o: v, t0: hoverPopT, k: 1, keepY: v.userData.kind === 'wire' }); // kablonun boyu (scale.y) oyun durumuna ait: sadece kalınlığı oynar
+}
+// Küçük hedefler için görünmez, büyütülmüş dokunma alanı. target: interact() ile kaydedilmiş görünen parça;
+// size: küre yarıçapı ya da [en, boy, derinlik] kutu (target'ın yerel ölçüsünde); offset: yerel kaydırma.
+// Alan target'ın türü ve verisiyle davranır, vurgu ve "pop" target'ta görünür; doğrudan vurulan gerçek parça her zaman önceliklidir.
+const hitPadMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+function hitPad(target, size, offset) {
+  const pad = new THREE.Mesh(Array.isArray(size) ? new THREE.BoxGeometry(size[0], size[1], size[2]) : new THREE.SphereGeometry(size, 10, 8), hitPadMat);
+  if (offset) pad.position.set(offset[0], offset[1], offset[2]);
+  pad.userData = { ...target.userData, proxy: target, pad: true, noCast: true, laserSkip: true };
+  pad.castShadow = pad.receiveShadow = false; target.add(pad); interactables.push(pad); return pad;
 }
 function loop() {
   requestAnimationFrame(loop);
@@ -3365,7 +3401,7 @@ function loop() {
     $('#vignette').style.opacity = game.status === 'playing' && game.timeLeft < 30 ? (settings.flash ? 0.35 + Math.sin(now / 200) * 0.25 : 0.26) : (holdingBtn ? 0 : $('#vignette').style.opacity * 0.9); // efektler kapalı: nabız yok, sabit hafif kenar
     // nişan
     const o = document.pointerLockElement === canvas ? aimed() : null;
-    setHover(o);
+    setHover(o); updateHover(now);
     const cross = $('#cross'), hint = $('#hint');
     if (o) {
       const need = canUse(o), ok = allowed(myRole(), need) || o.userData.kind === 'egg';
@@ -3454,7 +3490,7 @@ $('#menu').classList.remove('hidden');
 loop();
 window.__tb = { get game() { return game; }, me, players: () => players, net, act: m => sendToHost(m), myRole, avatars, emote: doEmote, M, camera, setRole: r => { players[myId].role = r; refreshModules(); setupRoleHud(); syncAvatars(); }, laser: v => { laserOn = v; } }; // test için
 // test için (konfor / görüntü / performans): ayarlar, kamera ve efekt değerleri, renderer
-Object.assign(window.__tb, { settings, applyComfort, syncSettingsUi, cam: camDbg, avatarFx, sendFx, quackDuck, fxLog, fxObjs, FX_MS, FX_TUNE, hostFx, playEmote, emoteLog, EMOTES, EMOTE_TUNE, renderer, scene, THREE, applyTheme, HIGH, setShake: v => { shake = v; }, explode, flashVignette,
+Object.assign(window.__tb, { settings, applyComfort, syncSettingsUi, cam: camDbg, hitPad, pops, hover: () => ({ kind: hovered ? hovered.userData.kind : null, pad: !!(hovered && hovered.userData.pad), mark: hoverMark.visible, color: hoverMark.material.color.getHex(), size: hoverMark.scale.x, em: hovered && visOf(hovered).material.emissive ? visOf(hovered).material.emissive.getHex() : null }), interactables: () => interactables, avatarFx, sendFx, quackDuck, fxLog, fxObjs, FX_MS, FX_TUNE, hostFx, playEmote, emoteLog, EMOTES, EMOTE_TUNE, renderer, scene, THREE, applyTheme, HIGH, setShake: v => { shake = v; }, explode, flashVignette,
   post: () => ({ bloom: bloom ? bloom.strength : null, vig: filmPass ? filmPass.uniforms.uVig.value : null, grain: filmPass ? filmPass.uniforms.uGrain.value : null, ab0: filmPass ? filmPass.uniforms.uAb0.value : null, ab: filmPass ? filmPass.uniforms.uAb.value : null, filmAb: film.ab, nofx: document.body.classList.contains('nofx'), vignette: +$('#vignette').style.opacity || 0, flashShown: getComputedStyle($('#flash')).display !== 'none', softFade: softFadeEl.classList.contains('on'), invMark: !invMark.classList.contains('hidden'), alarm: alarm.color.r * alarm.intensity, fov: camera.fov }) });
 
 </script>
