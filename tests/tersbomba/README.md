@@ -27,6 +27,7 @@ Başarısızlıkta çıkış kodu sıfırdan farklıdır; her istemcinin `state(
 | `TB_HTML` | Test edilecek oyun dosyası (varsayılan: `../../tersbomba.html`) |
 | `TB_OUT` | Ekran görüntülerinin yazılacağı klasör (varsayılan: `out/`) |
 | `TB_SLOW` | Tüm bekleme sürelerini çarpar (yavaş makine: `TB_SLOW=3`) |
+| `TB_ALLOW_KNOWN` | `1` ise `t.bug(...)` ile işaretli bilinen oyun hataları FAIL yerine uyarı sayılır |
 | `TB_HEADED` | `1` ise tarayıcı pencereli açılır |
 
 ## Senaryolar
