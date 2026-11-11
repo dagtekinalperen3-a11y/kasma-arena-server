@@ -975,10 +975,16 @@ function hostRoom(solo) {
   net.peer = peer;
   peer.on('open', id => { myId = id; players = { [id]: { name: myName, role: 'reader' } }; showLobby(code); });
   peer.on('connection', c => {
-    c.on('open', () => net.conns.push(c));
-    c.on('data', m => hostHandle(m, c.peer));
-    c.on('close', () => dropPlayer(c.peer));
-    c.on('error', () => dropPlayer(c.peer));
+    c.on('open', () => {
+      if (net.conns.includes(c)) return;                 // PeerJS 'open' olayını bazen iki kez verir: aynı bağlantı iki kez kaydedilmez
+      if (net.conns.length >= HOST_LIM.maxConns || net.conns.some(x => x.peer === c.peer)) { c._tbRej = true; try { c.close(); } catch (e) {} return; }
+      net.conns.push(c);
+      setTimeout(() => { if (!players[c.peer] && c.open) { try { c.close(); } catch (e) {} } }, HOST_LIM.helloMs); // "hello" demeyen bağlantı tutulmaz
+    });
+    // doğrulama hostHandle içinde; buradaki try/catch yalnızca emniyet ağı (hostDiag.caught testlerde 0 kalmalı)
+    c.on('data', m => { if (c._tbRej) return; try { hostHandle(m, c.peer); } catch (e) { hostDiag.caught++; console.warn('host: paket işlenemedi', e); } });
+    c.on('close', () => { if (!c._tbRej) dropPlayer(c.peer, c); });
+    c.on('error', () => { if (!c._tbRej) dropPlayer(c.peer, c); });
   });
   peer.on('disconnected', () => { try { peer.reconnect(); } catch (e) {} });
   peer.on('error', e => {
@@ -988,8 +994,10 @@ function hostRoom(solo) {
     $('#lobbyStatus').textContent = '⚠️ Bağlantı hatası: ' + e.type;
   });
 }
-function dropPlayer(id) {
+function dropPlayer(id, conn) {
+  if (conn && !net.conns.includes(conn)) return;        // zaten düşürülmüş (close + error art arda gelebilir)
   net.conns = net.conns.filter(c => c.peer !== id);
+  delete hostBuckets[id]; delete hostMeta[id];
   if (!players[id]) return;
   const gone = players[id];
   toast(`👋 ${gone.name} kaçtı!`);
@@ -1013,7 +1021,7 @@ function joinRoom(code) {
   peer.on('open', id => {
     myId = id;
     const c = peer.connect('tersbomba-' + code, { reliable: true, serialization: 'json' });
-    c.on('open', () => { clearTimeout(to); net.hostConn = c; c.send({ t: 'hello', name: myName }); showLobby(code); });
+    c.on('open', () => { clearTimeout(to); net.hostConn = c; c.send({ t: 'hello', name: myName, token: myToken() }); showLobby(code); });
     c.on('data', clientHandle);
     c.on('close', () => { toast('❌ Oda sahibiyle bağlantı koptu'); $('#lobbyStatus').textContent = 'Bağlantı koptu. Sayfayı yenileyip tekrar katıl.'; document.exitPointerLock && document.exitPointerLock(); $('#lostModal').classList.remove('hidden'); });
   });
@@ -1022,6 +1030,8 @@ function joinRoom(code) {
     $('#menuStatus').textContent = e.type === 'peer-unavailable' ? '🔍 Böyle bir oda yok. Kodu kontrol et!' : '⚠️ Bağlantı hatası: ' + e.type;
   });
 }
+// yeniden bağlanınca aynı rolü geri almak için kalıcı rastgele kimlik (yalnızca oda sahibine gider)
+function myToken() { let k = lsGet('tb-token'); if (!k || !/^[\w-]{8,64}$/.test(k)) { const a = new Uint8Array(12); crypto.getRandomValues(a); k = [...a].map(v => v.toString(16).padStart(2, '0')).join(''); lsSet('tb-token', k); } return k; }
 function sendToHost(msg) {
   if (net.isHost) hostHandle(msg, myId);
   else if (net.hostConn && net.hostConn.open) net.hostConn.send(msg);
@@ -1036,15 +1046,56 @@ function freeRole() { const used = Object.values(players).map(p => p.role); retu
 function stat(id, k) { if (!game) return; const s = game.stats[id] || (game.stats[id] = { voice: 0, emote: 0, strikes: 0, solves: 0, name: players[id] ? players[id].name : '?' }); s[k] = (s[k] || 0) + 1; }
 
 // ---------- HOST: gelen mesajlar ----------
+// Her paket önce burada doğrulanır; bozuk ya da kötü niyetli paket sessizce yok sayılır, asla istisna fırlatmaz.
+// Oda sahibinin kendi istemcisi de aynı yoldan geçer (sendToHost → hostHandle).
+const HOST_LIM = { maxPlayers: 8, maxConns: 12, helloMs: 15000, nameLen: 16 };                 // 5 rol + en çok 3 izleyici
+const HOST_RATE = { pos: [30, 36], act: [12, 14], role: [3, 5], hello: [0.2, 2], ping: [2, 4], _: [20, 30] }; // tür → [saniyede, patlama]
+const hostDiag = { bad: 0, limited: 0, caught: 0, reach: 0 };   // testler ve hata ayıklama için sayaçlar
+const hostBuckets = {}, hostMeta = {};                          // oyuncu başına jeton kovaları / oda sahibine özel veriler (jeton, son görülme)
+function hostAllow(from, t) { // jeton kovası: tür başına hız sınırı
+  const k = own(HOST_RATE, t) ? t : '_', L = HOST_RATE[k], now = performance.now(), B = hostBuckets[from] || (hostBuckets[from] = {});
+  const b = B[k] || (B[k] = { n: L[1], at: now });
+  b.n = Math.min(L[1], b.n + (now - b.at) / 1000 * L[0]); b.at = now;
+  if (b.n < 1) { hostDiag.limited++; return false; }
+  b.n--; return true;
+}
+const isNum = v => typeof v === 'number' && isFinite(v);
+const isVec3 = v => Array.isArray(v) && v.length === 3 && v.every(isNum);
+const cleanName = s => [...(typeof s === 'string' ? s.slice(0, 200) : '').replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e<>]/g, '').replace(/\s+/g, ' ').trim()].slice(0, HOST_LIM.nameLen).join('').trim() || 'Oyuncu';
+function hostSelfPose() { const p = players[myId]; if (p) { p.p = [me.pos.x, me.pos.y, me.pos.z]; p.yaw = me.yaw; p.l = p.role === 'pointer' ? me.laserPt : null; } }
+function hostHello(m, from) {
+  if (from === myId || players[from]) return;                    // ikinci "hello" rol çalamaz
+  const conn = net.conns.find(c => c.peer === from); if (!conn) return;
+  if (Object.keys(players).length >= HOST_LIM.maxPlayers) { try { conn.send({ t: 'full' }); } catch (e) {} setTimeout(() => { try { conn.close(); } catch (e) {} }, 400); return; }
+  hostMeta[from] = { token: typeof m.token === 'string' && /^[\w-]{8,64}$/.test(m.token) ? m.token : null, seen: performance.now() };
+  players[from] = { name: cleanName(m.name), role: freeRole() };
+  broadcastLobby();
+  if (game && inGame) { try { conn.send({ t: 'start', puzzle: game.puzzle, players: lobbyPlayers() }); } catch (e) {} }
+}
+// Sessizlik denetimi: istemciler 2 sn'de bir "ping" yollar; uzun süre hiç paket gelmeyen oyuncu kopmuş sayılır
+// (sekme kapanınca ya da ağ gidince WebRTC'nin kendi "close" olayı 30 sn'yi bulabiliyor).
+const HOST_SILENCE = { ping: 2000, drop: 12000 };
+let hostSilT = 0;
+function hostSilenceTick(now) {
+  if (now - hostSilT > 2500) for (const id in hostMeta) hostMeta[id].seen = now;   // oda sahibi takıldıysa (pencere, sekme) kimseyi suçlama
+  hostSilT = now;
+  for (const id in hostMeta) if (id !== myId && now - hostMeta[id].seen > HOST_SILENCE.drop) {
+    const c = net.conns.find(c => c.peer === id); dropPlayer(id); if (c) { c._tbRej = true; try { c.close(); } catch (e) {} }
+  }
+}
+setInterval(() => { if (!net.isHost && net.hostConn && net.hostConn.open) { try { net.hostConn.send({ t: 'ping' }); } catch (e) {} } }, HOST_SILENCE.ping);
 function hostHandle(m, from) {
+  if (!m || typeof m !== 'object' || Array.isArray(m) || typeof m.t !== 'string' || typeof from !== 'string') { hostDiag.bad++; return; }
+  if (!hostAllow(from, m.t)) return;
+  const pl = players[from];
+  if (!pl && m.t !== 'hello') return;                            // tanışmamış bağlantıdan başka paket kabul edilmez
+  if (hostMeta[from]) hostMeta[from].seen = performance.now();
+  if (from === myId) hostSelfPose();
   switch (m.t) {
-    case 'hello':
-      players[from] = { name: String(m.name || 'Oyuncu').slice(0, 16), role: freeRole() };
-      broadcastLobby();
-      if (game && inGame) { const c = net.conns.find(c => c.peer === from); c && c.send({ t: 'start', puzzle: game.puzzle, players: lobbyPlayers() }); }
-      break;
+    case 'hello': hostHello(m, from); break;
+    case 'ping': break;
     case 'role':
-      if (!players[from] || inGame) break;
+      if (inGame || typeof m.role !== 'string' || !own(ROLES, m.role)) break;
       if (m.role !== 'none') {
         const other = Object.keys(players).find(id => id !== from && players[id].role === m.role);
         if (other) players[other].role = players[from].role; // yer değiştir
@@ -1053,7 +1104,10 @@ function hostHandle(m, from) {
       broadcastLobby();
       break;
     case 'pos':
-      if (players[from]) { players[from].p = m.p; players[from].yaw = m.yaw; players[from].l = m.l || null; }
+      if (!isVec3(m.p)) break;
+      pl.p = [clamp(m.p[0], -HX, HX), clamp(m.p[1], 0, H), clamp(m.p[2], -HZ, HZ)];   // oda sınırına kırpılır
+      pl.yaw = isNum(m.yaw) ? m.yaw % (Math.PI * 2) : 0;
+      pl.l = pl.role === 'pointer' && isVec3(m.l) ? [clamp(m.l[0], -HX - 1, HX + 1), clamp(m.l[1], -1, H + 1), clamp(m.l[2], -HZ - 1, HZ + 1)] : null;
       break;
     case 'act': hostAction(m, from); break;
     case 'emote':
@@ -1113,9 +1167,25 @@ function hostStrike(why, from) {
 }
 function hostTime(sec, msg) { game.timeLeft = Math.max(1, game.timeLeft + sec); game.fxQ.push({ sec, msg }); }
 function pushState() { broadcast({ t: 'state', g: snapshot(), why: game.lastWhy || '', fx: game.fxQ.splice(0) }); game.lastWhy = ''; }
+// aksiyonun alanları (indeksler) geçerli aralıkta mı? Geçersizse aksiyon hiç işlenmez.
+function actFields(m, P) {
+  const int = (v, n) => Number.isInteger(v) && v >= 0 && v < n;
+  switch (m.a) {
+    case 'cut': return int(m.i, P.wires.length);
+    case 'key': return int(m.i, 4);
+    case 'pw': return int(m.c, 5) && (m.d === 1 || m.d === -1);
+    case 'fuse': return int(m.i, 5);
+    case 'duck': return int(m.i, P.ducks.spots.length);
+    case 'dial': return int(m.i, 3);
+    case 'maze': return int(m.i, MZ.cols * MZ.rows);
+    case 'turnKey': return int(m.i, 2);
+    default: return true;   // phone, btnDown, btnUp, pwOk, fuseOk, dialOk: alan yok
+  }
+}
 function hostAction(m, from) {
   if (!game || game.status !== 'playing' || game.countdown > 0 || !players[from]) return;
   const role = players[from].role, P = game.puzzle, S = game.solved;
+  if (typeof m.a !== 'string' || (m.a !== 'phone' && !own(ACT_MOD, m.a)) || !actFields(m, P)) { hostDiag.bad++; return; }
   if (m.a === 'phone') { // çalan telefonu herkes açabilir
     if (game.chaos && game.chaos.type === 'telefon' && !game.chaos.done && role !== 'none') {
       game.chaos.done = true; game.chaos.left = Math.min(game.chaos.left, 1.5);
@@ -1185,6 +1255,7 @@ let hostLast = performance.now(), hostStateT = 0, hostPoseT = 0;
 function hostTick() {
   const now = performance.now(), dt = Math.min(5, (now - hostLast) / 1000); hostLast = now;
   if (!net.isHost) return;
+  hostSilenceTick(now);
   if (game && inGame && game.status === 'playing') {
     let force = false;
     if (game.countdown > 0) { game.countdown -= dt; if (game.countdown <= 0) force = true; }
@@ -1262,6 +1333,7 @@ function clientHandle(m) {
     }
     case 'emote': playEmote(m.id, m.e); break;
     case 'toLobby': backToLobby(); break;
+    case 'full': $('#lobby').classList.add('hidden'); $('#menu').classList.remove('hidden'); $('#menuStatus').textContent = 'Oda dolu (en fazla 8 kişi).'; break;
   }
 }
 
@@ -3263,7 +3335,7 @@ $('#roleStrip').innerHTML = LOBBY_ORDER.map(r => `<div style="--rc:${ROLES[r].cs
 $('#menu').classList.remove('hidden');
 loop();
 window.__tb = { get game() { return game; }, me, players: () => players, net, act: m => sendToHost(m), myRole, avatars, emote: doEmote, M, camera, setRole: r => { players[myId].role = r; refreshModules(); setupRoleHud(); syncAvatars(); }, laser: v => { laserOn = v; } }; // test için
-Object.assign(window.__tb, { checkSolvable, genPuzzle, MOD_NEEDS, REQ_ROLES, missingRoles, hostStart, raw: m => net.hostConn && net.hostConn.send(m) }); // PKG-A test kancaları
+Object.assign(window.__tb, { get myId() { return myId; }, plateOf, MOD_ROLE, ACT_MOD, hostDiag, hostMeta, cleanName, checkSolvable, genPuzzle, MOD_NEEDS, REQ_ROLES, missingRoles, hostStart, raw: m => net.hostConn && net.hostConn.send(m) }); // PKG-A test kancaları
 
 </script>
 </body>
