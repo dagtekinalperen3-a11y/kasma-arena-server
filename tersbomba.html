@@ -467,6 +467,7 @@ const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { c
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const params = new URLSearchParams(location.search);
+const NORENDER = params.get('norender') === '1';
 const FONT = 'Anton, Impact, "Arial Narrow", sans-serif';
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
@@ -3179,6 +3180,7 @@ function loop() {
     crtT -= dt; if (crtT < 0) { crtT = 0.45; drawCrt(); } }
   film.ab *= Math.pow(0.03, dt);
   if (filmPass) { filmPass.uniforms.uTime.value = (now / 1000) % 100; filmPass.uniforms.uAb.value = film.ab + (inGame && game && game.status === 'playing' && game.timeLeft < 30 ? 0.03 + Math.sin(now / 200) * 0.02 : 0); }
+  if (NORENDER) return; // otomatik testler: mantık çalışır, çizim atlanır
   if (composer) composer.render(); else renderer.render(scene, camera);
 }
 let camRoll = 0, lsrOn = -1, lsrT = 0;
