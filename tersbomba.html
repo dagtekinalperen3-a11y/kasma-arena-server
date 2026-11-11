@@ -1347,7 +1347,13 @@ function noise2(x, w, h, n, a) { for (let i = 0; i < n; i++) { x.fillStyle = `rg
 
 // ---------- ışıklar ----------
 const hemi = new THREE.HemisphereLight(0xe4eeff, 0x8a7560, 0.36); scene.add(hemi);
-for (const [c, x, z] of [[0x2ec4b6, -10.5, -8.5], [0xff5a4a, 10.5, 8.5], [0x2ec4b6, 10.5, -8.5], [0xf5b800, -10.5, 8.5]]) { const l = new THREE.PointLight(c, 9, 13, 1.5); l.position.set(x, 1.1, z); scene.add(l); }
+// Işık bütçesi (ölçüldü: her nokta ışığı, ekrandaki her pikselde hesaplanır):
+//  yüksek: 3 tavan + 4 köşe vurgusu + alarm + telefon + 2 ikaz = 11 nokta ışığı (eskiden 15: disko için 4 ışık hep 0 şiddetle bekliyordu;
+//          artık disko sırasında köşe vurguları disko ışığı olarak kullanılıyor)
+//  düşük:  3 tavan + alarm = 4 nokta ışığı; köşe vurgusu, ikaz ve telefon ışığı yerine sadece ışıyan yüzeyler var.
+// Işıklar oyun sırasında eklenip çıkarılmaz ve .visible değiştirilmez (gölgelendiriciler yeniden derlenmesin); sadece şiddet/renk/konum değişir.
+const ACCENT = [[0x2ec4b6, -10.5, -8.5], [0xff5a4a, 10.5, 8.5], [0x2ec4b6, 10.5, -8.5], [0xf5b800, -10.5, 8.5]];
+const accentLights = HIGH ? ACCENT.map(([c, x, z]) => { const l = new THREE.PointLight(c, 9, 13, 1.5); l.position.set(x, 1.1, z); scene.add(l); return l; }) : [];
 const sun = new THREE.DirectionalLight(0xfff0d6, 2.4);
 sun.position.set(-7, 15, 26); sun.target.position.set(0, 0, 2); scene.add(sun, sun.target);
 sun.castShadow = HIGH; sun.shadow.mapSize.set(2048, 2048);
@@ -1358,7 +1364,8 @@ const bombSpot = new THREE.SpotLight(0xffffff, 30, 0, 0.42, 0.6, 1.5);
 bombSpot.position.set(0, 6.6, 0.4); bombSpot.target.position.set(0, 0.9, 0); scene.add(bombSpot, bombSpot.target);
 bombSpot.castShadow = HIGH; bombSpot.shadow.mapSize.set(1024, 1024); bombSpot.shadow.bias = -0.0005;
 const alarm = new THREE.PointLight(0xff2030, 0, 10, 1.6); alarm.position.set(0, 2.4, 0); scene.add(alarm);
-const discoLights = [0xff3df0, 0x3dd8ff, 0xfff23d, 0x5dff6a].map((c, i) => { const l = new THREE.PointLight(c, 0, 16, 1.4); l.position.set(Math.cos(i * 1.57) * 5, 5, Math.sin(i * 1.57) * 5); scene.add(l); return l; });
+const DISCO_COL = [0xff3df0, 0x3dd8ff, 0xfff23d, 0x5dff6a], CEIL_COL = 0xffd9a0;
+let discoWas = false;
 const flashlight = new THREE.SpotLight(0xfff6e0, 0, 22, 0.5, 0.5, 1.2);
 flashlight.position.set(0.25, -0.2, 0); camera.add(flashlight, flashlight.target); flashlight.target.position.set(0, -0.2, -5);
 const baseLights = { hemi: hemi.intensity, sun: sun.intensity, ceil: 14, spot: 30, exp: 0.92 };
@@ -1405,7 +1412,7 @@ function applyTheme(name) {
   shaftMat.color.setHex(T.shaft[0]); shaftMat.opacity = T.shaft[1];
   if (typeof sun !== 'undefined') {
     sun.color.setHex(T.sun[0]); sun.position.set(...T.sun[2]); hemi.color.setHex(T.hemi[0]); hemi.groundColor.setHex(T.hemi[1]);
-    Object.assign(baseLights, { hemi: T.hemi[2], sun: T.sun[1], ceil: T.ceil, exp: T.exp });
+    Object.assign(baseLights, { hemi: T.hemi[2] * (HIGH ? 1 : 1.18), sun: T.sun[1], ceil: T.ceil, exp: T.exp }); // düşük kalitede köşe vurguları yok: ortam ışığı biraz artar
   }
 }
 
@@ -1495,12 +1502,12 @@ for (const [y, z, c, r] of [[6.4, -HZ + 0.3, 0xc0392b, 0.12], [6.1, -HZ + 0.32, 
 }
 // asma lambalar
 const coneMat = new THREE.MeshBasicMaterial({ map: shaftTex, color: 0xffd9a0, transparent: true, opacity: 0.09, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false });
-const lampShadeMat = std(0xf5b800, { metalness: 0.5, roughness: 0.4, side: THREE.DoubleSide });
+const lampShadeMat = std(0xf5b800, { metalness: 0.5, roughness: 0.4, side: THREE.DoubleSide }), lampCones = [];
 for (const [x, z] of [[-6, -3], [6, -3], [0, 5], [-6, 5], [6, 5], [0, -6]]) {
   add(new THREE.CylinderGeometry(0.015, 0.015, 0.9), std(0x111111), x, H - 0.45, z);
   const sh = add(new THREE.ConeGeometry(0.55, 0.45, 24, 1, true), lampShadeMat, x, H - 0.98, z); sh.userData.noCast = true;
   const bulb = add(new THREE.SphereGeometry(0.16, 16, 12), glow(0xffe2a8, 3), x, H - 1.18, z); bulb.userData.noCast = true;
-  const cone = add(new THREE.ConeGeometry(2.7, 5.8, 28, 1, true), coneMat, x, H - 1.1 - 2.9, z); cone.userData.noCast = cone.userData.laserSkip = true;
+  const cone = add(new THREE.ConeGeometry(2.7, 5.8, 28, 1, true), coneMat, x, H - 1.1 - 2.9, z); cone.userData.noCast = cone.userData.laserSkip = true; lampCones.push(cone);
 }
 
 // ---------- çarpışma ----------
@@ -1614,7 +1621,8 @@ const phoneSet = new THREE.Group(); phoneSet.position.y = 0.16; phoneG.add(phone
 add(rbox(0.42, 0.06, 0.08, 0.03), std(0xb01822, { roughness: 0.25 }), 0, 0.03, 0, phoneSet);
 for (const sx of [-1, 1]) add(new THREE.SphereGeometry(0.07, 14, 10), std(0xb01822, { roughness: 0.25 }), sx * 0.19, 0.0, 0, phoneSet).scale.y = 0.7;
 add(new THREE.CylinderGeometry(0.07, 0.07, 0.02, 20), std(0xf4f4f4), 0, 0.125, 0.02, phoneG);
-const phoneLight = new THREE.PointLight(0xff2030, 0, 7, 1.6); phoneLight.position.set(-7.6, 1.7, 0.6); scene.add(phoneLight);
+const phoneLight = new THREE.PointLight(0xff2030, 0, 7, 1.6); phoneLight.position.set(-7.6, 1.7, 0.6); if (HIGH) scene.add(phoneLight); // düşük kalitede sahneye girmez; yerine telefonun üstündeki lamba ışır
+const phoneLamp = add(new THREE.SphereGeometry(0.07, 12, 10), new THREE.MeshBasicMaterial({ color: 0x3a0606, toneMapped: false }), -7.6, 1.34, 0.6); phoneLamp.userData.noCast = true;
 sign(['📞 ACİL HAT'], { w: 512, h: 128, size: 70, bg: '#d3202c', fg: '#fff', radius: 24 }, -7.34, 0.62, 0.6, Math.PI / 2, 0.44, 0.11);
 sign(['TERSTEN KONUŞMAK', 'SERBESTTİR'], { w: 768, h: 384, size: [76, 96], bg: '#ff4fa3', fg: '#fff', border: '#fff', radius: 30 }, -HX + 0.04, 3.4, 7.2, Math.PI / 2, 2.6, 1.3);
 sign(['YERÇEKİMİ', 'İSTEĞE BAĞLIDIR'], { w: 768, h: 384, size: [90, 70], bg: '#1d2a6b', fg: '#6bf06a', border: '#6bf06a', radius: 30 }, HX - 0.04, 3.4, 6.5, -Math.PI / 2, 2.4, 1.2);
@@ -1651,6 +1659,8 @@ for (let i = 0; i < 5; i++) { const b = add(new THREE.BoxGeometry(0.16, 0.62, 0.
 const dustGeo = new THREE.BufferGeometry(); { const p = new Float32Array(400 * 3); for (let i = 0; i < 400; i++) { p[i * 3] = rnd(-HX, HX); p[i * 3 + 1] = rnd(0.2, H); p[i * 3 + 2] = rnd(-HZ, HZ); } dustGeo.setAttribute('position', new THREE.BufferAttribute(p, 3)); }
 const dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({ color: 0xfff3d6, size: 0.035, transparent: true, opacity: 0.55, depthWrite: false }));
 scene.add(dust);
+// düşük kalite: toz, pencere huzmeleri ve lamba konileri çizilmez (büyük saydam yüzeyler = boşa piksel doldurma); bilgi taşımıyorlar
+dust.visible = HIGH; shafts.forEach(m => { m.visible = HIGH; }); lampCones.forEach(m => { m.visible = HIGH; });
 // disko topu (kaos sırasında iner)
 const discoBall = add(new THREE.IcosahedronGeometry(0.5, 2), new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.08, flatShading: true }), 0, H + 1, 0);
 
@@ -1661,7 +1671,7 @@ const beacons = [[-11.3, 6.1, -9.5], [11.3, 6.1, -9.5], [-11.3, 6.1, 9.3], [11.3
   add(new THREE.CylinderGeometry(0.2, 0.24, 0.14, 18), std(0x15171c, { metalness: 0.7 }), x, y + 0.34, z);
   const mat = new THREE.MeshStandardMaterial({ color: 0x5a0a06, emissive: 0xff2a1a, emissiveIntensity: 0.3, roughness: 0.2, transparent: true, opacity: 0.92 });
   add(new THREE.SphereGeometry(0.2, 18, 12), mat, x, y + 0.14, z).userData.noCast = true;
-  let light = null; if (i < 2) { light = new THREE.PointLight(0xff2a1a, 0, 12, 1.5); light.position.set(x * 0.92, y - 0.3, z * 0.92); scene.add(light); }
+  let light = null; if (i < 2 && HIGH) { light = new THREE.PointLight(0xff2a1a, 0, 12, 1.5); light.position.set(x * 0.92, y - 0.3, z * 0.92); scene.add(light); }
   return { mat, light };
 });
 // kontrol masası ve yeşil ekranlar
@@ -1689,6 +1699,29 @@ solidBox(0.61, 0, -HZ + 0.27, 1.85, 2.0, 0.55);
 for (const [x0, z0, x1, z1, sag, c] of [[-10, -9, -2, -9.4, 0.7, 0x111111], [-2, -9.4, 7, -9.2, 0.9, 0x111111], [11.4, -4, 11.4, 4, 0.8, 0xb3261c], [-11.4, 0, -11.4, 8, 0.6, 0x111111], [-6, -3, 0, -6, 0.5, 0xf5b800], [6, -3, 0, -6, 0.5, 0x111111]]) {
   const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(x0, H - 0.25, z0), new THREE.Vector3((x0 + x1) / 2, H - 0.25 - sag * 2, (z0 + z1) / 2), new THREE.Vector3(x1, H - 0.25, z1));
   add(new THREE.TubeGeometry(curve, 20, 0.025, 6), std(c, { roughness: 0.5 })).userData.noCast = true;
+}
+// ---------- yön bulma: duvarlarda pusula şablonları (K / D / G / B), bombanın çevresinde yer okları ----------
+// Görev metinlerindeki "kuzey duvarı", "doğu duvarı" bulunabilsin diye. Işıksız kaosta da seçilsin diye hafif ışıyor.
+const COMPASS = [ // harf, ad, duvardaki yer [x, y, z], duvar dönüşü, yerdeki okun yönü (rotation.z)
+  ['K', 'KUZEY', [-2.6, 4.75, -HZ + 0.04], 0, 0], ['D', 'DOĞU', [HX - 0.04, 4.95, 1.5], -Math.PI / 2, -Math.PI / 2],
+  ['G', 'GÜNEY', [3.25, 5.8, HZ - 0.02], Math.PI, Math.PI], ['B', 'BATI', [-HX + 0.04, 4.95, -2.8], Math.PI / 2, Math.PI / 2],
+];
+const compassWall = [], compassFloor = [];
+for (const [L, name, p, ry, fz] of COMPASS) {
+  const wt = canvasTex(384, 448, (x, w, h) => {
+    x.fillStyle = '#15120d'; roundRect(x, 0, 0, w, h, 34); x.fill();
+    x.strokeStyle = '#f5b800'; x.lineWidth = 14; roundRect(x, 14, 14, w - 28, h - 28, 24); x.stroke();
+    x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#f5b800'; x.font = `400 300px ${FONT}`; x.fillText(L, w / 2, 190);
+    x.fillStyle = '#efe6d2'; x.font = `400 66px ${FONT}`; x.fillText(name, w / 2, 386);
+  });
+  const wm = add(new THREE.PlaneGeometry(1.5, 1.75), new THREE.MeshStandardMaterial({ map: wt, roughness: 0.75, emissive: 0xffffff, emissiveMap: wt, emissiveIntensity: 0.3 }), p[0], p[1], p[2]);
+  wm.rotation.y = ry; wm.userData.noCast = true; compassWall.push(wm);
+  const ft = canvasTex(256, 384, (x, w, h) => {
+    x.fillStyle = '#f5b800'; x.beginPath(); x.moveTo(w / 2, 8); x.lineTo(w - 14, 150); x.lineTo(w - 78, 150); x.lineTo(w - 78, 196); x.lineTo(78, 196); x.lineTo(78, 150); x.lineTo(14, 150); x.closePath(); x.fill();
+    x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = `400 190px ${FONT}`; x.fillText(L, w / 2, 296);
+  });
+  const fm = add(new THREE.PlaneGeometry(1.1, 1.65), new THREE.MeshStandardMaterial({ map: ft, transparent: true, opacity: 0.9, roughness: 0.8, depthWrite: false }), Math.sin(-fz) * 6.1, 0.013, -Math.cos(fz) * 6.1);
+  fm.rotation.set(-Math.PI / 2, 0, fz); fm.userData.noCast = true; compassFloor.push(fm);
 }
 shadowAll(scene);
 sky.castShadow = sky.receiveShadow = false;
@@ -1761,7 +1794,7 @@ function station(parent, o) {
     add(new THREE.BoxGeometry(fw, fh, 0.03), nm, fx, fy, 0.07, g);
   for (const sx of [-1, 1]) for (const sy of [-1, 1]) add(new THREE.CylinderGeometry(0.03, 0.03, 0.03, 10), std(0x9aa3b2, { metalness: 1, roughness: 0.2 }), sx * (w / 2 + 0.08), sy * (h / 2 + 0.08), 0.07, g).rotation.x = Math.PI / 2;
   const tw = Math.max(1.4, w * 0.85);
-  add(new THREE.PlaneGeometry(tw, tw * 0.25), new THREE.MeshBasicMaterial({ map: textTex([o.title], { w: 640, h: 160, size: 92, bg: 'none', fg: '#ffffff', glow: hexCss(color), stroke: hexCss(color), strokeW: 6 }), transparent: true, toneMapped: false }), 0, h / 2 + 0.5, 0.08, g);
+  add(new THREE.PlaneGeometry(tw, tw * 0.25), new THREE.MeshBasicMaterial({ map: textTex([o.title], { w: 640, h: 160, size: o.title.length > 12 ? 78 : 100, bg: 'rgba(16,14,12,.9)', radius: 26, border: hexCss(color), bw: 8, fg: '#ffffff', glow: hexCss(color), stroke: hexCss(color), strokeW: 6 }), transparent: true, toneMapped: false }), 0, h / 2 + 0.5, 0.08, g); // koyu levha: açık renkli duvarda uzaktan da okunur
   const lamp = add(new THREE.SphereGeometry(0.11, 18, 14), new THREE.MeshStandardMaterial({ color: 0x440000, emissive: 0xff2020, emissiveIntensity: 2.5 }), w / 2 + 0.17, h / 2 + 0.17, 0.15, g);
   add(new THREE.TorusGeometry(0.12, 0.012, 6, 16), std(0x222222, { metalness: 0.8 }), w / 2 + 0.17, h / 2 + 0.17, 0.15, g);
   const content = new THREE.Group(); content.position.z = 0.1; g.add(content);
@@ -2358,6 +2391,7 @@ function updateChaos(dt, now) {
   // çalan telefon
   const ring = t === 'telefon' && !c.done;
   phoneLight.intensity = ring ? (settings.flash ? (Math.sin(now / 90) > 0 ? 45 : 5) : 24 + Math.sin(now / 350) * 14) : 0; // efektler kapalı: sert yanıp sönme yerine yavaş dalga
+  phoneLamp.material.color.setRGB(ring ? 0.3 + phoneLight.intensity / 14 : 0.22, 0.03, 0.03); phoneLamp.scale.setScalar(ring ? 1.5 : 1); // çalarken herkes (düşük kalitede de) görsün
   phoneSet.rotation.z = ring ? Math.sin(now / 30) * 0.2 : 0; phoneSet.position.y = 0.16 + (ring ? Math.abs(Math.sin(now / 45)) * 0.035 : 0);
   if (ring) { ringT -= dt; if (ringT <= 0) { ringT = 1.6; sfx.ring(); } } else ringT = 0;
   hemi.intensity = baseLights.hemi * lightK * (t === 'disko' ? 0.5 : 1); sun.intensity = baseLights.sun * lightK;
@@ -2366,7 +2400,15 @@ function updateChaos(dt, now) {
   renderer.toneMappingExposure = baseLights.exp * (0.3 + 0.7 * lightK);
   // disko
   const disco = t === 'disko';
-  discoLights.forEach((l, i) => { l.intensity = disco ? 12 : 0; const a = now / 400 + i * 1.57; l.position.set(Math.cos(a) * 6, 5, Math.sin(a) * 5); });
+  if (disco !== discoWas) { // disko başlarken/biterken: köşe vurguları disko ışığına döner / geri gelir (yeni ışık eklenmez)
+    discoWas = disco;
+    accentLights.forEach((l, i) => { if (disco) { l.color.setHex(DISCO_COL[i]); l.intensity = 12; l.distance = 16; l.decay = 1.4; } else { l.color.setHex(ACCENT[i][0]); l.intensity = 9; l.distance = 13; l.decay = 1.5; l.position.set(ACCENT[i][1], 1.1, ACCENT[i][2]); } });
+    if (!disco) ceilLights.forEach(l => l.color.setHex(CEIL_COL));
+  }
+  if (disco) {
+    accentLights.forEach((l, i) => { const a = now / 400 + i * 1.57; l.position.set(Math.cos(a) * 6, 5, Math.sin(a) * 5); });
+    if (!HIGH) ceilLights.forEach((l, i) => l.color.setHex(DISCO_COL[(i + Math.floor(now / 900)) % 4])); // düşük kalite: tavan lambaları renk değiştirir
+  }
   discoBall.position.y += ((disco ? H - 1.4 : H + 1) - discoBall.position.y) * Math.min(1, dt * 3);
   discoBall.rotation.y += dt * 2;
   // ördekler
@@ -3452,7 +3494,7 @@ function loop() {
   // ortam animasyonları
   fanBlades.rotation.z += dt * 6;
   const clk = now / 1000; hMin.rotation.z = clk * 0.6; hHour.rotation.z = clk * 0.05;
-  const dp = dust.geometry.attributes.position; for (let i = 0; i < dp.count; i += 7) { let y = dp.getY(i) + dt * 0.05; if (y > H) y = 0.2; dp.setY(i, y); } dp.needsUpdate = true;
+  const dp = dust.geometry.attributes.position; if (HIGH) for (let i = 0; i < dp.count; i += 7) { let y = dp.getY(i) + dt * 0.05; if (y > H) y = 0.2; dp.setY(i, y); } dp.needsUpdate = true;
   couchDuck.rotation.y = 0.5 + Math.sin(now / 1200) * 0.15;
   duckBoing = Math.max(0, duckBoing - dt * 2.2); couchDuck.position.y = 0.75 + Math.abs(Math.sin(duckBoing * 9)) * duckBoing * 0.35; couchDuck.scale.set(1.2, 1.2 * (1 - duckBoing * 0.25 * Math.cos(duckBoing * 18)), 1.2);
   stars.rotation.y = now / 400000;
