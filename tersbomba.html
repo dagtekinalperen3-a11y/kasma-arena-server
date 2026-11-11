@@ -580,7 +580,7 @@ const MOD_ROLE = { phone: 'any', egg: 'any' }; for (const k in MOD_NEEDS) MOD_RO
 const infoHolder = (mod, roles) => (MOD_NEEDS[mod].chain || []).find(r => roles.has(r)) || null;
 const modAvailable = (mod, roles) => { const N = own(MOD_NEEDS, mod) && MOD_NEEDS[mod]; return !!N && (N.apply === 'any' || roles.has(N.apply)) && (N.needs || []).every(r => roles.has(r)) && (!N.chain || !!infoHolder(mod, roles)); };
 const allowed = (role, need) => need === 'any' ? role !== 'none' : role === need;
-const ACT_MOD = { cut: 'wires', key: 'keypad', btnDown: 'button', btnUp: 'button', pw: 'password', pwOk: 'password', fuse: 'fuse', fuseOk: 'fuse', duck: 'ducks', dial: 'mouse', dialOk: 'mouse', maze: 'maze', turnKey: 'keys', laser: 'laser' };
+const ACT_MOD = { cut: 'wires', key: 'keypad', btnDown: 'button', btnUp: 'button', pw: 'password', pwOk: 'password', fuse: 'fuse', fuseOk: 'fuse', duck: 'ducks', dial: 'mouse', dialOk: 'mouse', maze: 'maze', turnKey: 'keys' }; // lazer kilidinin aksiyonu yok: oda sahibi lazer noktasından kendisi algılar
 const DIFF = {
   kolay:  { name: 'Kolay',  time: 450, mods: ['wires', 'button', 'keypad', 'fuse', 'ducks', 'mouse', 'keys'], keymix: 25, chaos: 55, pages: true, mult: 1 },
   normal: { name: 'Normal', time: 450, mods: ALL_MODS, keymix: 20, chaos: 42, pages: false, mult: 1.5 },
@@ -998,6 +998,7 @@ function dropPlayer(id, conn) {
   if (conn && !net.conns.includes(conn)) return;        // zaten düşürülmüş (close + error art arda gelebilir)
   net.conns = net.conns.filter(c => c.peer !== id);
   delete hostBuckets[id]; delete hostMeta[id];
+  if (game && hostR && hostR.btnBy === id) { game.btnHeld = false; hostR.btnBy = null; if (inGame && game.status === 'playing') pushState(); } // düğmeyi tutan gitti
   if (!players[id]) return;
   const gone = players[id];
   toast(`👋 ${gone.name} kaçtı!`);
@@ -1158,9 +1159,12 @@ function hostStart() {
   let puzzle = null;
   for (let k = 0; k < 40 && !puzzle; k++) { const p = genPuzzle(lobbyDiff, roles, lobbyMuts, nPl); if (!checkSolvable(p, roles).length) puzzle = p; }
   if (!puzzle) { toast('Çözülebilir bir bomba üretilemedi, tekrar dene.', 'bad'); return false; }
+  hostR = { P: puzzle, roles, btnBy: null, btnT0: 0, lsr: { on: -1, t: 0 } };
   broadcast({ t: 'start', puzzle, players: lobbyPlayers() });
   return true;
 }
+// Oda sahibine özel tur verisi (istemcilere gitmez): P = bulmacanın tamamı, roles = turun başladığı roller
+let hostR = null;
 function hostStrike(why, from) {
   game.strikes++; game.lastWhy = why; stat(from, 'strikes');
   if (game.strikes >= 3) game.status = 'lost';
@@ -1182,12 +1186,67 @@ function actFields(m, P) {
     default: return true;   // phone, btnDown, btnUp, pwOk, fuseOk, dialOk: alan yok
   }
 }
+// ---- Erişim denetimi: oda sahibi her oyuncunun konumunu bilir; aksiyonun dünyadaki yerine uzak olan reddedilir ----
+// İstemcinin ışını gözden 2.6 m; ağ gecikmesi ve nesne boyu için pay bırakılır. Sayılar ilk tahmindir.
+const REACH = { base: 3.6, kafein: 1.2, maze: 0.8, mazeY: 1.0 };
+const BTN_RULE = { tapMs: 700, digitSlack: 1 };      // düğme: basılı tutma süresi ve rakam oda sahibinin saatinden okunur
+const LSR_HOLD = { sec: 0.6, r: 0.6 };               // lazer kilidi: sensöre 0.6 m yakın, 0.6 sn kesintisiz
+// aksiyonun çapası: [x, y, z, nesne payı, en az oyuncu y, en çok oyuncu y]
+function actAnchor(m, P) {
+  switch (m.a) {
+    case 'cut': return [-4, 1.8 + 0.82 - m.i * 1.64 / (P.wires.length - 1), -HZ + 0.2, 1.1];
+    case 'key': return [HX - 0.2, 1.7 + (m.i < 2 ? 0.38 : -0.38), -2 + (m.i % 2 ? 0.38 : -0.38), 0.35];
+    case 'btnDown': return [0.45, 1.5, 0, 0.3];
+    case 'pw': case 'pwOk': return [-HX + 0.2, 1.75, 3, 1.4];
+    case 'fuse': return [HX - 0.2, 5.6, 6 - 1.1 + m.i * 0.45, 0.45, 1.0];      // YERÇEKİMSİZ kutunun hizasına çıkmış olmalı
+    case 'fuseOk': return [HX - 0.2, 5.97, 7.18, 0.3, 1.0];
+    case 'duck': { const d = P.ducks.spots[m.i]; return [d[0], d[1] + 0.27, d[2], 0.55]; }
+    case 'dial': case 'dialOk': return [0, 0.36, 0.25, 0.55, null, 0.6];        // MİNİK yerde olmalı (masanın üstünden olmaz)
+    case 'turnKey': return m.i ? [HX - 0.2, 1.5, 6.4, 0.35] : [-HX + 0.2, 1.5, -5.5, 0.35];
+    case 'phone': return [-7.6, 1.1, 0.6, 0.4];
+  }
+  return null;
+}
+function hostReach(from, A) {
+  const pl = players[from]; if (!pl || !pl.p || !A) return false;
+  const p = pl.p, caf = game.chaos && game.chaos.type === 'kafein' ? REACH.kafein : 0;
+  if ((A[4] != null && p[1] < A[4]) || (A[5] != null && p[1] > A[5])) return false;
+  return Math.hypot(p[0] - A[0], p[1] + (pl.role === 'tiny' ? 0.42 : 1.6) - A[1], p[2] - A[2]) <= REACH.base + A[3] + caf;
+}
+function hostOnTile(from, i) { // labirent: yürüyenin bilinen konumu o karenin üstünde ya da hemen yanında mı
+  const pl = players[from]; if (!pl || !pl.p) return false;
+  const tol = MZ.s / 2 + REACH.maze + (game.chaos && game.chaos.type === 'kafein' ? REACH.kafein : 0);
+  return Math.abs(pl.p[0] - (MZ.x0 + (i % MZ.cols + 0.5) * MZ.s)) <= tol && Math.abs(pl.p[2] - (MZ.z0 - ((i / MZ.cols | 0) + 0.5) * MZ.s)) <= tol && pl.p[1] <= REACH.mazeY;
+}
+function hostAfter(before, from) { // aksiyon sonrası: katkı, final, yayın
+  const S = game.solved;
+  for (const k in S) if (S[k] && !before[k]) stat(from, 'solves');
+  // tüm modüller bitti: BÜYÜK FİNAL — herkes kendi plakasına!
+  if (Object.values(S).every(Boolean) && !game.final) game.final = { hold: 0, on: [] };
+  pushState();
+}
+// Lazer kilidi: İŞARETÇİ'nin lazer noktası (konum akışıyla gelir; oda sahibinin kendisi için me.laserPt) sensörde yeterince durdu mu
+function hostLaserTick(dt) {
+  const P = hostR.P, S = game.solved, L = hostR.lsr;
+  if (!P.mods.includes('laser') || S.laser !== false) return;
+  const id = Object.keys(players).find(k => players[k].role === 'pointer'), l = id && players[id].l;
+  let hit = -1; if (l) LSR.forEach((q, i) => { if (Math.hypot(l[0] - q.p[0], l[1] - q.p[1], l[2] - q.p[2]) < LSR_HOLD.r) hit = i; });
+  if (hit !== L.on) { L.on = hit; L.t = 0; return; }
+  if (hit < 0 || L.t < 0) return;
+  L.t += dt; if (L.t < LSR_HOLD.sec) return;
+  L.t = -1;                                           // aynı sensör yeniden sayılmadan önce lazer ayrılmalı
+  const before = { ...S };
+  if (hit === P.laserSeq[game.laserProg]) { game.laserProg++; if (game.laserProg >= 4) S.laser = true; }
+  else if (!P.laserSeq.slice(0, game.laserProg).includes(hit)) { game.laserProg = 0; hostTime(-6, '🎯 Yanlış sensör! Lazer kilidi sıfırlandı.'); }
+  else return;
+  hostAfter(before, id);
+}
 function hostAction(m, from) {
-  if (!game || game.status !== 'playing' || game.countdown > 0 || !players[from]) return;
-  const role = players[from].role, P = game.puzzle, S = game.solved;
+  if (!game || !hostR || game.status !== 'playing' || game.countdown > 0 || !players[from]) return;
+  const role = players[from].role, P = hostR.P, S = game.solved;
   if (typeof m.a !== 'string' || (m.a !== 'phone' && !own(ACT_MOD, m.a)) || !actFields(m, P)) { hostDiag.bad++; return; }
   if (m.a === 'phone') { // çalan telefonu herkes açabilir
-    if (game.chaos && game.chaos.type === 'telefon' && !game.chaos.done && role !== 'none') {
+    if (game.chaos && game.chaos.type === 'telefon' && !game.chaos.done && role !== 'none' && hostReach(from, actAnchor(m, P))) {
       game.chaos.done = true; game.chaos.left = Math.min(game.chaos.left, 1.5);
       hostTime(12, `📞 ${players[from].name} telefonu açtı: ${pick(PHONE_LINES)}`); stat(from, 'phone'); pushState();
     }
@@ -1195,6 +1254,8 @@ function hostAction(m, from) {
   }
   const mod = ACT_MOD[m.a]; if (!mod) return;
   if (!allowed(role, MOD_ROLE[mod])) return; // yetkisi olmayan dokunamaz
+  if (S[mod] !== false) return;
+  if (m.a === 'maze' ? !hostOnTile(from, m.i) : m.a !== 'btnUp' && !hostReach(from, actAnchor(m, P))) { hostDiag.reach++; return; } // uzaktan dokunulmaz
   const before = { ...S };
   if (m.a === 'cut' && S.wires === false) {
     const i = m.i | 0; if (game.wireCut[i]) return;
@@ -1205,13 +1266,18 @@ function hostAction(m, from) {
     if (P.layout[i] === P.order[game.keyProg]) { game.keyPressed[i] = true; game.keyProg++; if (game.keyProg >= 4) S.keypad = true; }
     else { game.keyProg = 0; game.keyPressed = [false, false, false, false]; hostStrike('Yanlış sembol! Sıra sıfırlandı.', from); }
   } else if (m.a === 'btnDown' && S.button === false) {
-    game.btnHeld = true;
-  } else if (m.a === 'btnUp' && S.button === false && game.btnHeld) {
-    game.btnHeld = false;
-    const ans = P.btnAns, tapped = m.dur < 700;
+    if (game.btnHeld) return;
+    game.btnHeld = true; hostR.btnBy = from; hostR.btnT0 = performance.now();
+  } else if (m.a === 'btnUp' && S.button === false) {
+    if (!game.btnHeld || hostR.btnBy !== from) return;
+    game.btnHeld = false; hostR.btnBy = null;
+    // süre ve rakam oda sahibinin saatinden: istemcinin bildirdiği dur/timer yok sayılır.
+    // Rakam, bırakma anında ya da bir önceki saniyede sayaçta görünüyorsa kabul (gecikme payı).
+    const ans = P.btnAns, tapped = performance.now() - hostR.btnT0 < BTN_RULE.tapMs;
+    const shown = [...Array(BTN_RULE.digitSlack + 1).keys()].some(k => fmtTime(game.timeLeft + k).includes(String(ans.digit)));
     if (ans.mode === 'tap') { if (tapped) S.button = true; else hostStrike('Düğme basılı tutulmamalıydı!', from); }
     else if (tapped) hostStrike('Düğme basılı tutulmalıydı!', from);
-    else if (String(m.timer).includes(String(ans.digit))) S.button = true;
+    else if (shown) S.button = true;
     else hostStrike('Düğme yanlış anda bırakıldı!', from);
   } else if (m.a === 'pw' && S.password === false) {
     const c = clamp(m.c | 0, 0, 4); game.pwIdx[c] = (game.pwIdx[c] + (m.d > 0 ? 1 : 4)) % 5;
@@ -1241,21 +1307,14 @@ function hostAction(m, from) {
     const k = m.i ? 1 : 0; game.keyArm[k] = P.keyWin; game.keyBy[k] = from;
     if (game.keyArm[0] > 0 && game.keyArm[1] > 0 && (game.keyBy[0] !== game.keyBy[1] || P.nPlayers <= 1)) S.keys = true;
   }
-  else if (m.a === 'laser' && S.laser === false) {
-    const i = m.i | 0;
-    if (i === P.laserSeq[game.laserProg]) { game.laserProg++; if (game.laserProg >= 4) S.laser = true; }
-    else if (!P.laserSeq.slice(0, game.laserProg).includes(i)) { game.laserProg = 0; hostTime(-6, '🎯 Yanlış sensör! Lazer kilidi sıfırlandı.'); }
-  }
-  for (const k in S) if (S[k] && !before[k]) stat(from, 'solves');
-  // tüm modüller bitti: BÜYÜK FİNAL — herkes kendi plakasına!
-  if (Object.values(S).every(Boolean) && !game.final) game.final = { hold: 0, on: [] };
-  pushState();
+  hostAfter(before, from);
 }
 let hostLast = performance.now(), hostStateT = 0, hostPoseT = 0;
 function hostTick() {
   const now = performance.now(), dt = Math.min(5, (now - hostLast) / 1000); hostLast = now;
   if (!net.isHost) return;
-  hostSilenceTick(now);
+  hostSilenceTick(now); hostSelfPose();
+  if (game && inGame && hostR && game.status === 'playing' && game.countdown <= 0) hostLaserTick(dt);
   if (game && inGame && game.status === 'playing') {
     let force = false;
     if (game.countdown > 0) { game.countdown -= dt; if (game.countdown <= 0) force = true; }
@@ -2560,7 +2619,7 @@ document.addEventListener('mousedown', e => {
 function holdRelease() {
   if (!holdingBtn) return;
   holdingBtn = false;
-  sendToHost({ t: 'act', a: 'btnUp', dur: performance.now() - holdStart, timer: fmtTime(game.timeLeft) });
+  sendToHost({ t: 'act', a: 'btnUp' }); // süreyi ve sayaçtaki rakamı oda sahibi kendi saatinden ölçer
 }
 document.addEventListener('mouseup', e => { if (e.button === 0) holdRelease(); });
 function popCross() { const c = $('#cross'); c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop'); }
@@ -3268,7 +3327,7 @@ function loop() {
     }
     updateChaos(dt, now);
     // lazer (İŞARETÇİ)
-    me.laserPt = laserOn && role === 'pointer' && canPlay() && document.pointerLockElement === canvas ? laserHit() : null;
+    me.laserPt = tbLaserPt && role === 'pointer' ? tbLaserPt : laserOn && role === 'pointer' && canPlay() && document.pointerLockElement === canvas ? laserHit() : null;
     showLaser(myId, me.laserPt ? camera.localToWorld(_hand.set(0.32, -0.3, -0.55)) : null, me.laserPt);
     if (M.ducks) M.ducks.forEach((d, i) => { d.g.position.y = P_duckY(i) + Math.sin(now / 500 + i) * 0.03; });
     if (M.pages) M.pages.forEach(p => { p.g.position.y = p.by + Math.sin(now / 400) * 0.1; p.g.rotation.y += dt * 1.5; });
@@ -3280,11 +3339,11 @@ function loop() {
     }
     $('#finale').classList.toggle('hidden', !(game.final && game.status === 'playing'));
     if (game.final) for (const r in M.plates) { const pl = M.plates[r]; pl.beam.rotation.y += dt * 0.8; pl.top.position.y = 0.075 + Math.sin(now / 300) * 0.004; }
-    // lazer kilidi: İŞARETÇİ lazeri sensörün üstünde 0.7 sn tutar
+    // lazer kilidi: tutma süresini oda sahibi ölçer (hostLaserTick); burada yalnızca İŞARETÇİ'ye "sensördesin" sesi
     if (me.laserPt && M.lsr && game.puzzle.mods.includes('laser') && !game.solved.laser) {
       let hit = -1; M.lsr.forEach((s, i) => { if (Math.hypot(me.laserPt[0] - s.p[0], me.laserPt[1] - s.p[1], me.laserPt[2] - s.p[2]) < 0.55) hit = i; });
       if (hit !== lsrOn) { lsrOn = hit; lsrT = 0; }
-      else if (hit >= 0 && lsrT >= 0) { lsrT += dt; if (lsrT > 0.7) { lsrT = -1; tone(1400, 0.12, { type: 'sine', vol: 0.14 }); sendToHost({ t: 'act', a: 'laser', i: hit }); } }
+      else if (hit >= 0 && lsrT >= 0) { lsrT += dt; if (lsrT > 0.2) { lsrT = -1; tone(1400, 0.12, { type: 'sine', vol: 0.14 }); } }
     } else lsrOn = -1;
     $('#roleIntro').classList.toggle('hidden', !(game.countdown > 0 && game.status === 'playing'));
     const tf = settings.fov + (game.chaos && game.chaos.type === 'kafein' && game.status === 'playing' ? 14 : 0);
@@ -3335,7 +3394,8 @@ $('#roleStrip').innerHTML = LOBBY_ORDER.map(r => `<div style="--rc:${ROLES[r].cs
 $('#menu').classList.remove('hidden');
 loop();
 window.__tb = { get game() { return game; }, me, players: () => players, net, act: m => sendToHost(m), myRole, avatars, emote: doEmote, M, camera, setRole: r => { players[myId].role = r; refreshModules(); setupRoleHud(); syncAvatars(); }, laser: v => { laserOn = v; } }; // test için
-Object.assign(window.__tb, { get myId() { return myId; }, plateOf, MOD_ROLE, ACT_MOD, hostDiag, hostMeta, cleanName, checkSolvable, genPuzzle, MOD_NEEDS, REQ_ROLES, missingRoles, hostStart, raw: m => net.hostConn && net.hostConn.send(m) }); // PKG-A test kancaları
+let tbLaserPt = null; // test: İŞARETÇİ'nin lazer noktasını zorla (T.laser([x, y, z])); gerçek oyunda hep null
+Object.assign(window.__tb, { laser: v => { laserOn = !!v; tbLaserPt = Array.isArray(v) ? v : null; }, hostPuzzle: () => hostR && hostR.P, LSR, REACH, BTN_RULE, get myId() { return myId; }, plateOf, MOD_ROLE, ACT_MOD, hostDiag, hostMeta, cleanName, checkSolvable, genPuzzle, MOD_NEEDS, REQ_ROLES, missingRoles, hostStart, raw: m => net.hostConn && net.hostConn.send(m) }); // PKG-A test kancaları
 
 </script>
 </body>

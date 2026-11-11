@@ -1,7 +1,7 @@
 'use strict';
 // 5 oyuncu, 5 farklı rol, tek oda (yerel PeerServer + gerçek WebRTC veri kanalları):
 // roller tutarlı mı → her modülü yetkili rol çözer → yanlış rol reddedilir → final → herkes "won" görür.
-const H = require('../harness');
+const H = require('../harness'), A = require('../a-lib');   // a-lib: erişim/hız kurallarına uyan çözücüler
 
 H.run('smoke-5p', async t => {
   t.step('5 istemci, oda kur + katıl, rolleri dağıt');
@@ -19,7 +19,8 @@ H.run('smoke-5p', async t => {
   t.bug('oda sahibinin net.conns listesinde aynı bağlantı iki kez yok', net[0].peers.length === new Set(net[0].peers).size, `net.conns: ${net[0].peers.length} kayıt, ${new Set(net[0].peers).size} ayrı istemci`);
 
   t.step('Normal zorlukta başlat');
-  const P = await H.startGame(host, { diff: 'normal' });
+  await H.startGame(host, { diff: 'normal' });
+  const P = await A.full(host);   // bulmacanın tamamı yalnızca oda sahibinde
   t.log(`modüller: ${P.mods.join(', ')} · süre ${P.time} sn`);
   t.eq('5 rol varken 10 modülün hepsi açık', P.mods.length, 10);
   const puzzles = await Promise.all(clients.map(c => c.puzzle()));
@@ -36,14 +37,21 @@ H.run('smoke-5p', async t => {
   t.step('yanlış rolden gelen aksiyon reddedilir');
   const snap = () => host.tb('({ strikes: T.game.strikes, solved: T.game.solved, wireCut: T.game.wireCut, fuse: T.game.fuse, ducksGot: T.game.ducksGot, laserProg: T.game.laserProg, keyProg: T.game.keyProg })');
   const before = await snap(), wrongWire = (P.wireAns + 1) % P.wires.length;
+  // herkes ilgili modülün yanında: reddin sebebi uzaklık değil ROL olsun
+  await A.go(R.tiny, A.SPOT.wires); await A.go(R.pointer, [P.ducks.spots[P.ducks.gold[0]][0], 5, P.ducks.spots[P.ducks.gold[0]][2]]); await A.go(host, A.SPOT.keypad); await A.go(R.defuser, A.SPOT.fuse);
   await R.tiny.act('cut', { i: wrongWire });         // MİNİK kablo kesemez (kabul edilse: hata + kesik kablo)
-  await R.tiny.act('fuse', { i: 0 });                // sigorta YERÇEKİMSİZ'in
+  await R.defuser.act('fuse', { i: 0 });             // sigorta YERÇEKİMSİZ'in
   await R.pointer.act('duck', { i: P.ducks.gold[0] });
-  await R.defuser.act('laser', { i: P.laserSeq[0] });// lazer İŞARETÇİ'nin
+  await R.defuser.act('laser', { i: P.laserSeq[0] });// eski "laser" aksiyonu artık yok: lazer kilidini oda sahibi lazer noktasından algılar
+  await R.defuser.tb((T, p) => T.laser(p), [-9, 3.7, -9.92]);   // İŞARETÇİ olmayanın lazeri sayılmaz (yanlış sensör olsa −6 sn cezası gelirdi)
   await host.act('key', { i: P.layout.indexOf(P.order[0]) });   // oda sahibi (TERS SES) de sembole basamaz
+  await t.sleep(1000); await R.defuser.tb(T => T.laser(false));
   // sıra garantisi: aynı kanallardan SONRA yollanan geçerli aksiyonlar işlendiyse öncekiler de işlenmiştir
-  await R.tiny.act('dial', { i: 0 }); await R.pointer.act('laser', { i: P.laserSeq[0] }); await R.defuser.act('pw', { c: 0, d: 1 });
+  await A.go(R.tiny, A.SPOT.mouse); await A.go(R.defuser, A.SPOT.password);
+  await R.tiny.act('dial', { i: 0 }); await R.defuser.act('pw', { c: 0, d: 1 });
+  await R.pointer.tb((T, i) => T.laser(T.LSR[i].p.slice()), P.laserSeq[0]);
   await H.waitAll(clients, st => { const g = window.__tb.game; return g.mouseDial[0] === 1 && g.laserProg === 1 && g.pwIdx[0] === (st + 1) % 5; }, 10000, P.pw.start[0]);
+  await R.pointer.tb(T => T.laser(false));
   t.eq('yetkisiz aksiyonlar durumu değiştirmedi (hata yok, kablo/sigorta/ördek/sembol aynı)', { ...(await snap()), laserProg: 0 }, before);
   await checkpoint('yanlış rol sonrası');
 
@@ -59,6 +67,7 @@ H.run('smoke-5p', async t => {
 
   t.step('final: 4 kişi plakada → bomba beklemeli');
   const four = clients.filter(c => c !== R.tiny);
+  await R.tiny.moveTo([0, 0, 8.5], { pin: true });   // MİNİK kendi plakasından uzakta
   await H.toPlates(four);
   await H.waitAll(clients, () => window.__tb.game.final.on.length === 4, 10000);
   await t.sleep(2200);                               // 1.5 sn'lik bekleme süresinden uzun

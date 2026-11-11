@@ -1,6 +1,6 @@
 'use strict';
 // Antrenman (tek kişi): başlat → her modülü çöz → final plakası → kazan.
-const H = require('../harness');
+const H = require('../harness'), A = require('../a-lib');   // a-lib: erişim/hız kurallarına uyan çözücüler
 
 H.run('smoke-solo', async t => {
   t.step('altyapı + tek istemci');
@@ -9,7 +9,8 @@ H.run('smoke-solo', async t => {
 
   t.step('Antrenman odası → Normal zorlukta başlat');
   t.eq('oda kodu TEST', await H.soloRoom(c), 'TEST');
-  const P = await H.startGame(c, { diff: 'normal' });
+  await H.startGame(c, { diff: 'normal' });
+  const P = await A.full(c);   // bulmacanın tamamı yalnızca oda sahibinde (antrenmanda: kendisi)
   t.log(`modüller: ${P.mods.join(', ')} · süre ${P.time} sn`);
   t.eq('Normal: 10 modülün hepsi var', P.mods.length, 10);
   let s = await c.state();
