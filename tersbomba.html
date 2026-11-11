@@ -225,6 +225,24 @@ kbd{display:inline-block;min-width:22px;text-align:center;padding:0 6px;border-r
 @keyframes cd{from{transform:scale(2.2);opacity:0}30%{opacity:1;transform:scale(1)}to{transform:scale(.8);opacity:.9}}
 #vignette{position:fixed;inset:0;pointer-events:none;z-index:9;background:radial-gradient(ellipse at center,transparent 55%,rgba(229,30,20,.55));opacity:0;transition:opacity .3s}
 #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:12}
+/* ---------- konfor ayarları ---------- */
+body.nofx #flash{display:none}
+body.nofx #timer.panic,body.nofx .score .rec,body.nofx #players .p.talk::after{animation:none}
+#softfade{position:fixed;inset:0;pointer-events:none;z-index:12;background:#140c06;opacity:0;transition:opacity 1.6s}
+#softfade.on{opacity:.6;transition:opacity .35s}
+#strikes.bump{animation:cpop .35s}
+#invMark{position:absolute;left:50%;top:calc(50% - 104px);transform:translateX(-50%);display:flex;align-items:center;gap:10px;padding:7px 16px 5px;background:var(--haz);color:#15120d;border-radius:4px;font:400 20px var(--head);letter-spacing:1.5px;text-transform:uppercase;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+#invMark .ic{font-size:26px}
+#invMark small{font:700 13px var(--body);letter-spacing:1px}
+.seg.tog button{display:grid;grid-template-columns:1fr 38px;align-items:center;font-size:15px;padding:7px 10px 5px}
+.seg.tog button small{grid-column:1}
+.seg.tog button::after{content:"";grid-column:2;grid-row:1/3;width:36px;height:18px;border-radius:10px;background:#000;border:2px solid var(--steel3);box-shadow:inset 14px 0 0 -2px #555;transition:all .15s}
+.seg.tog button.on::after{border-color:var(--haz);box-shadow:inset -14px 0 0 -2px var(--haz)}
+#pause .seg.tog{flex-wrap:nowrap}
+#pause .seg.tog button{flex:1 1 0;min-width:0;font-size:13px;line-height:1.15;padding:6px 8px 4px}
+#pause .seg.tog button small{display:none}
+#pause .setrow{margin:8px 0}
+@media (max-height:640px){#pause h2{font-size:28px}#pause p{margin:4px 0 8px}#pause .btn.big{font-size:20px;padding:10px 20px 8px}#pause .setrow{margin:4px 0}#pause .row{margin:8px 0}#pause .card{padding:18px 24px 12px}}
 /* ---------- kitapçık ---------- */
 #manual{position:absolute;right:14px;top:150px;bottom:44px;width:min(450px,42vw);background:var(--paper);color:#2a2418;border-radius:3px;pointer-events:auto;display:flex;flex-direction:column;box-shadow:0 18px 50px rgba(0,0,0,.65),inset 12px 0 0 #b3261c;font-family:var(--type);overflow:hidden}
 #manual .tabs{display:flex;gap:3px;padding:10px 8px 0 20px;background:var(--paper2);flex-wrap:wrap}
@@ -378,6 +396,9 @@ kbd{display:inline-block;min-width:22px;text-align:center;padding:0 6px;border-r
   <div class="setrow"><span>Müzik</span><input type="range" id="sMusic" min="0" max="1" step="0.05"><span id="sMusicV"></span></div>
   <div class="setrow"><span>Fare hassasiyeti</span><input type="range" id="sSens" min="0.3" max="3" step="0.1"><span id="sSensV"></span></div>
   <div class="setrow"><span>Görüş açısı</span><input type="range" id="sFov" min="60" max="100" step="1"><span></span></div>
+  <div class="label">Konfor <span>— sadece görüntüyü değiştirir, oyunun kuralları aynı kalır</span></div>
+  <div class="setrow"><span>Kamera sarsıntısı</span><input type="range" id="sShake" min="0" max="1" step="0.05"><span></span></div>
+  <div class="seg tog" id="cSeg"></div>
   <div class="label">Grafik kalitesi</div>
   <div class="seg" id="qSeg">
     <button data-q="high">Yüksek<small>Gölgeler + parlama</small></button>
@@ -411,6 +432,8 @@ kbd{display:inline-block;min-width:22px;text-align:center;padding:0 6px;border-r
   <div class="setrow" style="margin-top:18px"><span>Ses</span><input type="range" id="pVol" min="0" max="1" step="0.05"><span></span></div>
   <div class="setrow"><span>Müzik</span><input type="range" id="pMusic" min="0" max="1" step="0.05"><span></span></div>
   <div class="setrow"><span>Hassasiyet</span><input type="range" id="pSens" min="0.3" max="3" step="0.1"><span></span></div>
+  <div class="setrow"><span>Sarsıntı</span><input type="range" id="pShake" min="0" max="1" step="0.05"><span></span></div>
+  <div class="seg tog" id="pcSeg"></div>
   <div class="row"><button class="btn ghost" id="btnHow3">Kontroller</button><button class="btn pink" id="btnQuit">Oyundan Çık</button></div>
   <div class="row hidden" id="hostLobbyRow"><button class="btn ghost" id="btnHostLobby">Herkesi lobiye döndür</button></div>
 </div></div>
@@ -501,7 +524,11 @@ await Promise.race([Promise.all(Object.keys(IC).flatMap(k => ['#111111', '#fffff
   im.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="128" height="128" fill="none" stroke="${c}" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">${IC[k]}</svg>`);
 })))), new Promise(r => setTimeout(r, 3000))]);
 const drawIcon = (x, k, cx, cy, s, c = '#111111') => { const im = icImg[k + c]; if (im && im.naturalWidth) x.drawImage(im, cx - s / 2, cy - s / 2, s, s); };
-const settings = Object.assign({ vol: 0.8, music: 0.5, sens: 1, fov: 72, quality: 'high' }, (() => { try { return JSON.parse(lsGet('tb-settings') || '{}'); } catch (e) { return {}; } })());
+// Konfor ayarları (shake/motion/flash/plain) sadece görüntüyü etkiler; bulmaca mantığına ve bilgiye dokunmaz.
+const calmOS = (() => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } })(); // işletim sistemi "hareketi azalt" diyorsa varsayılanlar sakin başlar
+const settings = Object.assign({ vol: 0.8, music: 0.5, sens: 1, fov: 72, quality: 'high', shake: calmOS ? 0.3 : 1, motion: !calmOS, flash: !calmOS, plain: false }, (() => { try { return JSON.parse(lsGet('tb-settings') || '{}'); } catch (e) { return {}; } })());
+if (!(settings.shake >= 0 && settings.shake <= 1)) settings.shake = 1;
+for (const k of ['motion', 'flash', 'plain']) settings[k] = !!settings[k];
 const saveSettings = () => lsSet('tb-settings', JSON.stringify(settings));
 const profile = Object.assign({ games: 0, wins: 0, streak: 0, bestStreak: 0, booms: 0, best: {}, roleWins: {}, ach: {} }, (() => { try { return JSON.parse(lsGet('tb-profile') || '{}'); } catch (e) { return {}; } })());
 const saveProfile = () => lsSet('tb-profile', JSON.stringify(profile));
@@ -1238,10 +1265,10 @@ if (HIGH) {
   bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.42, 0.5, 0.92);
   composer.addPass(bloom);
   filmPass = new ShaderPass({
-    uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uAb: { value: 0 }, uVig: { value: 0.42 }, uGrain: { value: 0.035 } },
+    uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uAb: { value: 0 }, uAb0: { value: 0.012 }, uVig: { value: 0.42 }, uGrain: { value: 0.035 } },
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: `uniform sampler2D tDiffuse; uniform float uTime, uAb, uVig, uGrain; varying vec2 vUv;
-      void main(){ vec2 d = vUv - 0.5; float r2 = dot(d, d); vec2 o = d * (0.012 + uAb) * r2;
+    fragmentShader: `uniform sampler2D tDiffuse; uniform float uTime, uAb, uAb0, uVig, uGrain; varying vec2 vUv;
+      void main(){ vec2 d = vUv - 0.5; float r2 = dot(d, d); vec2 o = d * (uAb0 + uAb) * r2;
         vec3 c = vec3(texture2D(tDiffuse, vUv + o).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - o).b);
         c *= 1.0 - uVig * smoothstep(0.12, 0.62, r2);
         float n = fract(sin(dot(vUv * vec2(1920.0, 1080.0) + uTime * 61.0, vec2(12.9898, 78.233))) * 43758.5453);
@@ -1250,6 +1277,15 @@ if (HIGH) {
   });
   composer.addPass(filmPass);
   composer.addPass(new OutputPass());
+}
+// Görüntü efektlerinin iki ayarı: normal ve "Sade görüntü" (az parlama, kumlanma yok, hafif kenar kararması)
+const POST_FX = { normal: { bloom: 0.42, vig: 0.42, grain: 0.035, ab: 0.012 }, plain: { bloom: 0.1, vig: 0.15, grain: 0, ab: 0 } };
+function applyComfort() {
+  document.body.classList.toggle('nofx', !settings.flash);
+  const F = settings.plain ? POST_FX.plain : POST_FX.normal;
+  if (bloom) bloom.strength = F.bloom;
+  if (filmPass) { const u = filmPass.uniforms; u.uVig.value = F.vig; u.uGrain.value = F.grain; u.uAb0.value = F.ab; }
+  alarm.color.setHex(0xff2030).multiplyScalar(settings.flash ? 1 : 0.3); // kırmızı alarm nabzı: efektler kapalıyken çok daha sönük (ilk çağrı BAŞLAT bölümünde, ışıklar kurulduktan sonra)
 }
 addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
@@ -2155,7 +2191,14 @@ function showCountdown(v, final) {
   const el = $('#countdown'); el.classList.remove('hidden'); el.classList.toggle('final', !!final); el.innerHTML = `<span>${v}</span>`;
   clearTimeout(el._t); el._t = setTimeout(() => el.classList.add('hidden'), 900);
 }
-function flashVignette() { const v = $('#vignette'); v.style.opacity = 1; setTimeout(() => v.style.opacity = 0, 400); }
+function flashVignette() {
+  const s = $('#strikes'); s.classList.remove('bump'); void s.offsetWidth; s.classList.add('bump'); // hata ışıkları küçük bir zıplama yapar (flaş değil)
+  if (!settings.flash) return; // "Flaş ve ekran efektleri" kapalı: kırmızı nabız yok
+  const v = $('#vignette'); v.style.opacity = 1; setTimeout(() => v.style.opacity = 0, 400);
+}
+// beyaz patlama flaşının sakin karşılığı: ekran kısa süre yumuşakça kararır
+const softFadeEl = document.createElement('div'); softFadeEl.id = 'softfade'; document.body.appendChild(softFadeEl);
+function softFade() { softFadeEl.classList.add('on'); clearTimeout(softFade.t); softFade.t = setTimeout(() => softFadeEl.classList.remove('on'), 700); }
 function burstAt(k) {
   const pos = { wires: [-4, 1.8, -HZ + 0.6], keypad: [HX - 0.6, 1.7, -2], password: [-HX + 0.6, 1.8, 3], button: [0.45, 1.6, 0], fuse: [HX - 0.6, 5.6, 6], laser: [0, 2.6, 0], ducks: [3.7, 1.0, 3.7], mouse: [0, 0.5, 0.7], maze: [6.2, 1.0, -6.6], keys: [0, 2.4, 0] }[k];
   if (pos) burst(50, [0x6bf06a, 0xffffff, 0xffd23f], 4, 1.4, new THREE.Vector3(...pos), 0.07);
@@ -2251,6 +2294,7 @@ function explode() {
   const d = new THREE.Vector3(me.pos.x, 0, me.pos.z).normalize();
   me.fly = { v: d.multiplyScalar(8).setY(11), roll: rnd(-6, 6) };
   alarm.intensity = 200; film.ab = 1.4; if (M.taunt) M.taunt.visible = false;
+  if (!settings.flash) softFade(); // beyaz flaş CSS ile kapalı (body.nofx), yerine yumuşak kararma
 }
 function confetti() { burst(260, [0xff4fa3, 0x4fc3ff, 0x6bf06a, 0xffd23f, 0xa66bff], 8, 3.5, new THREE.Vector3(0, 2.2, 0), 0.09); }
 function updateParticles(dt) {
@@ -2301,7 +2345,7 @@ function updateChaos(dt, now) {
   if (t === 'deprem') shake = Math.max(shake, 0.17);
   // çalan telefon
   const ring = t === 'telefon' && !c.done;
-  phoneLight.intensity = ring ? (Math.sin(now / 90) > 0 ? 45 : 5) : 0;
+  phoneLight.intensity = ring ? (settings.flash ? (Math.sin(now / 90) > 0 ? 45 : 5) : 24 + Math.sin(now / 350) * 14) : 0; // efektler kapalı: sert yanıp sönme yerine yavaş dalga
   phoneSet.rotation.z = ring ? Math.sin(now / 30) * 0.2 : 0; phoneSet.position.y = 0.16 + (ring ? Math.abs(Math.sin(now / 45)) * 0.035 : 0);
   if (ring) { ringT -= dt; if (ringT <= 0) { ringT = 1.6; sfx.ring(); } } else ringT = 0;
   hemi.intensity = baseLights.hemi * lightK * (t === 'disko' ? 0.5 : 1); sun.intensity = baseLights.sun * lightK;
@@ -2967,13 +3011,19 @@ $('#btnProf').onclick = () => { renderProfile(); openModal('profModal'); };
 $('#btnFs').onclick = toggleFs; $('#btnFs2').onclick = toggleFs;
 $('#btnLostMenu').onclick = () => { location.href = location.pathname; };
 $('#btnHostLobby').onclick = () => { if (net.isHost && confirm('Herkes lobiye dönsün mü? Bu tur iptal olur.')) broadcast({ t: 'toLobby' }); };
-const SET_INPUTS = [['sVol', 'vol'], ['sMusic', 'music'], ['sSens', 'sens'], ['sFov', 'fov'], ['pVol', 'vol'], ['pMusic', 'music'], ['pSens', 'sens']];
+const SET_INPUTS = [['sVol', 'vol'], ['sMusic', 'music'], ['sSens', 'sens'], ['sFov', 'fov'], ['pVol', 'vol'], ['pMusic', 'music'], ['pSens', 'sens'], ['sShake', 'shake'], ['pShake', 'shake']];
+const COMFORT = [['motion', 'Kamera hareketi', 'Yürüme sallanması, süzülme salınımı, baş aşağı dönüş'], ['flash', 'Flaş ve ekran efektleri', 'Beyaz patlama, kırmızı nabız, renk kayması'], ['plain', 'Sade görüntü', 'Az parlama, kumlanma yok, hafif kenar kararması']];
+for (const id of ['cSeg', 'pcSeg']) {
+  $('#' + id).innerHTML = COMFORT.map(([k, n, d]) => `<button data-c="${k}">${n}<small>${d}</small></button>`).join('');
+  $$(`#${id} button`).forEach(b => b.onclick = () => { const k = b.dataset.c; settings[k] = !settings[k]; saveSettings(); applyComfort(); syncSettingsUi(); });
+}
 function syncSettingsUi() {
   for (const [id, k] of SET_INPUTS) {
     const el = $('#' + id); el.value = settings[k];
     const lab = el.nextElementSibling; if (lab) lab.textContent = k === 'sens' ? (+settings[k]).toFixed(1) : k === 'fov' ? Math.round(settings[k]) + '°' : Math.round(settings[k] * 100);
   }
   $$('#qSeg button').forEach(b => b.classList.toggle('on', b.dataset.q === settings.quality));
+  $$('#cSeg button, #pcSeg button').forEach(b => { b.classList.toggle('on', !!settings[b.dataset.c]); b.setAttribute('aria-pressed', settings[b.dataset.c] ? 'true' : 'false'); });
 }
 for (const [id, k] of SET_INPUTS) {
   $('#' + id).addEventListener('input', e => { settings[k] = +e.target.value; saveSettings(); applyVolumes(); syncSettingsUi(); if (k === 'fov' && !inGame) { camera.fov = settings.fov; camera.updateProjectionMatrix(); } });
@@ -3088,15 +3138,20 @@ function loop() {
     buildViewModel();
     // kamera
     const role = myRole();
-    const bobY = role !== 'floater' && me.onGround ? Math.sin(me.bob * 2) * 0.04 : 0;
+    const mo = settings.motion; // "Kamera hareketi" kapalıysa: yürüme sallanması, süzülme salınımı, baş aşağı dönüş ve patlama taklası yok
+    const bobY = mo && role !== 'floater' && me.onGround ? Math.sin(me.bob * 2) * 0.04 : 0;
     camera.position.set(me.pos.x, me.pos.y + eyeH() + bobY * (role === 'tiny' ? 0.4 : 1), me.pos.z);
-    let roll = role === 'floater' ? Math.sin(now / 900) * 0.07 : 0;
-    if (game.chaos && game.chaos.type === 'bascasagi' && game.chaos.target === myId) roll = Math.PI;
-    if (me.fly) { me.fly.rollA = (me.fly.rollA || 0) + me.fly.roll * dt * (me.pos.y > 0.05 ? 1 : 0); roll = me.fly.rollA; }
+    let roll = mo && role === 'floater' ? Math.sin(now / 900) * 0.07 : 0;
+    const flipMe = !!(game.chaos && game.chaos.type === 'bascasagi' && game.chaos.target === myId);
+    if (flipMe && mo) roll = Math.PI;
+    invMark.classList.toggle('hidden', !(flipMe && !mo && game.status === 'playing')); // fare yine ters; kamera dönmüyorsa bunu açıkça göster
+    if (me.fly && mo) { me.fly.rollA = (me.fly.rollA || 0) + me.fly.roll * dt * (me.pos.y > 0.05 ? 1 : 0); roll = me.fly.rollA; }
     camRoll += (roll - camRoll) * Math.min(1, dt * 5);
     camera.rotation.set(me.pitch, me.yaw, camRoll);
-    if (shake > 0) { shake = Math.max(0, shake - dt); camera.position.x += rnd(-1, 1) * shake * 0.12; camera.position.y += rnd(-1, 1) * shake * 0.12; }
-    viewModel.position.y = -0.42 + Math.sin(me.bob * 2) * 0.012 + (role === 'floater' ? Math.sin(now / 500) * 0.02 : 0);
+    let shakeAmp = 0; // sarsıntı süresi aynı, genliği ayardaki yüzdeyle çarpılır
+    if (shake > 0) { shake = Math.max(0, shake - dt); shakeAmp = shake * 0.12 * settings.shake; camera.position.x += rnd(-1, 1) * shakeAmp; camera.position.y += rnd(-1, 1) * shakeAmp; }
+    camDbg.bob = bobY; camDbg.rollTarget = roll; camDbg.roll = camRoll; camDbg.shake = shake; camDbg.shakeAmp = shakeAmp; camDbg.flipMe = flipMe;
+    viewModel.position.y = -0.42 + (mo ? Math.sin(me.bob * 2) * 0.012 + (role === 'floater' ? Math.sin(now / 500) * 0.02 : 0) : 0);
     viewModel.visible = !me.fly;
     // sayaç
     const ts = fmtTime(game.timeLeft);
@@ -3116,7 +3171,7 @@ function loop() {
     alarm.intensity *= Math.pow(0.03, dt);
     if (M.antTip) M.antTip.material.emissiveIntensity = Math.max(0.5, M.antTip.material.emissiveIntensity * Math.pow(0.05, dt));
     if (M.bomb) { const pan = game.status === 'playing' && game.timeLeft < 20 ? 0.012 : 0; M.bomb.position.x = rnd(-1, 1) * pan; M.bomb.rotation.y = rnd(-1, 1) * pan; }
-    $('#vignette').style.opacity = game.status === 'playing' && game.timeLeft < 30 ? (0.35 + Math.sin(now / 200) * 0.25) : (holdingBtn ? 0 : $('#vignette').style.opacity * 0.9);
+    $('#vignette').style.opacity = game.status === 'playing' && game.timeLeft < 30 ? (settings.flash ? 0.35 + Math.sin(now / 200) * 0.25 : 0.26) : (holdingBtn ? 0 : $('#vignette').style.opacity * 0.9); // efektler kapalı: nabız yok, sabit hafif kenar
     // nişan
     const o = document.pointerLockElement === canvas ? aimed() : null;
     setHover(o);
@@ -3153,7 +3208,7 @@ function loop() {
       else if (hit >= 0 && lsrT >= 0) { lsrT += dt; if (lsrT > 0.7) { lsrT = -1; tone(1400, 0.12, { type: 'sine', vol: 0.14 }); sendToHost({ t: 'act', a: 'laser', i: hit }); } }
     } else lsrOn = -1;
     $('#roleIntro').classList.toggle('hidden', !(game.countdown > 0 && game.status === 'playing'));
-    const tf = settings.fov + (game.chaos && game.chaos.type === 'kafein' && game.status === 'playing' ? 14 : 0);
+    const tf = settings.fov + (settings.motion && game.chaos && game.chaos.type === 'kafein' && game.status === 'playing' ? 14 : 0); // hız aynı kalır; sadece görüş açısı sıçraması isteğe bağlı
     if (Math.abs(camera.fov - tf) > 0.05) { camera.fov += (tf - camera.fov) * Math.min(1, dt * 6); camera.updateProjectionMatrix(); }
     censorT -= dt; if (censorT < 0) { censorT = 0.18; if (myRole() !== 'defuser') drawCensor(); }
     if (recorder) $('#recLvl').style.width = (micLevel() * 100) + '%';
@@ -3175,15 +3230,21 @@ function loop() {
   duckBoing = Math.max(0, duckBoing - dt * 2.2); couchDuck.position.y = 0.75 + Math.abs(Math.sin(duckBoing * 9)) * duckBoing * 0.35; couchDuck.scale.set(1.2, 1.2 * (1 - duckBoing * 0.25 * Math.cos(duckBoing * 18)), 1.2);
   stars.rotation.y = now / 400000;
   { const live = inGame && game && game.status === 'playing', panic = live && game.timeLeft < 30, alert = live && (panic || game.strikes > 0);
-    stripMat.emissive.setHex(panic ? 0xff2a1a : 0x2ec4b6); stripMat.emissiveIntensity = panic ? 1.6 + Math.sin(now / 120) * 1.2 : 1.5;
-    beacons.forEach((b, i) => { const f = alert ? 0.5 + 0.5 * Math.sin(now / (panic ? 110 : 260) + i * 1.6) : 0; b.mat.emissiveIntensity = 0.3 + f * 6; if (b.light) b.light.intensity = f * (panic ? 34 : 14); });
+    const calm = !settings.flash; // efektler kapalı: ikaz ışıkları aynı bilgiyi verir ama yavaş ve sönük dalgalanır
+    stripMat.emissive.setHex(panic ? 0xff2a1a : 0x2ec4b6); stripMat.emissiveIntensity = panic ? (calm ? 1.7 : 1.6 + Math.sin(now / 120) * 1.2) : 1.5;
+    beacons.forEach((b, i) => { const f = alert ? 0.5 + 0.5 * Math.sin(now / (calm ? 520 : panic ? 110 : 260) + i * 1.6) : 0; b.mat.emissiveIntensity = 0.3 + f * (calm ? 2.5 : 6); if (b.light) b.light.intensity = f * (panic ? 34 : 14) * (calm ? 0.35 : 1); });
     crtT -= dt; if (crtT < 0) { crtT = 0.45; drawCrt(); } }
   film.ab *= Math.pow(0.03, dt);
-  if (filmPass) { filmPass.uniforms.uTime.value = (now / 1000) % 100; filmPass.uniforms.uAb.value = film.ab + (inGame && game && game.status === 'playing' && game.timeLeft < 30 ? 0.03 + Math.sin(now / 200) * 0.02 : 0); }
+  if (filmPass) { filmPass.uniforms.uTime.value = (now / 1000) % 100; filmPass.uniforms.uAb.value = settings.flash ? film.ab + (inGame && game && game.status === 'playing' && game.timeLeft < 30 ? 0.03 + Math.sin(now / 200) * 0.02 : 0) : 0; }
   if (NORENDER) return; // otomatik testler: mantık çalışır, çizim atlanır
   if (composer) composer.render(); else renderer.render(scene, camera);
 }
 let camRoll = 0, lsrOn = -1, lsrT = 0;
+const camDbg = { bob: 0, roll: 0, rollTarget: 0, shake: 0, shakeAmp: 0, flipMe: false }; // testler için: kameranın o karedeki değerleri
+// BAŞ AŞAĞI kaosunda kamera döndürülmüyorsa (Kamera hareketi kapalı) farenin ters olduğunu söyleyen işaret
+const invMark = document.createElement('div'); invMark.id = 'invMark'; invMark.className = 'hidden';
+invMark.innerHTML = '<svg class="ic" viewBox="0 0 24 24"><path d="M7 4v16M7 4L3.5 7.5M7 4l3.5 3.5M17 20V4M17 20l-3.5-3.5M17 20l3.5-3.5"/></svg><div>Baş aşağı<br><small>fare yönleri ters</small></div>';
+$('#hud').appendChild(invMark);
 const P_duckY = i => game.puzzle.ducks.spots[i][1];
 
 // =====================================================================
@@ -3195,12 +3256,15 @@ showPause = function (on) {
   $('#hostLobbyRow').classList.toggle('hidden', !net.isHost);
   if (on && game) { const starting = game.countdown > 0; $('#pause h2').textContent = starting ? 'Hazır mısın?' : 'Fare serbest'; $('#pause p').textContent = starting ? 'Tıkla ve bombaya koş! (ESC fareyi serbest bırakır)' : 'Bomba seni beklemiyor! Saat işliyor... ⏰'; $('#btnResume').textContent = starting ? 'Başla' : 'Oyuna Dön'; }
 };
-syncSettingsUi();
+syncSettingsUi(); applyComfort();
 $('#loading').classList.add('hidden');
 $('#roleStrip').innerHTML = LOBBY_ORDER.map(r => `<div style="--rc:${ROLES[r].css}">${icon(ROLES[r].ic)}${ROLES[r].name}</div>`).join('');
 $('#menu').classList.remove('hidden');
 loop();
 window.__tb = { get game() { return game; }, me, players: () => players, net, act: m => sendToHost(m), myRole, avatars, emote: doEmote, M, camera, setRole: r => { players[myId].role = r; refreshModules(); setupRoleHud(); syncAvatars(); }, laser: v => { laserOn = v; } }; // test için
+// test için (konfor / görüntü / performans): ayarlar, kamera ve efekt değerleri, renderer
+Object.assign(window.__tb, { settings, applyComfort, syncSettingsUi, cam: camDbg, renderer, scene, THREE, applyTheme, HIGH, setShake: v => { shake = v; }, explode, flashVignette,
+  post: () => ({ bloom: bloom ? bloom.strength : null, vig: filmPass ? filmPass.uniforms.uVig.value : null, grain: filmPass ? filmPass.uniforms.uGrain.value : null, ab0: filmPass ? filmPass.uniforms.uAb0.value : null, ab: filmPass ? filmPass.uniforms.uAb.value : null, filmAb: film.ab, nofx: document.body.classList.contains('nofx'), vignette: +$('#vignette').style.opacity || 0, flashShown: getComputedStyle($('#flash')).display !== 'none', softFade: softFadeEl.classList.contains('on'), invMark: !invMark.classList.contains('hidden'), alarm: alarm.color.r * alarm.intensity, fov: camera.fov }) });
 
 </script>
 </body>
