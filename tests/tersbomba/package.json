@@ -1,0 +1,16 @@
+{
+  "name": "tersbomba-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ters Bomba için otomatik çok oyunculu test düzeneği (Playwright + yerel PeerServer)",
+  "scripts": {
+    "test": "node run.js",
+    "solo": "node scenarios/smoke-solo.js",
+    "5p": "node scenarios/smoke-5p.js"
+  },
+  "dependencies": {
+    "peer": "1.0.2",
+    "peerjs": "1.5.4",
+    "three": "0.160.0"
+  }
+}
