@@ -1979,10 +1979,11 @@ function station(parent, o) {
   return { g, content, lamp, censor };
 }
 
-const keepTex = t => t === timerTex || t === censorTex || t === tntTex || t === qTex || t === haloTex || t === woodTex || Object.values(symTex).includes(t) || Object.values(letterTex).includes(t);
-function disposeTree(root) { // eski turun GPU belleğini bırak
+// paylaşılan dokular: tur/avatar/ördek silinirken bırakılmaz
+const keepTex = t => t === timerTex || t === censorTex || t === tntTex || t === qTex || t === haloTex || t === woodTex || t === shaftTex || Object.values(symTex).includes(t) || Object.values(letterTex).includes(t) || Object.values(bubbleCache).includes(t);
+function disposeTree(root) { // eski turun / silinen avatarın / yağmur ördeğinin GPU belleğini bırak
   root.traverse(o => {
-    if (o.geometry) o.geometry.dispose();
+    if (o.geometry && !o.isSprite) o.geometry.dispose();   // Sprite geometrisi three.js içinde ortak
     (o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []).forEach(m => { if (m.map && !keepTex(m.map)) m.map.dispose(); m.dispose(); });
   });
 }
@@ -2364,7 +2365,7 @@ function startRound(puzzle) {
   ['menu', 'lobby', 'endScreen'].forEach(id => $('#' + id).classList.add('hidden'));
   $('#hud').classList.remove('hidden');
   $('#flash').style.opacity = 0;
-  shake = 0; particles.forEach(p => scene.remove(p.mesh)); particles = []; ducks.forEach(d => scene.remove(d.g)); ducks = [];
+  shake = 0; clearParticles(); clearRain();
   setupRoleHud();
   ac();
   if (!document.pointerLockElement) showPause(true);
@@ -2521,9 +2522,11 @@ function updateParticles(dt) {
       if (p.mesh.position.y < 0.05) { p.mesh.position.y = 0.05; p.v.multiplyScalar(0.5); p.v.y = Math.abs(p.v.y) * 0.3; }
       p.mesh.rotation.x += dt * 6; p.mesh.rotation.y += dt * 4; p.mesh.material.opacity = Math.min(1, p.life / p.max * 2);
     }
-    if (p.life <= 0) { scene.remove(p.mesh); p.mesh.material.dispose(); particles.splice(i, 1); }
+    if (p.life <= 0) { freeParticle(p); particles.splice(i, 1); }
   }
 }
+function freeParticle(p) { scene.remove(p.mesh); p.mesh.material.dispose(); if (p.mesh.geometry !== partGeo) p.mesh.geometry.dispose(); } // patlama küresinin kendi geometrisi var
+function clearParticles() { particles.forEach(freeParticle); particles = []; }
 
 // =====================================================================
 //  KAOS OLAYLARI (yerel efektler)
@@ -2541,9 +2544,11 @@ function startChaos(c) {
 }
 function endChaos(type) {
   $('#chaos').classList.add('hidden');
-  if (type === 'ordek' || type === 'all') setTimeout(() => { ducks.forEach(d => scene.remove(d.g)); ducks = []; }, type === 'all' ? 0 : 6000);
+  if (type === 'ordek' || type === 'all') setTimeout(clearRain, type === 'all' ? 0 : 6000);
 }
+function clearRain() { ducks.forEach(d => { scene.remove(d.g); disposeTree(d.g); }); ducks = []; } // her ördek 6 geometri + 3 malzeme
 function spawnDuck() {
+  if (!(inGame && game && game.status === 'playing' && game.chaos && game.chaos.type === 'ordek')) return;   // tur bittiyse geciken zamanlayıcı ördek bırakmasın
   const g = makeDuck(rnd(0.9, 1.6)); g.position.set(rnd(-HX + 1, HX - 1), H - 0.5, rnd(-HZ + 1, HZ - 1)); g.rotation.y = rnd(0, 6);
   shadowAll(g); scene.add(g); ducks.push({ g, v: new THREE.Vector3(rnd(-1, 1), 0, rnd(-1, 1)), spin: rnd(-3, 3), bounced: 0 });
 }
@@ -2957,7 +2962,12 @@ function makeAvatar(id) {
 }
 function showBubble(a, e) { a.bubble.material.map = bubbleTex(e); a.bubble.material.needsUpdate = true; a.bubble.visible = true; a.bubbleUntil = performance.now() + 2000; }
 const _hand = new THREE.Vector3();
-function removeAvatar(id) { if (avatars[id]) { scene.remove(avatars[id].g); delete avatars[id]; } if (lasers[id]) showLaser(id, null, null); }
+function removeAvatar(id) {
+  if (avatars[id]) { scene.remove(avatars[id].g); disposeTree(avatars[id].g); delete avatars[id]; }   // geometri, malzeme ve isim etiketi dokusu
+  const L = lasers[id];
+  if (L && id !== myId) { scene.remove(L.beam, L.dot, L.core); L.beam.geometry.dispose(); L.core.geometry.dispose(); L.beam.material.dispose(); L.dot.material.dispose(); delete lasers[id]; }
+  else if (L) showLaser(id, null, null);
+}
 function syncAvatars() {
   for (const id in avatars) if (!players[id] || id === myId || avatars[id].role !== players[id].role || avatars[id].name !== players[id].name) removeAvatar(id);
   for (const id in players) if (id !== myId && !avatars[id]) makeAvatar(id);
@@ -3477,7 +3487,7 @@ $('#menu').classList.remove('hidden');
 loop();
 window.__tb = { get game() { return game; }, me, players: () => players, net, act: m => sendToHost(m), myRole, avatars, emote: doEmote, M, camera, setRole: r => { players[myId].role = r; refreshModules(); setupRoleHud(); syncAvatars(); }, laser: v => { laserOn = v; } }; // test için
 let tbLaserPt = null; // test: İŞARETÇİ'nin lazer noktasını zorla (T.laser([x, y, z])); gerçek oyunda hep null
-Object.assign(window.__tb, { laser: v => { laserOn = !!v; tbLaserPt = Array.isArray(v) ? v : null; }, hostPuzzle: () => hostR && hostR.P, hostR: () => hostR, VAC, LSR, REACH, BTN_RULE, get myId() { return myId; }, plateOf, MOD_ROLE, ACT_MOD, hostDiag, hostMeta, cleanName, checkSolvable, genPuzzle, MOD_NEEDS, REQ_ROLES, missingRoles, hostStart, raw: m => net.hostConn && net.hostConn.send(m) }); // PKG-A test kancaları
+Object.assign(window.__tb, { laser: v => { laserOn = !!v; tbLaserPt = Array.isArray(v) ? v : null; }, hostPuzzle: () => hostR && hostR.P, toLobby: () => net.isHost && broadcast({ t: 'toLobby' }), hostR: () => hostR, VAC, res: () => { let n = 0; scene.traverse(() => n++); return { geo: renderer.info.memory.geometries, tex: renderer.info.memory.textures, prog: renderer.info.programs ? renderer.info.programs.length : 0, objs: n, particles: particles.length, rain: ducks.length, lasers: Object.keys(lasers).length, avatars: Object.keys(avatars).length }; }, LSR, REACH, BTN_RULE, get myId() { return myId; }, plateOf, MOD_ROLE, ACT_MOD, hostDiag, hostMeta, cleanName, checkSolvable, genPuzzle, MOD_NEEDS, REQ_ROLES, missingRoles, hostStart, raw: m => net.hostConn && net.hostConn.send(m) }); // PKG-A test kancaları
 
 </script>
 </body>
