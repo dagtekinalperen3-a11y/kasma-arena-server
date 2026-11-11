@@ -313,7 +313,7 @@ const toPlates = clients => Promise.all(clients.map(async c => c.moveTo(await c.
 // ---------------------------------------------------------------------
 async function run(name, fn, { timeout = 300000 } = {}) {
   const t0 = Date.now(), el = () => ((Date.now() - t0) / 1000).toFixed(1).padStart(6) + 's';
-  const checks = [], fails = [];
+  const checks = [], fails = [], known = [];
   const t = {
     name,
     log: (...a) => console.log(`[${el()}]  `, ...a),
@@ -324,6 +324,11 @@ async function run(name, fn, { timeout = 300000 } = {}) {
       if (ok) console.log(`[${el()}]   ✓ ${label}`);
       else { fails.push(label + (detail !== undefined ? ' — ' + (typeof detail === 'string' ? detail : JSON.stringify(detail)) : '')); console.log(`[${el()}]   ✗ ${label}` + (detail !== undefined ? '\n            ' + (typeof detail === 'string' ? detail : JSON.stringify(detail)) : '')); }
       return !!ok;
+    },
+    // bilinen OYUN hatasına bağlı kontrol: varsayılan olarak FAIL sayılır; TB_ALLOW_KNOWN=1 ise yalnızca uyarı basar
+    bug(label, ok, detail) {
+      if (ok || !process.env.TB_ALLOW_KNOWN) return t.check(label, ok, detail);
+      known.push(label); console.log(`[${el()}]   ⚠ BİLİNEN OYUN HATASI (TB_ALLOW_KNOWN): ${label}\n            ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`); return false;
     },
     eq(label, got, want) { return t.check(label, JSON.stringify(got) === JSON.stringify(want), `beklenen ${JSON.stringify(want)}, gelen ${JSON.stringify(got)}`); },
     // tüm istemcilerde konsol/sayfa hatası olmamalı
@@ -353,6 +358,7 @@ async function run(name, fn, { timeout = 300000 } = {}) {
   const secs = ((Date.now() - t0) / 1000).toFixed(1);
   console.log(`\n${fails.length ? 'FAIL' : 'PASS'}  ${name}  (${checks.length} kontrol, ${fails.length} hata, ${secs} sn)`);
   fails.forEach(f => console.log('  ✗ ' + f));
+  known.forEach(f => console.log('  ⚠ bilinen oyun hatası (sayılmadı): ' + f));
   process.exit(fails.length ? 1 : 0);
 }
 
