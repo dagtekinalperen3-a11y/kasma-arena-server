@@ -197,11 +197,31 @@ kbd{display:inline-block;min-width:22px;text-align:center;padding:0 6px;border-r
 #secret .big span{display:inline-block;background:#fff;border:1px solid #b9ab88;border-radius:3px;padding:2px 8px 0;margin:2px 2px 2px 0}
 #secret hr{border:0;border-top:1px dashed #9c8f6e;margin:7px 0}
 #secret b{color:#000}
-#voice{position:absolute;right:14px;bottom:44px;display:flex;flex-direction:column;gap:5px;align-items:flex-end}
-#voice div{padding:6px 14px 4px;text-transform:uppercase;letter-spacing:1px;font-size:15px;border-left:4px solid var(--green)}
-#rec{position:absolute;left:50%;bottom:112px;transform:translateX(-50%);background:var(--red);color:#fff;border-radius:4px;padding:9px 18px 7px;font:400 18px var(--head);letter-spacing:1.5px;text-transform:uppercase;display:flex;align-items:center;gap:12px;box-shadow:0 0 30px rgba(229,56,43,.6)}
+#voice{position:absolute;right:14px;bottom:44px;display:flex;flex-direction:column;gap:5px;align-items:flex-end;max-width:min(440px,46vw)}
+#hud:has(#manual:not(.hidden)) #voice{right:calc(min(450px,42vw) + 26px)}
+#vNotes{display:flex;flex-direction:column;gap:5px;align-items:flex-end}
+.vchip{padding:6px 12px 4px;text-transform:uppercase;letter-spacing:1px;font-size:15px;border-left:4px solid var(--green);display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.vchip .ic{font-size:17px}
+.vchip.note{text-transform:none;letter-spacing:.3px;border-left-color:var(--haz);max-width:100%}.vchip.note.bad{border-left-color:var(--red)}.vchip.note.good{border-left-color:var(--green)}
+#vFloor{border-left-color:var(--haz)}#vFloor.me{background:#2b2410;box-shadow:0 0 18px rgba(245,184,0,.45)}#vFloor b{color:var(--haz);font:400 17px var(--head);letter-spacing:1px}
+.vsec{color:var(--paper);font:400 17px var(--head)}
+#vNow{flex-direction:column;align-items:stretch;gap:4px;min-width:220px}#vNowT{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.vbar{display:block;height:5px;background:#000;border-radius:2px;overflow:hidden}.vbar b{display:block;height:100%;width:0;background:var(--green);transition:width .1s linear}
+.vtag{font:700 12px var(--body);font-style:normal;letter-spacing:1.5px;padding:2px 6px 0;border-radius:3px;background:var(--steel3);color:#fff;display:inline-flex;align-items:center;gap:3px}.vtag .ic{font-size:13px}
+.vtag.rev{background:var(--pink);color:#111}.vtag.urg{background:var(--red)}.vtag.flr{background:var(--haz);color:#111}.vtag.tel{background:var(--teal);color:#04211e}
+#vQueue{border-left-color:var(--steel3)}#vQueue .urg{color:var(--red)!important}
+#vAim{border-left-color:var(--purple)}
+#vKeys{font-size:13px;letter-spacing:.6px;text-transform:uppercase;color:#d9d2c2;text-shadow:0 1px 3px #000,0 0 8px #000;text-align:right}#vKeys .nomic{color:var(--red)}
+#players .vm{display:inline-flex;margin-left:2px}#players .vm .ic{font-size:15px}
+#players .vm.rec{color:var(--red);animation:pulse .5s infinite}#players .vm.flr,#players .vm.hand{color:var(--haz)}#players .vm.nomic{color:var(--dim)}
+#rec{position:absolute;left:50%;bottom:112px;transform:translateX(-50%);background:var(--red);color:#fff;border-radius:4px;padding:9px 18px 7px;font:400 18px var(--head);letter-spacing:1.5px;text-transform:uppercase;display:flex;align-items:center;gap:12px;box-shadow:0 0 30px rgba(229,56,43,.6);white-space:nowrap}
+#rec.wait{background:var(--steel3);box-shadow:none}#rec.urg{background:#b3140a;outline:3px solid var(--haz)}
 #rec i{display:block;width:70px;height:8px;border-radius:2px;background:rgba(0,0,0,.35);overflow:hidden}
 #rec i b{display:block;height:100%;width:0;background:#fff;transition:width .05s}
+#rec i.rt{position:absolute;left:0;right:0;bottom:0;width:auto;height:3px;border-radius:0}#rec i.rt b{background:var(--haz);width:100%}
+.lab .btn{flex:1 1 180px}#labRec.on{--c:var(--red);--d:#8a1c14;--t:#fff}
+.labm{height:8px;background:#000;border-radius:2px;overflow:hidden;margin:4px 0 8px}.labm b{display:block;height:100%;width:0;background:var(--green);transition:width .1s}
+.labw{display:inline-block;font:400 15px var(--type);background:var(--paper);color:#2a2418;border-radius:3px;padding:2px 8px 0;margin:2px 3px}
 #toasts{position:absolute;top:150px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px}
 .toast{padding:9px 18px 7px;font:700 18px var(--body);letter-spacing:.8px;border-left:5px solid var(--haz);animation:pop .28s cubic-bezier(.3,1.6,.6,1);max-width:min(720px,92vw);text-align:center}
 @keyframes pop{from{transform:scale(.5);opacity:0}}
@@ -329,7 +349,7 @@ body.nofx #timer.panic,body.nofx .score .rec,body.nofx #players .p.talk::after{a
       <div class="label">Mutatörler <span>+%20 puan</span></div>
       <div class="seg col" id="mutSeg"></div>
       <div class="grow"></div>
-      <div class="row" style="margin-bottom:6px"><button class="btn sm ghost" id="btnMic">Ters sesini dene (basılı tut)</button></div>
+      <div class="row" style="margin-bottom:6px"><button class="btn sm ghost" id="btnLab">Ters Ses Laboratuvarı</button></div><div id="micNote" class="small hidden" style="color:var(--red);margin-bottom:6px"></div>
       <div id="hostBtns">
         <div class="row" style="margin:6px 0"><button class="btn sm ghost" id="btnShuffle">Rolleri karıştır</button></div>
         <div class="row" style="margin:10px 0 0"><button class="btn big green" id="btnStart">Vardiyayı Başlat</button></div>
@@ -364,6 +384,7 @@ body.nofx #timer.panic,body.nofx .score .rec,body.nofx #players .p.talk::after{a
   <h3>🔊 TERS SES</h3>
   <ul><li>Bomba kitapçığı (<kbd>M</kbd>) ve <b>TERS TUŞ'un yürüme tuşları</b> sende. Ama bombayı <b>göremezsin</b>.</li>
   <li><kbd>V</kbd> basılı tut → konuş → bırak. Herkes seni <b>TERSTEN</b> duyar. 😂 <kbd>B</kbd> ile prova yap.</li>
+  <li>Ters çevrilen şey harfler değil <b>sesin kendisi</b>: tersten hecelemek işe yaramaz. Lobideki <b>Ters Ses Laboratuvarı</b>'nda dene; sayı için <b>kaç kere</b>, evet/hayır için <b>uzun/kısa</b> ses kullan.</li>
   <li>Normal/Zor modda kitapçığın bazı sayfaları odaya dağılmış: parlayan sayfaların içinden yürü.</li></ul>
   <h3>🎮 TERS TUŞ</h3>
   <ul><li>Bombayı ve duvardaki modülleri <b>sadece sen</b> görürsün; başkaları gri kablo ve "?" görür. <kbd>Sol tık</kbd> ile kes, bas, çevir.</li>
@@ -389,9 +410,36 @@ body.nofx #timer.panic,body.nofx .score .rec,body.nofx #players .p.talk::after{a
   <ul><li>Çözülen modül, kalan süre ve az hata = yüksek puan. Hatasız ve bol süreyle bitirirseniz <b>3 yıldız</b>.</li>
   <li>Oda sahibi lobide <b>mutatör</b> açabilir (gece vardiyası, ayna dünya, helyum partisi...). Zorlaşır ama puanı artırır.</li>
   <li>Başarımların ve rekorların ana menüdeki <b>🏆 Profil</b>'de durur.</li></ul>
+  <h3>Ses sırası</h3>
+  <ul><li>Ses canlı değil, <b>kayıt</b>: <kbd>V</kbd> basılı tut, konuş, bırak. Kayıtlar <b>sıraya girer</b>; herkes aynı anda tek kayıt duyar. 6 saniyeden fazla bekleyen kayıt düşer, sahibine haber verilir.</li>
+  <li><kbd>I</kbd> basılı = <b>ACİL</b> kayıt: sıranın önüne geçer (25 saniyede bir). <kbd>9</kbd> = söz iste (✋).</li>
+  <li>İŞARETÇİ lazeri bir oyuncunun üstündeyken <kbd>Sol tık</kbd> yaparsa o oyuncuya 8 saniyelik <b>söz</b> verir: kaydı sırada öne alınır. Kimse susturulmaz, konuşmanın cezası yoktur.</li>
+  <li>Mikrofonun yoksa ya da izin vermediysen oyun devam eder; listede adının yanında işaret görünür.</li></ul>
   <h3>😂 Herkes</h3>
   <ul><li><kbd>1</kbd>-<kbd>8</kbd> emojiler ve danslar (5 = korna 📯, 6 = ✅, 7 = ❌, 8 = 🔁 tekrar et). İŞARETÇİ aynı tuşlarla başının üstünde yazılı <b>pankart</b> kaldırır (EVET, HAYIR, TEKRAR, DUR, ACELE, BURAYA). <kbd>H</kbd> rol kartını gizle/göster. <kbd>ESC</kbd> duraklat/ayarlar.</li>
   <li>Kurulum: biri <b>Oda Kur</b> der, kodu diğerlerine söyler, onlar <b>Katıl</b> der. Mikrofon izni sorulunca <b>İzin Ver</b>.</li></ul>
+</div></div>
+
+<!-- ============ TERS SES LABORATUVARI ============ -->
+<div id="labModal" class="modal hidden"><div class="card howto">
+  <button class="btn sm ghost x" data-close>Kapat</button>
+  <h2>Ters Ses Laboratuvarı</h2>
+  <p>TERS SES'in kaydı herkese <b>ses olarak ters çevrilip</b> gider: kayıt sondan başa doğru çalınır. Bu, kelimeyi <b>harf harf tersten söylemekle aynı şey değildir</b>. Vurgu, uzunluk ve harfler arası geçişler de ters döner; o yüzden "ÜÇ" yerine "ÇÜ" demek karşıya "üç" diye gitmez. Kendi sesinle dene:</p>
+  <div class="row lab"><button class="btn" id="labRec">Basılı tut ve konuş</button><button class="btn blue" id="labRev" disabled>Ekibin duyacağı (ters)</button><button class="btn ghost" id="labFwd" disabled>Tersin tersi (aslı)</button></div>
+  <div class="labm"><b id="labLvl"></b></div>
+  <div id="labStatus" class="status">Düğmeyi basılı tutup kısa bir şey söyle. Bırakınca ekibin duyacağı hâli çalar. Kayıt bu bilgisayardan çıkmaz.</div>
+  <h3>1 · Kısa hecelerle başla</h3>
+  <p>Tek tek kaydet, tersini dinle: <span class="labw">BA</span><span class="labw">DUR</span><span class="labw">KES</span><span class="labw">ÜÇ</span><span class="labw">EVET</span><span class="labw">HAYIR</span> Hangileri hâlâ tanınıyor? Baştan ve sondan aynı okunan kısa sözleri de dene: <span class="labw">İKİ</span><span class="labw">ANA</span><span class="labw">KEK</span> — ne kadar değiştiklerini kendi kulağınla ölç.</p>
+  <h3>2 · Tersten hecelemeyi dene (ve neden tutmadığını duy)</h3>
+  <p>"KIRMIZI" yerine "IZIMRIK" de, tersini dinle. Çoğu zaman "kırmızı" gibi duyulmaz. <b>Tersin tersi</b> düğmesi kaydın aslını çalar: ekibin düz duyması için ağzından çıkan sesin tam bu kaydın ters hâli olması gerekirdi. Uzun kelime ve cümlelerde buna güvenme.</p>
+  <h3>3 · Ters dönse de bozulmayan üç işaret</h3>
+  <ul><li><b>Kaç kere:</b> sayıyı kelimeyle değil tekrarla ver. 3 için <span class="labw">ta · ta · ta</span>. Üç vuruş ters dönünce de üç vuruştur.</li>
+  <li><b>Uzun / kısa:</b> uzun bir <span class="labw">aaaaa</span> ile kısa bir <span class="labw">a</span> ters dönünce de uzun ve kısadır (örnek: uzun = evet / basılı tut, kısa = hayır / bas-bırak). <b>Sıra ters döner:</b> "uzun, kısa" karşıya "kısa, uzun" diye gider; tek işaret ver.</li>
+  <li><b>İnce / kalın:</b> sabit ince bir <span class="labw">iii</span> ile kalın bir <span class="labw">ooo</span> ters dönünce de ince ve kalındır. Yükselen ses alçalan ses olur; sesi sabit tut.</li></ul>
+  <h3>4 · Ekipçe anlaşın</h3>
+  <ul><li>Diğerlerinin sesi sana <b>düz</b> gelir. Sana evet-hayır ya da sayıyla cevaplanacak sorular sorsunlar: "İleri tuşu K mi?" → uzun ses = evet.</li>
+  <li>Hangi işaretin ne demek olduğunu tur başlamadan kararlaştırın (vuruş sayısı = kablo numarası gibi).</li>
+  <li>Harf söylemen gerekirse harfi iki sesli arasına alıp dene (<span class="labw">EKE</span>, <span class="labw">ASA</span>) ve burada nasıl duyulduğunu dinle; emin değilsen karşı taraf tahminini söylesin, sen onayla.</li></ul>
 </div></div>
 
 <!-- ============ AYARLAR ============ -->
@@ -627,6 +675,7 @@ const MUTS = {
   kaos:   { name: 'Kaos Yağmuru',   icon: '🌪️', desc: 'Kaos olayları iki kat sık gelir' },
   hiz:    { name: 'Hız Bombası',    icon: '⚡', desc: 'Süre %35 daha kısa' },
   ayna:   { name: 'Ayna Dünya',     icon: '🪞', desc: 'Ekranın sağı solu yer değiştirir' },
+  telsiz: { name: 'Telsiz Disiplini', icon: '📻', desc: 'Söz birindeyken araya giren kayıtlar cızırtılı gider' },
 };
 // Labirent: yerdeki kareler (kuzeydoğu köşe). Yolu sadece YERÇEKİMSİZ görür, sadece TERS TUŞ yürür.
 const MZ = { cols: 5, rows: 4, s: 1.2, x0: 3.2, z0: -4.2 };
@@ -810,7 +859,7 @@ function ac() {
     const comp = actx.createDynamicsCompressor(); comp.connect(master);
     sfxBus = actx.createGain(); sfxBus.connect(comp);
     musicBus = actx.createGain(); musicBus.connect(comp);
-    voiceBus = actx.createGain(); voiceBus.connect(master);
+    voiceBus = actx.createGain(); const vlim = actx.createDynamicsCompressor(); vlim.threshold.value = -4; vlim.knee.value = 4; vlim.ratio.value = 16; vlim.attack.value = 0.003; vlim.release.value = 0.12; voiceBus.connect(vlim).connect(master); // ses: eşitlenmiş klipler + tepe sınırlayıcı
     noiseBuf = actx.createBuffer(1, actx.sampleRate, actx.sampleRate);
     const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     applyVolumes();
@@ -820,7 +869,9 @@ function ac() {
 }
 function applyVolumes() {
   if (!actx) return;
-  master.gain.value = settings.vol; musicBus.gain.value = settings.music * 0.32; voiceBus.gain.value = 1.9;
+  master.gain.value = settings.vol; voiceBus.gain.value = VOX.busGain;
+  const t = actx.currentTime; musicBus.gain.cancelScheduledValues(t); sfxBus.gain.cancelScheduledValues(t);
+  musicBus.gain.value = settings.music * 0.32 * (ducked ? VOX.duckMusic : 1); sfxBus.gain.value = ducked ? VOX.duckSfx : 1;   // klip çalarken kısık
 }
 function tone(freq, dur, o = {}) {
   if (!actx) return;
@@ -913,15 +964,59 @@ setInterval(() => {
 }, 60);
 
 // --- Mikrofon / bas-konuş ---
-let micStream = null, recorder = null, recMode = null, recTimeout = null, micAnalyser = null, micData = null;
-async function ensureMic() {
-  if (micStream) return true;
-  try {
-    micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
-    ac(); const src = actx.createMediaStreamSource(micStream);
-    micAnalyser = actx.createAnalyser(); micAnalyser.fftSize = 512; micData = new Uint8Array(micAnalyser.fftSize); src.connect(micAnalyser);
+// CANLI SES YOK: V (ACİL için I) basılıyken kayıt alınır, bırakınca klip oda sahibine gider. Oda sahibi klipleri
+// sıraya koyar ve herkese aynı anda TEK klip çaldırır (aşağıda "SES SIRASI"). Tüm ses paketleri t:'voice' + k alt türüyle gider.
+// Sayılar ilk tahmindir (oyuncu testi yapılmadı); hepsi bu tabloda durur.
+const VOX = {
+  maxWait: 3, staleMs: 6000, staleUrgentMs: 12000, gapMs: 250, leadMs: 150,          // sıra: bekleyen sınırı, bayatlama, klipler arası boşluk, çözme payı
+  urgentCdMs: 25000, floorMs: 8000, handMs: 6000, recMarkMs: 9500, clipEveryMs: 500, // ACİL bekleme, söz süresi, ✋ süresi, kayıt işareti, klip aralığı
+  minDur: 0.2, maxDur: 8.5, recMaxMs: 8000, maxB64: 400000,
+  rateCap: 1.6, tinyRate: 1.35, heliumRate: 1.45,                                    // çalma hızı çarpımı en çok 1.6
+  targetRms: 0.16, peakCeil: 0.9, minGain: 0.25, maxGain: 8, busGain: 1,             // ses yüksekliği eşitleme
+  duckMusic: 0.35, duckSfx: 0.6, duckRamp: 0.25,                                     // klip çalarken müzik / efekt seviyesi
+};
+Object.assign(IC, {
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/>',
+  micOff: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7M3.5 3.5l17 17"/>',
+  hand: '<path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V11M11 11V4a1.5 1.5 0 0 1 3 0v7M14 11V5.5a1.5 1.5 0 0 1 3 0V14c0 4-2.5 7-6 7-2.5 0-4-1.2-5.5-3.5L4 13.5a1.5 1.5 0 0 1 2.5-1.6L8 14"/>',
+  floor: '<path d="M3 10v4h3l8 4.5v-13L6 10zM17.5 9a4 4 0 0 1 0 6M6.5 14.5l1 4.5H10"/>',
+  urgent: '<path d="M12 3.5L2.5 20h19zM12 10v4.5M12 17.3v.1"/>',
+  queue: '<path d="M4 7h10M4 12h10M4 17h7M18 8v8M15.5 13.5L18 16l2.5-2.5"/>',
+  rev: '<path d="M4 8h13M13.5 4.5L17 8l-3.5 3.5M20 16H7M10.5 12.5L7 16l3.5 3.5"/>',
+  radio: '<rect x="6" y="8" width="12" height="13" rx="2"/><path d="M9 8V3M10 12h4M10 16h4"/>',
+});
+let micStream = null, micPending = null, micState = '', micWhy = '', micTold = false, micDirty = false;   // micState: '' bilinmiyor | 'ok' | 'yok'
+let recorder = null, recMode = null, recTimeout = null, recWant = null, recT0 = 0, micAnalyser = null, micData = null;
+const MIC_MSG = {
+  izin: 'Mikrofon izni verilmedi. Oyun devam eder: herkesi duyarsın, hareketlerle (1-8) anlatırsın. Açmak için adres çubuğundaki kilit simgesinden mikrofona izin ver, sonra V\'ye yeniden bas.',
+  cihaz: 'Mikrofon bulunamadı. Oyun devam eder: herkesi duyarsın, hareketlerle (1-8) anlatırsın. Mikrofon takınca V\'ye yeniden bas.',
+  destek: 'Bu tarayıcı ya da adres ses kaydına izin vermiyor (https gerekir). Oyun devam eder: herkesi duyarsın, hareketlerle (1-8) anlatırsın.',
+};
+function ensureMic() {
+  if (micStream) return Promise.resolve(true);
+  if (micPending) return micPending;                             // izin penceresi zaten açık: aynı isteği bekle
+  const fail = e => {
+    const n = e && e.name;
+    micWhy = n === 'NotFoundError' || n === 'DevicesNotFoundError' || n === 'OverconstrainedError' ? 'cihaz' : n === 'destek' ? 'destek' : 'izin';
+    if (micState !== 'yok') { micState = 'yok'; micDirty = true; }
+    renderMicNote();
+    if (inGame) { if (!micTold) { micTold = true; vnote(MIC_MSG[micWhy], 'bad', 10000); } else vnote('Mikrofon yok — kayıt alınamadı', 'bad', 2500); }
+    return false;
+  };
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') return Promise.resolve(fail({ name: 'destek' }));
+  let p;
+  try { p = navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); } catch (e) { return Promise.resolve(fail(e)); }
+  return micPending = p.then(st => {
+    micPending = null; micStream = st;
+    try {
+      ac(); const src = actx.createMediaStreamSource(st);
+      micAnalyser = actx.createAnalyser(); micAnalyser.fftSize = 512; micData = new Uint8Array(micAnalyser.fftSize); src.connect(micAnalyser);
+      const tr = st.getAudioTracks()[0]; if (tr) tr.onended = () => { if (micStream === st) { micStream = null; micAnalyser = null; } };   // mikrofon çekildi: sonraki basışta yeniden iste
+    } catch (e) {}
+    if (micState !== 'ok') { micState = 'ok'; micDirty = true; }
+    renderMicNote();
     return true;
-  } catch (e) { toast('🎙️ Mikrofon izni yok! Tarayıcı adres çubuğundan izin ver.'); return false; }
+  }, e => { micPending = null; return fail(e); });
 }
 function micLevel() {
   if (!micAnalyser) return 0;
@@ -929,64 +1024,372 @@ function micLevel() {
   for (let i = 0; i < micData.length; i++) { const v = (micData[i] - 128) / 128; s += v * v; }
   return Math.min(1, Math.sqrt(s / micData.length) * 5);
 }
+// mode: 'talk' (V) | 'acil' (I) | 'prova' (B, yalnızca yerel) | 'lab' (lobi laboratuvarı, yalnızca yerel)
 async function startRec(mode) {
-  if (recorder) return;
-  if (!(await ensureMic())) return;
-  if (recorder) return;
-  const chunks = [];
+  if (recorder || recWant) return;
+  const want = recWant = { mode };
+  if (!micStream && micState !== 'yok') showRec('izin');
+  const ok = await ensureMic();
+  if (recWant !== want) { if (!recorder && !recWant) hideRec(); return; }   // izin beklerken tuş bırakıldı → kayıt BAŞLAMAZ
+  if (!ok) { recWant = null; hideRec(); return; }
   let r;
-  try { r = new MediaRecorder(micStream, { audioBitsPerSecond: 32000 }); } catch (e) { r = new MediaRecorder(micStream); }
-  recorder = r; recMode = mode;
+  try { try { r = new MediaRecorder(micStream, { audioBitsPerSecond: 32000 }); } catch (e) { r = new MediaRecorder(micStream); } }
+  catch (e) { recWant = null; hideRec(); vnote('Kayıt başlatılamadı', 'bad'); return; }
+  const chunks = [];
+  recorder = r; recMode = mode; recT0 = performance.now();
   r.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
   r.onstop = async () => {
+    if (r.discard) return;
     const mime = r.mimeType || 'audio/webm';
     const buf = await new Blob(chunks, { type: mime }).arrayBuffer();
-    if (buf.byteLength < 200) return;
-    if (mode === 'prova') playClip(buf, true, null);
-    else { sendToHost({ t: 'voice', mime, data: b64enc(buf) }); }
+    if (buf.byteLength < 200) { if (mode === 'lab') labGot(null); return; }
+    if (mode === 'prova') playClip(buf, { local: 'prova', speaker: myId, rev: myRole() === 'reader', rate: voiceRate(myRole()) });
+    else if (mode === 'lab') labGot(buf);
+    else sendClip(buf, mime, mode === 'acil', (r.ms || 0) / 1000);
   };
   r.start();
-  $('#recTxt').textContent = mode === 'prova' ? 'Prova — sadece sen duyacaksın' : (myRole() === 'reader' ? 'Kayıt — herkes TERSTEN duyacak' : 'Kayıt — bırakınca gönderilir');
-  $('#rec').classList.remove('hidden');
+  showRec(mode); vc.stats.recs++;
+  if (mode === 'talk' || mode === 'acil') sendToHost({ t: 'voice', k: 'rec', on: true });
   clearTimeout(recTimeout);
-  recTimeout = setTimeout(() => stopRec(mode), 8000);
+  recTimeout = setTimeout(() => stopRec(mode), VOX.recMaxMs);
 }
-function stopRec(mode) {
+function stopRec(mode, discard) {
+  if (recWant && (!mode || recWant.mode === mode)) { recWant = null; if (!recorder) hideRec(); }
   if (!recorder || (mode && recMode !== mode)) return;
-  try { recorder.stop(); } catch (e) {}
-  recorder = null; recMode = null;
-  $('#rec').classList.add('hidden');
+  const r = recorder, m = recMode; r.discard = !!discard; r.ms = performance.now() - recT0;
+  try { r.stop(); } catch (e) {}
+  recorder = null; recMode = null; clearTimeout(recTimeout);
+  hideRec();
+  if (m === 'talk' || m === 'acil') sendToHost({ t: 'voice', k: 'rec', on: false });
 }
+function showRec(mode) {
+  const el = $('#rec'), cd = Math.ceil((vc.urgentAt - performance.now()) / 1000);
+  $('#recTxt').textContent = mode === 'izin' ? 'Mikrofon izni bekleniyor…' : mode === 'prova' ? 'Prova — sadece sen duyacaksın'
+    : mode === 'acil' ? (cd > 0 ? `Kayıt — ACİL hakkı ${cd} sn sonra, normal sıraya girer` : 'ACİL kayıt — sıranın önüne geçer')
+    : (myRole() === 'reader' ? 'Kayıt — herkes TERSTEN duyacak' : 'Kayıt — bırakınca sıraya girer');
+  el.classList.toggle('wait', mode === 'izin'); el.classList.toggle('urg', mode === 'acil' && cd <= 0);
+  if (mode !== 'lab') el.classList.remove('hidden');
+  const b = $('#recTime'); if (b) { b.style.transition = 'none'; b.style.width = '100%'; if (mode !== 'izin') { void b.offsetWidth; b.style.transition = `width ${VOX.recMaxMs}ms linear`; b.style.width = '0%'; } }
+  labStatus(mode === 'izin' ? 'Mikrofon izni bekleniyor…' : mode === 'lab' ? 'Kayıt sürüyor… bırakınca tersten çalar' : null);
+}
+function hideRec() { $('#rec').classList.add('hidden'); }
 function b64enc(buf) {
   const b = new Uint8Array(buf); let s = '';
   for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
   return btoa(s);
 }
 function b64dec(str) { const s = atob(str), b = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i); return b.buffer; }
-async function playClip(buf, reversed, speakerId) {
-  const a = ac();
-  let audio;
-  try { audio = await a.decodeAudioData(buf.slice(0)); } catch (e) { console.warn('ses çözülemedi', e); return; }
-  if (reversed) for (let c = 0; c < audio.numberOfChannels; c++) audio.getChannelData(c).reverse();
-  const helium = game && ((game.chaos && game.chaos.type === 'helyum') || hasMut('helyum'));
-  const s = a.createBufferSource(), an = a.createAnalyser();
-  const tinyV = speakerId && players[speakerId] && players[speakerId].role === 'tiny';
-  s.buffer = audio; s.playbackRate.value = (helium ? 1.6 : 1) * (tinyV ? 1.45 : 1);
-  an.fftSize = 256;
-  s.connect(an).connect(voiceBus); s.start();
-  const durMs = audio.duration / s.playbackRate.value * 1000;
-  if (speakerId) {
-    const p = players[speakerId]; const name = p ? p.name : '?';
-    const div = document.createElement('div'); div.className = 'glass';
-    const ex = (tinyV ? ' 🐭 cik cik' : '') + (helium ? ' 🎈 helyumlu' : '');
-    div.innerHTML = reversed ? `🔄 <span style="color:${ROLES.reader.css}">${esc(name)}</span> TERSTEN konuşuyor${ex}...` : `🔊 ${esc(name)} konuşuyor${ex}...`;
-    $('#voice').appendChild(div); setTimeout(() => div.remove(), durMs + 300);
-    const av = avatars[speakerId]; if (av) { av.talkUntil = performance.now() + durMs; av.analyser = an; av.anData = new Uint8Array(an.fftSize); }
-    talking[speakerId] = performance.now() + durMs; renderPlayersHud();
-    setTimeout(renderPlayersHud, durMs + 50);
+// Klibi oda sahibine yolla. Süreyi burada ölçeriz (oda sahibi sesi çözmez, bildirilen süreyi sınırlar ve kendi saatine göre planlar).
+async function sendClip(buf, mime, urgent, durGuess) {
+  let dur = durGuess || 0;
+  try { dur = (await ac().decodeAudioData(buf.slice(0))).duration; } catch (e) {}
+  const n = ++vc.n; vc.mine[n] = buf; for (const k in vc.mine) if (+k < n - 3) delete vc.mine[k];
+  vc.stats.sent++;
+  sendToHost({ t: 'voice', k: 'clip', n, mime, dur, urgent: !!urgent, data: b64enc(buf) });
+}
+const voiceRate = role => Math.min(VOX.rateCap, (role === 'tiny' ? VOX.tinyRate : 1) * (game && ((game.chaos && game.chaos.type === 'helyum') || hasMut('helyum')) ? VOX.heliumRate : 1));
+// Ses yüksekliği: 20 ms'lik çerçevelerin "konuşulan" kısmının RMS'i ortak hedefe çekilir; tepe değeri tavanı aşamaz.
+function clipGain(audio) {
+  const d = audio.getChannelData(0), fr = Math.max(64, Math.round(audio.sampleRate * 0.02)), rms = [];
+  let peak = 0;
+  for (let i = 0; i < d.length; i += fr) { let s = 0; const e = Math.min(d.length, i + fr); for (let j = i; j < e; j++) { const v = d[j]; s += v * v; if (v > peak) peak = v; else if (-v > peak) peak = -v; } rms.push(Math.sqrt(s / (e - i))); }
+  const thr = Math.max(Math.max(0, ...rms) * 0.1, 0.004), act = rms.filter(v => v >= thr);
+  const lvl = act.length ? Math.sqrt(act.reduce((s, v) => s + v * v, 0) / act.length) : 0;
+  if (lvl < 0.003 || peak <= 0) return { gain: 1, rms: lvl, peak };       // neredeyse sessiz: gürültüyü yükseltme
+  return { gain: Math.min(clamp(VOX.targetRms / lvl, VOX.minGain, VOX.maxGain), VOX.peakCeil / peak), rms: lvl, peak };
+}
+let TELSIZ_CURVE = null;
+// --- İstemci: çalma (aynı anda tek klip; tutamaklar saklanır ki durdurulabilsin) ---
+const vc = { playing: null, gen: 0, seq: 0, n: 0, mine: {}, log: [], urgentAt: 0, handAt: 0, game: null, role: '', aim: null,
+  st: { cur: null, q: [], floor: null, rec: {}, hands: {}, noMic: {} }, stats: { sent: 0, recs: 0, drops: [], acks: [] } };
+const talking = {};
+async function playClip(buf, o) {
+  const a = ac(), gen = vc.gen, my = ++vc.seq;
+  const L = { id: o.id || 0, speaker: o.speaker || null, start: 0, end: 0, flags: { rev: !!o.rev, urgent: !!o.urgent, floor: !!o.floor, telsiz: !!o.telsiz, self: !!o.self, local: o.local || '', rate: 1, gain: 1 } };
+  let audio = null;
+  if (buf) { try { audio = await a.decodeAudioData(buf.slice(0)); } catch (e) { console.warn('ses çözülemedi', e); L.flags.error = 'decode'; } }
+  if (gen !== vc.gen || my !== vc.seq) return;                   // çözülürken durduruldu ya da yeni klip geldi
+  stopVoice('yeni');                                             // ne olursa olsun üst üste binmez
+  const rate = L.flags.rate = clamp(+o.rate || 1, 0.5, VOX.rateCap);
+  const P = { L, o, src: null, g: null, an: null, t0: performance.now(), durMs: 0, timer: 0, done: false };
+  if (audio) {
+    if (o.rev) for (let c = 0; c < audio.numberOfChannels; c++) audio.getChannelData(c).reverse();
+    const G = clipGain(audio); L.flags.gain = Math.round(G.gain * 1000) / 1000;
+    const s = P.src = a.createBufferSource(), g = P.g = a.createGain(), an = P.an = a.createAnalyser();
+    s.buffer = audio; s.playbackRate.value = rate; g.gain.value = G.gain; an.fftSize = 256;
+    let node = s.connect(g);
+    if (o.telsiz) { // Telsiz Disiplini: dar bant + hafif kırpma + cızırtı (anlaşılır kalır)
+      if (!TELSIZ_CURVE) { TELSIZ_CURVE = new Float32Array(257); for (let i = 0; i < 257; i++) TELSIZ_CURVE[i] = Math.tanh((i / 128 - 1) * 3) / Math.tanh(3); }
+      const bp = a.createBiquadFilter(), ws = a.createWaveShaper(); bp.type = 'bandpass'; bp.frequency.value = 1500; bp.Q.value = 0.8; ws.curve = TELSIZ_CURVE;
+      node = node.connect(bp).connect(ws);
+    }
+    node.connect(an).connect(voiceBus);
+    const srcDur = Math.min(audio.duration, o.dur ? o.dur + 0.15 : 99);   // bildirilen süreden uzun klip kesilir
+    P.durMs = srcDur / rate * 1000;
+    s.onended = () => endVoice(P, 'bitti'); s.start(0, 0, srcDur);
+    if (o.urgent) { tone(1245, 0.08, { type: 'square', vol: 0.07 }); tone(1660, 0.11, { type: 'square', vol: 0.07, when: 0.09 }); }
+    if (o.telsiz) { noise(0.16, { vol: 0.16, filter: 'bandpass', freq: 2400, q: 1.5, bus: voiceBus }); noise(0.12, { vol: 0.14, filter: 'bandpass', freq: 2400, q: 1.5, bus: voiceBus, when: P.durMs / 1000 }); }
+  } else P.durMs = clamp(+o.dur || 1, VOX.minDur, VOX.maxDur) / rate * 1000;   // kendi klibim (ses yok) ya da çözülemeyen klip: yalnızca süre
+  P.timer = setTimeout(() => endVoice(P, 'bitti'), P.durMs + (audio ? 400 : 0));
+  vc.playing = P; L.start = Date.now(); vc.log.push(L); if (vc.log.length > 300) vc.log.shift();
+  if (o.speaker && !o.local) {
+    const until = performance.now() + P.durMs, av = avatars[o.speaker];
+    if (av) { av.talkUntil = until; av.analyser = P.an; av.anData = P.an ? new Uint8Array(P.an.fftSize) : null; }
+    talking[o.speaker] = until;
+  }
+  applyDuck(); renderVoiceHud(); renderPlayersHud();
+}
+function endVoice(P, why) {
+  if (!P || P.done) return; P.done = true; clearTimeout(P.timer);
+  P.L.end = Date.now(); if (why !== 'bitti') P.L.flags.stopped = why;
+  if (P.src) { P.src.onended = null; if (why !== 'bitti') { try { const t = actx.currentTime; P.g.gain.setTargetAtTime(0, t, 0.012); P.src.stop(t + 0.05); } catch (e) {} } }
+  if (vc.playing === P) vc.playing = null;
+  const sp = P.o.speaker; if (sp && !P.o.local) { talking[sp] = 0; const av = avatars[sp]; if (av) av.talkUntil = 0; }
+  applyDuck(); renderVoiceHud(); renderPlayersHud();
+}
+function stopVoice(why) { if (vc.playing) endVoice(vc.playing, why); }
+function stopAllVoices(why) { vc.gen++; stopVoice(why || 'durduruldu'); }   // çözülmekte olan klip de iptal olur
+// Kısma: klip çalarken (ve sırada klip beklerken) müzik ~%35, efektler ~%60; sıra boşalınca tam eski değerine döner.
+let ducked = false;
+function applyDuck() {
+  const S = vc.st, want = !!(vc.playing && vc.playing.src) || S.q.length > 0 || !!(S.cur && (S.cur.from !== myId || net.solo));
+  if (want === ducked) return; ducked = want;
+  if (!actx) return;
+  const t = actx.currentTime;
+  for (const [bus, v] of [[musicBus, settings.music * 0.32 * (ducked ? VOX.duckMusic : 1)], [sfxBus, ducked ? VOX.duckSfx : 1]]) {
+    bus.gain.cancelScheduledValues(t); bus.gain.setValueAtTime(bus.gain.value, t); bus.gain.linearRampToValueAtTime(v, t + VOX.duckRamp);
   }
 }
-const talking = {};
+// --- İstemci: oda sahibinden gelen ses paketleri ---
+const DROP_MSG = {
+  bayat: 'Kaydın 6 saniyeden fazla bekledi ve düştü. Hâlâ gerekiyorsa yeniden söyle.', yenisi: '', dolu: 'Sıra dolu (3 kayıt bekliyor). Birazdan yeniden dene.',
+  itildi: 'Sıra doluydu: öncelikli bir kayıt seninkinin yerini aldı.', hizli: 'Çok hızlı kayıt — bu gönderilmedi.', isaretci: 'İŞARETÇİ konuşamaz.', kapali: '', rol: 'Rol değişti: bekleyen kaydın silindi.',
+};
+function voiceClient(m) {
+  if (!m || typeof m.k !== 'string') return;
+  const now = performance.now(), S = vc.st;
+  if (m.k === 'play') {
+    const self = m.from === myId; let buf = null;
+    if (self) { if (net.solo) buf = vc.mine[m.n] || null; delete vc.mine[m.n]; }      // antrenmanda kendi klibini de duyarsın
+    else if (typeof m.data === 'string') { try { buf = b64dec(m.data); } catch (e) {} }
+    playClip(buf, { id: m.id, speaker: m.from, rev: !!m.rev, rate: m.rate, dur: m.dur, urgent: !!m.urgent, floor: !!m.floor, telsiz: !!m.telsiz, self });
+  } else if (m.k === 'state') {
+    const hadFloor = S.floor && S.floor.until > now ? S.floor.id : null;
+    S.cur = m.cur ? { ...m.cur, until: now + (m.cur.left || 0) + 600 } : null;
+    S.q = Array.isArray(m.q) ? m.q : [];
+    S.floor = m.floor ? { id: m.floor.id, by: m.floor.by, until: now + m.floor.left } : null;
+    S.rec = {}; for (const id of m.rec || []) S.rec[id] = 1;
+    S.noMic = {}; for (const id of m.noMic || []) S.noMic[id] = 1;
+    const hands = {};
+    for (const id in m.hands || {}) {
+      hands[id] = now + m.hands[id];
+      if (!(S.hands[id] > now)) { const av = avatars[id]; if (av) { showBubble(av, '✋'); av.bubbleUntil = now + m.hands[id]; } tone(880, 0.07, { type: 'triangle', vol: 0.08 }); if (id !== myId && players[id]) vnote(`${icon('hand')} ${esc(players[id].name)} söz istiyor`, '', 2500); }
+    }
+    S.hands = hands;
+    if (S.floor && S.floor.id !== hadFloor) {
+      tone(660, 0.09, { type: 'triangle', vol: 0.12 }); tone(990, 0.14, { type: 'triangle', vol: 0.12, when: 0.09 });
+      if (S.floor.id === myId) vnote(`${icon('floor')} SÖZ SENDE — ${VOX.floorMs / 1000} sn boyunca kaydın öne alınır`, 'good', 3500);
+    }
+    applyDuck(); renderVoiceHud(); renderPlayersHud(); renderMicNote();
+  } else if (m.k === 'ack') {
+    vc.urgentAt = now + (+m.cd || 0); vc.stats.acks.push({ n: m.n, id: m.id, urgent: !!m.urgent });
+  } else if (m.k === 'drop') {
+    delete vc.mine[m.n]; vc.stats.drops.push({ n: m.n, id: m.id || 0, why: m.why });
+    if (DROP_MSG[m.why]) vnote(DROP_MSG[m.why], 'bad', 4000);
+  } else if (m.k === 'stop') {
+    if (m.id == null) { stopAllVoices(m.why || 'tur'); vc.mine = {}; } else if (vc.playing && vc.playing.L.id === m.id) stopAllVoices(m.why || 'durduruldu');
+  }
+}
+// --- İstemci: ses arayüzü (sağ alt) ---
+$('#voice').innerHTML = '<div id="vNotes"></div><div id="vAim" class="glass vchip hidden"></div><div id="vFloor" class="glass vchip hidden"></div><div id="vNow" class="glass vchip hidden"><div id="vNowT"></div><i class="vbar"><b id="vNowB"></b></i></div><div id="vQueue" class="glass vchip hidden"></div><div id="vKeys"></div>';
+$('#rec').insertAdjacentHTML('beforeend', '<i class="rt"><b id="recTime"></b></i>');
+const setH = (el, h) => { if (el._h !== h) { el._h = h; el.innerHTML = h; } };
+function vnote(html, kind, ms) {
+  const box = $('#vNotes'); if (!inGame || !box) return;
+  if ([...box.children].some(d => d._h === html)) return;       // aynı uyarı üst üste binmesin
+  const d = document.createElement('div'); d.className = 'glass vchip note ' + (kind || ''); d._h = html; d.innerHTML = html;
+  box.appendChild(d); setTimeout(() => d.remove(), ms || 3500);
+  while (box.children.length > 3) box.firstChild.remove();
+}
+const vName = id => { const p = players[id]; if (!p) return '?'; const R0 = ROLES[p.role || 'none'] || ROLES.none; return `<span style="color:${R0.css}">${icon(R0.ic)} ${esc(p.name)}</span>`; };
+function renderVoiceHud() {
+  if (!inGame || !game) return;
+  const now = performance.now(), S = vc.st, P = vc.playing, role = myRole();
+  const F = S.floor && S.floor.until > now ? S.floor : null;
+  $('#vFloor').classList.toggle('hidden', !F); $('#vFloor').classList.toggle('me', !!F && F.id === myId);
+  if (F) setH($('#vFloor'), `${icon('floor')} <b>SÖZ</b> ${F.id === myId ? '<b>SENDE</b>' : vName(F.id)} <span class="vsec">${Math.max(1, Math.ceil((F.until - now) / 1000))} sn</span>`);
+  $('#vNow').classList.toggle('hidden', !P);
+  if (P) {
+    const f = P.L.flags, tags = (f.urgent ? `<em class="vtag urg">${icon('urgent')}ACİL</em>` : '') + (f.rev ? `<em class="vtag rev">${icon('rev')}TERSTEN</em>` : '') + (f.floor ? `<em class="vtag flr">SÖZ</em>` : '') + (f.telsiz ? `<em class="vtag tel">${icon('radio')}TELSİZ</em>` : '') + (f.rate > 1 ? '<em class="vtag">İNCE SES</em>' : '');
+    setH($('#vNowT'), f.local ? `${icon('mic')} PROVA — sadece sen duyuyorsun ${tags}` : f.self && !P.src ? `${icon('mic')} Senin kaydın çalıyor ${tags}` : `${vName(P.L.speaker)} ${tags}`);
+    $('#vNowB').style.width = clamp((now - P.t0) / P.durMs * 100, 0, 100) + '%';
+  }
+  const mine = S.q.findIndex(e => e.from === myId);
+  $('#vQueue').classList.toggle('hidden', !S.q.length);
+  if (S.q.length) setH($('#vQueue'), `${icon('queue')} Sırada ${S.q.length}: ` + S.q.map(e => { const p = players[e.from], R0 = ROLES[(p && p.role) || 'none'] || ROLES.none; return `<span class="${e.urgent ? 'urg' : ''}" style="color:${R0.css}">${icon(e.urgent ? 'urgent' : R0.ic)}</span>`; }).join('') + (mine >= 0 ? ` <b>· seninki ${mine + 1}.</b>` : ''));
+  const cd = Math.ceil((vc.urgentAt - now) / 1000), noMic = micState === 'yok' ? `<span class="nomic">${icon('micOff')} mikrofon yok</span> · ` : '';
+  setH($('#vKeys'), role === 'pointer' ? 'Lazer oyuncunun üstündeyken <kbd>Sol tık</kbd> = söz ver · <kbd>9</kbd> söz iste'
+    : `${noMic}<kbd>V</kbd> konuş${role === 'none' ? ' (izleyici: en son sıra)' : ` · <kbd>I</kbd> acil${cd > 0 ? ` (${cd} sn)` : ''}`} · <kbd>9</kbd> söz iste`);
+  const aim = vc.aim && players[vc.aim] ? vc.aim : null;
+  $('#vAim').classList.toggle('hidden', !aim); if (aim) setH($('#vAim'), `<kbd>Sol tık</kbd> sözü ${vName(aim)} oyuncusuna ver`);
+}
+function voiceMarks(id) { // oyuncu listesindeki ses işaretleri
+  const S = vc.st, now = performance.now();
+  return (S.rec[id] ? `<span class="vm rec" title="kayıt yapıyor">${icon('mic')}</span>` : '') + (S.floor && S.floor.id === id && S.floor.until > now ? `<span class="vm flr" title="söz onda">${icon('floor')}</span>` : '') +
+    (S.hands[id] > now ? `<span class="vm hand" title="söz istiyor">${icon('hand')}</span>` : '') + (S.noMic[id] ? `<span class="vm nomic" title="mikrofon yok">${icon('micOff')}</span>` : '');
+}
+function renderMicNote() { // lobi: mikrofon durumu
+  const el = $('#micNote'); if (!el) return;
+  const others = Object.keys(vc.st.noMic).filter(id => id !== myId && players[id]).map(id => esc(players[id].name));
+  const t = (micState === 'yok' ? MIC_MSG[micWhy] : '') + (others.length ? ` Mikrofonu olmayanlar: ${others.join(', ')}.` : '');
+  el.classList.toggle('hidden', !t); el.textContent = t;
+  if (micState === 'yok') labStatus(MIC_MSG[micWhy]);
+}
+// --- İstemci: söz iste (9) ve İŞARETÇİ'nin söz vermesi (lazer oyuncunun üstündeyken sol tık) ---
+function askFloor() {
+  const now = performance.now(); if (now < vc.handAt) return; vc.handAt = now + 2000;
+  sendToHost({ t: 'voice', k: 'hand' }); vnote(`${icon('hand')} Söz istedin`, '', 2000);
+}
+function aimPlayer(pt) { // lazer noktası hangi oyuncunun üstünde? (ayak dibi de sayılır: titrek lazere hoşgörü)
+  let best = null, bd = 1e9; if (!pt) return null;
+  for (const id in players) {
+    const p = players[id]; if (id === myId || !p.p || p.role === 'pointer') continue;
+    const tiny = p.role === 'tiny', d = Math.hypot(pt[0] - p.p[0], pt[2] - p.p[2]), dy = pt[1] - p.p[1];
+    if (d < (tiny ? 0.55 : 0.75) && dy > -0.25 && dy < (tiny ? 0.9 : 2.3) && d < bd) { bd = d; best = id; }
+  }
+  return best;
+}
+function giveFloor(id) { if (!id) return false; sendToHost({ t: 'voice', k: 'floor', id }); tone(1320, 0.06, { type: 'sine', vol: 0.08 }); return true; }
+document.addEventListener('mousedown', e => {
+  if (e.button !== 0 || document.pointerLockElement !== canvas || !canPlay() || myRole() !== 'pointer' || !me.laserPt) return;
+  giveFloor(aimPlayer(me.laserPt));
+});
+// İstemci saati: tur / rol değişimini yakalar (hangi yoldan gelirse gelsin), geri sayımları ve ilerleme çubuğunu günceller.
+setInterval(() => {
+  const now = performance.now(), S = vc.st, role = myRole();
+  if (vc.game !== game) { vc.game = game; vc.role = role; stopRec(null, true); stopAllVoices('tur'); S.cur = null; S.q = []; S.floor = null; S.rec = {}; S.hands = {}; vc.urgentAt = 0; vc.aim = null; $('#vNotes').innerHTML = ''; applyDuck(); }
+  else if (vc.role !== role) { vc.role = role; stopRec(null, true); stopAllVoices('rol'); }
+  if (S.cur && now > S.cur.until) { S.cur = null; applyDuck(); }                    // "bitti" paketi kaybolsa da kısma takılı kalmaz
+  if (micDirty && players[myId] && (net.isHost || (net.hostConn && net.hostConn.open))) { micDirty = false; sendToHost({ t: 'voice', k: 'mic', ok: micState !== 'yok' }); }
+  if (recMode === 'lab') { const b = $('#labLvl'); if (b) b.style.width = (micLevel() * 100) + '%'; }
+  if (!inGame || !game) return;
+  vc.aim = role === 'pointer' && me.laserPt ? aimPlayer(me.laserPt) : null;
+  const k = `${S.floor && S.floor.until > now ? Math.ceil((S.floor.until - now) / 1000) : 0}|${Object.keys(S.hands).filter(id => S.hands[id] > now)}`;
+  if (k !== vc.hudKey) { vc.hudKey = k; renderPlayersHud(); }
+  renderVoiceHud();
+}, 100);
+
+// --- SES SIRASI (oda sahibi) ---
+// Öncelik: ACİL > söz sahibi > geliş sırası > izleyici. En çok 3 bekleyen, konuşan başına 1 (yenisi eskisinin yerini alır),
+// 6 sn'den fazla bekleyen düşer ve sahibine bildirilir. Konuşmak için asla hata/süre cezası yoktur.
+const hv = { q: [], cur: null, seq: 0, ord: 0, nextAt: 0, floor: null, urgentAt: {}, hands: {}, rec: {}, noMic: {}, lim: {}, roles: {}, game: null, ended: false, dirty: false, log: [] };
+const B64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
+function sendTo(id, msg) {
+  if (id === myId) { clientHandle(msg); return; }
+  const c = net.conns.find(c => c.peer === id); if (c && c.open) { try { c.send(msg); } catch (e) {} }
+}
+const hvCls = e => e.urgent ? 0 : hv.floor && hv.floor.id === e.from ? 1 : e.spec ? 3 : 2;
+const hvCmp = (a, b) => hvCls(a) - hvCls(b) || a.ord - b.ord;
+function hvDrop(e, why) { sendTo(e.from, { t: 'voice', k: 'drop', n: e.n, id: e.id, why }); hv.log.push({ id: e.id, from: e.from, drop: why, at: Date.now() }); hv.dirty = true; }
+function hostVoice(m, from) {
+  const p = players[from]; if (!p || typeof m.k !== 'string') return;
+  const now = performance.now(), live = !!(inGame && game && game.status === 'playing');
+  const lim = hv.lim[from] || (hv.lim[from] = { clip: 0, hand: 0, floor: 0 });
+  if (m.k === 'mic') { const no = m.ok === false; if (!!hv.noMic[from] !== no) { if (no) hv.noMic[from] = 1; else delete hv.noMic[from]; hv.dirty = true; } }
+  else if (m.k === 'rec') { if (!live || p.role === 'pointer') return; if (m.on === true) hv.rec[from] = now + VOX.recMarkMs; else delete hv.rec[from]; hv.dirty = true; }
+  else if (m.k === 'hand') { if (!live || now < lim.hand) return; lim.hand = now + 1500; hv.hands[from] = now + VOX.handMs; hv.dirty = true; }
+  else if (m.k === 'floor') { // söz: yalnızca İŞARETÇİ verir; öncelik sağlar, kimseyi susturmaz
+    if (!live || p.role !== 'pointer' || now < lim.floor) return;
+    if (typeof m.id !== 'string' || m.id === from || !own(players, m.id) || players[m.id].role === 'pointer') return;
+    lim.floor = now + 600; hv.floor = { id: m.id, by: from, until: now + VOX.floorMs }; delete hv.hands[m.id]; hv.dirty = true;
+  } else if (m.k === 'clip') {
+    const n = Number.isInteger(m.n) && m.n >= 0 && m.n < 1e9 ? m.n : 0, drop = why => sendTo(from, { t: 'voice', k: 'drop', n, why });
+    if (typeof m.data !== 'string' || m.data.length < 200 || m.data.length > VOX.maxB64 || !B64_RE.test(m.data)) return;
+    delete hv.rec[from]; hv.dirty = true;
+    if (!live) return drop('kapali');
+    if (p.role === 'pointer') return drop('isaretci');           // İŞARETÇİ konuşamaz
+    if (now < lim.clip) return drop('hizli');
+    lim.clip = now + VOX.clipEveryMs;
+    const spec = p.role === 'none', urgent = m.urgent === true && !spec && now >= (hv.urgentAt[from] || 0);
+    if (urgent) hv.urgentAt[from] = now + VOX.urgentCdMs;
+    const dur = clamp(isNum(m.dur) && m.dur > 0 ? m.dur : m.data.length * 0.75 / 4000, VOX.minDur, VOX.maxDur);   // süre bildirilmediyse boyuttan tahmin (~32 kbit/sn)
+    const mime = typeof m.mime === 'string' && /^audio\/[\w.+-]{1,20}(; ?codecs=[\w.,-]{1,30})?$/.test(m.mime) ? m.mime : 'audio/webm';
+    const e = { id: ++hv.seq, from, n, mime, data: m.data, dur, urgent, spec, telsiz: !urgent && hasMut('telsiz') && !!hv.floor && hv.floor.id !== from, t0: now, ord: ++hv.ord };
+    const old = hv.q.findIndex(x => x.from === from);
+    if (old >= 0) { e.ord = hv.q[old].ord; hvDrop(hv.q[old], 'yenisi'); hv.q.splice(old, 1); }   // sıradaki yerini korur, bekleme süresi yeniden başlar
+    else if (hv.q.length >= VOX.maxWait) {
+      const worst = hv.q.slice().sort(hvCmp).pop();
+      if (hvCls(e) < hvCls(worst)) { hv.q.splice(hv.q.indexOf(worst), 1); hvDrop(worst, 'itildi'); } else return drop('dolu');
+    }
+    hv.q.push(e); stat(from, 'voice');
+    sendTo(from, { t: 'voice', k: 'ack', n, id: e.id, urgent, cd: Math.max(0, Math.round((hv.urgentAt[from] || 0) - now)) });
+    hvPump(now);
+  }
+}
+function hvPump(now) {
+  if (hv.cur && now >= hv.cur.endsAt) { hv.nextAt = hv.cur.endsAt + VOX.gapMs; hv.cur = null; hv.dirty = true; }
+  for (let i = hv.q.length - 1; i >= 0; i--) { const e = hv.q[i]; if (now - e.t0 > (e.urgent ? VOX.staleUrgentMs : VOX.staleMs)) { hv.q.splice(i, 1); hvDrop(e, 'bayat'); } }
+  if (hv.cur || now < hv.nextAt || !hv.q.length) return;
+  const e = hv.q.sort(hvCmp).shift(), sp = players[e.from]; hv.dirty = true;
+  if (!sp) return;
+  const rate = voiceRate(sp.role), floor = !!(hv.floor && hv.floor.id === e.from), ms = e.dur / rate * 1000;
+  hv.cur = { id: e.id, from: e.from, endsAt: now + VOX.leadMs + ms, urgent: e.urgent, floor, telsiz: e.telsiz, rev: sp.role === 'reader', rate };
+  const msg = { t: 'voice', k: 'play', id: e.id, from: e.from, dur: e.dur, rate, rev: hv.cur.rev, urgent: e.urgent, floor, telsiz: e.telsiz };
+  for (const id in players) sendTo(id, id === e.from ? { ...msg, n: e.n } : { ...msg, mime: e.mime, data: e.data });   // konuşana ses geri yollanmaz
+  hv.log.push({ id: e.id, from: e.from, at: Date.now(), ms: Math.round(ms), waited: Math.round(now - e.t0), urgent: e.urgent, floor, telsiz: e.telsiz, rate, dur: e.dur }); if (hv.log.length > 300) hv.log.shift();
+}
+function hvForget(id, gone, now) { // oyuncu çıktı ya da rolü değişti
+  for (let i = hv.q.length - 1; i >= 0; i--) if (hv.q[i].from === id) { const e = hv.q.splice(i, 1)[0]; if (!gone) hvDrop(e, 'rol'); }
+  if (hv.cur && hv.cur.from === id) { broadcast({ t: 'voice', k: 'stop', id: hv.cur.id, why: gone ? 'ayrildi' : 'rol' }); hv.cur = null; hv.nextAt = now + VOX.gapMs; }
+  if (hv.floor && (hv.floor.id === id || hv.floor.by === id)) hv.floor = null;   // söz sahibi ya da sözü veren İŞARETÇİ gitti / rol değiştirdi
+  delete hv.rec[id]; delete hv.hands[id];
+  if (gone) { delete hv.noMic[id]; delete hv.urgentAt[id]; delete hv.lim[id]; delete hv.roles[id]; }
+  hv.dirty = true;
+}
+function hvTick() {
+  if (!net.isHost) return;
+  const now = performance.now(), live = !!(inGame && game && game.status === 'playing');
+  if (hv.game !== game) { // yeni tur ya da lobi: çalan klip durur, sıra / söz / işaretler silinir
+    hv.game = game; hv.ended = false; hv.q = []; hv.cur = null; hv.floor = null; hv.rec = {}; hv.hands = {}; hv.urgentAt = {}; hv.nextAt = 0;
+    broadcast({ t: 'voice', k: 'stop', why: 'tur' }); hv.dirty = true;
+  }
+  if (game && !live && !hv.ended) { hv.ended = true; hv.q = []; hv.floor = null; hv.rec = {}; hv.hands = {}; hv.dirty = true; }   // tur bitti: çalan klip biter, gerisi silinir
+  for (const id in hv.roles) { const p = players[id]; if (!p || p.role !== hv.roles[id]) hvForget(id, !p, now); }
+  for (const id in players) if (hv.roles[id] !== players[id].role) { hv.roles[id] = players[id].role; hv.dirty = true; }   // yeni gelen de durumu alır
+  if (hv.floor && now >= hv.floor.until) { hv.floor = null; hv.dirty = true; }
+  for (const id in hv.hands) if (now >= hv.hands[id]) { delete hv.hands[id]; hv.dirty = true; }
+  for (const id in hv.rec) if (now >= hv.rec[id]) { delete hv.rec[id]; hv.dirty = true; }
+  hvPump(now);
+  if (hv.dirty) {
+    hv.dirty = false; const hands = {}; for (const id in hv.hands) hands[id] = Math.round(hv.hands[id] - now);
+    broadcast({ t: 'voice', k: 'state', cur: hv.cur ? { id: hv.cur.id, from: hv.cur.from, left: Math.round(hv.cur.endsAt - now) } : null,
+      q: hv.q.slice().sort(hvCmp).map(e => ({ id: e.id, from: e.from, urgent: e.urgent })), floor: hv.floor ? { id: hv.floor.id, by: hv.floor.by, left: Math.round(hv.floor.until - now) } : null,
+      rec: Object.keys(hv.rec), hands, noMic: Object.keys(hv.noMic) });
+  }
+}
+// oda sahibi başka sekmedeyken de sıra yürüsün diye Worker saati (hostTick ile aynı gerekçe)
+try { const w = new Worker(URL.createObjectURL(new Blob(['setInterval(()=>postMessage(0),50)'], { type: 'text/javascript' }))); w.onmessage = hvTick; } catch (e) { setInterval(hvTick, 50); }
+// --- Ters Ses Laboratuvarı (lobi): kaydet → ekibin duyacağı ters hâli dinle → tersin tersini (aslını) dinle ---
+const lab = { buf: null };
+function labStatus(t) { const el = $('#labStatus'); if (el && t != null) el.textContent = t; }
+function labGot(buf) {
+  if (!buf) { labStatus('Kayıt çok kısa oldu. Düğmeyi basılı tutup konuş.'); return; }
+  lab.buf = buf; $('#labRev').disabled = $('#labFwd').disabled = false;
+  labPlay(true);
+}
+function labPlay(rev) {
+  if (!lab.buf) return;
+  labStatus(rev ? 'Çalıyor: ekibin duyacağı hâli (ters).' : 'Çalıyor: tersin tersi — yani senin söylediğin.');
+  playClip(lab.buf, { local: 'lab', rev, rate: 1 });
+}
+// test kancası: __tb.voiceLog (çalınan klipler) ve __tb.voice (durum, sayaçlar, yardımcılar)
+(function hook() {
+  if (!window.__tb) return setTimeout(hook, 30);
+  Object.defineProperty(window.__tb, 'voiceLog', { get: () => vc.log, configurable: true });
+  window.__tb.voice = { VOX, vc, hv, send: (buf, o = {}) => sendClip(buf, o.mime || 'audio/wav', !!o.urgent, o.dur), clipGain, aimPlayer, giveFloor, askFloor, stopAll: stopAllVoices, rate: voiceRate, lab,
+    state: () => ({ ...vc.st, playing: vc.playing ? vc.playing.L : null, ducked, recording: !!recorder, recMode, wanting: !!recWant, mic: micState, micWhy }),
+    mix: () => actx ? { music: musicBus.gain.value, sfx: sfxBus.gain.value, voice: voiceBus.gain.value, baseMusic: settings.music * 0.32, ducked } : null };
+})();
 
 // =====================================================================
 //  AĞ (PeerJS: biri oda kurar, diğerleri bağlanır, oda sahibi hakemdir)
@@ -1202,10 +1605,7 @@ function hostHandle(m, from) {
       broadcast({ t: 'emote', id: from, e: m.e | 0 });
       break;
     case 'voice':
-      if (typeof m.data !== 'string' || m.data.length > 400000) break;
-      if (players[from] && players[from].role === 'pointer') break; // İŞARETÇİ konuşamaz
-      if (inGame) stat(from, 'voice');
-      broadcast({ t: 'voice', id: from, mime: m.mime, data: m.data }, from);
+      hostVoice(m, from); // klip, kayıt işareti, söz iste, söz ver, mikrofon durumu (bkz. SES SIRASI)
       break;
   }
 }
@@ -1481,11 +1881,7 @@ function clientHandle(m) {
         if (players[id]) { players[id].p = v.slice(0, 3); players[id].yaw = v[3]; players[id].l = v[4] || null; }
       }
       break;
-    case 'voice': {
-      const sp = players[m.id];
-      playClip(b64dec(m.data), sp && sp.role === 'reader', m.id);
-      break;
-    }
+    case 'voice': voiceClient(m); break;
     case 'emote': playEmote(m.id, m.e); break;
     case 'fx': if (m.id !== myId && typeof m.k === 'string') avatarFx(m.id, m.k, m.s | 0); break; // kendi şakam yerelde zaten oynadı
     case 'toLobby': backToLobby(); break;
@@ -2472,7 +2868,7 @@ function applyState(g, why, fx) {
   const ks = JSON.stringify(g.keymap);
   if (ks !== prev.keymapStr && g.countdown <= 0) {
     if (myRole() === 'defuser') { sfx.mix(); toast('🤪 TUŞLARIN KARIŞTI! TERS SES\'e sor!'); }
-    if (myRole() === 'reader') { sfx.mix(); toast('🔀 TERS TUŞ\'un tuşları değişti! Hemen söyle... tersten 😂'); }
+    if (myRole() === 'reader') { sfx.mix(); toast('🔀 TERS TUŞ\'un tuşları değişti! Hemen anlat (sesin ters gidecek 😂)'); }
   }
   for (const k in g.solved) if (g.solved[k] && !prev.solved[k]) { sfx.good(); toast(`✅ ${MOD_INFO[k].icon} ${MOD_INFO[k].name} çözüldü!`, 'good'); burstAt(k); if (g.status === 'playing' && Math.random() < 0.7) bombSay('solve'); }
   const ct = g.chaos ? g.chaos.type : '';
@@ -2703,8 +3099,9 @@ addEventListener('keydown', e => {
   keys[e.code] = true;
   if (!canPlay()) return;
   const role = myRole();
-  if (e.code === 'KeyV') { if (role === 'pointer') { sfx.honk(); toast('🤐 İŞARETÇİ konuşamaz! Sağ tık = lazer, 1-7 = hareketler'); } else startRec('talk'); }
-  if (e.code === 'KeyB' && role === 'reader') startRec('prova');
+  if (e.code === 'KeyV' || e.code === 'KeyI') { if (role === 'pointer') { sfx.honk(); toast('🤐 İŞARETÇİ konuşamaz! Sağ tık = lazer, 1-8 = hareketler'); } else startRec(e.code === 'KeyI' ? 'acil' : 'talk'); } // I = ACİL kayıt
+  if (e.code === 'KeyB' && role !== 'pointer') startRec('prova');
+  if (e.code === 'Digit9') askFloor(); // söz iste
   if (e.code === 'KeyM' && role === 'reader') { $('#manual').classList.toggle('hidden'); sfx.page(); }
   if ((e.code === 'KeyQ' || e.code === 'KeyE') && role === 'reader' && !$('#manual').classList.contains('hidden')) flipManual(e.code === 'KeyE' ? 1 : -1);
   if (e.code === 'KeyH') $('#roleCard').classList.toggle('open');
@@ -2718,6 +3115,7 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => {
   keys[e.code] = false;
   if (e.code === 'KeyV') stopRec('talk');
+  if (e.code === 'KeyI') stopRec('acil');
   if (e.code === 'KeyB') stopRec('prova');
 });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; stopRec(); });
@@ -3337,7 +3735,7 @@ function renderPlayersHud() {
   const now = performance.now();
   $('#players').innerHTML = Object.entries(players).map(([id, p]) => {
     const R0 = ROLES[p.role || 'none'];
-    return `<div class="p ${talking[id] > now ? 'talk' : ''}" style="color:${R0.css}">${icon(R0.ic)}${esc(p.name)}${id === myId ? ' <span class="small">· sen</span>' : ''}</div>`;
+    return `<div class="p ${talking[id] > now ? 'talk' : ''}" style="color:${R0.css}">${icon(R0.ic)}${esc(p.name)}${id === myId ? ' <span class="small">· sen</span>' : ''}${voiceMarks(id)}</div>`;
   }).join('');
 }
 function renderModsHud() {
@@ -3446,7 +3844,7 @@ function updateKeymapHud() {
   }
   if (r === 'reader') {
     box.classList.remove('hidden');
-    box.innerHTML = `🎮 TERS TUŞ'un tuşları → İleri <span class="k">${keyName(km.f)}</span> Geri <span class="k">${keyName(km.b)}</span> Sol <span class="k">${keyName(km.l)}</span> Sağ <span class="k">${keyName(km.r)}</span> <span class="small">⏱ ${sec} sn · tersten söyle!</span>`;
+    box.innerHTML = `🎮 TERS TUŞ'un tuşları → İleri <span class="k">${keyName(km.f)}</span> Geri <span class="k">${keyName(km.b)}</span> Sol <span class="k">${keyName(km.l)}</span> Sağ <span class="k">${keyName(km.r)}</span> <span class="small">⏱ ${sec} sn · sesin ters gidecek</span>`;
   } else if (r === 'defuser') {
     box.classList.remove('hidden');
     box.innerHTML = game.countdown > 0 ? '🤫 Yürüme tuşların birazdan belli olacak... (ama sana söylemeyeceğiz)' : `🤫 Tuşların gizli! TERS SES biliyor ama tersten söyleyecek 😂 <span class="small">Karışmaya ⏱ ${sec} sn</span>`;
@@ -3460,7 +3858,7 @@ function flipManual(d) { const t = manualTabs(); manualTab = t[(t.indexOf(manual
 const MANUAL = {
   intro: () => `<h2>📕 BOMBA İMHA KİTAPÇIĞI</h2>
     <div class="tip">Bombayı sadece <b>TERS TUŞ</b> görüyor: ona ne gördüğünü sor. Seri numarasını <b>YERÇEKİMSİZ</b> biliyor. Sen kuralları söyle... ama sesin <b>tersten</b> gidiyor 😈</div>
-    <p><b>Taktikler:</b></p><ol><li><kbd>B</kbd> ile prova yap, kendini tersten dinle.</li><li>Kısa, tek kelimelik cevaplar ver: "ÜÇ!", "KIRMIZI!"</li><li>Ustalık: cümleyi <b>tersten söylersen</b> onlar düz duyar! ("üç" → "çü")</li><li>Evet/hayır için emojileri kullan: <kbd>1</kbd> 👋 <kbd>4</kbd> 😂 <kbd>5</kbd> 📯</li></ol>
+    <p><b>Taktikler:</b></p><ol><li>Sesin <b>ses olarak</b> ters çevrilir; bu, harfleri tersten dizmek değildir. "ÜÇ" yerine "ÇÜ" demek tutmaz. <kbd>B</kbd> ile prova yap, kendini dinle.</li><li><b>Sayı = kaç kere:</b> 3 için "ta · ta · ta". Üç vuruş ters dönse de üç vuruştur.</li><li><b>Evet / hayır, tut / bırak = uzun ya da kısa tek ses</b> ("aaaaa" / "a"). Sıra ters döner: iki farklı işareti art arda verme.</li><li>Sabit <b>ince / kalın</b> ses de ters dönünce aynı kalır.</li><li>Ekibin sesi sana düz gelir: sana evet-hayır ya da sayıyla cevaplanacak sorular sorsunlar.</li><li>Evet/hayır için emojileri kullan: <kbd>1</kbd> 👋 <kbd>4</kbd> 😂 <kbd>5</kbd> 📯</li></ol>
     <p><b>3 hata = BUM.</b> Her hata sayacı hızlandırır.</p>
     <p><b>Büyük final:</b> tüm modüller çözülünce bombanın çevresinde renkli plakalar belirir. <b>Herkes aynı anda</b> kendi plakasında durmalı. Evet, TERS TUŞ da.</p>
     <p>Sayfalar arasında <kbd>Q</kbd> / <kbd>E</kbd> ile geçiş yap. 🔒 kilitli sayfalar odada bir yerde parlıyor.</p>`,
@@ -3490,7 +3888,7 @@ const MANUAL = {
     <div class="tip">MİNİK'in sesi cik cik çıkar. Bol şans.</div>`,
   keys: () => `<h2>🔑 ÇİFT ANAHTAR</h2><p>Batı duvarında <b>ANAHTAR A</b>, doğu duvarında <b>ANAHTAR B</b> var: odanın iki ucundalar.</p>
     <ol><li>İki <b>farklı</b> kişi anahtarları <b>aynı anda</b> çevirmeli (aralarında en fazla ${game.puzzle.keyWin} saniye olabilir).</li><li>İzleyiciler hariç herkes çevirebilir. Zamanlama tutmazsa hata sayılmaz, anahtar geri döner.</li></ol>
-    <div class="tip">"Üç, iki, bir, ÇEVİR!" diye sayın. Sen sayacaksan tersten say ki düz duyulsun. 😉</div>`,
+    <div class="tip">"Üç, iki, bir, ÇEVİR!" diye sayın. Sayan sensen kelime yerine vuruş kullan: "ta · ta · ta", üçüncü vuruşta çevirsinler (vuruş sayısı ters dönünce de aynı kalır).</div>`,
 };
 function renderManual() {
   if (!game) return;
@@ -3596,10 +3994,11 @@ $('#btnStart').onclick = () => { if (hostStart()) lockPointer(); };
 const copyText = (t, msg) => { (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => { $('#lobbyStatus').textContent = msg; }, () => prompt('Kopyala:', t)); };
 $('#btnCopy').onclick = () => copyText(net.code, '📋 Kod kopyalandı: ' + net.code);
 $('#btnLink').onclick = () => copyText(location.origin + location.pathname + '?oda=' + net.code, '🔗 Davet linki kopyalandı! Arkadaşına gönder.');
-const micBtn = $('#btnMic');
-micBtn.addEventListener('pointerdown', () => { micBtn.textContent = 'Konuş... (bırakınca tersten çalar)'; startRec('prova'); });
-const micUp = () => { if (recMode === 'prova') { stopRec('prova'); micBtn.textContent = 'Ters sesini dene (basılı tut)'; } };
-micBtn.addEventListener('pointerup', micUp); micBtn.addEventListener('pointerleave', micUp);
+$('#btnLab').onclick = () => { openModal('labModal'); ensureMic(); renderMicNote(); };
+{ const b = $('#labRec'), up = () => { if (!b.classList.contains('on')) return; b.classList.remove('on'); b.textContent = 'Basılı tut ve konuş'; const had = !!recorder; stopRec('lab'); if (!had && micState !== 'yok') labStatus('Kayıt başlamadı. Düğmeyi basılı tut.'); };
+  b.addEventListener('pointerdown', () => { if (inGame) return; b.classList.add('on'); b.textContent = 'Konuş… (bırakınca tersten çalar)'; stopAllVoices('lab'); startRec('lab'); });
+  b.addEventListener('pointerup', up); b.addEventListener('pointerleave', up);
+  $('#labRev').onclick = () => labPlay(true); $('#labFwd').onclick = () => labPlay(false); }
 $('#btnAgain').onclick = () => { if (hostStart()) lockPointer(); };
 $('#btnToLobby').onclick = () => broadcast({ t: 'toLobby' });
 // tüm butonlara ses
