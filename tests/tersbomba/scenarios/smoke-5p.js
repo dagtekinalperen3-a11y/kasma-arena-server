@@ -47,8 +47,8 @@ H.run('smoke-5p', async t => {
   await host.act('key', { i: P.layout.indexOf(P.order[0]) });   // oda sahibi (TERS SES) de sembole basamaz
   await t.sleep(1000); await R.defuser.tb(T => T.laser(false));
   // sıra garantisi: aynı kanallardan SONRA yollanan geçerli aksiyonlar işlendiyse öncekiler de işlenmiştir
-  await A.go(R.tiny, A.SPOT.mouse); await A.go(R.defuser, A.SPOT.password);
-  await R.tiny.act('dial', { i: 0 }); await R.defuser.act('pw', { c: 0, d: 1 });
+  await A.go(R.tiny, A.SPOT.mouse); await A.go(R.reader, A.SPOT.password);
+  await R.tiny.act('dial', { i: 0 }); await R.reader.act('pw', { c: 0, d: 1 });
   await R.pointer.tb((T, i) => T.laser(T.LSR[i].p.slice()), P.laserSeq[0]);
   await H.waitAll(clients, st => { const g = window.__tb.game; return g.mouseDial[0] === 1 && g.laserProg === 1 && g.pwIdx[0] === (st + 1) % 5; }, 10000, P.pw.start[0]);
   await R.pointer.tb(T => T.laser(false));

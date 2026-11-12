@@ -648,7 +648,7 @@ const MOD_NEEDS = {
   wires:    { apply: 'defuser', needs: ['reader', 'floater'] },                           // kural kitapçıkta, seri no YERÇEKİMSİZ'de
   button:   { apply: 'defuser', needs: ['reader', 'floater'] },
   keypad:   { apply: 'defuser', info: 'keypadInfo', chain: ['pointer', 'floater'] },
-  password: { apply: 'defuser', needs: ['reader'] },
+  password: { apply: 'reader', needs: ['defuser'] },                                      // terminali TERS SES kullanır, ipucu TERS TUŞ'un bombasında
   fuse:     { apply: 'floater', needs: ['defuser'] },                                     // yanan renkleri TERS TUŞ görür
   ducks:    { apply: 'floater', info: 'duckInfo', chain: ['pointer', 'tiny', 'reader'] },
   mouse:    { apply: 'tiny',    info: 'mouseInfo', chain: ['pointer', 'reader'] },
@@ -664,7 +664,7 @@ const modAvailable = (mod, roles) => { const N = own(MOD_NEEDS, mod) && MOD_NEED
 const allowed = (role, need) => need === 'any' ? role !== 'none' : role === need;
 const ACT_MOD = { cut: 'wires', key: 'keypad', btnDown: 'button', btnUp: 'button', pw: 'password', pwOk: 'password', fuse: 'fuse', fuseOk: 'fuse', duck: 'ducks', dial: 'mouse', dialOk: 'mouse', maze: 'maze', turnKey: 'keys' }; // lazer kilidinin aksiyonu yok: oda sahibi lazer noktasından kendisi algılar
 const DIFF = {
-  kolay:  { name: 'Kolay',  time: 450, mods: ['wires', 'button', 'keypad', 'fuse', 'ducks', 'mouse', 'keys'], keymix: 25, chaos: 55, pages: true, mult: 1 },
+  kolay:  { name: 'Kolay',  time: 450, mods: ['wires', 'button', 'keypad', 'password', 'fuse', 'ducks', 'mouse', 'keys'], keymix: 25, chaos: 55, pages: true, mult: 1 },
   normal: { name: 'Normal', time: 450, mods: ALL_MODS, keymix: 20, chaos: 42, pages: false, mult: 1.5 },
   zor:    { name: 'Zor',    time: 360, mods: ALL_MODS, keymix: 13, chaos: 28, pages: false, mult: 2.2 },
 };
@@ -769,16 +769,18 @@ function solveButton(b, serial) {
   else mode = 'hold';
   return { mode, digit: STRIP_DIGIT[b.strip] };
 }
+// Şifre Terminali: sütunlarla listeden TAM 3 kelime yazılabilir; hangisinin doğru olduğunu bombadaki ipucu (n. harf) söyler
 function genPassword() {
-  for (let t = 0; t < 500; t++) {
-    const word = pick(WORDS);
-    const cols = [...word].map(ch => { const s = new Set([ch]); while (s.size < 5) s.add(pick(LETTERS)); return shuffle([...s]); });
-    const ok = WORDS.filter(w => [...w].every((c, i) => cols[i].includes(c)));
-    if (ok.length === 1) {
-      let start;
-      do { start = cols.map(() => rand(5)); } while (start.every((s, i) => cols[i][s] === word[i]));
-      return { word, cols, start };
-    }
+  for (let t = 0; t < 3000; t++) {
+    const [word, b, c] = shuffle(WORDS), W = [...word], B = [...b], C = [...c];
+    const diff = [0, 1, 2, 3, 4].filter(i => W[i] !== B[i] && W[i] !== C[i]);
+    if (!diff.length) continue;
+    const cols = W.map((ch, i) => { const set = new Set([ch, B[i], C[i]]); while (set.size < 5) set.add(pick(LETTERS)); return shuffle([...set]); });
+    if (WORDS.filter(w => [...w].every((ch, i) => cols[i].includes(ch))).length !== 3) continue;
+    const pos = pick(diff);
+    let start;
+    do { start = cols.map(() => rand(5)); } while (start.every((x, i) => cols[i][x] === W[i]));
+    return { word, cols, start, clue: { pos, ch: W[pos] } };
   }
 }
 function genPuzzle(dk, roles, muts, nPlayers) {
@@ -803,7 +805,7 @@ function genPuzzle(dk, roles, muts, nPlayers) {
     mods: D.mods.filter(m => modAvailable(m, roles)),
     laserSeq: shuffle([0, 1, 2, 3]),
     keypadInfo: infoHolder('keypad', roles), duckInfo: infoHolder('ducks', roles), mouseInfo: infoHolder('mouse', roles),
-    serialInfo: 'floater', mazeInfo: 'floater', fuseInfo: 'defuser', laserInfo: 'tiny', moved: [], manualAll: false, kmShown: false, // tur ortasında rol boşalırsa değişir (applyVacancy)
+    serialInfo: 'floater', mazeInfo: 'floater', fuseInfo: 'defuser', pwInfo: 'defuser', laserInfo: 'tiny', moved: [], manualAll: false, kmShown: false, // tur ortasında rol boşalırsa değişir (applyVacancy)
     ducks: { spots: shuffle(DUCK_SPOTS).slice(0, 7), gold: shuffle([0, 1, 2, 3, 4, 5, 6]).slice(0, 3) }, mouseCode: [rand(10), rand(10), rand(10)], serial, wires, wireAns: solveWires(wires, serial), order, layout,
     button, btnAns: solveButton(button, serial), pw: genPassword(), fuseColors, fuseOn, fuseTarget, fuseStart,
   };
@@ -829,7 +831,7 @@ function checkSolvable(P, roles) {
   if (!perm(P.order, P.order || []) || (P.order || []).length !== 4 || !perm(P.layout, P.order || [])) bad.push('semboller');
   const pw = P.pw;
   if (!pw || !WORDS.includes(pw.word) || !Array.isArray(pw.cols) || pw.cols.length !== 5 || pw.cols.some((c, i) => !Array.isArray(c) || c.length !== 5 || new Set(c).size !== 5 || !c.includes([...pw.word][i]))) bad.push('şifre');
-  else if (WORDS.filter(w => [...w].every((c, i) => pw.cols[i].includes(c))).length !== 1 || !Array.isArray(pw.start) || pw.start.length !== 5 || pw.start.some(s => !int(s, 5)) || pw.start.every((s, i) => pw.cols[i][s] === [...pw.word][i])) bad.push('şifre başlangıcı');
+  else if (WORDS.filter(w => [...w].every((c, i) => pw.cols[i].includes(c))).length !== 3 || !pw.clue || !int(pw.clue.pos, 5) || [...pw.word][pw.clue.pos] !== pw.clue.ch || !Array.isArray(pw.start) || pw.start.length !== 5 || pw.start.some(s => !int(s, 5)) || pw.start.every((s, i) => pw.cols[i][s] === [...pw.word][i])) bad.push('şifre başlangıcı');
   if (!perm(P.fuseColors, FUSE_COLORS) || !Array.isArray(P.fuseOn) || !P.fuseOn.length || P.fuseOn.some(c => !FUSE_COLORS.includes(c)) || !Array.isArray(P.fuseTarget) || P.fuseTarget.length !== 5 || P.fuseTarget.some((v, i) => v !== P.fuseOn.includes(P.fuseColors[i]))) bad.push('sigorta');
   else if (!Array.isArray(P.fuseStart) || P.fuseStart.length !== 5 || P.fuseStart.every((v, i) => v === P.fuseTarget[i])) bad.push('sigorta başlangıcı');
   if (!P.ducks || !Array.isArray(P.ducks.spots) || P.ducks.spots.length !== 7 || !Array.isArray(P.ducks.gold) || P.ducks.gold.length !== 3 || new Set(P.ducks.gold).size !== 3 || P.ducks.gold.some(g => !int(g, 7))) bad.push('ördekler');
@@ -1479,7 +1481,7 @@ function dropPlayer(id, conn) {
 }
 // ---- Tur ortasında boşalan rol (§3.3). Sayılar ilk tahmindir, oyun testiyle doğrulanmadı. ----
 const VAC = { grace: 30, autoPenalty: 15, minLeft: 20, freezeCap: 90 };   // bekleme sn · otomatik bakım cezası sn/modül · cezanın inemeyeceği alt sınır · tur başına en çok donma sn
-const VAC_INFO = { floater: [['serialInfo', 'defuser'], ['mazeInfo', 'defuser']], defuser: [['fuseInfo', 'floater']], tiny: [['laserInfo', 'pointer']] }; // rol giderse elindeki bilgi kime geçer
+const VAC_INFO = { floater: [['serialInfo', 'defuser'], ['mazeInfo', 'defuser']], defuser: [['fuseInfo', 'floater'], ['pwInfo', 'reader']], tiny: [['laserInfo', 'pointer']] }; // rol giderse elindeki bilgi kime geçer
 // tur ortasında gelen oyuncu: aynı jetonla eski rolü (hâlâ boşsa), yoksa ilk boş rol, o da yoksa izleyici
 function vacantRoleFor(token) {
   const used = new Set(Object.values(players).map(p => p.role)), open = ROLE_ORDER.filter(r => hostR.roles.has(r) && !used.has(r));
@@ -2435,16 +2437,19 @@ drawTimer('5:00');
   add(new THREE.PlaneGeometry(3.65, 1.37), m, 6.2, 4.6, -HZ + 0.19).userData.noCast = true; }
 // sansür mozaiği (TERS TUŞ dışındakiler bunu görür)
 const censorTex = canvasTex(256, 256, () => {});
-function drawCensor() {
-  const { ctx: x } = censorTex.userData;
+const censorTexR = canvasTex(256, 256, () => {});   // TERS SES'in terminali için
+function drawCensor() { drawCensorOn(censorTex, 'sadece TERS TUŞ görür'); drawCensorOn(censorTexR, 'sadece TERS SES görür'); }
+function drawCensorOn(tex, label) {
+  const { ctx: x } = tex.userData;
   for (let i = 0; i < 16; i++) for (let j = 0; j < 16; j++) { const l = 25 + rand(30); x.fillStyle = `hsl(${250 + rand(50)},${30 + rand(30)}%,${l}%)`; x.fillRect(i * 16, j * 16, 16, 16); }
   x.fillStyle = 'rgba(0,0,0,.55)'; roundRect(x, 28, 86, 200, 84, 20); x.fill();
   x.font = `400 44px ${FONT}`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#fff'; x.fillText('GİZLİ', 128, 118);
-  x.font = `400 19px ${FONT}`; x.fillStyle = '#ffd23f'; x.fillText('sadece TERS TUŞ görür', 128, 150);
-  censorTex.needsUpdate = true;
+  x.font = `400 19px ${FONT}`; x.fillStyle = '#ffd23f'; x.fillText(label, 128, 150);
+  tex.needsUpdate = true;
 }
 drawCensor();
 const censorMat = new THREE.MeshBasicMaterial({ map: censorTex, toneMapped: false });
+const censorMatR = new THREE.MeshBasicMaterial({ map: censorTexR, toneMapped: false });
 const tntTex = canvasTex(256, 128, (x, w, h) => { x.fillStyle = '#c62828'; x.fillRect(0, 0, w, h); x.fillStyle = '#8e1b1b'; x.fillRect(0, 0, w, 10); x.fillRect(0, h - 10, w, 10); x.fillStyle = '#ffe9c4'; x.font = `400 54px ${FONT}`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('TNT', w / 2, h / 2 + 4); }, { repeat: [2, 1] });
 
 function interact(mesh, kind, extra = {}) {
@@ -2559,6 +2564,13 @@ function buildRound() {
     fp2.traverse(o => { if (o.isMesh && o.geometry.type === 'SphereGeometry') { o.material = o.material.clone(); M.fuseInd2.push(o); } if (o.material === censorMat) M.fuseCensor2 = o; });
   }
 
+  // şifre ipucu ekranı: bombanın iki uzun yüzünde, yalnız TERS TUŞ görür → TERS SES'e söyler
+  M.pwClue = [];
+  if (has('password') && P.pw && P.pw.clue) {
+    const tex = textTex(['ŞİFRE İPUCU', `${P.pw.clue.pos + 1}. HARF: ${P.pw.clue.ch}`], { w: 512, h: 200, size: [50, 92], bg: '#0f1a12', fg: ['#9fd8a0', '#7dff7a'], radius: 18, border: '#2e6b33', bw: 8 });
+    for (const sz of [-1, 1]) { const m = add(new THREE.PlaneGeometry(0.62, 0.24), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }), 0.55, 0.27, sz * 0.606, bomb); m.rotation.y = sz > 0 ? 0 : Math.PI; m.userData.noCast = true; M.pwClue.push(m); }
+  }
+
   // ================= KABLOLAR (kuzey duvarı) =================
   if (has('wires')) {
     const st = station(roundGroup, { x: -4, y: 1.8, z: -HZ + 0.07, w: 2.5, h: 2.1, title: '✂️ KABLOLAR', color: 0xffd23f, censor: true, marker: [-4, -8.3], mod: 'wires' });
@@ -2597,7 +2609,7 @@ function buildRound() {
   // ================= ŞİFRE (batı duvarı) =================
   if (has('password')) {
     const st = station(roundGroup, { x: -HX + 0.07, y: 1.75, z: 3, ry: Math.PI / 2, w: 2.7, h: 1.9, title: '🔤 ŞİFRE', color: 0xa66bff, censor: true, marker: [-HX + 1.5, 3], mod: 'password', markerRot: -Math.PI / 2 });
-    M.lamps.password = st.lamp; M.pwCensor = st.censor;
+    M.lamps.password = st.lamp; M.pwCensor = st.censor; st.censor.material = censorMatR;
     M.pwCols = [];
     for (let c = 0; c < 5; c++) {
       const cx = -1.04 + c * 0.52;
@@ -2788,7 +2800,7 @@ function refreshModules() {
     k.face.material.map = sees ? symTex[P.layout[i]] : qTex; k.face.material.needsUpdate = true;
     k.cap.material.color.setHex(on ? 0x8dff8a : 0xdfe3ea); k.cap.position.z = on ? 0.04 : 0.08; k.face.position.z = on ? 0.125 : 0.165;
   });
-  if (M.pwCols) M.pwCols.forEach((f, c) => { f.material.map = getLetter(sees ? P.pw.cols[c][game.pwIdx[c]] : '?'); f.material.needsUpdate = true; });
+  if (M.pwCols) M.pwCols.forEach((f, c) => { f.material.map = getLetter(role === 'reader' ? P.pw.cols[c][game.pwIdx[c]] : '?'); f.material.needsUpdate = true; });
   if (M.btn) {
     M.btn.material.color.setHex(sees ? BTN_HEX[P.button.color] : 0x6d6d78);
     M.btnLabel.material.map = M.btnLabelTex; M.btnLabel.material.needsUpdate = true;
@@ -2825,7 +2837,9 @@ function refreshModules() {
   });
   M.strikeLeds.forEach((l, i) => { l.material.emissiveIntensity = i < game.strikes ? 4 : 0.2; });
   // kim neyi görür
-  [M.wireCensor, M.keyCensor, M.pwCensor, M.btnCensor, M.fuseCensor, M.fuseCensor2].forEach(c => { if (c) c.visible = !sees; });
+  [M.wireCensor, M.keyCensor, M.btnCensor, M.fuseCensor, M.fuseCensor2].forEach(c => { if (c) c.visible = !sees; });
+  if (M.pwCensor) M.pwCensor.visible = role !== 'reader';
+  if (M.pwClue) M.pwClue.forEach(m => m.visible = sees && !S.password);
   if (M.btnLabel) M.btnLabel.visible = sees;
   M.floaterOnly.visible = role === 'floater';
   M.pages.forEach(p => p.g.visible = role === 'reader' && !pagesGot.has(p.id));
@@ -3773,8 +3787,9 @@ function myTasks() {
   const info = t => T.push({ t, info: true });
   if (game.final) T.push({ t: '<b>SON ADIM</b> — bombanın çevresindeki kendi renkli plakana bas, herkes aynı anda!', done: false });
   if (r === 'defuser') {
-    mod('wires', 'kuzey duvarı'); mod('button', 'masadaki bomba'); mod('keypad', 'doğu duvarı'); mod('password', 'batı duvarı'); mod('maze', 'kuzeydoğu köşe, yerde');
+    mod('wires', 'kuzey duvarı'); mod('button', 'masadaki bomba'); mod('keypad', 'doğu duvarı'); mod('maze', 'kuzeydoğu köşe, yerde');
     if (has('maze')) info(`🧭 Labirentin güvenli karelerini ${WHO('floater')} görüyor. Kare atlama, zıplama!`);
+    if (has('password')) info(`🔤 Bombanın yanındaki ŞİFRE İPUCU'nu ${WHO('reader')}'e söyle`);
     info(`🗣️ Yürüme tuşlarını ${WHO('reader')} biliyor (tersten söyleyecek 😂)`);
     if (has('fuse')) info(`⚡ Bombanın yanındaki SİGORTA ışıklarını ${WHO('floater')}'e söyle`);
     if (has('keypad')) info(`🔣 Sembol sırası: ${P.keypadInfo === 'pointer' ? WHO('pointer') + ' panoda gösterecek' : WHO('floater') + ' tavanda okuyacak'}`);
@@ -3787,6 +3802,8 @@ function myTasks() {
   } else if (r === 'reader') {
     info('🎮 TERS TUŞ\'un yürüme tuşları sende → söyle (TERSTEN gidecek!)');
     info('📕 Kitapçıktaki kuralları anlat (<kbd>M</kbd>)');
+    mod('password', 'batı duvarı; terminal senin');
+    if (has('password')) info(`🔤 Şifre: 3 aday kelimeden hangisi? ${WHO('defuser')} bombadaki ipucunu söyleyecek`);
     if (has('ducks') && P.duckInfo === 'reader') info('🦆 Parlayan altın ördekleri YERÇEKİMSİZ\'e tarif et');
     if (has('mouse') && P.mouseInfo === 'reader') info('🐭 Fare kodunu MİNİK\'e söyle');
   } else if (r === 'pointer') {
@@ -3823,6 +3840,7 @@ function renderSecret() {
   if (has('maze') && P.mazeInfo === r && r !== 'floater' && !game.solved.maze) L.push('🧭 Labirentin güvenli kareleri artık <b>sana</b> turkuaz parlıyor.');
   if (has('fuse') && P.fuseInfo === r && r !== 'defuser' && !game.solved.fuse) L.push(`⚡ Bombada yanan renkler (TERS TUŞ yok)<div class="big">${P.fuseOn.map(c => `<span style="border-bottom:5px solid ${hexCss(BTN_HEX[c])}">${TR[c]}</span>`).join(' ')}</div>`);
   if (has('laser') && (P.laserInfo || 'tiny') === r) L.push(`Lazer sensör sırası${game.solved.laser ? ' ✅' : ''}<div class="big">${P.laserSeq.map((i, k) => `<span style="border-bottom:5px solid ${hexCss(BTN_HEX[LSR[i].c])}">${k + 1}. ${LSR[i].n}</span>`).join(' ')}</div>`);
+  if (has('password') && P.pwInfo === r && r !== 'defuser' && P.pw && P.pw.clue) L.push(`Şifre ipucu${game.solved.password ? ' ✅' : ''}<div class="big"><span>${P.pw.clue.pos + 1}. harf: ${P.pw.clue.ch}</span></div>`);
   el.classList.toggle('hidden', !L.length);
   el.innerHTML = '<div class="small">SADECE SEN BİLİYORSUN</div>' + L.join('<hr>');
 }
@@ -3890,9 +3908,9 @@ const MANUAL = {
     <ol><li>Düğme <b>mavi</b> ve üstünde <b>VAZGEÇ</b> yazıyorsa → <b>basılı tut</b>.</li><li>Üstünde <b>PATLAT</b> yazıyor ve seri no'da <b>sesli harf (A E I O U)</b> varsa → <b>bas ve hemen bırak</b>.</li><li>Düğme <b>beyaz</b>sa → <b>basılı tut</b>.</li><li>Düğme <b>kırmızı</b> ve üstünde <b>TUT</b> yazıyorsa → <b>bas ve hemen bırak</b>.</li><li>Üstünde <b>BAS</b> yazıyorsa → <b>bas ve hemen bırak</b>.</li><li>Hiçbiri değilse → <b>basılı tut</b>.</li></ol>
     <p><b>Basılı tutunca</b> düğmenin yanında renkli bir şerit yanar. Sayaçta şu rakam <b>herhangi bir yerde</b> görününce bırak:</p>
     <table><tr><td>🔵 Mavi şerit</td><td><b>4</b></td></tr><tr><td>🔴 Kırmızı şerit</td><td><b>3</b></td></tr><tr><td>🟡 Sarı şerit</td><td><b>5</b></td></tr><tr><td>⚪ Beyaz şerit</td><td><b>1</b></td></tr></table>`,
-  password: () => `<h2>🔤 ŞİFRE</h2><p>Batı duvarındaki şifre kilidinde 5 harf sütunu var. Her sütun oklarla çevrilir, her birinde 5 harf var.</p>
-    <p>Aşağıdaki kelimelerden <b>sadece biri</b> bu sütunlarla yazılabilir. TERS TUŞ'a sütunlardaki harfleri sor, doğru kelimeyi bul, yazdır ve <b>GÖNDER</b>'e bastır.</p>
-    <div class="words">${WORDS.map(w => `<span>${w}</span>`).join('')}</div><div class="tip">İpucu: önce 1. sütunun harflerini sor, listeyi daralt!</div>`,
+  password: () => `<h2>ŞİFRE TERMİNALİ</h2><p>Batı duvarındaki terminal <b>senin</b>: harfleri yalnız sen görürsün, okları sen çevirirsin. 5 sütun, her birinde 5 harf.</p>
+    <ol><li>Aşağıdaki listeden bu sütunlarla yazılabilen <b>tam 3 kelime</b> var. Önce o üçünü bul.</li><li>Hangisinin doğru olduğunu <b>TERS TUŞ</b> bilir: bombasının yanında "ŞİFRE İPUCU: n. HARF" yazar. Ona sor.</li><li>Doğru kelimeyi yaz, <b>GÖNDER</b>'e bas. Yanlış kelime = hata.</li></ol>
+    <div class="words">${WORDS.map(w => `<span>${w}</span>`).join('')}</div><div class="tip">Soru sorarken sesin tersten gider; TERS TUŞ'un cevabı sana düz gelir. Kısa sor!</div>`,
   keypad: () => game.puzzle.keypadInfo === 'pointer' ? `<h2>🔣 SEMBOLLER</h2><p>Bu modül <b>senin değil</b>! 😌 Doğu duvarında 4 sembol var. Doğru sırayı <b>İŞARETÇİ</b> biliyor ama konuşamıyor: doğu duvarındaki <b>İŞARET PANOSU</b>'nda sembolleri lazerle tek tek gösterecek.</p><p>TERS TUŞ lazeri izleyip aynı sembollere sırayla basar. Yanlış basış = hata ve sıra baştan.</p><div class="tip">Ne gösterdiğini yüksek sesle söyleyin, İŞARETÇİ ✅/❌ ile cevap versin!</div>` : `<h2>🔣 SEMBOLLER</h2><p>Bu modül <b>senin değil</b>! 😌 Doğu duvarında 4 sembol var. Doğru sıra <b>tavanda</b> yazıyor ve onu sadece <b>YERÇEKİMSİZ</b> görüyor.</p><p>YERÇEKİMSİZ sırayı söyler, TERS TUŞ basar. Yanlış basış = hata ve sıra baştan.</p><div class="tip">Sembolleri komik isimlerle tarif edin: "şemsiye", "at kafası", "çiçek"...</div>`,
   fuse: () => `<h2>⚡ SİGORTA KUTUSU</h2><p>Bu da <b>senin değil</b>. Doğu duvarında, tavana yakın; sadece <b>YERÇEKİMSİZ</b> uçup ulaşabilir.</p>
     <ol><li>Bombanın yan yüzünde <b>SİGORTA</b> göstergesi var; hangi renklerin yandığını <b>TERS TUŞ</b> görür.</li><li>YERÇEKİMSİZ, <b>yanan renklerdeki</b> şalterleri <b>AÇIK (yukarı)</b>, diğerlerini <b>KAPALI (aşağı)</b> yapar.</li><li>Sonra kırmızı <b>ONAYLA</b> kolunu çeker.</li></ol>`,
@@ -4183,7 +4201,7 @@ function loop() {
     $('#roleIntro').classList.toggle('hidden', !(game.countdown > 0 && game.status === 'playing'));
     const tf = settings.fov + (settings.motion && game.chaos && game.chaos.type === 'kafein' && game.status === 'playing' ? 14 : 0); // hız aynı kalır; sadece görüş açısı sıçraması isteğe bağlı
     if (Math.abs(camera.fov - tf) > 0.05) { camera.fov += (tf - camera.fov) * Math.min(1, dt * 6); camera.updateProjectionMatrix(); }
-    censorT -= dt; if (censorT < 0) { censorT = 0.18; if (myRole() !== 'defuser') drawCensor(); }
+    censorT -= dt; if (censorT < 0) { censorT = 0.18; drawCensor(); }
     if (recorder) $('#recLvl').style.width = (micLevel() * 100) + '%';
   } else {
     // menüde yavaş dönen kamera

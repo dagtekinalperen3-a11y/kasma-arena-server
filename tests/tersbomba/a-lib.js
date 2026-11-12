@@ -35,7 +35,8 @@ const SOLVERS = {
   },
   async keypad(R, P) { await go(R.defuser, SPOT.keypad); for (const s of P.order) await act(R.defuser, 'key', { i: P.layout.indexOf(s) }); },
   async password(R, P) {
-    const c = R.defuser; await go(c, SPOT.password);
+    const c = R.reader; await go(c, SPOT.password);
+    await c.tb(T => { if (T.net.solo && T.myRole() !== 'reader') T.setRole('reader'); });
     const { pwIdx } = await live(c);
     for (let k = 0; k < 5; k++) for (let n = (P.pw.cols[k].indexOf([...P.pw.word][k]) - pwIdx[k] + 5) % 5; n > 0; n--) await act(c, 'pw', { c: k, d: 1 });
     await act(c, 'pwOk');
