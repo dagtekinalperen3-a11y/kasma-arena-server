@@ -185,6 +185,7 @@ kbd{display:inline-block;min-width:22px;text-align:center;padding:0 6px;border-r
 #bottom{position:absolute;bottom:12px;right:14px;padding:0;font-size:14px;letter-spacing:.6px;text-transform:uppercase;color:#d9d2c2;white-space:nowrap;max-width:calc(100vw - 400px);overflow:hidden;text-overflow:ellipsis;background:none;border:0;box-shadow:none;text-shadow:0 1px 3px #000,0 0 8px #000}
 #keymapBox{position:absolute;bottom:50px;left:50%;transform:translateX(-50%);padding:8px 16px 6px;font-size:16px;text-transform:uppercase;letter-spacing:1px;text-align:center;white-space:nowrap;border-top:4px solid var(--pink)}
 #keymapBox.def{border-top-color:var(--blue)}
+#keymapBox.warn{border-top-color:var(--red);animation:pulse .5s infinite}
 #keymapBox .k{display:inline-block;min-width:36px;padding:2px 8px 0;margin:0 8px 0 3px;border-radius:4px;background:var(--paper);color:#111;font:400 24px var(--head);border-bottom:4px solid #9c8f6e}
 #emotes{position:absolute;left:14px;bottom:12px;display:flex;gap:4px;padding:5px}
 #emotes div{width:38px;height:38px;border-radius:3px;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;font-size:19px;position:relative}
@@ -342,9 +343,9 @@ body.nofx #timer.panic,body.nofx .score .rec,body.nofx #players .p.talk::after{a
     <div class="lside">
       <div class="label" style="margin-top:14px">Zorluk</div>
       <div class="seg col" id="diffSeg">
-        <button data-d="kolay">Kolay<small>7.5 dk · şifre, labirent ve lazer yok</small></button>
-        <button data-d="normal">Normal<small>7.5 dk · tüm görevler · puan ×1.5</small></button>
-        <button data-d="zor">Zor<small>6 dk · bol kaos · puan ×2.2</small></button>
+        <button data-d="kolay">Kolay<small>9 dk · tuşlar yalnız WASD arasında karışır · hafif kaos</small></button>
+        <button data-d="normal">Normal<small>8 dk · 8 tuşluk karışım · puan ×1.5</small></button>
+        <button data-d="zor">Zor<small>6.5 dk · geniş karışım, bol kaos · puan ×2.2</small></button>
       </div>
       <div class="label">Mutatörler <span>+%20 puan</span></div>
       <div class="seg col" id="mutSeg"></div>
@@ -664,9 +665,9 @@ const modAvailable = (mod, roles) => { const N = own(MOD_NEEDS, mod) && MOD_NEED
 const allowed = (role, need) => need === 'any' ? role !== 'none' : role === need;
 const ACT_MOD = { cut: 'wires', key: 'keypad', btnDown: 'button', btnUp: 'button', pw: 'password', pwOk: 'password', fuse: 'fuse', fuseOk: 'fuse', duck: 'ducks', dial: 'mouse', dialOk: 'mouse', maze: 'maze', turnKey: 'keys' }; // lazer kilidinin aksiyonu yok: oda sahibi lazer noktasından kendisi algılar
 const DIFF = {
-  kolay:  { name: 'Kolay',  time: 450, mods: ['wires', 'button', 'keypad', 'password', 'fuse', 'ducks', 'mouse', 'keys'], keymix: 25, chaos: 55, pages: true, mult: 1 },
-  normal: { name: 'Normal', time: 450, mods: ALL_MODS, keymix: 20, chaos: 42, pages: false, mult: 1.5 },
-  zor:    { name: 'Zor',    time: 360, mods: ALL_MODS, keymix: 13, chaos: 28, pages: false, mult: 2.2 },
+  kolay:  { name: 'Kolay',  time: 540, mods: ALL_MODS, keymix: 25, chaos: 55, pages: true, mult: 1 },
+  normal: { name: 'Normal', time: 480, mods: ALL_MODS, keymix: 20, chaos: 42, pages: false, mult: 1.5 },
+  zor:    { name: 'Zor',    time: 390, mods: ALL_MODS, keymix: 13, chaos: 28, pages: false, mult: 2.2 },
 };
 // Mutatörler: oda sahibi lobide açar, her biri puanı %20 artırır
 const MUTS = {
@@ -700,6 +701,19 @@ const SYMBOLS = ['★', '☂', '♞', '✿', '⚓', '☯', '♫', '✈', '☘', 
 const FUSE_COLORS = ['kirmizi', 'mavi', 'sari', 'yesil', 'beyaz'];
 const WORDS = ['BOMBA', 'KABLO', 'ÖRDEK', 'ROKET', 'KALEM', 'ELMAS', 'TAVUK', 'KÖPEK', 'BALIK', 'MASAL', 'LİMON', 'KAYIK', 'ÇORBA', 'KUZEY', 'GÜNEŞ', 'ORMAN', 'PERDE', 'SİMİT', 'BULUT', 'DENİZ', 'KEBAP', 'HAVUÇ'];
 const LETTERS = [...'ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ'];
+// DOZ tablosu (ilk tahminler, oyuncu testiyle ayarlanmalı): warm = düz WASD ile ısınma (sn), pool = karışım havuzu,
+// every = karışma aralığı (sn), chaosFirst = ilk kaostan önceki en kısa süre (sn), mild = yalnız hafif/görsel kaos
+const TUNE = {
+  kolay:  { warm: 45, pool: 'wasd', every: 45, chaosFirst: 90, mild: true },
+  normal: { warm: 35, pool: 'near', every: 30, chaosFirst: 60, mild: false },
+  zor:    { warm: 20, pool: 'full', every: 18, chaosFirst: 45, mild: false },
+};
+const KM_WARN = 5;                                                             // karışmadan önceki uyarı (sn)
+const KM_PLAIN = { f: 'KeyW', b: 'KeyS', l: 'KeyA', r: 'KeyD' };
+const KM_POOLS = { wasd: ['KeyW', 'KeyA', 'KeyS', 'KeyD'], near: ['KeyQ', 'KeyW', 'KeyE', 'KeyA', 'KeyS', 'KeyD', 'KeyZ', 'KeyX'] };
+const kmIsPlain = km => !!km && km.f === 'KeyW' && km.b === 'KeyS' && km.l === 'KeyA' && km.r === 'KeyD';
+// görüşü/kontrolü/sesi bozan kaoslar; diğerleri görsel ya da etkileşimli (disko, ördek, gözler, telefon)
+const CHAOS_HARD = ['karanlik', 'buz', 'bascasagi', 'sis', 'deprem', 'ay', 'kafein', 'helyum'];
 const KEY_POOL = 'QWERTYUOPASDFGJKLZXCN'.split('').map(c => 'Key' + c); // V B M I yok
 // sign: İŞARETÇİ konuşamadığı için aynı tuş onun başının üstünde bu yazılı pankartı kaldırır
 const EMOTES = [
@@ -843,9 +857,10 @@ function checkSolvable(P, roles) {
   if (P.mods.includes('keys') && !(P.nPlayers >= 2 || P.keyWin >= 20)) bad.push('çift anahtar: tek kişi yetişemez');
   return bad;
 }
-function genKeymap(prev) {
+function genKeymap(prev, pool) {
+  const P = KM_POOLS[pool] || KEY_POOL;
   let km;
-  do { const k = shuffle(KEY_POOL); km = { f: k[0], b: k[1], l: k[2], r: k[3] }; } while (prev && km.f === prev.f);
+  do { const k = shuffle(P); km = { f: k[0], b: k[1], l: k[2], r: k[3] }; } while (kmIsPlain(km) || (prev && km.f === prev.f && km.l === prev.l));
   return km;
 }
 const keyName = code => code ? code.replace('Key', '') : '?';
@@ -1640,9 +1655,10 @@ function newGameState(puzzle) {
   return {
     puzzle, timeLeft: puzzle.time || D.time, elapsed: 0, countdown: 3.2, strikes: 0, status: 'playing', solved,
     wireCut: puzzle.wires.map(() => false), keyProg: 0, keyPressed: [false, false, false, false],
-    keymap: genKeymap(), keymapIn: D.keymix, btnHeld: false, pwIdx: puzzle.pw.start.slice(), fuse: puzzle.fuseStart.slice(), ducksGot: [], mouseDial: [0, 0, 0],
+    keymap: { ...KM_PLAIN }, keymapIn: (TUNE[puzzle.diff] || TUNE.normal).warm,   // tur düz WASD ile başlar (ısınma)
+    btnHeld: false, pwIdx: puzzle.pw.start.slice(), fuse: puzzle.fuseStart.slice(), ducksGot: [], mouseDial: [0, 0, 0],
     mazeVisited: [], mazeAt: -1, mazeFails: 0, laserProg: 0, final: null, keyArm: [0, 0], keyBy: [null, null], fxQ: [],
-    chaos: null, chaosIn: D.chaos * 0.55, lastChaos: '', stats: {},
+    chaos: null, chaosIn: Math.max(D.chaos * 0.55, (TUNE[puzzle.diff] || TUNE.normal).chaosFirst), lastChaos: '', stats: {},
     frozen: false, vac: [], auto: [],   // boş rol beklenirken sayaç donuk mu / beklenen roller / otomatik bakımla kapanan modüller
   };
 }
@@ -1844,13 +1860,18 @@ function hostTick() {
         if (need.length && on.length === need.length) { game.final.hold += dt; if (game.final.hold >= 1.5) { game.status = 'won'; force = true; } } else game.final.hold = 0;
       }
       for (let k = 0; k < 2; k++) if (game.keyArm[k] > 0) { game.keyArm[k] -= dt; if (game.keyArm[k] <= 0) { game.keyArm[k] = 0; force = true; } }
-      if (game.keymapIn <= 0) { game.keymap = genKeymap(game.keymap); game.keymapIn = D.keymix; force = true; }
+      if (game.final) game.keymapIn = Math.max(game.keymapIn, KM_WARN + 1);            // finalde tuşlar karışmaz
+      if (game.keymapIn <= 0) {
+        if (game.btnHeld && game.keymapIn > -10) { /* TERS TUŞ düğmeyi tutuyor: bırakana kadar (en çok 10 sn) ertele */ }
+        else { const T = TUNE[game.puzzle.diff] || TUNE.normal; game.keymap = genKeymap(game.keymap, T.pool); game.keymapIn = T.every; force = true; }
+      }
       if (game.chaos) { game.chaos.left -= dt; if (game.chaos.left <= 0) { if (game.chaos.type === 'telefon' && !game.chaos.done) hostTime(-12, '📞 Telefonu kimse açmadı! Arayan çok alındı.'); game.chaos = null; force = true; } }
       else {
         game.chaosIn -= dt;
         if (game.chaosIn <= 0) {
-          const type = pick(Object.keys(CHAOS).filter(k => k !== game.lastChaos));
-          const ids = Object.keys(players);
+          const T = TUNE[game.puzzle.diff] || TUNE.normal, noHard = T.mild || game.final || game.timeLeft < 40 || CHAOS_HARD.includes(game.lastChaos);   // kritik anda ve üst üste ağır kaos yok
+          const type = pick(Object.keys(CHAOS).filter(k => k !== game.lastChaos && !(noHard && CHAOS_HARD.includes(k) && !(T.mild && k === 'helyum'))));
+          const ids = Object.keys(players).filter(id => players[id].role !== 'none');
           game.chaos = { type, left: CHAOS[type].dur, dur: CHAOS[type].dur, target: pick(ids), seed: rand(1e6) };
           game.lastChaos = type; game.chaosIn = D.chaos * rnd(0.8, 1.2) * (hasMut('kaos') ? 0.5 : 1); force = true;
         }
@@ -3913,10 +3934,16 @@ function updateKeymapHud() {
   }
   if (r === 'reader') {
     box.classList.remove('hidden');
-    box.innerHTML = `🎮 TERS TUŞ'un tuşları → İleri <span class="k">${keyName(km.f)}</span> Geri <span class="k">${keyName(km.b)}</span> Sol <span class="k">${keyName(km.l)}</span> Sağ <span class="k">${keyName(km.r)}</span> <span class="small">⏱ ${sec} sn · sesin ters gidecek</span>`;
+    box.classList.toggle('warn', sec <= KM_WARN && !game.final);
+    box.innerHTML = kmIsPlain(km) ? `Isınma: TERS TUŞ şimdilik düz <span class="k">W</span><span class="k">A</span><span class="k">S</span><span class="k">D</span> ile yürüyor <span class="small">⏱ ${sec} sn sonra karışacak</span>` : `🎮 TERS TUŞ'un tuşları → İleri <span class="k">${keyName(km.f)}</span> Geri <span class="k">${keyName(km.b)}</span> Sol <span class="k">${keyName(km.l)}</span> Sağ <span class="k">${keyName(km.r)}</span> <span class="small">⏱ ${sec} sn · sesin ters gidecek</span>`;
   } else if (r === 'defuser') {
     box.classList.remove('hidden');
-    box.innerHTML = game.countdown > 0 ? '🤫 Yürüme tuşların birazdan belli olacak... (ama sana söylemeyeceğiz)' : `🤫 Tuşların gizli! TERS SES biliyor ama tersten söyleyecek 😂 <span class="small">Karışmaya ⏱ ${sec} sn</span>`;
+    box.classList.toggle('warn', sec <= KM_WARN && !game.final);
+    const kolay = game.puzzle.diff === 'kolay' ? ' (hep W/A/S/D\'nin bir sırası)' : '';
+    box.innerHTML = kmIsPlain(km) ? `Isınma: şimdilik düz <span class="k">W</span><span class="k">A</span><span class="k">S</span><span class="k">D</span> ile yürü <span class="small">⏱ ${sec} sn sonra tuşların karışacak${kolay}</span>`
+      : game.final ? 'Final: tuşların artık karışmıyor' : sec <= KM_WARN ? `DİKKAT: tuşların ${sec} sn sonra karışıyor!` : `Tuşların gizli${kolay}: TERS SES biliyor <span class="small">Karışmaya ⏱ ${sec} sn</span>`;
+    if (sec <= KM_WARN && sec > 0 && sec !== updateKeymapHud.last && !game.final && game.countdown <= 0) tone(880, 0.07, { type: 'square', vol: 0.06 });
+    updateKeymapHud.last = sec;
   } else box.classList.add('hidden');
 }
 
@@ -4290,6 +4317,7 @@ Object.assign(window.__tb, { laser: v => { laserOn = !!v; tbLaserPt = Array.isAr
 Object.assign(window.__tb, { settings, applyComfort, syncSettingsUi, cam: camDbg, hitPad, pops, hover: () => ({ kind: hovered ? hovered.userData.kind : null, pad: !!(hovered && hovered.userData.pad), mark: hoverMark.visible, color: hoverMark.material.color.getHex(), size: hoverMark.scale.x, em: hovered && visOf(hovered).material.emissive ? visOf(hovered).material.emissive.getHex() : null }), interactables: () => interactables, avatarFx, sendFx, quackDuck, fxLog, fxObjs, FX_MS, FX_TUNE, hostFx, playEmote, emoteLog, EMOTES, EMOTE_TUNE, renderer, scene, THREE, applyTheme, HIGH, setShake: v => { shake = v; }, explode, flashVignette,
   post: () => ({ bloom: bloom ? bloom.strength : null, vig: filmPass ? filmPass.uniforms.uVig.value : null, grain: filmPass ? filmPass.uniforms.uGrain.value : null, ab0: filmPass ? filmPass.uniforms.uAb0.value : null, ab: filmPass ? filmPass.uniforms.uAb.value : null, filmAb: film.ab, nofx: document.body.classList.contains('nofx'), vignette: +$('#vignette').style.opacity || 0, flashShown: getComputedStyle($('#flash')).display !== 'none', softFade: softFadeEl.classList.contains('on'), invMark: !invMark.classList.contains('hidden'), alarm: alarm.color.r * alarm.intensity, fov: camera.fov }) });
 
+Object.assign(window.__tb, { TUNE, KM_POOLS, KM_WARN, CHAOS_HARD, kmIsPlain });   // test: doz tablosu
 </script>
 </body>
 </html>
