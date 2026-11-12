@@ -1325,7 +1325,7 @@ function hostAction(m, from) {
     // süre ve rakam oda sahibinin saatinden: istemcinin bildirdiği dur/timer yok sayılır.
     // Rakam, bırakma anında ya da bir önceki saniyede sayaçta görünüyorsa kabul (gecikme payı).
     const ans = P.btnAns, tapped = performance.now() - hostR.btnT0 < BTN_RULE.tapMs;
-    const shown = [...Array(BTN_RULE.digitSlack + 1).keys()].some(k => fmtTime(game.timeLeft + k).includes(String(ans.digit)));
+    const shown = [-1, 0, 1].some(k => fmtTime(game.timeLeft + k * BTN_RULE.digitSlack).includes(String(ans.digit)));   // ağ gecikmesi: istemci saati oda sahibinden biraz ileride de geride de olabilir
     if (ans.mode === 'tap') { if (tapped) S.button = true; else hostStrike('Düğme basılı tutulmamalıydı!', from); }
     else if (tapped) hostStrike('Düğme basılı tutulmalıydı!', from);
     else if (shown) S.button = true;

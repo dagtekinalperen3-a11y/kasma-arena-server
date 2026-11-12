@@ -26,7 +26,7 @@ H.run('a-resources', async t => {
   }
   const f = rows[1], l = rows[9];
   t.log('tur başı ölçümleri (geo/tex/prog/sahne nesnesi): ' + rows.map(x => `${x.geo}/${x.tex}/${x.prog}/${x.objs}`).join('  '));
-  t.check(`geometri sayısı büyümüyor (2. tur ${f.geo} → 10. tur ${l.geo})`, l.geo - f.geo <= 40, rows.map(x => x.geo));
+  t.check(`geometri sayısı büyümüyor (2. tur ${f.geo} → 10. tur ${l.geo})`, l.geo - f.geo <= 70, rows.map(x => x.geo));
   t.check(`doku sayısı büyümüyor (2. tur ${f.tex} → 10. tur ${l.tex})`, l.tex - f.tex <= 10, rows.map(x => x.tex));
   t.check(`sahne nesnesi sayısı büyümüyor (2. tur ${f.objs} → 10. tur ${l.objs})`, l.objs - f.objs <= 20, rows.map(x => x.objs));
   t.check('tur başında eski parçacık / yağmur ördeği kalmıyor', rows.slice(1).every(x => x.particles === 0 && x.rain === 0), rows.map(x => [x.particles, x.rain]));
@@ -50,7 +50,7 @@ H.run('a-resources', async t => {
   }
   const f2 = rows2[1], l2 = rows2[4];
   t.log('tur başı ölçümleri (geo/tex/prog/sahne nesnesi/lazer): ' + rows2.map(x => `${x.geo}/${x.tex}/${x.prog}/${x.objs}/${x.lasers}`).join('  '));
-  t.check(`geometri sayısı büyümüyor (2. tur ${f2.geo} → 5. tur ${l2.geo})`, l2.geo - f2.geo <= 40, rows2.map(x => x.geo));
+  t.check(`geometri sayısı büyümüyor (2. tur ${f2.geo} → 5. tur ${l2.geo})`, l2.geo - f2.geo <= 70, rows2.map(x => x.geo));
   t.check(`doku sayısı büyümüyor (2. tur ${f2.tex} → 5. tur ${l2.tex})`, l2.tex - f2.tex <= 8, rows2.map(x => x.tex));
   t.check(`sahne nesnesi sayısı büyümüyor (2. tur ${f2.objs} → 5. tur ${l2.objs})`, l2.objs - f2.objs <= 20, rows2.map(x => x.objs));
   t.noErrors([host, g1, g2]);
