@@ -970,7 +970,7 @@ setInterval(() => {
 const VOX = {
   maxWait: 3, staleMs: 6000, staleUrgentMs: 12000, gapMs: 250, leadMs: 150,          // sıra: bekleyen sınırı, bayatlama, klipler arası boşluk, çözme payı
   urgentCdMs: 25000, floorMs: 8000, handMs: 6000, recMarkMs: 9500, clipEveryMs: 500, // ACİL bekleme, söz süresi, ✋ süresi, kayıt işareti, klip aralığı
-  minDur: 0.2, maxDur: 8.5, recMaxMs: 8000, maxB64: 400000,
+  minDur: 0.2, maxDur: 8.5, recMaxMs: 8000, maxB64: 240000, partLen: 12000,                 // PeerJS JSON kanalı paket başına ~16 KB taşır: klip parçalara bölünür
   rateCap: 1.6, tinyRate: 1.35, heliumRate: 1.45,                                    // çalma hızı çarpımı en çok 1.6
   targetRms: 0.16, peakCeil: 0.9, minGain: 0.25, maxGain: 8, busGain: 1,             // ses yüksekliği eşitleme
   duckMusic: 0.35, duckSfx: 0.6, duckRamp: 0.25,                                     // klip çalarken müzik / efekt seviyesi
@@ -1084,8 +1084,11 @@ async function sendClip(buf, mime, urgent, durGuess) {
   let dur = durGuess || 0;
   try { dur = (await ac().decodeAudioData(buf.slice(0))).duration; } catch (e) {}
   const n = ++vc.n; vc.mine[n] = buf; for (const k in vc.mine) if (+k < n - 3) delete vc.mine[k];
+  const data = b64enc(buf), PL = VOX.partLen, N = Math.max(1, Math.ceil(data.length / PL));
+  if (data.length > VOX.maxB64) { delete vc.mine[n]; vnote('Kayıt çok büyük, gönderilemedi.', 'bad'); return; }
   vc.stats.sent++;
-  sendToHost({ t: 'voice', k: 'clip', n, mime, dur, urgent: !!urgent, data: b64enc(buf) });
+  for (let i = 0; i < N - 1; i++) sendToHost({ t: 'voice', k: 'part', n, i, data: data.slice(i * PL, (i + 1) * PL) });
+  sendToHost({ t: 'voice', k: 'clip', n, mime, dur, urgent: !!urgent, data: data.slice((N - 1) * PL) });
 }
 const voiceRate = role => Math.min(VOX.rateCap, (role === 'tiny' ? VOX.tinyRate : 1) * (game && ((game.chaos && game.chaos.type === 'helyum') || hasMut('helyum')) ? VOX.heliumRate : 1));
 // Ses yüksekliği: 20 ms'lik çerçevelerin "konuşulan" kısmının RMS'i ortak hedefe çekilir; tepe değeri tavanı aşamaz.
@@ -1100,7 +1103,7 @@ function clipGain(audio) {
 }
 let TELSIZ_CURVE = null;
 // --- İstemci: çalma (aynı anda tek klip; tutamaklar saklanır ki durdurulabilsin) ---
-const vc = { playing: null, gen: 0, seq: 0, n: 0, mine: {}, log: [], urgentAt: 0, handAt: 0, game: null, role: '', aim: null,
+const vc = { playing: null, gen: 0, seq: 0, n: 0, mine: {}, parts: {}, log: [], urgentAt: 0, handAt: 0, game: null, role: '', aim: null,
   st: { cur: null, q: [], floor: null, rec: {}, hands: {}, noMic: {} }, stats: { sent: 0, recs: 0, drops: [], acks: [] } };
 const talking = {};
 async function playClip(buf, o) {
@@ -1168,8 +1171,12 @@ const DROP_MSG = {
 function voiceClient(m) {
   if (!m || typeof m.k !== 'string') return;
   const now = performance.now(), S = vc.st;
-  if (m.k === 'play') {
+  if (m.k === 'part') { // klip verisi parça parça gelir, 'play' ile tamamlanır
+    if (typeof m.data !== 'string' || typeof m.id !== 'number') return;
+    const had = vc.parts[m.id] || ''; vc.parts = {}; if (had.length + m.data.length <= VOX.maxB64) vc.parts[m.id] = had + m.data;
+  } else if (m.k === 'play') {
     const self = m.from === myId; let buf = null;
+    if (typeof m.data === 'string') m.data = (vc.parts[m.id] || '') + m.data; vc.parts = {};
     if (self) { if (net.solo) buf = vc.mine[m.n] || null; delete vc.mine[m.n]; }      // antrenmanda kendi klibini de duyarsın
     else if (typeof m.data === 'string') { try { buf = b64dec(m.data); } catch (e) {} }
     playClip(buf, { id: m.id, speaker: m.from, rev: !!m.rev, rate: m.rate, dur: m.dur, urgent: !!m.urgent, floor: !!m.floor, telsiz: !!m.telsiz, self });
@@ -1282,7 +1289,7 @@ setInterval(() => {
 // --- SES SIRASI (oda sahibi) ---
 // Öncelik: ACİL > söz sahibi > geliş sırası > izleyici. En çok 3 bekleyen, konuşan başına 1 (yenisi eskisinin yerini alır),
 // 6 sn'den fazla bekleyen düşer ve sahibine bildirilir. Konuşmak için asla hata/süre cezası yoktur.
-const hv = { q: [], cur: null, seq: 0, ord: 0, nextAt: 0, floor: null, urgentAt: {}, hands: {}, rec: {}, noMic: {}, lim: {}, roles: {}, game: null, ended: false, dirty: false, log: [] };
+const hv = { parts: {}, q: [], cur: null, seq: 0, ord: 0, nextAt: 0, floor: null, urgentAt: {}, hands: {}, rec: {}, noMic: {}, lim: {}, roles: {}, game: null, ended: false, dirty: false, log: [] };
 const B64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 function sendTo(id, msg) {
   if (id === myId) { clientHandle(msg); return; }
@@ -1302,9 +1309,17 @@ function hostVoice(m, from) {
     if (!live || p.role !== 'pointer' || now < lim.floor) return;
     if (typeof m.id !== 'string' || m.id === from || !own(players, m.id) || players[m.id].role === 'pointer') return;
     lim.floor = now + 600; hv.floor = { id: m.id, by: from, until: now + VOX.floorMs }; delete hv.hands[m.id]; hv.dirty = true;
+  } else if (m.k === 'part') { // büyük klibin ara parçası (sırayla gelmeli)
+    if (!live || typeof m.data !== 'string' || !m.data.length || m.data.length > VOX.partLen || !Number.isInteger(m.n)) return;
+    let A = hv.parts[from]; if (!A || A.n !== m.n) A = hv.parts[from] = { n: m.n, a: [], len: 0 };
+    if (m.i !== A.a.length || A.len + m.data.length > VOX.maxB64) { delete hv.parts[from]; return; }
+    A.a.push(m.data); A.len += m.data.length;
   } else if (m.k === 'clip') {
     const n = Number.isInteger(m.n) && m.n >= 0 && m.n < 1e9 ? m.n : 0, drop = why => sendTo(from, { t: 'voice', k: 'drop', n, why });
-    if (typeof m.data !== 'string' || m.data.length < 200 || m.data.length > VOX.maxB64 || !B64_RE.test(m.data)) return;
+    const A = hv.parts[from]; delete hv.parts[from];
+    if (typeof m.data !== 'string' || m.data.length > VOX.partLen) return;
+    if (A && A.n === m.n) m = { ...m, data: A.a.join('') + m.data };
+    if (m.data.length < 200 || m.data.length > VOX.maxB64 || !B64_RE.test(m.data)) return;
     delete hv.rec[from]; hv.dirty = true;
     if (!live) return drop('kapali');
     if (p.role === 'pointer') return drop('isaretci');           // İŞARETÇİ konuşamaz
@@ -1335,7 +1350,12 @@ function hvPump(now) {
   const rate = voiceRate(sp.role), floor = !!(hv.floor && hv.floor.id === e.from), ms = e.dur / rate * 1000;
   hv.cur = { id: e.id, from: e.from, endsAt: now + VOX.leadMs + ms, urgent: e.urgent, floor, telsiz: e.telsiz, rev: sp.role === 'reader', rate };
   const msg = { t: 'voice', k: 'play', id: e.id, from: e.from, dur: e.dur, rate, rev: hv.cur.rev, urgent: e.urgent, floor, telsiz: e.telsiz };
-  for (const id in players) sendTo(id, id === e.from ? { ...msg, n: e.n } : { ...msg, mime: e.mime, data: e.data });   // konuşana ses geri yollanmaz
+  const PL = VOX.partLen, N = Math.max(1, Math.ceil(e.data.length / PL));
+  for (const id in players) {
+    if (id === e.from) { sendTo(id, { ...msg, n: e.n }); continue; }                // konuşana ses geri yollanmaz
+    for (let i = 0; i < N - 1; i++) sendTo(id, { t: 'voice', k: 'part', id: e.id, data: e.data.slice(i * PL, (i + 1) * PL) });
+    sendTo(id, { ...msg, mime: e.mime, data: e.data.slice((N - 1) * PL) });
+  }
   hv.log.push({ id: e.id, from: e.from, at: Date.now(), ms: Math.round(ms), waited: Math.round(now - e.t0), urgent: e.urgent, floor, telsiz: e.telsiz, rate, dur: e.dur }); if (hv.log.length > 300) hv.log.shift();
 }
 function hvForget(id, gone, now) { // oyuncu çıktı ya da rolü değişti
@@ -1343,7 +1363,7 @@ function hvForget(id, gone, now) { // oyuncu çıktı ya da rolü değişti
   if (hv.cur && hv.cur.from === id) { broadcast({ t: 'voice', k: 'stop', id: hv.cur.id, why: gone ? 'ayrildi' : 'rol' }); hv.cur = null; hv.nextAt = now + VOX.gapMs; }
   if (hv.floor && (hv.floor.id === id || hv.floor.by === id)) hv.floor = null;   // söz sahibi ya da sözü veren İŞARETÇİ gitti / rol değiştirdi
   delete hv.rec[id]; delete hv.hands[id];
-  if (gone) { delete hv.noMic[id]; delete hv.urgentAt[id]; delete hv.lim[id]; delete hv.roles[id]; }
+  if (gone) { delete hv.noMic[id]; delete hv.urgentAt[id]; delete hv.lim[id]; delete hv.roles[id]; delete hv.parts[id]; }
   hv.dirty = true;
 }
 function hvTick() {
