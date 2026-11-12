@@ -1,6 +1,6 @@
 'use strict';
 // İfade: TEKRAR emojisi (8), İŞARETÇİ pankartı, emoji sesi spam sınırı, tek seferlik avatar şakaları (avatarFx / {t:'fx'}).
-const H = require('../harness');
+const H = require('../harness'); require('../a-lib');
 const frames = (c, n = 3) => c.eval(n => new Promise(r => { const f = () => (n-- > 0 ? requestAnimationFrame(f) : r()); f(); }), n);
 const idOf = c => c.tb(T => T.net.peer.id);
 const fxOf = (c, id, kind) => c.tb((T, [id, kind]) => T.fxLog.filter(f => f.id === id && (!kind || f.kind === kind)), [id, kind]);
@@ -94,6 +94,7 @@ H.run('express', async t => {
   t.eq('ördek şakası 1.2 sn içinde temizlendi', await byRole.reader.tb(T => T.fxObjs.length), 0);
   await fl.unpin();
   for (const c of clients) await c.tb(T => { T.fxLog.length = 0; });
+  await byRole.defuser.moveTo([10.3, 0, -2], { pin: true }); await t.sleep(300);   // erişim denetimi: sembol panosunun yanında
   await byRole.defuser.act('key', { i: P.layout.indexOf(P.order[1]) });   // yanlış sembol → hata
   await H.waitAll(clients, () => window.__tb.game.strikes === 2, 6000);
   await t.sleep(150);
