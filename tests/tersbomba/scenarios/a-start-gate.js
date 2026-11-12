@@ -33,7 +33,7 @@ H.run('a-start-gate', async t => {
   t.check('düğme açıldı', s.dis === false, s);
   const P = await H.startGame(host, { diff: 'normal' });
   t.check('3 kişilik tur başladı', (await host.state()).status === 'playing');
-  t.check('3 rolde fare paneli ve lazer yok, labirent var', !P.mods.includes('mouse') && !P.mods.includes('laser') && P.mods.includes('maze'), P.mods);
+  t.check('3 rolde fare paneli, tünel ve lazer yok', !P.mods.includes('mouse') && !P.mods.includes('laser') && !P.mods.includes('maze'), P.mods);
   t.eq('3 rolde bilgi sahipleri (sembol: floater, ördek: reader)', [P.keypadInfo, P.duckInfo], ['floater', 'reader']);
 
   t.step('antrenman (tek kişi) muaf');

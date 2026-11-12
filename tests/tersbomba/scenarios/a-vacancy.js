@@ -64,17 +64,17 @@ H.run('a-vacancy', async t => {
   await leave(R.defuser);
   await H.waitAll(alive(), () => window.__tb.game.frozen === true, 20000);
   await g('T.hostR().vac.defuser.left = 1.5');
-  await H.waitAll(alive(), () => ['wires', 'button', 'maze'].every(m => window.__tb.game.solved[m] && window.__tb.game.auto.includes(m)) && window.__tb.game.frozen === false, 10000);
+  await H.waitAll(alive(), () => ['wires', 'button'].every(m => window.__tb.game.solved[m] && window.__tb.game.auto.includes(m)) && window.__tb.game.frozen === false, 10000);
   s = await H.converge(alive());
   t.check('oyun sürüyor, hata yok', s.status === 'playing' && s.strikes === 0, s);
-  t.eq('otomatik kapananlar', (await g('T.game.auto')).slice().sort(), ['button', 'laser', 'maze', 'wires']);
+  t.eq('otomatik kapananlar', (await g('T.game.auto')).slice().sort(), ['button', 'laser', 'wires']);
   await t.sleep(400);
   t.check('sigortada yanan renkler YERÇEKİMSİZ\'in notunda', /yanan renkler/.test(await fl.page.textContent('#secret')));
 
   t.step('3b) kalan 3 kişi kalan modülleri çözer ve kazanır');
   const R3 = { reader: host, floater: fl, tiny: R.tiny };
   t.check('şifre ipucu TERS SES\'in notuna geçti', /Şifre ipucu/.test(await host.page.textContent('#secret')));
-  for (const mod of ['password', 'fuse', 'ducks', 'mouse', 'keys']) {
+  for (const mod of ['password', 'maze', 'fuse', 'ducks', 'mouse', 'keys']) {
     await A.solve(R3, mod, P);
     const ok = await H.waitAll(alive(), m => window.__tb.game.solved[m] === true, 10000, mod).then(() => true, e => e.message);
     t.check(`${mod} çözüldü`, ok === true, ok);
@@ -84,7 +84,7 @@ H.run('a-vacancy', async t => {
   const won = await H.waitAll(alive(), () => window.__tb.game.status === 'won', 15000).then(() => true, e => e.message);
   t.check('kalan 3 kişi turu kazandı', won === true, won);
   const sc = await host.tb(T => ({ solved: Object.values(T.game.solved).filter(Boolean).length, auto: T.game.auto.length }));
-  t.eq('10 modül kapalı, 4\'ü otomatik', sc, { solved: 10, auto: 4 });
+  t.eq('10 modül kapalı, 4\'ü otomatik', sc, { solved: 10, auto: 3 });
   t.eq('oda sahibinde yakalanan istisna yok', (await g('T.hostDiag')).caught, 0);
   t.noErrors(alive());
 }, { timeout: 480000 });

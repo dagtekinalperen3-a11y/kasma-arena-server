@@ -17,7 +17,7 @@ H.run('a-authority', async t => {
   await A.go(R.tiny, [0, 0.92, 0.3]); await R.tiny.act('dial', { i: 0 });                          // masanın ÜSTÜNDE
   await A.go(R.pointer, A.SPOT.far); await R.pointer.act('turnKey', { i: 0 });
   await A.go(R.floater, [-11, 0.3, 9]); await R.floater.act('duck', { i: P.ducks.gold[0] });
-  await A.go(R.defuser, A.SPOT.far); await R.defuser.act('maze', { i: P.maze.safe[0] });           // labirente basmadan adım beyanı
+  await A.go(R.tiny, A.SPOT.far); await R.tiny.act('maze', { i: P.maze.safe[0] });           // labirente basmadan adım beyanı
   await R.defuser.act('btnDown'); await R.defuser.act('btnUp');
   await sync(R.defuser); await t.sleep(400);
   const fuse0 = P.fuseStart[0];
@@ -29,7 +29,7 @@ H.run('a-authority', async t => {
   await A.go(R.tiny, A.SPOT.mouse); await A.act(R.tiny, 'dial', { i: 0 });
   await H.waitAll(clients, f => window.__tb.game.fuse[0] === !f && window.__tb.game.mouseDial[0] === 1, 8000, fuse0);
   t.check('sigorta ve fare paneli tepki verdi (5 istemcide)', true);
-  await A.go(R.defuser, A.tilePos(P.maze.safe[0])); await A.act(R.defuser, 'maze', { i: P.maze.safe[0] });
+  await A.go(R.tiny, A.tilePos(P.maze.safe[0])); await A.act(R.tiny, 'maze', { i: P.maze.safe[0] });
   await host.waitFor(() => window.__tb.game.mazeVisited.length === 1, 5000);
   t.eq('labirent: karenin üstündeyken adım sayıldı, ceza yok', await g('[T.game.mazeVisited.length, T.game.mazeFails]'), [1, 0]);
 

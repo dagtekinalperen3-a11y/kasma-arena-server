@@ -54,7 +54,7 @@ const SOLVERS = {
     for (let i = 0; i < 3; i++) for (let n = (P.mouseCode[i] - mouseDial[i] + 10) % 10; n > 0; n--) await act(c, 'dial', { i });
     await act(c, 'dialOk');
   },
-  async maze(R, P) { for (const i of P.maze.safe) { await go(R.defuser, tilePos(i)); await act(R.defuser, 'maze', { i }); } },
+  async maze(R, P) { const c = R.tiny; await c.tb(T => { if (T.net.solo && T.myRole() !== 'tiny') T.setRole('tiny'); }); for (const i of P.maze.safe) { await go(c, tilePos(i)); await act(c, 'maze', { i }); } },
   async laser(R, P) {
     const c = R.pointer;
     await c.tb(T => { if (T.net.solo && T.myRole() !== 'pointer') T.setRole('pointer'); });

@@ -400,8 +400,8 @@ body.nofx #timer.panic,body.nofx .score .rec,body.nofx #players .p.talk::after{a
   <h3>🐭 MİNİK</h3>
   <ul><li>Fare boyundasın, hızlısın, sesin <b>cik cik</b> çıkar. Masanın altına sadece sen girebilirsin.</li>
   <li>🐭 <b>Fare paneli</b> masanın altında: kodu İŞARETÇİ'den (yoksa TERS SES'ten) öğren, kutulara tıklayıp <b>TAMAM</b>'a bas.</li></ul>
-  <h3>🧭 Labirent &amp; 🔑 Çift Anahtar</h3>
-  <ul><li>🧭 <b>Labirent</b> (kuzeydoğu köşe, yerde): güvenli kareleri sadece YERÇEKİMSİZ görür, TERS TUŞ karışık tuşlarıyla o karelerden yürür. Yanlış kare = labirent sıfırlanır, −8 saniye.</li>
+  <h3>🧭 Bakım Tüneli &amp; 🔑 Çift Anahtar</h3>
+  <ul><li>🧭 <b>Bakım Tüneli</b> (kuzeydoğu köşe): ızgaralı alçak kanala yalnız MİNİK sığar; güvenli kareleri YERÇEKİMSİZ üstten görüp kare adıyla (A1, B2…) tarif eder. Yanlış kare = tünel sıfırlanır, −8 saniye. Dipteki pano lazer sırasını verir.</li>
   <li>🔑 <b>Çift Anahtar</b>: batı ve doğu duvarındaki iki anahtarı iki farklı kişi <b>aynı anda</b> çevirmeli. "3, 2, 1, ÇEVİR!"</li>
   <li>🎯 <b>Lazer Kilidi</b> (5 kişiyken): duvarlardaki 4 renkli sensörü İŞARETÇİ lazerle doğru sırada vurur; sırayı sadece MİNİK bilir.</li>
   <li>🏁 <b>Büyük final</b>: tüm modüller bitince herkes aynı anda bombanın çevresindeki kendi renkli plakasına basmalı.</li>
@@ -639,7 +639,7 @@ const plateOf = r => { const a = LOBBY_ORDER.indexOf(r) / 5 * Math.PI * 2 + 0.3;
 const MOD_INFO = {
   wires: { name: 'Kablolar', icon: '✂️', ic: 'wires' }, button: { name: 'Düğme', icon: '🔴', ic: 'button' }, keypad: { name: 'Semboller', icon: '🔣', ic: 'keypad' },
   password: { name: 'Şifre', icon: '🔤', ic: 'password' }, fuse: { name: 'Sigorta', icon: '⚡', ic: 'fuse' }, ducks: { name: 'Ördek Avı', icon: '🦆', ic: 'ducks' }, mouse: { name: 'Fare Paneli', icon: '🐭', ic: 'mouse' },
-  maze: { name: 'Labirent', icon: '🧭', ic: 'maze' }, keys: { name: 'Çift Anahtar', icon: '🔑', ic: 'keys' }, laser: { name: 'Lazer Kilidi', icon: '🎯', ic: 'laser' },
+  maze: { name: 'Bakım Tüneli', icon: '🧭', ic: 'maze' }, keys: { name: 'Çift Anahtar', icon: '🔑', ic: 'keys' }, laser: { name: 'Lazer Kilidi', icon: '🎯', ic: 'laser' },
 };
 // Modül tablosu (tek kaynak). apply = modüle dokunabilen rol · needs = bilgisi/kuralı şart olan roller (yoksa modül o tura girmez)
 // chain = gizli bilgiyi tutacak rol sırası: ilk mevcut olan tutar ve bulmacada P[info] alanına yazılır
@@ -652,7 +652,7 @@ const MOD_NEEDS = {
   fuse:     { apply: 'floater', needs: ['defuser'] },                                     // yanan renkleri TERS TUŞ görür
   ducks:    { apply: 'floater', info: 'duckInfo', chain: ['pointer', 'tiny', 'reader'] },
   mouse:    { apply: 'tiny',    info: 'mouseInfo', chain: ['pointer', 'reader'] },
-  maze:     { apply: 'defuser', needs: ['floater'] },                                     // güvenli yolu YERÇEKİMSİZ görür
+  maze:     { apply: 'tiny',    needs: ['floater'] },                                     // Bakım Tüneli: MİNİK yürür, güvenli planı YERÇEKİMSİZ üstten görür
   laser:    { apply: 'pointer', needs: ['tiny'] },                                        // renk sırası MİNİK'te
   keys:     { apply: 'any' },
 };
@@ -677,7 +677,8 @@ const MUTS = {
   ayna:   { name: 'Ayna Dünya',     icon: '🪞', desc: 'Ekranın sağı solu yer değiştirir' },
   telsiz: { name: 'Telsiz Disiplini', icon: '📻', desc: 'Söz birindeyken araya giren kayıtlar cızırtılı gider' },
 };
-// Labirent: yerdeki kareler (kuzeydoğu köşe). Yolu sadece YERÇEKİMSİZ görür, sadece TERS TUŞ yürür.
+// Bakım Tüneli: kuzeydoğu köşede, yalnız MİNİK'in sığdığı alçak ızgaralı kanal. Planı YERÇEKİMSİZ üstten görür, MİNİK yürür.
+const TUN = { roofY: 0.62, top: 0.72 };
 const MZ = { cols: 5, rows: 4, s: 1.2, x0: 3.2, z0: -4.2 };
 const mazeTileAt = p => { const c = Math.floor((p.x - MZ.x0) / MZ.s), r = Math.floor((MZ.z0 - p.z) / MZ.s); return c >= 0 && c < MZ.cols && r >= 0 && r < MZ.rows ? r * MZ.cols + c : -1; };
 const mazeAdj = (a, b) => { const ra = a / MZ.cols | 0, ca = a % MZ.cols, rb = b / MZ.cols | 0, cb = b % MZ.cols; return Math.abs(ra - rb) + Math.abs(ca - cb) <= 1; };
@@ -1812,7 +1813,7 @@ function hostAction(m, from) {
     if (game.mazeVisited.includes(i)) { game.mazeAt = i; return; }
     const ok = P.maze.safe.includes(i) && (game.mazeAt < 0 ? i < MZ.cols : mazeAdj(game.mazeAt, i));
     if (ok) { game.mazeVisited.push(i); game.mazeAt = i; if (i >= MZ.cols * (MZ.rows - 1)) S.maze = true; }
-    else { game.mazeVisited = []; game.mazeAt = -1; game.mazeFails++; hostTime(-8, P.maze.safe.includes(i) ? '🧭 Labirentte kare atlanmaz! Baştan.' : '🧭 Yanlış kare! Labirent sıfırlandı.'); }
+    else { game.mazeVisited = []; game.mazeAt = -1; game.mazeFails++; hostTime(-8, P.maze.safe.includes(i) ? '🧭 Tünelde kare atlanmaz! Baştan.' : '🧭 Yanlış kare! Tünel sıfırlandı.'); }
   } else if (m.a === 'turnKey' && S.keys === false) {
     const k = m.i ? 1 : 0; game.keyArm[k] = P.keyWin; game.keyBy[k] = from;
     if (game.keyArm[0] > 0 && game.keyArm[1] > 0 && (game.keyBy[0] !== game.keyBy[1] || P.nPlayers <= 1)) S.keys = true;
@@ -2507,6 +2508,7 @@ function buildRound() {
   interactables = [];
   const P = game.puzzle, has = m => P.mods.includes(m);
   for (const k of Object.keys(M)) delete M[k]; // önceki turdan kalanları temizle
+  for (let i = colliders.length - 1; i >= 0; i--) if (colliders[i].round) colliders.splice(i, 1);   // tura özel çarpışma kutuları (tünel)
   M.lamps = {}; M.lamps2 = {};
   phoneBase.userData = { kind: 'phone', mod: 'phone', baseEm: 0 }; couchDuckHit.userData = { kind: 'egg', mod: 'egg', noCast: true };
   interactables.push(phoneBase, couchDuckHit);
@@ -2700,21 +2702,43 @@ function buildRound() {
     M.lamps.mouse = add(new THREE.SphereGeometry(0.05, 14, 10), new THREE.MeshStandardMaterial({ color: 0x440000, emissive: 0xff2020, emissiveIntensity: 2.5 }), 0.42, 0.19, 0.04, mp);
   }
 
-  // ================= LABİRENT (yerde; TERS TUŞ yürür, yolu YERÇEKİMSİZ görür) =================
+  // ================= BAKIM TÜNELİ (alçak ızgaralı kanal; MİNİK yürür, planı YERÇEKİMSİZ üstten görür) =================
   if (has('maze')) {
     const mz = new THREE.Group(); roundGroup.add(mz);
-    const cx = MZ.x0 + MZ.cols * MZ.s / 2, cz = MZ.z0 - MZ.rows * MZ.s / 2;
-    add(new THREE.BoxGeometry(MZ.cols * MZ.s + 0.3, 0.02, MZ.rows * MZ.s + 0.3), std(0x14161f, { metalness: 0.6, roughness: 0.4 }), cx, 0.012, cz, mz).userData.noCast = true;
+    const W = MZ.cols * MZ.s, D = MZ.rows * MZ.s, cx = MZ.x0 + W / 2, cz = MZ.z0 - D / 2, zN = MZ.z0 - D;
+    const steel = std(0x2a2f36, { metalness: 0.7, roughness: 0.4 });
+    add(new THREE.BoxGeometry(W + 0.3, 0.02, D + 0.3), std(0x14161f, { metalness: 0.6, roughness: 0.4 }), cx, 0.012, cz, mz).userData.noCast = true;
     M.mazeTiles = [];
     for (let i = 0; i < MZ.cols * MZ.rows; i++) {
-      const r = i / MZ.cols | 0, c = i % MZ.cols;
-      const t = add(rbox(MZ.s - 0.1, 0.04, MZ.s - 0.1, 0.015), new THREE.MeshStandardMaterial({ color: 0x3a4058, roughness: 0.45, metalness: 0.3, emissive: 0x000000, emissiveIntensity: 1.5 }), MZ.x0 + (c + 0.5) * MZ.s, 0.035, MZ.z0 - (r + 0.5) * MZ.s, mz);
+      const r = i / MZ.cols | 0, c = i % MZ.cols, tx = MZ.x0 + (c + 0.5) * MZ.s, tz = MZ.z0 - (r + 0.5) * MZ.s;
+      const t = add(rbox(MZ.s - 0.1, 0.04, MZ.s - 0.1, 0.015), new THREE.MeshStandardMaterial({ color: 0x3a4058, roughness: 0.45, metalness: 0.3, emissive: 0x000000, emissiveIntensity: 1.5 }), tx, 0.035, tz, mz);
       t.userData.noCast = true; M.mazeTiles.push(t);
+      // kare adı (A1…E4): hem içeriden MİNİK hem üstten YERÇEKİMSİZ okur
+      const lb = add(new THREE.PlaneGeometry(0.62, 0.42), new THREE.MeshBasicMaterial({ map: textTex(['ABCDE'[c] + (r + 1)], { w: 128, h: 88, size: 76, bg: 'none', fg: '#cfd6e6' }), transparent: true, depthWrite: false }), tx, 0.058, tz, mz);
+      lb.rotation.x = -Math.PI / 2; lb.userData.noCast = lb.userData.laserSkip = true;
     }
-    const inS = add(new THREE.PlaneGeometry(4.2, 0.6), new THREE.MeshBasicMaterial({ map: textTex(['▲  GİRİŞ  ▲'], { w: 768, h: 110, size: 78, bg: '#ffd23f', fg: '#111', radius: 30 }), transparent: true }), cx, 0.016, MZ.z0 + 0.5, mz);
+    // ızgara tavan (üstünde durulur, içinden görülür) + üç yanda alçak duvar; giriş güneyde
+    const grate = canvasTex(256, 256, x => { x.clearRect(0, 0, 256, 256); x.strokeStyle = 'rgba(190,198,210,.95)'; x.lineWidth = 7; for (let k = 0; k <= 256; k += 64) { x.beginPath(); x.moveTo(k, 0); x.lineTo(k, 256); x.stroke(); x.beginPath(); x.moveTo(0, k); x.lineTo(256, k); x.stroke(); } }, { repeat: [MZ.cols * 2, MZ.rows * 2] });
+    const roof = add(new THREE.PlaneGeometry(W, D), new THREE.MeshBasicMaterial({ map: grate, transparent: true, side: THREE.DoubleSide, depthWrite: false }), cx, TUN.top - 0.02, cz, mz); roof.rotation.x = -Math.PI / 2; roof.userData.noCast = roof.userData.laserSkip = true;
+    for (let c = 0; c <= MZ.cols; c++) add(new THREE.BoxGeometry(0.07, 0.07, D), steel, MZ.x0 + c * MZ.s, TUN.top - 0.035, cz, mz);
+    for (let r = 0; r <= MZ.rows; r++) add(new THREE.BoxGeometry(W, 0.07, 0.07), steel, cx, TUN.top - 0.035, MZ.z0 - r * MZ.s, mz);
+    for (const [bw, bd, bx, bz] of [[0.1, D, MZ.x0 - 0.05, cz], [0.1, D, MZ.x0 + W + 0.05, cz], [W + 0.2, 0.1, cx, zN - 0.05]]) {
+      add(new THREE.BoxGeometry(bw, TUN.top, bd), steel, bx, TUN.top / 2, bz, mz);
+      colliders.push({ round: true, min: new THREE.Vector3(bx - bw / 2, 0, bz - bd / 2), max: new THREE.Vector3(bx + bw / 2, TUN.top, bz + bd / 2) });
+    }
+    colliders.push({ round: true, min: new THREE.Vector3(MZ.x0, TUN.roofY, zN), max: new THREE.Vector3(MZ.x0 + W, TUN.top, MZ.z0) });   // tavan: yalnız MİNİK (boy 0.5) altından geçer
+    add(new THREE.BoxGeometry(W + 0.2, 0.1, 0.12), std(0xf5b800, { roughness: 0.5 }), cx, TUN.top - 0.05, MZ.z0 + 0.06, mz);            // giriş lentosu
+    const inS = add(new THREE.PlaneGeometry(4.2, 0.6), new THREE.MeshBasicMaterial({ map: textTex(['▲  MİNİK GİRİŞİ  ▲'], { w: 768, h: 110, size: 74, bg: '#ffd23f', fg: '#111', radius: 30 }), transparent: true }), cx, 0.016, MZ.z0 + 0.5, mz);
     inS.rotation.x = -Math.PI / 2; inS.userData.noCast = true;
-    add(new THREE.PlaneGeometry(3.6, 0.9), new THREE.MeshBasicMaterial({ map: textTex(['LABİRENT'], { w: 768, h: 192, size: 104, bg: 'none', fg: '#ffffff', glow: '#18b8d8', stroke: '#18b8d8', strokeW: 6 }), transparent: true, toneMapped: false }), cx, 2.75, -HZ + 0.05, mz).userData.noCast = true;
-    add(new THREE.PlaneGeometry(4.4, 0.55), new THREE.MeshStandardMaterial({ map: textTex(['Sadece TERS TUŞ yürür · güvenli kareleri YERÇEKİMSİZ görür', 'Yanlış kare ya da kare atlamak = −8 saniye'], { w: 1024, h: 128, size: [34, 30], bg: '#1d2a3a', fg: ['#fff', '#ffd23f'], radius: 20 }), roughness: 0.6 }), cx, 2.05, -HZ + 0.05, mz).userData.noCast = true;
+    // üstten okunan sütun harfleri ve satır numaraları
+    for (let c = 0; c < MZ.cols; c++) { const m = add(new THREE.PlaneGeometry(0.5, 0.5), new THREE.MeshBasicMaterial({ map: textTex(['ABCDE'[c]], { w: 96, h: 96, size: 80, bg: '#f5b800', fg: '#111', radius: 18 }) }), MZ.x0 + (c + 0.5) * MZ.s, TUN.top + 0.012, MZ.z0 + 0.42, mz); m.rotation.x = -Math.PI / 2; m.userData.noCast = true; }
+    for (let r = 0; r < MZ.rows; r++) { const m = add(new THREE.PlaneGeometry(0.5, 0.5), new THREE.MeshBasicMaterial({ map: textTex([String(r + 1)], { w: 96, h: 96, size: 80, bg: '#f5b800', fg: '#111', radius: 18 }) }), MZ.x0 - 0.42, TUN.top + 0.012, MZ.z0 - (r + 0.5) * MZ.s, mz); m.rotation.x = -Math.PI / 2; m.userData.noCast = true; }
+    // tünelin dibindeki pano: tünel geçilince yanar, yalnız MİNİK okur (lazer sırası)
+    const seqTxt = has('laser') ? P.laserSeq.map((i, k) => `${k + 1}.${LSR[i].n.toUpperCase()}`).join('  ') : 'HAT AÇIK';
+    M.tunSign = add(new THREE.PlaneGeometry(W - 0.4, 0.46), new THREE.MeshBasicMaterial({ map: textTex([has('laser') ? 'LAZER SIRASI' : 'BAKIM TAMAM', seqTxt], { w: 1024, h: 180, size: [44, 78], bg: '#0f1a12', fg: ['#9fd8a0', '#7dff7a'], radius: 16, border: '#2e6b33', bw: 6 }), toneMapped: false }), cx, 0.31, zN + 0.012, mz); M.tunSign.userData.noCast = true;
+    M.tunSignOff = add(new THREE.PlaneGeometry(W - 0.4, 0.46), new THREE.MeshBasicMaterial({ map: textTex(['PANO KAPALI', 'son sıraya ulaş'], { w: 1024, h: 180, size: [60, 44], bg: '#1a1010', fg: ['#ff6b6b', '#c9a0a0'], radius: 16 }), toneMapped: false }), cx, 0.31, zN + 0.012, mz); M.tunSignOff.userData.noCast = true;
+    add(new THREE.PlaneGeometry(3.6, 0.9), new THREE.MeshBasicMaterial({ map: textTex(['BAKIM TÜNELİ'], { w: 768, h: 192, size: 100, bg: 'none', fg: '#ffffff', glow: '#18b8d8', stroke: '#18b8d8', strokeW: 6 }), transparent: true, toneMapped: false }), cx, 2.75, -HZ + 0.05, mz).userData.noCast = true;
+    add(new THREE.PlaneGeometry(4.4, 0.55), new THREE.MeshStandardMaterial({ map: textTex(['İçine yalnız MİNİK sığar · güvenli kareleri YERÇEKİMSİZ üstten görür', 'Yanlış kare ya da kare atlamak = −8 saniye'], { w: 1024, h: 128, size: [32, 30], bg: '#1d2a3a', fg: ['#fff', '#ffd23f'], radius: 20 }), roughness: 0.6 }), cx, 2.05, -HZ + 0.05, mz).userData.noCast = true;
     M.lamps.maze = add(new THREE.SphereGeometry(0.11, 18, 14), new THREE.MeshStandardMaterial({ color: 0x440000, emissive: 0xff2020, emissiveIntensity: 2.5 }), cx + 2.15, 2.75, -HZ + 0.12, mz);
   }
   // ================= ÇİFT ANAHTAR (iki duvarda; iki kişi AYNI ANDA çevirmeli) =================
@@ -2825,6 +2849,7 @@ function refreshModules() {
       t.material.emissive.setHex(flash ? 0xff2020 : v ? 0x30ff50 : hint ? 0x18b8d8 : 0x000000); t.material.color.setHex(v ? 0x2a7a35 : 0x3a4058);
     });
   }
+  if (M.tunSign) { M.tunSign.visible = S.maze && role === 'tiny'; M.tunSignOff.visible = !M.tunSign.visible; }
   if (M.lsr) M.lsr.forEach((s, i) => { const lit = S.laser || P.laserSeq.slice(0, game.laserProg).includes(i); s.eye.material.emissiveIntensity = lit ? 4 : 0.35; s.eye.material.color.setHex(lit ? BTN_HEX[LSR[i].c] : 0x1a1a1a); });
   if (M.plates) {
     const need = [...new Set(Object.values(players).map(p => p.role).filter(r => r !== 'none'))], on = game.final ? game.final.on : [];
@@ -2896,7 +2921,7 @@ function applyState(g, why, fx) {
   if (g.final && !prev.final) { sfx.go(); toast('Tüm modüller tamam! SON ADIM: herkes bombanın çevresindeki kendi plakasına!', 'good'); bombSay('final'); }
   if (g.laserProg > prev.laserProg) sfx.bonus();
   if (g.mazeFails > prev.mazeFails) {
-    if (myRole() === 'defuser') { me.pos.set(MZ.x0 + MZ.cols * MZ.s / 2, 0, MZ.z0 + 1.0); me.vel.set(0, 0, 0); }
+    if (myRole() === 'tiny') { me.pos.set(MZ.x0 + MZ.cols * MZ.s / 2, 0, MZ.z0 + 1.0); me.vel.set(0, 0, 0); }
     lastMazeTile = -1; mazeFlash = performance.now() + 450; setTimeout(refreshModules, 480);
   }
   const ks = JSON.stringify(g.keymap);
@@ -3326,7 +3351,7 @@ function updateMe(dt) {
     if (chaos === 'buz') { v.x += (dir.x - v.x) * Math.min(1, dt * 0.9); v.z += (dir.z - v.z) * Math.min(1, dt * 0.9); }
     else { v.x = dir.x; v.z = dir.z; }
     const grav = chaos === 'ay' ? 4 : 20;
-    if (active && keys.Space && me.onGround) { v.y = (chaos === 'ay' ? 6 : 6.6) * (role === 'tiny' ? 0.62 : 1); me.onGround = false; sfx.boing(); }
+    if (active && keys.Space && me.onGround && !(role === 'tiny' && game.puzzle.mods.includes('maze') && mazeTileAt(p) >= 0)) { /* tünelin içinde zıplanmaz */ v.y = (chaos === 'ay' ? 6 : 6.6) * (role === 'tiny' ? 0.62 : 1); me.onGround = false; sfx.boing(); }
     v.y -= grav * dt;
     p.x += v.x * dt; p.z += v.z * dt;
     collide(p, v, false);
@@ -3338,7 +3363,8 @@ function updateMe(dt) {
     if (me.onGround && hs > 0.5) { me.bob += dt * hs * 2.4; me.stepT -= dt * hs; if (me.stepT <= 0) { me.stepT = 1.6; sfx.step(); } }
   }
   // labirent: TERS TUŞ'un bastığı kareyi bildir
-  if (role === 'defuser' && me.onGround && canPlay() && game.countdown <= 0 && game.puzzle.mods.includes('maze') && !game.solved.maze) {
+  if (role === 'tiny' && game && game.puzzle.mods.includes('maze')) { const inT = mazeTileAt(p) >= 0 && p.y < 0.3; if (me.inTunnel && !inT && game.solved.maze && !me.tumbled) { me.tumbled = true; sendFx('tumble'); } me.inTunnel = inT; }   // tünelden çıkışta kısa takla
+  if (role === 'tiny' && me.onGround && canPlay() && game.countdown <= 0 && game.puzzle.mods.includes('maze') && !game.solved.maze) {
     const t = mazeTileAt(p);
     if (t !== lastMazeTile) { lastMazeTile = t; if (t >= 0) { tone(520 + (t / MZ.cols | 0) * 110, 0.09, { type: 'triangle', vol: 0.12 }); sendToHost({ t: 'act', a: 'maze', i: t }); } }
   }
@@ -3787,8 +3813,7 @@ function myTasks() {
   const info = t => T.push({ t, info: true });
   if (game.final) T.push({ t: '<b>SON ADIM</b> — bombanın çevresindeki kendi renkli plakana bas, herkes aynı anda!', done: false });
   if (r === 'defuser') {
-    mod('wires', 'kuzey duvarı'); mod('button', 'masadaki bomba'); mod('keypad', 'doğu duvarı'); mod('maze', 'kuzeydoğu köşe, yerde');
-    if (has('maze')) info(`🧭 Labirentin güvenli karelerini ${WHO('floater')} görüyor. Kare atlama, zıplama!`);
+    mod('wires', 'kuzey duvarı'); mod('button', 'masadaki bomba'); mod('keypad', 'doğu duvarı');
     if (has('password')) info(`🔤 Bombanın yanındaki ŞİFRE İPUCU'nu ${WHO('reader')}'e söyle`);
     info(`🗣️ Yürüme tuşlarını ${WHO('reader')} biliyor (tersten söyleyecek 😂)`);
     if (has('fuse')) info(`⚡ Bombanın yanındaki SİGORTA ışıklarını ${WHO('floater')}'e söyle`);
@@ -3796,7 +3821,7 @@ function myTasks() {
   } else if (r === 'floater') {
     mod('fuse', 'doğu duvarı, tavana yakın'); mod('ducks', 'lambaların ve boruların üstünde');
     info('🔢 Seri no: batı duvarında yüksek rafta (yeşil ok)');
-    if (has('maze')) info('🧭 Labirentte turkuaz parlayan kareler güvenli yol → TERS TUŞ\'a adım adım tarif et');
+    if (has('maze')) info('🧭 Bakım Tüneli (kuzeydoğu): üstünden bak, turkuaz parlayan kareler güvenli → MİNİK\'e kare adlarıyla tarif et (A1, B1…)');
     if (has('keypad') && P.keypadInfo === 'floater') info('🔣 Sembol sırası tavanda yazıyor → TERS TUŞ\'a söyle');
     if (has('ducks')) info(`🦆 Hangi ördekler altın? ${WHO(P.duckInfo)} biliyor. Sahte ördek = hata!`);
   } else if (r === 'reader') {
@@ -3815,6 +3840,8 @@ function myTasks() {
     if (has('laser')) info(`🎯 Sensörlerin sırasını ${WHO('tiny')} biliyor`);
     info('✅ <kbd>6</kbd> Evet · ❌ <kbd>7</kbd> Hayır');
   } else if (r === 'tiny') {
+    mod('maze', 'kuzeydoğu köşe; ızgaralı tünele sadece sen sığarsın');
+    if (has('maze')) info(`🧭 Tünelde güvenli kareleri ${WHO('floater')} üstten görüyor; kare atlama!`);
     mod('mouse', 'MASANIN ALTINDA! (sadece sen sığarsın)');
     info(`🔢 Kodu ${WHO(P.mouseInfo)} biliyor`);
     info('🐭 Sesin incecik, bol bol konuş!');
@@ -3839,7 +3866,8 @@ function renderSecret() {
   if (P.serialInfo === r && r !== 'floater' && (has('wires') || has('button')) && !(game.solved.wires && game.solved.button)) L.push(`🔢 Seri no (YERÇEKİMSİZ yok)<div class="big"><span>${esc(P.serial)}</span></div>`);
   if (has('maze') && P.mazeInfo === r && r !== 'floater' && !game.solved.maze) L.push('🧭 Labirentin güvenli kareleri artık <b>sana</b> turkuaz parlıyor.');
   if (has('fuse') && P.fuseInfo === r && r !== 'defuser' && !game.solved.fuse) L.push(`⚡ Bombada yanan renkler (TERS TUŞ yok)<div class="big">${P.fuseOn.map(c => `<span style="border-bottom:5px solid ${hexCss(BTN_HEX[c])}">${TR[c]}</span>`).join(' ')}</div>`);
-  if (has('laser') && (P.laserInfo || 'tiny') === r) L.push(`Lazer sensör sırası${game.solved.laser ? ' ✅' : ''}<div class="big">${P.laserSeq.map((i, k) => `<span style="border-bottom:5px solid ${hexCss(BTN_HEX[LSR[i].c])}">${k + 1}. ${LSR[i].n}</span>`).join(' ')}</div>`);
+  if (has('laser') && (P.laserInfo || 'tiny') === r && r === 'tiny' && has('maze') && !game.solved.maze) L.push('Lazer sensör sırası <b>tünelin dibindeki panoda</b>. Önce tüneli geç!');
+  else if (has('laser') && (P.laserInfo || 'tiny') === r) L.push(`Lazer sensör sırası${game.solved.laser ? ' ✅' : ''}<div class="big">${P.laserSeq.map((i, k) => `<span style="border-bottom:5px solid ${hexCss(BTN_HEX[LSR[i].c])}">${k + 1}. ${LSR[i].n}</span>`).join(' ')}</div>`);
   if (has('password') && P.pwInfo === r && r !== 'defuser' && P.pw && P.pw.clue) L.push(`Şifre ipucu${game.solved.password ? ' ✅' : ''}<div class="big"><span>${P.pw.clue.pos + 1}. harf: ${P.pw.clue.ch}</span></div>`);
   el.classList.toggle('hidden', !L.length);
   el.innerHTML = '<div class="small">SADECE SEN BİLİYORSUN</div>' + L.join('<hr>');
@@ -3918,11 +3946,11 @@ const MANUAL = {
     <ol><li>Altın olanları sadece <b>${holdsTxt(game.puzzle.duckInfo)}</b> görür: parlıyorlar.</li><li><b>YERÇEKİMSİZ</b> uçup ördeğe tıklayarak yakalar.</li><li>Sahte ördek yakalamak = hata (ve çok utanç verici bir VAK sesi).</li></ol>`,
   mouse: () => `<h2>🐭 FARE PANELİ</h2><p>Masanın <b>altında</b> küçük bir panel var. Oraya sadece <b>MİNİK</b> sığar.</p>
     <ol><li>3 haneli kodu <b>${holdsTxt(game.puzzle.mouseInfo)}</b> biliyor${game.puzzle.mouseInfo === 'pointer' ? ' (panodaki rakamları lazerle gösterir)' : game.puzzle.mouseInfo === myRole() ? ' (ekranının sol altında)' : ''}.</li><li>MİNİK her kutuya tıklayarak rakamı 1 artırır, sonra <b>TAMAM</b>'a basar.</li><li>Yanlış kod = hata.</li></ol>`,
-  maze: () => `<h2>🧭 LABİRENT</h2><p>Bu da <b>senin değil</b> ama kuralları sen biliyorsun: kuzeydoğu köşede, yerde 5×4 karelik bir alan var.</p>
-    <ol><li>Güvenli kareleri sadece <b>YERÇEKİMSİZ</b> görür: yukarıdan bakınca turkuaz parlarlar.</li><li><b>TERS TUŞ</b> sarı <b>GİRİŞ</b> çizgisinden girip güvenli karelerden yürüyerek en arka sıraya ulaşmalı. Evet, karışık tuşlarla. 😈</li><li>Yanlış kareye basmak ya da kare <b>atlamak</b> (zıplamak yok!) → labirent sıfırlanır ve <b>8 saniye</b> gider. Hata sayılmaz.</li></ol>
-    <div class="tip">YERÇEKİMSİZ "bir ileri, iki sağ" gibi adım adım tarif etsin. Doğru basılan kareler herkese yeşil yanar.</div>`,
+  maze: () => `<h2>BAKIM TÜNELİ</h2><p>Kuzeydoğu köşede ızgaralı, alçak bir kanal var: içine yalnız <b>MİNİK</b> sığar. Zemini 5×4 kare; sütunlar <b>A–E</b>, satırlar <b>1–4</b> (1 girişe en yakın).</p>
+    <ol><li>Güvenli kareleri yalnız <b>YERÇEKİMSİZ</b> görür: ızgaranın üstünden bakınca turkuaz parlarlar.</li><li><b>MİNİK</b> sarı girişten girer, güvenli karelerden yürüyerek 4. sıraya ulaşır.</li><li>Yanlış kare ya da kare <b>atlamak</b> → tünel sıfırlanır, MİNİK girişe döner, <b>8 saniye</b> gider. Hata sayılmaz.</li><li>Tünel geçilince dipteki pano yanar: <b>lazer sensörlerinin sırası</b> orada yazar. MİNİK okuyup İŞARETÇİ'ye söyler.</li></ol>
+    <div class="tip">YERÇEKİMSİZ kare adıyla tarif etsin: "A1, B1, B2…". Doğru basılan kareler herkese yeşil yanar.</div>`,
   laser: () => `<h2>LAZER KİLİDİ</h2><p>Dört duvarda, yüksekte birer renkli sensör var: <b>kırmızı</b> (kuzey), <b>mavi</b> (doğu), <b>sarı</b> (güney), <b>yeşil</b> (batı).</p>
-    <ol><li>Sensörlere sadece <b>İŞARETÇİ</b>'nin lazeri etki eder: lazeri sensörün üstünde kısa süre tutması yeter.</li><li>Doğru renk sırasını sadece <b>MİNİK</b> bilir (ekranındaki gizli notta). İŞARETÇİ konuşamadığı için sırayı MİNİK söyler.</li><li>Yanlış sensör → kilit sıfırlanır ve <b>6 saniye</b> gider. Hata sayılmaz.</li></ol>
+    <ol><li>Sensörlere sadece <b>İŞARETÇİ</b>'nin lazeri etki eder: lazeri sensörün üstünde kısa süre tutması yeter.</li><li>Doğru renk sırasını sadece <b>MİNİK</b> öğrenir: Bakım Tüneli'ni geçince dipteki panoda yazar. İŞARETÇİ konuşamadığı için sırayı MİNİK söyler.</li><li>Yanlış sensör → kilit sıfırlanır ve <b>6 saniye</b> gider. Hata sayılmaz.</li></ol>
     <div class="tip">MİNİK'in sesi cik cik çıkar. Bol şans.</div>`,
   keys: () => `<h2>🔑 ÇİFT ANAHTAR</h2><p>Batı duvarında <b>ANAHTAR A</b>, doğu duvarında <b>ANAHTAR B</b> var: odanın iki ucundalar.</p>
     <ol><li>İki <b>farklı</b> kişi anahtarları <b>aynı anda</b> çevirmeli (aralarında en fazla ${game.puzzle.keyWin} saniye olabilir).</li><li>İzleyiciler hariç herkes çevirebilir. Zamanlama tutmazsa hata sayılmaz, anahtar geri döner.</li></ol>

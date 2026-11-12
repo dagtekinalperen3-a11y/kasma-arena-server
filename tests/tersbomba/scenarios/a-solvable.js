@@ -35,9 +35,9 @@ H.run('a-solvable', async t => {
   t.check('hepsi çözülebilir', res.bad.length === 0, res.bad);
   t.log('modüller: ' + JSON.stringify(res.mods));
   t.log('bilgi sahipleri (sembol, ördek, fare): ' + JSON.stringify(res.holders));
-  t.eq('3 rol normal: fare/lazer yok', res.mods['3::normal'], 'wires,button,keypad,password,fuse,ducks,maze,keys');
+  t.eq('3 rol normal: fare/tünel/lazer yok', res.mods['3::normal'], 'wires,button,keypad,password,fuse,ducks,keys');
   t.eq('3+MİNİK normal: fare var, lazer yok', res.mods['4:tiny:normal'], 'wires,button,keypad,password,fuse,ducks,mouse,maze,keys');
-  t.eq('3+İŞARETÇİ normal: fare/lazer yok', res.mods['4:pointer:normal'], 'wires,button,keypad,password,fuse,ducks,maze,keys');
+  t.eq('3+İŞARETÇİ normal: fare/tünel/lazer yok', res.mods['4:pointer:normal'], 'wires,button,keypad,password,fuse,ducks,keys');
   t.eq('5 rol normal: 10 modül', res.mods['5:pointer+tiny:normal'].split(',').length, 10);
   t.eq('zincir: 3 rol → floater, reader, (fare yok)', res.holders['3::normal'], 'floater,reader,reader');
   t.eq('zincir: +MİNİK → ördek bilgisi MİNİK, fare kodu TERS SES', res.holders['4:tiny:normal'], 'floater,tiny,reader');
