@@ -227,6 +227,28 @@ kbd{display:inline-block;min-width:22px;text-align:center;padding:0 6px;border-r
 @keyframes cd{from{transform:scale(2.2);opacity:0}30%{opacity:1;transform:scale(1)}to{transform:scale(.8);opacity:.9}}
 #vignette{position:fixed;inset:0;pointer-events:none;z-index:9;background:radial-gradient(ellipse at center,transparent 55%,rgba(229,30,20,.55));opacity:0;transition:opacity .3s}
 #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:12}
+/* ---------- konfor ayarları ---------- */
+body.nofx #flash{display:none}
+body.nofx #timer.panic,body.nofx .score .rec,body.nofx #players .p.talk::after{animation:none}
+#softfade{position:fixed;inset:0;pointer-events:none;z-index:12;background:#140c06;opacity:0;transition:opacity 1.6s}
+#softfade.on{opacity:.6;transition:opacity .35s}
+#strikes.bump{animation:cpop .35s}
+#emotes div.wait{animation:ewait .4s}
+@keyframes ewait{30%{transform:translateX(-3px);background:rgba(229,56,43,.5)}70%{transform:translateX(3px)}}
+#emotes.signs div{width:54px;height:46px;flex-direction:column;font-size:17px;line-height:1;padding-top:3px}
+#emotes.signs div small{font:700 10px var(--body);letter-spacing:.5px;color:var(--paper);margin-top:2px}
+#invMark{position:absolute;left:50%;top:calc(50% - 104px);transform:translateX(-50%);display:flex;align-items:center;gap:10px;padding:7px 16px 5px;background:var(--haz);color:#15120d;border-radius:4px;font:400 20px var(--head);letter-spacing:1.5px;text-transform:uppercase;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+#invMark .ic{font-size:26px}
+#invMark small{font:700 13px var(--body);letter-spacing:1px}
+.seg.tog button{display:grid;grid-template-columns:1fr 38px;align-items:center;font-size:15px;padding:7px 10px 5px}
+.seg.tog button small{grid-column:1}
+.seg.tog button::after{content:"";grid-column:2;grid-row:1/3;width:36px;height:18px;border-radius:10px;background:#000;border:2px solid var(--steel3);box-shadow:inset 14px 0 0 -2px #555;transition:all .15s}
+.seg.tog button.on::after{border-color:var(--haz);box-shadow:inset -14px 0 0 -2px var(--haz)}
+#pause .seg.tog{flex-wrap:nowrap}
+#pause .seg.tog button{flex:1 1 0;min-width:0;font-size:13px;line-height:1.15;padding:6px 8px 4px}
+#pause .seg.tog button small{display:none}
+#pause .setrow{margin:8px 0}
+@media (max-height:640px){#pause h2{font-size:28px}#pause p{margin:4px 0 8px}#pause .btn.big{font-size:20px;padding:10px 20px 8px}#pause .setrow{margin:4px 0}#pause .row{margin:8px 0}#pause .card{padding:18px 24px 12px}}
 /* ---------- kitapçık ---------- */
 #manual{position:absolute;right:14px;top:150px;bottom:44px;width:min(450px,42vw);background:var(--paper);color:#2a2418;border-radius:3px;pointer-events:auto;display:flex;flex-direction:column;box-shadow:0 18px 50px rgba(0,0,0,.65),inset 12px 0 0 #b3261c;font-family:var(--type);overflow:hidden}
 #manual .tabs{display:flex;gap:3px;padding:10px 8px 0 20px;background:var(--paper2);flex-wrap:wrap}
@@ -368,7 +390,7 @@ kbd{display:inline-block;min-width:22px;text-align:center;padding:0 6px;border-r
   <li>Oda sahibi lobide <b>mutatör</b> açabilir (gece vardiyası, ayna dünya, helyum partisi...). Zorlaşır ama puanı artırır.</li>
   <li>Başarımların ve rekorların ana menüdeki <b>🏆 Profil</b>'de durur.</li></ul>
   <h3>😂 Herkes</h3>
-  <ul><li><kbd>1</kbd>-<kbd>7</kbd> emojiler ve danslar (5 = korna 📯, 6 = ✅, 7 = ❌). <kbd>H</kbd> rol kartını gizle/göster. <kbd>ESC</kbd> duraklat/ayarlar.</li>
+  <ul><li><kbd>1</kbd>-<kbd>8</kbd> emojiler ve danslar (5 = korna 📯, 6 = ✅, 7 = ❌, 8 = 🔁 tekrar et). İŞARETÇİ aynı tuşlarla başının üstünde yazılı <b>pankart</b> kaldırır (EVET, HAYIR, TEKRAR, DUR, ACELE, BURAYA). <kbd>H</kbd> rol kartını gizle/göster. <kbd>ESC</kbd> duraklat/ayarlar.</li>
   <li>Kurulum: biri <b>Oda Kur</b> der, kodu diğerlerine söyler, onlar <b>Katıl</b> der. Mikrofon izni sorulunca <b>İzin Ver</b>.</li></ul>
 </div></div>
 
@@ -380,6 +402,9 @@ kbd{display:inline-block;min-width:22px;text-align:center;padding:0 6px;border-r
   <div class="setrow"><span>Müzik</span><input type="range" id="sMusic" min="0" max="1" step="0.05"><span id="sMusicV"></span></div>
   <div class="setrow"><span>Fare hassasiyeti</span><input type="range" id="sSens" min="0.3" max="3" step="0.1"><span id="sSensV"></span></div>
   <div class="setrow"><span>Görüş açısı</span><input type="range" id="sFov" min="60" max="100" step="1"><span></span></div>
+  <div class="label">Konfor <span>— sadece görüntüyü değiştirir, oyunun kuralları aynı kalır</span></div>
+  <div class="setrow"><span>Kamera sarsıntısı</span><input type="range" id="sShake" min="0" max="1" step="0.05"><span></span></div>
+  <div class="seg tog" id="cSeg"></div>
   <div class="label">Grafik kalitesi</div>
   <div class="seg" id="qSeg">
     <button data-q="high">Yüksek<small>Gölgeler + parlama</small></button>
@@ -413,6 +438,8 @@ kbd{display:inline-block;min-width:22px;text-align:center;padding:0 6px;border-r
   <div class="setrow" style="margin-top:18px"><span>Ses</span><input type="range" id="pVol" min="0" max="1" step="0.05"><span></span></div>
   <div class="setrow"><span>Müzik</span><input type="range" id="pMusic" min="0" max="1" step="0.05"><span></span></div>
   <div class="setrow"><span>Hassasiyet</span><input type="range" id="pSens" min="0.3" max="3" step="0.1"><span></span></div>
+  <div class="setrow"><span>Sarsıntı</span><input type="range" id="pShake" min="0" max="1" step="0.05"><span></span></div>
+  <div class="seg tog" id="pcSeg"></div>
   <div class="row"><button class="btn ghost" id="btnHow3">Kontroller</button><button class="btn pink" id="btnQuit">Oyundan Çık</button></div>
   <div class="row hidden" id="hostLobbyRow"><button class="btn ghost" id="btnHostLobby">Herkesi lobiye döndür</button></div>
 </div></div>
@@ -504,7 +531,11 @@ await Promise.race([Promise.all(Object.keys(IC).flatMap(k => ['#111111', '#fffff
   im.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="128" height="128" fill="none" stroke="${c}" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">${IC[k]}</svg>`);
 })))), new Promise(r => setTimeout(r, 3000))]);
 const drawIcon = (x, k, cx, cy, s, c = '#111111') => { const im = icImg[k + c]; if (im && im.naturalWidth) x.drawImage(im, cx - s / 2, cy - s / 2, s, s); };
-const settings = Object.assign({ vol: 0.8, music: 0.5, sens: 1, fov: 72, quality: 'high' }, (() => { try { return JSON.parse(lsGet('tb-settings') || '{}'); } catch (e) { return {}; } })());
+// Konfor ayarları (shake/motion/flash/plain) sadece görüntüyü etkiler; bulmaca mantığına ve bilgiye dokunmaz.
+const calmOS = (() => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } })(); // işletim sistemi "hareketi azalt" diyorsa varsayılanlar sakin başlar
+const settings = Object.assign({ vol: 0.8, music: 0.5, sens: 1, fov: 72, quality: 'high', shake: calmOS ? 0.3 : 1, motion: !calmOS, flash: !calmOS, plain: false }, (() => { try { return JSON.parse(lsGet('tb-settings') || '{}'); } catch (e) { return {}; } })());
+if (!(settings.shake >= 0 && settings.shake <= 1)) settings.shake = 1;
+for (const k of ['motion', 'flash', 'plain']) settings[k] = !!settings[k];
 const saveSettings = () => lsSet('tb-settings', JSON.stringify(settings));
 const profile = Object.assign({ games: 0, wins: 0, streak: 0, bestStreak: 0, booms: 0, best: {}, roleWins: {}, ach: {} }, (() => { try { return JSON.parse(lsGet('tb-profile') || '{}'); } catch (e) { return {}; } })());
 const saveProfile = () => lsSet('tb-profile', JSON.stringify(profile));
@@ -620,10 +651,15 @@ const FUSE_COLORS = ['kirmizi', 'mavi', 'sari', 'yesil', 'beyaz'];
 const WORDS = ['BOMBA', 'KABLO', 'ÖRDEK', 'ROKET', 'KALEM', 'ELMAS', 'TAVUK', 'KÖPEK', 'BALIK', 'MASAL', 'LİMON', 'KAYIK', 'ÇORBA', 'KUZEY', 'GÜNEŞ', 'ORMAN', 'PERDE', 'SİMİT', 'BULUT', 'DENİZ', 'KEBAP', 'HAVUÇ'];
 const LETTERS = [...'ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ'];
 const KEY_POOL = 'QWERTYUOPASDFGJKLZXCN'.split('').map(c => 'Key' + c); // V B M I yok
+// sign: İŞARETÇİ konuşamadığı için aynı tuş onun başının üstünde bu yazılı pankartı kaldırır
 const EMOTES = [
-  { e: '👋', name: 'Selam', anim: 'wave' }, { e: '💃', name: 'Dans', anim: 'dance' }, { e: '😱', name: 'Panik', anim: 'panic' },
-  { e: '😂', name: 'Kahkaha', anim: 'laugh' }, { e: '📯', name: 'Korna', anim: 'honk' }, { e: '✅', name: 'Evet', anim: 'yes' }, { e: '❌', name: 'Hayır', anim: 'no' },
+  { e: '👋', name: 'Selam', anim: 'wave', sign: 'BURAYA' }, { e: '💃', name: 'Dans', anim: 'dance', sign: 'SÜPER' }, { e: '😱', name: 'Panik', anim: 'panic', sign: 'ACELE' },
+  { e: '😂', name: 'Kahkaha', anim: 'laugh', sign: 'HAHA' }, { e: '📯', name: 'Korna', anim: 'honk', sign: 'DUR' }, { e: '✅', name: 'Evet', anim: 'yes', sign: 'EVET' }, { e: '❌', name: 'Hayır', anim: 'no', sign: 'HAYIR' },
+  { e: '🔁', name: 'Tekrar', anim: 'again', sign: 'TEKRAR' },
 ];
+const SIGN_COL = { EVET: ['#2eaa3a', '#fff'], HAYIR: ['#e5382b', '#fff'], DUR: ['#e5382b', '#fff'] }; // diğer pankartlar sarı-siyah
+// Emoji dozu (ilk tahminler, oyuncu testi yapılmadı): ms cinsinden
+const EMOTE_TUNE = { sendGap: 700, hornGap: 4000, sameSoundGap: 1200, anySoundGap: 180, placardMs: 2800 };
 const CHAOS = {
   karanlik:  { name: 'IŞIKLAR GİTTİ!',   icon: '🔦', dur: 12, desc: 'Fenerler otomatik açıldı. Korkma... çok.' },
   disko:     { name: 'DİSKO ZAMANI!',    icon: '🪩', dur: 12, desc: 'Bomba bekleyebilir, önce dans! (2 tuşu)' },
@@ -1159,6 +1195,7 @@ function hostHandle(m, from) {
       pl.yaw = isNum(m.yaw) ? m.yaw % (Math.PI * 2) : 0;
       pl.l = pl.role === 'pointer' && isVec3(m.l) ? [clamp(m.l[0], -HX - 1, HX + 1), clamp(m.l[1], -1, H + 1), clamp(m.l[2], -HZ - 1, HZ + 1)] : null;
       break;
+    case 'fx': hostFx(m, from); break; // tek seferlik avatar şakası (bonk/tumble): doğrula, sınırla, aktar
     case 'act': hostAction(m, from); break;
     case 'emote':
       if (inGame) stat(from, 'emote');
@@ -1450,6 +1487,7 @@ function clientHandle(m) {
       break;
     }
     case 'emote': playEmote(m.id, m.e); break;
+    case 'fx': if (m.id !== myId && typeof m.k === 'string') avatarFx(m.id, m.k, m.s | 0); break; // kendi şakam yerelde zaten oynadı
     case 'toLobby': backToLobby(); break;
     case 'full': $('#lobby').classList.add('hidden'); $('#menu').classList.remove('hidden'); $('#menuStatus').textContent = 'Oda dolu (en fazla 8 kişi).'; break;
   }
@@ -1490,10 +1528,10 @@ if (HIGH) {
   bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.42, 0.5, 0.92);
   composer.addPass(bloom);
   filmPass = new ShaderPass({
-    uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uAb: { value: 0 }, uVig: { value: 0.42 }, uGrain: { value: 0.035 } },
+    uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uAb: { value: 0 }, uAb0: { value: 0.012 }, uVig: { value: 0.42 }, uGrain: { value: 0.035 } },
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: `uniform sampler2D tDiffuse; uniform float uTime, uAb, uVig, uGrain; varying vec2 vUv;
-      void main(){ vec2 d = vUv - 0.5; float r2 = dot(d, d); vec2 o = d * (0.012 + uAb) * r2;
+    fragmentShader: `uniform sampler2D tDiffuse; uniform float uTime, uAb, uAb0, uVig, uGrain; varying vec2 vUv;
+      void main(){ vec2 d = vUv - 0.5; float r2 = dot(d, d); vec2 o = d * (uAb0 + uAb) * r2;
         vec3 c = vec3(texture2D(tDiffuse, vUv + o).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - o).b);
         c *= 1.0 - uVig * smoothstep(0.12, 0.62, r2);
         float n = fract(sin(dot(vUv * vec2(1920.0, 1080.0) + uTime * 61.0, vec2(12.9898, 78.233))) * 43758.5453);
@@ -1502,6 +1540,15 @@ if (HIGH) {
   });
   composer.addPass(filmPass);
   composer.addPass(new OutputPass());
+}
+// Görüntü efektlerinin iki ayarı: normal ve "Sade görüntü" (az parlama, kumlanma yok, hafif kenar kararması)
+const POST_FX = { normal: { bloom: 0.42, vig: 0.42, grain: 0.035, ab: 0.012 }, plain: { bloom: 0.1, vig: 0.15, grain: 0, ab: 0 } };
+function applyComfort() {
+  document.body.classList.toggle('nofx', !settings.flash);
+  const F = settings.plain ? POST_FX.plain : POST_FX.normal;
+  if (bloom) bloom.strength = F.bloom;
+  if (filmPass) { const u = filmPass.uniforms; u.uVig.value = F.vig; u.uGrain.value = F.grain; u.uAb0.value = F.ab; }
+  alarm.color.setHex(0xff2030).multiplyScalar(settings.flash ? 1 : 0.3); // kırmızı alarm nabzı: efektler kapalıyken çok daha sönük (ilk çağrı BAŞLAT bölümünde, ışıklar kurulduktan sonra)
 }
 addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
@@ -1552,7 +1599,13 @@ function noise2(x, w, h, n, a) { for (let i = 0; i < n; i++) { x.fillStyle = `rg
 
 // ---------- ışıklar ----------
 const hemi = new THREE.HemisphereLight(0xe4eeff, 0x8a7560, 0.36); scene.add(hemi);
-for (const [c, x, z] of [[0x2ec4b6, -10.5, -8.5], [0xff5a4a, 10.5, 8.5], [0x2ec4b6, 10.5, -8.5], [0xf5b800, -10.5, 8.5]]) { const l = new THREE.PointLight(c, 9, 13, 1.5); l.position.set(x, 1.1, z); scene.add(l); }
+// Işık bütçesi (ölçüldü: her nokta ışığı, ekrandaki her pikselde hesaplanır):
+//  yüksek: 3 tavan + 4 köşe vurgusu + alarm + telefon + 2 ikaz = 11 nokta ışığı (eskiden 15: disko için 4 ışık hep 0 şiddetle bekliyordu;
+//          artık disko sırasında köşe vurguları disko ışığı olarak kullanılıyor)
+//  düşük:  3 tavan + alarm = 4 nokta ışığı; köşe vurgusu, ikaz ve telefon ışığı yerine sadece ışıyan yüzeyler var.
+// Işıklar oyun sırasında eklenip çıkarılmaz ve .visible değiştirilmez (gölgelendiriciler yeniden derlenmesin); sadece şiddet/renk/konum değişir.
+const ACCENT = [[0x2ec4b6, -10.5, -8.5], [0xff5a4a, 10.5, 8.5], [0x2ec4b6, 10.5, -8.5], [0xf5b800, -10.5, 8.5]];
+const accentLights = HIGH ? ACCENT.map(([c, x, z]) => { const l = new THREE.PointLight(c, 9, 13, 1.5); l.position.set(x, 1.1, z); scene.add(l); return l; }) : [];
 const sun = new THREE.DirectionalLight(0xfff0d6, 2.4);
 sun.position.set(-7, 15, 26); sun.target.position.set(0, 0, 2); scene.add(sun, sun.target);
 sun.castShadow = HIGH; sun.shadow.mapSize.set(2048, 2048);
@@ -1563,7 +1616,8 @@ const bombSpot = new THREE.SpotLight(0xffffff, 30, 0, 0.42, 0.6, 1.5);
 bombSpot.position.set(0, 6.6, 0.4); bombSpot.target.position.set(0, 0.9, 0); scene.add(bombSpot, bombSpot.target);
 bombSpot.castShadow = HIGH; bombSpot.shadow.mapSize.set(1024, 1024); bombSpot.shadow.bias = -0.0005;
 const alarm = new THREE.PointLight(0xff2030, 0, 10, 1.6); alarm.position.set(0, 2.4, 0); scene.add(alarm);
-const discoLights = [0xff3df0, 0x3dd8ff, 0xfff23d, 0x5dff6a].map((c, i) => { const l = new THREE.PointLight(c, 0, 16, 1.4); l.position.set(Math.cos(i * 1.57) * 5, 5, Math.sin(i * 1.57) * 5); scene.add(l); return l; });
+const DISCO_COL = [0xff3df0, 0x3dd8ff, 0xfff23d, 0x5dff6a], CEIL_COL = 0xffd9a0;
+let discoWas = false;
 const flashlight = new THREE.SpotLight(0xfff6e0, 0, 22, 0.5, 0.5, 1.2);
 flashlight.position.set(0.25, -0.2, 0); camera.add(flashlight, flashlight.target); flashlight.target.position.set(0, -0.2, -5);
 const baseLights = { hemi: hemi.intensity, sun: sun.intensity, ceil: 14, spot: 30, exp: 0.92 };
@@ -1610,7 +1664,7 @@ function applyTheme(name) {
   shaftMat.color.setHex(T.shaft[0]); shaftMat.opacity = T.shaft[1];
   if (typeof sun !== 'undefined') {
     sun.color.setHex(T.sun[0]); sun.position.set(...T.sun[2]); hemi.color.setHex(T.hemi[0]); hemi.groundColor.setHex(T.hemi[1]);
-    Object.assign(baseLights, { hemi: T.hemi[2], sun: T.sun[1], ceil: T.ceil, exp: T.exp });
+    Object.assign(baseLights, { hemi: T.hemi[2] * (HIGH ? 1 : 1.18), sun: T.sun[1], ceil: T.ceil, exp: T.exp }); // düşük kalitede köşe vurguları yok: ortam ışığı biraz artar
   }
 }
 
@@ -1700,12 +1754,12 @@ for (const [y, z, c, r] of [[6.4, -HZ + 0.3, 0xc0392b, 0.12], [6.1, -HZ + 0.32, 
 }
 // asma lambalar
 const coneMat = new THREE.MeshBasicMaterial({ map: shaftTex, color: 0xffd9a0, transparent: true, opacity: 0.09, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false });
-const lampShadeMat = std(0xf5b800, { metalness: 0.5, roughness: 0.4, side: THREE.DoubleSide });
+const lampShadeMat = std(0xf5b800, { metalness: 0.5, roughness: 0.4, side: THREE.DoubleSide }), lampCones = [];
 for (const [x, z] of [[-6, -3], [6, -3], [0, 5], [-6, 5], [6, 5], [0, -6]]) {
   add(new THREE.CylinderGeometry(0.015, 0.015, 0.9), std(0x111111), x, H - 0.45, z);
   const sh = add(new THREE.ConeGeometry(0.55, 0.45, 24, 1, true), lampShadeMat, x, H - 0.98, z); sh.userData.noCast = true;
   const bulb = add(new THREE.SphereGeometry(0.16, 16, 12), glow(0xffe2a8, 3), x, H - 1.18, z); bulb.userData.noCast = true;
-  const cone = add(new THREE.ConeGeometry(2.7, 5.8, 28, 1, true), coneMat, x, H - 1.1 - 2.9, z); cone.userData.noCast = cone.userData.laserSkip = true;
+  const cone = add(new THREE.ConeGeometry(2.7, 5.8, 28, 1, true), coneMat, x, H - 1.1 - 2.9, z); cone.userData.noCast = cone.userData.laserSkip = true; lampCones.push(cone);
 }
 
 // ---------- çarpışma ----------
@@ -1819,7 +1873,8 @@ const phoneSet = new THREE.Group(); phoneSet.position.y = 0.16; phoneG.add(phone
 add(rbox(0.42, 0.06, 0.08, 0.03), std(0xb01822, { roughness: 0.25 }), 0, 0.03, 0, phoneSet);
 for (const sx of [-1, 1]) add(new THREE.SphereGeometry(0.07, 14, 10), std(0xb01822, { roughness: 0.25 }), sx * 0.19, 0.0, 0, phoneSet).scale.y = 0.7;
 add(new THREE.CylinderGeometry(0.07, 0.07, 0.02, 20), std(0xf4f4f4), 0, 0.125, 0.02, phoneG);
-const phoneLight = new THREE.PointLight(0xff2030, 0, 7, 1.6); phoneLight.position.set(-7.6, 1.7, 0.6); scene.add(phoneLight);
+const phoneLight = new THREE.PointLight(0xff2030, 0, 7, 1.6); phoneLight.position.set(-7.6, 1.7, 0.6); if (HIGH) scene.add(phoneLight); // düşük kalitede sahneye girmez; yerine telefonun üstündeki lamba ışır
+const phoneLamp = add(new THREE.SphereGeometry(0.07, 12, 10), new THREE.MeshBasicMaterial({ color: 0x3a0606, toneMapped: false }), -7.6, 1.34, 0.6); phoneLamp.userData.noCast = true;
 sign(['📞 ACİL HAT'], { w: 512, h: 128, size: 70, bg: '#d3202c', fg: '#fff', radius: 24 }, -7.34, 0.62, 0.6, Math.PI / 2, 0.44, 0.11);
 sign(['TERSTEN KONUŞMAK', 'SERBESTTİR'], { w: 768, h: 384, size: [76, 96], bg: '#ff4fa3', fg: '#fff', border: '#fff', radius: 30 }, -HX + 0.04, 3.4, 7.2, Math.PI / 2, 2.6, 1.3);
 sign(['YERÇEKİMİ', 'İSTEĞE BAĞLIDIR'], { w: 768, h: 384, size: [90, 70], bg: '#1d2a6b', fg: '#6bf06a', border: '#6bf06a', radius: 30 }, HX - 0.04, 3.4, 6.5, -Math.PI / 2, 2.4, 1.2);
@@ -1856,6 +1911,8 @@ for (let i = 0; i < 5; i++) { const b = add(new THREE.BoxGeometry(0.16, 0.62, 0.
 const dustGeo = new THREE.BufferGeometry(); { const p = new Float32Array(400 * 3); for (let i = 0; i < 400; i++) { p[i * 3] = rnd(-HX, HX); p[i * 3 + 1] = rnd(0.2, H); p[i * 3 + 2] = rnd(-HZ, HZ); } dustGeo.setAttribute('position', new THREE.BufferAttribute(p, 3)); }
 const dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({ color: 0xfff3d6, size: 0.035, transparent: true, opacity: 0.55, depthWrite: false }));
 scene.add(dust);
+// düşük kalite: toz, pencere huzmeleri ve lamba konileri çizilmez (büyük saydam yüzeyler = boşa piksel doldurma); bilgi taşımıyorlar
+dust.visible = HIGH; shafts.forEach(m => { m.visible = HIGH; }); lampCones.forEach(m => { m.visible = HIGH; });
 // disko topu (kaos sırasında iner)
 const discoBall = add(new THREE.IcosahedronGeometry(0.5, 2), new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.08, flatShading: true }), 0, H + 1, 0);
 
@@ -1866,7 +1923,7 @@ const beacons = [[-11.3, 6.1, -9.5], [11.3, 6.1, -9.5], [-11.3, 6.1, 9.3], [11.3
   add(new THREE.CylinderGeometry(0.2, 0.24, 0.14, 18), std(0x15171c, { metalness: 0.7 }), x, y + 0.34, z);
   const mat = new THREE.MeshStandardMaterial({ color: 0x5a0a06, emissive: 0xff2a1a, emissiveIntensity: 0.3, roughness: 0.2, transparent: true, opacity: 0.92 });
   add(new THREE.SphereGeometry(0.2, 18, 12), mat, x, y + 0.14, z).userData.noCast = true;
-  let light = null; if (i < 2) { light = new THREE.PointLight(0xff2a1a, 0, 12, 1.5); light.position.set(x * 0.92, y - 0.3, z * 0.92); scene.add(light); }
+  let light = null; if (i < 2 && HIGH) { light = new THREE.PointLight(0xff2a1a, 0, 12, 1.5); light.position.set(x * 0.92, y - 0.3, z * 0.92); scene.add(light); }
   return { mat, light };
 });
 // kontrol masası ve yeşil ekranlar
@@ -1894,6 +1951,29 @@ solidBox(0.61, 0, -HZ + 0.27, 1.85, 2.0, 0.55);
 for (const [x0, z0, x1, z1, sag, c] of [[-10, -9, -2, -9.4, 0.7, 0x111111], [-2, -9.4, 7, -9.2, 0.9, 0x111111], [11.4, -4, 11.4, 4, 0.8, 0xb3261c], [-11.4, 0, -11.4, 8, 0.6, 0x111111], [-6, -3, 0, -6, 0.5, 0xf5b800], [6, -3, 0, -6, 0.5, 0x111111]]) {
   const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(x0, H - 0.25, z0), new THREE.Vector3((x0 + x1) / 2, H - 0.25 - sag * 2, (z0 + z1) / 2), new THREE.Vector3(x1, H - 0.25, z1));
   add(new THREE.TubeGeometry(curve, 20, 0.025, 6), std(c, { roughness: 0.5 })).userData.noCast = true;
+}
+// ---------- yön bulma: duvarlarda pusula şablonları (K / D / G / B), bombanın çevresinde yer okları ----------
+// Görev metinlerindeki "kuzey duvarı", "doğu duvarı" bulunabilsin diye. Işıksız kaosta da seçilsin diye hafif ışıyor.
+const COMPASS = [ // harf, ad, duvardaki yer [x, y, z], duvar dönüşü, yerdeki okun yönü (rotation.z)
+  ['K', 'KUZEY', [-2.6, 4.75, -HZ + 0.04], 0, 0], ['D', 'DOĞU', [HX - 0.04, 4.95, 1.5], -Math.PI / 2, -Math.PI / 2],
+  ['G', 'GÜNEY', [3.25, 5.8, HZ - 0.02], Math.PI, Math.PI], ['B', 'BATI', [-HX + 0.04, 4.95, -2.8], Math.PI / 2, Math.PI / 2],
+];
+const compassWall = [], compassFloor = [];
+for (const [L, name, p, ry, fz] of COMPASS) {
+  const wt = canvasTex(384, 448, (x, w, h) => {
+    x.fillStyle = '#15120d'; roundRect(x, 0, 0, w, h, 34); x.fill();
+    x.strokeStyle = '#f5b800'; x.lineWidth = 14; roundRect(x, 14, 14, w - 28, h - 28, 24); x.stroke();
+    x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#f5b800'; x.font = `400 300px ${FONT}`; x.fillText(L, w / 2, 190);
+    x.fillStyle = '#efe6d2'; x.font = `400 66px ${FONT}`; x.fillText(name, w / 2, 386);
+  });
+  const wm = add(new THREE.PlaneGeometry(1.5, 1.75), new THREE.MeshStandardMaterial({ map: wt, roughness: 0.75, emissive: 0xffffff, emissiveMap: wt, emissiveIntensity: 0.3 }), p[0], p[1], p[2]);
+  wm.rotation.y = ry; wm.userData.noCast = true; compassWall.push(wm);
+  const ft = canvasTex(256, 384, (x, w, h) => {
+    x.fillStyle = '#f5b800'; x.beginPath(); x.moveTo(w / 2, 8); x.lineTo(w - 14, 150); x.lineTo(w - 78, 150); x.lineTo(w - 78, 196); x.lineTo(78, 196); x.lineTo(78, 150); x.lineTo(14, 150); x.closePath(); x.fill();
+    x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = `400 190px ${FONT}`; x.fillText(L, w / 2, 296);
+  });
+  const fm = add(new THREE.PlaneGeometry(1.1, 1.65), new THREE.MeshStandardMaterial({ map: ft, transparent: true, opacity: 0.9, roughness: 0.8, depthWrite: false }), Math.sin(-fz) * 6.1, 0.013, -Math.cos(fz) * 6.1);
+  fm.rotation.set(-Math.PI / 2, 0, fz); fm.userData.noCast = true; compassFloor.push(fm);
 }
 shadowAll(scene);
 sky.castShadow = sky.receiveShadow = false;
@@ -1966,7 +2046,7 @@ function station(parent, o) {
     add(new THREE.BoxGeometry(fw, fh, 0.03), nm, fx, fy, 0.07, g);
   for (const sx of [-1, 1]) for (const sy of [-1, 1]) add(new THREE.CylinderGeometry(0.03, 0.03, 0.03, 10), std(0x9aa3b2, { metalness: 1, roughness: 0.2 }), sx * (w / 2 + 0.08), sy * (h / 2 + 0.08), 0.07, g).rotation.x = Math.PI / 2;
   const tw = Math.max(1.4, w * 0.85);
-  add(new THREE.PlaneGeometry(tw, tw * 0.25), new THREE.MeshBasicMaterial({ map: textTex([o.title], { w: 640, h: 160, size: 92, bg: 'none', fg: '#ffffff', glow: hexCss(color), stroke: hexCss(color), strokeW: 6 }), transparent: true, toneMapped: false }), 0, h / 2 + 0.5, 0.08, g);
+  add(new THREE.PlaneGeometry(tw, tw * 0.25), new THREE.MeshBasicMaterial({ map: textTex([o.title], { w: 640, h: 160, size: o.title.length > 12 ? 78 : 100, bg: 'rgba(16,14,12,.9)', radius: 26, border: hexCss(color), bw: 8, fg: '#ffffff', glow: hexCss(color), stroke: hexCss(color), strokeW: 6 }), transparent: true, toneMapped: false }), 0, h / 2 + 0.5, 0.08, g); // koyu levha: açık renkli duvarda uzaktan da okunur
   const lamp = add(new THREE.SphereGeometry(0.11, 18, 14), new THREE.MeshStandardMaterial({ color: 0x440000, emissive: 0xff2020, emissiveIntensity: 2.5 }), w / 2 + 0.17, h / 2 + 0.17, 0.15, g);
   add(new THREE.TorusGeometry(0.12, 0.012, 6, 16), std(0x222222, { metalness: 0.8 }), w / 2 + 0.17, h / 2 + 0.17, 0.15, g);
   const content = new THREE.Group(); content.position.z = 0.1; g.add(content);
@@ -2375,6 +2455,7 @@ function applyState(g, why, fx) {
   if (!game) return;
   const prev = lastFx;
   Object.assign(game, g);
+  avatarStateFx(); // hata tepkisi / sahte ördek / modül sevinci (avatar şakaları)
   const cd = Math.ceil(g.countdown);
   if (cd !== prev.countdown) { if (cd > 0) { sfx.count(); showCountdown(cd); } else { sfx.go(); showCountdown('BAŞLA!'); } }
   if (g.strikes > prev.strikes) { sfx.strike(); toast(`❌ ${why || 'HATA!'} (${g.strikes}/3)`, 'bad'); shake = 0.35; flashVignette(); film.ab = 0.6; if (g.status === 'playing') bombSay('strike'); }
@@ -2414,7 +2495,14 @@ function showCountdown(v, final) {
   const el = $('#countdown'); el.classList.remove('hidden'); el.classList.toggle('final', !!final); el.innerHTML = `<span>${v}</span>`;
   clearTimeout(el._t); el._t = setTimeout(() => el.classList.add('hidden'), 900);
 }
-function flashVignette() { const v = $('#vignette'); v.style.opacity = 1; setTimeout(() => v.style.opacity = 0, 400); }
+function flashVignette() {
+  const s = $('#strikes'); s.classList.remove('bump'); void s.offsetWidth; s.classList.add('bump'); // hata ışıkları küçük bir zıplama yapar (flaş değil)
+  if (!settings.flash) return; // "Flaş ve ekran efektleri" kapalı: kırmızı nabız yok
+  const v = $('#vignette'); v.style.opacity = 1; setTimeout(() => v.style.opacity = 0, 400);
+}
+// beyaz patlama flaşının sakin karşılığı: ekran kısa süre yumuşakça kararır
+const softFadeEl = document.createElement('div'); softFadeEl.id = 'softfade'; document.body.appendChild(softFadeEl);
+function softFade() { softFadeEl.classList.add('on'); clearTimeout(softFade.t); softFade.t = setTimeout(() => softFadeEl.classList.remove('on'), 700); }
 function burstAt(k) {
   const pos = { wires: [-4, 1.8, -HZ + 0.6], keypad: [HX - 0.6, 1.7, -2], password: [-HX + 0.6, 1.8, 3], button: [0.45, 1.6, 0], fuse: [HX - 0.6, 5.6, 6], laser: [0, 2.6, 0], ducks: [3.7, 1.0, 3.7], mouse: [0, 0.5, 0.7], maze: [6.2, 1.0, -6.6], keys: [0, 2.4, 0] }[k];
   if (pos) burst(50, [0x6bf06a, 0xffffff, 0xffd23f], 4, 1.4, new THREE.Vector3(...pos), 0.07);
@@ -2511,6 +2599,7 @@ function explode() {
   const d = new THREE.Vector3(me.pos.x, 0, me.pos.z).normalize();
   me.fly = { v: d.multiplyScalar(8).setY(11), roll: rnd(-6, 6) };
   alarm.intensity = 200; film.ab = 1.4; if (M.taunt) M.taunt.visible = false;
+  if (!settings.flash) softFade(); // beyaz flaş CSS ile kapalı (body.nofx), yerine yumuşak kararma
 }
 function confetti() { burst(260, [0xff4fa3, 0x4fc3ff, 0x6bf06a, 0xffd23f, 0xa66bff], 8, 3.5, new THREE.Vector3(0, 2.2, 0), 0.09); }
 function updateParticles(dt) {
@@ -2565,7 +2654,8 @@ function updateChaos(dt, now) {
   if (t === 'deprem') shake = Math.max(shake, 0.17);
   // çalan telefon
   const ring = t === 'telefon' && !c.done;
-  phoneLight.intensity = ring ? (Math.sin(now / 90) > 0 ? 45 : 5) : 0;
+  phoneLight.intensity = ring ? (settings.flash ? (Math.sin(now / 90) > 0 ? 45 : 5) : 24 + Math.sin(now / 350) * 14) : 0; // efektler kapalı: sert yanıp sönme yerine yavaş dalga
+  phoneLamp.material.color.setRGB(ring ? 0.3 + phoneLight.intensity / 14 : 0.22, 0.03, 0.03); phoneLamp.scale.setScalar(ring ? 1.5 : 1); // çalarken herkes (düşük kalitede de) görsün
   phoneSet.rotation.z = ring ? Math.sin(now / 30) * 0.2 : 0; phoneSet.position.y = 0.16 + (ring ? Math.abs(Math.sin(now / 45)) * 0.035 : 0);
   if (ring) { ringT -= dt; if (ringT <= 0) { ringT = 1.6; sfx.ring(); } } else ringT = 0;
   hemi.intensity = baseLights.hemi * lightK * (t === 'disko' ? 0.5 : 1); sun.intensity = baseLights.sun * lightK;
@@ -2574,7 +2664,15 @@ function updateChaos(dt, now) {
   renderer.toneMappingExposure = baseLights.exp * (0.3 + 0.7 * lightK);
   // disko
   const disco = t === 'disko';
-  discoLights.forEach((l, i) => { l.intensity = disco ? 12 : 0; const a = now / 400 + i * 1.57; l.position.set(Math.cos(a) * 6, 5, Math.sin(a) * 5); });
+  if (disco !== discoWas) { // disko başlarken/biterken: köşe vurguları disko ışığına döner / geri gelir (yeni ışık eklenmez)
+    discoWas = disco;
+    accentLights.forEach((l, i) => { if (disco) { l.color.setHex(DISCO_COL[i]); l.intensity = 12; l.distance = 16; l.decay = 1.4; } else { l.color.setHex(ACCENT[i][0]); l.intensity = 9; l.distance = 13; l.decay = 1.5; l.position.set(ACCENT[i][1], 1.1, ACCENT[i][2]); } });
+    if (!disco) ceilLights.forEach(l => l.color.setHex(CEIL_COL));
+  }
+  if (disco) {
+    accentLights.forEach((l, i) => { const a = now / 400 + i * 1.57; l.position.set(Math.cos(a) * 6, 5, Math.sin(a) * 5); });
+    if (!HIGH) ceilLights.forEach((l, i) => l.color.setHex(DISCO_COL[(i + Math.floor(now / 900)) % 4])); // düşük kalite: tavan lambaları renk değiştirir
+  }
   discoBall.position.y += ((disco ? H - 1.4 : H + 1) - discoBall.position.y) * Math.min(1, dt * 3);
   discoBall.rotation.y += dt * 2;
   // ördekler
@@ -2610,8 +2708,8 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyM' && role === 'reader') { $('#manual').classList.toggle('hidden'); sfx.page(); }
   if ((e.code === 'KeyQ' || e.code === 'KeyE') && role === 'reader' && !$('#manual').classList.contains('hidden')) flipManual(e.code === 'KeyE' ? 1 : -1);
   if (e.code === 'KeyH') $('#roleCard').classList.toggle('open');
-  const em = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7'].indexOf(e.code);
-  if (em >= 0) doEmote(em);
+  const em = /^Digit[1-8]$/.test(e.code) ? +e.code[5] - 1 : -1; // 1-8: emojiler (8 = Tekrar)
+  if (em >= 0 && em < EMOTES.length) doEmote(em);
   if (net.solo && e.code === 'Tab') {
     players[myId].role = LOBBY_ORDER[(LOBBY_ORDER.indexOf(myRole()) + 1) % LOBBY_ORDER.length]; laserOn = false;
     refreshModules(); setupRoleHud(); toast(`🧪 Test: artık ${ROLES[myRole()].emoji} ${ROLES[myRole()].name}`);
@@ -2623,21 +2721,43 @@ addEventListener('keyup', e => {
   if (e.code === 'KeyB') stopRec('prova');
 });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; stopRec(); });
-let lastEmote = 0;
+let lastEmote = 0, lastHorn = -1e9;
 function doEmote(i) {
-  const now = performance.now(); if (now - lastEmote < 700) return; lastEmote = now;
+  const E = EMOTES[i]; if (!E) return;
+  const now = performance.now(); if (now - lastEmote < EMOTE_TUNE.sendGap) return;
+  if (E.anim === 'honk') { if (now - lastHorn < EMOTE_TUNE.hornGap) { const el = $('#emotes').children[i]; if (el) { el.classList.remove('wait'); void el.offsetWidth; el.classList.add('wait'); } return; } lastHorn = now; } // korna: kendi kendine sınır (oda sahibi de ayrıca sınırlar)
+  lastEmote = now;
   sendToHost({ t: 'emote', e: i });
   if (i === 1 && game && game.chaos && game.chaos.type === 'disko') unlock('dans');
   const el = $('#emotes').children[i]; if (el) { el.classList.remove('fire'); void el.offsetWidth; el.classList.add('fire'); }
 }
+const EMOTE_SND = {
+  honk: () => sfx.honk(),
+  laugh: () => { tone(500, 0.1, { type: 'square', vol: 0.06 }); tone(560, 0.1, { type: 'square', vol: 0.06, when: 0.12 }); tone(620, 0.12, { type: 'square', vol: 0.06, when: 0.24 }); },
+  panic: () => tone(900, 0.5, { type: 'sawtooth', vol: 0.05, slide: 1400, lp: 2500 }),
+  yes: () => { tone(660, 0.1, { type: 'triangle', vol: 0.15 }); tone(990, 0.15, { type: 'triangle', vol: 0.15, when: 0.1 }); },
+  no: () => { tone(300, 0.15, { type: 'square', vol: 0.1, lp: 1500 }); tone(220, 0.25, { type: 'square', vol: 0.1, lp: 1500, when: 0.15 }); },
+  again: () => { tone(520, 0.1, { type: 'triangle', vol: 0.13 }); tone(520, 0.1, { type: 'triangle', vol: 0.13, when: 0.14 }); tone(780, 0.18, { type: 'triangle', vol: 0.13, when: 0.28 }); },
+};
+const emoteSndAt = {}; let emoteSndLast = -1e9; const emoteLog = []; // emoteLog: testler için (çalınan / susturulan sesler)
 function playEmote(id, i) {
   const E = EMOTES[i]; if (!E) return;
-  if (E.anim === 'honk') sfx.honk(); else if (E.anim === 'laugh') { tone(500, 0.1, { type: 'square', vol: 0.06 }); tone(560, 0.1, { type: 'square', vol: 0.06, when: 0.12 }); tone(620, 0.12, { type: 'square', vol: 0.06, when: 0.24 }); }
-  else if (E.anim === 'panic') tone(900, 0.5, { type: 'sawtooth', vol: 0.05, slide: 1400, lp: 2500 });
-  else if (E.anim === 'yes') { tone(660, 0.1, { type: 'triangle', vol: 0.15 }); tone(990, 0.15, { type: 'triangle', vol: 0.15, when: 0.1 }); }
-  else if (E.anim === 'no') { tone(300, 0.15, { type: 'square', vol: 0.1, lp: 1500 }); tone(220, 0.25, { type: 'square', vol: 0.1, lp: 1500, when: 0.15 }); } else sfx.ui();
-  const a = avatars[id]; if (a) { a.emote = { anim: E.anim, until: performance.now() + (E.anim === 'dance' ? 3000 : 1800) }; showBubble(a, E.e); }
-  if (id === myId) toast(`${E.e} ${E.name}!`);
+  // ses spam'i: aynı oyuncunun aynı emoji sesi 1.2 sn içinde tekrar çalmaz; herhangi iki emoji sesi arasında da kısa bir boşluk var. Hareket ve balon her zaman görünür.
+  const now = performance.now(), key = id + ':' + i, muted = now - (emoteSndAt[key] || -1e9) < EMOTE_TUNE.sameSoundGap || now - emoteSndLast < EMOTE_TUNE.anySoundGap;
+  if (!muted) { emoteSndAt[key] = emoteSndLast = now; (EMOTE_SND[E.anim] || sfx.ui)(); }
+  emoteLog.push({ id, i, muted, t: now }); if (emoteLog.length > 60) emoteLog.shift();
+  const a = avatars[id], silent = players[id] && players[id].role === 'pointer';
+  if (a) {
+    a.emote = { anim: E.anim, until: now + (E.anim === 'dance' ? 3000 : 1800) };
+    if (silent && E.sign) showPlacard(a, E.sign); else showBubble(a, E.e);
+  }
+  if (id === myId) toast(silent && E.sign ? `Pankart: ${E.sign}` : `${E.e} ${E.name}!`);
+}
+// Alttaki emoji çubuğu: İŞARETÇİ için her tuşun kaldıracağı pankart yazısı da görünür
+function renderEmoteBar() {
+  const signs = myRole() === 'pointer';
+  $('#emotes').classList.toggle('signs', signs);
+  $('#emotes').innerHTML = EMOTES.map((e, i) => `<div title="${signs ? 'Pankart: ' + e.sign : e.name}"><span>${i + 1}</span>${e.e}${signs ? `<small>${e.sign}</small>` : ''}</div>`).join('');
 }
 
 function lockPointer() { ac(); try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
@@ -2658,7 +2778,7 @@ function aimed() {
   if (!canPlay() || game.countdown > 0) return null;
   ray.setFromCamera({ x: 0, y: 0 }, camera);
   const hits = ray.intersectObjects(interactables, false);
-  return hits.length ? hits[0].object : null;
+  return hits.length ? (hits.find(h => !h.object.userData.pad) || hits[0]).object : null; // gerçek parça, büyütülmüş dokunma alanından (hitPad) önce gelir
 }
 const NOPE = ['🙅 Elini çek! Bu TERS TUŞ\'un işi.', '🚫 Sen dokunursan patlar. Ciddiyim.', '👀 Göremediğin şeye dokunma!', '🤚 TERS TUŞ\'a söyle, o yapsın.'];
 document.addEventListener('mousedown', e => {
@@ -2673,7 +2793,7 @@ document.addEventListener('mousedown', e => {
     return;
   }
   if (game.solved[u.mod]) return;
-  popCross();
+  popCross(); popObject(o);
   const at = new THREE.Vector3(); o.getWorldPosition(at);
   if (u.kind === 'wire') { if (!game.wireCut[u.i]) { sfx.snip(); burst(14, [0xffd23f, 0xffffff, 0xff8c1a], 2.5, 0.6, at, 0.035); sendToHost({ t: 'act', a: 'cut', i: u.i }); } }
   else if (u.kind === 'key') { if (!game.keyPressed[u.i]) { sfx.click(); sendToHost({ t: 'act', a: 'key', i: u.i }); } }
@@ -2764,7 +2884,7 @@ function updateMe(dt) {
     const g = groundAt(p);
     if (p.y < g) { p.y = g; v.y = Math.abs(v.y) * 0.5; }
     const maxY = H - 1.6 - 0.2;
-    if (p.y > maxY) { p.y = maxY; v.y = -Math.abs(v.y) * 0.5; }
+    if (p.y > maxY) { if (v.y > FX_TUNE.bonkSpeed) bonkSelf(); p.y = maxY; v.y = -Math.abs(v.y) * 0.5; } // tavana hızlı çarpış: "bonk" şakası (kontrol kilitlenmez, sekme aynı)
     if ((keys.Space || keys.ShiftLeft) && active && Math.random() < dt * 2) sfx.whoosh();
   } else {
     const dir = fwd.multiplyScalar(f).add(right.multiplyScalar(s));
@@ -2908,9 +3028,15 @@ function makeAvatar(id) {
     add(new THREE.SphereGeometry(0.035, 8, 6), std(0x2236a8), 0, 0, 0, bt);
     const book = new THREE.Group(); book.position.set(-0.02, -0.28, -0.12); book.rotation.x = -0.4; arms[0].add(book);
     add(new THREE.BoxGeometry(0.3, 0.38, 0.07), std(0x8d1d1d), 0, 0, 0, book); add(new THREE.BoxGeometry(0.28, 0.36, 0.075), std(0xf4ecd8), 0.012, 0, 0, book);
-    // kulaklık / hoparlör
-    for (const sx of [-1, 1]) add(new THREE.CylinderGeometry(0.1, 0.1, 0.08, 18), std(0x222233), sx * 0.41, 1.12, 0, body).rotation.z = Math.PI / 2;
-    add(new THREE.TorusGeometry(0.42, 0.025, 8, 28, Math.PI), std(0x222233), 0, 1.12, 0, body);
+    // kulaklık / hoparlör (uzaktan seçilsin diye iri kulaklıklar)
+    for (const sx of [-1, 1]) add(new THREE.CylinderGeometry(0.17, 0.17, 0.12, 18), std(0x222233), sx * 0.45, 1.12, 0, body).rotation.z = Math.PI / 2;
+    add(new THREE.TorusGeometry(0.46, 0.035, 8, 28, Math.PI), std(0x222233), 0, 1.12, 0, body);
+    // silüet: omuzda dev megafon (rol ikonu hoparlör) — huni öne ve yukarı bakar
+    const mega = new THREE.Group(); mega.position.set(0.5, 1.34, -0.1); mega.rotation.set(1.15, 0, -0.25); body.add(mega);
+    add(new THREE.ConeGeometry(0.3, 0.6, 20, 1, true), std(0xf3eee2, { roughness: 0.4, side: THREE.DoubleSide }), 0, -0.22, 0, mega);
+    add(new THREE.TorusGeometry(0.3, 0.035, 8, 24), std(R0.color, { roughness: 0.4 }), 0, -0.52, 0, mega).rotation.x = Math.PI / 2;
+    add(new THREE.CylinderGeometry(0.07, 0.07, 0.2, 12), std(0x222233), 0, 0.14, 0, mega);
+    add(new THREE.BoxGeometry(0.05, 0.05, 0.2), std(0x222233), 0, 0.02, 0.12, mega);
   } else if (role === 'floater') {
     const cap = new THREE.Group(); cap.position.y = 1.36; body.add(cap);
     const cc = [0xff4757, 0xffd23f, 0x4fc3ff, 0x6bf06a];
@@ -2938,6 +3064,13 @@ function makeAvatar(id) {
     const pen = new THREE.Group(); pen.position.set(0.03, -0.26, -0.08); pen.rotation.x = -1.2; arms[1].add(pen);
     add(new THREE.CylinderGeometry(0.02, 0.02, 0.2, 10), std(0x333344, { metalness: 0.8, roughness: 0.3 }), 0, 0.06, 0, pen);
     add(new THREE.SphereGeometry(0.022, 8, 6), glow(0xff2040, 3), 0, 0.17, 0, pen);
+    // silüet: sol elde dev "işaret parmağı" eldiveni (köpük el) — uzaktan bile İŞARETÇİ olduğu anlaşılır
+    const foam = new THREE.Group(); foam.position.set(-0.06, -0.3, 0); foam.rotation.x = Math.PI; arms[0].add(foam); // kol aşağıdayken parmak yukarı bakar
+    const fm = std(0xffffff, { roughness: 0.6 });
+    add(rbox(0.34, 0.36, 0.16, 0.07), fm, 0, 0.05, 0, foam);
+    add(new THREE.CapsuleGeometry(0.075, 0.42, 6, 12), fm, 0.06, 0.5, 0, foam);
+    add(new THREE.CapsuleGeometry(0.07, 0.12, 6, 12), fm, -0.2, 0.08, 0, foam).rotation.z = 0.9;
+    add(new THREE.CylinderGeometry(0.15, 0.17, 0.1, 16), std(R0.color, { roughness: 0.5 }), 0, -0.17, 0, foam);
   } else if (role === 'tiny') {
     // fare: kulaklar, bıyıklar, pembe burun, kuyruk
     for (const sx of [-1, 1]) {
@@ -2957,10 +3090,31 @@ function makeAvatar(id) {
   tag.scale.set(1.7, 0.37, 1); tag.position.y = small ? 0.85 : 2.05; tag.renderOrder = 10; root.add(tag);
   const bubble = new THREE.Sprite(new THREE.SpriteMaterial({ depthTest: false, transparent: true }));
   bubble.scale.set(0.6, 0.6, 1); bubble.position.y = small ? 1.3 : 2.6; bubble.visible = false; bubble.renderOrder = 11; root.add(bubble);
+  // İŞARETÇİ'nin pankartı (sadece o kullanır): her zaman kameraya döner, duvarların üstünden de görünür
+  let placard = null;
+  if (role === 'pointer') { placard = new THREE.Sprite(new THREE.SpriteMaterial({ depthTest: false, transparent: true })); placard.center.set(0.5, 0); placard.position.y = 2.42; placard.visible = false; placard.renderOrder = 12; root.add(placard); }
   shadowAll(root); tag.castShadow = false;
-  avatars[id] = { g: root, model, bubY: small ? 1.3 : 2.6, noMouth: role === 'pointer', body, face, eyes, mouth, arms, feet, prop, balloon, tag, bubble, role, name: p.name, talkUntil: 0, emote: null, bubbleUntil: 0, blinkT: rnd(1, 4), walk: 0, lastPos: new THREE.Vector3(), speed: 0 };
+  avatars[id] = { g: root, model, bubY: small ? 1.3 : 2.6, noMouth: role === 'pointer', body, face, eyes, mouth, arms, feet, prop, balloon, tag, bubble, placard, placardUntil: 0, placardT0: 0, sign: '', fx: null, role, name: p.name, talkUntil: 0, emote: null, bubbleUntil: 0, blinkT: rnd(1, 4), walk: 0, lastPos: new THREE.Vector3(), speed: 0 };
 }
 function showBubble(a, e) { a.bubble.material.map = bubbleTex(e); a.bubble.material.needsUpdate = true; a.bubble.visible = true; a.bubbleUntil = performance.now() + 2000; }
+// Pankart dokusu: saplı, kalın çerçeveli levha + iri yazı (odanın öbür ucundan okunacak kadar büyük)
+const placardCache = {};
+function placardTex(text) {
+  return placardCache[text] || (placardCache[text] = canvasTex(512, 320, (x) => {
+    const [bg, fg] = SIGN_COL[text] || ['#f5b800', '#15120d'];
+    x.fillStyle = '#6b4a2a'; x.fillRect(244, 200, 24, 120);                                   // sap
+    x.fillStyle = '#15120d'; roundRect(x, 4, 4, 504, 216, 26); x.fill();
+    x.fillStyle = bg; roundRect(x, 18, 18, 476, 188, 16); x.fill();
+    x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = fg;
+    let fs = 150; x.font = `400 ${fs}px ${FONT}`; while (x.measureText(text).width > 440 && fs > 60) { fs -= 4; x.font = `400 ${fs}px ${FONT}`; }
+    x.fillText(text, 256, 120);
+  }));
+}
+function showPlacard(a, text) {
+  if (!a.placard) return showBubble(a, '❗');
+  a.placard.material.map = placardTex(text); a.placard.material.needsUpdate = true; a.placard.visible = true;
+  a.sign = text; a.placardT0 = performance.now(); a.placardUntil = a.placardT0 + EMOTE_TUNE.placardMs; a.bubbleUntil = 0;
+}
 const _hand = new THREE.Vector3();
 function removeAvatar(id) {
   if (avatars[id]) { scene.remove(avatars[id].g); disposeTree(avatars[id].g); delete avatars[id]; }   // geometri, malzeme ve isim etiketi dokusu
@@ -3004,6 +3158,7 @@ function updateAvatars(dt, now) {
     let bodyY = floating ? Math.sin(now / 500) * 0.05 : Math.abs(Math.sin(a.walk)) * 0.06 * Math.min(1, a.speed / 3);
     let bodyRotY = 0, bodyRotZ = floating ? Math.sin(now / 700) * 0.12 : 0, bodyRotX = floating ? 0 : -Math.min(0.15, a.speed * 0.03), sq = 1;
     let armL = sw * 0.6, armR = -sw * 0.6;
+    if (a.role === 'pointer') armL = 2.7 + sw * 0.12; // köpük parmak hep havada: silüetin en belirgin parçası
     // emojiler
     if (a.emote && now < a.emote.until) {
       const t = now / 1000;
@@ -3015,10 +3170,43 @@ function updateAvatars(dt, now) {
         case 'honk': sq = 1 + Math.max(0, Math.sin(t * 12)) * 0.2; break;
         case 'yes': bodyRotX = Math.sin(t * 16) * 0.3; break;
         case 'no': bodyRotY = Math.sin(t * 16) * 0.6; break;
+        case 'again': bodyRotZ += Math.sin(t * 5) * 0.16; armR = 1.9 + Math.sin(t * 11) * 0.9; armL = 0.5; break; // "bir daha söyle": baş yana, el havada daire çizer
       }
     } else a.emote = null;
+    // konuşurken (kendi kaydı çalarken) küçük tepki: hafif öne eğilme, el kol
+    const talkNow = now < a.talkUntil && !a.noMouth;
+    if (talkNow && !a.emote) { bodyRotX -= 0.07; bodyY += Math.abs(Math.sin(now / 95)) * 0.025; armR = 1.15 + Math.sin(now / 170) * 0.4; }
+    // pankart: zıplayarak açılır, uzaktaki oyuncu için büyür
+    if (a.placard) {
+      if (now < a.placardUntil) {
+        const u = Math.min(1, (now - a.placardT0) / 220), pop = 1 + Math.sin(u * Math.PI) * 0.25, far = clamp(camera.position.distanceTo(a.g.position) / 7, 1, 2.2), w = 1.9 * far * u * pop;
+        a.placard.scale.set(w, w * 0.625, 1); a.placard.material.rotation = Math.sin(now / 240) * 0.05; armL = 2.9; // köpük el havaya
+      } else if (a.placard.visible) { a.placard.visible = false; a.sign = ''; }
+    }
+    // tek seferlik şakalar (avatarFx)
+    let bodyX = 0, bodyZ = 0, fxEye = 1;
+    if (a.fx) {
+      const u = (now - a.fx.t0) / a.fx.dur, v = a.fx.v, hop = Math.sin(Math.min(1, u) * Math.PI), CH = 0.74; // CH: gövdenin dönme merkezi
+      if (u >= 1) a.fx = null;
+      else switch (a.fx.kind) {
+        case 'bonk': sq *= 1 - 0.4 * Math.exp(-u * 5) * Math.cos(u * 17); bodyRotZ += [0.28, -0.28, 0][v] * (1 - u); fxEye = 1.3; if (v === 2) { armL = armR = 2.9; } else armR = 2.6; break;
+        case 'cheer':
+          if (v === 0) { bodyY += hop * 0.45; armL = armR = 2.8; }
+          else if (v === 1) { bodyY += Math.abs(Math.sin(u * Math.PI * 2)) * 0.28; armL = 2.6 + Math.sin(u * 12) * 0.5; armR = 2.6 - Math.sin(u * 12) * 0.5; }
+          else { bodyY += hop * 0.35; bodyRotY += u * Math.PI * 2; armL = armR = 2.4; }
+          break;
+        case 'tumble': {
+          const th = u * Math.PI * 2 * (v === 1 ? -1 : 1); bodyY += hop * 0.25;
+          if (v === 2) { bodyRotZ += th; bodyX += CH * Math.sin(th); bodyY += CH * (1 - Math.cos(th)); }
+          else { bodyRotX += -th; bodyZ += -CH * Math.sin(th); bodyY += CH * (1 - Math.cos(th)); }
+          break; }
+        case 'quack': bodyRotX += hop * 0.45; armL = armR = 2.2 + hop * 0.6; fxEye = 1.6; break;
+        case 'flinch': sq *= 1 - 0.14 * hop; fxEye = 1.35; if (v) armL = armR = 0.9 * hop; break;
+        case 'oops': armL = armR = 2.95; bodyRotY += Math.sin(u * 22) * 0.28 * (1 - u); fxEye = 1.5; bodyRotX += 0.12 * hop; break;
+      }
+    }
     if (chaos && chaos.type === 'disko') { const t = now / 1000; bodyRotY += Math.sin(t * 7 + id.length) * 0.6; bodyY += Math.abs(Math.sin(t * 8)) * 0.15; }
-    a.body.position.y = bodyY; a.body.rotation.set(bodyRotX, bodyRotY, bodyRotZ); a.body.scale.set(1 / Math.sqrt(sq), sq, 1 / Math.sqrt(sq));
+    a.body.position.set(bodyX, bodyY, bodyZ); a.body.rotation.set(bodyRotX, bodyRotY, bodyRotZ); a.body.scale.set(1 / Math.sqrt(sq), sq, 1 / Math.sqrt(sq));
     a.arms[0].rotation.x = armL; a.arms[1].rotation.x = armR;
     // baş aşağı kaosu
     const flip = chaos && chaos.type === 'bascasagi' && chaos.target === id;
@@ -3027,7 +3215,7 @@ function updateAvatars(dt, now) {
     if (flip) a.body.position.y -= 1.75;
     // göz kırpma & koca gözler
     a.blinkT -= dt; let blink = 1; if (a.blinkT < 0) { blink = 0.1; if (a.blinkT < -0.12) a.blinkT = rnd(2, 5); }
-    const big = chaos && chaos.type === 'gozler' ? 2.1 : 1;
+    const big = (chaos && chaos.type === 'gozler' ? 2.1 : 1) * fxEye * (talkNow ? 1.08 : 1);
     a.eyes.forEach(e => e.scale.set(big, big * blink, big));
     // konuşma: ağız sesin şiddetine göre açılır
     let open = 0.5;
@@ -3045,6 +3233,95 @@ function updateAvatars(dt, now) {
     else if (talking) { a.bubble.material.map = bubbleTex(a.role === 'reader' ? '🔄' : '🔊'); a.bubble.visible = true; a.bubble.position.y = a.bubY + Math.sin(now / 90) * 0.05; }
     else a.bubble.visible = false;
   }
+  updateFxObjs(now);
+}
+
+// ---------- tek seferlik avatar şakaları: avatarFx(id, tür) ----------
+// Kısa (<1.2 sn), kontrolü asla kilitlemez, her seferinde 3 çeşitten biri oynar (aynısı üst üste gelmez).
+// bonk: YERÇEKİMSİZ tavana hızlı çarpar · cheer: modül çözülünce herkes aynı anda zıplar · tumble: kısa takla
+// quack: sahte ördeği kapan irkilir (ördeğin kendisi quackDuck ile şişip fırlar) · flinch/oops: hata tepkisi
+const FX_MS = { bonk: 900, cheer: 800, tumble: 800, quack: 700, flinch: 450, oops: 1100 };
+const FX_NET = { bonk: 'floater', tumble: 'tiny' };                 // ağdan istenebilenler ve isteyebilecek rol (diğerleri durum değişiminden türetilir)
+const FX_TUNE = { relayGapMs: 600, bonkSpeed: 2.6, bonkGapMs: 900 }; // ilk tahminler
+const fxLog = [], fxObjs = [], fxRelayAt = {};
+let selfFx = null, lastBonk = -1e9;
+const starTex = canvasTex(64, 64, x => { x.font = '52px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#ffd23f'; x.strokeStyle = '#7a5200'; x.lineWidth = 4; x.strokeText('★', 32, 36); x.fillText('★', 32, 36); });
+function fxSound(kind, seed) {
+  const k = 1 + ((seed % 5) - 2) * 0.06; // her seferinde biraz farklı perde
+  if (kind === 'bonk') { tone(190 * k, 0.12, { type: 'sine', vol: 0.22, slide: 90 }); tone(620 * k, 0.05, { type: 'square', vol: 0.05, lp: 1800 }); if (seed % 3 === 0) tone(1300 * k, 0.25, { type: 'sine', vol: 0.04, when: 0.12, slide: 1700 }); }
+  else if (kind === 'tumble') noise(0.3, { vol: 0.07, filter: 'bandpass', freq: 500 * k, sweep: 1600, q: 2 });
+  else if (kind === 'oops') tone(330 * k, 0.22, { type: 'triangle', vol: 0.08, slide: 180 });
+}
+function avatarFx(id, kind, seed) {
+  if (!FX_MS[kind]) return false;
+  seed = (seed === undefined ? rand(1e6) : seed) >>> 0;
+  const now = performance.now(); let v = seed % 3;
+  fxLog.push({ id, kind, v, t: now }); if (fxLog.length > 80) fxLog.shift();
+  if (id === myId) { selfFx = { kind, t0: now, dur: FX_MS[kind], v }; fxSound(kind, seed); if (kind === 'bonk') burst(5 + seed % 4, [0xffd23f, 0xffffff], 1.6, 0.6, camera.localToWorld(new THREE.Vector3(0, 0.25, -0.7)), 0.03); return true; }
+  const a = avatars[id]; if (!a || a.fly) return false;
+  if (kind !== 'cheer' && a.lastFx === kind + v) v = (v + 1) % 3; // aynı şaka üst üste aynı görünmesin (cheer herkeste eş zamanlı, o yüzden tohuma sadık)
+  a.lastFx = kind + v; a.fx = { kind, t0: now, dur: FX_MS[kind], v };
+  fxLog[fxLog.length - 1].v = v;
+  if (kind === 'bonk') spawnStars(a, 3 + seed % 3, seed);
+  if (kind === 'oops') showBubble(a, '😬');
+  fxSound(kind, seed);
+  return true;
+}
+// kendi şakam: hemen yerelde oynar, diğerlerine oda sahibi üzerinden gider
+function sendFx(kind) { if (!FX_NET[kind] || !canPlay()) return; avatarFx(myId, kind); sendToHost({ t: 'fx', k: kind }); }
+function bonkSelf() { const now = performance.now(); if (now - lastBonk < FX_TUNE.bonkGapMs) return; lastBonk = now; sendFx('bonk'); }
+// oda sahibi: şakayı doğrular (tür, rol, hız sınırı) ve herkese aktarır
+function hostFx(m, from) {
+  const p = players[from]; if (!p || !inGame || !game || typeof m.k !== 'string' || !Object.prototype.hasOwnProperty.call(FX_NET, m.k) || p.role !== FX_NET[m.k]) return;
+  const now = performance.now(); if (now - (fxRelayAt[from] || -1e9) < FX_TUNE.relayGapMs) return;
+  fxRelayAt[from] = now; broadcast({ t: 'fx', id: from, k: m.k, s: rand(1e6) });
+}
+function spawnStars(a, n, seed) {
+  const small = a.role === 'tiny', y = small ? 0.7 : 1.85, r = small ? 0.22 : 0.5, dir = seed % 2 ? 1 : -1, t0 = performance.now();
+  const ss = Array.from({ length: n }, () => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: starTex, transparent: true, depthWrite: false })); a.g.add(s); return s; });
+  fxObjs.push({ t0, dur: FX_MS.bonk, upd(u) { ss.forEach((s, i) => { const an = dir * u * 7 + i / n * 6.283; s.position.set(Math.cos(an) * r, y + Math.sin(u * 9 + i) * 0.06, Math.sin(an) * r); const k = (small ? 0.12 : 0.24) * Math.sin(Math.min(1, u * 1.15) * Math.PI) + 0.001; s.scale.set(k, k, 1); }); }, end() { ss.forEach(s => { a.g.remove(s); s.material.dispose(); }); } });
+}
+// sahte ördek: şişer, sonra "VAK" diye dönerek fırlar (her seferinde başka yöne, başka yazıyla)
+const vakCache = {};
+function quackDuck(i, seed) {
+  const d = M.ducks && M.ducks[i]; if (!d) return false;
+  seed >>>= 0;
+  const g = makeDuck(1.35); g.position.copy(d.g.position); g.rotation.y = d.g.rotation.y; scene.add(g);
+  const word = ['VAK!', 'VAAAK!', 'VAK?!'][seed % 3], ang = (seed % 628) / 100, spin = (seed % 2 ? 1 : -1) * (10 + seed % 7);
+  const vel = new THREE.Vector3(Math.cos(ang) * 5, -1.5 - (seed % 4) * 0.5, Math.sin(ang) * 5), p0 = g.position.clone();
+  const lab = new THREE.Sprite(new THREE.SpriteMaterial({ map: vakCache[word] || (vakCache[word] = textTex([word], { w: 384, h: 160, size: 120, bg: 'none', fg: '#fff', stroke: '#e5382b', strokeW: 16 })), transparent: true, depthTest: false, depthWrite: false }));
+  lab.position.copy(p0).y += 0.75; lab.renderOrder = 12; scene.add(lab);
+  const k = 1 + ((seed % 5) - 2) * 0.08; tone(420 * k, 0.16, { type: 'sawtooth', vol: 0.16, slide: 250 * k, lp: 1500 }); tone(380 * k, 0.22, { type: 'sawtooth', vol: 0.14, slide: 200 * k, lp: 1300, when: 0.17 });
+  fxObjs.push({ t0: performance.now(), dur: 1100, upd(u) {
+    const A = 0.32; // ilk üçte bir: şişme, sonrası fırlama
+    if (u < A) { const q = u / A; g.scale.setScalar(1.35 * (1 + q * 1.1 + Math.sin(q * 30) * 0.06)); g.rotation.z = Math.sin(q * 40) * 0.15; }
+    else { const q = (u - A) / (1 - A), tt = q * 0.75; g.position.copy(p0).addScaledVector(vel, tt); g.rotation.y += spin * 0.016; g.rotation.z += spin * 0.012; g.scale.setScalar(Math.max(0.01, 2.9 * (1 - q))); }
+    const s = 1.5 * Math.min(1, u * 6) * (1 + Math.sin(u * 20) * 0.05); lab.scale.set(s, s * 0.42, 1); lab.position.y = p0.y + 0.75 + u * 0.5; lab.material.opacity = u > 0.75 ? (1 - u) * 4 : 1;
+  }, end() { scene.remove(g, lab); disposeTree(g); lab.material.dispose(); } });
+  return true;
+}
+function updateFxObjs(now) {
+  for (let i = fxObjs.length - 1; i >= 0; i--) { const o = fxObjs[i], u = (now - o.t0) / o.dur; if (u >= 1) { o.end(); fxObjs.splice(i, 1); } else o.upd(u); }
+  if (selfFx && now - selfFx.t0 > selfFx.dur) selfFx = null;
+}
+// kendi kameram: sadece tavana çarpınca küçük bir çökme (Kamera hareketi kapalıysa o da yok)
+const selfFxY = now => selfFx && selfFx.kind === 'bonk' && settings.motion ? -Math.sin(Math.min(1, (now - selfFx.t0) / 320) * Math.PI) * 0.07 : 0;
+// Durum değişiminden türeyen şakalar (applyState her durum paketinde çağırır): hata tepkisi, sahte ördek, çözülen modül sevinci
+let fxPrev = null;
+function avatarStateFx() {
+  const g = game; if (!g) return;
+  const by = {}; for (const id in (g.stats || {})) by[id] = (g.stats[id] && g.stats[id].strikes) || 0;
+  const cur = { game: g, strikes: g.strikes | 0, ducks: (g.ducksGot || []).length, solved: { ...g.solved }, by };
+  const prev = fxPrev; fxPrev = cur;
+  if (!prev || prev.game !== g || g.status !== 'playing') return;
+  if (cur.strikes > prev.strikes) {
+    const seed = cur.strikes * 7919 + cur.ducks * 104729 + Math.round(g.puzzle.time || 0), wrongDuck = cur.ducks > prev.ducks;
+    if (wrongDuck) quackDuck(g.ducksGot[g.ducksGot.length - 1], seed);
+    const culprits = Object.keys(by).filter(id => by[id] > (prev.by[id] || 0));
+    for (const id in avatars) avatarFx(id, culprits.includes(id) ? (wrongDuck ? 'quack' : 'oops') : 'flinch', seed);
+  }
+  const done = Object.keys(cur.solved).filter(k => cur.solved[k] && !prev.solved[k]);
+  if (done.length) { const seed = [...done[0]].reduce((s, ch) => s * 31 + ch.charCodeAt(0), 7) >>> 0; for (const id in avatars) avatarFx(id, 'cheer', seed); avatarFx(myId, 'cheer', seed); }
 }
 
 // =====================================================================
@@ -3154,7 +3431,7 @@ function setupRoleHud() {
     tiny: '<kbd>WASD</kbd> koş · <kbd>Boşluk</kbd> zıpla · <kbd>Sol tık</kbd> fare paneli · <kbd>V</kbd> konuş (cik cik)',
     none: '<kbd>WASD</kbd> yürü · <kbd>1-7</kbd> emoji',
   }[r];
-  $('#emotes').innerHTML = EMOTES.map((e, i) => `<div title="${e.name}"><span>${i + 1}</span>${e.e}</div>`).join('');
+  renderEmoteBar();
   renderPlayersHud(); updateKeymapHud(); renderModsHud();
   if (game) refreshModules();
 }
@@ -3254,13 +3531,19 @@ $('#btnProf').onclick = () => { renderProfile(); openModal('profModal'); };
 $('#btnFs').onclick = toggleFs; $('#btnFs2').onclick = toggleFs;
 $('#btnLostMenu').onclick = () => { location.href = location.pathname; };
 $('#btnHostLobby').onclick = () => { if (net.isHost && confirm('Herkes lobiye dönsün mü? Bu tur iptal olur.')) broadcast({ t: 'toLobby' }); };
-const SET_INPUTS = [['sVol', 'vol'], ['sMusic', 'music'], ['sSens', 'sens'], ['sFov', 'fov'], ['pVol', 'vol'], ['pMusic', 'music'], ['pSens', 'sens']];
+const SET_INPUTS = [['sVol', 'vol'], ['sMusic', 'music'], ['sSens', 'sens'], ['sFov', 'fov'], ['pVol', 'vol'], ['pMusic', 'music'], ['pSens', 'sens'], ['sShake', 'shake'], ['pShake', 'shake']];
+const COMFORT = [['motion', 'Kamera hareketi', 'Yürüme sallanması, süzülme salınımı, baş aşağı dönüş'], ['flash', 'Flaş ve ekran efektleri', 'Beyaz patlama, kırmızı nabız, renk kayması'], ['plain', 'Sade görüntü', 'Az parlama, kumlanma yok, hafif kenar kararması']];
+for (const id of ['cSeg', 'pcSeg']) {
+  $('#' + id).innerHTML = COMFORT.map(([k, n, d]) => `<button data-c="${k}">${n}<small>${d}</small></button>`).join('');
+  $$(`#${id} button`).forEach(b => b.onclick = () => { const k = b.dataset.c; settings[k] = !settings[k]; saveSettings(); applyComfort(); syncSettingsUi(); });
+}
 function syncSettingsUi() {
   for (const [id, k] of SET_INPUTS) {
     const el = $('#' + id); el.value = settings[k];
     const lab = el.nextElementSibling; if (lab) lab.textContent = k === 'sens' ? (+settings[k]).toFixed(1) : k === 'fov' ? Math.round(settings[k]) + '°' : Math.round(settings[k] * 100);
   }
   $$('#qSeg button').forEach(b => b.classList.toggle('on', b.dataset.q === settings.quality));
+  $$('#cSeg button, #pcSeg button').forEach(b => { b.classList.toggle('on', !!settings[b.dataset.c]); b.setAttribute('aria-pressed', settings[b.dataset.c] ? 'true' : 'false'); });
 }
 for (const [id, k] of SET_INPUTS) {
   $('#' + id).addEventListener('input', e => { settings[k] = +e.target.value; saveSettings(); applyVolumes(); syncSettingsUi(); if (k === 'fov' && !inGame) { camera.fov = settings.fov; camera.updateProjectionMatrix(); } });
@@ -3354,11 +3637,47 @@ function buildViewModel() {
 // =====================================================================
 const HINTS = { turnKey: () => '🔑 Anahtarı çevir (ikisi AYNI ANDA!)', phone: () => game.chaos && game.chaos.type === 'telefon' && !game.chaos.done ? '📞 AÇ! AÇ! AÇ!' : '📞 Acil hat (çalınca aç)', egg: () => '🦆 Vak?', duck: () => '🦆 Ördeği yakala', dial: () => '🔢 Rakamı çevir', dialOk: () => '✔ Kodu onayla', wire: u => `✂️ ${u.i + 1}. kabloyu kes`, key: () => '👆 Sembole bas', button: () => '🔴 Bas / basılı tut', pw: u => u.d > 0 ? '🔼 Harfi çevir' : '🔽 Harfi çevir', pwOk: () => '✔ Şifreyi gönder', fuse: () => '⚡ Şalteri çevir', fuseOk: () => '🔴 ONAYLA kolunu çek' };
 let last = performance.now(), sendT = 0, lastSec = -1, censorT = 0, posKey = '';
+// ---------- etkileşim hissi: vurgu çerçevesi, tıklama "pop"u, büyütülmüş dokunma alanı ----------
+const hoverTex = canvasTex(128, 128, x => { x.strokeStyle = '#fff'; x.lineWidth = 12; x.lineCap = 'round'; x.lineJoin = 'round'; for (const [a, b] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const X = a ? 120 : 8, Y = b ? 120 : 8, d = a ? -34 : 34, e = b ? -34 : 34; x.beginPath(); x.moveTo(X + d, Y); x.lineTo(X, Y); x.lineTo(X, Y + e); x.stroke(); } });
+const hoverMark = new THREE.Sprite(new THREE.SpriteMaterial({ map: hoverTex, transparent: true, depthTest: false, depthWrite: false })); hoverMark.renderOrder = 15; hoverMark.visible = false; hoverMark.userData.laserSkip = true; scene.add(hoverMark);
+const _hb = new THREE.Box3(), _hs = new THREE.Sphere(), pops = [];
+let hoverR = 0.2, hoverPopT = -1e9;
+const visOf = o => o.userData.proxy || o; // dokunma alanı (hitPad) → asıl görünen parça
 function setHover(o) {
   if (hovered === o) return;
-  if (hovered && hovered.material.emissive) hovered.material.emissive.setHex(hovered.userData.baseEm || 0);
-  hovered = o;
-  if (o && o.material.emissive) o.material.emissive.setHex(allowed(myRole(), canUse(o)) ? 0x5a4a10 : 0x400808);
+  if (hovered) { const v = visOf(hovered); if (v.material && v.material.emissive) v.material.emissive.setHex(v.userData.baseEm || 0); }
+  hovered = o; hoverMark.visible = !!o;
+  if (!o) return;
+  const v = visOf(o), ok = allowed(myRole(), canUse(o)) || o.userData.kind === 'egg';
+  if (v.material && v.material.emissive) v.material.emissive.setHex(ok ? 0x80680f : 0x5a0a0a);
+  _hb.setFromObject(v).getBoundingSphere(_hs); hoverMark.position.copy(_hs.center); hoverR = clamp(_hs.radius, 0.1, 0.9);
+  hoverMark.material.color.setHex(ok ? 0xf5b800 : 0xe5382b); // sarı köşeler: dokunabilirsin · kırmızı: bu senin işin değil
+}
+function updateHover(now) {
+  for (let i = pops.length - 1; i >= 0; i--) { // tıklanan parça kısa bir an büyür; ölçek göreli çarpıldığı için başka kodun yaptığı ölçek değişikliklerini bozmaz
+    const p = pops[i], u = (now - p.t0) / 170, k = u >= 1 ? 1 : 1 + 0.16 * Math.sin(u * Math.PI), f = k / p.k; p.k = k;
+    p.o.scale.x *= f; p.o.scale.z *= f; if (!p.keepY) p.o.scale.y *= f;
+    if (u >= 1) pops.splice(i, 1);
+  }
+  if (!hoverMark.visible) return;
+  const pu = (now - hoverPopT) / 220, s = hoverR * 2.5 * (1 + Math.sin(now / 150) * 0.04) * (pu < 1 ? 1 + 0.45 * Math.sin(pu * Math.PI) : 1);
+  hoverMark.scale.set(s, s, 1); hoverMark.material.opacity = 0.92;
+}
+function popObject(o) {
+  hoverPopT = performance.now();
+  let v = visOf(o); if (v.material && v.material.opacity === 0 && v.parent) v = v.parent; // görünmez dokunma küresi (ördek): görünen gövdeyi zıplat
+  if (v.userData.noPop || pops.some(p => p.o === v)) return;
+  pops.push({ o: v, t0: hoverPopT, k: 1, keepY: v.userData.kind === 'wire' }); // kablonun boyu (scale.y) oyun durumuna ait: sadece kalınlığı oynar
+}
+// Küçük hedefler için görünmez, büyütülmüş dokunma alanı. target: interact() ile kaydedilmiş görünen parça;
+// size: küre yarıçapı ya da [en, boy, derinlik] kutu (target'ın yerel ölçüsünde); offset: yerel kaydırma.
+// Alan target'ın türü ve verisiyle davranır, vurgu ve "pop" target'ta görünür; doğrudan vurulan gerçek parça her zaman önceliklidir.
+const hitPadMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+function hitPad(target, size, offset) {
+  const pad = new THREE.Mesh(Array.isArray(size) ? new THREE.BoxGeometry(size[0], size[1], size[2]) : new THREE.SphereGeometry(size, 10, 8), hitPadMat);
+  if (offset) pad.position.set(offset[0], offset[1], offset[2]);
+  pad.userData = { ...target.userData, proxy: target, pad: true, noCast: true, laserSkip: true };
+  pad.castShadow = pad.receiveShadow = false; target.add(pad); interactables.push(pad); return pad;
 }
 function loop() {
   requestAnimationFrame(loop);
@@ -3373,15 +3692,20 @@ function loop() {
     buildViewModel();
     // kamera
     const role = myRole();
-    const bobY = role !== 'floater' && me.onGround ? Math.sin(me.bob * 2) * 0.04 : 0;
-    camera.position.set(me.pos.x, me.pos.y + eyeH() + bobY * (role === 'tiny' ? 0.4 : 1), me.pos.z);
-    let roll = role === 'floater' ? Math.sin(now / 900) * 0.07 : 0;
-    if (game.chaos && game.chaos.type === 'bascasagi' && game.chaos.target === myId) roll = Math.PI;
-    if (me.fly) { me.fly.rollA = (me.fly.rollA || 0) + me.fly.roll * dt * (me.pos.y > 0.05 ? 1 : 0); roll = me.fly.rollA; }
+    const mo = settings.motion; // "Kamera hareketi" kapalıysa: yürüme sallanması, süzülme salınımı, baş aşağı dönüş ve patlama taklası yok
+    const bobY = mo && role !== 'floater' && me.onGround ? Math.sin(me.bob * 2) * 0.04 : 0;
+    camera.position.set(me.pos.x, me.pos.y + eyeH() + bobY * (role === 'tiny' ? 0.4 : 1) + selfFxY(now), me.pos.z);
+    let roll = mo && role === 'floater' ? Math.sin(now / 900) * 0.07 : 0;
+    const flipMe = !!(game.chaos && game.chaos.type === 'bascasagi' && game.chaos.target === myId);
+    if (flipMe && mo) roll = Math.PI;
+    invMark.classList.toggle('hidden', !(flipMe && !mo && game.status === 'playing')); // fare yine ters; kamera dönmüyorsa bunu açıkça göster
+    if (me.fly && mo) { me.fly.rollA = (me.fly.rollA || 0) + me.fly.roll * dt * (me.pos.y > 0.05 ? 1 : 0); roll = me.fly.rollA; }
     camRoll += (roll - camRoll) * Math.min(1, dt * 5);
     camera.rotation.set(me.pitch, me.yaw, camRoll);
-    if (shake > 0) { shake = Math.max(0, shake - dt); camera.position.x += rnd(-1, 1) * shake * 0.12; camera.position.y += rnd(-1, 1) * shake * 0.12; }
-    viewModel.position.y = -0.42 + Math.sin(me.bob * 2) * 0.012 + (role === 'floater' ? Math.sin(now / 500) * 0.02 : 0);
+    let shakeAmp = 0; // sarsıntı süresi aynı, genliği ayardaki yüzdeyle çarpılır
+    if (shake > 0) { shake = Math.max(0, shake - dt); shakeAmp = shake * 0.12 * settings.shake; camera.position.x += rnd(-1, 1) * shakeAmp; camera.position.y += rnd(-1, 1) * shakeAmp; }
+    camDbg.bob = bobY; camDbg.rollTarget = roll; camDbg.roll = camRoll; camDbg.shake = shake; camDbg.shakeAmp = shakeAmp; camDbg.flipMe = flipMe;
+    viewModel.position.y = -0.42 + (mo ? Math.sin(me.bob * 2) * 0.012 + (role === 'floater' ? Math.sin(now / 500) * 0.02 : 0) : 0);
     viewModel.visible = !me.fly;
     // sayaç
     const ts = fmtTime(game.timeLeft);
@@ -3401,10 +3725,10 @@ function loop() {
     alarm.intensity *= Math.pow(0.03, dt);
     if (M.antTip) M.antTip.material.emissiveIntensity = Math.max(0.5, M.antTip.material.emissiveIntensity * Math.pow(0.05, dt));
     if (M.bomb) { const pan = game.status === 'playing' && game.timeLeft < 20 ? 0.012 : 0; M.bomb.position.x = rnd(-1, 1) * pan; M.bomb.rotation.y = rnd(-1, 1) * pan; }
-    $('#vignette').style.opacity = game.status === 'playing' && game.timeLeft < 30 ? (0.35 + Math.sin(now / 200) * 0.25) : (holdingBtn ? 0 : $('#vignette').style.opacity * 0.9);
+    $('#vignette').style.opacity = game.status === 'playing' && game.timeLeft < 30 ? (settings.flash ? 0.35 + Math.sin(now / 200) * 0.25 : 0.26) : (holdingBtn ? 0 : $('#vignette').style.opacity * 0.9); // efektler kapalı: nabız yok, sabit hafif kenar
     // nişan
     const o = document.pointerLockElement === canvas ? aimed() : null;
-    setHover(o);
+    setHover(o); updateHover(now);
     const cross = $('#cross'), hint = $('#hint');
     if (o) {
       const need = canUse(o), ok = allowed(myRole(), need) || o.userData.kind === 'egg';
@@ -3438,7 +3762,7 @@ function loop() {
       else if (hit >= 0 && lsrT >= 0) { lsrT += dt; if (lsrT > 0.2) { lsrT = -1; tone(1400, 0.12, { type: 'sine', vol: 0.14 }); } }
     } else lsrOn = -1;
     $('#roleIntro').classList.toggle('hidden', !(game.countdown > 0 && game.status === 'playing'));
-    const tf = settings.fov + (game.chaos && game.chaos.type === 'kafein' && game.status === 'playing' ? 14 : 0);
+    const tf = settings.fov + (settings.motion && game.chaos && game.chaos.type === 'kafein' && game.status === 'playing' ? 14 : 0); // hız aynı kalır; sadece görüş açısı sıçraması isteğe bağlı
     if (Math.abs(camera.fov - tf) > 0.05) { camera.fov += (tf - camera.fov) * Math.min(1, dt * 6); camera.updateProjectionMatrix(); }
     censorT -= dt; if (censorT < 0) { censorT = 0.18; if (myRole() !== 'defuser') drawCensor(); }
     if (recorder) $('#recLvl').style.width = (micLevel() * 100) + '%';
@@ -3455,20 +3779,26 @@ function loop() {
   // ortam animasyonları
   fanBlades.rotation.z += dt * 6;
   const clk = now / 1000; hMin.rotation.z = clk * 0.6; hHour.rotation.z = clk * 0.05;
-  const dp = dust.geometry.attributes.position; for (let i = 0; i < dp.count; i += 7) { let y = dp.getY(i) + dt * 0.05; if (y > H) y = 0.2; dp.setY(i, y); } dp.needsUpdate = true;
+  const dp = dust.geometry.attributes.position; if (HIGH) for (let i = 0; i < dp.count; i += 7) { let y = dp.getY(i) + dt * 0.05; if (y > H) y = 0.2; dp.setY(i, y); } dp.needsUpdate = true;
   couchDuck.rotation.y = 0.5 + Math.sin(now / 1200) * 0.15;
   duckBoing = Math.max(0, duckBoing - dt * 2.2); couchDuck.position.y = 0.75 + Math.abs(Math.sin(duckBoing * 9)) * duckBoing * 0.35; couchDuck.scale.set(1.2, 1.2 * (1 - duckBoing * 0.25 * Math.cos(duckBoing * 18)), 1.2);
   stars.rotation.y = now / 400000;
   { const live = inGame && game && game.status === 'playing', panic = live && game.timeLeft < 30, alert = live && (panic || game.strikes > 0);
-    stripMat.emissive.setHex(panic ? 0xff2a1a : 0x2ec4b6); stripMat.emissiveIntensity = panic ? 1.6 + Math.sin(now / 120) * 1.2 : 1.5;
-    beacons.forEach((b, i) => { const f = alert ? 0.5 + 0.5 * Math.sin(now / (panic ? 110 : 260) + i * 1.6) : 0; b.mat.emissiveIntensity = 0.3 + f * 6; if (b.light) b.light.intensity = f * (panic ? 34 : 14); });
+    const calm = !settings.flash; // efektler kapalı: ikaz ışıkları aynı bilgiyi verir ama yavaş ve sönük dalgalanır
+    stripMat.emissive.setHex(panic ? 0xff2a1a : 0x2ec4b6); stripMat.emissiveIntensity = panic ? (calm ? 1.7 : 1.6 + Math.sin(now / 120) * 1.2) : 1.5;
+    beacons.forEach((b, i) => { const f = alert ? 0.5 + 0.5 * Math.sin(now / (calm ? 520 : panic ? 110 : 260) + i * 1.6) : 0; b.mat.emissiveIntensity = 0.3 + f * (calm ? 2.5 : 6); if (b.light) b.light.intensity = f * (panic ? 34 : 14) * (calm ? 0.35 : 1); });
     crtT -= dt; if (crtT < 0) { crtT = 0.45; drawCrt(); } }
   film.ab *= Math.pow(0.03, dt);
-  if (filmPass) { filmPass.uniforms.uTime.value = (now / 1000) % 100; filmPass.uniforms.uAb.value = film.ab + (inGame && game && game.status === 'playing' && game.timeLeft < 30 ? 0.03 + Math.sin(now / 200) * 0.02 : 0); }
+  if (filmPass) { filmPass.uniforms.uTime.value = (now / 1000) % 100; filmPass.uniforms.uAb.value = settings.flash ? film.ab + (inGame && game && game.status === 'playing' && game.timeLeft < 30 ? 0.03 + Math.sin(now / 200) * 0.02 : 0) : 0; }
   if (NORENDER) return; // otomatik testler: mantık çalışır, çizim atlanır
   if (composer) composer.render(); else renderer.render(scene, camera);
 }
 let camRoll = 0, lsrOn = -1, lsrT = 0;
+const camDbg = { bob: 0, roll: 0, rollTarget: 0, shake: 0, shakeAmp: 0, flipMe: false }; // testler için: kameranın o karedeki değerleri
+// BAŞ AŞAĞI kaosunda kamera döndürülmüyorsa (Kamera hareketi kapalı) farenin ters olduğunu söyleyen işaret
+const invMark = document.createElement('div'); invMark.id = 'invMark'; invMark.className = 'hidden';
+invMark.innerHTML = '<svg class="ic" viewBox="0 0 24 24"><path d="M7 4v16M7 4L3.5 7.5M7 4l3.5 3.5M17 20V4M17 20l-3.5-3.5M17 20l3.5-3.5"/></svg><div>Baş aşağı<br><small>fare yönleri ters</small></div>';
+$('#hud').appendChild(invMark);
 const P_duckY = i => game.puzzle.ducks.spots[i][1];
 
 // =====================================================================
@@ -3480,7 +3810,7 @@ showPause = function (on) {
   $('#hostLobbyRow').classList.toggle('hidden', !net.isHost);
   if (on && game) { const starting = game.countdown > 0; $('#pause h2').textContent = starting ? 'Hazır mısın?' : 'Fare serbest'; $('#pause p').textContent = starting ? 'Tıkla ve bombaya koş! (ESC fareyi serbest bırakır)' : 'Bomba seni beklemiyor! Saat işliyor... ⏰'; $('#btnResume').textContent = starting ? 'Başla' : 'Oyuna Dön'; }
 };
-syncSettingsUi();
+syncSettingsUi(); applyComfort();
 $('#loading').classList.add('hidden');
 $('#roleStrip').innerHTML = LOBBY_ORDER.map(r => `<div style="--rc:${ROLES[r].css}">${icon(ROLES[r].ic)}${ROLES[r].name}</div>`).join('');
 $('#menu').classList.remove('hidden');
@@ -3488,6 +3818,9 @@ loop();
 window.__tb = { get game() { return game; }, me, players: () => players, net, act: m => sendToHost(m), myRole, avatars, emote: doEmote, M, camera, setRole: r => { players[myId].role = r; refreshModules(); setupRoleHud(); syncAvatars(); }, laser: v => { laserOn = v; } }; // test için
 let tbLaserPt = null; // test: İŞARETÇİ'nin lazer noktasını zorla (T.laser([x, y, z])); gerçek oyunda hep null
 Object.assign(window.__tb, { laser: v => { laserOn = !!v; tbLaserPt = Array.isArray(v) ? v : null; }, hostPuzzle: () => hostR && hostR.P, toLobby: () => net.isHost && broadcast({ t: 'toLobby' }), hostR: () => hostR, VAC, res: () => { let n = 0; scene.traverse(() => n++); return { geo: renderer.info.memory.geometries, tex: renderer.info.memory.textures, prog: renderer.info.programs ? renderer.info.programs.length : 0, objs: n, particles: particles.length, rain: ducks.length, lasers: Object.keys(lasers).length, avatars: Object.keys(avatars).length }; }, LSR, REACH, BTN_RULE, get myId() { return myId; }, plateOf, MOD_ROLE, ACT_MOD, hostDiag, hostMeta, cleanName, checkSolvable, genPuzzle, MOD_NEEDS, REQ_ROLES, missingRoles, hostStart, raw: m => net.hostConn && net.hostConn.send(m) }); // PKG-A test kancaları
+// test için (konfor / görüntü / performans): ayarlar, kamera ve efekt değerleri, renderer
+Object.assign(window.__tb, { settings, applyComfort, syncSettingsUi, cam: camDbg, hitPad, pops, hover: () => ({ kind: hovered ? hovered.userData.kind : null, pad: !!(hovered && hovered.userData.pad), mark: hoverMark.visible, color: hoverMark.material.color.getHex(), size: hoverMark.scale.x, em: hovered && visOf(hovered).material.emissive ? visOf(hovered).material.emissive.getHex() : null }), interactables: () => interactables, avatarFx, sendFx, quackDuck, fxLog, fxObjs, FX_MS, FX_TUNE, hostFx, playEmote, emoteLog, EMOTES, EMOTE_TUNE, renderer, scene, THREE, applyTheme, HIGH, setShake: v => { shake = v; }, explode, flashVignette,
+  post: () => ({ bloom: bloom ? bloom.strength : null, vig: filmPass ? filmPass.uniforms.uVig.value : null, grain: filmPass ? filmPass.uniforms.uGrain.value : null, ab0: filmPass ? filmPass.uniforms.uAb0.value : null, ab: filmPass ? filmPass.uniforms.uAb.value : null, filmAb: film.ab, nofx: document.body.classList.contains('nofx'), vignette: +$('#vignette').style.opacity || 0, flashShown: getComputedStyle($('#flash')).display !== 'none', softFade: softFadeEl.classList.contains('on'), invMark: !invMark.classList.contains('hidden'), alarm: alarm.color.r * alarm.intensity, fov: camera.fov }) });
 
 </script>
 </body>
