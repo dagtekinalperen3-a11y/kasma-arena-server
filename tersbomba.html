@@ -1805,7 +1805,7 @@ function hostAction(m, from) {
     if (P.ducks.gold.includes(i)) { if (P.ducks.gold.every(g => game.ducksGot.includes(g))) S.ducks = true; }
     else hostStrike('Sahte ördek! VAAAK! 🦆', from);
   } else if (m.a === 'dial' && S.mouse === false) {
-    const i = clamp(m.i | 0, 0, 2); game.mouseDial[i] = (game.mouseDial[i] + 1) % 10;
+    const i = clamp(m.i | 0, 0, 2); game.mouseDial[i] = (game.mouseDial[i] + (m.d === -1 ? 9 : 1)) % 10;   // d: -1 = geri (sağ tık)
   } else if (m.a === 'dialOk' && S.mouse === false) {
     if (game.mouseDial.every((v, i) => v === P.mouseCode[i])) S.mouse = true; else hostStrike(`Fare kodu yanlış! (${game.mouseDial.join('')}) 🐭`, from);
   } else if (m.a === 'maze' && S.maze === false) {
@@ -3239,6 +3239,7 @@ function aimed() {
 }
 const NOPE = ['🙅 Elini çek! Bu TERS TUŞ\'un işi.', '🚫 Sen dokunursan patlar. Ciddiyim.', '👀 Göremediğin şeye dokunma!', '🤚 TERS TUŞ\'a söyle, o yapsın.'];
 document.addEventListener('mousedown', e => {
+  if (document.pointerLockElement === canvas && e.button === 2 && myRole() === 'tiny') { const o2 = aimed(); if (o2 && o2.userData.kind === 'dial' && !game.solved.mouse) { sfx.clack(); popCross(); sendToHost({ t: 'act', a: 'dial', i: o2.userData.i, d: -1 }); } return; }   // MİNİK: sağ tık rakamı geri alır
   if (document.pointerLockElement !== canvas || e.button !== 0) return;
   const o = aimed(); if (!o) return;
   const u = o.userData, need = canUse(o);
@@ -3333,8 +3334,10 @@ function updateMe(dt) {
     if (active && keys.Space) v.y += acc * dt;
     if (active && (keys.ShiftLeft || keys.ShiftRight)) v.y -= acc * dt;
     tAcc += dt;
-    v.x += Math.sin(tAcc * 0.7) * 0.4 * dt; v.z += Math.cos(tAcc * 0.53) * 0.4 * dt; v.y += Math.sin(tAcc * 0.9) * 0.3 * dt;
-    v.multiplyScalar(Math.pow(0.55, dt));
+    const brake = active && (keys.KeyC || (hovered && !f && !s && !keys.Space && !keys.ShiftLeft && !keys.ShiftRight));   // C basılı: çapa · nişan bir düzenekteyken kendiliğinden sabitlenir
+    me.braking = !!brake;
+    if (!brake) { v.x += Math.sin(tAcc * 0.7) * 0.4 * dt; v.z += Math.cos(tAcc * 0.53) * 0.4 * dt; v.y += Math.sin(tAcc * 0.9) * 0.3 * dt; }
+    v.multiplyScalar(Math.pow(brake ? 0.004 : 0.55, dt));
     if (v.length() > 4.2 * caf) v.setLength(4.2 * caf);
     p.addScaledVector(v, dt);
     collide(p, v, true);
@@ -3877,7 +3880,7 @@ function setupRoleHud() {
   const tips = {
     reader: `Bombayı <b>göremezsin</b>! <kbd>V</kbd> basılı = konuş → herkes <b style="color:var(--pink)">TERSTEN</b> duyar. <kbd>B</kbd> = prova.${game && !game.puzzle.pages ? '<br>📄 Kitapçığın eksik sayfaları odada parlıyor, bul!' : ''}`,
     defuser: `Bombayı <b>sadece sen</b> görürsün. <kbd>Sol tık</kbd> = kes / bas / çevir.`,
-    floater: `Yer çekimin yok! <kbd>WASD</kbd> itme · <kbd>Boşluk</kbd> yukarı · <kbd>Shift</kbd> aşağı.`,
+    floater: `Yer çekimin yok! <kbd>WASD</kbd> itme · <kbd>Boşluk</kbd> yukarı · <kbd>Shift</kbd> aşağı · <kbd>C</kbd> basılı = fren (olduğun yerde dur).`,
     pointer: `Herkesi duyarsın ama <b>konuşamazsın</b>. Lazer (<kbd>Sağ tık</kbd>) ve hareketlerle (<kbd>1</kbd>-<kbd>7</kbd>) anlat!`,
     tiny: `Fare boyundasın 🐭 Masanın altına girebilirsin, sesin cik cik çıkar.`,
     none: 'Arkana yaslan, patlamanın tadını çıkar. 🍿',
@@ -3890,7 +3893,7 @@ function setupRoleHud() {
   $('#bottom').innerHTML = {
     reader: '<kbd>WASD</kbd> yürü · <kbd>M</kbd> kitapçık · <kbd>V</kbd> konuş (ters!) · <kbd>B</kbd> prova · <kbd>Boşluk</kbd> zıpla',
     defuser: '<kbd>???</kbd> yürü (TERS SES\'e sor!) · <kbd>Sol tık</kbd> etkileşim · <kbd>V</kbd> konuş · <kbd>Boşluk</kbd> zıpla',
-    floater: '<kbd>WASD</kbd> süzül · <kbd>Boşluk</kbd>/<kbd>Shift</kbd> yukarı/aşağı · <kbd>Sol tık</kbd> şalter/ördek · <kbd>V</kbd> konuş',
+    floater: '<kbd>WASD</kbd> süzül · <kbd>Boşluk</kbd>/<kbd>Shift</kbd> yukarı/aşağı · <kbd>C</kbd> fren · <kbd>Sol tık</kbd> şalter/ördek · <kbd>V</kbd> konuş',
     pointer: '<kbd>WASD</kbd> yürü · <kbd>Sağ tık</kbd> lazer · <kbd>6</kbd> ✅ Evet · <kbd>7</kbd> ❌ Hayır · konuşamazsın 🤐',
     tiny: '<kbd>WASD</kbd> koş · <kbd>Boşluk</kbd> zıpla · <kbd>Sol tık</kbd> fare paneli · <kbd>V</kbd> konuş (cik cik)',
     none: '<kbd>WASD</kbd> yürü · <kbd>1-7</kbd> emoji',
@@ -4100,7 +4103,7 @@ function buildViewModel() {
 // =====================================================================
 //  ANA DÖNGÜ
 // =====================================================================
-const HINTS = { turnKey: () => '🔑 Anahtarı çevir (ikisi AYNI ANDA!)', phone: () => game.chaos && game.chaos.type === 'telefon' && !game.chaos.done ? '📞 AÇ! AÇ! AÇ!' : '📞 Acil hat (çalınca aç)', egg: () => '🦆 Vak?', duck: () => '🦆 Ördeği yakala', dial: () => '🔢 Rakamı çevir', dialOk: () => '✔ Kodu onayla', wire: u => `✂️ ${u.i + 1}. kabloyu kes`, key: () => '👆 Sembole bas', button: () => '🔴 Bas / basılı tut', pw: u => u.d > 0 ? '🔼 Harfi çevir' : '🔽 Harfi çevir', pwOk: () => '✔ Şifreyi gönder', fuse: () => '⚡ Şalteri çevir', fuseOk: () => '🔴 ONAYLA kolunu çek' };
+const HINTS = { turnKey: () => '🔑 Anahtarı çevir (ikisi AYNI ANDA!)', phone: () => game.chaos && game.chaos.type === 'telefon' && !game.chaos.done ? '📞 AÇ! AÇ! AÇ!' : '📞 Acil hat (çalınca aç)', egg: () => '🦆 Vak?', duck: () => '🦆 Ördeği yakala', dial: () => '🔢 Sol tık +1 · Sağ tık −1', dialOk: () => '✔ Kodu onayla', wire: u => `✂️ ${u.i + 1}. kabloyu kes`, key: () => '👆 Sembole bas', button: () => '🔴 Bas / basılı tut', pw: u => u.d > 0 ? '🔼 Harfi çevir' : '🔽 Harfi çevir', pwOk: () => '✔ Şifreyi gönder', fuse: () => '⚡ Şalteri çevir', fuseOk: () => '🔴 ONAYLA kolunu çek' };
 let last = performance.now(), sendT = 0, lastSec = -1, censorT = 0, posKey = '';
 // ---------- etkileşim hissi: vurgu çerçevesi, tıklama "pop"u, büyütülmüş dokunma alanı ----------
 const hoverTex = canvasTex(128, 128, x => { x.strokeStyle = '#fff'; x.lineWidth = 12; x.lineCap = 'round'; x.lineJoin = 'round'; for (const [a, b] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const X = a ? 120 : 8, Y = b ? 120 : 8, d = a ? -34 : 34, e = b ? -34 : 34; x.beginPath(); x.moveTo(X + d, Y); x.lineTo(X, Y); x.lineTo(X, Y + e); x.stroke(); } });
