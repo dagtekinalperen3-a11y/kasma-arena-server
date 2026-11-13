@@ -171,6 +171,11 @@ kbd{display:inline-block;min-width:22px;text-align:center;padding:0 6px;border-r
 .task.info{display:none;padding-left:0;color:#b9b2a2;font-size:14px;border-top:1px dashed #3d444e;margin-top:4px;padding-top:4px}
 .task.info::before{display:none}
 #roleCard.open .task.info{display:block}#roleCard.open .tip{display:block}
+.nowh{font:700 12px var(--body);letter-spacing:3px;color:var(--haz);margin:2px 0 3px}
+.nowh.later{color:var(--dim);margin-top:8px;border-top:1px solid #3d444e;padding-top:6px}
+.task.now{font-size:16px;font-weight:700;padding:3px 0 3px 22px}
+.task.now.tip2{padding-left:0}.task.now.tip2::before{display:none}
+.task.later{display:none}#roleCard.open .task.later{display:block}
 #players{position:absolute;top:14px;right:14px;padding:8px 12px 6px;min-width:170px}
 #players .p{display:flex;align-items:center;gap:7px;padding:2px 0;font:700 15px var(--body);letter-spacing:.8px;text-transform:uppercase;transition:transform .1s}
 #players .p .ic{font-size:17px}
@@ -1747,7 +1752,11 @@ function hostOnTile(from, i) { // labirent: yürüyenin bilinen konumu o karenin
 }
 function hostAfter(before, from) { // aksiyon sonrası: katkı, final, yayın
   const S = game.solved;
-  for (const k in S) if (S[k] && !before[k]) stat(from, 'solves');
+  for (const k in S) if (S[k] && !before[k]) {
+    stat(from, 'solves');
+    const N = MOD_NEEDS[k] || {}, helpers = new Set([...(N.needs || []), N.info ? hostR.P[N.info] : null].filter(Boolean));   // kuralı/bilgiyi sağlayanlar
+    for (const id in players) if (id !== from && helpers.has(players[id].role)) stat(id, 'info');
+  }
   // tüm modüller bitti: BÜYÜK FİNAL — herkes kendi plakasına!
   if (Object.values(S).every(Boolean) && !game.final) game.final = { hold: 0, on: [] };
   pushState();
@@ -3016,13 +3025,11 @@ function endRound(status, why) {
     const st = Object.values(game.stats);
     const top = k => st.filter(s => s[k] > 0).sort((a, b) => b[k] - a[k])[0];
     const aw = [];
-    const v = top('voice'); if (v) aw.push(`🗣️ <b>En Geveze:</b> ${esc(v.name)} (${v.voice} kayıt)`);
-    const e = top('emote'); if (e) aw.push(`🤡 <b>Emoji Canavarı:</b> ${esc(e.name)} (${e.emote} emoji)`);
-    const s = top('strikes'); if (s) aw.push(`💣 <b>Yanlış Kablo Ödülü:</b> ${esc(s.name)} (${s.strikes} hata)`);
-    const mv = top('solves'); if (mv) aw.push(`🏆 <b>Günün Kahramanı:</b> ${esc(mv.name)} (${mv.solves} modül çözdü)`);
-    const ph = top('phone'); if (ph) aw.push(`📞 <b>Santral Memuru:</b> ${esc(ph.name)} (telefona o baktı)`);
+    // katkı: herkes için, rolüyle birlikte; konuşma/emoji sayısı ödüllendirilmez, hata kişiye yazılmaz
+    for (const id in game.stats) { const x = game.stats[id], pl = players[id], R1 = ROLES[(pl && pl.role) || 'none']; if ((x.solves || 0) + (x.info || 0) + (x.phone || 0) === 0) continue;
+      aw.push(`${icon(R1.ic)} <b>${esc(x.name)}</b> · ${[x.solves ? `${x.solves} modül uyguladı` : '', x.info ? `${x.info} modülde bilgi sağladı` : '', x.phone ? 'telefona baktı' : ''].filter(Boolean).join(' · ')}`); }
     if ((game.auto || []).length) aw.push(`🛠️ <b>Otomatik bakımla kapanan:</b> ${game.auto.map(m => MOD_INFO[m].name).join(', ')}`);
-    if (game.mazeFails > 0) aw.push(`🧭 <b>Labirentte kaybolma sayısı:</b> ${game.mazeFails}`);
+    if (game.mazeFails > 0) aw.push(`🧭 <b>Tünelde baştan başlama:</b> ${game.mazeFails} (takımca)`);
     if (!won) aw.push(`✂️ <b>Doğru kablo:</b> ${P.wireAns + 1}. kablo idi${P.mods.includes('password') ? ` · <b>Şifre:</b> ${P.pw.word}` : ''}`);
     if (!aw.length) aw.push('🦆 <b>Ördek Ödülü:</b> herkese, katıldığınız için');
     $('#awards').innerHTML = aw.map(a => `<li>${a}</li>`).join('');
@@ -3878,7 +3885,10 @@ function myTasks() {
 }
 function renderTasks() {
   const el = $('#tasks'); if (!el || !game) return;
-  el.innerHTML = myTasks().map(t => `<div class="task ${t.done ? 'done' : ''} ${t.info ? 'info' : ''}">${t.t}</div>`).join('');
+  const T = myTasks(), todo = T.filter(t => !t.info && !t.done), now = new Set((todo.length ? todo : T.filter(t => t.info)).slice(0, 2));   // kendi işin bittiyse ilk iki bilgi/yardım satırı öne çıkar
+  el.innerHTML = '<div class="nowh">ŞİMDİ</div>' + (now.size ? '' : '<div class="task done">Kendi işlerin tamam. Ekibe yardım et!</div>') +
+    T.filter(t => now.has(t)).map(t => `<div class="task now ${t.info ? 'tip2' : ''}">${t.t}</div>`).join('') +
+    '<div class="nowh later">DİĞER <kbd>H</kbd></div>' + T.filter(t => !now.has(t)).map(t => `<div class="task later ${t.done ? 'done' : ''} ${t.info ? 'info' : ''}">${t.t}</div>`).join('');
 }
 function renderSecret() {
   const el = $('#secret'); if (!game) return;
