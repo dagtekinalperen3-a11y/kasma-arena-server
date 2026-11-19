@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d11">
+<meta name="description" content="Reklam Veriyor: tek sayfalık piksel reklam panosu. Boş alanı seç, sabit ücretle reklamını yayınla.">
+<title>Reklam Veriyor · Piksel Reklam Panosu</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ffc83d'/%3E%3Ctext x='16' y='21' font-family='Arial' font-weight='900' font-size='13' text-anchor='middle' fill='%231a1405'%3ERV%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/css/style.css?v=2">
+</head>
+<body class="board-page">
+
+<div id="stage" class="stage" tabindex="0" aria-label="Reklam panosu. Yakınlaştırmak için + ve -, sığdırmak için 0 tuşu.">
+  <div id="board" class="board">
+    <div id="ads" class="ads"></div>
+    <div id="overlay" class="overlay" hidden></div>
+    <div id="hovercell" class="hovercell" hidden></div>
+    <div id="selbox" class="selbox" hidden>
+      <span class="selbox-tag" id="seltag"></span>
+      <span class="hdl nw" data-h="nw"></span><span class="hdl ne" data-h="ne"></span>
+      <span class="hdl sw" data-h="sw"></span><span class="hdl se" data-h="se"></span>
+    </div>
+  </div>
+</div>
+
+<div id="empty-hint" class="empty-hint" hidden>
+  <h1>Bu pano henüz boş</h1>
+  <p>İlk reklamı sen ver: istediğin büyüklükte bir alan seç, tek seferlik ücretle yayınla.</p>
+  <button class="btn primary" type="button" data-action="advertise">Reklam Ver</button>
+</div>
+
+<section id="selpanel" class="selpanel" hidden aria-live="polite">
+  <h2><span>Alan seç</span> <span id="test-chip" class="chip warn" hidden>Test ödemesi</span></h2>
+  <div class="legend">
+    <span><i class="swatch free"></i>Boş</span>
+    <span><i class="swatch reserved"></i>Rezerve</span>
+    <span><i class="swatch sold"></i>Satıldı</span>
+    <span><i class="swatch sel"></i>Seçimin</span>
+  </div>
+  <dl class="sel-stats" id="sel-stats">
+    <div><dt>En</dt><dd id="s-w"></dd></div>
+    <div><dt>Boy</dt><dd id="s-h"></dd></div>
+    <div><dt>Toplam piksel</dt><dd id="s-px"></dd></div>
+    <div><dt>Yayın süresi</dt><dd id="s-days"></dd></div>
+    <div class="price"><dt>Fiyat</dt><dd id="s-price"></dd></div>
+  </dl>
+  <p class="sel-msg" id="sel-msg"></p>
+  <div class="sel-actions">
+    <button class="btn ghost" type="button" id="sel-clear">Temizle</button>
+    <button class="btn primary" type="button" id="sel-buy" disabled>Devam et</button>
+  </div>
+</section>
+
+<nav id="dock" class="dock" aria-label="Ana menü">
+  <a class="dock-brand" href="/" title="Reklam Veriyor"><span class="brand-mark">RV</span><span class="dock-brand-text">Reklam Veriyor</span></a>
+  <button id="btn-advertise" class="btn primary" type="button" data-action="advertise">Reklam Ver</button>
+  <a class="btn ghost" href="/reklamlarim">Reklamlarım</a>
+  <div class="zoom">
+    <button id="zoom-out" class="iconbtn" type="button" aria-label="Uzaklaştır">−</button>
+    <button id="zoom-fit" class="iconbtn" type="button" aria-label="Panoyu ekrana sığdır">⤢</button>
+    <button id="zoom-in" class="iconbtn" type="button" aria-label="Yakınlaştır">+</button>
+  </div>
+</nav>
+
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<script src="/static/js/common.js?v=2"></script>
+<script src="/static/js/board.js?v=2"></script>
+</body>
+</html>

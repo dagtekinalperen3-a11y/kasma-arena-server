@@ -1,0 +1,27 @@
+ÖN BİLGİLENDİRME FORMU VE MESAFELİ SATIŞ SÖZLEŞMESİ (ŞABLON)
+
+Bu metin bir şablondur. Siteyi yayına almadan önce Yönetim > Yasal metin bölümünden kendi bilgilerinizle güncelleyin ve bir hukukçuya kontrol ettirin.
+
+1. SATICI
+Unvan / Ad Soyad: [doldurun]
+Adres: [doldurun]
+Vergi dairesi ve numarası: [doldurun]
+E-posta: [doldurun]   Telefon: [doldurun]
+
+2. HİZMETİN KONUSU
+Reklam Veriyor panosunda alıcının seçtiği piksel alanında, ödeme sayfasında belirtilen süre boyunca alıcının reklamının yayınlanması.
+
+3. ÜCRET
+Ödeme sayfasında gösterilen tutar sabit ücrettir. Gösterim veya tıklama başına ek ücret alınmaz. Reklamverene gösterim veya tıklama karşılığında ödeme yapılmaz. Gösterim ve tıklama sayıları yalnızca bilgi amaçlıdır.
+
+4. YAYIN
+Ödeme sağlayıcısı ödemeyi onayladığında alan alıcının hesabına bağlanır ve yayın süresi başlar. Alıcı, Reklamlarım panelinden görselini, buton yazısını ve bağlantısını süre boyunca güncelleyebilir.
+
+5. İÇERİK KURALLARI
+Yasa dışı, yanıltıcı, müstehcen, nefret söylemi içeren, zararlı yazılım barındıran veya üçüncü kişilerin haklarını ihlal eden içerikler bildirim yapılmaksızın yayından kaldırılabilir.
+
+6. CAYMA HAKKI VE İADE
+[Elektronik ortamda anında ifa edilen hizmetlere ilişkin koşullarınızı yazın.]
+
+7. KİŞİSEL VERİLER
+Ödeme ve fatura için gereken bilgiler (ad, e-posta, telefon, adres) yalnızca bu amaçla işlenir. [KVKK aydınlatma metninizi ekleyin.]

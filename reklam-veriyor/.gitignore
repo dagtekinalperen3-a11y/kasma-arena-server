@@ -1,0 +1,5 @@
+veri/*
+!veri/.htaccess
+!veri/index.html
+__pycache__/
+*.pyc

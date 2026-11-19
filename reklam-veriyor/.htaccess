@@ -1,0 +1,37 @@
+# Reklam Veriyor — Apache / LiteSpeed ayarları
+Options -Indexes
+DirectoryIndex index.php
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Veritabanı, kod ve ayar dosyaları dışarıdan açılamaz
+  RewriteRule ^(veri|lib|tests)(/|$) - [F,L]
+  RewriteRule ^ayarlar\.php$ - [F,L]
+
+  # Var olan statik dosyalar (css, js, demo görselleri) doğrudan verilir
+  RewriteCond %{REQUEST_FILENAME} -f
+  RewriteRule ^static/ - [L]
+  RewriteRule ^index\.php$ - [L]
+
+  # Geri kalan her şey index.php'ye gider (pano, API, ödeme dönüşü...)
+  RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+<FilesMatch "\.(sqlite|sqlite3|db|log|md|py)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/css "access plus 1 hour"
+  ExpiresByType application/javascript "access plus 1 hour"
+  ExpiresByType image/svg+xml "access plus 7 days"
+</IfModule>

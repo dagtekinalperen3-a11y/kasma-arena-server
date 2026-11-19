@@ -1,0 +1,72 @@
+REKLAM VERİYOR — KURULUM (public_html)
+=======================================
+
+GEREKENLER
+- PHP 8.0 veya üstü. Açık olması gereken eklentiler: pdo_sqlite, gd (iyzico için curl)
+- Apache veya LiteSpeed (.htaccess desteği). cPanel / Plesk hostinglerin çoğu böyledir.
+- Site alan adının KÖK dizinine kurulmalı (public_html'in içine, alt klasöre değil).
+- SSL (https). Ödeme alacaksanız zorunludur.
+- MySQL GEREKMEZ: veritabanı SQLite dosyasıdır ve kendiliğinden oluşur.
+
+1) DOSYALARI YÜKLEYİN
+   Zip'in İÇİNDEKİLERİ public_html klasörüne çıkarın. index.php doğrudan
+   public_html içinde olmalı. Gizli ".htaccess" dosyası da gelmeli (dosya
+   yöneticisinde "gizli dosyaları göster" seçeneğini açın).
+
+2) AYARLARI YAZIN
+   public_html/ayarlar.php dosyasını düzenleyin:
+     'site_adresi'     => 'https://alanadiniz.com',
+     'yonetici_eposta' => 'siz@ornek.com',
+     'yonetici_sifre'  => 'en-az-8-karakterlik-sifre',
+
+3) YÖNETİM PANELİ
+   https://alanadiniz.com/yonetim adresine girip bu e-posta ve şifreyle giriş yapın.
+   - "Fiyat ve süre": piksel fiyatı (TL), yayın süresi (gün), rezervasyon süresi.
+   - "Yasal metin": [doldurun] yazan yerleri kendi şirket bilgilerinizle doldurun.
+   - "Demo": isterseniz panoyu dolduran örnek reklamları yükleyin.
+     Gerçek satışa başlamadan önce buradan kaldırın.
+
+4) DENEYİN
+   Ana sayfada "Reklam Ver" -> boş alanı sürükleyerek seçin -> "Devam et" ->
+   hesap oluşturun -> fatura bilgileri -> test ödemesini onaylayın ->
+   Reklamlarım'da görsel yükleyin, buton yazısını ve bağlantıyı girin -> "Yayınla".
+
+5) GERÇEK SATIŞA GEÇİŞ (iyzico)
+   - iyzico üye işyeri başvurusu yapın; API anahtarı ve gizli anahtar alın.
+   - ayarlar.php:
+       'odeme_saglayici'   => 'iyzico',
+       'iyzico_api_key'    => '...',
+       'iyzico_secret_key' => '...',
+       'iyzico_adres'      => 'https://api.iyzipay.com',
+     (Önce sandbox anahtarları ve 'https://sandbox-api.iyzipay.com' ile bir deneme yapın.)
+   - iyzico panelinde bildirim (webhook) adresi olarak şunu girin:
+       https://alanadiniz.com/odeme/iyzico/bildirim
+   - Test ödemesi açıkken herkes ücretsiz alan alabilir. Yönetim paneli bunu
+     sarı bir uyarıyla gösterir; iyzico'ya geçince uyarı kalkar.
+
+NASIL ÇALIŞIR
+- Pano 1200x750 sanal pikseldir, 15x15 bloklara bölünür (80x50 = 4000 blok).
+  Fiyat bu sanal piksellerle hesaplanır; ekran boyutu fiyatı değiştirmez.
+- Fiyatı tarayıcı değil sunucu hesaplar.
+- Ödeme sayfasına geçerken seçilen bloklar geçici olarak ayrılır (varsayılan 15 dk).
+  Ödeme tamamlanmazsa süre sonunda alan kendiliğinden serbest kalır.
+- Her blok veritabanında tek bir satırdır; aynı blok iki kişiye ayrılamaz.
+- Alan, ancak ödeme sağlayıcısı ödemeyi doğruladığında alıcının hesabına bağlanır.
+  Ödeme geç gelir ve alan o arada başkasına geçmişse ödeme otomatik iade edilmeye
+  çalışılır; olmazsa yönetim panelinde "İade gerekli" olarak görünür.
+- Gösterim ve tıklama sayıları yalnızca bilgi içindir; ücret sabittir.
+
+GÜVENLİK VE YEDEK
+- "veri" klasörü veritabanını, oturumları ve yüklenen görselleri tutar.
+  .htaccess ile dışarıya kapalıdır. Düzenli olarak bu klasörün yedeğini alın.
+- Daha güvenlisi: ayarlar.php'de 'veri_dizini' değerine public_html DIŞINDA bir
+  klasör yazın (örn. '/home/KULLANICIADI/reklam-veri') ve "veri" klasörünü taşıyın.
+- Nginx kullanan hostinglerde .htaccess çalışmaz. Bu durumda 'veri_dizini'
+  mutlaka public_html dışında olmalı ve tüm istekler index.php'ye yönlenmelidir.
+
+SORUN GİDERME
+- "Kurulum tamamlanmadı" sayfası: listelenen PHP eklentisini hosting panelinden
+  açın veya klasör izinlerini (755) düzeltin.
+- Ana sayfa dışındaki sayfalar 404 veriyor: .htaccess yüklenmemiş veya mod_rewrite kapalı.
+- Görsel yüklenmiyor: hostingde upload_max_filesize en az 6M olmalı.
+- Sunucu hataları veri/hata.log dosyasına yazılır.

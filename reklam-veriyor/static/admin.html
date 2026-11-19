@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e1015">
+<meta name="robots" content="noindex">
+<title>Yönetim · Reklam Veriyor</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ffc83d'/%3E%3Ctext x='16' y='21' font-family='Arial' font-weight='900' font-size='13' text-anchor='middle' fill='%231a1405'%3ERV%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/css/style.css?v=2">
+</head>
+<body class="page">
+<header class="topbar">
+  <a class="brand" href="/"><span class="brand-mark">RV</span><span>Reklam Veriyor</span></a>
+  <nav>
+    <a href="/">Pano</a>
+    <a href="/reklamlarim">Reklamlarım</a>
+    <a href="/yonetim" class="on">Yönetim</a>
+    <button class="btn small ghost" id="logout" type="button" hidden>Çıkış</button>
+  </nav>
+</header>
+
+<main class="container">
+  <div class="page-head">
+    <div>
+      <h1>Yönetim</h1>
+      <p>Fiyat, yayın süresi, siparişler ve panodaki reklamlar.</p>
+    </div>
+    <span id="pay-chip" class="chip"></span>
+  </div>
+
+  <section id="denied" class="card empty" hidden>
+    <h2>Bu sayfa site yöneticisi içindir</h2>
+    <p id="denied-msg">Yönetici hesabıyla giriş yapın. Yönetici e-postası ve şifresi <code>ayarlar.php</code> dosyasında tanımlanır.</p>
+    <button class="btn primary" id="login-btn" type="button">Giriş yap</button>
+  </section>
+
+  <div id="app" hidden>
+    <div id="alerts"></div>
+    <div class="kpis" id="kpis"></div>
+    <div class="admin-tabs" id="tabs" role="tablist"></div>
+    <div id="view"></div>
+  </div>
+</main>
+
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<script src="/static/js/common.js?v=2"></script>
+<script src="/static/js/admin.js?v=2"></script>
+</body>
+</html>
